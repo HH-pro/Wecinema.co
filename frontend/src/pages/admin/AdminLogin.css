@@ -1,0 +1,336 @@
+/* AdminLogin.css */
+
+/* Base Styles */
+.admin-login-container {
+  --neon-purple: #bc13fe;
+  --neon-cyan: #00f3ff;
+  --dark-bg: #0a0a14;
+  --cyber-gradient: linear-gradient(145deg, #1a1a2e 0%, #2d2a3a 100%);
+  --circuit-pattern: url("data:image/svg+xml,%3Csvg width='52' height='26' viewBox='0 0 52 26' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23bc13fe' fill-opacity='0.1'%3E%3Cpath d='M10 10c0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6h2c0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4v2c-3.314 0-6-2.686-6-6 0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6zm25.464-1.95l8.486 8.486-1.414 1.414-8.486-8.486 1.414-1.414z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--dark-bg);
+  background-image: var(--circuit-pattern);
+  position: relative;
+  overflow: hidden;
+  font-family: 'Source Code Pro', monospace;
+}
+
+/* Animated Background Elements */
+.admin-login-container::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 48%,
+    var(--neon-cyan) 50%,
+    transparent 52%
+  );
+  animation: gridFlow 20s linear infinite;
+  opacity: 0.05;
+}
+
+@keyframes gridFlow {
+  0% { transform: translate(0,0); }
+  100% { transform: translate(50%,50%); }
+}
+
+/* Login Box Styles */
+.login-box {
+  background: var(--cyber-gradient);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(188, 19, 254, 0.3);
+  border-radius: 1.5rem;
+  padding: 2.5rem;
+  width: 400px;
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 0 40px rgba(188, 19, 254, 0.2);
+  transform: translateY(0);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.login-box:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 0 60px rgba(188, 19, 254, 0.3);
+}
+
+/* AI Bot Styles */
+.ai-assistant {
+  position: fixed;
+  top: 2rem;
+  left: 2rem;
+  background: rgba(26, 26, 46, 0.9);
+  border: 1px solid var(--neon-purple);
+  border-radius: 1rem;
+  padding: 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  backdrop-filter: blur(10px);
+  animation: botEntrance 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes botEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ai-avatar {
+  width: 50px;
+  height: 50px;
+  background: linear-gradient(45deg, var(--neon-purple), var(--neon-cyan));
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  animation: pulseAvatar 2s infinite;
+}
+
+@keyframes pulseAvatar {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* Form Elements */
+.login-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.logo {
+  width: 80px;
+  height: 70px;
+  margin: 0 auto 1.5rem;
+  filter: drop-shadow(0 0 15px rgba(188, 19, 254, 0.4));
+  transition: transform 0.3s ease;
+}
+
+.logo:hover {
+  transform: rotate(15deg) scale(1.1);
+}
+
+.form-group {
+  margin-bottom: 1.8rem;
+}
+
+.form-label {
+  display: block;
+  color: var(--neon-cyan);
+  margin-bottom: 0.8rem;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 1rem;
+  background: rgba(10, 10, 20, 0.5);
+  border: 1px solid rgba(188, 19, 254, 0.3);
+  border-radius: 0.8rem;
+  color: white;
+  font-family: 'Source Code Pro', monospace;
+  transition: all 0.3s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+}
+
+/* Button Styles */
+.auth-button {
+  width: 100%;
+  padding: 1rem;
+  margin-bottom: 10px;
+  background: linear-gradient(135deg, var(--neon-purple), var(--neon-cyan));
+  border: none;
+  border-radius: 0.8rem;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.auth-button::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 48%,
+    rgba(255,255,255,0.1) 50%,
+    transparent 52%
+  );
+  animation: buttonShine 3s linear infinite;
+}
+
+@keyframes buttonShine {
+  from { transform: translate(-50%, -50%) rotate(45deg); }
+  to { transform: translate(50%, 50%) rotate(45deg); }
+}
+
+/* Error and Loading States */
+.error-message {
+  background: rgba(231, 76, 60, 0.1);
+  border: 1px solid rgba(231, 76, 60, 0.3);
+  color: #e74c3c;
+  padding: 1rem;
+  border-radius: 0.8rem;
+  margin-bottom: 1.5rem;
+  animation: errorShake 0.4s cubic-bezier(.36,.07,.19,.97);
+}
+
+@keyframes errorShake {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(4px); }
+  30%, 50%, 70% { transform: translateX(-8px); }
+  40%, 60% { transform: translateX(8px); }
+}
+
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(255,255,255,0.3);
+  border-top-color: var(--neon-cyan);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+  .login-box {
+    width: 90%;
+    padding: 1.5rem;
+  }
+  
+  .ai-assistant {
+    top: 1rem;
+    left: 1rem;
+    padding: 1rem;
+  }
+}
+
+/* Add these new animations */
+@keyframes doorLeft {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+  }
+  
+  @keyframes doorRight {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(100%); }
+  }
+  
+  @keyframes fadeInUp {
+    0% { 
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    100% { 
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Door animation container */
+  .door-animation {
+    position: relative;
+    overflow: hidden;
+    width: 400px;
+    height: 500px;
+  }
+  
+  .door {
+    position: absolute;
+    top: 0;
+    width: 50%;
+    height: 100%;
+    background: var(--dark-bg);
+    z-index: 3;
+    animation-duration: 1.5s;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    animation-fill-mode: forwards;
+  }
+  
+  .door-left {
+    left: 0;
+    animation-name: doorLeft;
+    border-right: 2px solid var(--neon-purple);
+  }
+  
+  .door-right {
+    right: 0;
+    animation-name: doorRight;
+    border-left: 2px solid var(--neon-purple);
+  }
+  
+  /* Updated login box styles */
+  .login-box {
+    animation: fadeInUp 1s ease-out 1.5s forwards;
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  
+  /* Add this to your AdminLogin component JSX */
+ /* Door animation styles */
+.door-animation {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+    height: 565px;
+    overflow: hidden;
+  }
+  
+  .door {
+    position: absolute;
+    top: 0;
+    width: 50%;
+    height: 100%;
+    background: var(--dark-bg);
+    z-index: 2;
+    border: 2px solid var(--neon-purple);
+    box-shadow: 0 0 30px rgba(188, 19, 254, 0.4);
+  }
+  
+  .door-left {
+    left: 0;
+    border-right: none;
+  }
+  
+  .door-right {
+    right: 0;
+    border-left: none;
+  }
+  
+  .login-box {
+    position: relative;
+    z-index: 1;
+    opacity: 0; /* Initial state for animation */
+  }
