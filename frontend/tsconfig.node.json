@@ -3,18 +3,9 @@
     "composite": true,
     "skipLibCheck": true,
     "module": "ESNext",
+    
     "moduleResolution": "node",
-    "allowSyntheticDefaultImports": true,
-
-    // 👇 ADD THESE
-    "noEmit": false,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "jsx": "react-jsx",                // Required for React JSX (if not set globally)
-    "strict": false                    // Optional: disables strict type checks
+    "allowSyntheticDefaultImports": true
   },
-  "include": [
-    "src",            // 👈 Include your app files
-    "vite.config.ts"
-  ]
+  "include": ["vite.config.ts"]
 }
