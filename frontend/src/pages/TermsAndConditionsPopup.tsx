@@ -13,7 +13,7 @@ const TermsAndConditionsPopup: React.FC<TermsAndConditionsPopupProps> = ({
 }) => {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 px-4 py-6 sm:px-6 animate-fade-in">
-      <div className="bg-white/90 backdrop-blur-md border border-gray-200 rounded-t-2xl shadow-lg max-w-4xl mx-auto px-6 py-4 sm:py-6 flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-8">
+      <div className="bg-white/900 backdrop-blur-md border border-gray-200 rounded-t-2xl shadow-lg max-w-4xl mx-auto px-6 py-4 sm:py-6 flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-8">
         <div className="text-center sm:text-left">
           <h2 className="text-lg font-semibold text-gray-800">Terms & Conditions</h2>
           <p className="text-sm text-gray-600 mt-1">
