@@ -2,14 +2,15 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
+  base: './', // ✅ Set base path for CPanel or relative hosting
   plugins: [react()],
   optimizeDeps: {
-    exclude: ["@ffmpeg/ffmpeg"], // Exclude FFmpeg from dependency optimization
+    exclude: ["@ffmpeg/ffmpeg"],
   },
   build: {
     commonjsOptions: {
-      transformMixedEsModules: true, // Fix for commonjs compatibility
-      sourcemap: true // Required for Sentry source maps
+      transformMixedEsModules: true,
     },
+    sourcemap: true,
   },
 });
