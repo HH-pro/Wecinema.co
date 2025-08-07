@@ -98,18 +98,22 @@ const Popup: React.FC<IPopupProps> = React.memo(
 			setDecodedToken(decoded);
 			
 			// Check if user has paid
-			const checkUserPaymentStatus = async () => {
-				if (decoded.userId) {
-					try {
-						const response = await axios.get(`https://wecinema.co/api/user/payment-status/${decoded.userId}`);
-						setHasPaid(response.data.hasPaid);
-					} catch (error) {
-						console.error("Error checking payment status:", error);
-					}
-				}
-			};
-			
-			checkUserPaymentStatus();
+const checkUserPaymentStatus = async () => {
+	if (!decoded || !decoded.userId) {
+		// User is not logged in, skip payment check
+		return;
+	}
+
+	try {
+		const response = await axios.get(`https://wecinema.co/api/user/payment-status/${decoded.userId}`);
+		setHasPaid(response.data.hasPaid);
+	} catch (error) {
+		console.error("Error checking payment status:", error);
+	}
+};
+
+checkUserPaymentStatus();
+
 			
 			// Clean-up function
 			return () => {
