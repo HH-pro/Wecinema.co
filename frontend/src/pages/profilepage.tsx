@@ -12,7 +12,7 @@ import avatar from '.././assets/public/avatar.jpg';
 import '../App.css'; // Import the CSS file for additional styling
 
 import { FaEllipsisV } from "react-icons/fa"; // Three dots icon
-let token = localStorage.getItem("token") || null;
+const token = localStorage.getItem("token") || null;
 
 const GenrePage: React.FC = () => {
     const { id } = useParams();
@@ -28,7 +28,7 @@ const GenrePage: React.FC = () => {
     const nav = useNavigate();
     const [scripts, setScripts] = useState<any>([]);
     useEffect(() => {
-        let isMounted = true;
+        const isMounted = true;
 
         if (!id) {
             toast.error("Please login first");

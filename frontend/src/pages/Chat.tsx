@@ -81,7 +81,7 @@ const Chat = () => {
 
   const createOrder = async () => {
     try {
-      let formErrors: FormErrors = {};
+      const formErrors: FormErrors = {};
       if (!newOrder.description) {
         formErrors.description = "Description is required";
       }

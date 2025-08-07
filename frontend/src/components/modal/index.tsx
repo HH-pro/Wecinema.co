@@ -230,7 +230,7 @@ checkUserPaymentStatus();
 							formData
 						)
 						.then(async (res: any) => {
-							let payload = {
+							const payload = {
 								title,
 								description,
 								genre: selectedItems.map((category: any) => category.value),
@@ -258,7 +258,7 @@ checkUserPaymentStatus();
 			if (decodedToken?.userId) {
 				try {
 					setLoading(true);
-					let payload = {
+					const payload = {
 						title,
 						script: description,
 						genre: selectedItems.map((category: any) => category.value),

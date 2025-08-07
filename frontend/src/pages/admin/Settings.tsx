@@ -13,7 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { motion } from "framer-motion";
 
-let token = localStorage.getItem("token") || null;
+const token = localStorage.getItem("token") || null;
 
 interface User {
   _id: string;

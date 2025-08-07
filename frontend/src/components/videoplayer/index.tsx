@@ -267,7 +267,7 @@ if (tokenData?.userId) {
       }
       try {
         setLoading(true);
-        let payload = {
+        const payload = {
           userId: tokenData?.userId,
           text: comment,
         };
@@ -297,7 +297,7 @@ if (tokenData?.userId) {
       }
       try {
         setLoading(true);
-        let payload = {
+        const payload = {
           userId: tokenData?.userId,
           text: reply,
         };
@@ -322,7 +322,7 @@ if (tokenData?.userId) {
     try {
       setLoading(true);
       const action = isBookmarked ? "removeBookmark" : "addBookmark";
-      let payload = {
+      const payload = {
         action,
         userId: tokenData?.userId,
       };
