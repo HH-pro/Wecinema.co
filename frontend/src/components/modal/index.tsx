@@ -479,112 +479,124 @@ checkUserPaymentStatus();
 			);
 		}
 		if (type === "login") {
-			return (
-				<div
-					style={{ background }}
-					className={`fixed sm:top-0 z-50 left-0 sm:h-screen w-full flex justify-center items-center ${
-						isShow && show ? "visible" : "invisible"
-					} ${className}`}
-				>
-					<div
-						className={`fixed top-0 left-0 h-full w-full  ${
-							background ?? "bg-black "
-						} bg-opacity-90 backdrop-filter backdrop-blur-15 flex items-center justify-center transition-opacity ease-in-out duration-300`}
-					>
-						<div
-							className={`sm:w-3/6 modal min-h-2/6 w-5/6 bg-white rounded-md p-6
-              transition-transform transform translate-y-0 ease-in-out relative cursor-pointer shadow-md
-              }`}
-						>
-							<header className="flex  gap-4 justify-between items-center">
-								<h2>Sign in to Wecinema</h2>
-								<FaTimes
-									onClick={() => {
-										setShow(false);
-									}}
-								/>
-							</header>
-							<motion.div
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="max-w-md mx-auto mt-10 p-8 bg-white shadow-2xl rounded-2xl border border-gray-200"
+  return (
+    <div
+      style={{ background }}
+      className={`fixed sm:top-0 z-50 left-0 sm:h-screen w-full flex justify-center items-center ${
+        isShow && show ? "visible" : "invisible"
+      } ${className}`}
     >
-      <h2 className="text-2xl font-bold text-center text-gray-700 mb-6">
-        Welcome Back 👋
-      </h2>
-
-      <form onSubmit={handleLoginSubmit} className="space-y-5">
-        <motion.div whileHover={{ scale: 1.02 }}>
-          <label className="block text-gray-600 font-medium">Email</label>
-          <input
-									className="rounded-md px-4 py-2 w-full mt-3 border outline-none"
-									placeholder="email"
-									type="email"
-									value={email}
-									onChange={(e: any) => {
-										e.preventDefault();
-										setEmail(e.target.value);
-									}}
-								/>
-        </motion.div>
-
-        <motion.div whileHover={{ scale: 1.02 }}>
-          <label className="block text-gray-600 font-medium">Password</label>
-		  						<input
-									className="rounded-md px-4 py-2 w-full mt-3 border outline-none"
-									placeholder="**************** "
-									type="password"
-									value={password}
-									onChange={(e: any) => {
-										e.preventDefault();
-										setPassword(e.target.value);
-									}}
-								/>
-        </motion.div>
-
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          disabled={loading}
-          className={`w-full mt-4 py-3 rounded-lg text-white font-semibold text-lg transition-all duration-300 flex items-center justify-center gap-2 ${
-            loading
-              ? "bg-blue-300 cursor-not-allowed"
-              : "bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg"
-          }`}
+      {/* Glass Blur Overlay */}
+      <div
+        className={`fixed top-0 left-0 h-full w-full ${
+          background ?? "bg-black"
+        } bg-opacity-50 backdrop-blur-md flex items-center justify-center transition-opacity ease-in-out duration-300`}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9, y: -20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.9, y: 20 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className="sm:w-3/6 w-5/6 bg-white/80 rounded-2xl shadow-2xl border border-white/20 p-6 relative"
         >
-          {loading ? (
-            <>
-              <span className="animate-spin border-2 border-t-transparent border-white rounded-full w-5 h-5"></span>
-              Signing in...
-            </>
-          ) : (
-            "Sign in"
-          )}
-        </motion.button>
-
-        <div className="flex flex-col sm:flex-row justify-between items-center mt-3">
-          <a
-            href="#"
-            className="text-sm text-gray-500 hover:text-blue-500 transition-all duration-300"
+          {/* Close Button */}
+          <button
+            onClick={() => setShow(false)}
+            className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition"
           >
-            Forgot password?
-          </a>
-          <a
-            href="/hypemode"
-            className="text-sm text-gray-500 hover:text-blue-500 transition-all duration-300"
-          >
-            Hypemode?
-          </a>
-        </div>
+            <FaTimes size={20} />
+          </button>
 
-        <hr className="mt-6 border-gray-300" />
-      </form>
-    </motion.div>
-						</div>
-					</div>
-				</div>
-			);
-		}
+          {/* Heading */}
+          <h2 className="text-3xl font-extrabold text-center text-gray-800 mb-2">
+            Welcome Back 👋
+          </h2>
+          <p className="text-center text-gray-500 mb-6">
+            Sign in to continue to <span className="font-semibold">Wecinema</span>
+          </p>
+
+          {/* Form */}
+          <form onSubmit={handleLoginSubmit} className="space-y-5">
+            {/* Email */}
+            <motion.div whileHover={{ scale: 1.02 }}>
+              <label className="block text-gray-600 font-medium mb-1">
+                Email Address
+              </label>
+              <div className="relative">
+                <input
+                  className="rounded-lg pl-10 pr-4 py-3 w-full border border-gray-300 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-300 transition"
+                  placeholder="Enter your email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+                <span className="absolute left-3 top-3 text-gray-400">
+                  📧
+                </span>
+              </div>
+            </motion.div>
+
+            {/* Password */}
+            <motion.div whileHover={{ scale: 1.02 }}>
+              <label className="block text-gray-600 font-medium mb-1">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  className="rounded-lg pl-10 pr-4 py-3 w-full border border-gray-300 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-300 transition"
+                  placeholder="••••••••"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <span className="absolute left-3 top-3 text-gray-400">
+                  🔒
+                </span>
+              </div>
+            </motion.div>
+
+            {/* Submit Button */}
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              disabled={loading}
+              className={`w-full py-3 rounded-lg text-white font-semibold text-lg transition-all duration-300 flex items-center justify-center gap-2 ${
+                loading
+                  ? "bg-gradient-to-r from-blue-300 to-indigo-300 cursor-not-allowed"
+                  : "bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-lg hover:shadow-xl"
+              }`}
+            >
+              {loading ? (
+                <>
+                  <span className="animate-spin border-2 border-t-transparent border-white rounded-full w-5 h-5"></span>
+                  Signing in...
+                </>
+              ) : (
+                "Sign in"
+              )}
+            </motion.button>
+
+            {/* Links */}
+            <div className="flex flex-col sm:flex-row justify-between items-center text-sm mt-4">
+              <a
+                href="#"
+                className="text-gray-500 hover:text-blue-500 transition"
+              >
+                Forgot password?
+              </a>
+              <a
+                href="/hypemode"
+                className="text-gray-500 hover:text-blue-500 transition"
+              >
+                Hypemode?
+              </a>
+            </div>
+          </form>
+        </motion.div>
+      </div>
+    </div>
+  );
+}
+
 		if (type === "video") {
 			return (
 				<div
