@@ -478,105 +478,93 @@ checkUserPaymentStatus();
 				</div>
 			);
 		}
-		if (type === "login") {
+		import { motion } from "framer-motion";
+import { FaTimes } from "react-icons/fa";
+
+if (type === "login") {
   return (
     <div
       style={{ background }}
-      className={`fixed sm:top-0 z-50 left-0 sm:h-screen w-full flex justify-center items-center ${
+      className={`fixed inset-0 z-50 flex justify-center items-center ${
         isShow && show ? "visible" : "invisible"
       } ${className}`}
     >
-      {/* Glass Blur Overlay */}
-      <div
-        className={`fixed top-0 left-0 h-full w-full ${
-          background ?? "bg-black"
-        } bg-opacity-50 backdrop-blur-md flex items-center justify-center transition-opacity ease-in-out duration-300`}
+      {/* Backdrop Overlay */}
+      <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm transition-opacity ease-in-out duration-300" />
+
+      {/* Modal Container */}
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.4 }}
+        className="relative bg-white w-11/12 sm:w-2/5 rounded-xl shadow-2xl p-6 z-50"
       >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9, y: -20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9, y: 20 }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
-          className="sm:w-3/6 w-5/6 bg-white/80 rounded-2xl shadow-2xl border border-white/20 p-6 relative"
-        >
-          {/* Close Button */}
-          <button
-            onClick={() => setShow(false)}
-            className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition"
-          >
-            <FaTimes size={20} />
-          </button>
-
-          {/* Heading */}
-          <h2 className="text-3xl font-extrabold text-center text-gray-800 mb-2">
-            Welcome Back 👋
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+            Sign in to <span className="text-blue-600">Wecinema</span>
           </h2>
-          <p className="text-center text-gray-500 mb-6">
-            Sign in to continue to <span className="font-semibold">Wecinema</span>
-          </p>
+          <FaTimes
+            className="cursor-pointer text-gray-600 hover:text-red-500 transition duration-200"
+            size={20}
+            onClick={() => setShow(false)}
+          />
+        </div>
 
-          {/* Form */}
+        {/* Body */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="space-y-6"
+        >
+          <h3 className="text-lg font-semibold text-center text-gray-600">
+            Welcome Back 👋
+          </h3>
+
           <form onSubmit={handleLoginSubmit} className="space-y-5">
-            {/* Email */}
-            <motion.div whileHover={{ scale: 1.02 }}>
-              <label className="block text-gray-600 font-medium mb-1">
-                Email Address
-              </label>
-              <div className="relative">
-                <input
-                  className="rounded-lg pl-10 pr-4 py-3 w-full border border-gray-300 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-300 transition"
-                  placeholder="Enter your email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-                <span className="absolute left-3 top-3 text-gray-400">
-                  📧
-                </span>
-              </div>
-            </motion.div>
+            <div>
+              <label className="block text-gray-600 mb-1 font-medium">Email</label>
+              <input
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition"
+              />
+            </div>
 
-            {/* Password */}
-            <motion.div whileHover={{ scale: 1.02 }}>
-              <label className="block text-gray-600 font-medium mb-1">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  className="rounded-lg pl-10 pr-4 py-3 w-full border border-gray-300 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-300 transition"
-                  placeholder="••••••••"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-                <span className="absolute left-3 top-3 text-gray-400">
-                  🔒
-                </span>
-              </div>
-            </motion.div>
+            <div>
+              <label className="block text-gray-600 mb-1 font-medium">Password</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition"
+              />
+            </div>
 
-            {/* Submit Button */}
             <motion.button
               whileTap={{ scale: 0.97 }}
               disabled={loading}
-              className={`w-full py-3 rounded-lg text-white font-semibold text-lg transition-all duration-300 flex items-center justify-center gap-2 ${
+              className={`w-full py-3 rounded-lg font-semibold text-white text-lg transition-all duration-300 ${
                 loading
-                  ? "bg-gradient-to-r from-blue-300 to-indigo-300 cursor-not-allowed"
-                  : "bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-lg hover:shadow-xl"
+                  ? "bg-blue-300 cursor-not-allowed"
+                  : "bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg"
               }`}
             >
               {loading ? (
-                <>
+                <div className="flex items-center justify-center gap-2">
                   <span className="animate-spin border-2 border-t-transparent border-white rounded-full w-5 h-5"></span>
                   Signing in...
-                </>
+                </div>
               ) : (
                 "Sign in"
               )}
             </motion.button>
 
-            {/* Links */}
-            <div className="flex flex-col sm:flex-row justify-between items-center text-sm mt-4">
+            <div className="flex flex-col sm:flex-row justify-between items-center mt-4 gap-2 text-sm">
               <a
                 href="#"
                 className="text-gray-500 hover:text-blue-500 transition"
@@ -590,9 +578,11 @@ checkUserPaymentStatus();
                 Hypemode?
               </a>
             </div>
+
+            <hr className="mt-6 border-gray-300" />
           </form>
         </motion.div>
-      </div>
+      </motion.div>
     </div>
   );
 }
