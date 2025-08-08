@@ -777,8 +777,65 @@ checkUserPaymentStatus();
         />
       </div>
 
-      
-	
+      {/* Form */}
+      <form onSubmit={handleRegisterSubmit} className="space-y-5">
+        <input
+          className="rounded-lg px-4 py-3 w-full border border-gray-300 focus:ring-4 focus:ring-blue-300 focus:border-blue-500 outline-none transition-all duration-300"
+          placeholder="Username"
+          type="text"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          required
+        />
+        <input
+          className="rounded-lg px-4 py-3 w-full border border-gray-300 focus:ring-4 focus:ring-blue-300 focus:border-blue-500 outline-none transition-all duration-300"
+          placeholder="Email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <input
+          className="rounded-lg px-4 py-3 w-full border border-gray-300 focus:ring-4 focus:ring-blue-300 focus:border-blue-500 outline-none transition-all duration-300"
+          placeholder="Password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        <input
+          className="rounded-lg px-4 py-3 w-full border border-gray-300 focus:ring-4 focus:ring-blue-300 focus:border-blue-500 outline-none transition-all duration-300"
+          type="date"
+          value={dob}
+          onChange={(e) => setDob(e.target.value)}
+          required
+        />
+        <button
+          disabled={loading}
+          className={`w-full mt-4 py-3 rounded-lg text-white font-semibold text-lg transition-all duration-300 ${
+            loading ? "bg-blue-300 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+          }`}
+        >
+          {loading ? "Signing up..." : "Sign up"}
+        </button>
+
+        <div className="flex flex-col sm:flex-row justify-between items-center mt-3">
+          <a href="#" className="text-sm text-gray-500 hover:text-blue-500">
+            Already have an account?
+          </a>
+          <a href="/hypemode" className="text-sm text-gray-500 hover:text-blue-500">
+            Hypemode?
+          </a>
+        </div>
+      </form>
+	  {successModal && (
+  <div className="fixed top-0 left-0 w-full h-full flex justify-center items-center bg-black bg-opacity-50 z-50">
+    <div className="bg-white p-6 rounded shadow-lg text-center">
+      <h2 className="text-green-600 text-xl font-semibold">✅ Registration Successful!</h2>
+      <p className="mt-2">A verification email has been sent to <strong>{email}</strong>.</p>
+    </div>
+  </div>
+)}
 
 {errorModal && (
   <div className="fixed top-0 left-0 w-full h-full flex justify-center items-center bg-black bg-opacity-50 z-50">
