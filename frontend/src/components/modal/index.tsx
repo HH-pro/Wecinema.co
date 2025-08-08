@@ -7,7 +7,6 @@ import { Itoken, decodeToken } from "../../utilities/helperfFunction";
 import moment from "moment";
 import axios from "axios";
 import '../header/drowpdown.css';
-import { Gallery, Layout, Render } from ".."; // Replace with actual imports
 
 import { motion } from "framer-motion"; // Animation library
 import emailjs from "emailjs-com";
@@ -744,7 +743,7 @@ checkUserPaymentStatus();
 	
 		if (type === "register") {
 			return (
-				<Layout expand={expand} setExpand={setExpand}></Layout>
+				
 				<div
 					style={{ background }}
 					className={`fixed sm:top-0 z-50 left-0 sm:h-screen w-full flex justify-center items-center ${
@@ -845,15 +844,12 @@ checkUserPaymentStatus();
       <p className="mt-2">Please try again later.</p>
     </div>
   </div>
-
 )}
 
     </motion.div>
 						</div>
 					</div>
 				</div>
-    </Layout>
-
 			);
 		}
 		if (type === "logout") {
