@@ -494,7 +494,7 @@ if (type === "login") {
 
       {/* Modal Container */}
       <motion.div
-        initial={{ opacity: 2, scale: 2.95 }}
+        initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.4 }}
         className="relative z-50 w-[90%] max-w-md sm:w-2/5 bg-white/30 border border-white/40 backdrop-blur-xl rounded-2xl shadow-[0_10px_40px_rgba(255,204,0,0.3)] p-8"
