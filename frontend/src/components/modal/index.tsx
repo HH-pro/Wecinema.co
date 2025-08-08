@@ -741,117 +741,118 @@ if (type === "login") {
 			);
 		} 
 	
-		if (type === "register") {
-			return (
-				
-				<div
-					style={{ background }}
-					className={`fixed sm:top-0 z-50 left-0 sm:h-screen w-full flex justify-center items-center ${
-						isShow && show ? "visible" : "invisible"
-					} ${className}`}
-				>
-					<div
-						className={`fixed top-0 left-0 h-full w-full  ${
-							background ?? "bg-black "
-						} bg-opacity-90 backdrop-filter backdrop-blur-15 flex items-center justify-center transition-opacity ease-in-out duration-300`}
-					>
-						<div
-							className={`sm:w-2/6 modal min-h-2/6 w-5/6 bg-white rounded-md p-6
-              transition-transform transform translate-y-0 ease-in-out relative cursor-pointer shadow-md
-              }`}
-						>
-						
-						<motion.div
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }} // Instant close effect
-      transition={{ duration: 0.5 }}
-      className="max-w-md mx-auto mt-10 p-8 bg-white shadow-2xl rounded-2xl border border-gray-200"
+	if (type === "register") {
+  return (
+    <div
+      className={`fixed inset-0 z-50 flex justify-center items-center ${
+        isShow && show ? "visible" : "invisible"
+      } ${className}`}
     >
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-700">Sign up to Wecinema</h2>
-        <FaTimes
-          className="text-gray-500 cursor-pointer hover:text-red-500 transition-all duration-100"
-          onClick={() => setShow(false)} // Close instantly
-        />
-      </div>
+      {/* Background Gradient */}
+      <div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-50 to-yellow-200 opacity-80 backdrop-blur-sm transition-all duration-300" />
 
-      {/* Form */}
-      <form onSubmit={handleRegisterSubmit} className="space-y-5">
-        <input
-          className="rounded-lg px-4 py-3 w-full border border-gray-300 focus:ring-4 focus:ring-blue-300 focus:border-blue-500 outline-none transition-all duration-300"
-          placeholder="Username"
-          type="text"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          required
-        />
-        <input
-          className="rounded-lg px-4 py-3 w-full border border-gray-300 focus:ring-4 focus:ring-blue-300 focus:border-blue-500 outline-none transition-all duration-300"
-          placeholder="Email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <input
-          className="rounded-lg px-4 py-3 w-full border border-gray-300 focus:ring-4 focus:ring-blue-300 focus:border-blue-500 outline-none transition-all duration-300"
-          placeholder="Password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-        <input
-          className="rounded-lg px-4 py-3 w-full border border-gray-300 focus:ring-4 focus:ring-blue-300 focus:border-blue-500 outline-none transition-all duration-300"
-          type="date"
-          value={dob}
-          onChange={(e) => setDob(e.target.value)}
-          required
-        />
-        <button
-          disabled={loading}
-          className={`w-full mt-4 py-3 rounded-lg text-white font-semibold text-lg transition-all duration-300 ${
-            loading ? "bg-blue-300 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-          }`}
-        >
-          {loading ? "Signing up..." : "Sign up"}
-        </button>
-
-        <div className="flex flex-col sm:flex-row justify-between items-center mt-3">
-          <a href="#" className="text-sm text-gray-500 hover:text-blue-500">
-            Already have an account?
-          </a>
-          <a href="/hypemode" className="text-sm text-gray-500 hover:text-blue-500">
-            Hypemode?
-          </a>
+      {/* Modal Container */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.4 }}
+        className="relative z-50 w-[90%] max-w-md sm:w-2/5 bg-white/80 border border-yellow-300 backdrop-blur-xl rounded-2xl shadow-2xl p-8"
+      >
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-800">
+            Sign up to <span className="text-yellow-500">Wecinema</span>
+          </h2>
+          <FaTimes
+            size={18}
+            onClick={() => setShow(false)}
+            className="cursor-pointer text-gray-600 hover:text-red-500 transition duration-200"
+          />
         </div>
-      </form>
-	  {successModal && (
-  <div className="fixed top-0 left-0 w-full h-full flex justify-center items-center bg-black bg-opacity-50 z-50">
-    <div className="bg-white p-6 rounded shadow-lg text-center">
-      <h2 className="text-green-600 text-xl font-semibold">✅ Registration Successful!</h2>
-      <p className="mt-2">A verification email has been sent to <strong>{email}</strong>.</p>
-    </div>
-  </div>
-)}
 
-{errorModal && (
-  <div className="fixed top-0 left-0 w-full h-full flex justify-center items-center bg-black bg-opacity-50 z-50">
-    <div className="bg-white p-6 rounded shadow-lg text-center">
-      <h2 className="text-red-600 text-xl font-semibold">❌ Something went wrong!</h2>
-      <p className="mt-2">Please try again later.</p>
-    </div>
-  </div>
-)}
+        {/* Form */}
+        <form onSubmit={handleRegisterSubmit} className="space-y-5">
+          <input
+            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition placeholder:text-gray-500"
+            placeholder="Username"
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+          />
+          <input
+            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition placeholder:text-gray-500"
+            placeholder="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <input
+            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition placeholder:text-gray-500"
+            placeholder="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          <input
+            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition"
+            type="date"
+            value={dob}
+            onChange={(e) => setDob(e.target.value)}
+            required
+          />
 
-    </motion.div>
-						</div>
-					</div>
-				</div>
-			);
-		}
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            disabled={loading}
+            className={`w-full py-3 mt-2 rounded-lg font-semibold text-white transition-all duration-300 text-lg shadow-md ${
+              loading
+                ? "bg-yellow-300 cursor-not-allowed"
+                : "bg-gradient-to-r from-yellow-500 to-yellow-400 hover:from-yellow-600 hover:to-yellow-500"
+            }`}
+          >
+            {loading ? "Signing up..." : "Sign up"}
+          </motion.button>
+
+          <div className="flex flex-col sm:flex-row justify-between items-center mt-3 text-sm text-gray-600">
+            <a href="#" className="hover:text-yellow-500 transition">
+              Already have an account?
+            </a>
+            <a href="/hypemode" className="hover:text-yellow-500 transition">
+              Hypemode?
+            </a>
+          </div>
+        </form>
+
+        {/* Success Modal */}
+        {successModal && (
+          <div className="fixed top-0 left-0 w-full h-full flex justify-center items-center bg-black bg-opacity-50 z-50">
+            <div className="bg-white p-6 rounded shadow-lg text-center">
+              <h2 className="text-green-600 text-xl font-semibold">✅ Registration Successful!</h2>
+              <p className="mt-2">
+                A verification email has been sent to <strong>{email}</strong>.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Error Modal */}
+        {errorModal && (
+          <div className="fixed top-0 left-0 w-full h-full flex justify-center items-center bg-black bg-opacity-50 z-50">
+            <div className="bg-white p-6 rounded shadow-lg text-center">
+              <h2 className="text-red-600 text-xl font-semibold">❌ Something went wrong!</h2>
+              <p className="mt-2">Please try again later.</p>
+            </div>
+          </div>
+        )}
+      </motion.div>
+    </div>
+  );
+}
+
 		if (type === "logout") {
 			return (
 				<div
