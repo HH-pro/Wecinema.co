@@ -490,16 +490,15 @@ if (type === "login") {
       } ${className}`}
     >
       {/* Background Gradient */}
-      <div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-10 to-yellow-200 opacity-70 backdrop-blur-md transition-all duration-300" />
+      <div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-100 to-yellow-300 opacity-90 backdrop-blur-md transition-all duration-300" />
 
       {/* Modal Container */}
       <motion.div
-  initial={{ opacity: 0, scale: 0.95 }}
-  animate={{ opacity: 1, scale: 1 }}
-  transition={{ duration: 0.4 }}
-  className="relative z-50 w-[90%] max-w-md sm:w-2/5 bg-white border border-white-300 rounded-2xl shadow-2xl p-8"
->
-
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4 }}
+        className="relative z-50 w-[90%] max-w-md sm:w-2/5 bg-white/30 border border-white/40 backdrop-blur-xl rounded-2xl shadow-[0_10px_40px_rgba(255,204,0,0.3)] p-8"
+      >
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-gray-800">Sign in to <span className="text-yellow-500">Wecinema</span></h2>
