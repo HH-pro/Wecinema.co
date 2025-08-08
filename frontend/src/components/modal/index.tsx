@@ -490,7 +490,7 @@ if (type === "login") {
       } ${className}`}
     >
       {/* Background Gradient */}
-      <div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-10 to-yellow-200 opacity-90 backdrop-blur-md transition-all duration-300" />
+      <div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-10 to-yellow-200 opacity-50 backdrop-blur-md transition-all duration-300" />
 
       {/* Modal Container */}
       <motion.div
