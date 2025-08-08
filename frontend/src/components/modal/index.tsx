@@ -478,8 +478,6 @@ checkUserPaymentStatus();
 				</div>
 			);
 		}
-		import { motion } from "framer-motion";
-import { FaTimes } from "react-icons/fa";
 
 if (type === "login") {
   return (
