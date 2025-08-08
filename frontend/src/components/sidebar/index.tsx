@@ -216,7 +216,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <div
                 className={`sidebar-item ${getActiveClass("/signup")} ${
-                  expand ? "" : ""
+                  expand ? "" : "collapsed"
                 }`}
                 onClick={toggleSignupModal}
               >
