@@ -12,7 +12,7 @@ import { motion } from "framer-motion"; // Animation library
 import emailjs from "emailjs-com";
 import toast from "react-hot-toast";
 import { X } from "lucide-react"; // Or use any icon you want
-
+import { FaEnvelope, FaLock } from "react-icons/fa6";
 interface IPopupProps {
 	type: string | undefined;
 	show?: boolean;
@@ -478,78 +478,82 @@ checkUserPaymentStatus();
 				</div>
 			);
 		}
+	
 
 if (type === "login") {
   return (
     <div
-      style={{ background }}
       className={`fixed inset-0 z-50 flex justify-center items-center ${
         isShow && show ? "visible" : "invisible"
       } ${className}`}
     >
-      {/* Backdrop Overlay */}
-      <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm transition-opacity ease-in-out duration-300" />
+      {/* Background Overlay */}
+      <div className="fixed inset-0 bg-gradient-to-br from-blue-800 via-black to-purple-800 opacity-80 backdrop-blur-lg transition-all duration-300" />
 
       {/* Modal Container */}
       <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.4 }}
-        className="relative bg-white w-11/12 sm:w-2/5 rounded-xl shadow-2xl p-6 z-50"
+        className="relative z-50 w-[90%] max-w-md sm:w-2/5 bg-white bg-opacity-10 border border-white/20 backdrop-blur-2xl rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.25)] p-8"
       >
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
-            Sign in to <span className="text-blue-600">Wecinema</span>
-          </h2>
+          <h2 className="text-2xl font-bold text-white">Sign in to <span className="text-blue-400">Wecinema</span></h2>
           <FaTimes
-            className="cursor-pointer text-gray-600 hover:text-red-500 transition duration-200"
-            size={20}
+            size={18}
             onClick={() => setShow(false)}
+            className="cursor-pointer text-white hover:text-red-500 transition duration-200"
           />
         </div>
 
-        {/* Body */}
+        {/* Form Body */}
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="space-y-6"
+          transition={{ delay: 0.2 }}
         >
-          <h3 className="text-lg font-semibold text-center text-gray-600">
-            Welcome Back 👋
-          </h3>
+          <h3 className="text-center text-white text-lg mb-6">Welcome Back 👋</h3>
 
           <form onSubmit={handleLoginSubmit} className="space-y-5">
-            <div>
-              <label className="block text-gray-600 mb-1 font-medium">Email</label>
-              <input
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition"
-              />
+            {/* Email */}
+            <div className="relative">
+              <label className="block text-white text-sm mb-1">Email</label>
+              <div className="relative">
+                <FaEnvelope className="absolute left-3 top-3.5 text-gray-300" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="w-full pl-10 pr-4 py-3 rounded-lg bg-white/20 text-white border border-white/30 focus:ring-2 focus:ring-blue-400 outline-none transition placeholder:text-white/60"
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-gray-600 mb-1 font-medium">Password</label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition"
-              />
+            {/* Password */}
+            <div className="relative">
+              <label className="block text-white text-sm mb-1">Password</label>
+              <div className="relative">
+                <FaLock className="absolute left-3 top-3.5 text-gray-300" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-4 py-3 rounded-lg bg-white/20 text-white border border-white/30 focus:ring-2 focus:ring-blue-400 outline-none transition placeholder:text-white/60"
+                />
+              </div>
             </div>
 
+            {/* Submit Button */}
             <motion.button
-              whileTap={{ scale: 0.97 }}
+              whileTap={{ scale: 0.98 }}
               disabled={loading}
-              className={`w-full py-3 rounded-lg font-semibold text-white text-lg transition-all duration-300 ${
+              className={`w-full py-3 mt-2 rounded-lg font-semibold text-white transition-all duration-300 text-lg shadow-md ${
                 loading
                   ? "bg-blue-300 cursor-not-allowed"
-                  : "bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg"
+                  : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
               }`}
             >
               {loading ? (
@@ -562,22 +566,15 @@ if (type === "login") {
               )}
             </motion.button>
 
-            <div className="flex flex-col sm:flex-row justify-between items-center mt-4 gap-2 text-sm">
-              <a
-                href="#"
-                className="text-gray-500 hover:text-blue-500 transition"
-              >
-                Forgot password?
-              </a>
-              <a
-                href="/hypemode"
-                className="text-gray-500 hover:text-blue-500 transition"
-              >
-                Hypemode?
-              </a>
+            {/* Links */}
+            <div className="flex justify-between items-center text-sm mt-4 text-white/80">
+              <a href="#" className="hover:text-blue-300 transition">Forgot password?</a>
+              <a href="/hypemode" className="hover:text-purple-300 transition">Hypemode?</a>
             </div>
 
-            <hr className="mt-6 border-gray-300" />
+            <div className="mt-6 text-center text-white text-sm opacity-70">
+              New here? <a href="/signup" className="text-blue-400 hover:underline">Create an account</a>
+            </div>
           </form>
         </motion.div>
       </motion.div>
