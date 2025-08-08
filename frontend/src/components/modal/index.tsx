@@ -763,7 +763,6 @@ if (type === "login") {
         isShow && show ? "visible" : "invisible"
       } ${className}`}
     >
-	{showTermsPopup && <TermsAndConditionsPopup onAccept={handleAcceptTerms} />}
 
       {/* Background Gradient */}
       <div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-50 to-yellow-200 opacity-80 backdrop-blur-sm transition-all duration-300" />
@@ -866,6 +865,8 @@ if (type === "login") {
           </div>
         )}
       </motion.div>
+	{showTermsPopup && <TermsAndConditionsPopup onAccept={handleAcceptTerms} />}
+
     </div>
   );
 }
