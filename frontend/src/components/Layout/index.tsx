@@ -5,7 +5,7 @@ import "react-toastify/dist/ReactToastify.css";
 import "quill/dist/quill.snow.css";
 import { Itoken, decodeToken } from "../../utilities/helperfFunction";
 import {
-  IoMdHome
+  IoMdHome,
 } from "react-icons/io";
 import {
   RiMovie2Line,
@@ -40,17 +40,14 @@ const Layout: React.FC<LayoutProps> = ({
   expand,
 }) => {
   const [screenWidth, setScreenWidth] = useState(window.innerWidth);
-  const [token] = useState<string | null>(localStorage.getItem("token") || null);
+  const [token, _] = useState<string | null>(localStorage.getItem("token") || null);
   const [decodedToken, setDecodedToken] = useState<Itoken | null>(null);
   const isDarkMode = localStorage.getItem("isDarkMode") ?? false;
   const [darkMode, setDarkMode] = useState<boolean>(!!isDarkMode);
   const [expanded, setExpanded] = useState<boolean>(false);
-
-  // Modal state
   const [modalShow, setModalShow] = useState(false);
-  const [modalType, setModalType] = useState<"" | "login" | "register" | "video" | "script" | "logout">("");
-
-  // Sidebar state
+  const [type, setType] = useState("");
+  const [show, setShow] = useState<boolean>(false);
   const [viewPageSidebarVisible, setViewPageSidebarVisible] = useState<boolean>(!hideSidebar);
 
   useEffect(() => {
@@ -75,15 +72,14 @@ const Layout: React.FC<LayoutProps> = ({
     setDarkMode(true);
   };
 
-  const openModal = (type: typeof modalType) => {
-    setModalType(type);
-    setModalShow(true);
+  const handleType = (str: string) => {
+    setType(str);
+    setModalShow(!modalShow);
   };
 
-  const closeModal = () => {
-    setModalShow(false);
-    setModalType("");
-  };
+  useEffect(() => {
+    setShow(!!type);
+  }, [type, modalShow]);
 
   const isMobile = screenWidth <= 420;
   const isSidebarVisible = hideSidebar ? viewPageSidebarVisible : true;
@@ -91,15 +87,13 @@ const Layout: React.FC<LayoutProps> = ({
   return (
     <div className="text-lg md:text-sm sm:text-xs">
       <ToastContainer />
-
-      {/* Always visible header */}
       <Header
         expand={expanded}
         isMobile={isMobile}
         toggler={() => setExpanded(!expanded)}
         darkMode={darkMode}
-        toggleUploadModal={() => openModal("video")}
-        toggleUploadScriptModal={() => openModal("script")}
+        toggleUploadModal={() => handleType("video")}
+        toggleUploadScriptModal={() => handleType("script")}
         toggleSidebar={hideSidebar ? () => setViewPageSidebarVisible(prev => !prev) : undefined}
       />
 
@@ -107,9 +101,9 @@ const Layout: React.FC<LayoutProps> = ({
       {expanded && screenWidth <= 1120 && isSidebarVisible && (
         <div className="fixed top-0 left-0 z-40 h-full w-full bg-black bg-opacity-90 backdrop-blur-md transition-opacity ease-in-out duration-300">
           <section
-            className={`mt-16 fixed border-r border-gray-200 w-4/5 max-w-xs z-50 ${
-              darkMode ? "bg-dark text-dark" : "bg-light text-light"
-            }`}
+            className={`text-blue bar mt-16 inset-0 sm:w-1/5 overflow-auto fixed border-r border-gray-200 w-4/5 max-w-xs z-50 ${
+              darkMode ? "bg-dark" : "bg-light"
+            } ${darkMode ? "text-dark" : "text-light"}`}
           >
             {/* Main Nav */}
             <nav className="flex items-center justify-between p-2 my-3 pb-6">
@@ -128,12 +122,10 @@ const Layout: React.FC<LayoutProps> = ({
                   <TbVideoPlus size="20" />
                   <span>Video Editor</span>
                 </Link>
-                {decodedToken && (
-                  <Link to={`/user/${decodedToken.userId}`} className="flex items-center gap-3 px-4 py-2">
-                    <CgProfile size="20" />
-                    <span>Profile</span>
-                  </Link>
-                )}
+                <Link to={`/user/${decodedToken?.userId}`} className="flex items-center gap-3 px-4 py-2">
+                  <CgProfile size="20" />
+                  <span>Profile</span>
+                </Link>
                 <Link to="/likedvideos" className="flex items-center gap-3 px-4 py-2">
                   <RiHeartLine size="20" />
                   <span>Liked Videos</span>
@@ -178,17 +170,17 @@ const Layout: React.FC<LayoutProps> = ({
             <nav className="px-4 py-3">
               {!decodedToken ? (
                 <>
-                  <li onClick={() => openModal("login")} className="flex items-center gap-3 py-2 cursor-pointer hover:text-green-500">
+                  <li onClick={() => handleType("login")} className="flex items-center gap-3 py-2 cursor-pointer hover:text-green-500">
                     <FaSignOutAlt size="16" />
                     <span>Sign In</span>
                   </li>
-                  <li onClick={() => openModal("register")} className="flex items-center gap-3 py-2 cursor-pointer hover:text-green-500">
+                  <li onClick={() => handleType("register")} className="flex items-center gap-3 py-2 cursor-pointer hover:text-green-500">
                     <FaSignOutAlt size="16" />
                     <span>Sign Up</span>
                   </li>
                 </>
               ) : (
-                <li onClick={() => openModal("logout")} className="flex items-center gap-3 py-2 cursor-pointer hover:text-green-500">
+                <li onClick={() => handleType("logout")} className="flex items-center gap-3 py-2 cursor-pointer hover:text-green-500">
                   <FaSignOutAlt size="16" />
                   <span>Log Out</span>
                 </li>
@@ -205,12 +197,12 @@ const Layout: React.FC<LayoutProps> = ({
             expand={expanded && screenWidth > 1120}
             setLightMode={setLightMode}
             setDarkMode={setDarkiMode}
-            toggleSigninModal={() => openModal("login")}
-            toggleSignupModal={() => openModal("register")}
-            toggleSignoutModal={() => openModal("logout")}
+            toggleSigninModal={() => handleType("login")}
+            toggleSignupModal={() => handleType("register")}
+            toggleSignoutModal={() => handleType("logout")}
             darkMode={darkMode}
-            toggleUploadModal={() => openModal("video")}
-            toggleUploadScriptModal={() => openModal("script")}
+            toggleUploadModal={() => handleType("video")}
+            toggleUploadScriptModal={() => handleType("script")}
             isLoggedIn={decodedToken}
           />
         )}
@@ -227,18 +219,16 @@ const Layout: React.FC<LayoutProps> = ({
               : "150px",
           }}
         >
+          <Modal type={type} authorized={!!token} show={modalShow} />
           {children}
         </main>
       </div>
-
-      {/* Global Modal — always rendered, just toggled */}
-      <Modal type={modalType} authorized={!!token} show={modalShow} onClose={closeModal} />
     </div>
   );
 };
 
 Layout.defaultProps = {
-  hasHeader: false,
+  hasHeader: true,
 };
 
 export default Layout;
