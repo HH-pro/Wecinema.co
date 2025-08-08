@@ -67,7 +67,10 @@ const Layout: React.FC<LayoutProps> = ({
   };
 
   const isMobile = screenWidth <= 420;
-  const isSidebarVisible = hideSidebar ? viewPageSidebarVisible : true;
+
+  // Sidebar should be hidden when signup/signin popup is active
+  const isSidebarVisible =
+    !["login", "register"].includes(type) && (hideSidebar ? viewPageSidebarVisible : true);
 
   return (
     <div className={`text-lg md:text-sm sm:text-xs ${darkMode ? "body-dark" : "body-light"}`}>
