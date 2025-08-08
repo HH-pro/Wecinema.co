@@ -7,7 +7,7 @@ import { Itoken, decodeToken } from "../../utilities/helperfFunction";
 import moment from "moment";
 import axios from "axios";
 import '../header/drowpdown.css';
-import TermsAndConditionsPopup from "../pages/TermsAndConditionsPopup"; 
+import TermsAndConditionsPopup from "../../pages/TermsAndConditionsPopup"; 
 
 import { motion } from "framer-motion"; // Animation library
 import emailjs from "emailjs-com";
