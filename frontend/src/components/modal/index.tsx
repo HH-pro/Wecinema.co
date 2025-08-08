@@ -7,6 +7,7 @@ import { Itoken, decodeToken } from "../../utilities/helperfFunction";
 import moment from "moment";
 import axios from "axios";
 import '../header/drowpdown.css';
+import TermsAndConditionsPopup from "../pages/TermsAndConditionsPopup"; 
 
 import { motion } from "framer-motion"; // Animation library
 import emailjs from "emailjs-com";
@@ -155,7 +156,20 @@ checkUserPaymentStatus();
 			  }
 			}
 		  };
-		  
+		  const [showTermsPopup, setShowTermsPopup] = useState(false);
+
+useEffect(() => {
+  const hasAcceptedTerms = localStorage.getItem("acceptedTerms");
+  if (!hasAcceptedTerms) {
+    setShowTermsPopup(true);
+  }
+}, []);
+
+const handleAcceptTerms = () => {
+  localStorage.setItem("acceptedTerms", "true");
+  setShowTermsPopup(false);
+};
+
 		
 		const handleLogoutSubmit = async (e: any) => {
 			e.preventDefault();
@@ -743,11 +757,14 @@ if (type === "login") {
 	
 	if (type === "register") {
   return (
+
     <div
       className={`fixed inset-0 z-50 flex justify-center items-center ${
         isShow && show ? "visible" : "invisible"
       } ${className}`}
     >
+	{showTermsPopup && <TermsAndConditionsPopup onAccept={handleAcceptTerms} />}
+
       {/* Background Gradient */}
       <div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-50 to-yellow-200 opacity-80 backdrop-blur-sm transition-all duration-300" />
 
