@@ -497,7 +497,7 @@ if (type === "login") {
   initial={{ opacity: 0, scale: 0.95 }}
   animate={{ opacity: 1, scale: 1 }}
   transition={{ duration: 0.4 }}
-  className="relative z-50 w-[90%] max-w-md sm:w-2/5 bg-white border border-yellow-300 rounded-2xl shadow-2xl p-8"
+  className="relative z-50 w-[90%] max-w-md sm:w-2/5 bg-white border border-white-300 rounded-2xl shadow-2xl p-8"
 >
 
         {/* Header */}
