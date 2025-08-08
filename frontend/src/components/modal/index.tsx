@@ -589,7 +589,7 @@ if (type === "login") {
             </div>
 
             <div className="mt-6 text-center text-sm text-gray-600">
-              New here? <a href="/signup" className="text-yellow-500 hover:underline">Create an account</a>
+              {/* New here? <a href="/signup" className="text-yellow-500 hover:underline">Create an account</a> */}
             </div>
           </form>
         </motion.div>
