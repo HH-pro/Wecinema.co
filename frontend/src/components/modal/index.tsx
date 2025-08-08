@@ -23,6 +23,7 @@ interface IPopupProps {
 	className?: string;
 }
 
+
 const Popup: React.FC<IPopupProps> = React.memo(
 	({ type, className, background, show }) => {
 		const [token, setToken] = useState<string | null>(
