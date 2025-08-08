@@ -68,10 +68,20 @@ const Layout: React.FC<LayoutProps> = ({
 
   const isMobile = screenWidth <= 420;
 
-  // Sidebar should be hidden when signup/signin popup is active
-  const isSidebarVisible =
-    !["login", "register"].includes(type) && (hideSidebar ? viewPageSidebarVisible : true);
+  // Special "focus mode" for login/signup
+  const isAuthModal = ["login", "register"].includes(type);
 
+  if (isAuthModal && modalShow) {
+    // Render only the popup, no header/sidebar/content
+    return (
+      <div className={darkMode ? "body-dark" : "body-light"}>
+        <ToastContainer />
+        <Modal type={type} authorized={!!token} show={modalShow} onClose={closeModal} />
+      </div>
+    );
+  }
+
+  // Normal layout
   return (
     <div className={`text-lg md:text-sm sm:text-xs ${darkMode ? "body-dark" : "body-light"}`}>
       <ToastContainer />
@@ -90,7 +100,7 @@ const Layout: React.FC<LayoutProps> = ({
 
       {/* Layout wrapper with padding for header */}
       <div className="flex pt-16">
-        {isSidebarVisible && (
+        {(!hideSidebar || viewPageSidebarVisible) && (
           <Sidebar
             expand={expanded && screenWidth > 1120}
             setLightMode={setLightMode}
@@ -111,18 +121,19 @@ const Layout: React.FC<LayoutProps> = ({
             darkMode ? "body-dark text-dark" : "body-light text-light"
           } bg-gray-200 w-full transition-all duration-300`}
           style={{
-            marginLeft: !isSidebarVisible
-              ? "0px"
-              : expanded && screenWidth > 1120
-              ? "16.8%"
-              : "150px",
+            marginLeft:
+              hideSidebar || !viewPageSidebarVisible
+                ? "0px"
+                : expanded && screenWidth > 1120
+                ? "16.8%"
+                : "150px",
           }}
         >
           {children}
         </main>
       </div>
 
-      {/* Always-mounted modal */}
+      {/* Other modals */}
       <Modal type={type} authorized={!!token} show={modalShow} onClose={closeModal} />
     </div>
   );
