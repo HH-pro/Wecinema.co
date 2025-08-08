@@ -238,7 +238,7 @@ const Layout: React.FC<LayoutProps> = ({
 };
 
 Layout.defaultProps = {
-  hasHeader: true,
+  hasHeader: false,
 };
 
 export default Layout;
