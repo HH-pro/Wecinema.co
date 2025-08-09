@@ -403,97 +403,105 @@ const handleAcceptTerms = () => {
 		};
 
 		if (type === "script") {
-			return (
-				<div
-					style={{ background }}
-					className={`fixed sm:top-0 z-50 left-0 h-screen w-full flex justify-center items-center ${
-						isShow && show ? "visible" : "invisible"
-					} ${className}`}
-				>
-					<div
-						className={`fixed top-0 left-0 h-full w-full  ${
-							background ?? "bg-black "
-						} bg-opacity-90 backdrop-filter backdrop-blur-15 flex items-center justify-center transition-opacity ease-in-out duration-300`}
-					>
-						<div
-							className={`sm:w-2/6 modal min-h-2/6 w-5/6 bg-white rounded-md p-6
-              transition-transform transform translate-y-0 ease-in-out relative cursor-pointer shadow-md
-              }`}
-						>
-							<header className="flex gap-4 justify-between items-center">
-								<h2>Upload Script</h2>
-								<FaTimes onClick={() => setShow(false)} />
-							</header>
-							<form onSubmit={handleScriptUploadSubmit}>
-								<input
-									className="rounded-md px-4 py-2 w-full mt-3 border outline-none"
-									placeholder="Title"
-									type="text"
-									value={title}
-									onChange={(e: any) => setTitle(e.target.value)}
-								/>
+  return (
+    <div
+      className={`fixed inset-0 z-50 flex justify-center items-center ${
+        isShow && show ? "visible" : "invisible"
+      } ${className || ""}`}
+    >
+      {/* Transparent gradient background */}
+      <div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-50 to-yellow-200 opacity-80 backdrop-blur-sm" />
 
-								<div
-									className="rounded-md  w-full mt-3  outline-none"
-									style={{ height: "204px" }}
-								>
-									<ReactQuill
-										theme="snow"
-										modules={modules}
-										formats={formats}
-										placeholder="write your script here...."
-										onChange={handleProcedureContentChange}
-										style={{ height: "109px", width: "100%" }}
-										className="rounded-md"
-									></ReactQuill>
-								</div>
-								<Select
-									values={selectedItems}
-									options={CAT}
-									placeholder="Select gener(s)..."
-									required
-									multi
-									className="rounded-md px-4 py- w-full mt- border outline-none"
-									onChange={(values: any) => {
-										setSelectedItems(values);
-									}}
-								/>
-								  	<Select
-									values={selectItems}
-									options={CATS}
-									placeholder="Select theme(s).."
-									required
-									multi
-									className="rounded-md px-4 py-2 w-full mt-3 border outline-none"
-									onChange={(values: any) => {
-										setSelectItems(values);
-									}}
-								/>
-									{hasPaid && (
-									<div className="my-4">
-										<label>
-											<input
-												type="checkbox"
-												checked={sellVideo}
-												onChange={(e) => setSellVideo(e.target.checked)}
-											/>{" "}
-											For Sale
-										</label>
-									</div>
-								)}
-								<button
-									disabled={loading}
-									className="rounded-md px-4 py-2 w-full my-3 bg-blue-500 text-white"
-								>
-									Upload
-								</button>
-							</form>
-						</div>
-					</div>
-				</div>
-			);
-		}
-	
+      {/* Modal container */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.4 }}
+        className="relative z-50 sm:w-2/6 w-5/6 bg-white/80 border border-yellow-300 backdrop-blur-xl rounded-2xl shadow-2xl p-8"
+      >
+        {/* Header */}
+        <header className="flex gap-4 justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold text-gray-800">Upload Script</h2>
+          <FaTimes
+            onClick={() => setShow(false)}
+            className="cursor-pointer text-gray-600 hover:text-red-500 transition duration-200"
+          />
+        </header>
+
+        {/* Form */}
+        <form onSubmit={handleScriptUploadSubmit} className="space-y-4">
+          {/* Title */}
+          <input
+            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 outline-none"
+            placeholder="Title"
+            type="text"
+            value={title}
+            onChange={(e: any) => setTitle(e.target.value)}
+          />
+
+          {/* Script Editor */}
+          <div className="rounded-lg border border-yellow-200 bg-white/60 w-full outline-none overflow-hidden">
+            <ReactQuill
+              theme="snow"
+              modules={modules}
+              formats={formats}
+              placeholder="Write your script here..."
+              onChange={handleProcedureContentChange}
+              style={{ height: "150px", width: "100%" }}
+              className="rounded-lg"
+            />
+          </div>
+
+          {/* Genre */}
+          <Select
+            values={selectedItems}
+            options={CAT}
+            placeholder="Select genre(s).."
+            required
+            multi
+            className="rounded-lg px-4 py-2 w-full border border-yellow-200 bg-white/60 outline-none"
+            onChange={(values: any) => setSelectedItems(values)}
+          />
+
+          {/* Theme */}
+          <Select
+            values={selectItems}
+            options={CATS}
+            placeholder="Select theme(s).."
+            required
+            multi
+            className="rounded-lg px-4 py-2 w-full border border-yellow-200 bg-white/60 outline-none"
+            onChange={(values: any) => setSelectItems(values)}
+          />
+
+          {/* For Sale */}
+          {hasPaid && (
+            <div className="my-4">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={sellVideo}
+                  onChange={(e) => setSellVideo(e.target.checked)}
+                />
+                For Sale
+              </label>
+            </div>
+          )}
+
+          {/* Submit */}
+          <button
+            disabled={loading}
+            className="bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold mt-5 py-2 px-4 rounded-lg shadow-md transition w-full"
+          >
+            {loading ? "Uploading..." : "Upload"}
+          </button>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
 
  if (type === "video") {
     return (
