@@ -4,15 +4,13 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import "quill/dist/quill.snow.css";
 import { Itoken, decodeToken } from "../../utilities/helperfFunction";
-import {
-  IoMdHome,
-} from "react-icons/io";
+import { IoMdHome } from "react-icons/io";
 import {
   RiMovie2Line,
   RiHeartLine,
   RiHistoryLine,
   RiFlagLine,
-  RiCustomerService2Line
+  RiCustomerService2Line,
 } from "react-icons/ri";
 import { MdChatBubbleOutline, MdOutlinePrivacyTip } from "react-icons/md";
 import { TbVideoPlus } from "react-icons/tb";
@@ -21,10 +19,24 @@ import { FaSignOutAlt, FaMoon } from "react-icons/fa";
 import { Link } from "react-router-dom";
 
 export const theme = [
-  "Love", "Redemption", "Family", "Oppression", "Corruption",
-  "Survival", "Revenge", "Death", "Justice", "Perseverance",
-  "War", "Bravery", "Freedom", "Friendship", "Hope",
-  "Society", "Isolation", "Peace"
+  "Love",
+  "Redemption",
+  "Family",
+  "Oppression",
+  "Corruption",
+  "Survival",
+  "Revenge",
+  "Death",
+  "Justice",
+  "Perseverance",
+  "War",
+  "Bravery",
+  "Freedom",
+  "Friendship",
+  "Hope",
+  "Society",
+  "Isolation",
+  "Peace",
 ];
 
 interface LayoutProps {
@@ -40,7 +52,9 @@ const Layout: React.FC<LayoutProps> = ({
   expand,
 }) => {
   const [screenWidth, setScreenWidth] = useState(window.innerWidth);
-  const [token, _] = useState<string | null>(localStorage.getItem("token") || null);
+  const [token, _] = useState<string | null>(
+    localStorage.getItem("token") || null
+  );
   const [decodedToken, setDecodedToken] = useState<Itoken | null>(null);
   const isDarkMode = localStorage.getItem("isDarkMode") ?? false;
   const [darkMode, setDarkMode] = useState<boolean>(!!isDarkMode);
@@ -48,7 +62,8 @@ const Layout: React.FC<LayoutProps> = ({
   const [modalShow, setModalShow] = useState(false);
   const [type, setType] = useState("");
   const [show, setShow] = useState<boolean>(false);
-  const [viewPageSidebarVisible, setViewPageSidebarVisible] = useState<boolean>(!hideSidebar);
+  const [viewPageSidebarVisible, setViewPageSidebarVisible] =
+    useState<boolean>(!hideSidebar);
 
   useEffect(() => {
     const handleResize = () => setScreenWidth(window.innerWidth);
@@ -94,7 +109,11 @@ const Layout: React.FC<LayoutProps> = ({
         darkMode={darkMode}
         toggleUploadModal={() => handleType("video")}
         toggleUploadScriptModal={() => handleType("script")}
-        toggleSidebar={hideSidebar ? () => setViewPageSidebarVisible(prev => !prev) : undefined}
+        toggleSidebar={
+          hideSidebar
+            ? () => setViewPageSidebarVisible((prev) => !prev)
+            : undefined
+        }
       />
 
       {/* Mobile Sidebar Modal */}
@@ -113,32 +132,53 @@ const Layout: React.FC<LayoutProps> = ({
                   <span>Home</span>
                 </Link>
                 {!decodedToken && (
-                  <Link to="/hypemode" className="flex items-center gap-3 px-4 py-2">
+                  <Link
+                    to="/hypemode"
+                    className="flex items-center gap-3 px-4 py-2"
+                  >
                     <RiMovie2Line size="20" />
                     <span>Hype Mode</span>
                   </Link>
                 )}
-                <Link to="/videoeditor" className="flex items-center gap-3 px-4 py-2">
+                <Link
+                  to="/videoeditor"
+                  className="flex items-center gap-3 px-4 py-2"
+                >
                   <TbVideoPlus size="20" />
                   <span>Video Editor</span>
                 </Link>
-                <Link to={`/user/${decodedToken?.userId}`} className="flex items-center gap-3 px-4 py-2">
+                <Link
+                  to={`/user/${decodedToken?.userId}`}
+                  className="flex items-center gap-3 px-4 py-2"
+                >
                   <CgProfile size="20" />
                   <span>Profile</span>
                 </Link>
-                <Link to="/likedvideos" className="flex items-center gap-3 px-4 py-2">
+                <Link
+                  to="/likedvideos"
+                  className="flex items-center gap-3 px-4 py-2"
+                >
                   <RiHeartLine size="20" />
                   <span>Liked Videos</span>
                 </Link>
-                <Link to="/history" className="flex items-center gap-3 px-4 py-2">
+                <Link
+                  to="/history"
+                  className="flex items-center gap-3 px-4 py-2"
+                >
                   <RiHistoryLine size="20" />
                   <span>History</span>
                 </Link>
-                <Link to="/chatbot" className="flex items-center gap-3 px-4 py-2">
+                <Link
+                  to="/chatbot"
+                  className="flex items-center gap-3 px-4 py-2"
+                >
                   <MdChatBubbleOutline size="20" />
                   <span>Chat Bot</span>
                 </Link>
-                <Link to="/customersupport" className="flex items-center gap-3 px-4 py-2">
+                <Link
+                  to="/customersupport"
+                  className="flex items-center gap-3 px-4 py-2"
+                >
                   <RiCustomerService2Line size="20" />
                   <span>Support</span>
                 </Link>
@@ -148,11 +188,17 @@ const Layout: React.FC<LayoutProps> = ({
             {/* Theme Settings */}
             <nav className="px-4 py-2 border-b border-gray-200">
               <h2 className="font-bold mb-2">Theme</h2>
-              <div className="flex items-center gap-3 py-2 cursor-pointer" onClick={setDarkiMode}>
+              <div
+                className="flex items-center gap-3 py-2 cursor-pointer"
+                onClick={setDarkiMode}
+              >
                 <FaMoon size="20" color={darkMode ? "green" : ""} />
                 <span className="text-sm">Dark Mode</span>
               </div>
-              <div className="flex items-center gap-3 py-2 cursor-pointer" onClick={setLightMode}>
+              <div
+                className="flex items-center gap-3 py-2 cursor-pointer"
+                onClick={setLightMode}
+              >
                 <IoMdHome size="20" color={!darkMode ? "green" : ""} />
                 <span className="text-sm">Light Mode</span>
               </div>
@@ -170,17 +216,26 @@ const Layout: React.FC<LayoutProps> = ({
             <nav className="px-4 py-3">
               {!decodedToken ? (
                 <>
-                  <li onClick={() => handleType("login")} className="flex items-center gap-3 py-2 cursor-pointer hover:text-green-500">
+                  <li
+                    onClick={() => handleType("login")}
+                    className="flex items-center gap-3 py-2 cursor-pointer hover:text-green-500"
+                  >
                     <FaSignOutAlt size="16" />
                     <span>Sign In</span>
                   </li>
-                  <li onClick={() => handleType("register")} className="flex items-center gap-3 py-2 cursor-pointer hover:text-green-500">
+                  <li
+                    onClick={() => handleType("register")}
+                    className="flex items-center gap-3 py-2 cursor-pointer hover:text-green-500"
+                  >
                     <FaSignOutAlt size="16" />
                     <span>Sign Up</span>
                   </li>
                 </>
               ) : (
-                <li onClick={() => handleType("logout")} className="flex items-center gap-3 py-2 cursor-pointer hover:text-green-500">
+                <li
+                  onClick={() => handleType("logout")}
+                  className="flex items-center gap-3 py-2 cursor-pointer hover:text-green-500"
+                >
                   <FaSignOutAlt size="16" />
                   <span>Log Out</span>
                 </li>
@@ -208,7 +263,7 @@ const Layout: React.FC<LayoutProps> = ({
         )}
 
         <main
-          className={`block main min-h-screen mt-12 ${
+          className={`flex flex-col min-h-screen mt-12 ${
             darkMode ? "body-dark text-dark" : "body-light text-light"
           } bg-gray-200 w-full transition-all duration-300`}
           style={{
@@ -220,7 +275,24 @@ const Layout: React.FC<LayoutProps> = ({
           }}
         >
           <Modal type={type} authorized={!!token} show={modalShow} />
-          {children}
+          <div className="flex-grow">{children}</div>
+
+          {/* Footer */}
+          <footer
+            className={`w-full text-center py-4 ${
+              darkMode ? "bg-gray-900 text-gray-300" : "bg-gray-100 text-gray-700"
+            }`}
+          >
+            © {new Date().getFullYear()} All rights reserved by{" "}
+            <a
+              href="https://wecinema.co"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold hover:underline"
+            >
+              wecinema.co
+            </a>
+          </footer>
         </main>
       </div>
     </div>
