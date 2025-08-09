@@ -525,14 +525,14 @@ if (type === "video") {
         {/* Form */}
         <form onSubmit={handleVideoUploadSubmit} className="space-y-4">
           <input
-            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 focus:ring-2 focus:ring-yellow-100 outline-none"
+            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 focus:ring-2 focus:ring-yellow-400 outline-none"
             placeholder="Title"
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
           <textarea
-            className="rounded-lg px-4 py-3 w-full border border-yellow-100 bg-white/60 focus:ring-2 focus:ring-yellow-400 outline-none"
+            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 focus:ring-2 focus:ring-yellow-400 outline-none"
             placeholder="Description..."
             rows={5}
             value={description}
