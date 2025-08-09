@@ -532,7 +532,7 @@ if (type === "video") {
             onChange={(e) => setTitle(e.target.value)}
           />
           <textarea
-            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 focus:ring-2 focus:ring-yellow-400 outline-none"
+            className="rounded-lg px-4 py-3 w-full border border-yellow-100 bg-white/60 focus:ring-2 focus:ring-yellow-400 outline-none"
             placeholder="Description..."
             rows={5}
             value={description}
