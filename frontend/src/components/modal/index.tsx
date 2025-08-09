@@ -495,57 +495,159 @@ const handleAcceptTerms = () => {
 		}
 	
 
-if (type === "video") {
-  return (
-    <div
-      className={`fixed inset-0 z-50 flex justify-center items-center ${
-        isShow && show ? "visible" : "invisible"
-      } ${className}`}
-    >
-      {/* Transparent gradient background */}
-      <div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-50 to-yellow-200 opacity-80 backdrop-blur-sm" />
-
-      {/* Modal container */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        transition={{ duration: 0.4 }}
-        className="relative z-50 sm:w-2/6 w-5/6 bg-white/80 border border-yellow-300 backdrop-blur-xl rounded-2xl shadow-2xl p-8"
+ if (type === "video") {
+    return (
+      <div
+        className={`fixed inset-0 z-50 flex justify-center items-center ${
+          isShow && show ? "visible" : "invisible"
+        } ${className || ""}`}
       >
-        {/* Header */}
-        <header className="flex gap-4 justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold text-gray-800">Upload Video</h2>
-          <FaTimes
-            onClick={() => setShow(false)}
-            className="cursor-pointer text-gray-600 hover:text-red-500 transition duration-200"
-          />
-        </header>
+        {/* Transparent gradient background */}
+        <div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-50 to-yellow-200 opacity-80 backdrop-blur-sm" />
 
-        {/* Form */}
-        <form onSubmit={handleVideoUploadSubmit} className="space-y-4">
-          {/* Inputs match signup style */}
-          <input
-            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 outline-none"
-            placeholder="Title"
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-          <textarea
-            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 outline-none"
-            placeholder="Description..."
-            rows={5}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-          {/* ... rest of form unchanged ... */}
-        </form>
-      </motion.div>
-    </div>
-  );
-}
+        {/* Modal container */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          transition={{ duration: 0.4 }}
+          className="relative z-50 sm:w-2/6 w-5/6 bg-white/80 border border-yellow-300 backdrop-blur-xl rounded-2xl shadow-2xl p-8"
+        >
+          {/* Header */}
+          <header className="flex gap-4 justify-between items-center mb-4">
+            <h2 className="text-2xl font-bold text-gray-800">Upload Video</h2>
+            <FaTimes
+              onClick={() => setShow(false)}
+              className="cursor-pointer text-gray-600 hover:text-red-500 transition duration-200"
+            />
+          </header>
 
+          {/* Form */}
+          <form onSubmit={handleVideoUploadSubmit} className="space-y-4">
+            {/* Title */}
+            <input
+              className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 outline-none"
+              placeholder="Title"
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+
+            {/* Description */}
+            <textarea
+              className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 outline-none"
+              placeholder="Description..."
+              rows={5}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+
+            {/* Genre */}
+            <Select
+              values={selectedItems}
+              options={CAT}
+              placeholder="Select genre(s).."
+              required
+              multi
+              className="rounded-lg px-4 py-2 w-full border border-yellow-200 bg-white/60 outline-none"
+              onChange={(values: any) => setSelectedItems(values)}
+            />
+
+            {/* Theme */}
+            <Select
+              values={selectItems}
+              options={CATS}
+              placeholder="Select theme(s).."
+              required
+              multi
+              className="rounded-lg px-4 py-2 w-full border border-yellow-200 bg-white/60 outline-none"
+              onChange={(values: any) => setSelectItems(values)}
+            />
+
+            {/* Rating */}
+            <select
+              id="rating"
+              required
+              value={rating}
+              onChange={(e) => setRating(e.target.value)}
+              className="rounded-lg px-4 py-2 w-full border border-yellow-200 bg-white/60 outline-none"
+            >
+              <option value="">Select Rating</option>
+              <option value="p">G</option>
+              <option value="pg">PG</option>
+              <option value="pg-13">PG-13</option>
+              <option value="R">R</option>
+              <option value="X">X</option>
+            </select>
+
+            {/* Video Upload */}
+            <div className="flex flex-col items-center p-3 border border-yellow-200 rounded-lg bg-white/60">
+              <div className="relative">
+                <input
+                  type="file"
+                  accept="video/*"
+                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                  onChange={handleFileChange}
+                  ref={fileInputRef}
+                />
+                <div
+                  className="bg-gray-100 p-4 rounded-md mt-3 cursor-pointer"
+                  onClick={handleThumbnailClick}
+                >
+                  {selectedFile ? (
+                    <video
+                      src={URL.createObjectURL(selectedFile)}
+                      height={100}
+                      width={100}
+                      className="object-cover"
+                    />
+                  ) : (
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-6 w-6 text-gray-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M3 7h18M3 12h18m-9 5h9"
+                      />
+                    </svg>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* For Sale Checkbox */}
+            {hasPaid && (
+              <div className="my-4">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={sellVideo}
+                    onChange={(e) => setSellVideo(e.target.checked)}
+                  />
+                  For Sale
+                </label>
+              </div>
+            )}
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold mt-5 py-2 px-4 rounded-lg shadow-md transition"
+            >
+              {loading ? "Uploading..." : "Upload Video"}
+            </button>
+          </form>
+        </motion.div>
+      </div>
+    );
+  }
 if (type === "login") {
   return (
     <div
