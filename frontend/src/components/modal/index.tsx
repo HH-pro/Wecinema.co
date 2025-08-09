@@ -494,6 +494,7 @@ const handleAcceptTerms = () => {
 			);
 		}
 	
+
 if (type === "video") {
   return (
     <div
@@ -502,45 +503,40 @@ if (type === "video") {
         isShow && show ? "visible" : "invisible"
       } ${className}`}
     >
-      {/* Background Gradient */}
+      {/* Transparent gradient background like signin/signup */}
       <div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-50 to-yellow-200 opacity-80 backdrop-blur-sm transition-all duration-300" />
 
-      {/* Modal Container */}
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.4 }}
-        className="relative z-50 w-[90%] max-w-lg sm:w-2/5 bg-white/80 border border-yellow-300 backdrop-blur-xl rounded-2xl shadow-2xl p-8"
+        className="relative z-50 sm:w-2/6 w-5/6 bg-white/80 border border-yellow-300 backdrop-blur-xl rounded-2xl shadow-2xl p-8"
       >
         {/* Header */}
-        <header className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">
-            Upload <span className="text-yellow-500">Video</span>
-          </h2>
+        <header className="flex gap-4 justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold text-gray-800">Upload Video</h2>
           <FaTimes
             onClick={() => setShow(false)}
             className="cursor-pointer text-gray-600 hover:text-red-500 transition duration-200"
           />
         </header>
 
-        {/* Video Upload Form */}
+        {/* Form */}
         <form onSubmit={handleVideoUploadSubmit} className="space-y-4">
           <input
-            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 outline-none transition"
+            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 focus:ring-2 focus:ring-yellow-400 outline-none"
             placeholder="Title"
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            required
           />
           <textarea
-            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 outline-none transition"
+            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 focus:ring-2 focus:ring-yellow-400 outline-none"
             placeholder="Description..."
             rows={5}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            required
           />
           <Select
             values={selectedItems}
@@ -565,7 +561,7 @@ if (type === "video") {
             required
             value={rating}
             onChange={(e) => setRating(e.target.value)}
-            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 outline-none transition"
+            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60"
           >
             <option value="">Select Rating</option>
             <option value="p">G</option>
@@ -575,8 +571,8 @@ if (type === "video") {
             <option value="X">X</option>
           </select>
 
-          {/* Video File Upload */}
-          <div className="flex flex-col items-center p-3 border border-yellow-200 rounded-lg bg-white/50">
+          {/* Video Upload */}
+          <div className="flex flex-col items-center p-4 border border-yellow-200 rounded-lg bg-white/60">
             <div className="relative">
               <input
                 type="file"
@@ -594,7 +590,7 @@ if (type === "video") {
                     src={URL.createObjectURL(selectedFile)}
                     height={100}
                     width={100}
-                    className="object-cover rounded"
+                    className="object-cover"
                   />
                 ) : (
                   <svg
@@ -616,15 +612,17 @@ if (type === "video") {
             </div>
           </div>
 
-          {/* Hype Mode Selling Option */}
+          {/* For Sale Option */}
           {hasPaid && (
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={sellVideo}
-                onChange={(e) => setSellVideo(e.target.checked)}
-              />
-              <label className="text-gray-700">For Sale</label>
+            <div className="my-4">
+              <label className="text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={sellVideo}
+                  onChange={(e) => setSellVideo(e.target.checked)}
+                />{" "}
+                For Sale
+              </label>
             </div>
           )}
 
@@ -632,7 +630,7 @@ if (type === "video") {
           <motion.button
             whileTap={{ scale: 0.98 }}
             disabled={loading}
-            className={`w-full py-3 mt-2 rounded-lg font-semibold text-white transition-all duration-300 text-lg shadow-md ${
+            className={`w-full py-3 rounded-lg font-semibold text-white transition-all duration-300 text-lg shadow-md ${
               loading
                 ? "bg-yellow-300 cursor-not-allowed"
                 : "bg-gradient-to-r from-yellow-500 to-yellow-400 hover:from-yellow-600 hover:to-yellow-500"
@@ -645,7 +643,6 @@ if (type === "video") {
     </div>
   );
 }
-
 
 if (type === "login") {
   return (
