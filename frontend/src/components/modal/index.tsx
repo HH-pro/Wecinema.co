@@ -494,6 +494,157 @@ const handleAcceptTerms = () => {
 			);
 		}
 	
+if (type === "video") {
+  return (
+    <div
+      style={{ background }}
+      className={`fixed sm:top-0 z-50 left-0 sm:h-screen w-full flex justify-center items-center ${
+        isShow && show ? "visible" : "invisible"
+      } ${className}`}
+    >
+      {/* Background Gradient */}
+      <div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-50 to-yellow-200 opacity-80 backdrop-blur-sm transition-all duration-300" />
+
+      {/* Modal Container */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.4 }}
+        className="relative z-50 w-[90%] max-w-lg sm:w-2/5 bg-white/80 border border-yellow-300 backdrop-blur-xl rounded-2xl shadow-2xl p-8"
+      >
+        {/* Header */}
+        <header className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-800">
+            Upload <span className="text-yellow-500">Video</span>
+          </h2>
+          <FaTimes
+            onClick={() => setShow(false)}
+            className="cursor-pointer text-gray-600 hover:text-red-500 transition duration-200"
+          />
+        </header>
+
+        {/* Video Upload Form */}
+        <form onSubmit={handleVideoUploadSubmit} className="space-y-4">
+          <input
+            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 outline-none transition"
+            placeholder="Title"
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+          />
+          <textarea
+            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 outline-none transition"
+            placeholder="Description..."
+            rows={5}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            required
+          />
+          <Select
+            values={selectedItems}
+            options={CAT}
+            placeholder="Select genre(s).."
+            required
+            multi
+            className="rounded-lg px-4 py-2 w-full border border-yellow-200 bg-white/60"
+            onChange={(values) => setSelectedItems(values)}
+          />
+          <Select
+            values={selectItems}
+            options={CATS}
+            placeholder="Select theme(s).."
+            required
+            multi
+            className="rounded-lg px-4 py-2 w-full border border-yellow-200 bg-white/60"
+            onChange={(values) => setSelectItems(values)}
+          />
+          <select
+            id="rating"
+            required
+            value={rating}
+            onChange={(e) => setRating(e.target.value)}
+            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 outline-none transition"
+          >
+            <option value="">Select Rating</option>
+            <option value="p">G</option>
+            <option value="pg">PG</option>
+            <option value="pg-13">PG-13</option>
+            <option value="R">R</option>
+            <option value="X">X</option>
+          </select>
+
+          {/* Video File Upload */}
+          <div className="flex flex-col items-center p-3 border border-yellow-200 rounded-lg bg-white/50">
+            <div className="relative">
+              <input
+                type="file"
+                accept="video/*"
+                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                onChange={handleFileChange}
+                ref={fileInputRef}
+              />
+              <div
+                className="bg-gray-100 p-4 rounded-md cursor-pointer"
+                onClick={handleThumbnailClick}
+              >
+                {selectedFile ? (
+                  <video
+                    src={URL.createObjectURL(selectedFile)}
+                    height={100}
+                    width={100}
+                    className="object-cover rounded"
+                  />
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-6 w-6 text-gray-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M3 7h18M3 12h18m-9 5h9"
+                    />
+                  </svg>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Hype Mode Selling Option */}
+          {hasPaid && (
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={sellVideo}
+                onChange={(e) => setSellVideo(e.target.checked)}
+              />
+              <label className="text-gray-700">For Sale</label>
+            </div>
+          )}
+
+          {/* Submit Button */}
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            disabled={loading}
+            className={`w-full py-3 mt-2 rounded-lg font-semibold text-white transition-all duration-300 text-lg shadow-md ${
+              loading
+                ? "bg-yellow-300 cursor-not-allowed"
+                : "bg-gradient-to-r from-yellow-500 to-yellow-400 hover:from-yellow-600 hover:to-yellow-500"
+            }`}
+          >
+            {loading ? "Uploading..." : "Upload Video"}
+          </motion.button>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
 
 
 if (type === "login") {
@@ -599,161 +750,7 @@ if (type === "login") {
 }
 
 
-		if (type === "video") {
-			return (
-				<div
-					style={{ background }}
-					className={`fixed sm:top-0 z-50 left-0 sm:h-screen w-full flex justify-center items-center ${
-						isShow && show ? "visible" : "invisible"
-					} ${className}`}
-				>
-					<div
-						className={`fixed top-0 left-0 h-full w-full ${
-							background ?? "bg-black"
-						} bg-opacity-90 backdrop-filter backdrop-blur-15 flex items-center justify-center transition-opacity ease-in-out duration-300`}
-					>
-						<div
-							className={`sm:w-2/6 modal min-h-2/6 w-5/6 bg-white rounded-md p-6 transition-transform transform translate-y-0 ease-in-out relative cursor-pointer shadow-md`}
-						>
-							<header className="flex gap-4 justify-between items-center">
-								<h2>Upload Video</h2>
-								<FaTimes onClick={() => setShow(false)} />
-							</header>
-							<form onSubmit={handleVideoUploadSubmit}>
-								{/* Video details form */}
-								<input
-									className="rounded-md px-4 py-2 w-full mt-3 border outline-none"
-									placeholder="Title"
-									type="text"
-									value={title}
-									onChange={(e: any) => setTitle(e.target.value)}
-								/>
-								<textarea
-									className="rounded-md px-4 py-2 w-full mt-3 border outline-none"
-									placeholder="Description..."
-									rows={5}
-									value={description}
-									onChange={(e: any) => setDescription(e.target.value)}
-								/>
-								<Select
-									values={selectedItems}
-									options={CAT}
-									placeholder="Select genre(s).."
-									required
-									multi
-									className="rounded-md px-4 py-2 w-full mt-3 border outline-none"
-									onChange={(values: any) => {
-										setSelectedItems(values);
-									}}
-								/>
-								<Select
-									values={selectItems}
-									options={CATS}
-									placeholder="Select theme(s).."
-									required
-									multi
-									className="rounded-md px-4 py-2 w-full mt-3 border outline-none"
-									onChange={(values: any) => {
-										setSelectItems(values);
-									}}
-								/>
-								<div>
-									<select
-										id="rating"
-										required
-										value={rating}
-										onChange={(e) => setRating(e.target.value)}
-										className="rounded-md px-4 py-2 w-full mt-3 border outline-none"
-									>
-										<option value="">Select Rating</option>
-										<option value="p">G</option>
-										<option value="pg">PG</option>
-										<option value="pg-13">PG-13</option>
-										<option value="R">R</option>
-										<option value="X">X</option>
-									</select>
-								</div>
-
-								{/* Video upload */}
-								<div
-									style={{
-										display: "flex",
-										flexDirection: "column",
-										alignItems: "center",
-										padding: "5px",
-										border: "1px solid #ccc",
-										borderRadius: "8px",
-										maxWidth: "500px",
-										margin: "auto",
-										marginTop: "10px",
-									}}
-								>
-									<div className="relative">
-										<input
-											type="file"
-											accept="video/*"
-											className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-											onChange={handleFileChange}
-											ref={fileInputRef}
-										/>
-										<div
-											className="bg-gray-100 p-4 rounded-md mt-5 cursor-pointer"
-											onClick={handleThumbnailClick}
-										>
-											{selectedFile ? (
-												<video
-													src={URL.createObjectURL(selectedFile)}
-													height={100}
-													width={100}
-													className="object-cover"
-												/>
-											) : (
-												<svg
-													xmlns="http://www.w3.org/2000/svg"
-													className="h-6 w-6 text-gray-500"
-													fill="none"
-													viewBox="0 0 24 24"
-													stroke="currentColor"
-												>
-													<path
-														strokeLinecap="round"
-														strokeLinejoin="round"
-														strokeWidth="2"
-														d="M3 7h18M3 12h18m-9 5h9"
-													/>
-												</svg>
-											)}
-										</div>
-									</div>
-								</div>
-
-								{/* Conditionally render the sell button for Hype Mode users */}
-								{hasPaid && (
-									<div className="my-4">
-										<label>
-											<input
-												type="checkbox"
-												checked={sellVideo}
-												onChange={(e) => setSellVideo(e.target.checked)}
-											/>{" "}
-											For Sale
-										</label>
-									</div>
-								)}
-
-								<button
-									type="submit"
-									disabled={loading}
-									className="bg-blue-500 hover:bg-blue-600 text-white font-semibold mt-5 py-2 px-4 rounded-md"
-								>
-									{loading ? "Uploading..." : "Upload Video"}
-								</button>
-							</form>
-						</div>
-					</div>
-				</div>
-			);
-		} 
+	
 	
 	if (type === "register") {
   return (
