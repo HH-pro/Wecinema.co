@@ -506,7 +506,13 @@ const handleAcceptTerms = () => {
         <div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-50 to-yellow-200 opacity-80 backdrop-blur-sm" />
 
         {/* Modal container */}
-        
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          transition={{ duration: 0.4 }}
+          className="relative z-50 sm:w-2/6 w-5/6 bg-white/120 border border-yellow-300 backdrop-blur-xl rounded-2xl shadow-2xl p-8"
+        >
           {/* Header */}
           <header className="flex gap-4 justify-between items-center mb-4">
             <h2 className="text-2xl font-bold text-gray-800">Upload Video</h2>
