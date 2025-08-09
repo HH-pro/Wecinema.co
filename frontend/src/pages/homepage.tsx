@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { Gallery, Layout, Render } from "../components/"; // Replace with actual imports
 import { getRequest } from "../api"; // Replace with actual API call
 import { useNavigate } from "react-router-dom";
-import TermsAndConditionsPopup from "../pages/TermsAndConditionsPopup"; 
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Pagination, Navigation } from "swiper/modules";
 import { Line } from "react-chartjs-2";
@@ -66,14 +65,7 @@ const Homepage: React.FC = () => {
   const [expand, setExpand] = useState(false); // Optional toggle
   const [progress, setProgress] = useState(0);
   const [showPopup, setShowPopup] = useState(false);
-  const [showTermsPopup, setShowTermsPopup] = useState(false);
   
-  useEffect(() => {
-    const hasAcceptedTerms = localStorage.getItem("acceptedTerms");
-    if (!hasAcceptedTerms) {
-      setShowTermsPopup(true);
-    }
-  }, []);
   
   useEffect(() => {
     const load = setInterval(() => {
@@ -88,12 +80,7 @@ const Homepage: React.FC = () => {
 
     return () => clearInterval(load);
   }, []);
-  
-  const handleAcceptTerms = () => {
-    localStorage.setItem("acceptedTerms", "true");
-    setShowTermsPopup(false);
-  };
-  
+ 
   useEffect(() => {
     if (window.innerWidth < 768) {
       setShowPopup(true);
@@ -301,7 +288,6 @@ const Homepage: React.FC = () => {
   return (
      <Layout expand={expand} setExpand={setExpand}>
       <LoadingBar color="#ffb300" progress={progress} height={3} />
-      {showTermsPopup && <TermsAndConditionsPopup onAccept={handleAcceptTerms} />}
       
       <div className="textured-background">
         <h1 className="chart-heading">WECINEMA</h1>
