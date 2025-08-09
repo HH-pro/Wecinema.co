@@ -510,7 +510,7 @@ const handleAcceptTerms = () => {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.4 }}
-        className="relative z-50 w-[90%] max-w-md sm:w-2/5 bg-white/80 border border-yellow-300 backdrop-blur-xl rounded-2xl shadow-2xl p-8"
+        className="relative z-50 w-[90%] max-w-md sm:w-2/5 bg-white border border-yellow-300 backdrop-blur-xl rounded-2xl shadow-2xl p-8"
 >
           {/* Header */}
           <header className="flex gap-4 justify-between items-center mb-4">
