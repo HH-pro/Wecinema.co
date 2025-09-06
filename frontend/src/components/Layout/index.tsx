@@ -271,7 +271,7 @@ const Layout: React.FC<LayoutProps> = ({
               ? "0px"
               : expanded && screenWidth > 1120
               ? "16.8%"
-              : "250px",
+              : "150px",
           }}
         >
           <Modal type={type} authorized={!!token} show={modalShow} />
