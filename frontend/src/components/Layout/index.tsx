@@ -96,7 +96,7 @@ const Layout: React.FC<LayoutProps> = ({
     setShow(!!type);
   }, [type, modalShow]);
 
-  const isMobile = screenWidth <= 420;
+  const isMobile = screenWidth <= 1120;
   const isSidebarVisible = hideSidebar ? viewPageSidebarVisible : true;
 
   return (
@@ -117,7 +117,7 @@ const Layout: React.FC<LayoutProps> = ({
       />
 
       {/* Mobile Sidebar Modal */}
-      {expanded && screenWidth <= 1120 && isSidebarVisible && (
+      {expanded && isMobile && isSidebarVisible && (
         <div className="fixed top-0 left-0 z-40 h-full w-full bg-black bg-opacity-90 backdrop-blur-md transition-opacity ease-in-out duration-300">
           <section
             className={`text-blue bar mt-16 inset-0 sm:w-1/5 overflow-auto fixed border-r border-gray-200 w-4/5 max-w-xs z-50 ${
@@ -247,9 +247,10 @@ const Layout: React.FC<LayoutProps> = ({
 
       {/* Desktop Layout */}
       <div className="flex">
-        {isSidebarVisible && (
+        {/* Sidebar only on mobile */}
+        {isSidebarVisible && isMobile && (
           <Sidebar
-            expand={expanded && screenWidth > 1120}
+            expand={expanded}
             setLightMode={setLightMode}
             setDarkMode={setDarkiMode}
             toggleSigninModal={() => handleType("login")}
@@ -267,11 +268,11 @@ const Layout: React.FC<LayoutProps> = ({
             darkMode ? "body-dark text-dark" : "body-light text-light"
           } bg-gray-200 w-full transition-all duration-300`}
           style={{
-            marginLeft: !isSidebarVisible
-              ? "0px"
-              : expanded && screenWidth > 1120
-              ? "16.8%"
-              : "150px",
+            marginLeft: isMobile && isSidebarVisible
+              ? expanded
+                ? "16.8%"
+                : "150px"
+              : "0px", // ✅ no margin on desktop
           }}
         >
           <Modal type={type} authorized={!!token} show={modalShow} />
