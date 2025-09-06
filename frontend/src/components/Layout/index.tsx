@@ -262,21 +262,18 @@ const Layout: React.FC<LayoutProps> = ({
           />
         )}
 
-     <main
-  className={`flex flex-col min-h-screen ${
-    isMobile ? "mt-12" : "mt-0"
-  } ${darkMode ? "body-dark text-dark" : "body-light text-light"}
-  bg-gray-200 w-full transition-all duration-300`}
-  style={{
-    marginLeft:
-      isMobile && isSidebarVisible
-        ? expanded
-          ? "16.8%"
-          : "150px"
-        : "0px", // ✅ Desktop pe sidebar ka margin hata diya
-  }}
->
-
+        <main
+          className={`flex flex-col min-h-screen mt-12 ${
+            darkMode ? "body-dark text-dark" : "body-light text-light"
+          } bg-gray-200 w-full transition-all duration-300`}
+          style={{
+            marginLeft: !isSidebarVisible
+              ? "0px"
+              : expanded && screenWidth > 1120
+              ? "16.8%"
+              : "150px",
+          }}
+        >
           <Modal type={type} authorized={!!token} show={modalShow} />
           <div className="flex-grow">{children}</div>
 
