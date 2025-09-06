@@ -270,7 +270,7 @@ const Layout: React.FC<LayoutProps> = ({
             marginLeft: !isSidebarVisible
               ? "0px"
               : expanded && screenWidth > 1120
-              ? "16.8%"
+              ? "1.8%"
               : "150px",
           }}
         >
