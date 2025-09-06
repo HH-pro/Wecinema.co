@@ -96,7 +96,10 @@ const Layout: React.FC<LayoutProps> = ({
     setShow(!!type);
   }, [type, modalShow]);
 
+  // ✅ Breakpoints
+  const isTabletOrMobile = screenWidth <= 1120; // tablet + mobile
   const isMobile = screenWidth <= 420;
+
   const isSidebarVisible = hideSidebar ? viewPageSidebarVisible : true;
 
   return (
@@ -116,13 +119,13 @@ const Layout: React.FC<LayoutProps> = ({
         }
       />
 
-      {/* Mobile Sidebar Modal */}
-      {expanded && screenWidth <= 1120 && isSidebarVisible && (
+      {/* ✅ Sidebar Overlay for Tablet + Mobile */}
+      {expanded && isTabletOrMobile && isSidebarVisible && (
         <div className="fixed top-0 left-0 z-40 h-full w-full bg-black bg-opacity-90 backdrop-blur-md transition-opacity ease-in-out duration-300">
           <section
-            className={`text-blue bar mt-16 inset-0 sm:w-1/5 overflow-auto fixed border-r border-gray-200 w-4/5 max-w-xs z-50 ${
-              darkMode ? "bg-dark" : "bg-light"
-            } ${darkMode ? "text-dark" : "text-light"}`}
+            className={`mt-16 fixed inset-0 w-4/5 max-w-xs border-r border-gray-200 overflow-auto z-50 ${
+              darkMode ? "bg-dark text-light" : "bg-light text-dark"
+            }`}
           >
             {/* Main Nav */}
             <nav className="flex items-center justify-between p-2 my-3 pb-6">
@@ -245,11 +248,11 @@ const Layout: React.FC<LayoutProps> = ({
         </div>
       )}
 
-      {/* Desktop Layout */}
+      {/* ✅ Desktop Layout */}
       <div className="flex">
-        {isSidebarVisible && (
+        {!isTabletOrMobile && isSidebarVisible && (
           <Sidebar
-            expand={expanded && screenWidth > 1120}
+            expand={expanded}
             setLightMode={setLightMode}
             setDarkMode={setDarkiMode}
             toggleSigninModal={() => handleType("login")}
@@ -269,9 +272,11 @@ const Layout: React.FC<LayoutProps> = ({
           style={{
             marginLeft: !isSidebarVisible
               ? "0px"
-              : expanded && screenWidth > 1120
-              ? "16.8%"
-              : "150px",
+              : !isTabletOrMobile
+              ? expanded
+                ? "16.8%"
+                : "150px"
+              : "0px",
           }}
         >
           <Modal type={type} authorized={!!token} show={modalShow} />
