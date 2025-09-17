@@ -301,7 +301,7 @@ const Homepage: React.FC = () => {
   return (
      <Layout expand={expand} setExpand={setExpand}>
       <LoadingBar color="#ffb300" progress={progress} height={3} />
-      {showTermsPopup && <TermsAndConditionsPopup onAccept={handleAcceptTerms} />}
+      {/* {showTermsPopup && <TermsAndConditionsPopup onAccept={handleAcceptTerms} />} */}
       
       <div className="textured-background">
         <h1 className="chart-heading">WECINEMA</h1>
