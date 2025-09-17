@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
-  base: './', // ✅ Set base path for CPanel or relative hosting
+  base: '/', // ✅ Use absolute path for cPanel root hosting
   plugins: [react()],
   optimizeDeps: {
     exclude: ["@ffmpeg/ffmpeg"],
