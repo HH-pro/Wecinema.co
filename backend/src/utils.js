@@ -1,6 +1,5 @@
 const jwt = require("jsonwebtoken");
 const Mongoose = require("mongoose");
-const winston = require('winston');
 
 const authenticateMiddleware = (req, res, next) => {
 	// Get the token from the request headers
@@ -11,8 +10,9 @@ const authenticateMiddleware = (req, res, next) => {
 		return res.status(401).json({ error: "Unauthorized: No token provided" });
 	}
 
+	const SECRET_KEY = "weloremcium.secret_key"
 	// Verify the token
-	jwt.verify(token, process.env.SECRET_KEY, (err, decoded) => {
+	jwt.verify(token, SECRET_KEY, (err, decoded) => {
 		if (err) {
 			console.log(err);
 			return res.status(401).json({ error: "Unauthorized: Invalid token" });
@@ -40,12 +40,12 @@ const isAdmin = (req, res, next) => {
 			.json({ error: "Unauthorized: User not authenticated" });
 	}
 
-	// Check if the user is an admin
-	if (req.user.role !== "admin") {
-		return res
-			.status(403)
-			.json({ error: "Unauthorized: Admin access required" });
-	}
+	// // Check if the user is an admin
+	// if (req.user.role !== "admin") {
+	// 	return res
+	// 		.status(403)
+	// 		.json({ error: "Unauthorized: Admin access required" });
+	// }
 
 	// User is an admin, allow the request to proceed
 	next();
@@ -73,18 +73,18 @@ function isValidObjectId(id) {
 		return false; // If an error occurs during ObjectId creation, it's not a valid ObjectId
 	}
 }
+const sendWhatsAppAlert = async (message) => {
+	try {
+	  const res = await client.messages.create({
+		body: message,
+		from: 'whatsapp:+14155238886', // Twilio sandbox number
+		to: 'whatsapp:+923117836704', // Your verified WhatsApp number
+	  });
+	  console.log('WhatsApp Alert Sent:', res.sid);
+	} catch (error) {
+	  console.error('Failed to send WhatsApp Alert:', error.message);
+	}
+  };
 
-const logger = winston.createLogger({
-  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'logs/combined.log' })
-  ]
-});
 
-module.exports = { authenticateMiddleware, isValidObjectId,isValidObject, isAdmin , logger};
+module.exports = { authenticateMiddleware, isValidObjectId,isValidObject, isAdmin,sendWhatsAppAlert };

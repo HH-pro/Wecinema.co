@@ -57,7 +57,9 @@ const userSchema = new Schema({
         },
     ],
     isAdmin: { type: Boolean, default: false }, // Add this field
-
+    isSubAdmin: { type: Boolean, default: false }, // Add this field
+    
+    isVerified: { type: Boolean, default: false }
 });
 
 userSchema.methods.calculateAge = function() {

@@ -352,14 +352,14 @@ router.get('/genres/graph', async (req, res) => {
 
         // Convert them to Date objects
         const fromDate = from ? new Date(from) : new Date();
-        fromDate.setDate(fromDate.getDate() - 2); // Default to last 2 days if `from` is not provided
+        fromDate.setDate(fromDate.getDate() - 7); // Default to last 7 days if `from` is not provided
         fromDate.setHours(0, 0, 0, 0);
 
         const toDate = to ? new Date(to) : new Date();
         toDate.setHours(23, 59, 59, 999);
 
         const genreTrends = await Videos.aggregate([
-            // Filter data to only include videos created in the last 2 days
+            // Filter data to only include videos created in the last 7 days
             {
                 $match: {
                     createdAt: { $gte: fromDate, $lte: toDate }
@@ -416,7 +416,131 @@ router.get('/genres/graph', async (req, res) => {
     }
 });
 
+router.get('/themes/graph', async (req, res) => {
+    try {
+        // Get the `from` and `to` query parameters from the request
+        const { from, to } = req.query;
 
+        // Convert them to Date objects
+        const fromDate = from ? new Date(from) : new Date();
+        fromDate.setDate(fromDate.getDate() - 7); // Default to last 7 days
+        fromDate.setHours(0, 0, 0, 0);
+
+        const toDate = to ? new Date(to) : new Date();
+        toDate.setHours(23, 59, 59, 999);
+
+        const themeTrends = await Videos.aggregate([
+            {
+                $match: {
+                    createdAt: { $gte: fromDate, $lte: toDate }
+                }
+            },
+            {
+                $project: {
+                    theme: {
+                        $cond: {
+                            if: { $isArray: "$theme" },
+                            then: "$theme",
+                            else: { $cond: { if: { $eq: ["$theme", null] }, then: [], else: ["$theme"] } }
+                        }
+                    },
+                    themeCounts: 1,
+                    createdAt: 1
+                }
+            },
+            { 
+                $unwind: '$theme' 
+            },
+            {
+                $group: {
+                    _id: {
+                        theme: '$theme',
+                        date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }
+                    },
+                    count: { $sum: 1 },
+                    themeCounts: { $first: "$themeCounts" }
+                }
+            },
+            {
+                $sort: { '_id.date': 1 }
+            }
+        ]);
+
+        // Restructure data for easier charting
+        const chartData = {}; 
+        themeTrends.forEach(item => {
+            const { theme, date } = item._id;
+            if (!chartData[theme]) {
+                chartData[theme] = {};
+            }
+            chartData[theme][date] = {
+                count: item.count,
+                themeCounts: item.themeCounts
+            };
+        });
+
+        res.status(200).json(chartData);
+    } catch (error) {
+        console.error("Error fetching theme data:", error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+router.get('/ratings/graph', async (req, res) => {
+    try {
+        // Get the `from` and `to` query parameters from the request
+        const { from, to } = req.query;
+
+        // Convert them to Date objects
+        const fromDate = from ? new Date(from) : new Date();
+        fromDate.setDate(fromDate.getDate() - 7); // Default to last 7 days
+        fromDate.setHours(0, 0, 0, 0);
+
+        const toDate = to ? new Date(to) : new Date();
+        toDate.setHours(23, 59, 59, 999);
+
+        const ratingTrends = await Videos.aggregate([
+            {
+                $match: {
+                    createdAt: { $gte: fromDate, $lte: toDate },
+                    rating: { $ne: null } // Ensure only videos with ratings are included
+                }
+            },
+            {
+                $project: {
+                    rating: 1,
+                    createdAt: 1
+                }
+            },
+            {
+                $group: {
+                    _id: {
+                        date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }
+                    },
+                    averageRating: { $avg: '$rating' },
+                    totalRatings: { $sum: 1 }
+                }
+            },
+            {
+                $sort: { '_id.date': 1 }
+            }
+        ]);
+
+        // Restructure data for easier charting
+        const chartData = {};
+        ratingTrends.forEach(item => {
+            const { date } = item._id;
+            chartData[date] = {
+                averageRating: item.averageRating,
+                totalRatings: item.totalRatings
+            };
+        });
+
+        res.status(200).json(chartData);
+    } catch (error) {
+        console.error("Error fetching rating data:", error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
 
 // Route to check if the user has liked/disliked a specific video
 router.get('/:videoId/like-status/:userId', async (req, res) => {
@@ -775,15 +899,16 @@ router.post("/scripts", async (req, res) => {
 	}
 });
 
+
 // Route to get all scripts
 router.get("/author/scripts", async (req, res) => {
-	try {
-		const scripts = await Script.find().populate("author", "username avatar followers followings");
-		res.status(200).json(scripts);
-	} catch (error) {
-		console.error("Error getting scripts:", error);
-		res.status(500).json({ error: "Internal Server Error" });
-	}
+    try {
+        const scripts = await Script.find().populate("author", "username avatar followers followings");
+        res.status(200).json(scripts);
+    } catch (error) {
+        console.error("Error getting scripts:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
 });
 
 // Route to get all scripts of a specific author

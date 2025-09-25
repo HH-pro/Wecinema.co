@@ -1,11 +1,28 @@
 const express = require("express");
-require("dotenv").config();
-const { VideoController, UserController } = require("./controller");
+const Sentry = require("@sentry/node");
+const Tracing = require("@sentry/tracing");
+const { VideoController, UserController, domainController, sentryRouter } = require("./controller");
 const connectDB = require("./config");
 const morgan = require("morgan");
 const cors = require("cors");
 const app = express();
+require('../services/expirationService');
+const cron = require('node-cron');
+const axios = require('axios');
 
+// ✅ Initialize Sentry (replace with your actual DSN)
+Sentry.init({
+    dsn: "https://ffba1b70eb56e50557f3a75a5899e7ab@o4509361947148288.ingest.us.sentry.io/4509361953177600",
+    integrations: [
+        new Sentry.Integrations.Http({ tracing: true }),
+        new Tracing.Integrations.Express({ app }),
+    ],
+    tracesSampleRate: 1.0, // Adjust in production
+});
+
+// ✅ Request handler must be the first middleware
+app.use(Sentry.Handlers.requestHandler());
+app.use(Sentry.Handlers.tracingHandler());
 
 app.use((req, res, next) => {
     res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
@@ -41,31 +58,51 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// Example in Express.js
 app.use((req, res, next) => {
     res.cookie('token', 'your-token-value', {
         httpOnly: true,
         secure: true,
-        sameSite: 'None', // Required for cross-domain cookies
+        sameSite: 'None',
     });
     next();
 });
 
-// Add logging middleware to debug incoming requests
 app.use((req, res, next) => {
     console.log("Received request: ", req.method, req.url);
     console.log("Request body: ", req.body);
     next();
 });
 
-// Define a route to create a user
+// Schedule daily check at 9 AM
+cron.schedule('0 9 * * *', async () => {
+  try {
+    console.log('Running daily domain/hosting expiration check...');
+    await axios.get('https://wecinema.co/api/check-expirations');
+    console.log('Expiration check completed');
+  } catch (error) {
+    console.error('Error in scheduled expiration check:', error);
+    Sentry.captureException(error); // ✅ Send error to Sentry
+  }
+});
+
 app.use("/video", VideoController);
 app.use("/user", UserController);
+app.use("/domain", domainController);
+app.use("/sentry", sentryRouter);
 
-// Connect to the database
+// ✅ Error handler must be before any other error middleware
+app.use(Sentry.Handlers.errorHandler());
+
+// Custom fallback error handler (optional)
+app.use((err, req, res, next) => {
+    console.error("Custom Error Handler:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+});
+
+// Connect to MongoDB
 connectDB("mongodb+srv://hamzamanzoor046:9Jf9tuRZv2bEvKES@wecinema.15sml.mongodb.net/database_name?retryWrites=true&w=majority");
 console.log("connected db")
-// Start the Ecxpress server
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
