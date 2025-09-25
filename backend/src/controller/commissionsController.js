@@ -1,6 +1,13 @@
-const Commission = require('../../models/Commission');
+const express = require("express");
+const router = express.Router();
+const Commission = require("../../models/Commission");
+const protect = require("../middleware/protect");
 
-exports.createCommission = async (req, res) => {
+/**
+ * @route POST /commissions
+ * @description Create commission request
+ */
+router.post("/commissions", protect, async (req, res) => {
   try {
     const { requirements, budget, timeline, sellerId } = req.body;
     const commission = await Commission.create({
@@ -8,32 +15,58 @@ exports.createCommission = async (req, res) => {
       sellerId: sellerId || null,
       requirements,
       budget,
-      timeline
+      timeline,
     });
     res.status(201).json(commission);
-  } catch (err) { res.status(400).json({ error: err.message }); }
-};
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
 
-exports.addMessage = async (req, res) => {
+/**
+ * @route POST /commissions/:id/message
+ * @description Add message to commission
+ */
+router.post("/commissions/:id/message", protect, async (req, res) => {
   try {
-    const { id } = req.params;
-    const { text } = req.body;
-    const commission = await Commission.findById(id);
-    if (!commission) return res.status(404).json({ message: 'Not found' });
+    const commission = await Commission.findById(req.params.id);
+    if (!commission) return res.status(404).json({ message: "Not found" });
 
-    commission.messages.push({ senderId: req.user.id, text });
+    commission.messages.push({ senderId: req.user.id, text: req.body.text });
     await commission.save();
     res.json(commission);
-  } catch (err) { res.status(400).json({ error: err.message }); }
-};
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
 
-exports.getCommission = async (req, res) => {
-  const commission = await Commission.findById(req.params.id);
-  if (!commission) return res.status(404).json({ message: 'Not found' });
-  res.json(commission);
-};
+/**
+ * @route GET /commissions/:id
+ * @description Get commission by ID
+ */
+router.get("/commissions/:id", protect, async (req, res) => {
+  try {
+    const commission = await Commission.findById(req.params.id);
+    if (!commission) return res.status(404).json({ message: "Not found" });
+    res.json(commission);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-exports.getUserCommissions = async (req, res) => {
-  const commissions = await Commission.find({ $or: [{ buyerId: req.user.id }, { sellerId: req.user.id }] }).sort({ createdAt: -1 });
-  res.json(commissions);
-};
+/**
+ * @route GET /commissions/me
+ * @description Get commissions of user (buyer or seller)
+ */
+router.get("/commissions/me", protect, async (req, res) => {
+  try {
+    const commissions = await Commission.find({
+      $or: [{ buyerId: req.user.id }, { sellerId: req.user.id }],
+    }).sort({ createdAt: -1 });
+    res.json(commissions);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+module.exports = router;
