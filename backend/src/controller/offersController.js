@@ -1,5 +1,5 @@
-const Offer = require('../models/Offer');
-const Listing = require('../models/Listing');
+const Offer = require('../../models/Offer');
+const Listing = require('../../models/Listing');
 
 exports.createOffer = async (req, res) => {
   try {
