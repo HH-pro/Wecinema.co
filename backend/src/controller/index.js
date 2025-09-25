@@ -3,9 +3,9 @@ const VideoController = require("./video");
 const domainController = require("./domainController");
 const sentryRouter = require("./sentry");
 
-const listingsRoutes = require("../routes/listingsRoutes");
-const offersRoutes = require("../routes/offersRoutes");
-const commissionsRoutes = require("../routes/commissionsRoutes");
+const listingsRoutes = require("./listingsRoutes");
+const offersRoutes = require("./offersRoutes");
+const commissionsRoutes = require("./commissionsRoutes");
 
 module.exports = {
   UserController,
