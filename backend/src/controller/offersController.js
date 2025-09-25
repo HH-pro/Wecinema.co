@@ -4,6 +4,8 @@ const Offer = require("../../models/Offer");
 const Listing = require("../../models/Listing");
 const protect = require("../middleware/protect");
 
+const { Listing, protect } = require("../utils");
+
 /**
  * @route POST /offers
  * @description Create an offer
