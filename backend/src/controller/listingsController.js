@@ -1,8 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const Listing = require("../../models/Listing");
-const protect = require("../middleware/protect");
-const ensureOwner = require("../middleware/ownerCheck");
+
+const { ensureOwner, protect } = require("../utils");
 
 /**
  * @route GET /listings
