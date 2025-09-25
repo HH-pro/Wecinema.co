@@ -1,4 +1,4 @@
-const Commission = require('../models/Commission');
+const Commission = require('../../models/Commission');
 
 exports.createCommission = async (req, res) => {
   try {
