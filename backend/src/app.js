@@ -90,6 +90,9 @@ app.use("/user", UserController);
 app.use("/domain", domainController);
 app.use("/sentry", sentryRouter);
 
+router.use("/listings", listingsRoutes);
+router.use("/offers", offersRoutes);
+router.use("/commissions", commissionsRoutes);
 // ✅ Error handler must be before any other error middleware
 app.use(Sentry.Handlers.errorHandler());
 
