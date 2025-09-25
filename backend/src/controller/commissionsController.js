@@ -1,8 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const Commission = require("../../models/Commission");
-const protect = require("../middleware/protect");
 
+const { Commission, protect } = require("../utils");
 /**
  * @route POST /commissions
  * @description Create commission request
