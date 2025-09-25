@@ -1,8 +1,6 @@
 const express = require("express");
 const router = express.Router();
 const Offer = require("../../models/Offer");
-const Listing = require("../../models/Listing");
-const protect = require("../middleware/protect");
 
 const { Listing, protect } = require("../utils");
 
