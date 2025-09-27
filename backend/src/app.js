@@ -6,7 +6,6 @@ const {
   UserController,
   domainController,
   sentryRouter,
-  istingController,
   offerController,
   commissionController,
   listingController,
