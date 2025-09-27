@@ -6,9 +6,9 @@ const {
   UserController,
   domainController,
   sentryRouter,
-  listingsRoutes,
-  offersRoutes,
-  commissionsRoutes,
+  listingController,
+  offerController,
+  commissionController,
 } = require("./controller");
 const connectDB = require("./config");
 const morgan = require("morgan");
@@ -104,10 +104,10 @@ app.use("/user", UserController);
 app.use("/domain", domainController);
 app.use("/sentry", sentryRouter);
 
-// Grouped routes
-app.use("/api/listings", require("./routes/listingRoutes"));
-app.use("/api/offers", require("./routes/offerRoutes"));
-app.use("/api/commissions", require("./routes/commissionRoutes"));
+// ✅ Listings, Offers, Commissions Controllers
+app.use("/api/listings", listingController);
+app.use("/api/offers", offerController);
+app.use("/api/commissions", commissionController);
 
 // ✅ Error handler (Sentry first, then fallback)
 app.use(Sentry.Handlers.errorHandler());
