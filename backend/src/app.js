@@ -54,7 +54,7 @@ const allowedOrigins = [
   "http://wecinema.co",
   "http://wecinema.co/api",
   "https://wecinema.co",
-  "http://localhost:3000/api/",
+  "http://localhost:3000",
   "https://wecinema-admin.onrender.com",
   "https://wecinema-main.vercel.app/",
   "https://wecinema-21d00.firebaseapp.com",
