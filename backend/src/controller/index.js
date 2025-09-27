@@ -4,7 +4,7 @@ const domainController = require("./domainController");
 const sentryRouter = require("./sentry");
 
 // ✅ Controllers
-const listingController = require("./listingController");
+const listingController = require("./listingsController");
 const offerController = require("./offerController");
 const commissionController = require("./commissionController");
 
