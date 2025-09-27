@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const Offer = require("../models/Offer");
-const Listing = require("../models/Listing");
+const Offer = require("../../models/Offer");
+const Listing = require("../../models/Listing");
 const auth = require("../middleware/auth");
 
 /**
