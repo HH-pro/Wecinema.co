@@ -6,10 +6,13 @@ const {
   UserController,
   domainController,
   sentryRouter,
-  listingController,
-  offerController,
-  commissionController,
 } = require("./controller");
+
+// ✅ Import route files (not controllers directly)
+const listingRoutes = require("./routes/listingRoutes");
+const offerRoutes = require("./routes/offerRoutes");
+const commissionRoutes = require("./routes/commissionRoutes");
+
 const connectDB = require("./config");
 const morgan = require("morgan");
 const cors = require("cors");
@@ -104,10 +107,10 @@ app.use("/user", UserController);
 app.use("/domain", domainController);
 app.use("/sentry", sentryRouter);
 
-// ✅ Listings, Offers, Commissions Controllers
-app.use("/api/listings", listingController);
-app.use("/api/offers", offerController);
-app.use("/api/commissions", commissionController);
+// ✅ Listings, Offers, Commissions Routes
+app.use("/api/listings", listingRoutes);
+app.use("/api/offers", offerRoutes);
+app.use("/api/commissions", commissionRoutes);
 
 // ✅ Error handler (Sentry first, then fallback)
 app.use(Sentry.Handlers.errorHandler());
