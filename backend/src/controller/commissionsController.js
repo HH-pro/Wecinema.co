@@ -2,11 +2,15 @@ const Commission = require("../../models/Commission");
 const User = require("../../models/User");
 
 /**
- * Create a commission request
+ * ✅ Create a commission request
  */
 exports.createCommission = async (req, res) => {
   try {
     const { creatorId, description, budget, deadline } = req.body;
+
+    if (!creatorId || !description || !budget) {
+      return res.status(400).json({ message: "creatorId, description and budget are required" });
+    }
 
     const creator = await User.findById(creatorId);
     if (!creator) {
@@ -18,12 +22,24 @@ exports.createCommission = async (req, res) => {
       return res.status(400).json({ message: "You cannot send a commission request to yourself" });
     }
 
+    // Prevent duplicate commission requests (same buyer to same creator with same description)
+    const existing = await Commission.findOne({
+      buyer: req.user.id,
+      creator: creatorId,
+      description,
+      status: "pending",
+    });
+    if (existing) {
+      return res.status(400).json({ message: "You already sent a similar commission request" });
+    }
+
     const commission = new Commission({
       buyer: req.user.id,
       creator: creatorId,
       description,
       budget,
       deadline,
+      status: "pending",
     });
 
     await commission.save();
@@ -35,12 +51,13 @@ exports.createCommission = async (req, res) => {
 };
 
 /**
- * Get commissions received by creator
+ * ✅ Get commissions received by creator
  */
 exports.getCommissionsForCreator = async (req, res) => {
   try {
     const commissions = await Commission.find({ creator: req.user.id })
-      .populate("buyer", "username email avatar");
+      .populate("buyer", "username email avatar")
+      .sort({ createdAt: -1 });
 
     res.status(200).json(commissions);
   } catch (error) {
@@ -50,12 +67,13 @@ exports.getCommissionsForCreator = async (req, res) => {
 };
 
 /**
- * Get commissions requested by buyer
+ * ✅ Get commissions requested by buyer
  */
 exports.getMyCommissions = async (req, res) => {
   try {
     const commissions = await Commission.find({ buyer: req.user.id })
-      .populate("creator", "username email avatar");
+      .populate("creator", "username email avatar")
+      .sort({ createdAt: -1 });
 
     res.status(200).json(commissions);
   } catch (error) {
@@ -65,12 +83,16 @@ exports.getMyCommissions = async (req, res) => {
 };
 
 /**
- * Respond to commission (creator only)
+ * ✅ Respond to commission (creator only)
  */
 exports.respondToCommission = async (req, res) => {
   try {
     const { commissionId } = req.params;
     const { action } = req.body; // "accept" | "reject"
+
+    if (!["accept", "reject"].includes(action)) {
+      return res.status(400).json({ message: "Invalid action (must be accept/reject)" });
+    }
 
     const commission = await Commission.findById(commissionId);
     if (!commission) {
@@ -81,15 +103,13 @@ exports.respondToCommission = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
-    if (action === "accept") {
-      commission.status = "accepted";
-    } else if (action === "reject") {
-      commission.status = "rejected";
-    } else {
-      return res.status(400).json({ message: "Invalid action" });
+    if (commission.status !== "pending") {
+      return res.status(400).json({ message: `This commission is already ${commission.status}` });
     }
 
+    commission.status = action === "accept" ? "accepted" : "rejected";
     await commission.save();
+
     res.status(200).json({ message: `Commission ${commission.status}`, commission });
   } catch (error) {
     console.error("Error responding to commission:", error);
