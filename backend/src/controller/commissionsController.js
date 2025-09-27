@@ -1,71 +1,98 @@
-const express = require("express");
-const router = express.Router();
+const Commission = require("../models/Commission");
+const User = require("../models/User");
 
-const { Commission, protect } = require("../utils");
 /**
- * @route POST /commissions
- * @description Create commission request
+ * Create a commission request
  */
-router.post("/commissions", protect, async (req, res) => {
+exports.createCommission = async (req, res) => {
   try {
-    const { requirements, budget, timeline, sellerId } = req.body;
-    const commission = await Commission.create({
-      buyerId: req.user.id,
-      sellerId: sellerId || null,
-      requirements,
+    const { creatorId, description, budget, deadline } = req.body;
+
+    const creator = await User.findById(creatorId);
+    if (!creator) {
+      return res.status(404).json({ message: "Creator not found" });
+    }
+
+    // Prevent sending commission request to self
+    if (creator._id.toString() === req.user.id) {
+      return res.status(400).json({ message: "You cannot send a commission request to yourself" });
+    }
+
+    const commission = new Commission({
+      buyer: req.user.id,
+      creator: creatorId,
+      description,
       budget,
-      timeline,
+      deadline,
     });
-    res.status(201).json(commission);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
 
-/**
- * @route POST /commissions/:id/message
- * @description Add message to commission
- */
-router.post("/commissions/:id/message", protect, async (req, res) => {
-  try {
-    const commission = await Commission.findById(req.params.id);
-    if (!commission) return res.status(404).json({ message: "Not found" });
-
-    commission.messages.push({ senderId: req.user.id, text: req.body.text });
     await commission.save();
-    res.json(commission);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(201).json({ message: "Commission request sent", commission });
+  } catch (error) {
+    console.error("Error creating commission:", error);
+    res.status(500).json({ message: "Server error" });
   }
-});
+};
 
 /**
- * @route GET /commissions/:id
- * @description Get commission by ID
+ * Get commissions received by creator
  */
-router.get("/commissions/:id", protect, async (req, res) => {
+exports.getCommissionsForCreator = async (req, res) => {
   try {
-    const commission = await Commission.findById(req.params.id);
-    if (!commission) return res.status(404).json({ message: "Not found" });
-    res.json(commission);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    const commissions = await Commission.find({ creator: req.user.id })
+      .populate("buyer", "username email avatar");
+
+    res.status(200).json(commissions);
+  } catch (error) {
+    console.error("Error fetching commissions:", error);
+    res.status(500).json({ message: "Server error" });
   }
-});
+};
 
 /**
- * @route GET /commissions/me
- * @description Get commissions of user (buyer or seller)
+ * Get commissions requested by buyer
  */
-router.get("/commissions/me", protect, async (req, res) => {
+exports.getMyCommissions = async (req, res) => {
   try {
-    const commissions = await Commission.find({
-      $or: [{ buyerId: req.user.id }, { sellerId: req.user.id }],
-    }).sort({ createdAt: -1 });
-    res.json(commissions);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+    const commissions = await Commission.find({ buyer: req.user.id })
+      .populate("creator", "username email avatar");
 
-module.exports = router;
+    res.status(200).json(commissions);
+  } catch (error) {
+    console.error("Error fetching commissions:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/**
+ * Respond to commission (creator only)
+ */
+exports.respondToCommission = async (req, res) => {
+  try {
+    const { commissionId } = req.params;
+    const { action } = req.body; // "accept" | "reject"
+
+    const commission = await Commission.findById(commissionId);
+    if (!commission) {
+      return res.status(404).json({ message: "Commission not found" });
+    }
+
+    if (commission.creator.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    if (action === "accept") {
+      commission.status = "accepted";
+    } else if (action === "reject") {
+      commission.status = "rejected";
+    } else {
+      return res.status(400).json({ message: "Invalid action" });
+    }
+
+    await commission.save();
+    res.status(200).json({ message: `Commission ${commission.status}`, commission });
+  } catch (error) {
+    console.error("Error responding to commission:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
