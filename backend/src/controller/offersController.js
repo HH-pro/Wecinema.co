@@ -105,3 +105,63 @@ exports.respondToOffer = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+/**
+ * ✅ Mark offer as payment pending (buyer action after accept)
+ */
+exports.markPaymentPending = async (req, res) => {
+  try {
+    const { offerId } = req.params;
+
+    const offer = await Offer.findById(offerId);
+    if (!offer) {
+      return res.status(404).json({ message: "Offer not found" });
+    }
+
+    if (offer.buyer.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Only the buyer can mark payment pending" });
+    }
+
+    if (offer.status !== "accepted") {
+      return res.status(400).json({ message: "Offer must be accepted before payment" });
+    }
+
+    offer.status = "payment_pending";
+    await offer.save();
+
+    res.status(200).json({ message: "Offer marked as payment pending", offer });
+  } catch (error) {
+    console.error("Error marking payment pending:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/**
+ * ✅ Mark offer as paid (manual update - seller/admin confirmation)
+ */
+exports.markPaid = async (req, res) => {
+  try {
+    const { offerId } = req.params;
+
+    const offer = await Offer.findById(offerId).populate("listing");
+    if (!offer) {
+      return res.status(404).json({ message: "Offer not found" });
+    }
+
+    if (offer.listing.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Only the seller can confirm payment" });
+    }
+
+    if (offer.status !== "payment_pending") {
+      return res.status(400).json({ message: "Offer must be payment_pending before marking as paid" });
+    }
+
+    offer.status = "paid";
+    await offer.save();
+
+    res.status(200).json({ message: "Offer marked as paid", offer });
+  } catch (error) {
+    console.error("Error marking offer paid:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
