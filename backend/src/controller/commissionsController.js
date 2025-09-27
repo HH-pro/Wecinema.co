@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const Commission = require("../../models/Commission");
-const User = require("../../models/User");
+const Commission = require("../models/Commission");
+const User = require("../models/User");
 
 // ✅ Create a commission request
 router.post("/commissions", async (req, res) => {
