@@ -109,9 +109,9 @@ app.use("/domain", domainController);
 app.use("/sentry", sentryRouter);
 
 // ✅ Listings, Offers, Commissions Routes
-app.use("/api/listings", listingController);
-app.use("/api/offers", offerController);
-app.use("/api/commissions", commissionController);
+app.use("/listings", listingController);
+app.use("/offers", offerController);
+app.use("/commissions", commissionController);
 
 // ✅ Error handler (Sentry first, then fallback)
 app.use(Sentry.Handlers.errorHandler());
