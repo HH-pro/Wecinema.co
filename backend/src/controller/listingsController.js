@@ -37,7 +37,7 @@ router.post("/listings", authenticateMiddleware, async (req, res) => {
  * @route GET /listings
  * @desc Get all active listings
  */
-router.get("/", async (req, res) => {
+router.get("/listings", async (req, res) => {
   try {
     const listings = await Listing.find({ status: "active" })
       .populate("owner", "username email avatar")
