@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 const Mongoose = require("mongoose");
-const Listing = require("../");
+const Listing = require("../src/models/listing");
 
 // ✅ Authenticate Middleware (basic token validation)
 const authenticateMiddleware = (req, res, next) => {
