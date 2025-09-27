@@ -1,82 +1,106 @@
-const express = require("express");
-const router = express.Router();
-const Listing = require("../models/listing");
-
-const { ensureOwner, protect } = require("../utils");
+const Listing = require("../models/Listing");
 
 /**
- * @route GET /listings
- * @description Get all listings (filter by owner/status if provided)
+ * Create a new listing
  */
-router.get("/listings", async (req, res) => {
+exports.createListing = async (req, res) => {
   try {
-    const q = {};
-    if (req.query.owner) q.owner = req.query.owner;
-    if (req.query.status) q.status = req.query.status;
-    const listings = await Listing.find(q).sort({ createdAt: -1 }).limit(200);
-    res.json(listings);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    const listing = new Listing({
+      owner: req.user.id,
+      video: req.body.videoId,
+      type: req.body.type, // for_sale | licensing | adaptation | offer | commission
+      price: req.body.price || null,
+      status: "active",
+    });
+
+    await listing.save();
+    res.status(201).json({ message: "Listing created successfully", listing });
+  } catch (error) {
+    console.error("Error creating listing:", error);
+    res.status(500).json({ message: "Server error" });
   }
-});
+};
 
 /**
- * @route GET /listings/:id
- * @description Get single listing by ID
+ * Get all listings
  */
-router.get("/listings/:id", async (req, res) => {
+exports.getListings = async (req, res) => {
   try {
-    const listing = await Listing.findById(req.params.id).populate("owner", "email name");
-    if (!listing) return res.status(404).json({ message: "Not found" });
-    res.json(listing);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    const listings = await Listing.find({ status: "active" })
+      .populate("owner", "username email avatar")
+      .populate("video", "title file");
+
+    res.status(200).json(listings);
+  } catch (error) {
+    console.error("Error fetching listings:", error);
+    res.status(500).json({ message: "Server error" });
   }
-});
+};
 
 /**
- * @route POST /listings
- * @description Create a new listing
+ * Get single listing
  */
-router.post("/listings", protect, async (req, res) => {
+exports.getListingById = async (req, res) => {
   try {
-    const data = { ...req.body, owner: req.user.id };
-    const listing = await Listing.create(data);
-    res.status(201).json(listing);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
+    const listing = await Listing.findById(req.params.id)
+      .populate("owner", "username email avatar")
+      .populate("video", "title file");
 
-/**
- * @route PUT /listings/:id
- * @description Update listing (owner only)
- */
-router.put("/listings/:id", protect, ensureOwner, async (req, res) => {
-  try {
-    Object.assign(req.listing, req.body);
-    await req.listing.save();
-    res.json(req.listing);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-/**
- * @route POST /listings/:id/publish
- * @description Publish listing (set status active)
- */
-router.post("/listings/:id/publish", protect, ensureOwner, async (req, res) => {
-  try {
-    if (!req.listing.price) {
-      return res.status(400).json({ message: "Set price before publishing" });
+    if (!listing) {
+      return res.status(404).json({ message: "Listing not found" });
     }
-    req.listing.status = "active";
-    await req.listing.save();
-    res.json(req.listing);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
 
-module.exports = router;
+    res.status(200).json(listing);
+  } catch (error) {
+    console.error("Error fetching listing:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/**
+ * Update listing
+ */
+exports.updateListing = async (req, res) => {
+  try {
+    const listing = await Listing.findById(req.params.id);
+
+    if (!listing) {
+      return res.status(404).json({ message: "Listing not found" });
+    }
+
+    if (listing.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    Object.assign(listing, req.body); // update fields
+    await listing.save();
+
+    res.status(200).json({ message: "Listing updated", listing });
+  } catch (error) {
+    console.error("Error updating listing:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/**
+ * Delete listing
+ */
+exports.deleteListing = async (req, res) => {
+  try {
+    const listing = await Listing.findById(req.params.id);
+
+    if (!listing) {
+      return res.status(404).json({ message: "Listing not found" });
+    }
+
+    if (listing.owner.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    await listing.remove();
+    res.status(200).json({ message: "Listing deleted" });
+  } catch (error) {
+    console.error("Error deleting listing:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
