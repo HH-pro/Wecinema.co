@@ -1,10 +1,14 @@
-const Offer = require("../../models/Offer");
-const Listing = require("../../models/Listing");
+const express = require("express");
+const router = express.Router();
+const Offer = require("../models/Offer");
+const Listing = require("../models/Listing");
+const auth = require("../middleware/auth");
 
 /**
- * ✅ Create a new offer on a listing
+ * @route POST /offers
+ * @description Create a new offer on a listing
  */
-exports.createOffer = async (req, res) => {
+router.post("/offers", auth, async (req, res) => {
   try {
     const { listingId, proposedPrice, message } = req.body;
 
@@ -17,12 +21,10 @@ exports.createOffer = async (req, res) => {
       return res.status(404).json({ message: "Listing not found or not active" });
     }
 
-    // Prevent owner from making offer on their own listing
     if (listing.owner.toString() === req.user.id) {
       return res.status(400).json({ message: "You cannot make an offer on your own listing" });
     }
 
-    // Prevent duplicate offers from the same buyer
     const existingOffer = await Offer.findOne({ listing: listingId, buyer: req.user.id });
     if (existingOffer) {
       return res.status(400).json({ message: "You already made an offer for this listing" });
@@ -42,12 +44,13 @@ exports.createOffer = async (req, res) => {
     console.error("Error creating offer:", error);
     res.status(500).json({ message: "Server error" });
   }
-};
+});
 
 /**
- * ✅ Get all offers for a listing (owner only)
+ * @route GET /offers/listing/:listingId
+ * @description Get all offers for a listing (owner only)
  */
-exports.getOffersForListing = async (req, res) => {
+router.get("/offers/listing/:listingId", auth, async (req, res) => {
   try {
     const { listingId } = req.params;
 
@@ -69,12 +72,13 @@ exports.getOffersForListing = async (req, res) => {
     console.error("Error fetching offers:", error);
     res.status(500).json({ message: "Server error" });
   }
-};
+});
 
 /**
- * ✅ Accept or reject an offer (owner only)
+ * @route PUT /offers/:offerId/respond
+ * @description Accept or reject an offer
  */
-exports.respondToOffer = async (req, res) => {
+router.put("/offers/:offerId/respond", auth, async (req, res) => {
   try {
     const { offerId } = req.params;
     const { action } = req.body; // "accept" or "reject"
@@ -104,12 +108,13 @@ exports.respondToOffer = async (req, res) => {
     console.error("Error responding to offer:", error);
     res.status(500).json({ message: "Server error" });
   }
-};
+});
 
 /**
- * ✅ Mark offer as payment pending (buyer action after accept)
+ * @route PUT /offers/:offerId/payment-pending
+ * @description Mark offer as payment pending (buyer only)
  */
-exports.markPaymentPending = async (req, res) => {
+router.put("/offers/:offerId/payment-pending", auth, async (req, res) => {
   try {
     const { offerId } = req.params;
 
@@ -134,12 +139,13 @@ exports.markPaymentPending = async (req, res) => {
     console.error("Error marking payment pending:", error);
     res.status(500).json({ message: "Server error" });
   }
-};
+});
 
 /**
- * ✅ Mark offer as paid (manual update - seller/admin confirmation)
+ * @route PUT /offers/:offerId/paid
+ * @description Mark offer as paid (seller only)
  */
-exports.markPaid = async (req, res) => {
+router.put("/offers/:offerId/paid", auth, async (req, res) => {
   try {
     const { offerId } = req.params;
 
@@ -164,4 +170,6 @@ exports.markPaid = async (req, res) => {
     console.error("Error marking offer paid:", error);
     res.status(500).json({ message: "Server error" });
   }
-};
+});
+
+module.exports = router;
