@@ -1,5 +1,5 @@
-const Offer = require("../models/Offer");
-const Listing = require("../models/Listing");
+const Offer = require("../../models/Offer");
+const Listing = require("../../models/Listing");
 
 /**
  * Create a new offer on a listing
