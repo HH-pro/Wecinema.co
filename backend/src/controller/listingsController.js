@@ -1,4 +1,4 @@
-const Listing = require("../models/Listing");
+const Listing = require("../../models/Listing");
 
 /**
  * Create a new listing
