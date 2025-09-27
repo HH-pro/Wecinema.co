@@ -4,8 +4,8 @@ const domainController = require("./domainController");
 const sentryRouter = require("./sentry");
 
 const listingsRoutes = require("./listingsController");
-const offersRoutes = require("./offersRoutes");
-const commissionsRoutes = require("./commissionsRoutes");
+const offersRoutes = require("./offersController");
+const commissionsRoutes = require("./commissionsController");
 
 module.exports = {
   UserController,
