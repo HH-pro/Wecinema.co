@@ -1,15 +1,21 @@
 const Listing = require("../../models/Listing");
 
 /**
- * Create a new listing
+ * ✅ Create a new listing
  */
 exports.createListing = async (req, res) => {
   try {
+    const { videoId, type, price } = req.body;
+
+    if (!videoId || !type) {
+      return res.status(400).json({ message: "videoId and type are required" });
+    }
+
     const listing = new Listing({
       owner: req.user.id,
-      video: req.body.videoId,
-      type: req.body.type, // for_sale | licensing | adaptation | offer | commission
-      price: req.body.price || null,
+      video: videoId,
+      type, // for_sale | licensing | adaptation | offer | commission
+      price: price || null,
       status: "active",
     });
 
@@ -22,7 +28,7 @@ exports.createListing = async (req, res) => {
 };
 
 /**
- * Get all listings
+ * ✅ Get all active listings
  */
 exports.getListings = async (req, res) => {
   try {
@@ -38,7 +44,7 @@ exports.getListings = async (req, res) => {
 };
 
 /**
- * Get single listing
+ * ✅ Get single listing by ID
  */
 exports.getListingById = async (req, res) => {
   try {
@@ -58,7 +64,7 @@ exports.getListingById = async (req, res) => {
 };
 
 /**
- * Update listing
+ * ✅ Update listing (only by owner)
  */
 exports.updateListing = async (req, res) => {
   try {
@@ -72,9 +78,15 @@ exports.updateListing = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
-    Object.assign(listing, req.body); // update fields
-    await listing.save();
+    // Prevent updating restricted fields like owner/status directly
+    const allowedUpdates = ["type", "price", "status"];
+    allowedUpdates.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        listing[field] = req.body[field];
+      }
+    });
 
+    await listing.save();
     res.status(200).json({ message: "Listing updated", listing });
   } catch (error) {
     console.error("Error updating listing:", error);
@@ -83,7 +95,7 @@ exports.updateListing = async (req, res) => {
 };
 
 /**
- * Delete listing
+ * ✅ Delete listing (soft delete instead of permanent remove)
  */
 exports.deleteListing = async (req, res) => {
   try {
@@ -97,8 +109,11 @@ exports.deleteListing = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
-    await listing.remove();
-    res.status(200).json({ message: "Listing deleted" });
+    // Instead of permanent delete, mark as inactive
+    listing.status = "deleted";
+    await listing.save();
+
+    res.status(200).json({ message: "Listing deleted (soft)" });
   } catch (error) {
     console.error("Error deleting listing:", error);
     res.status(500).json({ message: "Server error" });
