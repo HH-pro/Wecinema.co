@@ -5,8 +5,8 @@ const sentryRouter = require("./sentry");
 
 // ✅ Controllers
 const listingController = require("./listingsController");
-const offerController = require("./offerController");
-const commissionController = require("./commissionController");
+const offerController = require("./offersController");
+const commissionController = require("./commissionsController");
 
 module.exports = {
   UserController,
