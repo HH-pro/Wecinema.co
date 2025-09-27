@@ -1,13 +1,15 @@
 const express = require("express");
 const router = express.Router();
 const Listing = require("../../models/Listing");
-const auth = require("../middleware/auth");
+
+const { authenticateMiddleware } = require("../utils");
+
 
 /**
  * @route POST /listings
  * @desc Create a new listing
  */
-router.post("/listings", auth, async (req, res) => {
+router.post("/listings", authenticateMiddleware, async (req, res) => {
   try {
     const { videoId, type, price } = req.body;
 
@@ -73,7 +75,7 @@ router.get("/listings/:id", async (req, res) => {
  * @route PUT /listings/:id
  * @desc Update listing (only by owner)
  */
-router.put("/listings/:id", auth, async (req, res) => {
+router.put("/listings/:id", authenticateMiddleware, async (req, res) => {
   try {
     const listing = await Listing.findById(req.params.id);
 
@@ -82,7 +84,7 @@ router.put("/listings/:id", auth, async (req, res) => {
     }
 
     if (listing.owner.toString() !== req.user.id) {
-      return res.status(403).json({ message: "Unauthorized" });
+      return res.status(403).json({ message: "UnauthenticateMiddlewareorized" });
     }
 
     const allowedUpdates = ["type", "price", "status"];
@@ -104,7 +106,7 @@ router.put("/listings/:id", auth, async (req, res) => {
  * @route DELETE /listings/:id
  * @desc Soft delete listing (mark as deleted)
  */
-router.delete("/listings/:id", auth, async (req, res) => {
+router.delete("/listings/:id", authenticateMiddleware, async (req, res) => {
   try {
     const listing = await Listing.findById(req.params.id);
 
@@ -113,7 +115,7 @@ router.delete("/listings/:id", auth, async (req, res) => {
     }
 
     if (listing.owner.toString() !== req.user.id) {
-      return res.status(403).json({ message: "Unauthorized" });
+      return res.status(403).json({ message: "UnauthenticateMiddlewareorized" });
     }
 
     listing.status = "deleted";
