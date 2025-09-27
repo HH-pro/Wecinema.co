@@ -1,9 +1,13 @@
-const Listing = require("../../models/Listing");
+const express = require("express");
+const router = express.Router();
+const Listing = require("../models/Listing");
+const auth = require("../middleware/auth");
 
 /**
- * ✅ Create a new listing
+ * @route POST /listings
+ * @desc Create a new listing
  */
-exports.createListing = async (req, res) => {
+router.post("/listings", auth, async (req, res) => {
   try {
     const { videoId, type, price } = req.body;
 
@@ -25,12 +29,13 @@ exports.createListing = async (req, res) => {
     console.error("Error creating listing:", error);
     res.status(500).json({ message: "Server error" });
   }
-};
+});
 
 /**
- * ✅ Get all active listings
+ * @route GET /listings
+ * @desc Get all active listings
  */
-exports.getListings = async (req, res) => {
+router.get("/listings", async (req, res) => {
   try {
     const listings = await Listing.find({ status: "active" })
       .populate("owner", "username email avatar")
@@ -41,12 +46,13 @@ exports.getListings = async (req, res) => {
     console.error("Error fetching listings:", error);
     res.status(500).json({ message: "Server error" });
   }
-};
+});
 
 /**
- * ✅ Get single listing by ID
+ * @route GET /listings/:id
+ * @desc Get single listing by ID
  */
-exports.getListingById = async (req, res) => {
+router.get("/listings/:id", async (req, res) => {
   try {
     const listing = await Listing.findById(req.params.id)
       .populate("owner", "username email avatar")
@@ -61,12 +67,13 @@ exports.getListingById = async (req, res) => {
     console.error("Error fetching listing:", error);
     res.status(500).json({ message: "Server error" });
   }
-};
+});
 
 /**
- * ✅ Update listing (only by owner)
+ * @route PUT /listings/:id
+ * @desc Update listing (only by owner)
  */
-exports.updateListing = async (req, res) => {
+router.put("/listings/:id", auth, async (req, res) => {
   try {
     const listing = await Listing.findById(req.params.id);
 
@@ -78,7 +85,6 @@ exports.updateListing = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
-    // Prevent updating restricted fields like owner/status directly
     const allowedUpdates = ["type", "price", "status"];
     allowedUpdates.forEach((field) => {
       if (req.body[field] !== undefined) {
@@ -92,12 +98,13 @@ exports.updateListing = async (req, res) => {
     console.error("Error updating listing:", error);
     res.status(500).json({ message: "Server error" });
   }
-};
+});
 
 /**
- * ✅ Delete listing (soft delete instead of permanent remove)
+ * @route DELETE /listings/:id
+ * @desc Soft delete listing (mark as deleted)
  */
-exports.deleteListing = async (req, res) => {
+router.delete("/listings/:id", auth, async (req, res) => {
   try {
     const listing = await Listing.findById(req.params.id);
 
@@ -109,7 +116,6 @@ exports.deleteListing = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
-    // Instead of permanent delete, mark as inactive
     listing.status = "deleted";
     await listing.save();
 
@@ -118,4 +124,6 @@ exports.deleteListing = async (req, res) => {
     console.error("Error deleting listing:", error);
     res.status(500).json({ message: "Server error" });
   }
-};
+});
+
+module.exports = router;
