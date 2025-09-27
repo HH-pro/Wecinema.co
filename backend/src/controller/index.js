@@ -3,16 +3,17 @@ const VideoController = require("./video");
 const domainController = require("./domainController");
 const sentryRouter = require("./sentry");
 
-const listingsRoutes = require("./listingsController");
-const offersRoutes = require("./offersController");
-const commissionsRoutes = require("./commissionsController");
+// ✅ Controllers
+const listingController = require("./listingController");
+const offerController = require("./offerController");
+const commissionController = require("./commissionController");
 
 module.exports = {
   UserController,
   VideoController,
   domainController,
   sentryRouter,
-  listingsRoutes,
-  offersRoutes,
-  commissionsRoutes,
+  listingController,
+  offerController,
+  commissionController,
 };
