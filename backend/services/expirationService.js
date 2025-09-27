@@ -1,5 +1,5 @@
 const cron = require('node-cron');
-const Domain = require('../../backend/src/models/domainModel');
+const Domain = require('../src/models/domainModel');
 const { sendWhatsAppMessage } = require('./twilioService');
 
 // Configure these values
