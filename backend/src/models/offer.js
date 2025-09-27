@@ -1,38 +1,33 @@
+// models/Offer.js
 const mongoose = require("mongoose");
-const { Schema } = mongoose;
 
-const offerSchema = new Schema(
+const OfferSchema = new mongoose.Schema(
   {
     listing: {
-      type: Schema.Types.ObjectId,
+      type: mongoose.Schema.Types.ObjectId,
       ref: "Listing",
       required: true,
     },
     buyer: {
-      type: Schema.Types.ObjectId,
+      type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
     seller: {
-      type: Schema.Types.ObjectId,
+      type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
+    price: { type: Number, required: true },
 
-    proposedPrice: { type: Number, required: true },
-
+    // 🔹 New field for offer/payment flow
     status: {
       type: String,
-      enum: ["pending", "accepted", "rejected", "withdrawn"],
+      enum: ["pending", "accepted", "rejected", "payment_pending", "paid"],
       default: "pending",
     },
-
-    message: { type: String }, // optional buyer message
   },
-  {
-    timestamps: true, // createdAt, updatedAt
-  }
+  { timestamps: true }
 );
 
-const offerModel = mongoose.model("Offer", offerSchema);
-module.exports = offerModel;
+module.exports = mongoose.model("Offer", OfferSchema);
