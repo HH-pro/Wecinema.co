@@ -105,9 +105,9 @@ app.use("/domain", domainController);
 app.use("/sentry", sentryRouter);
 
 // Grouped routes
-app.use("/api", listingsRoutes);
-app.use("/api", offersRoutes);
-app.use("/api", commissionsRoutes);
+app.use("/api/listings", require("./routes/listingRoutes"));
+app.use("/api/offers", require("./routes/offerRoutes"));
+app.use("/api/commissions", require("./routes/commissionRoutes"));
 
 // ✅ Error handler (Sentry first, then fallback)
 app.use(Sentry.Handlers.errorHandler());
