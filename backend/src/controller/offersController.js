@@ -2,13 +2,13 @@ const express = require("express");
 const router = express.Router();
 const Offer = require("../../models/Offer");
 const Listing = require("../../models/Listing");
-const auth = require("../middleware/auth");
+const { authenticateMiddleware } = require("../utils");
 
 /**
  * @route POST /offers
  * @description Create a new offer on a listing
  */
-router.post("/offers", auth, async (req, res) => {
+router.post("/offers", authenticateMiddleware, async (req, res) => {
   try {
     const { listingId, proposedPrice, message } = req.body;
 
@@ -50,7 +50,7 @@ router.post("/offers", auth, async (req, res) => {
  * @route GET /offers/listing/:listingId
  * @description Get all offers for a listing (owner only)
  */
-router.get("/offers/listing/:listingId", auth, async (req, res) => {
+router.get("/offers/listing/:listingId", authenticateMiddleware, async (req, res) => {
   try {
     const { listingId } = req.params;
 
@@ -60,7 +60,7 @@ router.get("/offers/listing/:listingId", auth, async (req, res) => {
     }
 
     if (listing.owner.toString() !== req.user.id) {
-      return res.status(403).json({ message: "Unauthorized" });
+      return res.status(403).json({ message: "UnauthenticateMiddlewareorized" });
     }
 
     const offers = await Offer.find({ listing: listingId })
@@ -78,7 +78,7 @@ router.get("/offers/listing/:listingId", auth, async (req, res) => {
  * @route PUT /offers/:offerId/respond
  * @description Accept or reject an offer
  */
-router.put("/offers/:offerId/respond", auth, async (req, res) => {
+router.put("/offers/:offerId/respond", authenticateMiddleware, async (req, res) => {
   try {
     const { offerId } = req.params;
     const { action } = req.body; // "accept" or "reject"
@@ -93,7 +93,7 @@ router.put("/offers/:offerId/respond", auth, async (req, res) => {
     }
 
     if (offer.listing.owner.toString() !== req.user.id) {
-      return res.status(403).json({ message: "Unauthorized" });
+      return res.status(403).json({ message: "UnauthenticateMiddlewareorized" });
     }
 
     if (offer.status !== "pending") {
@@ -114,7 +114,7 @@ router.put("/offers/:offerId/respond", auth, async (req, res) => {
  * @route PUT /offers/:offerId/payment-pending
  * @description Mark offer as payment pending (buyer only)
  */
-router.put("/offers/:offerId/payment-pending", auth, async (req, res) => {
+router.put("/offers/:offerId/payment-pending", authenticateMiddleware, async (req, res) => {
   try {
     const { offerId } = req.params;
 
@@ -145,7 +145,7 @@ router.put("/offers/:offerId/payment-pending", auth, async (req, res) => {
  * @route PUT /offers/:offerId/paid
  * @description Mark offer as paid (seller only)
  */
-router.put("/offers/:offerId/paid", auth, async (req, res) => {
+router.put("/offers/:offerId/paid", authenticateMiddleware, async (req, res) => {
   try {
     const { offerId } = req.params;
 
