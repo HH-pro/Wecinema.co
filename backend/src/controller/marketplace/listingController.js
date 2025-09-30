@@ -1,8 +1,9 @@
 const express = require("express");
 const router = express.Router();
-const Listing = require("../../models/marketplace/listing");
+const Listing = require("../../models/marketplace/Listing");
+const { protect, isHypeModeUser, isSeller } = require("../../utils/auth"); // 🆕 AUTH IMPORT
 
-// Get all active listings
+// ✅ PUBLIC ROUTE - No auth required
 router.get("/listings", async (req, res) => {
   try {
     const listings = await Listing.find({ status: 'active' })
@@ -14,8 +15,8 @@ router.get("/listings", async (req, res) => {
   }
 });
 
-// Get my listings (seller)
-router.get("/my-listings", async (req, res) => {
+// ✅ PROTECTED ROUTES - HypeMode + Seller only
+router.get("/my-listings", protect, isHypeModeUser, isSeller, async (req, res) => {
   try {
     const listings = await Listing.find({ sellerId: req.user.id });
     res.status(200).json(listings);
@@ -26,7 +27,7 @@ router.get("/my-listings", async (req, res) => {
 });
 
 // Create new listing
-router.post("/create-listing", async (req, res) => {
+router.post("/create-listing", protect, isHypeModeUser, isSeller, async (req, res) => {
   try {
     const { title, description, price, type, category, tags } = req.body;
     
@@ -50,7 +51,7 @@ router.post("/create-listing", async (req, res) => {
 });
 
 // Update listing
-router.put("/listing/:id", async (req, res) => {
+router.put("/listing/:id", protect, isHypeModeUser, isSeller, async (req, res) => {
   try {
     const listing = await Listing.findOne({ 
       _id: req.params.id, 
@@ -71,7 +72,7 @@ router.put("/listing/:id", async (req, res) => {
 });
 
 // Delete listing
-router.delete("/listing/:id", async (req, res) => {
+router.delete("/listing/:id", protect, isHypeModeUser, isSeller, async (req, res) => {
   try {
     const listing = await Listing.findOneAndDelete({ 
       _id: req.params.id, 
