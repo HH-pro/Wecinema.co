@@ -16,7 +16,7 @@ module.exports = {
   VideoController,
   domainController,
   sentryRouter,
-  ioi,
+  
   // 🆕 MARKETPLACE EXPORTS
   listingRoutes,
   orderRoutes, 
