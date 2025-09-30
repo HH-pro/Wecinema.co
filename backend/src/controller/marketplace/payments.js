@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const Order = require("../../models/marketplace/Order");
-const User = require("../../models/User");
+const Order = require("../../models/marketplace/order");
+const User = require("../../models/user");
 
 // Create payment intent
 router.post("/create-payment-intent", async (req, res) => {
