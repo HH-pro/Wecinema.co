@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const listingSchema = new mongoose.Schema({
+const marketplaceListingSchema = new mongoose.Schema({
   sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   title: { type: String, required: true },
   description: String,
@@ -20,4 +20,6 @@ const listingSchema = new mongoose.Schema({
   tags: [String]
 }, { timestamps: true });
 
-module.exports = mongoose.model('Listing', listingSchema);
+// 🆕 NAME CHANGE: MarketplaceListing
+const MarketplaceListing = mongoose.model('MarketplaceListing', marketplaceListingSchema);
+module.exports = MarketplaceListing;
