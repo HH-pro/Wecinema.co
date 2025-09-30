@@ -1,103 +1,197 @@
 const express = require("express");
 const router = express.Router();
-const Order = require("../../models/marketplace/order");
-const User = require("../../models/user");
+const Order = require("../../models/marketplace/Order");
+const User = require("../../models/User");
+const stripe = require("../../config/stripe");
 
-// Create payment intent
+// 1. Create Payment Intent (Funds hold in escrow)
 router.post("/create-payment-intent", async (req, res) => {
   try {
     const { orderId, amount } = req.body;
-
-    const order = await Order.findOne({
-      _id: orderId,
-      buyerId: req.user.id
-    });
-
-    if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
-    }
-
-    // Here you would integrate with Stripe
-    // For now, we'll simulate payment intent creation
-    const paymentIntent = {
-      id: `pi_${Date.now()}`,
-      client_secret: `cs_test_${Date.now()}`,
-      amount: amount * 100, // Convert to cents
-      currency: 'usd'
-    };
-
-    // Update order with payment intent ID
-    order.stripePaymentIntentId = paymentIntent.id;
-    await order.save();
-
-    res.status(200).json(paymentIntent);
-  } catch (error) {
-    console.error('Error creating payment intent:', error);
-    res.status(500).json({ error: 'Failed to create payment intent' });
-  }
-});
-
-// Confirm payment (webhook simulation)
-router.post("/confirm-payment", async (req, res) => {
-  try {
-    const { orderId, paymentIntentId } = req.body;
 
     const order = await Order.findById(orderId);
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    // Verify payment intent
-    if (order.stripePaymentIntentId !== paymentIntentId) {
-      return res.status(400).json({ error: 'Invalid payment intent' });
-    }
+    // Create Stripe Payment Intent with manual capture (escrow)
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount * 100, // Convert to cents
+      currency: 'usd',
+      capture_method: 'manual', // Manual capture for escrow
+      metadata: {
+        orderId: orderId.toString(),
+        type: 'marketplace_escrow'
+      },
+    });
 
-    // Update order status
-    order.status = 'confirmed';
+    // Update order with payment intent
+    order.stripePaymentIntentId = paymentIntent.id;
     await order.save();
 
-    res.status(200).json({ message: 'Payment confirmed', order });
+    res.status(200).json({
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id
+    });
   } catch (error) {
-    console.error('Error confirming payment:', error);
-    res.status(500).json({ error: 'Failed to confirm payment' });
+    console.error('Error creating payment intent:', error);
+    res.status(500).json({ error: 'Failed to create payment intent' });
   }
 });
 
-// Release funds to seller (when buyer accepts delivery)
-router.post("/release-funds", async (req, res) => {
+// 2. Confirm Payment (Webhook - Funds moved to escrow)
+router.post("/stripe-webhook", express.raw({type: 'application/json'}), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  switch (event.type) {
+    case 'payment_intent.succeeded':
+      const paymentIntent = event.data.object;
+      
+      // Update order status to PAID (funds in escrow)
+      await Order.findOneAndUpdate(
+        { stripePaymentIntentId: paymentIntent.id },
+        { 
+          status: 'paid',
+          // Payment captured but funds held by platform
+        }
+      );
+      console.log('Payment received - Funds in escrow');
+      break;
+
+    default:
+      console.log(`Unhandled event type ${event.type}`);
+  }
+
+  res.json({received: true});
+});
+
+// 3. Seller Delivers Work
+router.post("/deliver-order", async (req, res) => {
+  try {
+    const { orderId, deliveryMessage, deliveryFiles } = req.body;
+
+    const order = await Order.findOne({
+      _id: orderId,
+      sellerId: req.user.id,
+      status: 'paid' // Only deliver if paid
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found or not paid' });
+    }
+
+    // Update order with delivery
+    order.status = 'delivered';
+    order.deliveryMessage = deliveryMessage;
+    order.deliveryFiles = deliveryFiles;
+    order.deliveredAt = new Date();
+    
+    await order.save();
+
+    res.status(200).json({ 
+      message: 'Order delivered successfully', 
+      order 
+    });
+  } catch (error) {
+    console.error('Error delivering order:', error);
+    res.status(500).json({ error: 'Failed to deliver order' });
+  }
+});
+
+// 4. Buyer Accepts Delivery & Release Funds
+router.post("/accept-delivery", async (req, res) => {
   try {
     const { orderId } = req.body;
 
     const order = await Order.findOne({
       _id: orderId,
-      sellerId: req.user.id,
-      status: 'delivered'
+      buyerId: req.user.id,
+      status: 'delivered' // Only accept if delivered
     });
 
     if (!order) {
-      return res.status(404).json({ error: 'Order not found or not ready for payout' });
+      return res.status(404).json({ error: 'Order not found or not delivered' });
     }
 
-    // Update order status
-    order.status = 'completed';
-    await order.save();
+    // CAPTURE PAYMENT - Release funds from escrow to seller
+    const paymentIntent = await stripe.paymentIntents.capture(
+      order.stripePaymentIntentId
+    );
 
-    // Update seller balance (simplified - in real app, use MarketplaceTransaction)
+    // Calculate platform fee and seller amount
+    const platformFee = order.amount * 0.15; // 15% platform fee
+    const sellerAmount = order.amount - platformFee;
+
+    // Update seller balance
     await User.findByIdAndUpdate(order.sellerId, {
       $inc: { 
-        balance: order.amount * 0.85, // 15% platform fee
+        balance: sellerAmount,
         totalSales: 1 
       }
     });
 
+    // Mark order as completed
+    order.status = 'completed';
+    order.paymentReleased = true;
+    order.releaseDate = new Date();
+    order.completedAt = new Date();
+    
+    await order.save();
+
     res.status(200).json({ 
-      message: 'Funds released to seller', 
+      message: 'Delivery accepted and funds released to seller', 
       order,
-      payoutAmount: order.amount * 0.85
+      sellerAmount: sellerAmount,
+      platformFee: platformFee
     });
   } catch (error) {
-    console.error('Error releasing funds:', error);
-    res.status(500).json({ error: 'Failed to release funds' });
+    console.error('Error accepting delivery:', error);
+    res.status(500).json({ error: 'Failed to accept delivery' });
+  }
+});
+
+// 5. Request Revision
+router.post("/request-revision", async (req, res) => {
+  try {
+    const { orderId, revisionNotes } = req.body;
+
+    const order = await Order.findOne({
+      _id: orderId,
+      buyerId: req.user.id,
+      status: 'delivered'
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    // Check revision limit
+    if (order.revisions >= order.maxRevisions) {
+      return res.status(400).json({ error: 'Maximum revisions reached' });
+    }
+
+    order.status = 'in_revision';
+    order.revisions += 1;
+    order.revisionNotes = revisionNotes;
+    
+    await order.save();
+
+    res.status(200).json({ 
+      message: 'Revision requested', 
+      order,
+      revisionsUsed: order.revisions,
+      revisionsLeft: order.maxRevisions - order.revisions
+    });
+  } catch (error) {
+    console.error('Error requesting revision:', error);
+    res.status(500).json({ error: 'Failed to request revision' });
   }
 });
 
