@@ -2,10 +2,10 @@ const UserController = require("./user");
 const VideoController = require("./video");
 const domainController = require("./domainController");
 const sentryRouter = require("./sentry");
-const S = require("./sentry");
+
 
 // 🆕 INDIVIDUAL MARKETPLACE ROUTES
-const listingRoutes = require("./marketplace/listingController");
+const listingRoutes = require("./marketplace/listings");
 const orderRoutes = require("./marketplace/orders");
 const offerRoutes = require("./marketplace/offers");
 const messageRoutes = require("./marketplace/messages");
@@ -16,7 +16,7 @@ module.exports = {
   VideoController,
   domainController,
   sentryRouter,
-  
+ 
   // 🆕 MARKETPLACE EXPORTS
   listingRoutes,
   orderRoutes, 
