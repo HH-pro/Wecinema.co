@@ -6,11 +6,16 @@ const {
   UserController,
   domainController,
   sentryRouter,
+  listingRoutes,
+  orderRoutes, 
+  offerRoutes,
+  messageRoutes,
+  paymentRoutes
  
 } = require("./controller");
 
 // 🆕 MARKETPLACE ROUTES IMPORT KARO
-const marketplaceRoutes = require("./routes/marketplace");
+
 
 const connectDB = require("./config");
 const morgan = require("morgan");
@@ -107,12 +112,13 @@ app.use("/domain", domainController);
 app.use("/sentry", sentryRouter);
 
 // ✅ Listings, Offers, Commissions Routes
-app.use("/listings", listingController);
-app.use("/offers", offerController);
-app.use("/commissions", commissionController);
+app.use("/listings", listingRoutes);
+app.use("/offers", offerRoutes);
+app.use("/orders", orderRoutes);
+app.use("/messages", messageRoutes);
+app.use("/payments", paymentRoutes);
 
-// 🆕 MARKETPLACE ROUTES ADD KARO
-app.use("/api/marketplace", marketplaceRoutes);
+
 
 // ✅ Error handler (Sentry first, then fallback)
 app.use(Sentry.Handlers.errorHandler());
