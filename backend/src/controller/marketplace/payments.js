@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Order = require("../../models/marketplace/order");
 const User = require("../../models/user");
-const stripe = require("../../config/stripe");
+const stripeConfig = require("../../config/stripe"); // 🆕 Updated import
 
 // 1. Create Payment Intent (Escrow mein funds hold karein)
 router.post("/create-payment-intent", async (req, res) => {
@@ -26,17 +26,11 @@ router.post("/create-payment-intent", async (req, res) => {
       return res.status(400).json({ error: 'Order already paid or cancelled' });
     }
 
-    // Create Stripe Payment Intent with manual capture (escrow)
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(order.amount * 100), // Convert to cents
-      currency: 'usd',
-      capture_method: 'manual', // Manual capture for escrow
-      metadata: {
-        orderId: orderId.toString(),
-        userId: req.user.id.toString(),
-        type: 'marketplace_escrow'
-      },
-      description: `Payment for: ${order.listingId?.title || 'Marketplace Order'}`
+    // 🆕 Use stripeConfig for payment intent creation
+    const paymentIntent = await stripeConfig.createPaymentIntent(order.amount, {
+      orderId: orderId.toString(),
+      userId: req.user.id.toString(),
+      type: 'marketplace_escrow'
     });
 
     // Update order with payment intent ID
@@ -50,7 +44,7 @@ router.post("/create-payment-intent", async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating payment intent:', error);
-    res.status(500).json({ error: 'Failed to create payment intent' });
+    res.status(500).json({ error: error.message || 'Failed to create payment intent' });
   }
 });
 
@@ -105,14 +99,13 @@ router.post("/capture-payment", async (req, res) => {
       return res.status(400).json({ error: 'No payment intent found' });
     }
 
-    // Capture the payment - funds release from escrow
-    const paymentIntent = await stripe.paymentIntents.capture(
-      order.stripePaymentIntentId
-    );
+    // 🆕 Use stripeConfig for payment capture
+    const paymentIntent = await stripeConfig.capturePayment(order.stripePaymentIntentId);
 
-    // Calculate platform fee (15%) and seller amount
-    const platformFee = order.amount * 0.15;
-    const sellerAmount = order.amount - platformFee;
+    // 🆕 Use stripeConfig for fee calculation
+    const fees = stripeConfig.calculateFees(order.amount);
+    const platformFee = fees.platformFee;
+    const sellerAmount = fees.sellerAmount;
 
     // Update seller balance
     await User.findByIdAndUpdate(order.sellerId, {
@@ -136,20 +129,12 @@ router.post("/capture-payment", async (req, res) => {
       message: 'Payment captured and funds released to seller', 
       order,
       sellerAmount: sellerAmount,
-      platformFee: platformFee
+      platformFee: platformFee,
+      platformFeePercent: fees.platformFeePercent
     });
   } catch (error) {
     console.error('Error capturing payment:', error);
-    
-    // Stripe specific errors
-    if (error.type === 'StripeError') {
-      return res.status(400).json({ 
-        error: 'Payment capture failed', 
-        details: error.message 
-      });
-    }
-    
-    res.status(500).json({ error: 'Failed to capture payment' });
+    res.status(500).json({ error: error.message || 'Failed to capture payment' });
   }
 });
 
@@ -169,8 +154,8 @@ router.post("/cancel-payment", async (req, res) => {
     }
 
     if (order.stripePaymentIntentId) {
-      // Cancel the payment intent
-      await stripe.paymentIntents.cancel(order.stripePaymentIntentId);
+      // 🆕 Use stripeConfig for payment cancellation
+      await stripeConfig.cancelPayment(order.stripePaymentIntentId);
     }
 
     // Update order status
@@ -183,7 +168,7 @@ router.post("/cancel-payment", async (req, res) => {
     });
   } catch (error) {
     console.error('Error cancelling payment:', error);
-    res.status(500).json({ error: 'Failed to cancel payment' });
+    res.status(500).json({ error: error.message || 'Failed to cancel payment' });
   }
 });
 
@@ -203,8 +188,12 @@ router.get("/payment-status/:orderId", async (req, res) => {
 
     let paymentIntent = null;
     if (order.stripePaymentIntentId) {
-      paymentIntent = await stripe.paymentIntents.retrieve(order.stripePaymentIntentId);
+      // 🆕 Use stripeConfig for payment status
+      paymentIntent = await stripeConfig.getPaymentStatus(order.stripePaymentIntentId);
     }
+
+    // 🆕 Calculate fees for display
+    const fees = stripeConfig.calculateFees(order.amount);
 
     res.status(200).json({
       orderStatus: order.status,
@@ -215,21 +204,58 @@ router.get("/payment-status/:orderId", async (req, res) => {
         created: paymentIntent.created
       } : null,
       paymentReleased: order.paymentReleased,
-      releaseDate: order.releaseDate
+      releaseDate: order.releaseDate,
+      fees: fees // 🆕 Include fee breakdown
     });
   } catch (error) {
     console.error('Error fetching payment status:', error);
-    res.status(500).json({ error: 'Failed to fetch payment status' });
+    res.status(500).json({ error: error.message || 'Failed to fetch payment status' });
   }
 });
 
-// 6. Stripe Webhook (Important for real-time updates)
+// 6. Request Refund
+router.post("/request-refund", async (req, res) => {
+  try {
+    const { orderId, reason } = req.body;
+
+    const order = await Order.findOne({
+      _id: orderId,
+      buyerId: req.user.id,
+      status: 'paid' // Only refund if paid but not delivered
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found or not eligible for refund' });
+    }
+
+    // 🆕 Create refund using stripeConfig
+    const refund = await stripeConfig.createRefund(order.stripePaymentIntentId);
+
+    // Update order status
+    order.status = 'cancelled';
+    order.refundReason = reason;
+    order.refundedAt = new Date();
+    await order.save();
+
+    res.status(200).json({ 
+      message: 'Refund processed successfully', 
+      refundId: refund.id,
+      order 
+    });
+  } catch (error) {
+    console.error('Error processing refund:', error);
+    res.status(500).json({ error: error.message || 'Failed to process refund' });
+  }
+});
+
+// 7. Stripe Webhook (Important for real-time updates)
 router.post("/stripe-webhook", express.raw({type: 'application/json'}), async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event;
 
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    // 🆕 Use stripeConfig for webhook verification
+    event = stripeConfig.verifyWebhook(req.body, sig);
   } catch (err) {
     console.error('Webhook signature verification failed.', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -261,6 +287,11 @@ router.post("/stripe-webhook", express.raw({type: 'application/json'}), async (r
     case 'payment_intent.canceled':
       const paymentIntentCanceled = event.data.object;
       console.log('PaymentIntent was canceled!');
+      break;
+
+    case 'charge.refunded':
+      const chargeRefunded = event.data.object;
+      console.log('Charge was refunded!');
       break;
 
     default:
