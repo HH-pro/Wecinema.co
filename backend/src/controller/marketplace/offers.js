@@ -1,8 +1,8 @@
 const express = require("express");
 const router = express.Router();
-const Offer = require("../../models/marketplace/Offer");
-const Listing = require("../../models/marketplace/Listing");
-const Order = require("../../models/marketplace/Order");
+const Offer = require("../../models/marketplace/offer");
+const Listing = require("../../models/marketplace/listing");
+const Order = require("../../models/marketplace/order");
 
 // Make an offer
 router.post("/make-offer", async (req, res) => {
