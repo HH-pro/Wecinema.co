@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const Listing = require("../../models/marketplace/Listing");
+const Listing = require("../../models/marketplace/listing");
 const { protect, isHypeModeUser, isSeller } = require("../../utils/auth"); // 🆕 AUTH IMPORT
 
 // ✅ PUBLIC ROUTE - No auth required
