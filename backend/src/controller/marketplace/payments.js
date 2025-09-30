@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Order = require("../../models/marketplace/order");
-const User = require("../../models/User");
+const User = require("../../models/user");
 const stripe = require("../../config/stripe");
 
 // 1. Create Payment Intent (Escrow mein funds hold karein)
