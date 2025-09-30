@@ -1,46 +1,16 @@
-const mongoose = require("mongoose");
-const { Schema } = mongoose;
+const mongoose = require('mongoose');
 
-const listingSchema = new Schema(
-  {
-    video: {
-      type: Schema.Types.ObjectId,
-      ref: "Video",
-      required: true,
-    },
-    owner: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
+const ListingSchema = new mongoose.Schema({
+  seller: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  title: String,
+  description: String,
+  price: { type: Number, required: true },
+  currency: { type: String, default: 'usd' },
+  saleType: { type: String, enum: ['for_sale','licensing','adaptation','commission'], default: 'for_sale' },
+  mediaUrls: [String],
+  thumbnailUrl: String,
+  status: { type: String, enum: ['draft','published','archived'], default: 'draft' },
+  hypeMode: { type: Boolean, default: false }
+}, { timestamps: true });
 
-    // 🔹 Core Selling Options
-    price: { type: Number, required: true }, // fixed price
-    type: {
-      type: String,
-      enum: ["sale", "license", "adaptation", "offer", "commission"],
-      required: true,
-    },
-
-    // Licensing / Adaptation flags
-    allowLicense: { type: Boolean, default: false },
-    allowAdaptation: { type: Boolean, default: false },
-
-    // Relations
-    offers: [{ type: Schema.Types.ObjectId, ref: "Offer" }],
-    commissions: [{ type: Schema.Types.ObjectId, ref: "CommissionRequest" }],
-
-    // Status tracking
-    status: {
-      type: String,
-      enum: ["active", "pending", "sold", "archived"],
-      default: "active",
-    },
-  },
-  {
-    timestamps: true, // createdAt, updatedAt
-  }
-);
-
-const listingModel = mongoose.model("Listing", listingSchema);
-module.exports = listingModel;
+module.exports = mongoose.model('Listing', ListingSchema);
