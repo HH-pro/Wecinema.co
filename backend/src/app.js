@@ -11,7 +11,8 @@ const {
   listingController,
 } = require("./controller");
 
-// ✅ Import route files (not controllers directly)
+// 🆕 MARKETPLACE ROUTES IMPORT KARO
+const marketplaceRoutes = require("./routes/marketplace");
 
 const connectDB = require("./config");
 const morgan = require("morgan");
@@ -111,6 +112,9 @@ app.use("/sentry", sentryRouter);
 app.use("/listings", listingController);
 app.use("/offers", offerController);
 app.use("/commissions", commissionController);
+
+// 🆕 MARKETPLACE ROUTES ADD KARO
+app.use("/api/marketplace", marketplaceRoutes);
 
 // ✅ Error handler (Sentry first, then fallback)
 app.use(Sentry.Handlers.errorHandler());
