@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const Order = require("../../models/marketplace/Order");
-const Listing = require("../../models/marketplace/Listing");
+const Order = require("../../models/marketplace/order");
+const Listing = require("../../models/marketplace/listing");
 
 // Create new order
 router.post("/create-order", async (req, res) => {
