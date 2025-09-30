@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
-const Listing = require("../src/models/listing"); // ✅ fix path according to your structure
+const Listing = require("../src/models/marketplace/listing"); // ✅ fix path according to your structure
 
 // 🔑 Secret Key
 const SECRET_KEY = process.env.JWT_SECRET || "weloremcium.secret_key";
