@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const Mongoose = require("mongoose");
 const Listing = require("../models/Listing");
+const User = require("../models/User"); // 🆕 ADD THIS
 
 // ✅ Authenticate Middleware (basic token validation)
 const authenticateMiddleware = (req, res, next) => {
@@ -49,6 +50,72 @@ const protect = (req, res, next) => {
 	} catch (err) {
 		return res.status(401).json({ message: "Token invalid" });
 	}
+};
+
+// 🆕 HYPEMODE USER MIDDLEWARE
+const isHypeModeUser = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    if (!user.isHypeModeUser) {
+      return res.status(403).json({ 
+        error: 'Access denied. HypeMode subscription required for marketplace features.' 
+      });
+    }
+    
+    next();
+  } catch (error) {
+    console.error('HypeMode check error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// 🆕 SELLER MIDDLEWARE  
+const isSeller = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    if (user.role !== 'seller' && user.role !== 'both') {
+      return res.status(403).json({ 
+        error: 'Access denied. Seller account required to create listings.' 
+      });
+    }
+    
+    next();
+  } catch (error) {
+    console.error('Seller check error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+// 🆕 BUYER MIDDLEWARE
+const isBuyer = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    if (user.role !== 'buyer' && user.role !== 'both') {
+      return res.status(403).json({ 
+        error: 'Access denied. Buyer account required to make purchases.' 
+      });
+    }
+    
+    next();
+  } catch (error) {
+    console.error('Buyer check error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
 };
 
 // ✅ Ensure Owner Middleware
@@ -125,4 +192,8 @@ module.exports = {
 	isValidObject,
 	isAdmin,
 	sendWhatsAppAlert,
+	// 🆕 NEW MIDDLEWARES
+	isHypeModeUser,
+	isSeller,
+	isBuyer
 };
