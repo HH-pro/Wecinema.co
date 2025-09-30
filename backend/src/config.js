@@ -1,34 +1,90 @@
-const mongoose = require("mongoose");
-
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-module.exports = stripe;
-/**
- * Connect to a MongoDB database using Mongoose.
- * @param {string} databaseURL - The URL of the MongoDB database to connect to.
- * @returns {Promise<mongoose.Mongoose>} A promise that resolves with the Mongoose instance upon successful connection.
- */
-async function connectToMongoDB(databaseURL) {
-	// Define Mongoose connection options.
-	const options = {
-		dbName: "wecinemaDB_test",
-		useNewUrlParser: true,
-		useUnifiedTopology: true,
-		// Additional options can be added here if needed.
-	};
 
-	try {
-		// Attempt to connect to the MongoDB database.
-		const mongooseInstance = await mongoose.connect(databaseURL, options);
-		console.log("DB CONNECTION SUCCESSFUL!");
-		console.log("M", databaseURL);
-		return mongooseInstance;
-	} catch (error) {
-		// Handle connection errors.
-		console.error(
-			`An error occurred while connecting to the database: ${error}`
-		);
-		throw error;
-	}
-}
+// Stripe configuration and utility functions
+const stripeConfig = {
+  // Platform fee percentage (15%)
+  platformFeePercent: 0.15,
+  
+  // Currency
+  defaultCurrency: 'usd',
+  
+  // Calculate platform fee and seller amount
+  calculateFees: (amount) => {
+    const platformFee = Math.round(amount * 0.15 * 100) / 100; // 15% platform fee
+    const sellerAmount = Math.round((amount - platformFee) * 100) / 100;
+    return {
+      platformFee,
+      sellerAmount,
+      originalAmount: amount
+    };
+  },
+  
+  // Create payment intent for marketplace
+  createPaymentIntent: async (amount, metadata = {}) => {
+    try {
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100), // Convert to cents
+        currency: 'usd',
+        capture_method: 'manual', // Manual capture for escrow
+        metadata: {
+          ...metadata,
+          platform: 'wecinema-marketplace'
+        }
+      });
+      return paymentIntent;
+    } catch (error) {
+      console.error('Stripe Payment Intent Error:', error);
+      throw error;
+    }
+  },
+  
+  // Capture payment (release funds from escrow)
+  capturePayment: async (paymentIntentId) => {
+    try {
+      const paymentIntent = await stripe.paymentIntents.capture(paymentIntentId);
+      return paymentIntent;
+    } catch (error) {
+      console.error('Stripe Capture Error:', error);
+      throw error;
+    }
+  },
+  
+  // Cancel payment intent
+  cancelPayment: async (paymentIntentId) => {
+    try {
+      const paymentIntent = await stripe.paymentIntents.cancel(paymentIntentId);
+      return paymentIntent;
+    } catch (error) {
+      console.error('Stripe Cancel Error:', error);
+      throw error;
+    }
+  },
+  
+  // Get payment intent status
+  getPaymentStatus: async (paymentIntentId) => {
+    try {
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      return paymentIntent;
+    } catch (error) {
+      console.error('Stripe Retrieve Error:', error);
+      throw error;
+    }
+  },
+  
+  // Verify webhook signature
+  verifyWebhook: (payload, signature) => {
+    try {
+      const event = stripe.webhooks.constructEvent(
+        payload,
+        signature,
+        process.env.STRIPE_WEBHOOK_SECRET
+      );
+      return event;
+    } catch (error) {
+      console.error('Webhook verification failed:', error);
+      throw error;
+    }
+  }
+};
 
-module.exports = connectToMongoDB;
+module.exports = stripeConfig;
