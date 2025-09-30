@@ -1,8 +1,32 @@
-const Listing = require('../../models/marketplace/Listing');
-const User = require('../../models/User');
+const express = require("express");
+const router = express.Router();
+const Listing = require("../../models/marketplace/Listing");
+
+// Get all active listings
+router.get("/listings", async (req, res) => {
+  try {
+    const listings = await Listing.find({ status: 'active' })
+      .populate('sellerId', 'username avatar sellerRating');
+    res.status(200).json(listings);
+  } catch (error) {
+    console.error('Error fetching listings:', error);
+    res.status(500).json({ error: 'Failed to fetch listings' });
+  }
+});
+
+// Get my listings (seller)
+router.get("/my-listings", async (req, res) => {
+  try {
+    const listings = await Listing.find({ sellerId: req.user.id });
+    res.status(200).json(listings);
+  } catch (error) {
+    console.error('Error fetching my listings:', error);
+    res.status(500).json({ error: 'Failed to fetch my listings' });
+  }
+});
 
 // Create new listing
-const createListing = async (req, res) => {
+router.post("/create-listing", async (req, res) => {
   try {
     const { title, description, price, type, category, tags } = req.body;
     
@@ -18,35 +42,15 @@ const createListing = async (req, res) => {
     });
 
     await listing.save();
-    res.status(201).json({ success: true, data: listing });
+    res.status(201).json(listing);
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Error creating listing:', error);
+    res.status(500).json({ error: 'Failed to create listing' });
   }
-};
-
-// Get all listings
-const getAllListings = async (req, res) => {
-  try {
-    const listings = await Listing.find({ status: 'active' })
-      .populate('sellerId', 'username avatar sellerRating');
-    res.json({ success: true, data: listings });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// Get seller's own listings
-const getMyListings = async (req, res) => {
-  try {
-    const listings = await Listing.find({ sellerId: req.user.id });
-    res.json({ success: true, data: listings });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+});
 
 // Update listing
-const updateListing = async (req, res) => {
+router.put("/listing/:id", async (req, res) => {
   try {
     const listing = await Listing.findOne({ 
       _id: req.params.id, 
@@ -54,34 +58,35 @@ const updateListing = async (req, res) => {
     });
     
     if (!listing) {
-      return res.status(404).json({ success: false, message: 'Listing not found' });
+      return res.status(404).json({ error: 'Listing not found' });
     }
 
     Object.assign(listing, req.body);
     await listing.save();
-    res.json({ success: true, data: listing });
+    res.status(200).json(listing);
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Error updating listing:', error);
+    res.status(500).json({ error: 'Failed to update listing' });
   }
-};
+});
 
 // Delete listing
-const deleteListing = async (req, res) => {
+router.delete("/listing/:id", async (req, res) => {
   try {
-    await Listing.findOneAndDelete({ 
+    const listing = await Listing.findOneAndDelete({ 
       _id: req.params.id, 
       sellerId: req.user.id 
     });
-    res.json({ success: true, message: 'Listing deleted' });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+    
+    if (!listing) {
+      return res.status(404).json({ error: 'Listing not found' });
+    }
 
-module.exports = {
-  createListing,
-  getAllListings,
-  getMyListings,
-  updateListing,
-  deleteListing
-};
+    res.status(200).json({ message: 'Listing deleted successfully', listing });
+  } catch (error) {
+    console.error('Error deleting listing:', error);
+    res.status(500).json({ error: 'Failed to delete listing' });
+  }
+});
+
+module.exports = router;
