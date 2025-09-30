@@ -113,11 +113,11 @@ app.use("/domain", domainController);
 app.use("/sentry", sentryRouter);
 
 // ✅ Marketplace Routes
-app.use("/api/marketplace/listings", listingRoutes);        // 🆕 API prefix add karein
-app.use("/api/marketplace/orders", orderRoutes);           // 🆕 API prefix add karein  
-app.use("/api/marketplace/offers", offerRoutes);           // 🆕 API prefix add karein
-app.use("/api/marketplace/messages", messageRoutes);       // 🆕 API prefix add karein
-app.use("/api/marketplace/payments", paymentRoutes);       // 🆕 API prefix add karein
+app.use("/marketplace/listings", listingRoutes);        // 🆕 API prefix add karein
+app.use("/marketplace/orders", orderRoutes);           // 🆕 API prefix add karein  
+app.use("/marketplace/offers", offerRoutes);           // 🆕 API prefix add karein
+app.use("/marketplace/messages", messageRoutes);       // 🆕 API prefix add karein
+app.use("/marketplace/payments", paymentRoutes);       // 🆕 API prefix add karein
 
 // 🆕 STRIPE WEBHOOK ROUTE (Raw body parser ke baath)
 app.use("/webhook/stripe", paymentRoutes); // 🆕 Stripe webhook ke liye alag route
