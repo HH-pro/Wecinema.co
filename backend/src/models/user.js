@@ -50,11 +50,31 @@ const userSchema = new Schema({
     isSubAdmin: { type: Boolean, default: false },
     isVerified: { type: Boolean, default: false },
 
-    // 🔹 Hype Mode specific relations
-    listings: [{ type: Schema.Types.ObjectId, ref: "Listing" }],
-    offers: [{ type: Schema.Types.ObjectId, ref: "Offer" }],
-    commissions: [{ type: Schema.Types.ObjectId, ref: "CommissionRequest" }],
-    messages: [{ type: Schema.Types.ObjectId, ref: "Message" }]
+    // 🆕 MARKETPLACE FIELDS ADD KAR DIYE
+    role: {
+        type: String,
+        enum: ['creator', 'buyer', 'both'],
+        default: 'creator'
+    },
+    isHypeModeUser: {
+        type: Boolean,
+        default: false
+    },
+    stripeCustomerId: String,
+    stripeAccountId: String,
+    balance: {
+        type: Number,
+        default: 0
+    },
+    sellerRating: {
+        type: Number,
+        default: 0
+    },
+    totalSales: {
+        type: Number,
+        default: 0
+    }
+
 });
 
 // Utility method: calculate age
