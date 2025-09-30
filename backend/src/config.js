@@ -11,17 +11,19 @@ async function connectToMongoDB(databaseURL) {
 		dbName: "wecinemaDB_test",
 		useNewUrlParser: true,
 		useUnifiedTopology: true,
+		// Additional options can be added here if needed.
 	};
 
 	try {
 		// Attempt to connect to the MongoDB database.
 		const mongooseInstance = await mongoose.connect(databaseURL, options);
-		console.log("✅ DB CONNECTION SUCCESSFUL!");
+		console.log("DB CONNECTION SUCCESSFUL!");
+		console.log("M", databaseURL);
 		return mongooseInstance;
 	} catch (error) {
 		// Handle connection errors.
 		console.error(
-			`❌ An error occurred while connecting to the database: ${error}`
+			`An error occurred while connecting to the database: ${error}`
 		);
 		throw error;
 	}
