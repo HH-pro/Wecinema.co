@@ -1,5 +1,7 @@
 const mongoose = require("mongoose");
 
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+module.exports = stripe;
 /**
  * Connect to a MongoDB database using Mongoose.
  * @param {string} databaseURL - The URL of the MongoDB database to connect to.
