@@ -5,7 +5,7 @@ const sentryRouter = require("./sentry");
 
 
 // 🆕 INDIVIDUAL MARKETPLACE ROUTES
-const listingRoutes = require("./marketplace/listings");
+const listingRoutes = require("./marketplace/listingController");
 const orderRoutes = require("./marketplace/orders");
 const offerRoutes = require("./marketplace/offers");
 const messageRoutes = require("./marketplace/messages");
