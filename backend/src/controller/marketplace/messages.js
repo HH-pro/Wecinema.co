@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const Message = require("../../models/marketplace/Message");
-const Order = require("../../models/marketplace/Order");
+const Message = require("../../models/marketplace/message");
+const Order = require("../../models/marketplace/order");
 
 // Get messages for an order
 router.get("/messages/:orderId", async (req, res) => {
