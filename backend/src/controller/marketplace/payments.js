@@ -248,13 +248,12 @@ router.post("/request-refund", async (req, res) => {
   }
 });
 
-// 7. Stripe Webhook (Important for real-time updates)
 router.post("/stripe-webhook", express.raw({type: 'application/json'}), async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event;
 
   try {
-    // 🆕 Use stripeConfig for webhook verification
+   
     event = stripeConfig.verifyWebhook(req.body, sig);
   } catch (err) {
     console.error('Webhook signature verification failed.', err.message);
