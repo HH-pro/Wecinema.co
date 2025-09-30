@@ -11,13 +11,9 @@ const {
   offerRoutes,
   messageRoutes,
   paymentRoutes
- 
 } = require("./controller");
 
-// 🆕 MARKETPLACE ROUTES IMPORT KARO
-
-
-const connectDB = require("./config");
+const connectDB = require("./config/config");
 const morgan = require("morgan");
 const cors = require("cors");
 const cron = require("node-cron");
@@ -48,6 +44,11 @@ app.use((req, res, next) => {
 });
 
 app.use(morgan("dev"));
+
+// 🆕 STRIPE WEBHOOK KE LIYE IMPORTANT: Raw body parser pehle use karein
+app.use("/webhook/stripe", express.raw({type: 'application/json'})); // 🆕 Stripe webhook ke liye
+
+// Baaki sab routes ke liye JSON parser
 app.use(express.json());
 
 // ✅ CORS configuration
@@ -111,14 +112,15 @@ app.use("/user", UserController);
 app.use("/domain", domainController);
 app.use("/sentry", sentryRouter);
 
-// ✅ Listings, Offers, Commissions Routes
-app.use("/listings", listingRoutes);
-app.use("/offers", offerRoutes);
-app.use("/orders", orderRoutes);
-app.use("/messages", messageRoutes);
-app.use("/payments", paymentRoutes);
+// ✅ Marketplace Routes
+app.use("/api/marketplace/listings", listingRoutes);        // 🆕 API prefix add karein
+app.use("/api/marketplace/orders", orderRoutes);           // 🆕 API prefix add karein  
+app.use("/api/marketplace/offers", offerRoutes);           // 🆕 API prefix add karein
+app.use("/api/marketplace/messages", messageRoutes);       // 🆕 API prefix add karein
+app.use("/api/marketplace/payments", paymentRoutes);       // 🆕 API prefix add karein
 
-
+// 🆕 STRIPE WEBHOOK ROUTE (Raw body parser ke baath)
+app.use("/webhook/stripe", paymentRoutes); // 🆕 Stripe webhook ke liye alag route
 
 // ✅ Error handler (Sentry first, then fallback)
 app.use(Sentry.Handlers.errorHandler());
@@ -136,4 +138,5 @@ console.log("connected db");
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
+  console.log(`🏪 Marketplace API: http://localhost:${PORT}/api/marketplace`); // 🆕 Marketplace info
 });
