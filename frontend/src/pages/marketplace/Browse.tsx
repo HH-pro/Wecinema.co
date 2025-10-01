@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import ListingCard from '../../components/marketplace/ListingCard';
-import CreateListingModal from '../../components/marketplace/CreateListingModal';
-import MarketplaceLayout from '../../components/marketplace/MarketplaceLayout';
+import ListingCard from '../../components/marketplae/ListingCard';
+import CreateListingModal from '../../components/marketplae/CreateListingModal';
+import MarketplaceLayout from '../../components/Layout/MarketplaceLayout';
 import { Listing } from '../../types/marketplace';
 
 const Browse: React.FC = () => {
