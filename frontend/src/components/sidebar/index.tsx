@@ -1,21 +1,28 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { IoMdHome } from "react-icons/io";
-import { RiMovie2Line, RiHeartLine, RiHistoryLine, RiFlagLine } from "react-icons/ri";
+import {
+  RiHeartLine,
+  RiHistoryLine,
+  RiFlagLine,
+  RiStoreLine,
+  RiAddCircleLine,
+  RiShoppingBagLine,
+  RiListCheck,
+} from "react-icons/ri";
 import { LiaSignInAltSolid } from "react-icons/lia";
 import { HiUserAdd } from "react-icons/hi";
 import { FaMoon } from "react-icons/fa";
-import { MdOutlineDescription } from "react-icons/md";
+import { MdOutlineDescription, MdChatBubbleOutline } from "react-icons/md";
 import { IoSunnyOutline } from "react-icons/io5";
 import { CgProfile } from "react-icons/cg";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { TbVideoPlus } from "react-icons/tb";
 import { FaUser, FaSignOutAlt } from "react-icons/fa";
 import { RiCustomerService2Line } from "react-icons/ri";
-import { MdOutlinePrivacyTip, MdChatBubbleOutline } from "react-icons/md";
-import axios from "axios";
+import { MdOutlinePrivacyTip } from "react-icons/md";
 import { toast } from "react-toastify";
 import { decodeToken } from "../../utilities/helperfFunction";
-import './Sidebar.css';
+import "./Sidebar.css";
 
 interface SidebarProps {
   expand: boolean;
@@ -39,39 +46,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   setDarkMode,
   darkMode,
   isLoggedIn,
-  toggleUploadScriptModal,
-  toggleUploadModal,
 }) => {
   const token = localStorage.getItem("token") || null;
   const tokenData = decodeToken(token);
-  const [hasPaid, setHasPaid] = useState(false);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (tokenData) {
-      fetchPaymentStatus(tokenData.userId);
-    }
-  }, [tokenData]);
-
-  const fetchPaymentStatus = async (userId: any) => {
-    try {
-      const response = await axios.get(
-        `https://wecinema.co/api/user/payment-status/${userId}`
-      );
-      setHasPaid(response.data.hasPaid);
-    } catch (error) {
-      console.error("Payment status error:", error);
-    }
-  };
-
-  const handleHypemodeClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
-    if (hasPaid) {
-      event.preventDefault();
-      toast.info("You are already subscribed to Hypemode!");
-    } else if (!hasPaid) {
-      navigate("/hypemode");
-    }
-  };
 
   const getActiveClass = (path: string) => {
     return window.location.pathname === path ? "text-active" : "";
@@ -83,6 +60,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         darkMode ? "dark" : "light"
       }`}
     >
+      {/* -------- MAIN NAV -------- */}
       <nav className="sidebar-nav">
         <ul className="sidebar-section">
           <Link
@@ -94,16 +72,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <IoMdHome className="sidebar-icon" />
             <span className="sidebar-text">Home</span>
           </Link>
-          <Link
-            to="/hypemode"
-            onClick={handleHypemodeClick}
-            className={`sidebar-item ${getActiveClass("/hypemode")} ${
-              expand ? "" : "collapsed"
-            }`}
-          >
-            <RiMovie2Line className="sidebar-icon" />
-            <span className="sidebar-text">Hype mode</span>
-          </Link>
+
           <Link
             to="/videoeditor"
             className={`sidebar-item ${getActiveClass("/videoeditor")} ${
@@ -113,6 +82,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <TbVideoPlus className="sidebar-icon" />
             <span className="sidebar-text">Video Editor</span>
           </Link>
+
           <Link
             to={tokenData ? `/user/${tokenData.userId}` : "#"}
             onClick={(event) => {
@@ -121,13 +91,14 @@ const Sidebar: React.FC<SidebarProps> = ({
                 event.preventDefault();
               }
             }}
-            className={`sidebar-item ${getActiveClass(`/user/${tokenData?.userId}`)} ${
-              expand ? "" : "collapsed"
-            }`}
+            className={`sidebar-item ${getActiveClass(
+              `/user/${tokenData?.userId}`
+            )} ${expand ? "" : "collapsed"}`}
           >
             <CgProfile className="sidebar-icon" />
             <span className="sidebar-text">Profile</span>
           </Link>
+
           <Link
             to="/history"
             className={`sidebar-item ${getActiveClass("/history")} ${
@@ -137,6 +108,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <RiHistoryLine className="sidebar-icon" />
             <span className="sidebar-text">History</span>
           </Link>
+
           <Link
             to="/likedvideos"
             className={`sidebar-item ${getActiveClass("/likedvideos")} ${
@@ -146,9 +118,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             <RiHeartLine className="sidebar-icon" />
             <span className="sidebar-text">Liked Videos</span>
           </Link>
+
           <Link
             to="/chatbot"
-            className={`sidebar-item ${getActiveClass("/privacy-policy")} ${
+            className={`sidebar-item ${getActiveClass("/chatbot")} ${
               expand ? "" : "collapsed"
             }`}
           >
@@ -158,6 +131,57 @@ const Sidebar: React.FC<SidebarProps> = ({
         </ul>
       </nav>
 
+      {/* -------- MARKETPLACE -------- */}
+      {tokenData && (
+        <nav className="sidebar-section-container">
+          <h2 className={`sidebar-section-title ${expand ? "" : "collapsed"}`}>
+            Marketplace
+          </h2>
+          <ul className="sidebar-section">
+            <Link
+              to="/marketplace"
+              className={`sidebar-item ${getActiveClass("/marketplace")} ${
+                expand ? "" : "collapsed"
+              }`}
+            >
+              <RiStoreLine className="sidebar-icon" />
+              <span className="sidebar-text">Browse Listings</span>
+            </Link>
+
+            <Link
+              to="/marketplace/create"
+              className={`sidebar-item ${getActiveClass(
+                "/marketplace/create"
+              )} ${expand ? "" : "collapsed"}`}
+            >
+              <RiAddCircleLine className="sidebar-icon" />
+              <span className="sidebar-text">Create Listing</span>
+            </Link>
+
+            <Link
+              to="/marketplace/orders"
+              className={`sidebar-item ${getActiveClass(
+                "/marketplace/orders"
+              )} ${expand ? "" : "collapsed"}`}
+            >
+              <RiShoppingBagLine className="sidebar-icon" />
+              <span className="sidebar-text">My Orders</span>
+            </Link>
+
+            <Link
+              to="/marketplace/dashboard"
+              className={`sidebar-item ${getActiveClass(
+                "/marketplace/dashboard"
+              )} ${expand ? "" : "collapsed"}`}
+            >
+              <RiListCheck className="sidebar-icon" />
+              <span className="sidebar-text">Seller Dashboard</span>
+            </Link>
+          </ul>
+        </nav>
+      )}
+
+      {/* -------- SETTINGS / ACCOUNT -------- */}
       <nav className="sidebar-section-container">
         <h2 className={`sidebar-section-title ${expand ? "" : "collapsed"}`}>
           Theme
@@ -225,6 +249,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </>
           )}
+
           <Link
             to="/customersupport"
             className={`sidebar-item ${getActiveClass("/customersupport")} ${
@@ -234,6 +259,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <RiCustomerService2Line className="sidebar-icon" />
             <span className="sidebar-text">Support</span>
           </Link>
+
           <Link
             to="/privacy-policy"
             className={`sidebar-item ${getActiveClass("/privacy-policy")} ${
@@ -243,6 +269,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <MdOutlinePrivacyTip className="sidebar-icon" />
             <span className="sidebar-text">Privacy</span>
           </Link>
+
           <Link
             to="/report"
             className={`sidebar-item ${getActiveClass("/report")} ${
@@ -252,11 +279,12 @@ const Sidebar: React.FC<SidebarProps> = ({
             <RiFlagLine className="sidebar-icon" />
             <span className="sidebar-text">Report</span>
           </Link>
+
           <Link
             to="/terms-and-conditions"
-            className={`sidebar-item ${getActiveClass("/terms-and-conditions")} ${
-              expand ? "" : "collapsed"
-            }`}
+            className={`sidebar-item ${getActiveClass(
+              "/terms-and-conditions"
+            )} ${expand ? "" : "collapsed"}`}
           >
             <MdOutlineDescription className="sidebar-icon" />
             <span className="sidebar-text">Terms</span>
