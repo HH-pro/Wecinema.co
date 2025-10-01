@@ -11,6 +11,7 @@ import {
   RiHistoryLine,
   RiFlagLine,
   RiCustomerService2Line,
+  RiStoreLine, // 🆕 ADD MARKETPLACE ICON
 } from "react-icons/ri";
 import { MdChatBubbleOutline, MdOutlinePrivacyTip } from "react-icons/md";
 import { TbVideoPlus } from "react-icons/tb";
@@ -102,6 +103,9 @@ const Layout: React.FC<LayoutProps> = ({
 
   const isSidebarVisible = hideSidebar ? viewPageSidebarVisible : true;
 
+  // 🆕 Check if user is HypeMode user
+  const isHypeModeUser = decodedToken?.isHypeModeUser || false;
+
   return (
     <div className="text-lg md:text-sm sm:text-xs">
       <ToastContainer />
@@ -117,6 +121,7 @@ const Layout: React.FC<LayoutProps> = ({
             ? () => setViewPageSidebarVisible((prev) => !prev)
             : undefined
         }
+        isHypeModeUser={isHypeModeUser} // 🆕 PASS HYPEMODE STATUS
       />
 
       {/* ✅ Sidebar Overlay for Tablet + Mobile */}
@@ -130,58 +135,74 @@ const Layout: React.FC<LayoutProps> = ({
             {/* Main Nav */}
             <nav className="flex items-center justify-between p-2 my-3 pb-6">
               <ul className="border-b w-full border-gray-200 pb-4">
-                <Link to="/" className="flex items-center gap-3 px-4 py-2">
+                {/* Home - Always Visible */}
+                <Link to="/" className="flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
                   <IoMdHome size="20" />
                   <span>Home</span>
                 </Link>
+                
+                {/* 🆕 MARKETPLACE - Only for HypeMode Users */}
+                {isHypeModeUser && (
+                  <Link to="/marketplace" className="flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+                    <RiStoreLine size="20" />
+                    <span>Marketplace</span>
+                  </Link>
+                )}
+                
+                {/* 🆕 HYPEMODE UPSELL - For Regular Logged-in Users */}
+                {decodedToken && !isHypeModeUser && (
+                  <Link to="/hypemode" className="flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-green-500 font-semibold">
+                    <RiMovie2Line size="20" />
+                    <span>Upgrade to HypeMode</span>
+                  </Link>
+                )}
+                
+                {/* HYPEMODE PROMOTION - For Non-logged in Users */}
                 {!decodedToken && (
-                  <Link
-                    to="/hypemode"
-                    className="flex items-center gap-3 px-4 py-2"
-                  >
+                  <Link to="/hypemode" className="flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
                     <RiMovie2Line size="20" />
                     <span>Hype Mode</span>
                   </Link>
                 )}
-                <Link
-                  to="/videoeditor"
-                  className="flex items-center gap-3 px-4 py-2"
-                >
+                
+                {/* Video Editor - Always Visible */}
+                <Link to="/videoeditor" className="flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
                   <TbVideoPlus size="20" />
                   <span>Video Editor</span>
                 </Link>
-                <Link
-                  to={`/user/${decodedToken?.userId}`}
-                  className="flex items-center gap-3 px-4 py-2"
-                >
-                  <CgProfile size="20" />
-                  <span>Profile</span>
-                </Link>
-                <Link
-                  to="/likedvideos"
-                  className="flex items-center gap-3 px-4 py-2"
-                >
-                  <RiHeartLine size="20" />
-                  <span>Liked Videos</span>
-                </Link>
-                <Link
-                  to="/history"
-                  className="flex items-center gap-3 px-4 py-2"
-                >
-                  <RiHistoryLine size="20" />
-                  <span>History</span>
-                </Link>
-                <Link
-                  to="/chatbot"
-                  className="flex items-center gap-3 px-4 py-2"
-                >
+                
+                {/* Profile - Only for Logged-in Users */}
+                {decodedToken && (
+                  <Link to={`/user/${decodedToken?.userId}`} className="flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+                    <CgProfile size="20" />
+                    <span>Profile</span>
+                  </Link>
+                )}
+                
+                {/* Liked Videos - Only for Logged-in Users */}
+                {decodedToken && (
+                  <Link to="/likedvideos" className="flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+                    <RiHeartLine size="20" />
+                    <span>Liked Videos</span>
+                  </Link>
+                )}
+                
+                {/* History - Only for Logged-in Users */}
+                {decodedToken && (
+                  <Link to="/history" className="flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+                    <RiHistoryLine size="20" />
+                    <span>History</span>
+                  </Link>
+                )}
+                
+                {/* Chat Bot - Always Visible */}
+                <Link to="/chatbot" className="flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
                   <MdChatBubbleOutline size="20" />
                   <span>Chat Bot</span>
                 </Link>
-                <Link
-                  to="/customersupport"
-                  className="flex items-center gap-3 px-4 py-2"
-                >
+                
+                {/* Customer Support - Always Visible */}
+                <Link to="/customersupport" className="flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
                   <RiCustomerService2Line size="20" />
                   <span>Support</span>
                 </Link>
@@ -192,24 +213,24 @@ const Layout: React.FC<LayoutProps> = ({
             <nav className="px-4 py-2 border-b border-gray-200">
               <h2 className="font-bold mb-2">Theme</h2>
               <div
-                className="flex items-center gap-3 py-2 cursor-pointer"
+                className="flex items-center gap-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
                 onClick={setDarkiMode}
               >
                 <FaMoon size="20" color={darkMode ? "green" : ""} />
                 <span className="text-sm">Dark Mode</span>
               </div>
               <div
-                className="flex items-center gap-3 py-2 cursor-pointer"
+                className="flex items-center gap-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
                 onClick={setLightMode}
               >
                 <IoMdHome size="20" color={!darkMode ? "green" : ""} />
                 <span className="text-sm">Light Mode</span>
               </div>
-              <Link to="/report" className="flex items-center gap-3 py-2">
+              <Link to="/report" className="flex items-center gap-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2">
                 <RiFlagLine size="20" />
                 <span className="text-sm">Report</span>
               </Link>
-              <Link to="/privacy-policy" className="flex items-center gap-3 py-2">
+              <Link to="/privacy-policy" className="flex items-center gap-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2">
                 <MdOutlinePrivacyTip size="20" />
                 <span className="text-sm">Privacy Policy</span>
               </Link>
@@ -221,14 +242,14 @@ const Layout: React.FC<LayoutProps> = ({
                 <>
                   <li
                     onClick={() => handleType("login")}
-                    className="flex items-center gap-3 py-2 cursor-pointer hover:text-green-500"
+                    className="flex items-center gap-3 py-2 cursor-pointer hover:text-green-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
                   >
                     <FaSignOutAlt size="16" />
                     <span>Sign In</span>
                   </li>
                   <li
                     onClick={() => handleType("register")}
-                    className="flex items-center gap-3 py-2 cursor-pointer hover:text-green-500"
+                    className="flex items-center gap-3 py-2 cursor-pointer hover:text-green-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
                   >
                     <FaSignOutAlt size="16" />
                     <span>Sign Up</span>
@@ -237,7 +258,7 @@ const Layout: React.FC<LayoutProps> = ({
               ) : (
                 <li
                   onClick={() => handleType("logout")}
-                  className="flex items-center gap-3 py-2 cursor-pointer hover:text-green-500"
+                  className="flex items-center gap-3 py-2 cursor-pointer hover:text-green-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
                 >
                   <FaSignOutAlt size="16" />
                   <span>Log Out</span>
@@ -262,6 +283,7 @@ const Layout: React.FC<LayoutProps> = ({
             toggleUploadModal={() => handleType("video")}
             toggleUploadScriptModal={() => handleType("script")}
             isLoggedIn={decodedToken}
+            isHypeModeUser={isHypeModeUser} // 🆕 PASS HYPEMODE STATUS
           />
         )}
 
