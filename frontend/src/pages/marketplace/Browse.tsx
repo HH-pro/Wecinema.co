@@ -4,7 +4,9 @@ import CreateListingModal from '../../components/marketplae/CreateListingModal';
 import MarketplaceLayout from '../../components/Layout';
 import { Listing } from '../../types/marketplace';
 import { FiFilter, FiPlus, FiSearch } from 'react-icons/fi';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+
+// Inside your component
 
 const Browse: React.FC = () => {
   const [listings, setListings] = useState<Listing[]>([]);
@@ -12,6 +14,8 @@ const Browse: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
+const navigate = useNavigate();
+
   const [filters, setFilters] = useState({
     type: '',
     category: '',
@@ -271,21 +275,12 @@ const Browse: React.FC = () => {
                 </p>
  <div className="flex flex-col sm:flex-row gap-3 justify-center">
   <button 
-    className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-  >
-    <Link href="/create-listing" className="inline-flex items-center">
-      <FiPlus className="mr-2" size={18} />
-      Create First Listing
-    </Link>
-  </button>
-  {(searchQuery || Object.values(filters).some(Boolean)) && (
-    <button 
-      onClick={clearFilters}
-      className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-    >
-      Clear all filters
-    </button>
-  )}
+  onClick={() => navigate('/create-listing')}
+  className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+>
+  <FiPlus className="mr-2" size={18} />
+  Create First Listing
+</button>
 </div>
               </div>
             </div>
