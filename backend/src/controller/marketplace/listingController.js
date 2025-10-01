@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Listing = require("../../models/marketplace/listing");
-const { protect, isHypeModeUser, isSeller } = require("../../utils"); // 🆕 AUTH IMPORT
+const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils"); // 🆕 AUTH IMPORT
 
 // ✅ PUBLIC ROUTE - No auth required
 router.get("/listings", async (req, res) => {
@@ -27,7 +27,7 @@ router.get("/my-listings", protect, isHypeModeUser, isSeller, async (req, res) =
 });
 
 // Create new listing
-router.post("/create-listing", protect, isHypeModeUser, isSeller, async (req, res) => {
+router.post("/create-listing",authenticateMiddleware, async (req, res) => {
   try {
     const { title, description, price, type, category, tags } = req.body;
     
