@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ListingCard from '../../components/marketplae/ListingCard';
 import CreateListingModal from '../../components/marketplae/CreateListingModal';
-import MarketplaceLayout from '../../components/Layout/';
+import MarketplaceLayout from '../../components/Layout/MarketplaceLayout';
 import { Listing } from '../../types/marketplace';
 import { FiFilter, FiPlus, FiSearch } from 'react-icons/fi';
 
