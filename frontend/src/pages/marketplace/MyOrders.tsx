@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import MarketplaceLayout from '../../components/marketplace/MarketplaceLayout';
-import OrderSummary from '../../components/marketplace/OrderSummary';
+import MarketplaceLayout from '../../components/Layout/MarketplaceLayout';
+import OrderSummary from '../../components/marketplae/OrderSummary';
 
 interface Order {
   _id: string;
