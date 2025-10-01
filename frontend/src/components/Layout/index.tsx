@@ -103,16 +103,13 @@ const Layout: React.FC<LayoutProps> = ({
   }, [type, modalShow]);
 
   // ✅ Breakpoints
-  const isTabletOrMobile = screenWidth <= 1120; // tablet + mobile
+  const isTabletOrMobile = screenWidth <= 1120;
   const isMobile = screenWidth <= 420;
 
   const isSidebarVisible = hideSidebar ? viewPageSidebarVisible : true;
 
-  // 🆕 Check if user is HypeMode user
-  const isHypeModeUser = decodedToken?.isHypeModeUser || false;
-
-  // 🆕 Check if current route is marketplace
-  const isMarketplaceRoute = location.pathname.startsWith('/marketplace');
+  // 🆕 Removed HypeMode check
+  const isMarketplaceRoute = location.pathname.startsWith("/marketplace");
 
   return (
     <div className="text-lg md:text-sm sm:text-xs">
@@ -129,8 +126,7 @@ const Layout: React.FC<LayoutProps> = ({
             ? () => setViewPageSidebarVisible((prev) => !prev)
             : undefined
         }
-        isHypeModeUser={isHypeModeUser}
-        isMarketplaceRoute={isMarketplaceRoute} // 🆕 PASS MARKETPLACE ROUTE STATUS
+        isMarketplaceRoute={isMarketplaceRoute}
       />
 
       {/* ✅ Sidebar Overlay for Tablet + Mobile */}
@@ -144,166 +140,168 @@ const Layout: React.FC<LayoutProps> = ({
             {/* Main Nav */}
             <nav className="flex items-center justify-between p-2 my-3 pb-6">
               <ul className="border-b w-full border-gray-200 pb-4">
-                {/* Home - Always Visible */}
-                <Link 
-                  to="/" 
+                {/* Home */}
+                <Link
+                  to="/"
                   className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                    location.pathname === '/' ? 'bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400' : ''
+                    location.pathname === "/"
+                      ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
+                      : ""
                   }`}
                 >
                   <IoMdHome size="20" />
                   <span>Home</span>
                 </Link>
-                
-                {/* 🆕 MARKETPLACE SECTION - Only for HypeMode Users */}
-                {  (
+
+                {/* ✅ Marketplace for logged-in users */}
+                {decodedToken && (
                   <>
                     <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       Marketplace
                     </div>
-                    
-                    <Link 
-                      to="/marketplace" 
+
+                    <Link
+                      to="/marketplace"
                       className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                        location.pathname === '/marketplace' ? 'bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400' : ''
+                        location.pathname === "/marketplace"
+                          ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
+                          : ""
                       }`}
                     >
                       <RiStoreLine size="20" />
                       <span>Browse Listings</span>
                     </Link>
-                    
-                    <Link 
-                      to="/marketplace/create" 
+
+                    <Link
+                      to="/marketplace/create"
                       className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                        location.pathname === '/marketplace/create' ? 'bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400' : ''
+                        location.pathname === "/marketplace/create"
+                          ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
+                          : ""
                       }`}
                     >
                       <RiAddCircleLine size="20" />
                       <span>Create Listing</span>
                     </Link>
-                    
-                    <Link 
-                      to="/marketplace/orders" 
+
+                    <Link
+                      to="/marketplace/orders"
                       className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                        location.pathname === '/marketplace/orders' ? 'bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400' : ''
+                        location.pathname === "/marketplace/orders"
+                          ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
+                          : ""
                       }`}
                     >
                       <RiShoppingBagLine size="20" />
                       <span>My Orders</span>
                     </Link>
-                    
-                    <Link 
-                      to="/marketplace/dashboard" 
+
+                    <Link
+                      to="/marketplace/dashboard"
                       className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                        location.pathname === '/marketplace/dashboard' ? 'bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400' : ''
+                        location.pathname === "/marketplace/dashboard"
+                          ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
+                          : ""
                       }`}
                     >
                       <RiListCheck size="20" />
                       <span>Seller Dashboard</span>
                     </Link>
-                    
-                    <Link 
-                      to="/marketplace/messages" 
+
+                    <Link
+                      to="/marketplace/messages"
                       className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                        location.pathname.startsWith('/marketplace/messages') ? 'bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400' : ''
+                        location.pathname.startsWith("/marketplace/messages")
+                          ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
+                          : ""
                       }`}
                     >
                       <MdChatBubbleOutline size="20" />
                       <span>Messages</span>
                     </Link>
-                    
+
                     <div className="border-t border-gray-200 my-2"></div>
                   </>
                 )}
-                
-                {/* 🆕 HYPEMODE UPSELL - For Regular Logged-in Users */}
-                {decodedToken && !isHypeModeUser && (
-                  <Link 
-                    to="/hypemode" 
-                    className="flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-green-500 font-semibold bg-green-50 dark:bg-green-900"
-                  >
-                    <RiMovie2Line size="20" />
-                    <span>Upgrade to HypeMode</span>
-                  </Link>
-                )}
-                
-                {/* HYPEMODE PROMOTION - For Non-logged in Users */}
-                {!decodedToken && (
-                  <Link 
-                    to="/hypemode" 
-                    className="flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                  >
-                    <RiMovie2Line size="20" />
-                    <span>Hype Mode</span>
-                  </Link>
-                )}
-                
-                {/* Video Editor - Always Visible */}
-                <Link 
-                  to="/videoeditor" 
+
+                {/* Video Editor */}
+                <Link
+                  to="/videoeditor"
                   className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                    location.pathname === '/videoeditor' ? 'bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400' : ''
+                    location.pathname === "/videoeditor"
+                      ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
+                      : ""
                   }`}
                 >
                   <TbVideoPlus size="20" />
                   <span>Video Editor</span>
                 </Link>
-                
-                {/* Profile - Only for Logged-in Users */}
+
+                {/* Profile */}
                 {decodedToken && (
-                  <Link 
-                    to={`/user/${decodedToken?.userId}`} 
+                  <Link
+                    to={`/user/${decodedToken?.userId}`}
                     className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                      location.pathname === `/user/${decodedToken?.userId}` ? 'bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400' : ''
+                      location.pathname === `/user/${decodedToken?.userId}`
+                        ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
+                        : ""
                     }`}
                   >
                     <CgProfile size="20" />
                     <span>Profile</span>
                   </Link>
                 )}
-                
-                {/* Liked Videos - Only for Logged-in Users */}
+
+                {/* Liked Videos */}
                 {decodedToken && (
-                  <Link 
-                    to="/likedvideos" 
+                  <Link
+                    to="/likedvideos"
                     className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                      location.pathname === '/likedvideos' ? 'bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400' : ''
+                      location.pathname === "/likedvideos"
+                        ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
+                        : ""
                     }`}
                   >
                     <RiHeartLine size="20" />
                     <span>Liked Videos</span>
                   </Link>
                 )}
-                
-                {/* History - Only for Logged-in Users */}
+
+                {/* History */}
                 {decodedToken && (
-                  <Link 
-                    to="/history" 
+                  <Link
+                    to="/history"
                     className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                      location.pathname === '/history' ? 'bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400' : ''
+                      location.pathname === "/history"
+                        ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
+                        : ""
                     }`}
                   >
                     <RiHistoryLine size="20" />
                     <span>History</span>
                   </Link>
                 )}
-                
-                {/* Chat Bot - Always Visible */}
-                <Link 
-                  to="/chatbot" 
+
+                {/* Chat Bot */}
+                <Link
+                  to="/chatbot"
                   className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                    location.pathname === '/chatbot' ? 'bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400' : ''
+                    location.pathname === "/chatbot"
+                      ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
+                      : ""
                   }`}
                 >
                   <MdChatBubbleOutline size="20" />
                   <span>Chat Bot</span>
                 </Link>
-                
-                {/* Customer Support - Always Visible */}
-                <Link 
-                  to="/customersupport" 
+
+                {/* Support */}
+                <Link
+                  to="/customersupport"
                   className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                    location.pathname === '/customersupport' ? 'bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400' : ''
+                    location.pathname === "/customersupport"
+                      ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
+                      : ""
                   }`}
                 >
                   <RiCustomerService2Line size="20" />
@@ -329,19 +327,23 @@ const Layout: React.FC<LayoutProps> = ({
                 <IoMdHome size="20" color={!darkMode ? "green" : ""} />
                 <span className="text-sm">Light Mode</span>
               </div>
-              <Link 
-                to="/report" 
+              <Link
+                to="/report"
                 className={`flex items-center gap-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 ${
-                  location.pathname === '/report' ? 'bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400' : ''
+                  location.pathname === "/report"
+                    ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
+                    : ""
                 }`}
               >
                 <RiFlagLine size="20" />
                 <span className="text-sm">Report</span>
               </Link>
-              <Link 
-                to="/privacy-policy" 
+              <Link
+                to="/privacy-policy"
                 className={`flex items-center gap-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 ${
-                  location.pathname === '/privacy-policy' ? 'bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400' : ''
+                  location.pathname === "/privacy-policy"
+                    ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
+                    : ""
                 }`}
               >
                 <MdOutlinePrivacyTip size="20" />
@@ -349,7 +351,7 @@ const Layout: React.FC<LayoutProps> = ({
               </Link>
             </nav>
 
-            {/* Auth Buttons */}
+            {/* Auth */}
             <nav className="px-4 py-3">
               {!decodedToken ? (
                 <>
@@ -396,8 +398,7 @@ const Layout: React.FC<LayoutProps> = ({
             toggleUploadModal={() => handleType("video")}
             toggleUploadScriptModal={() => handleType("script")}
             isLoggedIn={decodedToken}
-            isHypeModeUser={isHypeModeUser}
-            currentPath={location.pathname} // 🆕 PASS CURRENT PATH
+            currentPath={location.pathname}
           />
         )}
 
@@ -421,7 +422,9 @@ const Layout: React.FC<LayoutProps> = ({
           {/* Footer */}
           <footer
             className={`w-full text-center py-4 ${
-              darkMode ? "bg-gray-900 text-gray-300" : "bg-gray-100 text-gray-700"
+              darkMode
+                ? "bg-gray-900 text-gray-300"
+                : "bg-gray-100 text-gray-700"
             }`}
           >
             © {new Date().getFullYear()} All rights reserved by{" "}
