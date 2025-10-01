@@ -156,7 +156,7 @@ const Layout: React.FC<LayoutProps> = ({
                 </Link>
                 
                 {/* 🆕 MARKETPLACE SECTION - Only for HypeMode Users */}
-                {!isHypeModeUser && (
+                {  (
                   <>
                     <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                       Marketplace
