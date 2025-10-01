@@ -32,7 +32,7 @@ router.post("/create-listing", async (req, res) => {
     const { title, description, price, type, category, tags } = req.body;
     
     const listing = new Listing({
-      sellerId: req.user.id,
+     
       title,
       description,
       price,
