@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import MarketplaceLayout from '../../components/marketplace/MarketplaceLayout';
+import MarketplaceLayout from '../../components/Layout/MarketplaceLayout';
 import OrderSummary from '../../components/marketplace/OrderSummary';
 
 interface DashboardStats {
