@@ -67,7 +67,7 @@ const CreateListing: React.FC = () => {
 
   return (
     <MarketplaceLayout>
-      <div className="create-listing-page">
+      <div className="create-listing-page py-80">
         <div className="page-header">
           <h1>Create New Listing</h1>
           <p>Sell your digital content to the community</p>
