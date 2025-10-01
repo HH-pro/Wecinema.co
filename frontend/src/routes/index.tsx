@@ -33,10 +33,19 @@ import {
 } from "../pages";
 import Layout from "../components/admin/Layout";
 
+// 🆕 IMPORT MARKETPLACE PAGES
+import Browse from "../pages/marketplace/Browse";
+import CreateListing from "../pages/marketplace/CreateListing";
+import SellerDashboard from "../pages/marketplace/SellerDashboard";
+import MyOrders from "../pages/marketplace/MyOrders";
+import OrderDetails from "../pages/marketplace/OrderDetails";
+import Messages from "../pages/marketplace/Messages";
+
 const Router: React.FC = () => {
   return (
     <BrowserRouter>
         <Routes>
+          {/* ========== EXISTING ROUTES ========== */}
           <Route path="/" element={<Homepage />} />
           <Route path="/video/:slug" element={<Viewpage />} />
           <Route path="/category/:slug" element={<CategoryPage />} />
@@ -59,6 +68,16 @@ const Router: React.FC = () => {
           <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
           <Route path="/admin" element={<Signin />} />
 
+          {/* ========== 🆕 MARKETPLACE ROUTES ========== */}
+          <Route path="/marketplace" element={<Browse />} />
+          <Route path="/marketplace/create" element={<CreateListing />} />
+          <Route path="/marketplace/dashboard" element={<SellerDashboard />} />
+          <Route path="/marketplace/orders" element={<MyOrders />} />
+          <Route path="/marketplace/orders/:orderId" element={<OrderDetails />} />
+          <Route path="/marketplace/messages" element={<Messages />} />
+          <Route path="/marketplace/messages/:orderId" element={<Messages />} />
+
+          {/* ========== ADMIN ROUTES ========== */}
           <Route element={<ProtectedRoute />}>
             <Route
               path="/admin/*"
@@ -72,6 +91,10 @@ const Router: React.FC = () => {
                     <Route path="transactions" element={<Transactions />} />
                     <Route path="settings" element={<Settings />} />
                     <Route path="script" element={<Scripts />} />
+                    
+                    {/* 🆕 Optional: Add marketplace admin routes later */}
+                    {/* <Route path="marketplace-listings" element={<MarketplaceListings />} /> */}
+                    {/* <Route path="marketplace-orders" element={<MarketplaceOrders />} /> */}
                   </Routes>
                 </Layout>
               }
