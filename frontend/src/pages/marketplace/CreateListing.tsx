@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import MarketplaceLayout from '../../components/Layout/MarketplaceLayout';
-import './CreateListing.css';
+import '../../css/Creatinglisting.css';
 
 interface ListingFormData {
   title: string;
