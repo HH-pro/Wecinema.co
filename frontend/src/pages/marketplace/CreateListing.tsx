@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import MarketplaceLayout from '../../components/marketplace/MarketplaceLayout';
+import MarketplaceLayout from '../../components/Layout/MarketplaceLayout';
 
 interface ListingFormData {
   title: string;
