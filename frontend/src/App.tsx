@@ -2,7 +2,10 @@ import { default as Router } from "./routes";
 import "./App.css";
 import { useEffect } from "react";
 import * as Sentry from "@sentry/react";
-import AICustomerSupport from "./components/AICustomerSupport"; // Your popup with Chat with Agent button
+import AICustomerSupport from "./components/AICustomerSupport";
+import { MarketplaceProvider } from "./context/MarketplaceContext"; // 🆕 ADD MARKETPLACE PROVIDER
+import { ToastContainer } from 'react-toastify'; // 🆕 ADD TOAST CONTAINER
+import 'react-toastify/dist/ReactToastify.css'; // 🆕 ADD TOAST STYLES
 
 export const categories = [
   "Action ",
@@ -38,35 +41,38 @@ export const themes = [
 
 export const ratings = ["g ", "pg ", "pg-13 ", "r ", "x "];
 
-
 export default function App() {
   // ✅ Tawk.to Live Chat Widget Setup
   useEffect(() => {
     const script = document.createElement("script");
-    script.src = "https://embed.tawk.to/6849bde9e7d8d619164a49fe/1itg0ro66"; // Replace with your actual Tawk.to property/widget ID
+    script.src = "https://embed.tawk.to/6849bde9e7d8d619164a49fe/1itg0ro66";
     script.async = true;
     script.charset = "UTF-8";
     script.setAttribute("crossorigin", "*");
     document.body.appendChild(script);
   }, []);
 
-  
-  // Optional: Web Vitals reporting to Sentry
-  // useEffect(() => {
-  //   const sendToSentry = (metric: any) => {
-  //     Sentry.metrics.distribution(`web_vitals.${metric.name}`, metric.value);
-  //   };
-  //   import("web-vitals").then((vitals) => {
-  //     vitals.getCLS(sendToSentry);
-  //     vitals.getFID(sendToSentry);
-  //     vitals.getLCP(sendToSentry);
-  //   });
-  // }, []);
-
   return (
     <div>
-      <AICustomerSupport />
-      <Router />
+      {/* 🆕 WRAP EVERYTHING WITH MARKETPLACE PROVIDER */}
+      <MarketplaceProvider>
+        <AICustomerSupport />
+        <Router />
+        
+        {/* 🆕 ADD TOAST CONTAINER FOR NOTIFICATIONS */}
+        <ToastContainer
+          position="top-right"
+          autoClose={5000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
+        />
+      </MarketplaceProvider>
     </div>
   );
 }
