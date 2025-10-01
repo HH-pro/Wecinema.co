@@ -30,9 +30,10 @@ router.get("/my-listings", protect, isHypeModeUser, isSeller, async (req, res) =
 router.post("/create-listing", protect, isHypeModeUser, isSeller, async (req, res) => {
   try {
     const { title, description, price, type, category, tags } = req.body;
+    const userId = req.params.user;
     
     const listing = new Listing({
-      sellerId: req.user.id,
+      sellerId: userId,
       title,
       description,
       price,
