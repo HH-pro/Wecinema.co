@@ -17,6 +17,7 @@ const CreateListing: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState<boolean>(false);
   const [formData, setFormData] = useState<ListingFormData>({
+    const token = localStorage.getItem("token");
     title: '',
     description: '',
     price: 0,
@@ -53,12 +54,15 @@ const CreateListing: React.FC = () => {
       formDataToSend.append('category', formData.category);
       formData.tags.forEach(tag => formDataToSend.append('tags', tag));
       formData.mediaFiles.forEach(file => formDataToSend.append('media', file));
-
-      const response = await fetch('http://localhost:3000/marketplace/listings/create-listing', {
-        method: 'POST',
-        body: formDataToSend,
-      });
-
+      
+const response = await fetch('http://localhost:3000/marketplace/listings/create-listing', {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${token}`,
+    // Note: DON'T set Content-Type manually for FormData; browser handles it.
+  },
+  body: formDataToSend,
+});
       if (response.ok) {
         navigate('/marketplace');
       } else {
