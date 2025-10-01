@@ -269,14 +269,15 @@ const Browse: React.FC = () => {
                     : 'Be the first to create a listing and start trading!'
                   }
                 </p>
-           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-  <Link 
-    href="/create-listing" // Update this path to your actual create listing page
+ <div className="flex flex-col sm:flex-row gap-3 justify-center">
+  <button 
     className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
   >
-    <FiPlus className="mr-2" size={18} />
-    Create First Listing
-  </Link>
+    <Link href="/create-listing" className="inline-flex items-center">
+      <FiPlus className="mr-2" size={18} />
+      Create First Listing
+    </Link>
+  </button>
   {(searchQuery || Object.values(filters).some(Boolean)) && (
     <button 
       onClick={clearFilters}
