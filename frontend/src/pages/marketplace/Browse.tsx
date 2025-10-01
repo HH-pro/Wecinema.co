@@ -4,6 +4,7 @@ import CreateListingModal from '../../components/marketplae/CreateListingModal';
 import MarketplaceLayout from '../../components/Layout';
 import { Listing } from '../../types/marketplace';
 import { FiFilter, FiPlus, FiSearch } from 'react-icons/fi';
+import { Link } from 'react-router-dom';
 
 const Browse: React.FC = () => {
   const [listings, setListings] = useState<Listing[]>([]);
