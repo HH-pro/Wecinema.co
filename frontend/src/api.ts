@@ -733,3 +733,32 @@ export const marketplaceAPI = {
 };
 
 // ... your existing exports continue ...
+// Payment-specific functions
+export const initializeStripe = async () => {
+  if (typeof window !== 'undefined' && !window.Stripe) {
+    const { loadStripe } = await import('@stripe/stripe-js');
+    return loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY!);
+  }
+  return null;
+};
+
+export const createStripePaymentMethod = async (cardElement: any) => {
+  const stripe = await initializeStripe();
+  if (!stripe) throw new Error('Stripe not loaded');
+
+  const { error, paymentMethod } = await stripe.createPaymentMethod({
+    type: 'card',
+    card: cardElement,
+  });
+
+  if (error) throw new Error(error.message);
+  return paymentMethod;
+};
+
+// Webhook simulation for development
+export const simulateWebhook = async (paymentIntentId: string, eventType: string) => {
+  return postRequest('/api/webhook/simulate', {
+    paymentIntentId,
+    eventType
+  }, () => {});
+};
