@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { Listing, Order, Offer, User } from '../types/marketplace';
-import { marketplaceAPI } from '../services/api';
+import { marketplaceAPI } from '../api';
 
 interface MarketplaceState {
   listings: Listing[];
