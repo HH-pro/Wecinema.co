@@ -268,23 +268,23 @@ const Browse: React.FC = () => {
                     : 'Be the first to create a listing and start trading!'
                   }
                 </p>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <button 
-                    onClick={() => setShowCreateModal(true)}
-                    className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-                  >
-                    <FiPlus className="mr-2" size={18} />
-                    Create First Listing
-                  </button>
-                  {(searchQuery || Object.values(filters).some(Boolean)) && (
-                    <button 
-                      onClick={clearFilters}
-                      className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-                    >
-                      Clear all filters
-                    </button>
-                  )}
-                </div>
+           <div className="flex flex-col sm:flex-row gap-3 justify-center">
+  <Link 
+    href="/create-listing" // Update this path to your actual create listing page
+    className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+  >
+    <FiPlus className="mr-2" size={18} />
+    Create First Listing
+  </Link>
+  {(searchQuery || Object.values(filters).some(Boolean)) && (
+    <button 
+      onClick={clearFilters}
+      className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+    >
+      Clear all filters
+    </button>
+  )}
+</div>
               </div>
             </div>
           ) : (
