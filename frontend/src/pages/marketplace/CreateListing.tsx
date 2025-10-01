@@ -16,8 +16,9 @@ interface ListingFormData {
 const CreateListing: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState<boolean>(false);
+  const token = localStorage.getItem("token");
   const [formData, setFormData] = useState<ListingFormData>({
-    const token = localStorage.getItem("token");
+    
     title: '',
     description: '',
     price: 0,
