@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useMarketplace } from '../../context/MarketplaceContext';
-import { marketplaceAPI } from '../../services/api';
+import { marketplaceAPI } from '../../api';
 
 interface Message {
   _id: string;
