@@ -54,7 +54,7 @@ const CreateListing: React.FC = () => {
       formData.tags.forEach(tag => formDataToSend.append('tags', tag));
       formData.mediaFiles.forEach(file => formDataToSend.append('media', file));
 
-      const response = await fetch('/api/marketplace/create-listing', {
+      const response = await fetch('/marketplace/create-listing', {
         method: 'POST',
         body: formDataToSend,
       });
