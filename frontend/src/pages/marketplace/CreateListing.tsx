@@ -63,7 +63,7 @@ const CreateListing: React.FC = () => {
 
     // Try the correct API endpoint
     const response = await axios.post(
-      '/api/marketplace/create-listing', // Most likely this one
+      '/marketplace/create-listing', // Most likely this one
       formDataToSend,
       {
         headers: {
