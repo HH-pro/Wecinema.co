@@ -26,30 +26,21 @@ router.get("/my-listings", protect, isHypeModeUser, isSeller, async (req, res) =
   }
 });
 // Create new listing
-// Create new listing
+// Backend - routes/marketplace.js (or wherever your listing routes are)
 router.post("/create-listing", protect, isHypeModeUser, isSeller, async (req, res) => {
   try {
+    console.log('=== REQUEST DEBUG ===');
+    console.log('req.user:', req.user);
+    console.log('req.body:', req.body);
+    console.log('=== END DEBUG ===');
+    
     const { title, description, price, type, category, tags } = req.body;
     
-    // Debug: Print all available user information
-    console.log('=== USER DEBUG INFO ===');
-    console.log('req.user:', req.user);
-    console.log('req.user._id:', req.user?._id);
-    console.log('req.user.id:', req.user?.id);
-    console.log('req.user.userId:', req.user?.userId);
-    console.log('req.params:', req.params);
-    console.log('req.params.user:', req.params.user);
-    console.log('req.body.userId:', req.body.userId);
-    console.log('=== END DEBUG INFO ===');
-    
-    // Try different ways to get user ID
-    const userId = req.user?._id || req.user?.id || req.params.user || req.body.userId;
-    
-    console.log('Final userId being used:', userId);
+    // Get user ID from authenticated user
+    const userId = req.user._id; // or req.user.id
     
     if (!userId) {
-      console.error('No user ID found in any of the expected locations');
-      return res.status(400).json({ error: "User not found" });
+      return res.status(401).json({ error: "User not authenticated" });
     }
 
     // Validate required fields
@@ -69,15 +60,9 @@ router.post("/create-listing", protect, isHypeModeUser, isSeller, async (req, re
     });
 
     await listing.save();
-    console.log('Listing created successfully with ID:', listing._id);
     res.status(201).json(listing);
   } catch (error) {
     console.error('Error creating listing:', error);
-    
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({ error: error.message });
-    }
-    
     res.status(500).json({ error: 'Failed to create listing' });
   }
 });
