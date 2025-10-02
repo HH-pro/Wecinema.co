@@ -43,14 +43,12 @@ const token = localStorage.getItem("token") || null;
   e.preventDefault();
   setLoading(true);
 
-  // Validation
-  const newErrors: { [key: string]: string } = {};
-  if (!formData.title.trim()) newErrors.title = 'Title is required';
-  if (formData.price <= 0) newErrors.price = 'Price must be greater than 0';
-  if (!formData.type) newErrors.type = 'Please select a listing type';
-
-  if (Object.keys(newErrors).length > 0) {
-    setErrors(newErrors);
+  // Debug token
+  const token = localStorage.getItem("token");
+  console.log('Token from localStorage:', token);
+  
+  if (!token) {
+    console.error('No token found in localStorage');
     setLoading(false);
     return;
   }
@@ -62,16 +60,11 @@ const token = localStorage.getItem("token") || null;
     formDataToSend.append('price', formData.price.toString());
     formDataToSend.append('type', formData.type);
     formDataToSend.append('category', formData.category);
-    
-    // Append tags properly
     formData.tags.forEach(tag => formDataToSend.append('tags', tag));
-    
-    // Append files - use 'mediaFiles' as field name
     formData.mediaFiles.forEach(file => formDataToSend.append('mediaFiles', file));
 
-    // Try the correct API endpoint
     const response = await axios.post(
-      'http://localhost:3000/marketplace/listings/create-listing', // Most likely this one
+      '/api/marketplace/create-listing',
       formDataToSend,
       {
         headers: {
@@ -88,6 +81,13 @@ const token = localStorage.getItem("token") || null;
     if (error.response) {
       console.error('Server error:', error.response.data);
       console.error('Status code:', error.response.status);
+      
+      // If it's auth error, redirect to login
+      if (error.response.status === 401) {
+        console.error('Authentication failed. Redirecting to login...');
+        localStorage.removeItem('token'); // Clear invalid token
+        navigate('/login');
+      }
     }
   } finally {
     setLoading(false);
