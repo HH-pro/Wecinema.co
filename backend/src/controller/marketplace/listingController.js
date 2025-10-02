@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const MarketplaceListing = require('../models/MarketplaceListing'); // Correct import
+const MarketplaceListing = require('../../models/MarketplaceListing'); // Correct import
 
 const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils"); // 🆕 AUTH IMPORT
 
