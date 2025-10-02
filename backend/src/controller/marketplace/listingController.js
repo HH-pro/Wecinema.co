@@ -29,11 +29,7 @@ router.get("/my-listings", protect, isHypeModeUser, isSeller, async (req, res) =
 // Backend - routes/marketplace.js (or wherever your listing routes are)
 router.post("/create-listing", protect, isHypeModeUser, isSeller, async (req, res) => {
   try {
-    console.log('=== REQUEST DEBUG ===');
-    console.log('req.user:', req.user);
-    console.log('req.body:', req.body);
-    console.log('=== END DEBUG ===');
-    
+  
     const { title, description, price, type, category, tags } = req.body;
     
     // Get user ID from authenticated user
