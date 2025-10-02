@@ -31,64 +31,60 @@ const CreateListing: React.FC = () => {
   const [tagInput, setTagInput] = useState('');
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+ const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
 
-    // Validation
-    const newErrors: { [key: string]: string } = {};
-    if (!formData.title.trim()) newErrors.title = 'Title is required';
-    if (formData.price <= 0) newErrors.price = 'Price must be greater than 0';
-    if (!formData.type) newErrors.type = 'Please select a listing type';
+  // Validation
+  const newErrors: { [key: string]: string } = {};
+  if (!formData.title.trim()) newErrors.title = 'Title is required';
+  if (formData.price <= 0) newErrors.price = 'Price must be greater than 0';
+  if (!formData.type) newErrors.type = 'Please select a listing type';
 
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const formDataToSend = new FormData();
-      formDataToSend.append('title', formData.title);
-      formDataToSend.append('description', formData.description);
-      formDataToSend.append('price', formData.price.toString());
-      formDataToSend.append('type', formData.type);
-      formDataToSend.append('category', formData.category);
-      formData.tags.forEach(tag => formDataToSend.append('tags', tag));
-      formData.mediaFiles.forEach(file => formDataToSend.append('media', file));
-
-   const response = await axios.post(
-  '/api/marketplace/listings/create-listing', // Relative path
-  formDataToSend,
-  {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+  if (Object.keys(newErrors).length > 0) {
+    setErrors(newErrors);
+    setLoading(false);
+    return;
   }
-);
+
+  try {
+    const formDataToSend = new FormData();
+    formDataToSend.append('title', formData.title);
+    formDataToSend.append('description', formData.description);
+    formDataToSend.append('price', formData.price.toString());
+    formDataToSend.append('type', formData.type);
+    formDataToSend.append('category', formData.category);
+    
+    // Append tags properly
+    formData.tags.forEach(tag => formDataToSend.append('tags', tag));
+    
+    // Append files - use 'mediaFiles' as field name
+    formData.mediaFiles.forEach(file => formDataToSend.append('mediaFiles', file));
+
+    // Try the correct API endpoint
+    const response = await axios.post(
+      '/api/marketplace/create-listing', // Most likely this one
+      formDataToSend,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
 
     if (response.status === 201) {
       navigate('/marketplace');
     }
   } catch (error) {
     console.error('Error creating listing:', error);
-    // Axios provides detailed error information
     if (error.response) {
-      // Server responded with error status
       console.error('Server error:', error.response.data);
       console.error('Status code:', error.response.status);
-    } else if (error.request) {
-      // Request made but no response received
-      console.error('No response received:', error.request);
-    } else {
-      // Something else happened
-      console.error('Error:', error.message);
     }
   } finally {
     setLoading(false);
   }
 };
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       setFormData(prev => ({
