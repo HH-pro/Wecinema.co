@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 const Listing = require("../../models/marketplace/listing");
 const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils"); // 🆕 AUTH IMPORT
-const User = require("../../models/user");
 
 // ✅ PUBLIC ROUTE - No auth required
 router.get("/listings", async (req, res) => {
@@ -26,21 +25,27 @@ router.get("/my-listings", protect, isHypeModeUser, isSeller, async (req, res) =
     res.status(500).json({ error: 'Failed to fetch my listings' });
   }
 });
-
 // Create new listing
 router.post("/create-listing", protect, isHypeModeUser, isSeller, async (req, res) => {
   try {
     const { title, description, price, type, category, tags } = req.body;
-       const { userId } = req.params;
-     const user = await User.findById(userId);
+    
+    // Get user ID from req.user (set by protect middleware) instead of req.params
+    const userId = req.user._id; // or req.user.id depending on your user object structure
+    
+    // Validate required fields
+    if (!title || !description || !price || !type || !category) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
     const listing = new Listing({
-      sellerId: user,
+      sellerId: userId,
       title,
       description,
       price,
       type,
       category,
-      tags,
+      tags: tags || [], // default to empty array if not provided
       mediaUrls: req.files ? req.files.map(file => file.path) : []
     });
 
@@ -48,6 +53,12 @@ router.post("/create-listing", protect, isHypeModeUser, isSeller, async (req, re
     res.status(201).json(listing);
   } catch (error) {
     console.error('Error creating listing:', error);
+    
+    // More specific error handling
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ error: error.message });
+    }
+    
     res.status(500).json({ error: 'Failed to create listing' });
   }
 });
