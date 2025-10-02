@@ -64,7 +64,7 @@ const token = localStorage.getItem("token") || null;
     formData.mediaFiles.forEach(file => formDataToSend.append('mediaFiles', file));
 
     const response = await axios.post(
-      '/api/marketplace/create-listing',
+      'http://localhost:3000/marketplace/create-listing',
       formDataToSend,
       {
         headers: {
