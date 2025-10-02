@@ -28,8 +28,8 @@ router.get("/my-listings", protect, isHypeModeUser, isSeller, async (req, res) =
 // Create new listing
 // Make sure you're importing the correct model
 
-// Create new listing
-router.post("/create-listing", isSeller, async (req, res) => {
+// Make sure protect comes BEFORE isSeller
+router.post("/create-listing",  isSeller, async (req, res) => {
   try {
     console.log('=== CREATE LISTING REQUEST ===');
     console.log('req.user:', req.user);
@@ -37,19 +37,14 @@ router.post("/create-listing", isSeller, async (req, res) => {
     
     const { title, description, price, type, category, tags } = req.body;
     
-    // Get user ID from authenticated user
-    const userId = req.params.user._id || req.user.id;
+    // Get user ID safely
+    const userId = req.user._id;
+    console.log('User ID:', userId);
     
-    if (!userId) {
-      return res.status(401).json({ error: "User not authenticated" });
-    }
-
-    // Validate required fields
     if (!title || !description || !price || !type || !category) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // Use MarketplaceListing instead of Listing
     const listing = new MarketplaceListing({
       sellerId: userId,
       title,
@@ -62,14 +57,13 @@ router.post("/create-listing", isSeller, async (req, res) => {
     });
 
     await listing.save();
-    console.log('Listing created successfully:', listing._id);
+    console.log('Listing created successfully');
     res.status(201).json(listing);
   } catch (error) {
     console.error('Error creating listing:', error);
     res.status(500).json({ error: 'Failed to create listing' });
   }
 });
-
 // Delete listing
 router.delete("/listing/:id", protect, isHypeModeUser, isSeller, async (req, res) => {
   try {
