@@ -57,15 +57,15 @@ const CreateListing: React.FC = () => {
       formData.tags.forEach(tag => formDataToSend.append('tags', tag));
       formData.mediaFiles.forEach(file => formDataToSend.append('media', file));
 
-    const response = await axios.post(
-      'http://localhost:3000/marketplace/listings/create-listing',
-      formDataToSend,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
+   const response = await axios.post(
+  '/marketplace/listings/create-listing', // Relative path
+  formDataToSend,
+  {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  }
+);
 
     if (response.status === 201) {
       navigate('/marketplace');
