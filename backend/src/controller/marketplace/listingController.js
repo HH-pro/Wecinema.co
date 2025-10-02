@@ -38,7 +38,7 @@ router.post("/create-listing",  isSeller, async (req, res) => {
     const { title, description, price, type, category, tags } = req.body;
     
     // Get user ID safely
-    const userId = req.user._id;
+    const userId = req.params.user._id;
     console.log('User ID:', userId);
     
     if (!title || !description || !price || !type || !category) {
