@@ -6,7 +6,7 @@ const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require(".
 // ✅ PUBLIC ROUTE - No auth required
 router.get("/listings", async (req, res) => {
   try {
-    const listings = await Listing.find({ status: 'active' })
+    const listings = await MarketplaceListing.find({ status: 'active' })
       .populate('sellerId', 'username avatar sellerRating');
     res.status(200).json(listings);
   } catch (error) {
@@ -18,7 +18,7 @@ router.get("/listings", async (req, res) => {
 // ✅ PROTECTED ROUTES - HypeMode + Seller only
 router.get("/my-listings", protect, isHypeModeUser, isSeller, async (req, res) => {
   try {
-    const listings = await Listing.find({ sellerId: req.user.id });
+    const listings = await MarketplaceListing.find({ sellerId: req.user.id });
     res.status(200).json(listings);
   } catch (error) {
     console.error('Error fetching my listings:', error);
@@ -73,7 +73,7 @@ router.post("/create-listing", protect, isHypeModeUser, isSeller, async (req, re
 // Delete listing
 router.delete("/listing/:id", protect, isHypeModeUser, isSeller, async (req, res) => {
   try {
-    const listing = await Listing.findOneAndDelete({ 
+    const listing = await MarketplaceListing.findOneAndDelete({ 
       _id: req.params.id, 
       sellerId: req.user.id 
     });
