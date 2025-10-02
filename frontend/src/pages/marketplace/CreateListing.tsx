@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MarketplaceLayout from '../../components/Layout';
 import { FiUpload, FiDollarSign, FiType, FiFolder, FiTag, FiArrowLeft } from 'react-icons/fi';
+import axios from 'axios';
 
 interface ListingFormData {
   title: string;
@@ -55,26 +56,38 @@ const CreateListing: React.FC = () => {
       formDataToSend.append('category', formData.category);
       formData.tags.forEach(tag => formDataToSend.append('tags', tag));
       formData.mediaFiles.forEach(file => formDataToSend.append('media', file));
-      
-const response = await fetch('http://localhost:3000/api/marketplace/listings/create-listing', {
-  method: 'POST',
-  headers: {
-    Authorization: `Bearer ${token}`,
-    // Note: DON'T set Content-Type manually for FormData; browser handles it.
-  },
-  body: formDataToSend,
-});
-      if (response.ok) {
-        navigate('/marketplace');
-      } else {
-        console.error('Failed to create listing');
+
+    const response = await axios.post(
+      'http://localhost:3000/api/marketplace/listings/create-listing',
+      formDataToSend,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       }
-    } catch (error) {
-      console.error('Error creating listing:', error);
-    } finally {
-      setLoading(false);
+    );
+
+    if (response.status === 201) {
+      navigate('/marketplace');
     }
-  };
+  } catch (error) {
+    console.error('Error creating listing:', error);
+    // Axios provides detailed error information
+    if (error.response) {
+      // Server responded with error status
+      console.error('Server error:', error.response.data);
+      console.error('Status code:', error.response.status);
+    } else if (error.request) {
+      // Request made but no response received
+      console.error('No response received:', error.request);
+    } else {
+      // Something else happened
+      console.error('Error:', error.message);
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
