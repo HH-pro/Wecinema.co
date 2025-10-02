@@ -32,8 +32,7 @@ router.post("/create-listing", protect, isHypeModeUser, isSeller, async (req, re
   
     const { title, description, price, type, category, tags } = req.body;
     
-    // Get user ID from authenticated user
-    const userId = req.user.id; // or req.user.id
+   
     
     if (!userId) {
       return res.status(401).json({ error: "User not authenticated" });
