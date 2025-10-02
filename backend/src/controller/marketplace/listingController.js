@@ -32,7 +32,7 @@ router.get("/my-listings", protect, isHypeModeUser, isSeller, async (req, res) =
 router.post("/create-listing",  authenticateMiddleware, async (req, res) => {
   try {
     console.log('=== CREATE LISTING REQUEST ===');
-     console.log('req.files:', req.title); // Check if files are coming through
+    
     const { title, description, price, type, category, tags } = req.body;
     
     // Get user ID safely
