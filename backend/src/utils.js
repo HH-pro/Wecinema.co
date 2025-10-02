@@ -73,26 +73,28 @@ const isHypeModeUser = async (req, res, next) => {
     res.status(500).json({ error: 'Server error' });
   }
 };
-
-// 🆕 SELLER MIDDLEWARE  
-const isSeller = async (req, res, next) => {
+// In your utils.js - Fix isSeller middleware
+const isSeller = (req, res, next) => {
   try {
-    const user = await User.findById(req.user.id);
+    console.log('=== IS SELLER MIDDLEWARE ===');
+    console.log('req.user:', req.user);
     
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+    // Check if req.user exists and has the required properties
+    if (!req.user) {
+      return res.status(401).json({ error: 'User not authenticated' });
     }
-    
-    if (user.role !== 'seller' && user.role !== 'both') {
-      return res.status(403).json({ 
-        error: 'Access denied. Seller account required to create listings.' 
-      });
+
+    // Check if user has seller role or permissions
+    // Adjust this based on your user model structure
+    if (req.user.role !== 'seller' && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied. Seller role required.' });
     }
-    
+
+    console.log('User is seller, proceeding...');
     next();
   } catch (error) {
-    console.error('Seller check error:', error);
-    res.status(500).json({ error: 'Server error' });
+    console.log('isSeller middleware error:', error);
+    res.status(500).json({ error: 'Server error in seller verification' });
   }
 };
 
