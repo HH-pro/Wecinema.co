@@ -56,7 +56,7 @@ const CreateListing: React.FC = () => {
       formData.tags.forEach(tag => formDataToSend.append('tags', tag));
       formData.mediaFiles.forEach(file => formDataToSend.append('media', file));
       
-const response = await fetch('http://localhost:3000/api/marketplace/listings/create-listing', {
+const response = await fetch('http://localhost:3000/marketplace/listings/create-listing', {
   method: 'POST',
   headers: {
     Authorization: `Bearer ${token}`,
