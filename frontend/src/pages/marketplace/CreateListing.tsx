@@ -58,7 +58,7 @@ const CreateListing: React.FC = () => {
       formData.mediaFiles.forEach(file => formDataToSend.append('media', file));
 
     const response = await axios.post(
-      'http://localhost:3000/marketplace/listing/create-listing',
+      'http://localhost:3000/marketplace/listings/create-listing',
       formDataToSend,
       {
         headers: {
