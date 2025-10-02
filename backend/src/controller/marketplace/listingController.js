@@ -38,7 +38,7 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
     const { title, description, price, type, category, tags } = req.body;
     
     // Get user ID from authenticated user
-    const userId = req.params._id;
+    const userId = req.params._id || req.user.id;
     
     if (!userId) {
       return res.status(401).json({ error: "User not authenticated" });
