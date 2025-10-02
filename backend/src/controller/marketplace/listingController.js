@@ -31,7 +31,7 @@ router.post("/create-listing", protect, isHypeModeUser, isSeller, async (req, re
     const { title, description, price, type, category, tags } = req.body;
     
     // Get user ID from req.user (set by protect middleware) instead of req.params
-    const { id } = req.params;  // or req.user.id depending on your user object structure
+    const id =   req.params.id;  // or req.user.id depending on your user object structure
     
     // Validate required fields
     if (!title || !description || !price || !type || !category) {
