@@ -26,35 +26,54 @@ router.get("/my-listings", protect, isHypeModeUser, isSeller, async (req, res) =
   }
 });
 // Create new listing
+// Create new listing
 router.post("/create-listing", protect, isHypeModeUser, isSeller, async (req, res) => {
   try {
     const { title, description, price, type, category, tags } = req.body;
     
-    // Get user ID from req.user (set by protect middleware) instead of req.params
-    const id =   req.params.id;  // or req.user.id depending on your user object structure
-    console.log("Id", id);
+    // Debug: Print all available user information
+    console.log('=== USER DEBUG INFO ===');
+    console.log('req.user:', req.user);
+    console.log('req.user._id:', req.user?._id);
+    console.log('req.user.id:', req.user?.id);
+    console.log('req.user.userId:', req.user?.userId);
+    console.log('req.params:', req.params);
+    console.log('req.params.user:', req.params.user);
+    console.log('req.body.userId:', req.body.userId);
+    console.log('=== END DEBUG INFO ===');
+    
+    // Try different ways to get user ID
+    const userId = req.user?._id || req.user?.id || req.params.user || req.body.userId;
+    
+    console.log('Final userId being used:', userId);
+    
+    if (!userId) {
+      console.error('No user ID found in any of the expected locations');
+      return res.status(400).json({ error: "User not found" });
+    }
+
     // Validate required fields
     if (!title || !description || !price || !type || !category) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
     const listing = new Listing({
-      sellerId: id,
+      sellerId: userId,
       title,
       description,
       price,
       type,
       category,
-      tags: tags || [], // default to empty array if not provided
+      tags: tags || [],
       mediaUrls: req.files ? req.files.map(file => file.path) : []
     });
 
     await listing.save();
+    console.log('Listing created successfully with ID:', listing._id);
     res.status(201).json(listing);
   } catch (error) {
     console.error('Error creating listing:', error);
     
-    // More specific error handling
     if (error.name === 'ValidationError') {
       return res.status(400).json({ error: error.message });
     }
@@ -62,7 +81,6 @@ router.post("/create-listing", protect, isHypeModeUser, isSeller, async (req, re
     res.status(500).json({ error: 'Failed to create listing' });
   }
 });
-
 // Update listing
 router.put("/listing/:id", protect, isHypeModeUser, isSeller, async (req, res) => {
   try {
