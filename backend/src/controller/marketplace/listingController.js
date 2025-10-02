@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const Listing = require("../../models/marketplace/listing");
+const MarketplaceListing = require('../models/MarketplaceListing'); // Correct import
+
 const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils"); // 🆕 AUTH IMPORT
 
 // ✅ PUBLIC ROUTE - No auth required
@@ -26,13 +27,19 @@ router.get("/my-listings", protect, isHypeModeUser, isSeller, async (req, res) =
   }
 });
 // Create new listing
-// Backend - routes/marketplace.js (or wherever your listing routes are)
+// Make sure you're importing the correct model
+
+// Create new listing
 router.post("/create-listing", protect, isHypeModeUser, isSeller, async (req, res) => {
   try {
-  
+    console.log('=== CREATE LISTING REQUEST ===');
+    console.log('req.user:', req.user);
+    console.log('req.body:', req.body);
+    
     const { title, description, price, type, category, tags } = req.body;
     
-   
+    // Get user ID from authenticated user
+    const userId = req.user._id || req.user.id;
     
     if (!userId) {
       return res.status(401).json({ error: "User not authenticated" });
@@ -43,42 +50,24 @@ router.post("/create-listing", protect, isHypeModeUser, isSeller, async (req, re
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    const listing = new Listing({
+    // Use MarketplaceListing instead of Listing
+    const listing = new MarketplaceListing({
       sellerId: userId,
       title,
       description,
       price,
       type,
       category,
-      tags: tags || [],
+      tags: Array.isArray(tags) ? tags : (tags ? [tags] : []),
       mediaUrls: req.files ? req.files.map(file => file.path) : []
     });
 
     await listing.save();
+    console.log('Listing created successfully:', listing._id);
     res.status(201).json(listing);
   } catch (error) {
     console.error('Error creating listing:', error);
     res.status(500).json({ error: 'Failed to create listing' });
-  }
-});
-// Update listing
-router.put("/listing/:id", protect, isHypeModeUser, isSeller, async (req, res) => {
-  try {
-    const listing = await Listing.findOne({ 
-      _id: req.params.id, 
-      sellerId: req.user.id 
-    });
-    
-    if (!listing) {
-      return res.status(404).json({ error: 'Listing not found' });
-    }
-
-    Object.assign(listing, req.body);
-    await listing.save();
-    res.status(200).json(listing);
-  } catch (error) {
-    console.error('Error updating listing:', error);
-    res.status(500).json({ error: 'Failed to update listing' });
   }
 });
 
