@@ -10,6 +10,7 @@ import {
   RiShoppingBagLine,
   RiListCheck,
   RiMessageLine,
+  RiMovie2Line
 } from "react-icons/ri";
 import { LiaSignInAltSolid } from "react-icons/lia";
 import { HiUserAdd } from "react-icons/hi";
