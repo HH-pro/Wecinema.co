@@ -44,10 +44,7 @@ router.post("/create-listing", async (req, res) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    const userId = req.user?._id;
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized — user not found" });
-    }
+
 
     // Normalize tags and media URLs
     const tagsArray = Array.isArray(tags) ? tags : [tags];
