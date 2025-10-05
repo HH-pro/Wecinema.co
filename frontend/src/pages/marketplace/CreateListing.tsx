@@ -166,7 +166,7 @@ const CreateListing: React.FC = () => {
                           setFormData(prev => ({ ...prev, title: e.target.value }));
                           clearError('title');
                         }}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-blue-500 transition-colors duration-200 ${
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 ${
                           errors.title ? 'border-red-300' : 'border-gray-300'
                         }`}
                         placeholder="Enter a compelling title for your listing..."
@@ -185,7 +185,7 @@ const CreateListing: React.FC = () => {
                         value={formData.description}
                         onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                         rows={4}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 resize-none"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 resize-none"
                         placeholder="Describe your content in detail. What makes it unique? What can buyers expect?"
                       />
                       <p className="text-gray-500 text-sm mt-1">
@@ -218,7 +218,7 @@ const CreateListing: React.FC = () => {
                           }}
                           min="0"
                           step="0.01"
-                          className={`w-full pl-8 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 ${
+                          className={`w-full pl-8 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 ${
                             errors.price ? 'border-red-300' : 'border-gray-300'
                           }`}
                           placeholder="0.00"
@@ -240,7 +240,7 @@ const CreateListing: React.FC = () => {
                           setFormData(prev => ({ ...prev, type: e.target.value }));
                           clearError('type');
                         }}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 ${
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 ${
                           errors.type ? 'border-red-300' : 'border-gray-300'
                         }`}
                       >
@@ -263,7 +263,7 @@ const CreateListing: React.FC = () => {
                       type="text"
                       value={formData.category}
                       onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200"
                       placeholder="e.g., Video Production, Script Writing, Music Composition"
                     />
                   </div>
@@ -283,14 +283,14 @@ const CreateListing: React.FC = () => {
                         value={tagInput}
                         onChange={(e) => setTagInput(e.target.value)}
                         onKeyPress={handleTagKeyPress}
-                        className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                        className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200"
                         placeholder="Add relevant tags (press Enter to add)"
                       />
                       <button
                         type="button"
                         onClick={addTag}
                         disabled={!tagInput.trim()}
-                        className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 focus:ring-2 focus:ring-yellow-500 focus:outline-none transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Add
                       </button>
@@ -302,14 +302,14 @@ const CreateListing: React.FC = () => {
                         {formData.tags.map(tag => (
                           <span
                             key={tag}
-                            className="inline-flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-800 rounded-full text-sm font-medium"
+                            className="inline-flex items-center gap-2 px-3 py-2 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium"
                           >
                             <FiTag size={12} />
                             {tag}
                             <button
                               type="button"
                               onClick={() => removeTag(tag)}
-                              className="hover:text-blue-900 focus:outline-none ml-1"
+                              className="hover:text-yellow-900 focus:outline-none ml-1"
                             >
                               ×
                             </button>
@@ -350,7 +350,7 @@ const CreateListing: React.FC = () => {
                       />
                       <label
                         htmlFor="media-upload"
-                        className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 cursor-pointer"
+                        className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200 cursor-pointer"
                       >
                         Choose Files
                       </label>
@@ -385,14 +385,14 @@ const CreateListing: React.FC = () => {
                     type="button"
                     onClick={() => navigate('/marketplace')}
                     disabled={loading}
-                    className="px-8 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-colors duration-200 disabled:opacity-50"
+                    className="px-8 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-yellow-500 focus:outline-none transition-colors duration-200 disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={loading}
-                    className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="px-8 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 focus:ring-2 focus:ring-yellow-500 focus:outline-none transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {loading ? (
                       <>
