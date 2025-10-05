@@ -33,7 +33,9 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== CREATE LISTING REQUEST ===");
 
-    const { title, description, price, type, category, tags, file } = req.body;
+  const { title, description, price, type, category, tags } = req.body;
+const media = req.body.mediaUrls || req.files;
+
 
     // The authenticated user's ID (from token)
     const userId = req.user?._id;
