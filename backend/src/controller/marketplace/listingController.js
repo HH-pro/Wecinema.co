@@ -2,7 +2,6 @@ const express = require("express");
 const MarketplaceListing = require("../../models/marketplace/listing");
 import User from "../../models/user.js";
 import { authenticateMiddleware } from "../../utils.js";
-const router = express.Router();
 // ✅ PUBLIC ROUTE - No auth required
 router.get("/listings", async (req, res) => {
   try {
