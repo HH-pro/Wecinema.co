@@ -3,7 +3,7 @@ import { toast } from "react-toastify";
 
 // Create an axios instance with default configurations
 const api = axios.create({
-  baseURL: "https://wecinema.co/api//", // Base URL for all requests  https://wecinema.co/api/
+  baseURL: "http://localhost:3000/", // Base URL for all requests  https://wecinema.co/api/
   withCredentials: true, // Important for cookies
   headers: {
     "Content-Type": "application/json",
