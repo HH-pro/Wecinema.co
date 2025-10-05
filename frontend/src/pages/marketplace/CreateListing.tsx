@@ -88,8 +88,8 @@ try {
   }
 } finally {
   setLoading(false);
-};
-
+}
+ };
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       setFormData(prev => ({
