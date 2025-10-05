@@ -39,7 +39,7 @@ const navigate = useNavigate();
       if (filters.maxPrice) queryParams.append('maxPrice', filters.maxPrice);
       if (filters.sortBy) queryParams.append('sortBy', filters.sortBy);
       
-      const response = await fetch(`/api/marketplace/listings?${queryParams}`);
+      const response = await fetch(`/marketplace/listings?${queryParams}`);
       const data = await response.json();
       setListings(data);
     } catch (error) {
