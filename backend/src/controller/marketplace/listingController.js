@@ -34,7 +34,7 @@ router.get("/my-listings", protect, isHypeModeUser, isSeller, async (req, res) =
 // ✅ CREATE LISTING (like your working video route)
 // ===================================================
 // ✅ Create Listing — without multer
-router.post("/create-listing", authenticateMiddleware, async (req, res) => {
+router.post("/create-listing", async (req, res) => {
   try {
     console.log("=== CREATE LISTING REQUEST ===");
     console.log("Body received:", req.body);
@@ -47,10 +47,7 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
     }
 
     // ✅ Get authenticated user
-    const userId = req.user?._id;
-    if (!userId) {
-      return res.status(401).json({ error: "Unauthorized — user not found" });
-    }
+   
 
     // ✅ Normalize tags (handle both single string or array)
     const tagsArray = Array.isArray(tags)
