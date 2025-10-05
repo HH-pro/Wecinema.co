@@ -61,16 +61,17 @@ const CreateListing: React.FC = () => {
     // Append files - use 'mediaFiles' as field name
     formData.mediaFiles.forEach(file => formDataToSend.append('mediaFiles', file));
 
-    // Try the correct API endpoint
-    const response = await axios.post(
-      'http://localhost:3000/marketplace/listings/create-listing', // Most likely this one
-      formDataToSend,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
+  const response = await axios.post(
+  'http://localhost:3000/marketplace/listings/create-listing',
+  formDataToSend,
+  {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "multipart/form-data", // ✅ Required for FormData
+    },
+  }
+);
+
 
     if (response.status === 201) {
       navigate('/marketplace');
