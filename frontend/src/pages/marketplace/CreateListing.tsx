@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import MarketplaceLayout from '../../components/Layout';
 import { FiUpload, FiDollarSign, FiType, FiFolder, FiTag, FiArrowLeft } from 'react-icons/fi';
 import axios from 'axios';
-import { Itoken, decodeToken } from "../../utilities/helperfFunction";
 
 interface ListingFormData {
   title: string;
@@ -18,11 +17,7 @@ interface ListingFormData {
 const CreateListing: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState<boolean>(false);
-      const [decodedToken, setDecodedToken] = useState<Itoken | null>(null);
-  
   const token = localStorage.getItem("token");
-  	
-			
   const [formData, setFormData] = useState<ListingFormData>({
     
     title: '',
@@ -35,73 +30,37 @@ const CreateListing: React.FC = () => {
   });
   const [tagInput, setTagInput] = useState('');
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-	const decoded = decodeToken(token);
-			setDecodedToken(decoded);
+
  const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
-
-  if (!decodedToken?.userId) {
-    toast.error("You must log in first before creating a listing!");
-    return;
-  }
+  setLoading(true);
 
   try {
-    setLoading(true);
-
-    // ✅ Upload media to Cloudinary first (if a file is selected)
-    let uploadedUrl = "";
-    if (selectedFile) {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-      formData.append("upload_preset", "zoahguuq"); // your Cloudinary preset
-
-      const res = await axios.post(
-        "https://api.cloudinary.com/v1_1/folajimidev/video/upload",
-        formData
-      );
-
-      uploadedUrl = res.data.secure_url;
-    }
-
-    // ✅ Prepare payload for backend (JSON body)
-    const payload = {
+    const data = {
       title: formData.title,
       description: formData.description,
       price: formData.price,
       type: formData.type,
       category: formData.category,
       tags: formData.tags,
-      mediaUrls: uploadedUrl ? [uploadedUrl] : [], // send Cloudinary URL array
+      mediaUrls: formData.mediaUrls, // URLs from Cloudinary
     };
 
-    // ✅ Send to backend (normal JSON request)
     const response = await axios.post(
       "http://localhost:3000/marketplace/listings/create-listing",
-      payload,
+      data,
       {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${token}` },
       }
     );
 
-    if (response.status === 201) {
-      toast.success("Listing created successfully!");
-      navigate("/marketplace");
-    }
+    if (response.status === 201) navigate("/marketplace");
   } catch (error) {
-    setLoading(false);
     console.error("Error creating listing:", error);
-    if (error.response) {
-      console.error("Server error:", error.response.data);
-      toast.error(error.response.data?.error || "Failed to create listing");
-    }
   } finally {
     setLoading(false);
   }
 };
-
 
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
