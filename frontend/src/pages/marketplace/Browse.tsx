@@ -32,7 +32,7 @@ const Browse: React.FC = () => {
       
       // Aapke route ke hisaab se sirf active listings fetch karo
       const response = await axios.get(
-        'http://localhost:3000/marketplace/listings'
+        'http://localhost:3000/marketplace/listings/listings'
       );
       
       // Server se mili listings ko filter karo based on local filters
