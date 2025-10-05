@@ -46,46 +46,50 @@ const CreateListing: React.FC = () => {
     setLoading(false);
     return;
   }
+try {
+  const formDataToSend = new FormData();
+  formDataToSend.append('title', formData.title);
+  formDataToSend.append('description', formData.description);
+  formDataToSend.append('price', formData.price.toString());
+  formDataToSend.append('type', formData.type);
+  formDataToSend.append('category', formData.category);
 
-  try {
-    const formDataToSend = new FormData();
-    formDataToSend.append('title', formData.title);
-    formDataToSend.append('description', formData.description);
-    formDataToSend.append('price', formData.price.toString());
-    formDataToSend.append('type', formData.type);
-    formDataToSend.append('category', formData.category);
-    
-    // Append tags properly
+  // ✅ Add tags
+  if (Array.isArray(formData.tags)) {
     formData.tags.forEach(tag => formDataToSend.append('tags', tag));
-    
-    // Append files - use 'mediaFiles' as field name
-    formData.mediaFiles.forEach(file => formDataToSend.append('mediaFiles', file));
+  } else if (formData.tags) {
+    formDataToSend.append('tags', formData.tags);
+  }
+
+  // ✅ Add media (if uploading images/videos)
+  if (formData.media && formData.media.length > 0) {
+    formData.media.forEach(file => formDataToSend.append('media', file));
+  }
 
   const response = await axios.post(
-  'http://localhost:3000/marketplace/listings/create-listing',
-  formDataToSend,
-  {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "multipart/form-data", // ✅ Required for FormData
-    },
-  }
-);
-
-
-    if (response.status === 201) {
-      navigate('/marketplace');
+    'http://localhost:3000/marketplace/listings/create-listing',
+    formDataToSend,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "multipart/form-data",
+      },
     }
-  } catch (error) {
-    console.error('Error creating listing:', error);
-    if (error.response) {
-      console.error('Server error:', error.response.data);
-      console.error('Status code:', error.response.status);
-    }
-  } finally {
-    setLoading(false);
+  );
+
+  if (response.status === 201) {
+    navigate('/marketplace');
   }
-};
+} catch (error) {
+  console.error('Error creating listing:', error);
+  if (error.response) {
+    console.error('Server error:', error.response.data);
+    console.error('Status code:', error.response.status);
+  }
+} finally {
+  setLoading(false);
+}
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       setFormData(prev => ({
