@@ -35,72 +35,33 @@ const CreateListing: React.FC = () => {
   e.preventDefault();
   setLoading(true);
 
-  // 🔹 Validate fields
-  const newErrors: { [key: string]: string } = {};
-  if (!formData.title.trim()) newErrors.title = "Title is required";
-  if (formData.price <= 0) newErrors.price = "Price must be greater than 0";
-  if (!formData.type) newErrors.type = "Please select a listing type";
-  if (!formData.category) newErrors.category = "Please select a category";
-
-  if (Object.keys(newErrors).length > 0) {
-    setErrors(newErrors);
-    setLoading(false);
-    return;
-  }
-
   try {
-    // 🔹 Create FormData
-    const formDataToSend = new FormData();
+    const data = {
+      title: formData.title,
+      description: formData.description,
+      price: formData.price,
+      type: formData.type,
+      category: formData.category,
+      tags: formData.tags,
+      mediaUrls: formData.mediaUrls, // URLs from Cloudinary
+    };
 
-    formDataToSend.append("title", formData.title);
-    formDataToSend.append("description", formData.description || "");
-    formDataToSend.append("price", formData.price.toString());
-    formDataToSend.append("type", formData.type);
-    formDataToSend.append("category", formData.category);
-
-    // 🔹 Append tags correctly (Array → multiple keys)
-    if (Array.isArray(formData.tags)) {
-      formData.tags.forEach((tag) => formDataToSend.append("tags", tag));
-    }
-
-    // 🔹 Append files
-    // Supports both local File objects and Cloudinary URLs
-    if (Array.isArray(formData.mediaFiles) && formData.mediaFiles.length > 0) {
-      formData.mediaFiles.forEach((file) => {
-        if (file instanceof File) {
-          formDataToSend.append("mediaFiles", file); // local file upload
-        } else if (typeof file === "string") {
-          formDataToSend.append("mediaUrls[]", file); // already uploaded URL
-        }
-      });
-    }
-
-    // 🔹 Make API request
     const response = await axios.post(
       "http://localhost:3000/marketplace/listings/create-listing",
-      formDataToSend,
+      data,
       {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
-        },
+        headers: { Authorization: `Bearer ${token}` },
       }
     );
 
-    // 🔹 Success redirect
-    if (response.status === 201) {
-      navigate("/marketplace");
-    }
-  } catch (error: any) {
-    console.error("❌ Error creating listing:", error);
-    if (error.response) {
-      console.error("Server error:", error.response.data);
-      console.error("Status code:", error.response.status);
-    }
+    if (response.status === 201) navigate("/marketplace");
+  } catch (error) {
+    console.error("Error creating listing:", error);
   } finally {
     setLoading(false);
   }
 };
+
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
