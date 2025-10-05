@@ -33,42 +33,40 @@ router.get("/my-listings", protect, isHypeModeUser, isSeller, async (req, res) =
 // ===================================================
 // ✅ CREATE LISTING (like your working video route)
 // ===================================================
+// ✅ Create Listing — without multer
 router.post("/create-listing", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== CREATE LISTING REQUEST ===");
     console.log("Body received:", req.body);
 
-    const { title, description, price, type, category, tags, mediaFiles, mediaUrls } = req.body;
+    const { title, description, price, type, category, tags, mediaUrls } = req.body;
 
-    // 🔹 Validate required fields
+    // ✅ Validate required fields
     if (!title || !description || !price || !type || !category) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // 🔹 Use authenticated user ID
-    const userId = req.user._id;
+    // ✅ Get authenticated user
+    const userId = req.user?._id;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized — user not found" });
     }
 
-    // 🔹 Normalize tags
+    // ✅ Normalize tags (handle both single string or array)
     const tagsArray = Array.isArray(tags)
       ? tags
       : typeof tags === "string"
       ? [tags]
       : [];
 
-    // 🔹 Handle media (Cloudinary URLs or direct links)
-    const mediaArray =
-      Array.isArray(mediaFiles)
-        ? mediaFiles
-        : Array.isArray(mediaUrls)
-        ? mediaUrls
-        : typeof mediaFiles === "string"
-        ? [mediaFiles]
-        : [];
+    // ✅ Normalize media URLs (string or array)
+    const mediaArray = Array.isArray(mediaUrls)
+      ? mediaUrls
+      : typeof mediaUrls === "string"
+      ? [mediaUrls]
+      : [];
 
-    // 🔹 Create listing
+    // ✅ Create and save listing
     const listing = new MarketplaceListing({
       sellerId: userId,
       title,
@@ -84,13 +82,12 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
     await listing.save();
 
     console.log("✅ Listing created successfully");
-    res.status(201).json(listing);
+    res.status(201).json({ message: "Listing created successfully", listing });
   } catch (error) {
     console.error("❌ Error creating listing:", error);
     res.status(500).json({ error: "Failed to create listing" });
   }
 });
-
 // ===================================================
 // ✅ DELETE LISTING
 // ===================================================
