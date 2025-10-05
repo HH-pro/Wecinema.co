@@ -41,7 +41,7 @@ const Browse: React.FC = () => {
       if (filters.sortBy) queryParams.append('sortBy', filters.sortBy);
       
       const response = await axios.get(
-        `http://localhost:3000/marketplace/listings?${queryParams}`
+        `http://localhost:3000/marketplace/listings/listings`
       );
       
       setListings(response.data);
