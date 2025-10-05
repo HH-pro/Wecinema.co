@@ -29,7 +29,7 @@ router.get("/my-listings", protect, isHypeModeUser, isSeller, async (req, res) =
 // Create new listing
 // Make sure you're importing the correct model
 
-/router.post("/create-listing", authenticateMiddleware, async (req, res) => {
+router.post("/create-listing", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== CREATE LISTING REQUEST ===");
     console.log("Body received:", req.body);
