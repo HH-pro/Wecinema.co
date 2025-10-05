@@ -1,5 +1,4 @@
 const express = require("express");
-const router = express.Router();
 const MarketplaceListing = require("../../models/marketplace/listing");
 import User from "../models/user.js";
 import { authenticateMiddleware } from "../utils.js";
