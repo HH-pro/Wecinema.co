@@ -5,8 +5,7 @@ import MarketplaceLayout from '../../components/Layout';
 import { Listing } from '../../types/marketplace';
 import { FiFilter, FiPlus, FiSearch } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
-
-// Inside your component
+import axios from 'axios';
 
 const Browse: React.FC = () => {
   const [listings, setListings] = useState<Listing[]>([]);
@@ -14,7 +13,7 @@ const Browse: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
-const navigate = useNavigate();
+  const navigate = useNavigate();
 
   const [filters, setFilters] = useState({
     type: '',
@@ -24,7 +23,7 @@ const navigate = useNavigate();
     sortBy: 'newest'
   });
 
-  // Fetch listings on component mount
+  // Fetch listings on component mount and when filters change
   useEffect(() => {
     fetchListings();
   }, [filters]);
@@ -33,15 +32,19 @@ const navigate = useNavigate();
     try {
       setLoading(true);
       const queryParams = new URLSearchParams();
+      
+      // Add filters to query params
       if (filters.type) queryParams.append('type', filters.type);
       if (filters.category) queryParams.append('category', filters.category);
       if (filters.minPrice) queryParams.append('minPrice', filters.minPrice);
       if (filters.maxPrice) queryParams.append('maxPrice', filters.maxPrice);
       if (filters.sortBy) queryParams.append('sortBy', filters.sortBy);
       
-      const response = await fetch(`/marketplace/listings?${queryParams}`);
-      const data = await response.json();
-      setListings(data);
+      const response = await axios.get(
+        `http://localhost:3000/marketplace/listings?${queryParams}`
+      );
+      
+      setListings(response.data);
     } catch (error) {
       console.error('Error fetching listings:', error);
     } finally {
@@ -51,15 +54,19 @@ const navigate = useNavigate();
 
   const handleCreateListing = async (listingData: any) => {
     try {
-      const response = await fetch('/api/marketplace/create-listing', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(listingData),
-      });
+      const token = localStorage.getItem("token");
+      const response = await axios.post(
+        'http://localhost:3000/marketplace/listings/create-listing',
+        listingData,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
       
-      if (response.ok) {
+      if (response.status === 201) {
         setShowCreateModal(false);
         fetchListings(); // Refresh listings
       }
@@ -69,13 +76,14 @@ const navigate = useNavigate();
   };
 
   const handleViewDetails = (listingId: string) => {
-    // Navigate to listing details or show modal
-    console.log('View details:', listingId);
+    navigate(`/marketplace/listings/${listingId}`);
   };
 
   const handleMakeOffer = (listing: Listing) => {
-    // Open make offer modal
+    // Open make offer modal or navigate to offer page
     console.log('Make offer:', listing);
+    // You can implement offer functionality here
+    navigate(`/marketplace/offer/${listing._id}`);
   };
 
   const clearFilters = () => {
@@ -89,10 +97,11 @@ const navigate = useNavigate();
     setSearchQuery('');
   };
 
+  // Filter listings based on search query
   const filteredListings = listings.filter(listing =>
     listing.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     listing.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    listing.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+    (listing.tags && listing.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())))
   );
 
   if (loading) {
@@ -100,7 +109,7 @@ const navigate = useNavigate();
       <MarketplaceLayout>
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto"></div>
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-600 mx-auto"></div>
             <p className="mt-4 text-gray-600 text-lg">Loading listings...</p>
           </div>
         </div>
@@ -124,16 +133,16 @@ const navigate = useNavigate();
               
               <div className="flex flex-col sm:flex-row gap-3">
                 <button 
-  onClick={() => navigate('/marketplace/create')}
-  className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-yellow-500 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
->
-  <FiPlus className="mr-2" size={18} />
-  Create  Listing
-</button>
+                  onClick={() => navigate('/marketplace/create')}
+                  className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                >
+                  <FiPlus className="mr-2" size={18} />
+                  Create Listing
+                </button>
                 
                 <button 
                   onClick={() => setShowFilters(!showFilters)}
-                  className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+                  className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
                 >
                   <FiFilter className="mr-2" size={18} />
                   Filters
@@ -152,7 +161,7 @@ const navigate = useNavigate();
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search listings by title, description, or tags..."
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200"
                 />
               </div>
             </div>
@@ -165,7 +174,7 @@ const navigate = useNavigate();
                 <h3 className="text-lg font-medium text-gray-900">Filters</h3>
                 <button
                   onClick={clearFilters}
-                  className="text-sm text-blue-600 hover:text-blue-500 font-medium"
+                  className="text-sm text-yellow-600 hover:text-yellow-500 font-medium"
                 >
                   Clear all
                 </button>
@@ -179,7 +188,7 @@ const navigate = useNavigate();
                   <select 
                     value={filters.type}
                     onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200"
                   >
                     <option value="">All Types</option>
                     <option value="for_sale">For Sale</option>
@@ -198,7 +207,7 @@ const navigate = useNavigate();
                     value={filters.category}
                     onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
                     placeholder="Video, Script, Music..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200"
                   />
                 </div>
 
@@ -211,7 +220,7 @@ const navigate = useNavigate();
                     placeholder="$0"
                     value={filters.minPrice}
                     onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200"
                   />
                 </div>
 
@@ -222,7 +231,7 @@ const navigate = useNavigate();
                   <select 
                     value={filters.sortBy}
                     onChange={(e) => setFilters(prev => ({ ...prev, sortBy: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200"
                   >
                     <option value="newest">Newest First</option>
                     <option value="oldest">Oldest First</option>
@@ -247,7 +256,7 @@ const navigate = useNavigate();
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="text-sm text-blue-600 hover:text-blue-500 font-medium"
+                className="text-sm text-yellow-600 hover:text-yellow-500 font-medium"
               >
                 Clear search
               </button>
@@ -273,15 +282,15 @@ const navigate = useNavigate();
                     : 'Be the first to create a listing and start trading!'
                   }
                 </p>
- <div className="flex flex-col sm:flex-row gap-3 justify-center">
-  <button 
-  onClick={() => navigate('/marketplace/create')}
-  className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-yellow-500 hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
->
-  <FiPlus className="mr-2" size={18} />
-  Create First Listing
-</button>
-</div>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <button 
+                    onClick={() => navigate('/marketplace/create')}
+                    className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                  >
+                    <FiPlus className="mr-2" size={18} />
+                    Create First Listing
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
@@ -300,7 +309,10 @@ const navigate = useNavigate();
           {/* Load More (if needed) */}
           {filteredListings.length > 0 && filteredListings.length >= 12 && (
             <div className="mt-12 text-center">
-              <button className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
+              <button 
+                onClick={fetchListings}
+                className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+              >
                 Load more listings
               </button>
             </div>
