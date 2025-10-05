@@ -166,7 +166,7 @@ const CreateListing: React.FC = () => {
                           setFormData(prev => ({ ...prev, title: e.target.value }));
                           clearError('title');
                         }}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 ${
+                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-blue-500 transition-colors duration-200 ${
                           errors.title ? 'border-red-300' : 'border-gray-300'
                         }`}
                         placeholder="Enter a compelling title for your listing..."
