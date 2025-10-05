@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import MarketplaceLayout from '../../components/Layout';
 import { FiUpload, FiDollarSign, FiType, FiFolder, FiTag, FiArrowLeft } from 'react-icons/fi';
 import axios from 'axios';
+import { Itoken, decodeToken } from "../../utilities/helperfFunction";
 
 interface ListingFormData {
   title: string;
@@ -17,8 +18,11 @@ interface ListingFormData {
 const CreateListing: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState<boolean>(false);
-  const token = localStorage.getItem("token");
+      const [decodedToken, setDecodedToken] = useState<Itoken | null>(null);
   
+  const token = localStorage.getItem("token");
+  	
+			
   const [formData, setFormData] = useState<ListingFormData>({
     
     title: '',
@@ -31,11 +35,12 @@ const CreateListing: React.FC = () => {
   });
   const [tagInput, setTagInput] = useState('');
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-
+	const decoded = decodeToken(token);
+			setDecodedToken(decoded);
  const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
 
-  if (!token?.userId) {
+  if (!decodedToken?.userId) {
     toast.error("You must log in first before creating a listing!");
     return;
   }
