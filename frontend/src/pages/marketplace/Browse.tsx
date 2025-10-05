@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import ListingCard from '../../components/marketplae/ListingCard';
-import CreateListingModal from '../../components/marketplae/CreateListingModal';
 import MarketplaceLayout from '../../components/Layout';
 import { Listing } from '../../types/marketplace';
 import { FiFilter, FiPlus, FiSearch } from 'react-icons/fi';
@@ -10,7 +9,6 @@ import axios from 'axios';
 const Browse: React.FC = () => {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const navigate = useNavigate();
@@ -41,7 +39,7 @@ const Browse: React.FC = () => {
       if (filters.sortBy) queryParams.append('sortBy', filters.sortBy);
       
       const response = await axios.get(
-        `http://localhost:3000/marketplace/listings/listings`
+        `http://localhost:3000/marketplace/listings?${queryParams}`
       );
       
       setListings(response.data);
@@ -49,29 +47,6 @@ const Browse: React.FC = () => {
       console.error('Error fetching listings:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleCreateListing = async (listingData: any) => {
-    try {
-      const token = localStorage.getItem("token");
-      const response = await axios.post(
-        'http://localhost:3000/marketplace/listings/create-listing',
-        listingData,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
-      
-      if (response.status === 201) {
-        setShowCreateModal(false);
-        fetchListings(); // Refresh listings
-      }
-    } catch (error) {
-      console.error('Error creating listing:', error);
     }
   };
 
@@ -132,6 +107,7 @@ const Browse: React.FC = () => {
               </div>
               
               <div className="flex flex-col sm:flex-row gap-3">
+                {/* Create Listing Button - Direct navigation to create page */}
                 <button 
                   onClick={() => navigate('/marketplace/create')}
                   className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
@@ -318,13 +294,6 @@ const Browse: React.FC = () => {
             </div>
           )}
         </div>
-
-        {/* Create Listing Modal */}
-        <CreateListingModal
-          isOpen={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
-          onSubmit={handleCreateListing}
-        />
       </div>
     </MarketplaceLayout>
   );
