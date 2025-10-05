@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Listing } from '../../types/marketplace';
-import { FiEye, FiShoppingCart, FiPlay, FiImage, FiStar, FiHeart, FiShare2, FiClock, FiDownload } from 'react-icons/fi';
+import { FiEye, FiShoppingCart, FiPlay, FiImage, FiHeart, FiShare2, FiClock, FiDownload } from 'react-icons/fi';
 
 interface ListingCardProps {
   listing: Listing;
@@ -33,11 +33,6 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onMak
     }).format(price);
   };
 
-  // Get seller initials
-  const getSellerInitials = (username: string) => {
-    return username ? username.charAt(0).toUpperCase() : 'U';
-  };
-
   // Get type color
   const getTypeColor = (type: string) => {
     const colors = {
@@ -49,6 +44,17 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onMak
     return colors[type as keyof typeof colors] || 'from-gray-500 to-gray-600';
   };
 
+  // Get type label
+  const getTypeLabel = (type: string) => {
+    const labels = {
+      for_sale: 'For Sale',
+      licensing: 'Licensing',
+      adaptation_rights: 'Adaptation Rights',
+      commission: 'Commission'
+    };
+    return labels[type as keyof typeof labels] || type;
+  };
+
   const handleImageLoad = () => {
     setImageLoaded(true);
   };
@@ -58,7 +64,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onMak
       {/* Animated Background Effect */}
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-purple-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
       
-      {/* Media Container with Floating Elements */}
+      {/* Media Container */}
       <div className="relative h-52 overflow-hidden rounded-t-3xl">
         {firstMedia ? (
           <>
@@ -66,7 +72,6 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onMak
               <div className="relative w-full h-full">
                 <video
                   className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
-                  poster={listing.mediaUrls?.find(url => isImage(url)) || ''}
                   controls={false}
                   muted
                   onMouseEnter={(e) => e.currentTarget.play()}
@@ -91,7 +96,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onMak
                   VIDEO
                 </div>
               </div>
-            ) : isImage(firstMedia) ? (
+            ) : (
               <div className="relative w-full h-full">
                 {!imageLoaded && (
                   <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse rounded-t-3xl"></div>
@@ -108,20 +113,13 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onMak
                 {/* Image Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               </div>
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
-                <div className="text-center">
-                  <FiImage className="text-gray-400 mx-auto mb-2" size={32} />
-                  <p className="text-gray-500 text-sm font-medium">No preview</p>
-                </div>
-              </div>
             )}
           </>
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
             <div className="text-center">
               <FiImage className="text-gray-400 mx-auto mb-2" size={32} />
-              <p className="text-gray-500 text-sm font-medium">No media</p>
+              <p className="text-gray-500 text-sm font-medium">No media available</p>
             </div>
           </div>
         )}
@@ -143,7 +141,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onMak
           </button>
         </div>
 
-        {/* Price Tag with 3D Effect */}
+        {/* Price Tag */}
         <div className={`absolute bottom-4 left-4 bg-gradient-to-r ${getTypeColor(listing.type)} text-white px-4 py-2.5 rounded-2xl shadow-2xl font-bold text-lg transform -rotate-2 group-hover:rotate-0 transition-transform duration-300`}>
           {formatPrice(listing.price)}
         </div>
@@ -158,115 +156,89 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onMak
 
       {/* Content Section */}
       <div className="relative p-6 bg-white/80 backdrop-blur-sm">
-        {/* Category and Rating */}
+        {/* Category and Type */}
         <div className="flex items-center justify-between mb-4">
           <span className="bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-full border border-blue-200/50">
             {listing.category}
           </span>
-          <div className="flex items-center gap-1 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-full border border-gray-200/50">
-            <FiStar className="text-yellow-400 fill-current" size={14} />
-            <span className="text-sm font-bold text-gray-700">4.8</span>
-            <span className="text-xs text-gray-500">(24)</span>
-          </div>
+          <span className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 text-xs font-bold px-3 py-1.5 rounded-full border border-purple-200/50">
+            {getTypeLabel(listing.type)}
+          </span>
         </div>
 
-        {/* Title with Gradient Hover */}
+        {/* Title */}
         <h3 className="font-bold text-gray-800 text-xl mb-3 line-clamp-2 leading-tight group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 group-hover:bg-clip-text transition-all duration-300">
           {listing.title}
         </h3>
         
         {/* Description */}
-        <p className="text-gray-600 text-sm mb-4 line-clamp-2 leading-relaxed">
+        <p className="text-gray-600 text-sm mb-6 line-clamp-2 leading-relaxed">
           {listing.description}
         </p>
 
-        {/* Seller Info with Status */}
-        {listing.sellerId && typeof listing.sellerId === 'object' && (
-          <div className="flex items-center gap-3 mb-4 p-3 bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-2xl border border-gray-200/50 backdrop-blur-sm">
-            <div className="relative">
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg">
-                {getSellerInitials(listing.sellerId.username)}
-              </div>
-              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full shadow-lg"></div>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-semibold text-gray-800 truncate">
-                  {listing.sellerId.username || 'Verified Seller'}
-                </p>
-                <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">
-                  Pro
-                </span>
-              </div>
-              <div className="flex items-center gap-2 mt-1">
-                <div className="flex items-center gap-1">
-                  <FiStar className="text-yellow-400 fill-current" size={12} />
-                  <span className="text-xs font-semibold text-gray-700">
-                    {listing.sellerId.sellerRating?.toFixed(1) || '5.0'}
-                  </span>
-                </div>
-                <span className="text-gray-300 text-xs">•</span>
-                <div className="flex items-center gap-1 text-gray-500">
-                  <FiClock size={10} />
-                  <span className="text-xs">2h ago</span>
-                </div>
-              </div>
-            </div>
+        {/* Status Badge */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${
+              listing.status === 'active' ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
+            }`}></div>
+            <span className="text-xs font-semibold text-gray-600 capitalize">
+              {listing.status}
+            </span>
           </div>
-        )}
+          <div className="flex items-center gap-1 text-gray-500 text-xs">
+            <FiClock size={12} />
+            <span>Just now</span>
+          </div>
+        </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-3">
+        <div className="flex gap-3 mb-4">
           <button
             onClick={() => onViewDetails(listing._id)}
             className="flex-1 bg-white text-gray-700 py-3 rounded-xl font-semibold transition-all duration-300 hover:bg-gray-50 hover:shadow-lg border border-gray-300/50 flex items-center justify-center gap-2 group/btn"
           >
             <FiEye className="group-hover/btn:scale-110 transition-transform duration-200" size={16} />
-            Details
+            View Details
           </button>
           <button
             onClick={() => onMakeOffer(listing)}
             className="flex-1 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white py-3 rounded-xl font-semibold transition-all duration-300 hover:shadow-xl transform hover:scale-105 flex items-center justify-center gap-2 group/btn shadow-lg"
           >
             <FiShoppingCart className="group-hover/btn:scale-110 transition-transform duration-200" size={16} />
-            Buy Now
+            Get Offer
           </button>
-        </div>
-
-        {/* Quick Stats */}
-        <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200/50">
-          <div className="flex items-center gap-1 text-gray-500">
-            <FiEye size={14} />
-            <span className="text-xs font-medium">1.2k views</span>
-          </div>
-          <div className="flex items-center gap-1 text-gray-500">
-            <FiDownload size={14} />
-            <span className="text-xs font-medium">48 downloads</span>
-          </div>
-          <div className="flex items-center gap-1 text-gray-500">
-            <FiHeart size={14} />
-            <span className="text-xs font-medium">86 likes</span>
-          </div>
         </div>
 
         {/* Tags */}
         {listing.tags && listing.tags.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {listing.tags.slice(0, 3).map((tag, index) => (
+          <div className="flex flex-wrap gap-2">
+            {listing.tags.map((tag, index) => (
               <span 
                 key={index}
                 className="inline-block bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300/50 hover:from-gray-200 hover:to-gray-300 transition-all duration-200 cursor-pointer hover:shadow-sm"
               >
-                #{tag.toLowerCase()}
+                #{tag}
               </span>
             ))}
-            {listing.tags.length > 3 && (
-              <span className="inline-block bg-gray-100 text-gray-500 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300/50">
-                +{listing.tags.length - 3}
-              </span>
-            )}
           </div>
         )}
+
+        {/* Quick Stats */}
+        <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200/50">
+          <div className="flex items-center gap-1 text-gray-500 text-xs">
+            <FiEye size={12} />
+            <span>1.2k views</span>
+          </div>
+          <div className="flex items-center gap-1 text-gray-500 text-xs">
+            <FiDownload size={12} />
+            <span>48 downloads</span>
+          </div>
+          <div className="flex items-center gap-1 text-gray-500 text-xs">
+            <FiHeart size={12} />
+            <span>86 likes</span>
+          </div>
+        </div>
       </div>
 
       {/* Shine Effect on Hover */}
