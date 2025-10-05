@@ -8,6 +8,7 @@ import {
   RiAddCircleLine,
   RiShoppingBagLine,
   RiListCheck,
+  RiMessageLine,
 } from "react-icons/ri";
 import { LiaSignInAltSolid } from "react-icons/lia";
 import { HiUserAdd } from "react-icons/hi";
@@ -176,6 +177,16 @@ const Sidebar: React.FC<SidebarProps> = ({
             >
               <RiListCheck className="sidebar-icon" />
               <span className="sidebar-text">Seller Dashboard</span>
+            </Link>
+
+            <Link
+              to="/marketplace/messages"
+              className={`sidebar-item ${getActiveClass(
+                "/marketplace/messages"
+              )} ${expand ? "" : "collapsed"}`}
+            >
+              <RiMessageLine className="sidebar-icon" />
+              <span className="sidebar-text">Messages</span>
             </Link>
           </ul>
         </nav>
