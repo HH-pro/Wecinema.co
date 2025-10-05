@@ -18,6 +18,7 @@ const CreateListing: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState<boolean>(false);
   const token = localStorage.getItem("token");
+  
   const [formData, setFormData] = useState<ListingFormData>({
     
     title: '',
@@ -33,34 +34,69 @@ const CreateListing: React.FC = () => {
 
  const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
-  setLoading(true);
+
+  if (!token?.userId) {
+    toast.error("You must log in first before creating a listing!");
+    return;
+  }
 
   try {
-    const data = {
+    setLoading(true);
+
+    // ✅ Upload media to Cloudinary first (if a file is selected)
+    let uploadedUrl = "";
+    if (selectedFile) {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("upload_preset", "zoahguuq"); // your Cloudinary preset
+
+      const res = await axios.post(
+        "https://api.cloudinary.com/v1_1/folajimidev/video/upload",
+        formData
+      );
+
+      uploadedUrl = res.data.secure_url;
+    }
+
+    // ✅ Prepare payload for backend (JSON body)
+    const payload = {
       title: formData.title,
       description: formData.description,
       price: formData.price,
       type: formData.type,
       category: formData.category,
       tags: formData.tags,
-      mediaUrls: formData.mediaUrls, // URLs from Cloudinary
+      mediaUrls: uploadedUrl ? [uploadedUrl] : [], // send Cloudinary URL array
     };
 
+    // ✅ Send to backend (normal JSON request)
     const response = await axios.post(
       "http://localhost:3000/marketplace/listings/create-listing",
-      data,
+      payload,
       {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
       }
     );
 
-    if (response.status === 201) navigate("/marketplace");
+    if (response.status === 201) {
+      toast.success("Listing created successfully!");
+      navigate("/marketplace");
+    }
   } catch (error) {
+    setLoading(false);
     console.error("Error creating listing:", error);
+    if (error.response) {
+      console.error("Server error:", error.response.data);
+      toast.error(error.response.data?.error || "Failed to create listing");
+    }
   } finally {
     setLoading(false);
   }
 };
+
 
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
