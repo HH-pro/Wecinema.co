@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Listing } from '../../types/marketplace';
-import { FiEye, FiShoppingCart, FiPlay, FiImage, FiHeart, FiShare2, FiClock, FiDownload } from 'react-icons/fi';
+import { FiPlay, FiImage } from 'react-icons/fi';
 
 interface ListingCardProps {
   listing: Listing;
@@ -9,16 +9,11 @@ interface ListingCardProps {
 }
 
 const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onMakeOffer }) => {
-  const [isLiked, setIsLiked] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
   // Check if media is video or image
   const isVideo = (url: string) => {
     return url.match(/\.(mp4|mov|avi|wmv|flv|webm|mkv)$/i);
-  };
-
-  const isImage = (url: string) => {
-    return url.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i);
   };
 
   // Get first media URL
@@ -60,20 +55,19 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onMak
   };
 
   return (
-    <div className="group relative w-80 bg-gradient-to-br from-white to-gray-50 rounded-3xl shadow-2xl hover:shadow-3xl transition-all duration-500 hover:-translate-y-3 border border-white/50 overflow-hidden">
-      {/* Animated Background Effect */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-purple-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+    <div className="group relative w-80 bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 border border-gray-200 overflow-hidden">
       
-      {/* Media Container */}
-      <div className="relative h-52 overflow-hidden rounded-t-3xl">
+      {/* Media Section */}
+      <div className="relative h-48 overflow-hidden">
         {firstMedia ? (
           <>
             {isVideo(firstMedia) ? (
               <div className="relative w-full h-full">
                 <video
-                  className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
+                  className="w-full h-full object-cover"
                   controls={false}
                   muted
+                  loop
                   onMouseEnter={(e) => e.currentTarget.play()}
                   onMouseLeave={(e) => {
                     e.currentTarget.pause();
@@ -83,140 +77,79 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onMak
                   <source src={firstMedia} type="video/mp4" />
                 </video>
                 
-                {/* Video Play Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
-                  <div className="bg-white/95 rounded-full p-4 transform scale-75 group-hover:scale-100 transition-transform duration-300 shadow-2xl">
-                    <FiPlay className="text-gray-800" size={24} />
-                  </div>
-                </div>
-                
-                {/* Video Badge */}
-                <div className="absolute top-4 left-4 bg-black/80 text-white px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-semibold backdrop-blur-sm">
-                  <FiPlay size={12} />
-                  VIDEO
+                {/* Video Play Indicator */}
+                <div className="absolute top-3 left-3 bg-black/80 text-white px-2 py-1 rounded-full flex items-center gap-1 text-xs font-medium">
+                  <FiPlay size={10} />
+                  <span>VIDEO</span>
                 </div>
               </div>
             ) : (
               <div className="relative w-full h-full">
                 {!imageLoaded && (
-                  <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse rounded-t-3xl"></div>
+                  <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>
                 )}
                 <img
                   src={firstMedia}
                   alt={listing.title}
-                  className={`w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700 ${
+                  className={`w-full h-full object-cover ${
                     imageLoaded ? 'opacity-100' : 'opacity-0'
                   }`}
                   onLoad={handleImageLoad}
                 />
-                
-                {/* Image Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               </div>
             )}
           </>
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
-            <div className="text-center">
-              <FiImage className="text-gray-400 mx-auto mb-2" size={32} />
-              <p className="text-gray-500 text-sm font-medium">No media available</p>
-            </div>
+          <div className="w-full h-full flex items-center justify-center bg-gray-100">
+            <FiImage className="text-gray-400" size={32} />
           </div>
         )}
 
-        {/* Floating Action Buttons */}
-        <div className="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transform translate-x-4 group-hover:translate-x-0 transition-all duration-300">
-          <button 
-            onClick={() => setIsLiked(!isLiked)}
-            className={`p-2 rounded-full backdrop-blur-sm border transition-all duration-300 ${
-              isLiked 
-                ? 'bg-red-500/90 border-red-500 text-white' 
-                : 'bg-white/90 border-white/50 text-gray-700 hover:bg-white'
-            }`}
-          >
-            <FiHeart className={isLiked ? 'fill-current' : ''} size={16} />
-          </button>
-          <button className="p-2 rounded-full bg-white/90 backdrop-blur-sm border border-white/50 text-gray-700 hover:bg-white transition-all duration-300">
-            <FiShare2 size={16} />
-          </button>
-        </div>
-
         {/* Price Tag */}
-        <div className={`absolute bottom-4 left-4 bg-gradient-to-r ${getTypeColor(listing.type)} text-white px-4 py-2.5 rounded-2xl shadow-2xl font-bold text-lg transform -rotate-2 group-hover:rotate-0 transition-transform duration-300`}>
+        <div className={`absolute bottom-3 left-3 bg-gradient-to-r ${getTypeColor(listing.type)} text-white px-3 py-2 rounded-xl font-bold text-lg shadow-lg`}>
           {formatPrice(listing.price)}
         </div>
 
-        {/* Media Count */}
-        {listing.mediaUrls && listing.mediaUrls.length > 1 && (
-          <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm text-gray-800 px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg border border-white/50">
-            +{listing.mediaUrls.length - 1} more
-          </div>
-        )}
+        {/* Status Indicator */}
+        <div className="absolute top-3 right-3 flex items-center gap-1">
+          <div className={`w-2 h-2 rounded-full ${
+            listing.status === 'active' ? 'bg-green-500' : 'bg-gray-400'
+          }`}></div>
+          <span className="text-xs font-medium text-white bg-black/50 px-2 py-1 rounded-full capitalize">
+            {listing.status}
+          </span>
+        </div>
       </div>
 
       {/* Content Section */}
-      <div className="relative p-6 bg-white/80 backdrop-blur-sm">
-        {/* Category and Type */}
-        <div className="flex items-center justify-between mb-4">
-          <span className="bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-full border border-blue-200/50">
+      <div className="p-5">
+        {/* Category and Type Badges */}
+        <div className="flex items-center gap-2 mb-3">
+          <span className="bg-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-full">
             {listing.category}
           </span>
-          <span className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 text-xs font-bold px-3 py-1.5 rounded-full border border-purple-200/50">
+          <span className="bg-purple-100 text-purple-700 text-xs font-semibold px-2.5 py-1 rounded-full">
             {getTypeLabel(listing.type)}
           </span>
         </div>
 
-        {/* Title */}
-        <h3 className="font-bold text-gray-800 text-xl mb-3 line-clamp-2 leading-tight group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 group-hover:bg-clip-text transition-all duration-300">
+        {/* Title with Gradient Hover Effect */}
+        <h3 className="font-bold text-gray-900 text-xl mb-2 line-clamp-2 group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 group-hover:bg-clip-text transition-all duration-300">
           {listing.title}
         </h3>
         
         {/* Description */}
-        <p className="text-gray-600 text-sm mb-6 line-clamp-2 leading-relaxed">
+        <p className="text-gray-600 text-sm mb-4 line-clamp-2 leading-relaxed">
           {listing.description}
         </p>
 
-        {/* Status Badge */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${
-              listing.status === 'active' ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
-            }`}></div>
-            <span className="text-xs font-semibold text-gray-600 capitalize">
-              {listing.status}
-            </span>
-          </div>
-          <div className="flex items-center gap-1 text-gray-500 text-xs">
-            <FiClock size={12} />
-            <span>Just now</span>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-3 mb-4">
-          <button
-            onClick={() => onViewDetails(listing._id)}
-            className="flex-1 bg-white text-gray-700 py-3 rounded-xl font-semibold transition-all duration-300 hover:bg-gray-50 hover:shadow-lg border border-gray-300/50 flex items-center justify-center gap-2 group/btn"
-          >
-            <FiEye className="group-hover/btn:scale-110 transition-transform duration-200" size={16} />
-            View Details
-          </button>
-          <button
-            onClick={() => onMakeOffer(listing)}
-            className="flex-1 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white py-3 rounded-xl font-semibold transition-all duration-300 hover:shadow-xl transform hover:scale-105 flex items-center justify-center gap-2 group/btn shadow-lg"
-          >
-            <FiShoppingCart className="group-hover/btn:scale-110 transition-transform duration-200" size={16} />
-            Get Offer
-          </button>
-        </div>
-
         {/* Tags */}
         {listing.tags && listing.tags.length > 0 && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5 mb-4">
             {listing.tags.map((tag, index) => (
               <span 
                 key={index}
-                className="inline-block bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300/50 hover:from-gray-200 hover:to-gray-300 transition-all duration-200 cursor-pointer hover:shadow-sm"
+                className="inline-block bg-gray-100 text-gray-700 text-xs font-medium px-2.5 py-1 rounded-lg border border-gray-200 hover:bg-gray-200 transition-colors duration-200 cursor-pointer"
               >
                 #{tag}
               </span>
@@ -224,25 +157,22 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onMak
           </div>
         )}
 
-        {/* Quick Stats */}
-        <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200/50">
-          <div className="flex items-center gap-1 text-gray-500 text-xs">
-            <FiEye size={12} />
-            <span>1.2k views</span>
-          </div>
-          <div className="flex items-center gap-1 text-gray-500 text-xs">
-            <FiDownload size={12} />
-            <span>48 downloads</span>
-          </div>
-          <div className="flex items-center gap-1 text-gray-500 text-xs">
-            <FiHeart size={12} />
-            <span>86 likes</span>
-          </div>
+        {/* Action Buttons */}
+        <div className="flex gap-3">
+          <button
+            onClick={() => onViewDetails(listing._id)}
+            className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-lg font-semibold text-sm hover:bg-gray-200 transition-colors duration-200 border border-gray-300"
+          >
+            View Details
+          </button>
+          <button
+            onClick={() => onMakeOffer(listing)}
+            className="flex-1 bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-2.5 rounded-lg font-semibold text-sm hover:from-yellow-600 hover:to-orange-600 transition-all duration-200 shadow-md"
+          >
+            Make Offer
+          </button>
         </div>
       </div>
-
-      {/* Shine Effect on Hover */}
-      <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-transparent via-white/10 to-transparent transform -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
     </div>
   );
 };
