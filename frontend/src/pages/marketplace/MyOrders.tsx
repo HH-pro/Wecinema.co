@@ -74,7 +74,7 @@ const MyOrders: React.FC = () => {
             <button 
               className={`filter-tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
                 filter === 'all' 
-                  ? 'border-blue-500 text-blue-600' 
+                  ? 'border-yellow-500 text-yellow-600' 
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
               onClick={() => setFilter('all')}
@@ -84,7 +84,7 @@ const MyOrders: React.FC = () => {
             <button 
               className={`filter-tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
                 filter === 'pending_payment' 
-                  ? 'border-blue-500 text-blue-600' 
+                  ? 'border-yellow-500 text-yellow-600' 
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
               onClick={() => setFilter('pending_payment')}
@@ -94,7 +94,7 @@ const MyOrders: React.FC = () => {
             <button 
               className={`filter-tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
                 filter === 'in_progress' 
-                  ? 'border-blue-500 text-blue-600' 
+                  ? 'border-yellow-500 text-yellow-600' 
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
               onClick={() => setFilter('in_progress')}
@@ -104,7 +104,7 @@ const MyOrders: React.FC = () => {
             <button 
               className={`filter-tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
                 filter === 'delivered' 
-                  ? 'border-blue-500 text-blue-600' 
+                  ? 'border-yellow-500 text-yellow-600' 
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
               onClick={() => setFilter('delivered')}
@@ -114,7 +114,7 @@ const MyOrders: React.FC = () => {
             <button 
               className={`filter-tab whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
                 filter === 'completed' 
-                  ? 'border-blue-500 text-blue-600' 
+                  ? 'border-yellow-500 text-yellow-600' 
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
               onClick={() => setFilter('completed')}
@@ -138,7 +138,7 @@ const MyOrders: React.FC = () => {
                 </p>
                 {filter === 'all' && (
                   <button 
-                    className="btn btn-primary bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                    className="btn btn-primary bg-yellow-600 text-white px-6 py-2 rounded-md hover:bg-yellow-700 transition-colors"
                     onClick={() => window.location.href = '/marketplace'}
                   >
                     Browse Listings
