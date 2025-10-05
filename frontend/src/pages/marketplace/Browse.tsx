@@ -319,7 +319,7 @@ const Browse: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-2 gap-6">
               {filteredListings.map(listing => (
                 <ListingCard
                   key={listing._id}
