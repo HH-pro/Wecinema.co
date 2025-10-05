@@ -28,20 +28,41 @@ router.get("/my-listings", protect, isHypeModeUser, isSeller, async (req, res) =
 // Create new listing
 // Make sure you're importing the correct model
 
-// Make sure protect comes BEFORE isSeller
-router.post("/create-listing",  authenticateMiddleware, async (req, res) => {
+/// ✅ Make sure protect comes BEFORE isSeller
+router.post("/create-listing", authenticateMiddleware, async (req, res) => {
   try {
-    console.log('=== CREATE LISTING REQUEST ===');
-    
-    const { title, description, price, type, category, tags } = req.body;
-    
-    // Get user ID safely
-    const userId = req.params.user;
+    console.log("=== CREATE LISTING REQUEST ===");
 
-    console.log('User ID:', userId);
-    
-    if (!title || !description || !price || !type || !category || !tags) {
+    const { title, description, price, type, category, tags, file } = req.body;
+
+    // The authenticated user's ID (from token)
+    const userId = req.user?._id;
+
+    console.log("User ID:", userId);
+
+    // Basic validation
+    if (!title || !description || !price || !type || !category) {
       return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Handle tags safely
+    const tagsArray = Array.isArray(tags)
+      ? tags
+      : tags
+      ? tags.split(",").map((t) => t.trim())
+      : [];
+
+    // Handle media URLs (Cloudinary or uploaded)
+    const mediaUrls = [];
+
+    // Case 1: Cloudinary URL in `file`
+    if (file && typeof file === "string" && file.startsWith("http")) {
+      mediaUrls.push(file);
+    }
+
+    // Case 2: Files uploaded with multer (optional)
+    if (req.files && req.files.length > 0) {
+      mediaUrls.push(...req.files.map((f) => f.path));
     }
 
     const listing = new MarketplaceListing({
@@ -51,16 +72,17 @@ router.post("/create-listing",  authenticateMiddleware, async (req, res) => {
       price,
       type,
       category,
-      tags: Array.isArray(tags) ? tags : (tags ? [tags] : []),
-      mediaUrls: req.files ? req.files.map(file => file.path) : []
+      tags: tagsArray,
+      mediaUrls,
     });
 
     await listing.save();
-    console.log('Listing created successfully');
-    res.status(201).json(listing);
+
+    console.log("✅ Listing created successfully");
+    res.status(201).json({ success: true, listing });
   } catch (error) {
-    console.error('Error creating listing:', error);
-    res.status(500).json({ error: 'Failed to create listing' });
+    console.error("❌ Error creating listing:", error);
+    res.status(500).json({ error: "Failed to create listing" });
   }
 });
 // Delete listing
