@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MarketplaceLayout from '../../components/Layout';
 import { FiUpload, FiDollarSign, FiType, FiFolder, FiTag, FiArrowLeft } from 'react-icons/fi';
@@ -12,64 +12,113 @@ interface ListingFormData {
   category: string;
   tags: string[];
   mediaFiles: File[];
+  mediaUrls: string[]; // Cloudinary URLs ke liye
 }
 
 const CreateListing: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState<boolean>(false);
+  const [uploading, setUploading] = useState<boolean>(false);
   const token = localStorage.getItem("token");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const [formData, setFormData] = useState<ListingFormData>({
-    
     title: '',
     description: '',
     price: 0,
     type: 'for_sale',
     category: '',
     tags: [],
-    mediaFiles: []
+    mediaFiles: [],
+    mediaUrls: []
   });
+  
   const [tagInput, setTagInput] = useState('');
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
- const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
+  // Cloudinary par video upload karne ka function
+  const uploadToCloudinary = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "zoahguuq"); // Same preset as modal
+    
+    try {
+      const response = await axios.post(
+        "https://api.cloudinary.com/v1_1/folajimidev/video/upload",
+        formData
+      );
+      return response.data.secure_url;
+    } catch (error) {
+      console.error("Cloudinary upload error:", error);
+      throw new Error("File upload failed");
+    }
+  };
 
-  try {
-    const data = {
-      title: formData.title,
-      description: formData.description,
-      price: formData.price,
-      type: formData.type,
-      category: formData.category,
-      tags: formData.tags,
-      mediaUrls: formData.mediaUrls, // URLs from Cloudinary
-    };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
 
-    const response = await axios.post(
-      "http://localhost:3000/marketplace/listings/create-listing",
-      data,
-      {
-        headers: { Authorization: `Bearer ${token}` },
+    try {
+      // Pehle sab files Cloudinary par upload karo
+      setUploading(true);
+      const mediaUrls: string[] = [];
+      
+      for (const file of formData.mediaFiles) {
+        const url = await uploadToCloudinary(file);
+        mediaUrls.push(url);
       }
-    );
+      
+      setUploading(false);
 
-    if (response.status === 201) navigate("/marketplace");
-  } catch (error) {
-    console.error("Error creating listing:", error);
-  } finally {
-    setLoading(false);
-  }
-};
+      // Ab listing create karo
+      const data = {
+        title: formData.title,
+        description: formData.description,
+        price: formData.price,
+        type: formData.type,
+        category: formData.category,
+        tags: formData.tags,
+        mediaUrls: mediaUrls, // Cloudinary URLs
+      };
 
+      const response = await axios.post(
+        "http://localhost:3000/marketplace/listings/create-listing",
+        data,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (response.status === 201) navigate("/marketplace");
+    } catch (error) {
+      console.error("Error creating listing:", error);
+      setUploading(false);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
+      const files = Array.from(e.target.files);
       setFormData(prev => ({
         ...prev,
-        mediaFiles: Array.from(e.target.files!)
+        mediaFiles: [...prev.mediaFiles, ...files]
       }));
     }
+  };
+
+  // File remove karne ka function
+  const removeFile = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      mediaFiles: prev.mediaFiles.filter((_, i) => i !== index)
+    }));
+  };
+
+  // Thumbnail click handler (modal jaisa)
+  const handleThumbnailClick = () => {
+    fileInputRef.current?.click();
   };
 
   const addTag = () => {
@@ -302,7 +351,7 @@ const CreateListing: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Media Files Section */}
+                {/* Media Files Section - UPDATED */}
                 <div className="bg-gray-50 rounded-xl p-6">
                   <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
                     <FiUpload className="mr-3 text-orange-600" size={24} />
@@ -313,42 +362,75 @@ const CreateListing: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Upload Preview Images/Videos
                     </label>
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors duration-200">
-                      <FiUpload className="mx-auto text-gray-400 mb-4" size={48} />
-                      <p className="text-gray-600 mb-2">
-                        Drag and drop files here, or click to browse
-                      </p>
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/*,video/*"
-                        onChange={handleFileChange}
-                        className="hidden"
-                        id="media-upload"
-                      />
-                      <label
-                        htmlFor="media-upload"
-                        className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200 cursor-pointer"
-                      >
-                        Choose Files
-                      </label>
-                      <p className="text-gray-500 text-sm mt-2">
-                        Supported formats: JPG, PNG, GIF, MP4, MOV. Max 10 files.
-                      </p>
+                    
+                    {/* File Upload Area - Modal jaisa design */}
+                    <div className="flex flex-col items-center p-6 border-2 border-dashed border-gray-300 rounded-lg bg-white hover:border-gray-400 transition-colors duration-200">
+                      <div className="relative w-full">
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/*,video/*"
+                          onChange={handleFileChange}
+                          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                          ref={fileInputRef}
+                        />
+                        <div
+                          className="bg-gray-100 p-8 rounded-lg text-center cursor-pointer border-2 border-dashed border-gray-300 hover:border-yellow-400 transition-colors duration-200"
+                          onClick={handleThumbnailClick}
+                        >
+                          <FiUpload className="mx-auto text-gray-400 mb-4" size={48} />
+                          <p className="text-gray-600 mb-2 font-medium">
+                            Click to upload files
+                          </p>
+                          <p className="text-gray-500 text-sm">
+                            Supported formats: JPG, PNG, GIF, MP4, MOV
+                          </p>
+                        </div>
+                      </div>
                     </div>
                     
+                    {/* Selected Files Preview - Modal jaisa */}
                     {formData.mediaFiles.length > 0 && (
-                      <div className="mt-4">
-                        <p className="text-sm font-medium text-gray-700 mb-2">
+                      <div className="mt-6">
+                        <p className="text-sm font-medium text-gray-700 mb-3">
                           Selected files ({formData.mediaFiles.length}):
                         </p>
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           {formData.mediaFiles.map((file, index) => (
-                            <div key={index} className="flex items-center justify-between bg-white px-4 py-2 rounded-lg border">
-                              <span className="text-sm text-gray-700">{file.name}</span>
-                              <span className="text-xs text-gray-500">
-                                {(file.size / (1024 * 1024)).toFixed(2)} MB
-                              </span>
+                            <div key={index} className="flex items-center justify-between bg-white px-4 py-3 rounded-lg border border-gray-200 shadow-sm">
+                              <div className="flex items-center space-x-3">
+                                {/* File Preview */}
+                                {file.type.startsWith('image/') ? (
+                                  <img 
+                                    src={URL.createObjectURL(file)} 
+                                    alt="Preview" 
+                                    className="w-12 h-12 object-cover rounded"
+                                  />
+                                ) : file.type.startsWith('video/') ? (
+                                  <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
+                                    <FiFolder className="text-gray-500" size={20} />
+                                  </div>
+                                ) : (
+                                  <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
+                                    <FiFolder className="text-gray-500" size={20} />
+                                  </div>
+                                )}
+                                <div>
+                                  <span className="text-sm font-medium text-gray-700 block">
+                                    {file.name}
+                                  </span>
+                                  <span className="text-xs text-gray-500">
+                                    {(file.size / (1024 * 1024)).toFixed(2)} MB
+                                  </span>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeFile(index)}
+                                className="text-red-500 hover:text-red-700 transition-colors duration-200"
+                              >
+                                ×
+                              </button>
                             </div>
                           ))}
                         </div>
@@ -362,20 +444,20 @@ const CreateListing: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => navigate('/marketplace')}
-                    disabled={loading}
+                    disabled={loading || uploading}
                     className="px-8 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-yellow-500 focus:outline-none transition-colors duration-200 disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || uploading}
                     className="px-8 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 focus:ring-2 focus:ring-yellow-500 focus:outline-none transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    {loading ? (
+                    {(loading || uploading) ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Creating Listing...
+                        {uploading ? 'Uploading Files...' : 'Creating Listing...'}
                       </>
                     ) : (
                       <>
