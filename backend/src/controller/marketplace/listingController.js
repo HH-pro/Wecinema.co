@@ -33,7 +33,7 @@ router.get("/my-listings", protect, isHypeModeUser, isSeller, async (req, res) =
 // ===================================================
 // ✅ CREATE LISTING (like your working video route)
 // ===================================================
-router.post("/create-listing", authenticateMiddleware, async (req, res) => {
+router.post("/create-listing", async (req, res) => {
   try {
     console.log("=== CREATE LISTING REQUEST ===");
     console.log("Body received:", req.body);
