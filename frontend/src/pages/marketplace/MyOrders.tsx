@@ -64,7 +64,7 @@ const MyOrders: React.FC = () => {
     <MarketplaceLayout>
       <div className="my-orders-page">
         <div className="page-header">
-          <h1 className="text-3xl font-bold mt-20 text-gray-900">My Orders</h1>
+          <h1 className="text-3xl font-bold mt-10 text-gray-900">My Orders</h1>
           <p className="text-gray-600 mt-2">Track and manage your purchases</p>
         </div>
 
