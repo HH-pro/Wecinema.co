@@ -122,8 +122,8 @@ const SellerDashboard: React.FC = () => {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
                   </div>
@@ -222,7 +222,7 @@ const SellerDashboard: React.FC = () => {
                   <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
                 </div>
                 <div className="p-6 space-y-4">
-                  <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center">
+                  <button className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center">
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
@@ -246,9 +246,9 @@ const SellerDashboard: React.FC = () => {
               </div>
 
               {/* Additional Stats or Tips */}
-              <div className="mt-6 bg-blue-50 rounded-lg border border-blue-200 p-6">
-                <h3 className="text-sm font-semibold text-blue-900 mb-2">Tips for Success</h3>
-                <ul className="text-sm text-blue-700 space-y-2">
+              <div className="mt-6 bg-yellow-50 rounded-lg border border-yellow-200 p-6">
+                <h3 className="text-sm font-semibold text-yellow-900 mb-2">Tips for Success</h3>
+                <ul className="text-sm text-yellow-700 space-y-2">
                   <li>• Upload high-quality photos of your items</li>
                   <li>• Write clear and detailed descriptions</li>
                   <li>• Respond quickly to buyer inquiries</li>
