@@ -36,15 +36,15 @@ const CreateListing: React.FC = () => {
   setLoading(true);
 
   try {
-   const data = {
-  title: formData.title,
-  description: formData.description,
-  price: formData.price,
-  type: formData.type,
-  category: formData.category,
-  tags: formData.tags,
-  mediaUrls: [uploadedVideoUrl], // like Cloudinary URL
-};
+    const data = {
+      title: formData.title,
+      description: formData.description,
+      price: formData.price,
+      type: formData.type,
+      category: formData.category,
+      tags: formData.tags,
+      mediaUrls: formData.mediaUrls, // URLs from Cloudinary
+    };
 
     const response = await axios.post(
       "http://localhost:3000/marketplace/listings/create-listing",
