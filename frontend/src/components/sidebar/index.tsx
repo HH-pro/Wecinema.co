@@ -25,6 +25,7 @@ import { toast } from "react-toastify";
 import { decodeToken } from "../../utilities/helperfFunction";
 import "./Sidebar.css";
 
+import axios from "axios";
 interface SidebarProps {
   expand: boolean;
   darkMode: boolean;
@@ -47,9 +48,38 @@ const Sidebar: React.FC<SidebarProps> = ({
   setDarkMode,
   darkMode,
   isLoggedIn,
+    toggleUploadScriptModal,
+  toggleUploadModal,
 }) => {
   const token = localStorage.getItem("token") || null;
   const tokenData = decodeToken(token);
+   const [hasPaid, setHasPaid] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (tokenData) {
+      fetchPaymentStatus(tokenData.userId);
+    }
+  }, [tokenData]);
+
+  const fetchPaymentStatus = async (userId: any) => {
+    try {
+      const response = await axios.get(
+        `https://wecinema.co/api/user/payment-status/${userId}`
+      );
+      setHasPaid(response.data.hasPaid);
+    } catch (error) {
+      console.error("Payment status error:", error);
+    }
+  };
+  const handleHypemodeClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (hasPaid) {
+      event.preventDefault();
+      toast.info("You are already subscribed to Hypemode!");
+    } else if (!hasPaid) {
+      navigate("/hypemode");
+    }
+  };
 
   const getActiveClass = (path: string) => {
     return window.location.pathname === path ? "text-active" : "";
@@ -73,7 +103,16 @@ const Sidebar: React.FC<SidebarProps> = ({
             <IoMdHome className="sidebar-icon" />
             <span className="sidebar-text">Home</span>
           </Link>
-
+          <Link
+            to="/hypemode"
+            onClick={handleHypemodeClick}
+            className={`sidebar-item ${getActiveClass("/hypemode")} ${
+              expand ? "" : "collapsed"
+            }`}
+          >
+            <RiMovie2Line className="sidebar-icon" />
+            <span className="sidebar-text">Hype mode</span>
+          </Link>
           <Link
             to="/videoeditor"
             className={`sidebar-item ${getActiveClass("/videoeditor")} ${
