@@ -55,48 +55,61 @@ const CreateListing: React.FC = () => {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  e.preventDefault();
+  setLoading(true);
 
-    try {
-      // Pehle sab files Cloudinary par upload karo
-      setUploading(true);
-      const mediaUrls: string[] = [];
-      
-      for (const file of formData.mediaFiles) {
-        const url = await uploadToCloudinary(file);
-        mediaUrls.push(url);
-      }
-      
-      setUploading(false);
-
-      // Ab listing create karo
-      const data = {
-        title: formData.title,
-        description: formData.description,
-        price: formData.price,
-        type: formData.type,
-        category: formData.category,
-        tags: formData.tags,
-        mediaUrls: mediaUrls, // Cloudinary URLs
-      };
-
-      const response = await axios.post(
-        "http://localhost:3000/marketplace/listings/create-listing",
-        data,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      if (response.status === 201) navigate("/marketplace");
-    } catch (error) {
-      console.error("Error creating listing:", error);
-      setUploading(false);
-    } finally {
-      setLoading(false);
+  try {
+    // Get user ID from token
+    const token = localStorage.getItem("token");
+    let userId = "";
+    
+    if (token) {
+      // Simple token decode (install jwt-decode package for better solution)
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      userId = payload.userId || payload.id;
     }
-  };
+
+    // Pehle sab files Cloudinary par upload karo
+    setUploading(true);
+    const mediaUrls: string[] = [];
+    
+    for (const file of formData.mediaFiles) {
+      const url = await uploadToCloudinary(file);
+      mediaUrls.push(url);
+    }
+    
+    setUploading(false);
+
+    // Ab listing create karo with sellerId
+    const data = {
+      title: formData.title,
+      description: formData.description,
+      price: formData.price,
+      type: formData.type,
+      category: formData.category,
+      tags: formData.tags,
+      mediaUrls: mediaUrls,
+      sellerId: userId // Add sellerId here
+    };
+
+    console.log("Sending data:", data);
+
+    const response = await axios.post(
+      "http://localhost:3000/marketplace/listings/create-listing",
+      data,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    if (response.status === 201) navigate("/marketplace");
+  } catch (error) {
+    console.error("Error creating listing:", error);
+    setUploading(false);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
