@@ -29,20 +29,42 @@ const Browse: React.FC = () => {
   const fetchListings = async () => {
     try {
       setLoading(true);
-      const queryParams = new URLSearchParams();
       
-      // Add filters to query params
-      if (filters.type) queryParams.append('type', filters.type);
-      if (filters.category) queryParams.append('category', filters.category);
-      if (filters.minPrice) queryParams.append('minPrice', filters.minPrice);
-      if (filters.maxPrice) queryParams.append('maxPrice', filters.maxPrice);
-      if (filters.sortBy) queryParams.append('sortBy', filters.sortBy);
-      
+      // Aapke route ke hisaab se sirf active listings fetch karo
       const response = await axios.get(
-        `http://localhost:3000/marketplace/listings/listings`
+        'http://localhost:3000/marketplace/listings'
       );
       
-      setListings(response.data);
+      // Server se mili listings ko filter karo based on local filters
+      let filteredData = response.data;
+      
+      // Apply local filters
+      if (filters.type) {
+        filteredData = filteredData.filter((listing: Listing) => listing.type === filters.type);
+      }
+      
+      if (filters.category) {
+        filteredData = filteredData.filter((listing: Listing) => 
+          listing.category.toLowerCase().includes(filters.category.toLowerCase())
+        );
+      }
+      
+      if (filters.minPrice) {
+        filteredData = filteredData.filter((listing: Listing) => 
+          listing.price >= parseFloat(filters.minPrice)
+        );
+      }
+      
+      if (filters.maxPrice) {
+        filteredData = filteredData.filter((listing: Listing) => 
+          listing.price <= parseFloat(filters.maxPrice)
+        );
+      }
+      
+      // Apply sorting
+      filteredData = sortListings(filteredData, filters.sortBy);
+      
+      setListings(filteredData);
     } catch (error) {
       console.error('Error fetching listings:', error);
     } finally {
@@ -50,14 +72,41 @@ const Browse: React.FC = () => {
     }
   };
 
+  // Local sorting function
+  const sortListings = (data: Listing[], sortBy: string) => {
+    const sortedData = [...data];
+    
+    switch (sortBy) {
+      case 'newest':
+        return sortedData.sort((a, b) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      case 'oldest':
+        return sortedData.sort((a, b) => 
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+      case 'price_low':
+        return sortedData.sort((a, b) => a.price - b.price);
+      case 'price_high':
+        return sortedData.sort((a, b) => b.price - a.price);
+      case 'rating':
+        return sortedData.sort((a, b) => {
+          const ratingA = a.sellerId?.sellerRating || 0;
+          const ratingB = b.sellerId?.sellerRating || 0;
+          return ratingB - ratingA;
+        });
+      default:
+        return sortedData;
+    }
+  };
+
   const handleViewDetails = (listingId: string) => {
-    navigate(`/marketplace/listings/listings`);
+    navigate(`/marketplace/listings/${listingId}`);
   };
 
   const handleMakeOffer = (listing: Listing) => {
     // Open make offer modal or navigate to offer page
     console.log('Make offer:', listing);
-    // You can implement offer functionality here
     navigate(`/marketplace/offer/${listing._id}`);
   };
 
