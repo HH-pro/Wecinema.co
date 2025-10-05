@@ -1,8 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const MarketplaceListing = require("../../models/marketplace/listing");
-const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils"); // 🆕 AUTH IMPORT
-
+import User from "../models/user.js";
+import { authenticateMiddleware } from "../utils.js";
+const router = express.Router();
 // ✅ PUBLIC ROUTE - No auth required
 router.get("/listings", async (req, res) => {
   try {
@@ -28,45 +29,39 @@ router.get("/my-listings", protect, isHypeModeUser, isSeller, async (req, res) =
 // Create new listing
 // Make sure you're importing the correct model
 
-/// ✅ Make sure protect comes BEFORE isSeller
-router.post("/create-listing", async (req, res) => {
+/router.post("/create-listing", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== CREATE LISTING REQUEST ===");
+    console.log("Body received:", req.body);
 
-  const { title, description, price, type, category, tags } = req.body;
-const media = req.body.mediaUrls || req.files;
+    const { title, description, price, type, category, tags, mediaFiles, mediaUrls, sellerId } = req.body;
 
-
-    // The authenticated user's ID (from token)
-    const userId = req.user?._id;
-
-    console.log("User ID:", userId);
-
-    // Basic validation
+    // ✅ Check required fields
     if (!title || !description || !price || !type || !category) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    // Handle tags safely
-    const tagsArray = Array.isArray(tags)
-      ? tags
-      : tags
-      ? tags.split(",").map((t) => t.trim())
-      : [];
-
-    // Handle media URLs (Cloudinary or uploaded)
-    const mediaUrls = [];
-
-    // Case 1: Cloudinary URL in `file`
-    if (file && typeof file === "string" && file.startsWith("http")) {
-      mediaUrls.push(file);
+    // ✅ Determine user ID
+    const userId = sellerId || req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized — user not found" });
     }
 
-    // Case 2: Files uploaded with multer (optional)
-    if (req.files && req.files.length > 0) {
-      mediaUrls.push(...req.files.map((f) => f.path));
-    }
+    // ✅ Normalize tags
+    const tagsArray =
+      Array.isArray(tags) ? tags : typeof tags === "string" ? [tags] : [];
 
+    // ✅ Handle media (Cloudinary URLs or plain URLs)
+    const mediaArray =
+      Array.isArray(mediaFiles)
+        ? mediaFiles
+        : Array.isArray(mediaUrls)
+        ? mediaUrls
+        : typeof mediaFiles === "string"
+        ? [mediaFiles]
+        : [];
+
+    // ✅ Create listing
     const listing = new MarketplaceListing({
       sellerId: userId,
       title,
@@ -75,13 +70,13 @@ const media = req.body.mediaUrls || req.files;
       type,
       category,
       tags: tagsArray,
-      mediaUrls,
+      mediaUrls: mediaArray,
     });
 
     await listing.save();
 
     console.log("✅ Listing created successfully");
-    res.status(201).json({ success: true, listing });
+    res.status(201).json(listing);
   } catch (error) {
     console.error("❌ Error creating listing:", error);
     res.status(500).json({ error: "Failed to create listing" });
