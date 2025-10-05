@@ -24,7 +24,7 @@ import { MdOutlinePrivacyTip } from "react-icons/md";
 import { toast } from "react-toastify";
 import { decodeToken } from "../../utilities/helperfFunction";
 import "./Sidebar.css";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 
 import axios from "axios";
