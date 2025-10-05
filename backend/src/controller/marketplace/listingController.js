@@ -40,7 +40,7 @@ router.post("/create-listing",  authenticateMiddleware, async (req, res) => {
 
     console.log('User ID:', userId);
     
-    if (!title || !description || !price || !type || !category) {
+    if (!title || !description || !price || !type || !category !tags) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
