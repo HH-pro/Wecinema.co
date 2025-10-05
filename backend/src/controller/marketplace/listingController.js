@@ -38,20 +38,23 @@ router.post("/create-listing", async (req, res) => {
     console.log("=== CREATE LISTING REQUEST ===");
     console.log("Body received:", req.body);
 
-    const { title, description, price, type, category, tags, mediaUrls } = req.body;
+    const { title, description, price, type, category, tags, mediaUrls, sellerId } = req.body;
 
-    if (!title || !description || !price || !type || !category) {
-      return res.status(400).json({ error: "Missing required fields" });
+    if (!title || !description || !price || !type || !category || !sellerId) {
+      return res.status(400).json({ 
+        error: "Missing required fields",
+        required: ["title", "description", "price", "type", "category", "sellerId"]
+      });
     }
-
-
 
     // Normalize tags and media URLs
     const tagsArray = Array.isArray(tags) ? tags : [tags];
     const mediaArray = Array.isArray(mediaUrls) ? mediaUrls : [mediaUrls];
 
+    console.log("Creating listing for seller:", sellerId);
+
     const listing = await MarketplaceListing.create({
-      sellerId: userId,
+      sellerId: sellerId,
       title,
       description,
       price,
@@ -65,7 +68,7 @@ router.post("/create-listing", async (req, res) => {
     res.status(201).json({ message: "Listing created successfully", listing });
   } catch (error) {
     console.error("Error creating listing:", error);
-    res.status(500).json({ error: "Failed to create listing" });
+    res.status(500).json({ error: "Failed to create listing", details: error.message });
   }
 });
 
