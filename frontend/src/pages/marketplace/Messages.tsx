@@ -199,7 +199,7 @@ const Messages: React.FC = () => {
   const getStatusColor = (status: string) => {
     const colors: { [key: string]: string } = {
       pending_payment: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      paid: 'bg-blue-100 text-blue-800 border-blue-200',
+      paid: 'bg-yellow-100 text-yellow-800 border-yellow-200',
       in_progress: 'bg-indigo-100 text-indigo-800 border-indigo-200',
       delivered: 'bg-purple-100 text-purple-800 border-purple-200',
       completed: 'bg-green-100 text-green-800 border-green-200',
@@ -213,7 +213,7 @@ const Messages: React.FC = () => {
       <MarketplaceLayout>
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600 mx-auto"></div>
             <p className="mt-4 text-gray-600">Loading messages...</p>
           </div>
         </div>
@@ -250,7 +250,7 @@ const Messages: React.FC = () => {
                           key={conversation.orderId}
                           className={`p-4 cursor-pointer transition-colors ${
                             selectedConversation === conversation.orderId 
-                              ? 'bg-blue-50 border-r-2 border-blue-600' 
+                              ? 'bg-yellow-50 border-r-2 border-yellow-600' 
                               : 'bg-white hover:bg-gray-50'
                           }`}
                           onClick={() => {
@@ -260,7 +260,7 @@ const Messages: React.FC = () => {
                         >
                           <div className="flex items-start space-x-3">
                             <div className="flex-shrink-0">
-                              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                              <div className="w-10 h-10 bg-yellow-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
                                 {conversation.otherUser.username.charAt(0).toUpperCase()}
                               </div>
                             </div>
@@ -311,7 +311,7 @@ const Messages: React.FC = () => {
                         <p className="text-sm text-gray-500 mb-4">Start a conversation from your orders</p>
                         <button 
                           onClick={() => navigate('/marketplace/orders')}
-                          className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+                          className="bg-yellow-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-yellow-700 transition-colors"
                         >
                           View Your Orders
                         </button>
@@ -332,7 +332,7 @@ const Messages: React.FC = () => {
                           const conversation = conversations.find(c => c.orderId === selectedConversation);
                           return conversation ? (
                             <div className="flex items-center space-x-3">
-                              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                              <div className="w-8 h-8 bg-yellow-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
                                 {conversation.otherUser.username.charAt(0).toUpperCase()}
                               </div>
                               <div>
@@ -368,13 +368,13 @@ const Messages: React.FC = () => {
                             <div
                               className={`max-w-xs lg:max-w-md rounded-lg px-4 py-2 ${
                                 message.senderId._id === 'user1' 
-                                  ? 'bg-blue-600 text-white rounded-br-none' 
+                                  ? 'bg-yellow-600 text-white rounded-br-none' 
                                   : 'bg-white text-gray-900 border border-gray-200 rounded-bl-none'
                               }`}
                             >
                               <div className="text-sm">{message.message}</div>
                               <div className={`text-xs mt-1 ${
-                                message.senderId._id === 'user1' ? 'text-blue-100' : 'text-gray-500'
+                                message.senderId._id === 'user1' ? 'text-yellow-100' : 'text-gray-500'
                               }`}>
                                 {formatTime(message.createdAt)}
                               </div>
@@ -394,12 +394,12 @@ const Messages: React.FC = () => {
                           placeholder="Type your message..."
                           onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
                           disabled={sending}
-                          className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                         />
                         <button 
                           onClick={sendMessage}
                           disabled={!newMessage.trim() || sending}
-                          className="bg-blue-600 text-white px-6 py-2 rounded-md font-medium hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                          className="bg-yellow-600 text-white px-6 py-2 rounded-md font-medium hover:bg-yellow-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
                         >
                           {sending ? (
                             <div className="flex items-center">
@@ -426,7 +426,7 @@ const Messages: React.FC = () => {
                       {conversations.length === 0 && (
                         <button 
                           onClick={() => navigate('/marketplace')}
-                          className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
+                          className="bg-yellow-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-yellow-700 transition-colors"
                         >
                           Browse Marketplace
                         </button>
