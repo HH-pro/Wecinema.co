@@ -150,7 +150,7 @@ const CreateListing: React.FC = () => {
                 {/* Basic Information Section */}
                 <div className="bg-gray-50 rounded-xl p-6">
                   <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
-                    <FiType className="mr-3 text-blue-600" size={24} />
+                    <FiType className="mr-3 text-yellow-600" size={24} />
                     Basic Information
                   </h3>
                   
