@@ -51,7 +51,7 @@ const Browse: React.FC = () => {
   };
 
   const handleViewDetails = (listingId: string) => {
-    navigate(`/marketplace/listings/${listingId}`);
+    navigate(`/marketplace/listings/listings`);
   };
 
   const handleMakeOffer = (listing: Listing) => {
