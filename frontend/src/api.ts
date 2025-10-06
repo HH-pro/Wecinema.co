@@ -1,6 +1,5 @@
 import axios, { AxiosResponse, AxiosError, Method } from "axios";
 import { toast } from "react-toastify";
-import { auth } from '../../frontend/src/context/AuthContext';
 
 // Create an axios instance with default configurations
 const api = axios.create({
@@ -762,32 +761,4 @@ export const simulateWebhook = async (paymentIntentId: string, eventType: string
     paymentIntentId,
     eventType
   }, () => {});
-};
-
-// services/api.js
-
-export const apiClient = {
-  async request(url, options = {}) {
-    const token = auth.getToken();
-    
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      },
-      ...options,
-    };
-
-    const response = await fetch(url, config);
-    
-    if (response.status === 401) {
-      // Token expired
-      auth.logout();
-      window.location.href = '/login';
-      throw new Error('Authentication required');
-    }
-
-    return response;
-  }
 };
