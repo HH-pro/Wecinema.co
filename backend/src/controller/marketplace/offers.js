@@ -7,11 +7,19 @@ const Order = require("../../models/marketplace/order");
 // Make an offer
 router.post("/make-offer", async (req, res) => {
   try {
+    console.log("Received offer request body:", req.body);
+    
     const { listingId, amount, message } = req.body;
 
     // Validate required fields
     if (!listingId || !amount) {
       return res.status(400).json({ error: 'Listing ID and amount are required' });
+    }
+
+    // Ensure amount is a number
+    const offerAmount = parseFloat(amount);
+    if (isNaN(offerAmount) || offerAmount <= 0) {
+      return res.status(400).json({ error: 'Valid amount is required' });
     }
 
     const listing = await Listing.findById(listingId);
@@ -43,7 +51,7 @@ router.post("/make-offer", async (req, res) => {
     const offer = new Offer({
       buyerId: req.user.id,
       listingId,
-      amount,
+      amount: offerAmount,
       message: message || ''
     });
 
@@ -53,7 +61,11 @@ router.post("/make-offer", async (req, res) => {
     await offer.populate('buyerId', 'username avatar');
     await offer.populate('listingId', 'title price');
 
-    res.status(201).json(offer);
+    res.status(201).json({
+      success: true,
+      message: 'Offer submitted successfully',
+      offer
+    });
   } catch (error) {
     console.error('Error making offer:', error);
     res.status(500).json({ error: 'Failed to make offer' });
