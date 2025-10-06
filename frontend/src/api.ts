@@ -270,7 +270,7 @@ export const makeOffer = (
     message?: string;
   },
   setLoading: React.Dispatch<React.SetStateAction<boolean>>
-) => postRequest('/api/marketplace/offers/make-offer', offerData, setLoading, "Offer sent successfully");
+) => postRequest('/marketplace/offers/make-offer', offerData, setLoading, "Offer sent successfully");
 
 export const getMyOffers = (
   setLoading?: React.Dispatch<React.SetStateAction<boolean>>
