@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Listing } from '../../types/marketplace';
 import { FiPlay, FiImage, FiTag, FiDollarSign, FiCheck, FiX } from 'react-icons/fi';
-import { makeOffer } from '../../services/marketplaceAPI';
-import { useAuth } from '../../contexts/AuthContext';
+import { makeOffer } from '../../api';
+import { useAuth } from '../../context/AuthContext';
 
 interface ListingCardProps {
   listing: Listing;
