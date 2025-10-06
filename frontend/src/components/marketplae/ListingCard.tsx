@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Listing } from '../../types/marketplace';
 import { FiPlay, FiImage, FiTag, FiDollarSign, FiCheck, FiX } from 'react-icons/fi';
-import { makeOffer } from '../../api';
-import { useAuth } from '../../context/AuthContext';
+import { makeOffer } from '../../services/marketplaceAPI';
+import { decodeToken } from "../../utilities/helperfFunction";
+import { toast } from 'react-toastify';
 
 interface ListingCardProps {
   listing: Listing;
@@ -16,13 +17,28 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [offerError, setOfferError] = useState('');
   const [offerSuccess, setOfferSuccess] = useState(false);
-  const { user } = useAuth();
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Offer form state
   const [offerData, setOfferData] = useState({
     amount: '',
     message: ''
   });
+
+  // Get token and decode user info
+  const token = localStorage.getItem("token") || null;
+  
+  useEffect(() => {
+    if (token) {
+      try {
+        const decodedUser = decodeToken(token);
+        setCurrentUser(decodedUser);
+      } catch (error) {
+        console.error('Error decoding token:', error);
+        localStorage.removeItem("token");
+      }
+    }
+  }, [token]);
 
   // Check if media is video or image
   const isVideo = (url: string) => {
@@ -68,14 +84,17 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
   };
 
   const handleMakeOfferClick = () => {
-    if (!user) {
-      setOfferError('Please login to make an offer');
+    if (!token || !currentUser) {
+      toast.error("Please login to make an offer");
       return;
     }
     
     // Check if user is the seller
-    if (user.id === listing.sellerId?._id || user._id === listing.sellerId?._id) {
-      setOfferError('You cannot make an offer on your own listing');
+    const userId = currentUser.id || currentUser._id;
+    const sellerId = listing.sellerId?._id || listing.sellerId;
+    
+    if (userId === sellerId) {
+      toast.error("You cannot make an offer on your own listing");
       return;
     }
 
@@ -148,6 +167,11 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
     setOfferData({ amount: '', message: '' });
   };
 
+  const isUserLoggedIn = token && currentUser;
+  const userId = currentUser?.id || currentUser?._id;
+  const sellerId = listing.sellerId?._id || listing.sellerId;
+  const isOwnListing = userId === sellerId;
+
   return (
     <>
       <div className="group relative w-80 bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 border border-gray-200 overflow-hidden">
@@ -219,7 +243,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
           {/* Seller Info */}
           {listing.sellerId && (
             <div className="absolute bottom-3 right-3 bg-black/70 text-white px-2 py-1 rounded-full text-xs">
-              @{listing.sellerId.username}
+              @{listing.sellerId.username || 'Seller'}
             </div>
           )}
         </div>
@@ -275,7 +299,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
             </button>
             <button
               onClick={handleMakeOfferClick}
-              disabled={listing.status !== 'active' || !user}
+              disabled={listing.status !== 'active' || !isUserLoggedIn || isOwnListing}
               className="flex-1 bg-gradient-to-r from-yellow-500 to-orange-500 text-white py-2.5 rounded-lg font-semibold text-sm hover:from-yellow-600 hover:to-orange-600 transition-all duration-200 shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               <FiTag size={16} />
@@ -291,7 +315,16 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
               </span>
             </div>
           )}
-          {!user && (
+          
+          {isOwnListing && (
+            <div className="mt-2 text-center">
+              <span className="text-xs text-blue-600 font-medium">
+                Your Listing
+              </span>
+            </div>
+          )}
+          
+          {!isUserLoggedIn && (
             <div className="mt-2 text-center">
               <span className="text-xs text-blue-600 font-medium">
                 Login to make offers
