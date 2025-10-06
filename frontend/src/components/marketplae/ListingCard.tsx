@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Listing } from '../../types/marketplace';
 import { FiPlay, FiImage, FiTag, FiDollarSign, FiCheck, FiX } from 'react-icons/fi';
-import { makeOffer } from '../../services/marketplaceAPI';
+import { makeOffer } from '../../api';
 import { decodeToken } from "../../utilities/helperfFunction";
 import { toast } from 'react-toastify';
 
