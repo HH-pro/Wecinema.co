@@ -263,14 +263,39 @@ export const deleteListing = (
 ) => deleteRequest(`/api/marketplace/listings/${listingId}`, setLoading, "Listing deleted");
 
 // Offer APIs
-export const makeOffer = (
+export const makeOffer = async (
   offerData: {
     listingId: string;
     amount: number;
     message?: string;
   },
   setLoading: React.Dispatch<React.SetStateAction<boolean>>
-) => postRequest('/marketplace/offers/make-offer', offerData, setLoading, "Offer sent successfully");
+) => {
+  try {
+    setLoading(true);
+    
+    // Ensure we're sending proper JSON
+    const requestData = {
+      listingId: offerData.listingId,
+      amount: parseFloat(offerData.amount.toString()), // Ensure it's a number
+      message: offerData.message || ''
+    };
+
+    console.log("Sending offer data:", requestData);
+
+    const response = await api.post('/api/marketplace/offers/make-offer', requestData);
+    
+    toast.success("Offer sent successfully!");
+    return response.data;
+  } catch (error: any) {
+    console.error('Error making offer:', error);
+    const errorMessage = error.response?.data?.error || 'Failed to send offer';
+    toast.error(errorMessage);
+    throw new Error(errorMessage);
+  } finally {
+    setLoading(false);
+  }
+};
 
 export const getMyOffers = (
   setLoading?: React.Dispatch<React.SetStateAction<boolean>>
