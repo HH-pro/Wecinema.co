@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Listing } from '../../types/marketplace';
 import { FiPlay, FiImage, FiTag } from 'react-icons/fi';
-import MakeOfferModal from './MakeOfferModal';
+import MakeOfferModal from '../../components/marketplae/OfferModal';
 
 interface ListingCardProps {
   listing: Listing;
