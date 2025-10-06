@@ -762,3 +762,14 @@ export const simulateWebhook = async (paymentIntentId: string, eventType: string
     eventType
   }, () => {});
 };
+export const makeOffer = async (listingId, offerData) => {
+  const response = await axios.post(`${API_BASE_URL}/offers/make-offer`, {
+    listingId,
+    ...offerData
+  }, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem('token')}`
+    }
+  });
+  return response.data;
+};
