@@ -1,5 +1,6 @@
 import axios, { AxiosResponse, AxiosError, Method } from "axios";
 import { toast } from "react-toastify";
+import { auth } from '../../frontend/src/context/AuthContext';
 
 // Create an axios instance with default configurations
 const api = axios.create({
