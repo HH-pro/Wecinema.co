@@ -46,7 +46,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
     }
 
     console.log("🔍 Looking for listing:", listingId);
-    const listing = await Listing.findById(listingId);
+    const listing = await MarketplaceListing.findById(listingId);
     if (!listing) {
       console.log("❌ Listing not found:", listingId);
       return res.status(404).json({ error: 'Listing not found' });
