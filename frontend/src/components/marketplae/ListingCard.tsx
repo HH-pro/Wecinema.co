@@ -49,7 +49,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
     }
 
     const response = await axios.post(
-      "http://localhost:3000/marketplace/offers/create-offer",
+      "http://localhost:3000/marketplace/offers/make-offer",
       {
         listingId,
         amount: offerData.amount,
