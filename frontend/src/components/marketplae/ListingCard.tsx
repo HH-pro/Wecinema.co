@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Listing } from '../../types/marketplace';
 import { FiPlay, FiImage, FiTag, FiDollarSign, FiCheck, FiX } from 'react-icons/fi';
-import { makeOffer } from '../../api';
 import { decodeToken } from "../../utilities/helperfFunction";
 import { toast } from 'react-toastify';
+import axios from 'axios';
 
 interface ListingCardProps {
   listing: Listing;
@@ -39,6 +39,29 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
       }
     }
   }, [token]);
+
+  // Direct API function for making an offer using Axios
+  const makeOffer = async (listingId: string, offerData: { amount: number; message: string }) => {
+    const token = localStorage.getItem("token");
+    
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    const response = await axios.post(
+      "http://localhost:3000/marketplace/offers/create-offer",
+      {
+        listingId,
+        amount: offerData.amount,
+        message: offerData.message
+      },
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    return response.data;
+  };
 
   // Check if media is video or image
   const isVideo = (url: string) => {
@@ -127,27 +150,28 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
         return;
       }
 
-      // Make API call
+      // Make API call using Axios
       await makeOffer(listing._id, {
         amount: offerAmount,
         message: offerData.message
       });
 
       setOfferSuccess(true);
+      toast.success('Offer submitted successfully!');
+      
       setTimeout(() => {
         setShowOfferModal(false);
         setOfferSuccess(false);
         if (onOfferSuccess) {
           onOfferSuccess();
         }
-      }, 2000);
+      }, 1500);
 
     } catch (error: any) {
       console.error('Failed to make offer:', error);
-      setOfferError(
-        error.response?.data?.error || 
-        'Failed to submit offer. Please try again.'
-      );
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to submit offer. Please try again.';
+      setOfferError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
