@@ -13,6 +13,10 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
     
     const { listingId, amount, message } = req.body;
 
+    // Validate user authentication
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
 
     // Validate required fields
     if (!listingId || !amount) {
