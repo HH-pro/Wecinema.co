@@ -22,7 +22,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
     }
 
     // Check for user ID in multiple possible fields
-    const userId = req.user.id || req.user._id || req.user.userId;
+    const userId = req.params.id || req.user._id || req.user.userId;
     console.log("Extracted user ID:", userId);
     
     if (!userId) {
