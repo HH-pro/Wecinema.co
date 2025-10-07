@@ -17,7 +17,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [offerError, setOfferError] = useState('');
   const [offerSuccess, setOfferSuccess] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   // Offer form state
   const [offerData, setOfferData] = useState({
@@ -49,14 +49,17 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
     }
 
     const response = await axios.post(
-      "http://localhost:3000/marketplace/offers/make-offer",
+      "http://localhost:3000/marketplace/offers/make-offer", // Updated endpoint
       {
         listingId,
         amount: offerData.amount,
         message: offerData.message
       },
       {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
       }
     );
 
@@ -65,7 +68,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
 
   // Check if media is video or image
   const isVideo = (url: string) => {
-    return url.match(/\.(mp4|mov|avi|wmv|flv|webm|mkv)$/i);
+    return url?.match(/\.(mp4|mov|avi|wmv|flv|webm|mkv)$/i);
   };
 
   // Get first media URL
@@ -142,11 +145,13 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
       // Validation
       if (!offerAmount || offerAmount <= 0) {
         setOfferError('Please enter a valid amount');
+        setIsSubmitting(false);
         return;
       }
 
       if (offerAmount > listing.price * 3) {
         setOfferError('Offer amount seems too high. Please enter a reasonable amount.');
+        setIsSubmitting(false);
         return;
       }
 
@@ -185,10 +190,12 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
   };
 
   const closeModal = () => {
-    setShowOfferModal(false);
-    setOfferError('');
-    setOfferSuccess(false);
-    setOfferData({ amount: '', message: '' });
+    if (!isSubmitting) {
+      setShowOfferModal(false);
+      setOfferError('');
+      setOfferSuccess(false);
+      setOfferData({ amount: '', message: '' });
+    }
   };
 
   const isUserLoggedIn = token && currentUser;
