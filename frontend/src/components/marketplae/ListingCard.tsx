@@ -31,56 +31,57 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
   useEffect(() => {
     if (token) {
       try {
-        const tokenData = decodeToken(token);
-        console.log('🔍 Decoded token data:', tokenData);
-        
-        // Set current user with the decoded token data
-        setCurrentUser(tokenData);
+        const decodedUser = decodeToken(token);
+        setCurrentUser(decodedUser);
       } catch (error) {
         console.error('Error decoding token:', error);
         localStorage.removeItem("token");
-        setCurrentUser(null);
       }
     }
   }, [token]);
 
   // Direct API function for making an offer using Axios
-  const makeOffer = async (listingId: string, offerData: { amount: number; message: string }) => {
-    const token = localStorage.getItem("token");
-    
-    if (!token) {
-      throw new Error('No authentication token found');
-    }
+  // Direct API function for making an offer using Axios
+const makeOffer = async (listingId: string, offerData: { amount: number; message: string }) => {
+  const token = localStorage.getItem("token");
+  
+  console.log('🚀 Making offer with:', {
+    token: token ? `${token.substring(0, 20)}...` : 'No token',
+    listingId,
+    offerData
+  });
 
-    try {
-      const response = await axios.post(
-        "http://localhost:3000/marketplace/offers/make-offer",
-        {
-          listingId,
-          amount: offerData.amount,
-          message: offerData.message
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  try {
+    const response = await axios.post(
+      "http://localhost:3000/marketplace/offers/make-offer",
+      {
+        listingId,
+        amount: offerData.amount,
+        message: offerData.message
+      },
+      {
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
         },
-        {
-          headers: { 
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}` 
-          },
-          timeout: 10000,
-        }
-      );
+      }
+    );
 
-      console.log('✅ Offer successful:', response.data);
-      return response.data;
-    } catch (error: any) {
-      console.error('❌ Offer failed:', {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message
-      });
-      throw error;
-    }
-  };
-
+    console.log('✅ Offer successful:', response.data);
+    return response.data;
+  } catch (error: any) {
+    console.error('❌ Offer failed:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
+    });
+    throw error;
+  }
+};
   // Check if media is video or image
   const isVideo = (url: string) => {
     return url?.match(/\.(mp4|mov|avi|wmv|flv|webm|mkv)$/i);
@@ -124,51 +125,42 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
     setImageLoaded(true);
   };
 
-  const handleMakeOfferClick = () => {
-    console.log('🔐 Auth check:', {
-      hasToken: !!token,
-      currentUser
-    });
+ const handleMakeOfferClick = () => {
+  console.log('🔐 Auth Debug:', {
+    hasToken: !!token,
+    token: token ? `${token.substring(0, 20)}...` : 'No token',
+    currentUser: currentUser,
+    localStorageToken: localStorage.getItem("token")
+  });
 
-    if (!token || !currentUser) {
-      toast.error("Please login to make an offer");
-      return;
-    }
+  if (!token || !currentUser) {
+    toast.error("Please login to make an offer");
+    return;
+  }
+  
+  // Check if user is the seller
+  const userId = currentUser.id;
+  const sellerId = listing.sellerId?.id || listing.sellerId?._id || listing.sellerId;
+  
+  console.log('👤 User Comparison:', {
+    userId,
+    sellerId,
+    isOwnListing: userId === sellerId
+  });
 
-    // Check if we have user ID from the decoded token
-    const userId = currentUser.id || currentUser._id;
-    if (!userId) {
-      console.error('❌ No user ID found in token:', currentUser);
-      toast.error("Authentication issue. Please login again.");
-      localStorage.removeItem("token");
-      setCurrentUser(null);
-      return;
-    }
-    
-    // Check if user is the seller
-    const sellerId = listing.sellerId?.id || listing.sellerId?._id || listing.sellerId;
-    
-    console.log('👤 User comparison:', {
-      userId,
-      sellerId,
-      isOwnListing: userId === sellerId
-    });
+  if (userId === sellerId) {
+    toast.error("You cannot make an offer on your own listing");
+    return;
+  }
 
-    if (userId === sellerId) {
-      toast.error("You cannot make an offer on your own listing");
-      return;
-    }
-
-    setShowOfferModal(true);
-    setOfferError('');
-    setOfferSuccess(false);
-    // Pre-fill with 80% of listing price as suggested offer
-    setOfferData({
-      amount: (listing.price * 0.8).toFixed(2),
-      message: ''
-    });
-  };
-
+  setShowOfferModal(true);
+  setOfferError('');
+  setOfferSuccess(false);
+  setOfferData({
+    amount: (listing.price * 0.8).toFixed(2),
+    message: ''
+  });
+};
   const handleOfferSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setOfferError('');
@@ -209,29 +201,9 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
 
     } catch (error: any) {
       console.error('Failed to make offer:', error);
-      
-      // Handle specific authentication errors
-      if (error.response?.status === 401) {
-        const errorMessage = error.response?.data?.error || 'Authentication failed';
-        setOfferError(errorMessage);
-        toast.error('Please login again');
-        
-        // Clear invalid token and user data
-        localStorage.removeItem("token");
-        setCurrentUser(null);
-      } else if (error.code === 'ERR_NETWORK') {
-        const errorMessage = 'Network error. Please check your connection and try again.';
-        setOfferError(errorMessage);
-        toast.error(errorMessage);
-      } else if (error.response?.status === 500) {
-        const errorMessage = 'Server error. Please try again later.';
-        setOfferError(errorMessage);
-        toast.error(errorMessage);
-      } else {
-        const errorMessage = error.response?.data?.error || error.message || 'Failed to submit offer. Please try again.';
-        setOfferError(errorMessage);
-        toast.error(errorMessage);
-      }
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to submit offer. Please try again.';
+      setOfferError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -255,7 +227,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
 
   const isUserLoggedIn = token && currentUser;
   const userId = currentUser?.id || currentUser?._id;
-  const sellerId = listing.sellerId?.id || listing.sellerId?._id || listing.sellerId;
+  const sellerId = listing.sellerId?._id || listing.sellerId;
   const isOwnListing = userId === sellerId;
 
   return (
