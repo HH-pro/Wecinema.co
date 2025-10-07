@@ -5,17 +5,33 @@ const Listing = require("../../models/marketplace/listing");
 const Order = require("../../models/marketplace/order");
 const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils");
 
-// backend/src/controller/marketplace/offers.js
+/// backend/src/controller/marketplace/offers.js
 router.post("/make-offer", authenticateMiddleware, async (req, res) => {
   try {
+    console.log("=== MAKE OFFER REQUEST ===");
     console.log("Received offer request body:", req.body);
-    console.log("User from request:", req.user); // Debug log
+    console.log("Full req.user object:", req.user);
+    console.log("Request headers authorization:", req.headers.authorization ? "Present" : "Missing");
     
     const { listingId, amount, message } = req.body;
 
-    // Validate user authentication
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ error: 'Authentication required' });
+    // Enhanced user authentication validation with better debugging
+    if (!req.user) {
+      console.log("❌ No user object found in request");
+      return res.status(401).json({ error: 'Authentication required - no user data' });
+    }
+
+    // Extract user ID from multiple possible fields
+    const userId = req.user.id || req.user._id || req.user.userId;
+    console.log("Extracted user ID:", userId);
+    console.log("Available req.user fields:", Object.keys(req.user));
+
+    if (!userId) {
+      console.log("❌ No user ID found in req.user. Full req.user:", JSON.stringify(req.user, null, 2));
+      return res.status(401).json({ 
+        error: 'Authentication required - invalid user data',
+        details: 'User ID not found in token payload'
+      });
     }
 
     // Validate required fields
@@ -29,25 +45,41 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Valid amount is required' });
     }
 
+    console.log("🔍 Looking for listing:", listingId);
     const listing = await Listing.findById(listingId);
     if (!listing) {
+      console.log("❌ Listing not found:", listingId);
       return res.status(404).json({ error: 'Listing not found' });
     }
+
+    console.log("📋 Listing found:", {
+      id: listing._id,
+      title: listing.title,
+      sellerId: listing.sellerId,
+      status: listing.status
+    });
 
     // Check if listing is available for offers
     if (listing.status !== 'active') {
       return res.status(400).json({ error: 'Listing is not available for offers' });
     }
 
-    // Check if user is not the seller - use req.user.id
-    if (listing.sellerId.toString() === req.user.id) {
+    // Check if user is not the seller
+    const sellerId = listing.sellerId.toString();
+    console.log("👤 User comparison:", {
+      userId: userId.toString(),
+      sellerId: sellerId,
+      isOwnListing: userId.toString() === sellerId
+    });
+
+    if (userId.toString() === sellerId) {
       return res.status(400).json({ error: 'Cannot make offer on your own listing' });
     }
 
     // Check for existing pending offer from same user
     const existingOffer = await Offer.findOne({
       listingId,
-      buyerId: req.user.id, // Use req.user.id
+      buyerId: userId,
       status: 'pending'
     });
 
@@ -55,8 +87,15 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'You already have a pending offer for this listing' });
     }
 
+    console.log("✅ Creating new offer with data:", {
+      buyerId: userId,
+      listingId,
+      amount: offerAmount,
+      message: message || ''
+    });
+
     const offer = new Offer({
-      buyerId: req.user.id, // Use req.user.id
+      buyerId: userId,
       listingId,
       amount: offerAmount,
       message: message || ''
@@ -65,17 +104,44 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
     await offer.save();
     
     // Populate the offer with buyer info for response
-    await offer.populate('buyerId', 'username avatar');
-    await offer.populate('listingId', 'title price');
+    await offer.populate('buyerId', 'username avatar email');
+    await offer.populate('listingId', 'title price sellerId');
+
+    console.log("✅ Offer created successfully:", {
+      offerId: offer._id,
+      buyer: offer.buyerId,
+      listing: offer.listingId
+    });
 
     res.status(201).json({
       success: true,
       message: 'Offer submitted successfully',
-      offer
+      offer: {
+        _id: offer._id,
+        buyerId: offer.buyerId,
+        listingId: offer.listingId,
+        amount: offer.amount,
+        message: offer.message,
+        status: offer.status,
+        createdAt: offer.createdAt
+      }
     });
   } catch (error) {
-    console.error('Error making offer:', error);
-    res.status(500).json({ error: 'Failed to make offer' });
+    console.error('❌ Error making offer:', error);
+    
+    // More specific error handling
+    if (error.name === 'CastError') {
+      return res.status(400).json({ error: 'Invalid listing ID format' });
+    }
+    
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ error: 'Invalid offer data', details: error.message });
+    }
+    
+    res.status(500).json({ 
+      error: 'Failed to make offer',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 // Get offers received (seller)
