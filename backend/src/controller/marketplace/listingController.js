@@ -123,25 +123,41 @@ router.delete("/listing/:id", async (req, res) => {
   }
 });
 
-// Temporary admin delete route (remove after use)
-router.delete("/admin/listing/:id", async (req, res) => {
+// Delete ALL listings (⚠️ Use with caution - irreversible!)
+router.delete("/admin/delete-all-listings", async (req, res) => {
   try {
-    const listing = await MarketplaceListing.findByIdAndDelete(req.params.id);
+    console.log("🚨 ATTEMPTING TO DELETE ALL LISTINGS");
     
-    if (!listing) {
-      return res.status(404).json({ error: "Listing not found" });
+    // First, get count of listings before deletion
+    const beforeCount = await MarketplaceListing.countDocuments();
+    console.log(`Listings before deletion: ${beforeCount}`);
+    
+    if (beforeCount === 0) {
+      return res.status(404).json({ 
+        message: "No listings found to delete",
+        deletedCount: 0
+      });
     }
 
+    // Delete all listings
+    const result = await MarketplaceListing.deleteMany({});
+    
+    console.log(`✅ Successfully deleted ${result.deletedCount} listings`);
+    
     res.status(200).json({ 
-      message: "Listing deleted successfully", 
-      listing: {
-        _id: listing._id,
-        title: listing.title
-      }
+      success: true,
+      message: `All listings deleted successfully`,
+      deletedCount: result.deletedCount,
+      beforeCount: beforeCount,
+      warning: "This action is irreversible!"
     });
+    
   } catch (error) {
-    console.error("Error deleting listing:", error);
-    res.status(500).json({ error: "Failed to delete listing" });
+    console.error("❌ Error deleting all listings:", error);
+    res.status(500).json({ 
+      error: "Failed to delete listings",
+      details: error.message 
+    });
   }
 });
 module.exports = router;
