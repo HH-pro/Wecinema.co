@@ -283,7 +283,7 @@ export const makeOffer = async (
 
     console.log("Sending offer data:", requestData);
 
-    const response = await api.post('/api/marketplace/offers/make-offer', requestData);
+    const response = await api.post('/marketplace/offers/make-offer', requestData);
     
     toast.success("Offer sent successfully!");
     return response.data;
