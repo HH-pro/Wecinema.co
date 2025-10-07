@@ -1,17 +1,16 @@
 const express = require("express");
 const router = express.Router();
-const offerSchema = require("../../models/marketplace/offer");
+const Offer = require("../../models/marketplace/offer");
 const MarketplaceListing = require("../../models/marketplace/listing");
 const Order = require("../../models/marketplace/order");
 const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils");
 
-/// backend/src/controller/marketplace/offers.js
+// Make Offer Route
 router.post("/make-offer", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== MAKE OFFER REQUEST ===");
     console.log("Received offer request body:", req.body);
     console.log("Full req.user object:", req.user);
-    console.log("Request headers authorization:", req.headers.authorization ? "Present" : "Missing");
     
     const { listingId, amount, message } = req.body;
 
@@ -144,29 +143,42 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
     });
   }
 });
-// Get offers received (seller)
-router.get("/received-offers", async (req, res) => {
+
+// Get offers received (seller) - Add authentication middleware
+router.get("/received-offers", authenticateMiddleware, async (req, res) => {
   try {
-    const myListings = await MarketplaceListing.find({ sellerId: req.user.id });
+    const userId = req.user.id || req.user._id || req.user.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const myListings = await MarketplaceListing.find({ sellerId: userId });
     const listingIds = myListings.map(listing => listing._id);
     
-    const offers = await offerSchema.find({ listingId: { $in: listingIds } })
+    const offers = await Offer.find({ listingId: { $in: listingIds } })
       .populate('buyerId', 'username avatar email')
-      .populate('listingId', 'title price images status')
+      .populate('listingId', 'title price mediaUrls status')
       .sort({ createdAt: -1 });
     
     res.status(200).json(offers);
   } catch (error) {
-    console.error('Error fetching offers:', error);
+    console.error('Error fetching received offers:', error);
     res.status(500).json({ error: 'Failed to fetch offers' });
   }
 });
 
-// Get offers made (buyer)
-router.get("/my-offers", async (req, res) => {
+// Get offers made (buyer) - Add authentication middleware
+router.get("/my-offers", authenticateMiddleware, async (req, res) => {
   try {
-    const offers = await offerSchema.find({ buyerId: req.user.id })
-      .populate('listingId', 'title price images status sellerId')
+    const userId = req.user.id || req.user._id || req.user.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const offers = await Offer.find({ buyerId: userId })
+      .populate('listingId', 'title price mediaUrls status sellerId')
       .populate('listingId.sellerId', 'username avatar')
       .sort({ createdAt: -1 });
     
@@ -177,9 +189,15 @@ router.get("/my-offers", async (req, res) => {
   }
 });
 
-// Accept offer
-router.put("/accept-offer/:id", async (req, res) => {
+// Accept offer - Add authentication middleware
+router.put("/accept-offer/:id", authenticateMiddleware, async (req, res) => {
   try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     const offer = await Offer.findById(req.params.id)
       .populate('listingId');
     
@@ -187,8 +205,9 @@ router.put("/accept-offer/:id", async (req, res) => {
       return res.status(404).json({ error: 'Offer not found' });
     }
 
-    if (offer.listingId.sellerId.toString() !== req.user.id) {
-      return res.status(403).json({ error: 'Not authorized' });
+    // Check if user is the seller of the listing
+    if (offer.listingId.sellerId.toString() !== userId) {
+      return res.status(403).json({ error: 'Not authorized to accept this offer' });
     }
 
     if (offer.status !== 'pending') {
@@ -196,13 +215,12 @@ router.put("/accept-offer/:id", async (req, res) => {
     }
 
     offer.status = 'accepted';
-    offer.updatedAt = new Date();
     await offer.save();
 
     // Create order from accepted offer
     const order = new Order({
       buyerId: offer.buyerId,
-      sellerId: req.user.id,
+      sellerId: userId,
       listingId: offer.listingId._id,
       offerId: offer._id,
       orderType: 'accepted_offer',
@@ -213,7 +231,7 @@ router.put("/accept-offer/:id", async (req, res) => {
     await order.save();
 
     // Mark listing as sold and reject other pending offers
-    await Listing.findByIdAndUpdate(offer.listingId._id, { status: 'sold' });
+    await MarketplaceListing.findByIdAndUpdate(offer.listingId._id, { status: 'sold' });
     await Offer.updateMany(
       { 
         listingId: offer.listingId._id, 
@@ -221,8 +239,7 @@ router.put("/accept-offer/:id", async (req, res) => {
         status: 'pending' 
       },
       { 
-        status: 'rejected',
-        updatedAt: new Date()
+        status: 'rejected'
       }
     );
 
@@ -237,9 +254,15 @@ router.put("/accept-offer/:id", async (req, res) => {
   }
 });
 
-// Reject offer
-router.put("/reject-offer/:id", async (req, res) => {
+// Reject offer - Add authentication middleware
+router.put("/reject-offer/:id", authenticateMiddleware, async (req, res) => {
   try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     const offer = await Offer.findById(req.params.id)
       .populate('listingId');
     
@@ -247,8 +270,9 @@ router.put("/reject-offer/:id", async (req, res) => {
       return res.status(404).json({ error: 'Offer not found' });
     }
 
-    if (offer.listingId.sellerId.toString() !== req.user.id) {
-      return res.status(403).json({ error: 'Not authorized' });
+    // Check if user is the seller of the listing
+    if (offer.listingId.sellerId.toString() !== userId) {
+      return res.status(403).json({ error: 'Not authorized to reject this offer' });
     }
 
     if (offer.status !== 'pending') {
@@ -256,7 +280,6 @@ router.put("/reject-offer/:id", async (req, res) => {
     }
 
     offer.status = 'rejected';
-    offer.updatedAt = new Date();
     await offer.save();
 
     res.status(200).json({ 
@@ -269,17 +292,24 @@ router.put("/reject-offer/:id", async (req, res) => {
   }
 });
 
-// Cancel offer (buyer)
-router.put("/cancel-offer/:id", async (req, res) => {
+// Cancel offer (buyer) - Add authentication middleware
+router.put("/cancel-offer/:id", authenticateMiddleware, async (req, res) => {
   try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     const offer = await Offer.findById(req.params.id);
     
     if (!offer) {
       return res.status(404).json({ error: 'Offer not found' });
     }
 
-    if (offer.buyerId.toString() !== req.user.id) {
-      return res.status(403).json({ error: 'Not authorized' });
+    // Check if user is the buyer who made the offer
+    if (offer.buyerId.toString() !== userId) {
+      return res.status(403).json({ error: 'Not authorized to cancel this offer' });
     }
 
     if (offer.status !== 'pending') {
@@ -287,7 +317,6 @@ router.put("/cancel-offer/:id", async (req, res) => {
     }
 
     offer.status = 'cancelled';
-    offer.updatedAt = new Date();
     await offer.save();
 
     res.status(200).json({ 
