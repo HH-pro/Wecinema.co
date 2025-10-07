@@ -44,46 +44,12 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
     }
   }, [token]);
 
-  // Token validation function
-  const validateToken = (token: string) => {
-    try {
-      const decoded = decodeToken(token);
-      const currentTime = Date.now() / 1000;
-      
-      console.log('🔐 Token validation:', {
-        expiresAt: decoded.exp,
-        currentTime,
-        isValid: decoded.exp > currentTime
-      });
-
-      return decoded.exp > currentTime;
-    } catch (error) {
-      console.error('❌ Token validation failed:', error);
-      return false;
-    }
-  };
-
   // Direct API function for making an offer using Axios
   const makeOffer = async (listingId: string, offerData: { amount: number; message: string }) => {
-    // Always get fresh token from localStorage
-    const freshToken = localStorage.getItem("token");
+    const token = localStorage.getItem("token");
     
-    console.log('🚀 Making offer request:', {
-      hasToken: !!freshToken,
-      listingId,
-      offerAmount: offerData.amount,
-      currentUser: currentUser
-    });
-
-    if (!freshToken) {
+    if (!token) {
       throw new Error('No authentication token found');
-    }
-
-    // Validate token before making request
-    if (!validateToken(freshToken)) {
-      localStorage.removeItem("token");
-      setCurrentUser(null);
-      throw new Error('Token expired, please login again');
     }
 
     try {
@@ -97,7 +63,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
         {
           headers: { 
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${freshToken}` 
+            Authorization: `Bearer ${token}` 
           },
           timeout: 10000,
         }
@@ -161,20 +127,11 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
   const handleMakeOfferClick = () => {
     console.log('🔐 Auth check:', {
       hasToken: !!token,
-      currentUser,
-      tokenValid: token ? validateToken(token) : false
+      currentUser
     });
 
     if (!token || !currentUser) {
       toast.error("Please login to make an offer");
-      return;
-    }
-
-    // Check if token is still valid
-    if (!validateToken(token)) {
-      toast.error("Your session has expired, please login again");
-      localStorage.removeItem("token");
-      setCurrentUser(null);
       return;
     }
 
@@ -296,7 +253,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
     }
   };
 
-  const isUserLoggedIn = token && currentUser && validateToken(token);
+  const isUserLoggedIn = token && currentUser;
   const userId = currentUser?.id || currentUser?._id;
   const sellerId = listing.sellerId?.id || listing.sellerId?._id || listing.sellerId;
   const isOwnListing = userId === sellerId;
