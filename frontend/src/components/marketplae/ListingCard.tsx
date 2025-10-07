@@ -538,5 +538,6 @@ const makeOffer = async (listingId: string, offerData: { amount: number; message
       )}
     </>
   );
+};
 
 export default ListingCard;
