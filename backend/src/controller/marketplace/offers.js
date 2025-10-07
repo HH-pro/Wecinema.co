@@ -14,7 +14,10 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => { // Make
     const { listingId, amount, message } = req.body;
 
     // Validate user authentication
-   
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     // Validate required fields
     if (!listingId || !amount) {
       return res.status(400).json({ error: 'Listing ID and amount are required' });
@@ -44,7 +47,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => { // Make
     // Check for existing pending offer from same user
     const existingOffer = await Offer.findOne({
       listingId,
-      buyerId: req.user._id,
+      buyerId: req.user.id,
       status: 'pending'
     });
 
@@ -53,7 +56,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => { // Make
     }
 
     const offer = new Offer({
-      buyerId: req.user._id,
+      buyerId: req.user.id,
       listingId,
       amount: offerAmount,
       message: message || ''
