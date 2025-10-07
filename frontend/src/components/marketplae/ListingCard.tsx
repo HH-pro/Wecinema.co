@@ -239,7 +239,7 @@ const makeOffer = async (listingId: string, offerData: { amount: number; message
           {firstMedia ? (
             <>
               {isVideo(firstMedia) ? (
-                <div className="relative w-full h-full">
+                <div className="relative w-full h-full cursor-pointer" onClick={() => setShowVideoModal(true)}>
                   <video
                     className="w-full h-full object-cover"
                     controls={false}
@@ -258,6 +258,13 @@ const makeOffer = async (listingId: string, offerData: { amount: number; message
                   <div className="absolute top-3 left-3 bg-black/80 text-white px-2 py-1 rounded-full flex items-center gap-1 text-xs font-medium backdrop-blur-sm">
                     <FiPlay size={10} />
                     <span>VIDEO</span>
+                  </div>
+
+                  {/* Click to Zoom Overlay */}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300 flex items-center justify-center">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white/90 rounded-full p-2 shadow-lg">
+                      <FiPlay className="text-gray-900" size={16} />
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -287,8 +294,8 @@ const makeOffer = async (listingId: string, offerData: { amount: number; message
             </div>
           )}
 
-          {/* Price Tag */}
-          <div className={`absolute bottom-3 left-3 bg-gradient-to-r ${getTypeColor(listing.type)} text-white px-3 py-2 rounded-xl font-bold text-lg shadow-lg backdrop-blur-sm`}>
+          {/* Price Tag - Red Color */}
+          <div className="absolute bottom-3 left-3 bg-red-600 text-white px-3 py-2 rounded-xl font-bold text-lg shadow-lg">
             {formatPrice(listing.price)}
           </div>
 
@@ -315,19 +322,19 @@ const makeOffer = async (listingId: string, offerData: { amount: number; message
         </div>
 
         {/* Content Section */}
-        <div className="p-5 bg-gradient-to-b from-white to-gray-50/50">
+        <div className="p-5">
           {/* Category and Type Badges */}
           <div className="flex items-center gap-2 mb-3">
-            <span className="bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm">
+            <span className="bg-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-full">
               {listing.category}
             </span>
-            <span className="bg-gradient-to-r from-purple-500 to-purple-600 text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm">
+            <span className="bg-purple-100 text-purple-700 text-xs font-semibold px-2.5 py-1 rounded-full">
               {getTypeLabel(listing.type)}
             </span>
           </div>
 
-          {/* Title with Enhanced Hover Effect */}
-          <h3 className="font-bold text-gray-900 text-xl mb-2 line-clamp-2 group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 group-hover:bg-clip-text transition-all duration-300 leading-tight">
+          {/* Title */}
+          <h3 className="font-bold text-gray-900 text-xl mb-2 line-clamp-2 leading-tight">
             {listing.title}
           </h3>
           
@@ -342,86 +349,92 @@ const makeOffer = async (listingId: string, offerData: { amount: number; message
               {listing.tags.slice(0, 4).map((tag, index) => (
                 <span 
                   key={index}
-                  className="inline-block bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 text-xs font-medium px-2.5 py-1 rounded-lg border border-gray-300/50 hover:from-gray-200 hover:to-gray-300 transition-all duration-200 cursor-pointer shadow-sm"
+                  className="inline-block bg-gray-100 text-gray-700 text-xs font-medium px-2.5 py-1 rounded-lg border border-gray-200"
                 >
                   #{tag}
                 </span>
               ))}
               {listing.tags.length > 4 && (
-                <span className="inline-block bg-gradient-to-r from-gray-100 to-gray-200 text-gray-500 text-xs font-medium px-2.5 py-1 rounded-lg border border-gray-300/50">
+                <span className="inline-block bg-gray-100 text-gray-500 text-xs font-medium px-2.5 py-1 rounded-lg border border-gray-200">
                   +{listing.tags.length - 4} more
                 </span>
               )}
             </div>
           )}
 
-          {/* Unified Action Button */}
-          <div className="space-y-3">
-            <button
-              onClick={() => onViewDetails(listing._id)}
-              className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white py-3 rounded-xl font-semibold text-sm transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 flex items-center justify-center gap-2 group/btn"
-            >
-              <span>View Details & Make Offer</span>
-              <FiTag className="group-hover/btn:scale-110 transition-transform duration-300" size={16} />
-            </button>
-
-            {/* Quick Action Buttons */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => onViewDetails(listing._id)}
-                className="flex-1 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 py-2.5 rounded-lg font-semibold text-sm hover:from-gray-200 hover:to-gray-300 transition-all duration-200 border border-gray-300/50 flex items-center justify-center gap-2 shadow-sm"
-              >
-                <span>Quick View</span>
-              </button>
-              <button
-                onClick={handleMakeOfferClick}
-                disabled={listing.status !== 'active' || !isUserLoggedIn || isOwnListing}
-                className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white py-2.5 rounded-lg font-semibold text-sm transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 disabled:hover:from-green-500 disabled:hover:to-emerald-600"
-              >
-                <FiTag size={14} />
-                <span>Offer</span>
-              </button>
-            </div>
-          </div>
+          {/* Single Make Offer Button - Yellow */}
+          <button
+            onClick={handleMakeOfferClick}
+            disabled={listing.status !== 'active' || !isUserLoggedIn || isOwnListing}
+            className="w-full bg-yellow-500 hover:bg-yellow-600 text-white py-3 rounded-xl font-semibold text-sm transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:bg-yellow-500 flex items-center justify-center gap-2"
+          >
+            <FiTag size={16} />
+            <span>Make Offer</span>
+          </button>
 
           {/* Status Messages */}
           <div className="mt-3 space-y-1">
             {listing.status !== 'active' && (
               <div className="text-center">
-                <span className="text-xs font-medium bg-gradient-to-r from-red-500 to-red-600 text-white px-3 py-1.5 rounded-full">
-                  {listing.status === 'sold' ? '🚫 Sold Out' : '⏸️ Not Available'}
+                <span className="text-xs font-medium text-red-600">
+                  {listing.status === 'sold' ? 'Sold Out' : 'Not Available for Offers'}
                 </span>
               </div>
             )}
             
             {isOwnListing && (
               <div className="text-center">
-                <span className="text-xs font-medium bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-1.5 rounded-full">
-                  👤 Your Listing
+                <span className="text-xs font-medium text-blue-600">
+                  Your Listing
                 </span>
               </div>
             )}
             
             {!isUserLoggedIn && (
               <div className="text-center">
-                <span className="text-xs font-medium bg-gradient-to-r from-orange-500 to-orange-600 text-white px-3 py-1.5 rounded-full">
-                  🔐 Login to Make Offers
+                <span className="text-xs font-medium text-blue-600">
+                  Login to make offers
                 </span>
               </div>
             )}
           </div>
         </div>
-
-        {/* Enhanced Hover Border Effect */}
-        <div className="absolute inset-0 rounded-2xl border-2 border-transparent group-hover:border-blue-500/20 transition-all duration-300 pointer-events-none" />
       </div>
+
+      {/* Video Zoom Modal */}
+      {showVideoModal && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="relative w-full max-w-4xl max-h-[90vh] bg-black rounded-2xl overflow-hidden">
+            <button
+              onClick={() => setShowVideoModal(false)}
+              className="absolute top-4 right-4 z-10 text-white hover:text-gray-300 transition-colors duration-200 bg-black/50 rounded-full p-2"
+            >
+              <FiX size={24} />
+            </button>
+            
+            <video
+              className="w-full h-full max-h-[80vh] object-contain"
+              controls
+              autoPlay
+              muted={false}
+            >
+              <source src={firstMedia} type="video/mp4" />
+              Your browser does not support the video tag.
+            </video>
+            
+            <div className="absolute bottom-4 left-4 right-4 text-white text-sm opacity-75">
+              Click anywhere outside or press ESC to close
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Make Offer Modal */}
       {showOfferModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-2xl w-full max-w-md transform transition-all duration-300 scale-100 animate-slideUp shadow-2xl border border-gray-300/50">
+          <div className="bg-white rounded-2xl w-full max-w-md transform transition-all duration-300 scale-100 animate-slideUp shadow-2xl border border-gray-300">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white rounded-t-2xl">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-900">Make an Offer</h2>
               <button
                 onClick={closeModal}
@@ -433,27 +446,27 @@ const makeOffer = async (listingId: string, offerData: { amount: number; message
             </div>
 
             {/* Listing Info */}
-            <div className="p-6 border-b border-gray-200 bg-white">
+            <div className="p-6 border-b border-gray-200">
               <h3 className="font-semibold text-gray-900 mb-2 text-lg">{listing.title}</h3>
-              <div className="flex justify-between items-center bg-gradient-to-r from-blue-50 to-purple-50 p-3 rounded-lg">
+              <div className="flex justify-between items-center bg-red-50 p-3 rounded-lg">
                 <p className="text-gray-600 text-sm font-medium">Listed Price:</p>
-                <p className="text-lg font-bold text-gray-900 bg-white px-3 py-1 rounded-lg shadow-sm">
+                <p className="text-lg font-bold text-red-600 bg-white px-3 py-1 rounded-lg shadow-sm">
                   {formatPrice(listing.price)}
                 </p>
               </div>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleOfferSubmit} className="p-6 bg-white rounded-b-2xl">
+            <form onSubmit={handleOfferSubmit} className="p-6">
               {offerError && (
-                <div className="mb-4 p-3 bg-gradient-to-r from-red-50 to-red-100 border border-red-200 rounded-lg text-red-700 text-sm flex items-center gap-2 animate-shake">
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center gap-2">
                   <FiX className="flex-shrink-0" />
                   <span>{offerError}</span>
                 </div>
               )}
 
               {offerSuccess && (
-                <div className="mb-4 p-3 bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-lg text-green-700 text-sm flex items-center gap-2">
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm flex items-center gap-2">
                   <FiCheck className="flex-shrink-0" />
                   <span>Offer submitted successfully!</span>
                 </div>
@@ -475,7 +488,7 @@ const makeOffer = async (listingId: string, offerData: { amount: number; message
                     max={listing.price * 3}
                     value={offerData.amount}
                     onChange={(e) => handleInputChange('amount', e.target.value)}
-                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 bg-white shadow-sm transition-all duration-200"
+                    className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 disabled:opacity-50 bg-white shadow-sm"
                     placeholder="Enter your offer amount"
                     required
                     disabled={isSubmitting || offerSuccess}
@@ -496,7 +509,7 @@ const makeOffer = async (listingId: string, offerData: { amount: number; message
                   value={offerData.message}
                   onChange={(e) => handleInputChange('message', e.target.value)}
                   rows={3}
-                  className="block w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none disabled:opacity-50 bg-white shadow-sm transition-all duration-200"
+                  className="block w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 resize-none disabled:opacity-50 bg-white shadow-sm"
                   placeholder="Tell the seller why you're interested..."
                   disabled={isSubmitting || offerSuccess}
                 />
@@ -508,14 +521,14 @@ const makeOffer = async (listingId: string, offerData: { amount: number; message
                   type="button"
                   onClick={closeModal}
                   disabled={isSubmitting}
-                  className="flex-1 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 py-3 rounded-lg font-semibold hover:from-gray-200 hover:to-gray-300 transition-all duration-200 disabled:opacity-50 shadow-sm"
+                  className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-200 transition-colors duration-200 disabled:opacity-50"
                 >
                   {offerSuccess ? 'Close' : 'Cancel'}
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting || offerSuccess}
-                  className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white py-3 rounded-lg font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:hover:translate-y-0"
+                  className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white py-3 rounded-lg font-semibold transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? (
                     <>
@@ -538,6 +551,6 @@ const makeOffer = async (listingId: string, offerData: { amount: number; message
       )}
     </>
   );
-};
+};s
 
 export default ListingCard;
