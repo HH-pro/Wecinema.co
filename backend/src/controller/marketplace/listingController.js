@@ -74,23 +74,52 @@ router.post("/create-listing", async (req, res) => {
 
 // ===================================================
 // ✅ DELETE LISTING
-// ===================================================
-router.delete("/listing/:id",  async (req, res) => {
+router.delete("/listing/:id", authenticateMiddleware, async (req, res) => {
   try {
+    console.log("=== DELETE LISTING REQUEST ===");
+    console.log("Listing ID to delete:", req.params.id);
+    console.log("User making request:", req.user);
+
+    // Extract user ID from multiple possible fields
+    const userId = req.user.id || req.user._id || req.user.userId;
+    
+    if (!userId) {
+      console.log("❌ No user ID found in request");
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
     const listing = await MarketplaceListing.findOneAndDelete({
       _id: req.params.id,
-      sellerId: req.user._id,
+      sellerId: userId, // Use the extracted userId
     });
 
     if (!listing) {
-      return res.status(404).json({ error: "Listing not found" });
+      console.log("❌ Listing not found or user not authorized:", {
+        listingId: req.params.id,
+        userId: userId
+      });
+      return res.status(404).json({ 
+        error: "Listing not found or you don't have permission to delete this listing" 
+      });
     }
 
-    res.status(200).json({ message: "Listing deleted successfully", listing });
+    console.log("✅ Listing deleted successfully:", listing._id);
+    res.status(200).json({ 
+      message: "Listing deleted successfully", 
+      listing: {
+        _id: listing._id,
+        title: listing.title,
+        status: listing.status
+      }
+    });
   } catch (error) {
     console.error("❌ Error deleting listing:", error);
+    
+    if (error.name === 'CastError') {
+      return res.status(400).json({ error: "Invalid listing ID format" });
+    }
+    
     res.status(500).json({ error: "Failed to delete listing" });
   }
 });
-
 module.exports = router;
