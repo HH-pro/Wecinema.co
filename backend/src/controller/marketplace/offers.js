@@ -5,7 +5,7 @@ const Listing = require("../../models/marketplace/listing");
 const Order = require("../../models/marketplace/order");
 
 // backend/src/controller/marketplace/offers.js
-router.post("/make-offer", auth, async (req, res) => { // Make sure auth middleware is added
+router.post("/make-offer",  async (req, res) => { // Make sure auth middleware is added
   try {
     console.log("Received offer request body:", req.body);
     console.log("User from request:", req.user); // Debug log
