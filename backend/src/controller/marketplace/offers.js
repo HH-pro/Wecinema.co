@@ -3,9 +3,10 @@ const router = express.Router();
 const Offer = require("../../models/marketplace/offer");
 const Listing = require("../../models/marketplace/listing");
 const Order = require("../../models/marketplace/order");
+const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils");
 
 // backend/src/controller/marketplace/offers.js
-router.post("/make-offer",  async (req, res) => { // Make sure auth middleware is added
+router.post("/make-offer", authenticateMiddleware, async (req, res) => { // Make sure auth middleware is added
   try {
     console.log("Received offer request body:", req.body);
     console.log("User from request:", req.user); // Debug log
