@@ -3,38 +3,67 @@ const Mongoose = require("mongoose");
 const Listing = require("../../backend/src/models/marketplace/listing");
 const User = require("../../backend/src/models/user"); // 🆕 ADD THIS
 
-// ✅ Authenticate Middleware (basic token validation)
+// Updated authenticateMiddleware - make sure this is what you're using
 const authenticateMiddleware = (req, res, next) => {
-	let token = req.headers.authorization;
-	token = token?.split(" ")[1];
+  let token = req.headers.authorization;
+  
+  console.log("🔐 Auth Middleware - Raw authorization header:", req.headers.authorization);
+  
+  token = token?.split(" ")[1];
 
-	if (!token) {
-		return res.status(401).json({ error: "Unauthorized: No token provided" });
-	}
+  if (!token) {
+    console.log("❌ No token provided in headers");
+    return res.status(401).json({ error: "Unauthorized: No token provided" });
+  }
 
-	const SECRET_KEY = process.env.JWT_SECRET || "weloremcium.secret_key"; // use env if available
+  const SECRET_KEY = process.env.JWT_SECRET || "weloremcium.secret_key";
 
-	// Verify the token
-	jwt.verify(token, SECRET_KEY, (err, decoded) => {
-		if (err) {
-			console.log(err);
-			return res.status(401).json({ error: "Unauthorized: Invalid token" });
-		}
+  // Verify the token
+  jwt.verify(token, SECRET_KEY, (err, decoded) => {
+    if (err) {
+      console.log("❌ JWT verification error:", err);
+      return res.status(401).json({ error: "Unauthorized: Invalid token" });
+    }
 
-		// Check if the token has expired
-		const currentTimestamp = Math.floor(Date.now() / 1000);
-		if (decoded.exp < currentTimestamp) {
-			return res.status(401).json({ error: "Unauthorized: Token has expired" });
-		}
+    // Check if the token has expired
+    const currentTimestamp = Math.floor(Date.now() / 1000);
+    if (decoded.exp < currentTimestamp) {
+      console.log("❌ Token expired");
+      return res.status(401).json({ error: "Unauthorized: Token has expired" });
+    }
 
-		// Attach the user information to the request object for further use
-		req.user = { id: decoded.id, email: decoded.email, role: decoded.role };
+    console.log("✅ JWT decoded successfully. Full payload:", decoded);
 
-		// Continue to the next middleware or route handler
-		next();
-	});
+    // Extract user information from decoded token - try multiple field names
+    const userId = decoded.id || decoded._id || decoded.userId || decoded.sub;
+    const userEmail = decoded.email;
+    const userRole = decoded.role;
+
+    console.log("🔍 Extracted from token - userId:", userId, "email:", userEmail, "role:", userRole);
+
+    if (!userId) {
+      console.log("❌ No user ID found in token payload. Available fields:", Object.keys(decoded));
+      return res.status(401).json({ 
+        error: "Unauthorized: Invalid token payload",
+        details: "User ID not found in token" 
+      });
+    }
+
+    // Attach the user information to the request object
+    req.user = { 
+      id: userId.toString(), // Ensure it's a string
+      email: userEmail, 
+      role: userRole,
+      // Include the full decoded payload for debugging
+      _fullPayload: decoded
+    };
+
+    console.log("✅ Setting req.user:", req.user);
+
+    // Continue to the next middleware or route handler
+    next();
+  });
 };
-
 // ✅ Alternative Protect Middleware (simpler version)
 const protect = (req, res, next) => {
 	const auth = req.headers.authorization;
