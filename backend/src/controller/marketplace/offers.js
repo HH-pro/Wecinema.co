@@ -44,7 +44,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => { // Make
     // Check for existing pending offer from same user
     const existingOffer = await Offer.findOne({
       listingId,
-      buyerId: req.user.id,
+      buyerId: req.user._id,
       status: 'pending'
     });
 
@@ -53,7 +53,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => { // Make
     }
 
     const offer = new Offer({
-      buyerId: req.user.id,
+      buyerId: req.user._id,
       listingId,
       amount: offerAmount,
       message: message || ''
