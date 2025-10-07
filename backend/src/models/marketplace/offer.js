@@ -1,3 +1,4 @@
+// models/marketplace/offer.js
 const mongoose = require('mongoose');
 
 const offerSchema = new mongoose.Schema({
@@ -8,7 +9,7 @@ const offerSchema = new mongoose.Schema({
   },
   listingId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Listing',
+    ref: 'MarketplaceListing', // CHANGED FROM 'Listing' to 'MarketplaceListing'
     required: true
   },
   amount: {
@@ -22,7 +23,7 @@ const offerSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'accepted', 'rejected', 'countered'],
+    enum: ['pending', 'accepted', 'rejected', 'countered', 'cancelled'],
     default: 'pending'
   }
 }, {
