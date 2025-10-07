@@ -147,7 +147,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
 // Get offers received (seller)
 router.get("/received-offers", async (req, res) => {
   try {
-    const myListings = await Listing.find({ sellerId: req.user.id });
+    const myListings = await MarketplaceListing.find({ sellerId: req.user.id });
     const listingIds = myListings.map(listing => listing._id);
     
     const offers = await Offer.find({ listingId: { $in: listingIds } })
