@@ -4,12 +4,18 @@ const Offer = require("../../models/marketplace/offer");
 const Listing = require("../../models/marketplace/listing");
 const Order = require("../../models/marketplace/order");
 
-// Make an offer
-router.post("/make-offer", async (req, res) => {
+// backend/src/controller/marketplace/offers.js
+router.post("/make-offer", auth, async (req, res) => { // Make sure auth middleware is added
   try {
     console.log("Received offer request body:", req.body);
+    console.log("User from request:", req.user); // Debug log
     
     const { listingId, amount, message } = req.body;
+
+    // Validate user authentication
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
 
     // Validate required fields
     if (!listingId || !amount) {
