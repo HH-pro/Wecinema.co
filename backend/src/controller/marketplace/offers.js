@@ -6,7 +6,7 @@ const Order = require("../../models/marketplace/order");
 const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils");
 
 // backend/src/controller/marketplace/offers.js
-router.post("/make-offer", authenticateMiddleware, async (req, res) => { // Make sure auth middleware is added
+router.post("/make-offer", authenticateMiddleware, async (req, res) => {
   try {
     console.log("Received offer request body:", req.body);
     console.log("User from request:", req.user); // Debug log
@@ -14,7 +14,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => { // Make
     const { listingId, amount, message } = req.body;
 
     // Validate user authentication
-    if (!req.user || !req.user._id) {
+    if (!req.user || !req.user.id) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
@@ -39,7 +39,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => { // Make
       return res.status(400).json({ error: 'Listing is not available for offers' });
     }
 
-    // Check if user is not the seller
+    // Check if user is not the seller - use req.user.id
     if (listing.sellerId.toString() === req.user.id) {
       return res.status(400).json({ error: 'Cannot make offer on your own listing' });
     }
@@ -47,7 +47,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => { // Make
     // Check for existing pending offer from same user
     const existingOffer = await Offer.findOne({
       listingId,
-      buyerId: req.user.id,
+      buyerId: req.user.id, // Use req.user.id
       status: 'pending'
     });
 
@@ -56,7 +56,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => { // Make
     }
 
     const offer = new Offer({
-      buyerId: req.user.id,
+      buyerId: req.user.id, // Use req.user.id
       listingId,
       amount: offerAmount,
       message: message || ''
@@ -78,7 +78,6 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => { // Make
     res.status(500).json({ error: 'Failed to make offer' });
   }
 });
-
 // Get offers received (seller)
 router.get("/received-offers", async (req, res) => {
   try {
