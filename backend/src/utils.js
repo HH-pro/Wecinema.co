@@ -3,36 +3,42 @@ const Mongoose = require("mongoose");
 const Listing = require("../../backend/src/models/marketplace/listing");
 const User = require("../../backend/src/models/user"); // 🆕 ADD THIS
 
-// ✅ Authenticate Middleware (basic token validation)
-const authenticateMiddleware = (req, res, next) => {
-	let token = req.headers.authorization;
-	token = token?.split(" ")[1];
+// ✅ Authenticate Middleware (with user lookup)
+const authenticateMiddleware = async (req, res, next) => {
+  let token = req.headers.authorization;
+  token = token?.split(" ")[1];
 
-	if (!token) {
-		return res.status(401).json({ error: "Unauthorized: No token provided" });
-	}
+  if (!token) {
+    return res.status(401).json({ error: "Unauthorized: No token provided" });
+  }
 
-	const SECRET_KEY = process.env.JWT_SECRET || "weloremcium.secret_key"; // use env if available
+  const SECRET_KEY = process.env.JWT_SECRET || "weloremcium.secret_key";
 
-	// Verify the token
-	jwt.verify(token, SECRET_KEY, (err, decoded) => {
-		if (err) {
-			console.log(err);
-			return res.status(401).json({ error: "Unauthorized: Invalid token" });
-		}
+  try {
+    // Verify the token
+    const decoded = jwt.verify(token, SECRET_KEY);
+    
+    // Check if the token has expired
+    const currentTimestamp = Math.floor(Date.now() / 1000);
+    if (decoded.exp < currentTimestamp) {
+      return res.status(401).json({ error: "Unauthorized: Token has expired" });
+    }
 
-		// Check if the token has expired
-		const currentTimestamp = Math.floor(Date.now() / 1000);
-		if (decoded.exp < currentTimestamp) {
-			return res.status(401).json({ error: "Unauthorized: Token has expired" });
-		}
+    // Fetch the complete user from database
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(401).json({ error: "Unauthorized: User not found" });
+    }
 
-		// Attach the user information to the request object for further use
-		req.user = { id: decoded.id, email: decoded.email, role: decoded.role };
+    // Attach the full user object to the request
+    req.user = user;
 
-		// Continue to the next middleware or route handler
-		next();
-	});
+    // Continue to the next middleware or route handler
+    next();
+  } catch (err) {
+    console.log(err);
+    return res.status(401).json({ error: "Unauthorized: Invalid token" });
+  }
 };
 
 // ✅ Alternative Protect Middleware (simpler version)
