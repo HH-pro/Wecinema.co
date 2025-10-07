@@ -41,15 +41,23 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
   }, [token]);
 
   // Direct API function for making an offer using Axios
-  const makeOffer = async (listingId: string, offerData: { amount: number; message: string }) => {
-    const token = localStorage.getItem("token");
-    
-    if (!token) {
-      throw new Error('No authentication token found');
-    }
+  // Direct API function for making an offer using Axios
+const makeOffer = async (listingId: string, offerData: { amount: number; message: string }) => {
+  const token = localStorage.getItem("token");
+  
+  console.log('🚀 Making offer with:', {
+    token: token ? `${token.substring(0, 20)}...` : 'No token',
+    listingId,
+    offerData
+  });
 
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  try {
     const response = await axios.post(
-      "http://localhost:3000/marketplace/offers/make-offer", // Updated endpoint
+      "http://localhost:3000/marketplace/offers/make-offer",
       {
         listingId,
         amount: offerData.amount,
@@ -63,9 +71,17 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
       }
     );
 
+    console.log('✅ Offer successful:', response.data);
     return response.data;
-  };
-
+  } catch (error: any) {
+    console.error('❌ Offer failed:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
+    });
+    throw error;
+  }
+};
   // Check if media is video or image
   const isVideo = (url: string) => {
     return url?.match(/\.(mp4|mov|avi|wmv|flv|webm|mkv)$/i);
@@ -110,20 +126,28 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
   };
 
  const handleMakeOfferClick = () => {
+  console.log('🔐 Auth Debug:', {
+    hasToken: !!token,
+    token: token ? `${token.substring(0, 20)}...` : 'No token',
+    currentUser: currentUser,
+    localStorageToken: localStorage.getItem("token")
+  });
+
   if (!token || !currentUser) {
     toast.error("Please login to make an offer");
     return;
   }
   
-  // Check if user is the seller - use id (from JWT token) consistently
-  const userId = currentUser.id; // Your JWT token uses 'id'
+  // Check if user is the seller
+  const userId = currentUser.id;
   const sellerId = listing.sellerId?.id || listing.sellerId?._id || listing.sellerId;
   
-  console.log('User ID:', userId);
-  console.log('Seller ID:', sellerId);
-  console.log('Current User:', currentUser);
-  console.log('Listing Seller:', listing.sellerId);
-  
+  console.log('👤 User Comparison:', {
+    userId,
+    sellerId,
+    isOwnListing: userId === sellerId
+  });
+
   if (userId === sellerId) {
     toast.error("You cannot make an offer on your own listing");
     return;
@@ -132,13 +156,11 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
   setShowOfferModal(true);
   setOfferError('');
   setOfferSuccess(false);
-  // Pre-fill with 80% of listing price as suggested offer
   setOfferData({
     amount: (listing.price * 0.8).toFixed(2),
     message: ''
   });
 };
-
   const handleOfferSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setOfferError('');
