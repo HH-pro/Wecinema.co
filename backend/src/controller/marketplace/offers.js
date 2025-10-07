@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const Offer = require("../../models/marketplace/offer");
-const Listing = require("../../models/marketplace/listing");
+const MarketplaceListing = require("../../models/marketplace/listing");
 const Order = require("../../models/marketplace/order");
 const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils");
 
