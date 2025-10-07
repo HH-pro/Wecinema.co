@@ -109,30 +109,35 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
     setImageLoaded(true);
   };
 
-  const handleMakeOfferClick = () => {
-    if (!token || !currentUser) {
-      toast.error("Please login to make an offer");
-      return;
-    }
-    
-    // Check if user is the seller
-    const userId = currentUser.id || currentUser._id;
-    const sellerId = listing.sellerId?._id || listing.sellerId;
-    
-    if (userId === sellerId) {
-      toast.error("You cannot make an offer on your own listing");
-      return;
-    }
+ const handleMakeOfferClick = () => {
+  if (!token || !currentUser) {
+    toast.error("Please login to make an offer");
+    return;
+  }
+  
+  // Check if user is the seller - use id (from JWT token) consistently
+  const userId = currentUser.id; // Your JWT token uses 'id'
+  const sellerId = listing.sellerId?.id || listing.sellerId?._id || listing.sellerId;
+  
+  console.log('User ID:', userId);
+  console.log('Seller ID:', sellerId);
+  console.log('Current User:', currentUser);
+  console.log('Listing Seller:', listing.sellerId);
+  
+  if (userId === sellerId) {
+    toast.error("You cannot make an offer on your own listing");
+    return;
+  }
 
-    setShowOfferModal(true);
-    setOfferError('');
-    setOfferSuccess(false);
-    // Pre-fill with 80% of listing price as suggested offer
-    setOfferData({
-      amount: (listing.price * 0.8).toFixed(2),
-      message: ''
-    });
-  };
+  setShowOfferModal(true);
+  setOfferError('');
+  setOfferSuccess(false);
+  // Pre-fill with 80% of listing price as suggested offer
+  setOfferData({
+    amount: (listing.price * 0.8).toFixed(2),
+    message: ''
+  });
+};
 
   const handleOfferSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
