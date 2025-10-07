@@ -75,7 +75,7 @@ router.post("/create-listing", async (req, res) => {
 // ===================================================
 // ✅ DELETE LISTING
 // ===================================================
-router.delete("/listing/:id", protect, isHypeModeUser, isSeller, async (req, res) => {
+router.delete("/listing/:id",  async (req, res) => {
   try {
     const listing = await MarketplaceListing.findOneAndDelete({
       _id: req.params.id,
