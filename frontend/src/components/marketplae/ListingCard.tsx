@@ -28,60 +28,100 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
   // Get token and decode user info
   const token = localStorage.getItem("token") || null;
   
+  // Token validation function
+  const validateToken = (token: string) => {
+    try {
+      const decoded = decodeToken(token);
+      const currentTime = Date.now() / 1000;
+      
+      console.log('🔍 Token validation:', {
+        decoded,
+        isExpired: decoded.exp < currentTime,
+        currentTime,
+        tokenExp: decoded.exp
+      });
+
+      return decoded.exp > currentTime;
+    } catch (error) {
+      console.error('❌ Token validation failed:', error);
+      return false;
+    }
+  };
+
   useEffect(() => {
     if (token) {
       try {
+        // Check if token is valid
+        if (!validateToken(token)) {
+          console.log('🔄 Token expired, removing...');
+          localStorage.removeItem("token");
+          setCurrentUser(null);
+          return;
+        }
+
         const decodedUser = decodeToken(token);
+        console.log('✅ Token decoded successfully:', decodedUser);
         setCurrentUser(decodedUser);
       } catch (error) {
         console.error('Error decoding token:', error);
         localStorage.removeItem("token");
+        setCurrentUser(null);
       }
     }
   }, [token]);
 
   // Direct API function for making an offer using Axios
-  // Direct API function for making an offer using Axios
-const makeOffer = async (listingId: string, offerData: { amount: number; message: string }) => {
-  const token = localStorage.getItem("token");
-  
-  console.log('🚀 Making offer with:', {
-    token: token ? `${token.substring(0, 20)}...` : 'No token',
-    listingId,
-    offerData
-  });
-
-  if (!token) {
-    throw new Error('No authentication token found');
-  }
-
-  try {
-    const response = await axios.post(
-      "http://localhost:3000/marketplace/offers/make-offer",
-      {
-        listingId,
-        amount: offerData.amount,
-        message: offerData.message
-      },
-      {
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-      }
-    );
-
-    console.log('✅ Offer successful:', response.data);
-    return response.data;
-  } catch (error: any) {
-    console.error('❌ Offer failed:', {
-      status: error.response?.status,
-      data: error.response?.data,
-      message: error.message
+  const makeOffer = async (listingId: string, offerData: { amount: number; message: string }) => {
+    // Always get fresh token from localStorage
+    const freshToken = localStorage.getItem("token");
+    
+    console.log('🔐 Making offer with fresh token:', {
+      hasToken: !!freshToken,
+      token: freshToken ? `${freshToken.substring(0, 20)}...` : 'No token',
+      listingId,
+      offerData
     });
-    throw error;
-  }
-};
+
+    if (!freshToken) {
+      throw new Error('No authentication token found');
+    }
+
+    // Validate token before making request
+    if (!validateToken(freshToken)) {
+      localStorage.removeItem("token");
+      throw new Error('Token expired, please login again');
+    }
+
+    try {
+      const response = await axios.post(
+        "http://localhost:3000/marketplace/offers/make-offer",
+        {
+          listingId,
+          amount: offerData.amount,
+          message: offerData.message
+        },
+        {
+          headers: { 
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${freshToken}` 
+          },
+          timeout: 10000, // 10 second timeout
+        }
+      );
+
+      console.log('✅ Offer successful:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Offer failed:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+        headers: error.config?.headers
+      });
+      throw error;
+    }
+  };
+
   // Check if media is video or image
   const isVideo = (url: string) => {
     return url?.match(/\.(mp4|mov|avi|wmv|flv|webm|mkv)$/i);
@@ -125,42 +165,54 @@ const makeOffer = async (listingId: string, offerData: { amount: number; message
     setImageLoaded(true);
   };
 
- const handleMakeOfferClick = () => {
-  console.log('🔐 Auth Debug:', {
-    hasToken: !!token,
-    token: token ? `${token.substring(0, 20)}...` : 'No token',
-    currentUser: currentUser,
-    localStorageToken: localStorage.getItem("token")
-  });
+  const handleMakeOfferClick = () => {
+    console.log('🔐 Auth Debug:', {
+      hasToken: !!token,
+      token: token ? `${token.substring(0, 20)}...` : 'No token',
+      currentUser: currentUser,
+      localStorageToken: localStorage.getItem("token"),
+      tokenValid: token ? validateToken(token) : false
+    });
 
-  if (!token || !currentUser) {
-    toast.error("Please login to make an offer");
-    return;
-  }
-  
-  // Check if user is the seller
-  const userId = currentUser.id;
-  const sellerId = listing.sellerId?.id || listing.sellerId?._id || listing.sellerId;
-  
-  console.log('👤 User Comparison:', {
-    userId,
-    sellerId,
-    isOwnListing: userId === sellerId
-  });
+    if (!token || !currentUser) {
+      toast.error("Please login to make an offer");
+      return;
+    }
 
-  if (userId === sellerId) {
-    toast.error("You cannot make an offer on your own listing");
-    return;
-  }
+    // Check if token is still valid
+    if (!validateToken(token)) {
+      toast.error("Your session has expired, please login again");
+      localStorage.removeItem("token");
+      setCurrentUser(null);
+      return;
+    }
+    
+    // Check if user is the seller - use id consistently
+    const userId = currentUser.id;
+    const sellerId = listing.sellerId?.id || listing.sellerId?._id || listing.sellerId;
+    
+    console.log('👤 User Comparison:', {
+      userId,
+      sellerId,
+      isOwnListing: userId === sellerId,
+      sellerInfo: listing.sellerId
+    });
 
-  setShowOfferModal(true);
-  setOfferError('');
-  setOfferSuccess(false);
-  setOfferData({
-    amount: (listing.price * 0.8).toFixed(2),
-    message: ''
-  });
-};
+    if (userId === sellerId) {
+      toast.error("You cannot make an offer on your own listing");
+      return;
+    }
+
+    setShowOfferModal(true);
+    setOfferError('');
+    setOfferSuccess(false);
+    // Pre-fill with 80% of listing price as suggested offer
+    setOfferData({
+      amount: (listing.price * 0.8).toFixed(2),
+      message: ''
+    });
+  };
+
   const handleOfferSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setOfferError('');
@@ -201,9 +253,29 @@ const makeOffer = async (listingId: string, offerData: { amount: number; message
 
     } catch (error: any) {
       console.error('Failed to make offer:', error);
-      const errorMessage = error.response?.data?.error || error.message || 'Failed to submit offer. Please try again.';
-      setOfferError(errorMessage);
-      toast.error(errorMessage);
+      
+      // Handle specific authentication errors
+      if (error.response?.status === 401) {
+        const errorMessage = error.response?.data?.error || 'Authentication failed';
+        setOfferError(errorMessage);
+        toast.error('Please login again');
+        
+        // Clear invalid token and user data
+        localStorage.removeItem("token");
+        setCurrentUser(null);
+      } else if (error.code === 'ERR_NETWORK') {
+        const errorMessage = 'Network error. Please check your connection and try again.';
+        setOfferError(errorMessage);
+        toast.error(errorMessage);
+      } else if (error.response?.status === 500) {
+        const errorMessage = 'Server error. Please try again later.';
+        setOfferError(errorMessage);
+        toast.error(errorMessage);
+      } else {
+        const errorMessage = error.response?.data?.error || error.message || 'Failed to submit offer. Please try again.';
+        setOfferError(errorMessage);
+        toast.error(errorMessage);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -225,9 +297,9 @@ const makeOffer = async (listingId: string, offerData: { amount: number; message
     }
   };
 
-  const isUserLoggedIn = token && currentUser;
-  const userId = currentUser?.id || currentUser?._id;
-  const sellerId = listing.sellerId?._id || listing.sellerId;
+  const isUserLoggedIn = token && currentUser && validateToken(token);
+  const userId = currentUser?.id;
+  const sellerId = listing.sellerId?.id || listing.sellerId?._id || listing.sellerId;
   const isOwnListing = userId === sellerId;
 
   return (
