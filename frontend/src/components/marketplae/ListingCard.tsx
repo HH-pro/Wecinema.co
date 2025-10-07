@@ -13,6 +13,8 @@ interface ListingCardProps {
 
 const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOfferSuccess }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [offerError, setOfferError] = useState('');
