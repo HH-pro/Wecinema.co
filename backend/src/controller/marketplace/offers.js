@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const Offer = require("../../models/marketplace/offer");
+const offerSchema = require("../../models/marketplace/offer");
 const MarketplaceListing = require("../../models/marketplace/listing");
 const Order = require("../../models/marketplace/order");
 const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils");
@@ -150,7 +150,7 @@ router.get("/received-offers", async (req, res) => {
     const myListings = await MarketplaceListing.find({ sellerId: req.user.id });
     const listingIds = myListings.map(listing => listing._id);
     
-    const offers = await Offer.find({ listingId: { $in: listingIds } })
+    const offers = await offerSchema.find({ listingId: { $in: listingIds } })
       .populate('buyerId', 'username avatar email')
       .populate('listingId', 'title price images status')
       .sort({ createdAt: -1 });
@@ -165,7 +165,7 @@ router.get("/received-offers", async (req, res) => {
 // Get offers made (buyer)
 router.get("/my-offers", async (req, res) => {
   try {
-    const offers = await Offer.find({ buyerId: req.user.id })
+    const offers = await offerSchema.find({ buyerId: req.user.id })
       .populate('listingId', 'title price images status sellerId')
       .populate('listingId.sellerId', 'username avatar')
       .sort({ createdAt: -1 });
