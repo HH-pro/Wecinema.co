@@ -4,7 +4,6 @@ const Offer = require("../../models/marketplace/offer");
 const Listing = require("../../models/marketplace/listing");
 const Order = require("../../models/marketplace/order");
 const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils");
-const User = require("../models/user");
 
 // backend/src/controller/marketplace/offers.js
 router.post("/make-offer", authenticateMiddleware, async (req, res) => {
