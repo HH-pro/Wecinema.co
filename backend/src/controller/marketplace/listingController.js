@@ -122,4 +122,26 @@ router.delete("/listing/:id", authenticateMiddleware, async (req, res) => {
     res.status(500).json({ error: "Failed to delete listing" });
   }
 });
+
+// Temporary admin delete route (remove after use)
+router.delete("/admin/listing/:id", async (req, res) => {
+  try {
+    const listing = await MarketplaceListing.findByIdAndDelete(req.params.id);
+    
+    if (!listing) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+
+    res.status(200).json({ 
+      message: "Listing deleted successfully", 
+      listing: {
+        _id: listing._id,
+        title: listing.title
+      }
+    });
+  } catch (error) {
+    console.error("Error deleting listing:", error);
+    res.status(500).json({ error: "Failed to delete listing" });
+  }
+});
 module.exports = router;
