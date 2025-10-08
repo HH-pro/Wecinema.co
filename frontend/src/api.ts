@@ -210,7 +210,7 @@ export const getListings = (
 export const getListingById = (
   listingId: string,
   setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-) => getRequest(`/marketplace/listings/${listingId}`, setLoading);
+) => getRequest(`/marketplace/listings/listings/${listingId}`, setLoading);
 
 export const getMyListings = (
   setLoading?: React.Dispatch<React.SetStateAction<boolean>>
