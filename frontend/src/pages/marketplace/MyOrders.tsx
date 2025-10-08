@@ -29,7 +29,7 @@ const MyOrders: React.FC = () => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/marketplace/my-orders');
+      const response = await fetch('/marketplace/my-orders');
       const data = await response.json();
       setOrders(data);
     } catch (error) {
