@@ -36,6 +36,7 @@ interface Offer {
     avatar?: string;
   };
   listingId: {
+    _id: string;
     title: string;
     mediaUrls: string[];
     price: number;
@@ -68,32 +69,59 @@ const SellerDashboard: React.FC = () => {
     try {
       setLoading(true);
       
-      // Fetch seller orders
-      const ordersResponse = await fetch('marketplace/seller-orders');
+      // Fetch all data in parallel for better performance
+      const [ordersResponse, listingsResponse, offersResponse] = await Promise.all([
+        fetch('/api/marketplace/seller-orders', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }),
+        fetch('/api/marketplace/my-listings', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }),
+        fetch('/api/marketplace/seller-offers', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+      ]);
+
+      // Check if all responses are OK
+      if (!ordersResponse.ok || !listingsResponse.ok || !offersResponse.ok) {
+        throw new Error('Failed to fetch dashboard data');
+      }
+
+      // Parse JSON responses
       const ordersData = await ordersResponse.json();
-      setRecentOrders(ordersData.slice(0, 5));
-
-      // Fetch seller listings for stats
-      const listingsResponse = await fetch('/marketplace/listings/my-listings');
       const listingsData = await listingsResponse.json();
-
-      // Fetch offers
-      const offersResponse = await fetch('/marketplace/offers/my-offers');
       const offersData = await offersResponse.json();
-      setOffers(offersData);
+
+      // Handle different response structures
+      const orders = Array.isArray(ordersData) ? ordersData : ordersData.orders || ordersData.data || [];
+      const listings = Array.isArray(listingsData) ? listingsData : listingsData.listings || listingsData.data || [];
+      const allOffers = Array.isArray(offersData) ? offersData : offersData.offers || offersData.data || [];
+
+      // Set recent orders (last 5 orders)
+      setRecentOrders(orders.slice(0, 5));
+      setOffers(allOffers);
 
       // Calculate stats
-      const totalListings = listingsData.length;
-      const activeListings = listingsData.filter((l: any) => l.status === 'active').length;
-      const totalOrders = ordersData.length;
-      const pendingOrders = ordersData.filter((o: any) => 
-        ['pending_payment', 'paid', 'in_progress'].includes(o.status)
+      const totalListings = listings.length;
+      const activeListings = listings.filter((l: any) => l.status === 'active').length;
+      const totalOrders = orders.length;
+      const pendingOrders = orders.filter((o: any) => 
+        ['pending_payment', 'paid', 'in_progress', 'pending'].includes(o.status)
       ).length;
-      const totalRevenue = ordersData
-        .filter((o: any) => o.status === 'completed')
-        .reduce((sum: number, order: any) => sum + order.amount, 0);
+      const totalRevenue = orders
+        .filter((o: any) => o.status === 'completed' || o.status === 'delivered')
+        .reduce((sum: number, order: any) => sum + (order.amount || 0), 0);
       
-      const pendingOffers = offersData.filter((o: Offer) => o.status === 'pending').length;
+      const pendingOffers = allOffers.filter((o: Offer) => o.status === 'pending').length;
 
       setStats({
         totalListings,
@@ -106,6 +134,9 @@ const SellerDashboard: React.FC = () => {
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      // Set empty states on error
+      setRecentOrders([]);
+      setOffers([]);
     } finally {
       setLoading(false);
     }
@@ -114,11 +145,19 @@ const SellerDashboard: React.FC = () => {
   const handleViewOrderDetails = (orderId: string) => {
     // Navigate to order details
     console.log('View order:', orderId);
+    // You can implement navigation logic here
+    // window.location.href = `/orders/${orderId}`;
+  };
+
+  const handleViewListingDetails = (listingId: string) => {
+    // Navigate to listing details
+    console.log('View listing:', listingId);
+    // window.location.href = `/listings/${listingId}`;
   };
 
   const handleOfferAction = async (offerId: string, action: 'accept' | 'reject') => {
     try {
-      const response = await fetch(`/marketplace/offers/${offerId}`, {
+      const response = await fetch(`/api/marketplace/offers/${offerId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -131,9 +170,11 @@ const SellerDashboard: React.FC = () => {
         fetchDashboardData();
       } else {
         console.error('Failed to update offer');
+        alert('Failed to update offer. Please try again.');
       }
     } catch (error) {
       console.error('Error updating offer:', error);
+      alert('Error updating offer. Please try again.');
     }
   };
 
@@ -152,6 +193,25 @@ const SellerDashboard: React.FC = () => {
       style: 'currency',
       currency: 'USD',
     }).format(amount);
+  };
+
+  const getOrderStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+      case 'delivered':
+        return 'bg-green-100 text-green-800';
+      case 'pending':
+      case 'pending_payment':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'cancelled':
+      case 'rejected':
+        return 'bg-red-100 text-red-800';
+      case 'in_progress':
+      case 'shipped':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   };
 
   if (loading) {
@@ -342,21 +402,30 @@ const SellerDashboard: React.FC = () => {
                       <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
                     </div>
                     <div className="p-6 space-y-4">
-                      <button className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center">
+                      <button 
+                        onClick={() => window.location.href = '/create-listing'}
+                        className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center"
+                      >
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
                         Create New Listing
                       </button>
                       
-                      <button className="w-full bg-white hover:bg-gray-50 text-gray-700 font-medium py-3 px-4 rounded-lg border border-gray-300 transition duration-200 flex items-center justify-center">
+                      <button 
+                        onClick={() => window.location.href = '/orders'}
+                        className="w-full bg-white hover:bg-gray-50 text-gray-700 font-medium py-3 px-4 rounded-lg border border-gray-300 transition duration-200 flex items-center justify-center"
+                      >
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                         </svg>
                         View All Orders
                       </button>
                       
-                      <button className="w-full bg-white hover:bg-gray-50 text-gray-700 font-medium py-3 px-4 rounded-lg border border-gray-300 transition duration-200 flex items-center justify-center">
+                      <button 
+                        onClick={() => window.location.href = '/my-listings'}
+                        className="w-full bg-white hover:bg-gray-50 text-gray-700 font-medium py-3 px-4 rounded-lg border border-gray-300 transition duration-200 flex items-center justify-center"
+                      >
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                         </svg>
