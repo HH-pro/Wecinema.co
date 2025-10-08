@@ -204,7 +204,7 @@ export const getListings = (
   }
   
   const queryString = queryParams.toString();
-  return getRequest(`/marketplace/listings${queryString ? `?${queryString}` : ''}`, setLoading);
+  return getRequest(`/marketplace/listings/listings${queryString ? `?${queryString}` : ''}`, setLoading);
 };
 
 export const getListingById = (
