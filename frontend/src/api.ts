@@ -204,17 +204,17 @@ export const getListings = (
   }
   
   const queryString = queryParams.toString();
-  return getRequest(`/marketplace/listings/listings${queryString ? `?${queryString}` : ''}`, setLoading);
+  return getRequest(`/api/marketplace/listings${queryString ? `?${queryString}` : ''}`, setLoading);
 };
 
 export const getListingById = (
   listingId: string,
   setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-) => getRequest(`/marketplace/listings/listings${listingId}`, setLoading);
+) => getRequest(`/api/marketplace/listings/${listingId}`, setLoading);
 
 export const getMyListings = (
   setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-) => getRequest('/marketplace/listings/my-listings', setLoading);
+) => getRequest('/api/marketplace/my-listings', setLoading);
 
 export const createListing = (
   formData: FormData,
@@ -255,12 +255,12 @@ export const updateListing = (
   listingId: string,
   data: any,
   setLoading: React.Dispatch<React.SetStateAction<boolean>>
-) => putRequest(`/marketplace/listings/${listingId}`, data, setLoading, "Listing updated");
+) => putRequest(`/api/marketplace/listings/${listingId}`, data, setLoading, "Listing updated");
 
 export const deleteListing = (
   listingId: string,
   setLoading: React.Dispatch<React.SetStateAction<boolean>>
-) => deleteRequest(`/marketplace/listings/${listingId}`, setLoading, "Listing deleted");
+) => deleteRequest(`/api/marketplace/listings/${listingId}`, setLoading, "Listing deleted");
 
 // Offer APIs
 export const makeOffer = async (
@@ -299,7 +299,7 @@ export const makeOffer = async (
 
 export const getMyOffers = (
   setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-) => getRequest('/marketplace/offers/my-offers', setLoading);
+) => getRequest('/api/marketplace/offers/my-offers', setLoading);
 
 export const getReceivedOffers = (
   setLoading?: React.Dispatch<React.SetStateAction<boolean>>
