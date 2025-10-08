@@ -255,12 +255,12 @@ export const updateListing = (
   listingId: string,
   data: any,
   setLoading: React.Dispatch<React.SetStateAction<boolean>>
-) => putRequest(`/api/marketplace/listings/${listingId}`, data, setLoading, "Listing updated");
+) => putRequest(`/marketplace/listings/${listingId}`, data, setLoading, "Listing updated");
 
 export const deleteListing = (
   listingId: string,
   setLoading: React.Dispatch<React.SetStateAction<boolean>>
-) => deleteRequest(`/api/marketplace/listings/${listingId}`, setLoading, "Listing deleted");
+) => deleteRequest(`/marketplace/listings/${listingId}`, setLoading, "Listing deleted");
 
 // Offer APIs
 export const makeOffer = async (
