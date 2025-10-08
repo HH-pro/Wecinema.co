@@ -103,7 +103,7 @@ const SellerDashboard: React.FC = () => {
         // Fetch my listings using API function
         getMyListings(setLoading),
         // Fetch seller offers
-        fetch('/api/marketplace/offers/seller-offers', {
+        fetch('/marketplace/offers/seller-offers', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
