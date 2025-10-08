@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import OrderSummary from '../../components/marketplae/OrderSummary';
-import { getMyListings, createListing, updateListing, deleteListing } from '../../api/marketplace';
+import { getMyListings, createListing, updateListing, deleteListing } from '../../api';
 
 interface DashboardStats {
   totalListings: number;
