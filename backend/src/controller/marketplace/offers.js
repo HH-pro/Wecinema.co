@@ -5,7 +5,21 @@ const MarketplaceListing = require("../../models/marketplace/listing");
 const Order = require("../../models/marketplace/order");
 const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils");
 
-// Make Offer Route
+// Import EmailJS (server-side version)
+const emailjs = require('@emailjs/nodejs');
+
+// Configure EmailJS
+const EMAILJS_CONFIG = {
+  serviceId: process.env.EMAILJS_SERVICE_ID,
+  templateId: {
+    sellerNotification: process.env.EMAILJS_TEMPLATE_SELLER,
+    buyerConfirmation: process.env.EMAILJS_TEMPLATE_BUYER
+  },
+  publicKey: process.env.EMAILJS_PUBLIC_KEY,
+  privateKey: process.env.EMAILJS_PRIVATE_KEY
+};
+
+// Make Offer Route with EmailJS
 router.post("/make-offer", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== MAKE OFFER REQUEST ===");
@@ -23,10 +37,9 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
     // Extract user ID from multiple possible fields
     const userId = req.user.id || req.user._id || req.user.userId;
     console.log("Extracted user ID:", userId);
-    console.log("Available req.user fields:", Object.keys(req.user));
 
     if (!userId) {
-      console.log("❌ No user ID found in req.user. Full req.user:", JSON.stringify(req.user, null, 2));
+      console.log("❌ No user ID found in req.user");
       return res.status(401).json({ 
         error: 'Authentication required - invalid user data',
         details: 'User ID not found in token payload'
@@ -45,7 +58,9 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
     }
 
     console.log("🔍 Looking for listing:", listingId);
-    const listing = await MarketplaceListing.findById(listingId);
+    const listing = await MarketplaceListing.findById(listingId)
+      .populate('sellerId', 'username email firstName lastName');
+    
     if (!listing) {
       console.log("❌ Listing not found:", listingId);
       return res.status(404).json({ error: 'Listing not found' });
@@ -55,6 +70,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
       id: listing._id,
       title: listing.title,
       sellerId: listing.sellerId,
+      sellerEmail: listing.sellerId?.email,
       status: listing.status
     });
 
@@ -64,13 +80,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
     }
 
     // Check if user is not the seller
-    const sellerId = listing.sellerId.toString();
-    console.log("👤 User comparison:", {
-      userId: userId.toString(),
-      sellerId: sellerId,
-      isOwnListing: userId.toString() === sellerId
-    });
-
+    const sellerId = listing.sellerId._id.toString();
     if (userId.toString() === sellerId) {
       return res.status(400).json({ error: 'Cannot make offer on your own listing' });
     }
@@ -86,8 +96,15 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'You already have a pending offer for this listing' });
     }
 
+    // Get buyer details for email
+    const buyer = await User.findById(userId).select('username email firstName lastName');
+    if (!buyer) {
+      return res.status(404).json({ error: 'Buyer user not found' });
+    }
+
     console.log("✅ Creating new offer with data:", {
       buyerId: userId,
+      buyerEmail: buyer.email,
       listingId,
       amount: offerAmount,
       message: message || ''
@@ -103,14 +120,28 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
     await offer.save();
     
     // Populate the offer with buyer info for response
-    await offer.populate('buyerId', 'username avatar email');
-    await offer.populate('listingId', 'title price sellerId');
+    await offer.populate('buyerId', 'username avatar email firstName lastName');
+    await offer.populate('listingId', 'title price sellerId mediaUrls');
 
     console.log("✅ Offer created successfully:", {
       offerId: offer._id,
       buyer: offer.buyerId,
       listing: offer.listingId
     });
+
+    // ✅ SEND EMAIL NOTIFICATIONS USING EMAILJS
+    try {
+      await sendOfferEmailsWithEmailJS({
+        offer,
+        listing,
+        buyer,
+        seller: listing.sellerId
+      });
+      console.log("✅ EmailJS notifications sent successfully");
+    } catch (emailError) {
+      console.error("❌ EmailJS sending failed, but offer was created:", emailError);
+      // Don't fail the request if email fails
+    }
 
     res.status(201).json({
       success: true,
@@ -143,6 +174,101 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
     });
   }
 });
+
+// ✅ EMAILJS SERVICE FUNCTION
+const sendOfferEmailsWithEmailJS = async ({ offer, listing, buyer, seller }) => {
+  try {
+    console.log("📧 Starting EmailJS notification process...");
+
+    // 1. Email to SELLER - New Offer Received
+    const sellerTemplateParams = {
+      to_email: seller.email,
+      to_name: seller.firstName || seller.username,
+      seller_name: seller.firstName || seller.username,
+      buyer_name: buyer.firstName || buyer.username,
+      buyer_email: buyer.email,
+      listing_title: listing.title,
+      offer_amount: `$${offer.amount}`,
+      listing_price: `$${listing.price}`,
+      offer_message: offer.message || 'No message provided',
+      offer_date: new Date(offer.createdAt).toLocaleDateString(),
+      offer_id: offer._id.toString(),
+      dashboard_url: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/seller/offers`,
+      site_name: "Your Marketplace"
+    };
+
+    // 2. Email to BUYER - Offer Confirmation
+    const buyerTemplateParams = {
+      to_email: buyer.email,
+      to_name: buyer.firstName || buyer.username,
+      buyer_name: buyer.firstName || buyer.username,
+      listing_title: listing.title,
+      offer_amount: `$${offer.amount}`,
+      listing_price: `$${listing.price}`,
+      offer_message: offer.message || 'No message provided',
+      offer_date: new Date(offer.createdAt).toLocaleDateString(),
+      offer_id: offer._id.toString(),
+      tracking_url: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/offers/${offer._id}`,
+      site_name: "Your Marketplace"
+    };
+
+    // Send emails using EmailJS
+    const emailPromises = [];
+
+    // Send to Seller
+    if (EMAILJS_CONFIG.templateId.sellerNotification) {
+      emailPromises.push(
+        emailjs.send(
+          EMAILJS_CONFIG.serviceId,
+          EMAILJS_CONFIG.templateId.sellerNotification,
+          sellerTemplateParams,
+          {
+            publicKey: EMAILJS_CONFIG.publicKey,
+            privateKey: EMAILJS_CONFIG.privateKey,
+          }
+        )
+      );
+    }
+
+    // Send to Buyer
+    if (EMAILJS_CONFIG.templateId.buyerConfirmation) {
+      emailPromises.push(
+        emailjs.send(
+          EMAILJS_CONFIG.serviceId,
+          EMAILJS_CONFIG.templateId.buyerConfirmation,
+          buyerTemplateParams,
+          {
+            publicKey: EMAILJS_CONFIG.publicKey,
+            privateKey: EMAILJS_CONFIG.privateKey,
+          }
+        )
+      );
+    }
+
+    // Wait for all emails to be sent
+    await Promise.all(emailPromises);
+    
+    console.log("✅ All EmailJS emails sent successfully");
+    
+  } catch (error) {
+    console.error("❌ Error in sendOfferEmailsWithEmailJS:", error);
+    throw error;
+  }
+};
+
+// ✅ Initialize EmailJS (Optional - for testing)
+const initializeEmailJS = () => {
+  if (!process.env.EMAILJS_SERVICE_ID || !process.env.EMAILJS_PUBLIC_KEY) {
+    console.warn('⚠️  EmailJS environment variables not set. Emails will not be sent.');
+    return false;
+  }
+  
+  console.log('✅ EmailJS initialized successfully');
+  return true;
+};
+
+// Initialize on server start
+initializeEmailJS();
 
 // Get offers received (seller) - Add authentication middleware
 router.get("/received-offers", async (req, res) => {
