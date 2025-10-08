@@ -100,7 +100,7 @@ const SellerDashboard: React.FC = () => {
           },
           credentials: 'include'
         }),
-        fetch('/api/marketplace/seller-offers', {
+        fetch('/marketplace/offers/seller-offers', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
