@@ -20,7 +20,7 @@ router.get("/listings", async (req, res) => {
 // ===================================================
 // ✅ PROTECTED ROUTE — Get current user's listings
 // ===================================================
-router.get("/my-listings",  async (req, res) => {
+router.get("/my-listings", authenticateMiddleware, async (req, res) => {
   try {
     const listings = await MarketplaceListing.find({ sellerId: req.user._id });
     res.status(200).json(listings);
