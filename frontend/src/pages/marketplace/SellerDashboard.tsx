@@ -23,13 +23,14 @@ interface Order {
   listingId?: {
     title: string;
     mediaUrls: string[];
+    price: number;
   };
 }
 
 interface Offer {
   _id: string;
   amount: number;
-  status: 'pending' | 'accepted' | 'rejected' | 'expired';
+  status: 'pending' | 'accepted' | 'rejected' | 'expired' | 'countered';
   createdAt: string;
   buyerId: {
     username: string;
@@ -40,9 +41,20 @@ interface Offer {
     title: string;
     mediaUrls: string[];
     price: number;
+    status: string;
   };
   message?: string;
   expiresAt?: string;
+}
+
+interface Listing {
+  _id: string;
+  title: string;
+  price: number;
+  status: string;
+  mediaUrls: string[];
+  sellerId: string;
+  createdAt: string;
 }
 
 type TabType = 'overview' | 'offers';
@@ -58,8 +70,10 @@ const SellerDashboard: React.FC = () => {
   });
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
+  const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [error, setError] = useState<string>('');
 
   useEffect(() => {
     fetchDashboardData();
@@ -68,123 +82,182 @@ const SellerDashboard: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      setError('');
       
-      // Fetch all data in parallel for better performance
+      // Fetch all data in parallel
       const [ordersResponse, listingsResponse, offersResponse] = await Promise.all([
-        fetch('/marketplace/seller-orders', {
+        fetch('/api/marketplace/seller-orders', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           },
+          credentials: 'include'
         }),
-        fetch('/marketplace/my-listings', {
+        fetch('/api/marketplace/my-listings', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           },
+          credentials: 'include'
         }),
-        fetch('/marketplace/my-offers', {
+        fetch('/api/marketplace/seller-offers', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           },
-        })
+          credentials: 'include'
+        }).catch(() => ({ ok: false })) // Gracefully handle missing endpoint
       ]);
 
-      // Check if all responses are OK
-      if (!ordersResponse.ok || !listingsResponse.ok || !offersResponse.ok) {
-        throw new Error('Failed to fetch dashboard data');
+      // Handle orders response
+      if (!ordersResponse.ok) {
+        throw new Error('Failed to fetch orders');
       }
-
-      // Parse JSON responses
       const ordersData = await ordersResponse.json();
+      const ordersArray = Array.isArray(ordersData) ? ordersData : ordersData.orders || ordersData.data || [];
+      setRecentOrders(ordersArray.slice(0, 5));
+
+      // Handle listings response
+      if (!listingsResponse.ok) {
+        throw new Error('Failed to fetch listings');
+      }
       const listingsData = await listingsResponse.json();
-      const offersData = await offersResponse.json();
+      const listingsArray = Array.isArray(listingsData) ? listingsData : listingsData.listings || listingsData.data || [];
+      setListings(listingsArray);
 
-      // Handle different response structures
-      const orders = Array.isArray(ordersData) ? ordersData : ordersData.orders || ordersData.data || [];
-      const listings = Array.isArray(listingsData) ? listingsData : listingsData.listings || listingsData.data || [];
-      const allOffers = Array.isArray(offersData) ? offersData : offersData.offers || offersData.data || [];
+      // Handle offers response
+      let offersArray: Offer[] = [];
+      if (offersResponse.ok) {
+        const offersData = await offersResponse.json();
+        offersArray = Array.isArray(offersData) ? offersData : offersData.offers || offersData.data || [];
+      }
+      setOffers(offersArray);
 
-      // Set recent orders (last 5 orders)
-      setRecentOrders(orders.slice(0, 5));
-      setOffers(allOffers);
-
-      // Calculate stats
-      const totalListings = listings.length;
-      const activeListings = listings.filter((l: any) => l.status === 'active').length;
-      const totalOrders = orders.length;
-      const pendingOrders = orders.filter((o: any) => 
-        ['pending_payment', 'paid', 'in_progress', 'pending'].includes(o.status)
-      ).length;
-      const totalRevenue = orders
-        .filter((o: any) => o.status === 'completed' || o.status === 'delivered')
-        .reduce((sum: number, order: any) => sum + (order.amount || 0), 0);
-      
-      const pendingOffers = allOffers.filter((o: Offer) => o.status === 'pending').length;
-
-      setStats({
-        totalListings,
-        activeListings,
-        totalOrders,
-        pendingOrders,
-        totalRevenue,
-        pendingOffers
-      });
+      // Calculate statistics
+      calculateStats(ordersArray, listingsArray, offersArray);
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      // Set empty states on error
+      setError('Failed to load dashboard data. Please try again.');
       setRecentOrders([]);
       setOffers([]);
+      setListings([]);
     } finally {
       setLoading(false);
     }
   };
 
+  const calculateStats = (orders: Order[], listings: Listing[], offers: Offer[]) => {
+    const totalListings = listings.length;
+    const activeListings = listings.filter(listing => listing.status === 'active').length;
+    const totalOrders = orders.length;
+    const pendingOrders = orders.filter(order => 
+      ['pending', 'pending_payment', 'paid', 'in_progress', 'processing'].includes(order.status)
+    ).length;
+    const totalRevenue = orders
+      .filter(order => ['completed', 'delivered', 'fulfilled'].includes(order.status))
+      .reduce((sum, order) => sum + (order.amount || 0), 0);
+    const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
+
+    setStats({
+      totalListings,
+      activeListings,
+      totalOrders,
+      pendingOrders,
+      totalRevenue,
+      pendingOffers
+    });
+  };
+
   const handleViewOrderDetails = (orderId: string) => {
-    // Navigate to order details
-    console.log('View order:', orderId);
-    // You can implement navigation logic here
-    // window.location.href = `/orders/${orderId}`;
+    // Navigate to order details page
+    window.location.href = `/orders/${orderId}`;
   };
 
   const handleViewListingDetails = (listingId: string) => {
-    // Navigate to listing details
-    console.log('View listing:', listingId);
-    // window.location.href = `/listings/${listingId}`;
+    // Navigate to listing details page
+    window.location.href = `/listings/${listingId}`;
   };
 
-  const handleOfferAction = async (offerId: string, action: 'accept' | 'reject') => {
+  const handleOfferAction = async (offerId: string, action: 'accept' | 'reject' | 'counter') => {
     try {
+      setError('');
       const response = await fetch(`/api/marketplace/offers/${offerId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ action }),
       });
 
       if (response.ok) {
         // Refresh offers data
-        fetchDashboardData();
+        await fetchDashboardData();
       } else {
-        console.error('Failed to update offer');
-        alert('Failed to update offer. Please try again.');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update offer');
       }
     } catch (error) {
       console.error('Error updating offer:', error);
-      alert('Error updating offer. Please try again.');
+      setError(error instanceof Error ? error.message : 'Failed to update offer');
+    }
+  };
+
+  const handleCounterOffer = async (offerId: string, counterAmount: number) => {
+    try {
+      setError('');
+      const response = await fetch(`/api/marketplace/offers/${offerId}/counter`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ counterAmount }),
+      });
+
+      if (response.ok) {
+        await fetchDashboardData();
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send counter offer');
+      }
+    } catch (error) {
+      console.error('Error sending counter offer:', error);
+      setError(error instanceof Error ? error.message : 'Failed to send counter offer');
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'accepted': return 'bg-green-100 text-green-800';
-      case 'rejected': return 'bg-red-100 text-red-800';
-      case 'expired': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'accepted': return 'bg-green-100 text-green-800 border-green-200';
+      case 'rejected': return 'bg-red-100 text-red-800 border-red-200';
+      case 'expired': return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'countered': return 'bg-blue-100 text-blue-800 border-blue-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getOrderStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+      case 'delivered':
+      case 'fulfilled':
+        return 'bg-green-100 text-green-800';
+      case 'pending':
+      case 'pending_payment':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'cancelled':
+      case 'rejected':
+      case 'declined':
+        return 'bg-red-100 text-red-800';
+      case 'in_progress':
+      case 'processing':
+      case 'shipped':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -195,30 +268,76 @@ const SellerDashboard: React.FC = () => {
     }).format(amount);
   };
 
-  const getOrderStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-      case 'delivered':
-        return 'bg-green-100 text-green-800';
-      case 'pending':
-      case 'pending_payment':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'cancelled':
-      case 'rejected':
-        return 'bg-red-100 text-red-800';
-      case 'in_progress':
-      case 'shipped':
-        return 'bg-blue-100 text-blue-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
+
+  const calculateDiscount = (originalPrice: number, offerAmount: number) => {
+    return ((1 - offerAmount / originalPrice) * 100).toFixed(1);
+  };
+
+  const StatCard = ({ 
+    title, 
+    value, 
+    icon, 
+    color = 'gray' 
+  }: { 
+    title: string; 
+    value: string | number; 
+    icon: React.ReactNode; 
+    color?: string; 
+  }) => (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+      <div className="flex items-center">
+        <div className="flex-shrink-0">
+          <div className={`w-12 h-12 bg-${color}-100 rounded-lg flex items-center justify-center`}>
+            {icon}
+          </div>
+        </div>
+        <div className="ml-4">
+          <p className="text-sm font-medium text-gray-600">{title}</p>
+          <p className="text-2xl font-bold text-gray-900">{value}</p>
+        </div>
+      </div>
+    </div>
+  );
+
+  const QuickActionButton = ({ 
+    title, 
+    onClick, 
+    icon, 
+    variant = 'primary' 
+  }: { 
+    title: string; 
+    onClick: () => void; 
+    icon: React.ReactNode; 
+    variant?: 'primary' | 'secondary'; 
+  }) => (
+    <button
+      onClick={onClick}
+      className={`w-full font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center ${
+        variant === 'primary' 
+          ? 'bg-yellow-600 hover:bg-yellow-700 text-white' 
+          : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-300'
+      }`}
+    >
+      {icon}
+      <span className="ml-2">{title}</span>
+    </button>
+  );
 
   if (loading) {
     return (
       <MarketplaceLayout>
         <div className="min-h-screen flex items-center justify-center">
-          <div className="text-lg text-gray-600">Loading dashboard...</div>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600 mx-auto"></div>
+            <p className="mt-4 text-lg text-gray-600">Loading dashboard...</p>
+          </div>
         </div>
       </MarketplaceLayout>
     );
@@ -233,6 +352,18 @@ const SellerDashboard: React.FC = () => {
             <h1 className="text-3xl font-bold text-gray-900">Seller Dashboard</h1>
             <p className="mt-2 text-gray-600">Manage your listings, offers, and track your sales performance</p>
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <svg className="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-red-800">{error}</p>
+              </div>
+            </div>
+          )}
 
           {/* Tabs */}
           <div className="mb-8 border-b border-gray-200">
@@ -249,7 +380,7 @@ const SellerDashboard: React.FC = () => {
               </button>
               <button
                 onClick={() => setActiveTab('offers')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
                   activeTab === 'offers'
                     ? 'border-yellow-600 text-yellow-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -268,108 +399,77 @@ const SellerDashboard: React.FC = () => {
           {activeTab === 'overview' && (
             <>
               {/* Stats Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                        <span className="text-green-600 text-lg font-semibold">$</span>
-                      </div>
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                      <p className="text-2xl font-bold text-gray-900">${stats.totalRevenue.toLocaleString()}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
-                        <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                        </svg>
-                      </div>
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Total Listings</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.totalListings}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Active Listings</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.activeListings}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                        <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                        </svg>
-                      </div>
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Total Orders</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.totalOrders}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
-                        <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </div>
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Pending Orders</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.pendingOrders}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                      </div>
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Pending Offers</p>
-                      <p className="text-2xl font-bold text-gray-900">{stats.pendingOffers}</p>
-                    </div>
-                  </div>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
+                <StatCard
+                  title="Total Revenue"
+                  value={`$${stats.totalRevenue.toLocaleString()}`}
+                  icon={<span className="text-green-600 text-lg font-semibold">$</span>}
+                  color="green"
+                />
+                <StatCard
+                  title="Total Listings"
+                  value={stats.totalListings}
+                  icon={
+                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                  }
+                  color="yellow"
+                />
+                <StatCard
+                  title="Active Listings"
+                  value={stats.activeListings}
+                  icon={
+                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  }
+                  color="green"
+                />
+                <StatCard
+                  title="Total Orders"
+                  value={stats.totalOrders}
+                  icon={
+                    <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
+                  }
+                  color="purple"
+                />
+                <StatCard
+                  title="Pending Orders"
+                  value={stats.pendingOrders}
+                  icon={
+                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  }
+                  color="yellow"
+                />
+                <StatCard
+                  title="Pending Offers"
+                  value={stats.pendingOffers}
+                  icon={
+                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  }
+                  color="blue"
+                />
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Recent Orders */}
                 <div className="lg:col-span-2">
                   <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                    <div className="px-6 py-4 border-b border-gray-200">
+                    <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                       <h2 className="text-lg font-semibold text-gray-900">Recent Orders</h2>
+                      <button 
+                        onClick={() => window.location.href = '/orders'}
+                        className="text-sm text-yellow-600 hover:text-yellow-700 font-medium"
+                      >
+                        View All
+                      </button>
                     </div>
                     <div className="p-6">
                       {recentOrders.length === 0 ? (
@@ -395,53 +495,76 @@ const SellerDashboard: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Quick Actions */}
-                <div className="lg:col-span-1">
+                {/* Quick Actions & Tips */}
+                <div className="space-y-6">
+                  {/* Quick Actions */}
                   <div className="bg-white rounded-lg shadow-sm border border-gray-200">
                     <div className="px-6 py-4 border-b border-gray-200">
                       <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
                     </div>
                     <div className="p-6 space-y-4">
-                      <button 
+                      <QuickActionButton
+                        title="Create New Listing"
                         onClick={() => window.location.href = '/create-listing'}
-                        className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center"
-                      >
-                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                        Create New Listing
-                      </button>
-                      
-                      <button 
+                        icon={
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                        }
+                        variant="primary"
+                      />
+                      <QuickActionButton
+                        title="View All Orders"
                         onClick={() => window.location.href = '/orders'}
-                        className="w-full bg-white hover:bg-gray-50 text-gray-700 font-medium py-3 px-4 rounded-lg border border-gray-300 transition duration-200 flex items-center justify-center"
-                      >
-                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
-                        View All Orders
-                      </button>
-                      
-                      <button 
+                        icon={
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                          </svg>
+                        }
+                        variant="secondary"
+                      />
+                      <QuickActionButton
+                        title="Manage Listings"
                         onClick={() => window.location.href = '/my-listings'}
-                        className="w-full bg-white hover:bg-gray-50 text-gray-700 font-medium py-3 px-4 rounded-lg border border-gray-300 transition duration-200 flex items-center justify-center"
-                      >
-                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                        </svg>
-                        Manage Listings
-                      </button>
+                        icon={
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                          </svg>
+                        }
+                        variant="secondary"
+                      />
                     </div>
                   </div>
 
-                  {/* Additional Stats or Tips */}
-                  <div className="mt-6 bg-yellow-50 rounded-lg border border-yellow-200 p-6">
-                    <h3 className="text-sm font-semibold text-yellow-900 mb-2">Tips for Success</h3>
+                  {/* Success Tips */}
+                  <div className="bg-yellow-50 rounded-lg border border-yellow-200 p-6">
+                    <h3 className="text-sm font-semibold text-yellow-900 mb-3 flex items-center">
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Tips for Success
+                    </h3>
                     <ul className="text-sm text-yellow-700 space-y-2">
-                      <li>• Upload high-quality photos of your items</li>
-                      <li>• Write clear and detailed descriptions</li>
-                      <li>• Respond quickly to buyer inquiries</li>
-                      <li>• Ship orders promptly</li>
+                      <li className="flex items-start">
+                        <span className="mr-2">•</span>
+                        <span>Upload high-quality photos of your items</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-2">•</span>
+                        <span>Write clear and detailed descriptions</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-2">•</span>
+                        <span>Respond quickly to buyer inquiries</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-2">•</span>
+                        <span>Ship orders promptly</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-2">•</span>
+                        <span>Consider offers from serious buyers</span>
+                      </li>
                     </ul>
                   </div>
                 </div>
@@ -451,9 +574,20 @@ const SellerDashboard: React.FC = () => {
 
           {activeTab === 'offers' && (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Received Offers</h2>
-                <p className="text-sm text-gray-600 mt-1">Manage and respond to offers from buyers</p>
+              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Received Offers</h2>
+                  <p className="text-sm text-gray-600 mt-1">Manage and respond to offers from buyers</p>
+                </div>
+                <button
+                  onClick={fetchDashboardData}
+                  className="text-sm text-gray-500 hover:text-gray-700 flex items-center"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh
+                </button>
               </div>
               <div className="p-6">
                 {offers.length === 0 ? (
@@ -463,21 +597,32 @@ const SellerDashboard: React.FC = () => {
                     </svg>
                     <h3 className="mt-4 text-lg font-medium text-gray-900">No offers yet</h3>
                     <p className="mt-2 text-gray-500">When buyers make offers on your listings, they'll appear here.</p>
+                    <button
+                      onClick={() => window.location.href = '/my-listings'}
+                      className="mt-4 bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
+                    >
+                      View Your Listings
+                    </button>
                   </div>
                 ) : (
                   <div className="space-y-6">
                     {offers.map(offer => (
                       <div key={offer._id} className="border border-gray-200 rounded-lg p-6 hover:border-gray-300 transition-colors">
-                        <div className="flex items-start justify-between">
+                        <div className="flex items-start justify-between mb-4">
                           <div className="flex-1">
                             <div className="flex items-center justify-between mb-3">
-                              <h3 className="text-lg font-medium text-gray-900">{offer.listingId.title}</h3>
-                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(offer.status)}`}>
+                              <h3 
+                                className="text-lg font-medium text-gray-900 hover:text-yellow-600 cursor-pointer"
+                                onClick={() => handleViewListingDetails(offer.listingId._id)}
+                              >
+                                {offer.listingId.title}
+                              </h3>
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(offer.status)}`}>
                                 {offer.status.charAt(0).toUpperCase() + offer.status.slice(1)}
                               </span>
                             </div>
                             
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                               <div>
                                 <p className="text-sm text-gray-600">Buyer</p>
                                 <p className="font-medium text-gray-900">{offer.buyerId.username}</p>
@@ -493,7 +638,7 @@ const SellerDashboard: React.FC = () => {
                               <div>
                                 <p className="text-sm text-gray-600">Discount</p>
                                 <p className="font-medium text-orange-600">
-                                  {((1 - offer.amount / offer.listingId.price) * 100).toFixed(1)}% off
+                                  {calculateDiscount(offer.listingId.price, offer.amount)}% off
                                 </p>
                               </div>
                             </div>
@@ -501,33 +646,51 @@ const SellerDashboard: React.FC = () => {
                             {offer.message && (
                               <div className="mb-4">
                                 <p className="text-sm text-gray-600 mb-1">Buyer's Message</p>
-                                <p className="text-gray-900 bg-gray-50 rounded-lg p-3 text-sm">{offer.message}</p>
+                                <p className="text-gray-900 bg-gray-50 rounded-lg p-3 text-sm border border-gray-200">
+                                  {offer.message}
+                                </p>
                               </div>
                             )}
 
                             <div className="flex items-center justify-between text-sm text-gray-500">
-                              <span>Received {new Date(offer.createdAt).toLocaleDateString()}</span>
+                              <span>Received {formatDate(offer.createdAt)}</span>
                               {offer.expiresAt && (
-                                <span>Expires {new Date(offer.expiresAt).toLocaleDateString()}</span>
+                                <span className="text-orange-600">
+                                  Expires {formatDate(offer.expiresAt)}
+                                </span>
                               )}
                             </div>
                           </div>
                         </div>
 
                         {offer.status === 'pending' && (
-                          <div className="flex space-x-3 mt-4 pt-4 border-t border-gray-200">
+                          <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 mt-4 pt-4 border-t border-gray-200">
                             <button
                               onClick={() => handleOfferAction(offer._id, 'accept')}
-                              className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
+                              className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 flex items-center justify-center"
                             >
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
                               Accept Offer
                             </button>
                             <button
                               onClick={() => handleOfferAction(offer._id, 'reject')}
-                              className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
+                              className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 flex items-center justify-center"
                             >
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
                               Decline Offer
                             </button>
+                          </div>
+                        )}
+
+                        {offer.status === 'countered' && (
+                          <div className="mt-4 pt-4 border-t border-gray-200">
+                            <p className="text-sm text-blue-600 font-medium">
+                              You've sent a counter offer for this listing
+                            </p>
                           </div>
                         )}
                       </div>
