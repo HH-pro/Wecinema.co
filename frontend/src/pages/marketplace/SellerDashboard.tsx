@@ -207,7 +207,7 @@ const SellerDashboard: React.FC = () => {
   const handleCounterOffer = async (offerId: string, counterAmount: number) => {
     try {
       setError('');
-      const response = await fetch(`/api/marketplace/offers/${offerId}/counter`, {
+      const response = await fetch(`/marketplace/offers/${offerId}/counter`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
