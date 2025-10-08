@@ -204,13 +204,13 @@ export const getListings = (
   }
   
   const queryString = queryParams.toString();
-  return getRequest(`/api/marketplace/listings${queryString ? `?${queryString}` : ''}`, setLoading);
+  return getRequest(`/marketplace/listings${queryString ? `?${queryString}` : ''}`, setLoading);
 };
 
 export const getListingById = (
   listingId: string,
   setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-) => getRequest(`/api/marketplace/listings/${listingId}`, setLoading);
+) => getRequest(`/marketplace/listings/${listingId}`, setLoading);
 
 export const getMyListings = (
   setLoading?: React.Dispatch<React.SetStateAction<boolean>>
@@ -255,12 +255,12 @@ export const updateListing = (
   listingId: string,
   data: any,
   setLoading: React.Dispatch<React.SetStateAction<boolean>>
-) => putRequest(`/api/marketplace/listings/${listingId}`, data, setLoading, "Listing updated");
+) => putRequest(`/marketplace/listings/${listingId}`, data, setLoading, "Listing updated");
 
 export const deleteListing = (
   listingId: string,
   setLoading: React.Dispatch<React.SetStateAction<boolean>>
-) => deleteRequest(`/api/marketplace/listings/${listingId}`, setLoading, "Listing deleted");
+) => deleteRequest(`/marketplace/listings/${listingId}`, setLoading, "Listing deleted");
 
 // Offer APIs
 export const makeOffer = async (
