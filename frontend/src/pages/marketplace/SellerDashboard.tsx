@@ -69,7 +69,7 @@ const SellerDashboard: React.FC = () => {
       setLoading(true);
       
       // Fetch seller orders
-      const ordersResponse = await fetch('/api/marketplace/seller-orders');
+      const ordersResponse = await fetch('marketplace/seller-orders');
       const ordersData = await ordersResponse.json();
       setRecentOrders(ordersData.slice(0, 5));
 
