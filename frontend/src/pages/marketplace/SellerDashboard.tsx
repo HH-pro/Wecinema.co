@@ -77,13 +77,13 @@ const SellerDashboard: React.FC = () => {
             'Content-Type': 'application/json',
           },
         }),
-        fetch('/api/marketplace/my-listings', {
+        fetch('/marketplace/my-listings', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           },
         }),
-        fetch('/api/marketplace/seller-offers', {
+        fetch('/marketplace/seller-offers', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
