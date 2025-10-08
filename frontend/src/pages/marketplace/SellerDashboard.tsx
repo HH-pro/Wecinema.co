@@ -74,7 +74,7 @@ const SellerDashboard: React.FC = () => {
       setRecentOrders(ordersData.slice(0, 5));
 
       // Fetch seller listings for stats
-      const listingsResponse = await fetch('/api/marketplace/my-listings');
+      const listingsResponse = await fetch('/marketplace/my-listings');
       const listingsData = await listingsResponse.json();
 
       // Fetch offers
