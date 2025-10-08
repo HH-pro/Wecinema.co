@@ -212,7 +212,9 @@ export const getListingById = (
   setLoading?: React.Dispatch<React.SetStateAction<boolean>>
 ) => getRequest(`/marketplace/listings/listings/${listingId}`, setLoading);
 
-
+export const getMyListings = (
+  setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+) => getRequest('/api/marketplace/listings/my-listings', setLoading);
 
 export const createListing = (
   formData: FormData,
