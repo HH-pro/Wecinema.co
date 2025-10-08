@@ -204,17 +204,17 @@ export const getListings = (
   }
   
   const queryString = queryParams.toString();
-  return getRequest(`/api/marketplace/listings${queryString ? `?${queryString}` : ''}`, setLoading);
+  return getRequest(`/marketplace/listings${queryString ? `?${queryString}` : ''}`, setLoading);
 };
 
 export const getListingById = (
   listingId: string,
   setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-) => getRequest(`/api/marketplace/listings/${listingId}`, setLoading);
+) => getRequest(`/marketplace/listings/${listingId}`, setLoading);
 
 export const getMyListings = (
   setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-) => getRequest('/api/marketplace/my-listings', setLoading);
+) => getRequest('/marketplace/my-listings', setLoading);
 
 export const createListing = (
   formData: FormData,
@@ -299,7 +299,7 @@ export const makeOffer = async (
 
 export const getMyOffers = (
   setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-) => getRequest('/api/marketplace/offers/my-offers', setLoading);
+) => getRequest('/marketplace/offers/my-offers', setLoading);
 
 export const getReceivedOffers = (
   setLoading?: React.Dispatch<React.SetStateAction<boolean>>
