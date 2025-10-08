@@ -86,7 +86,7 @@ const SellerDashboard: React.FC = () => {
       
       // Fetch all data in parallel
       const [ordersResponse, listingsResponse, offersResponse] = await Promise.all([
-        fetch('/marketplace/seller-orders', {
+        fetch('/marketplace/orders/seller-orders', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
