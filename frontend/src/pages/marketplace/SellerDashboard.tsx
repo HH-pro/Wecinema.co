@@ -78,7 +78,7 @@ const SellerDashboard: React.FC = () => {
       const listingsData = await listingsResponse.json();
 
       // Fetch offers
-      const offersResponse = await fetch('/marketplace/my-offers');
+      const offersResponse = await fetch('/marketplace/offers/my-offers');
       const offersData = await offersResponse.json();
       setOffers(offersData);
 
