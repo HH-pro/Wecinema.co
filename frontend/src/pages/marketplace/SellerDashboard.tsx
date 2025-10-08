@@ -118,7 +118,7 @@ const SellerDashboard: React.FC = () => {
 
   const handleOfferAction = async (offerId: string, action: 'accept' | 'reject') => {
     try {
-      const response = await fetch(`/api/marketplace/offers/${offerId}`, {
+      const response = await fetch(`/marketplace/offers/${offerId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
