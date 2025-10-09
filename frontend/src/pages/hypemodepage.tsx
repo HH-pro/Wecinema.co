@@ -6,7 +6,7 @@ import { getAuth, signInWithPopup, signOut, createUserWithEmailAndPassword, sign
 import { googleProvider } from "./firebase";
 import { motion } from "framer-motion";
 import Confetti from "react-confetti";
-import "../css/HypeModeProfile.css";
+import "./styles/HypeModeProfile.css";
 
 const HypeModeProfile = () => {
   const navigate = useNavigate();
@@ -20,6 +20,7 @@ const HypeModeProfile = () => {
   const [showFireworks, setShowFireworks] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState<"user" | "studio" | null>(null);
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer");
+  const [isLoading, setIsLoading] = useState(false);
 
   const registerUser = async (username: string, email: string, avatar: string, userType: string, callback: any) => {
     try {
@@ -47,10 +48,11 @@ const HypeModeProfile = () => {
         }, 2000);
       }
     } catch (error: any) {
+      setIsLoading(false);
       if (error.response && error.response.data && error.response.data.error === 'Email already exists.') {
-        setPopupMessage('Email already exists.');
+        setPopupMessage('Email already exists. Please sign in instead.');
       } else {
-        setPopupMessage('Email already exists. Please sign in.');
+        setPopupMessage('Registration failed. Please try again.');
       }
       setShowPopup(true);
     }
@@ -72,44 +74,75 @@ const HypeModeProfile = () => {
         if (callback) callback();
       }
     } catch (error: any) {
+      setIsLoading(false);
       if (error.response) {
         setPopupMessage(error.response.data.message || 'Login failed.');
       } else {
-        setPopupMessage('Login failed.');
+        setPopupMessage('Login failed. Please check your credentials.');
       }
       setShowPopup(true);
     }
   };
 
-  const onLoginSuccess = async (user: any) => {
+  const onLoginSuccess = async (user: any, isEmailAuth: boolean = false) => {
     const profile = user.providerData[0];
     const email = profile.email;
     const username = profile.displayName || email.split('@')[0];
     const avatar = profile.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`;
 
     try {
-      const callback = () => navigate('/payment', { 
-        state: { 
-          subscriptionType: selectedSubscription, 
-          amount: selectedSubscription === 'user' ? 5 : 10, 
-          userId,
-          userType 
-        } 
-      });
+      const callback = () => {
+        setIsLoading(false);
+        navigate('/payment', { 
+          state: { 
+            subscriptionType: selectedSubscription, 
+            amount: selectedSubscription === 'user' ? 5 : 10, 
+            userId,
+            userType 
+          } 
+        });
+      };
 
-      if (isSignup) {
-        await registerUser(username, email, avatar, userType, callback);
+      // For email authentication, we need to check if user exists in backend
+      if (isEmailAuth) {
+        if (isSignup) {
+          await registerUser(username, email, avatar, userType, callback);
+        } else {
+          await loginUser(email, callback);
+        }
       } else {
-        await loginUser(email, callback);
+        // For Google auth, proceed directly
+        if (isSignup) {
+          await registerUser(username, email, avatar, userType, callback);
+        } else {
+          await loginUser(email, callback);
+        }
       }
     } catch (error) {
-      setPopupMessage('Failed to get Firebase token. Please try again.');
+      setIsLoading(false);
+      setPopupMessage('Authentication failed. Please try again.');
       setShowPopup(true);
     }
   };
 
   const onLoginFailure = (error: any) => {
-    setPopupMessage('Login failed. Please try again.');
+    setIsLoading(false);
+    console.error('Authentication error:', error);
+    
+    // More specific error messages
+    if (error.code === 'auth/invalid-email') {
+      setPopupMessage('Invalid email address format.');
+    } else if (error.code === 'auth/user-disabled') {
+      setPopupMessage('This account has been disabled.');
+    } else if (error.code === 'auth/user-not-found') {
+      setPopupMessage('No account found with this email. Please sign up.');
+    } else if (error.code === 'auth/wrong-password') {
+      setPopupMessage('Incorrect password. Please try again.');
+    } else if (error.code === 'auth/network-request-failed') {
+      setPopupMessage('Network error. Please check your connection.');
+    } else {
+      setPopupMessage('Authentication failed. Please try again.');
+    }
     setShowPopup(true);
   };
 
@@ -120,12 +153,13 @@ const HypeModeProfile = () => {
       return;
     }
 
+    setIsLoading(true);
     const auth = getAuth();
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
       await onLoginSuccess(user);
-    } catch (error) {
+    } catch (error: any) {
       onLoginFailure(error);
     }
   };
@@ -156,22 +190,20 @@ const HypeModeProfile = () => {
       return;
     }
 
+    if (password.length < 6) {
+      setPopupMessage("Password should be at least 6 characters long.");
+      setShowPopup(true);
+      return;
+    }
+
+    setIsLoading(true);
     const auth = getAuth();
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      await onLoginSuccess(user);
+      await onLoginSuccess(user, true);
     } catch (error: any) {
-      if (error.code === 'auth/email-already-in-use') {
-        setPopupMessage('Email already in use. Please try logging in.');
-      } else if (error.code === 'auth/weak-password') {
-        setPopupMessage('Password should be at least 6 characters.');
-      } else if (error.code === 'auth/invalid-email') {
-        setPopupMessage('Invalid email address.');
-      } else {
-        setPopupMessage('Email signup failed. Please try again.');
-      }
-      setShowPopup(true);
+      onLoginFailure(error);
     }
   };
 
@@ -188,27 +220,20 @@ const HypeModeProfile = () => {
       return;
     }
 
+    setIsLoading(true);
     const auth = getAuth();
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      await onLoginSuccess(user);
+      await onLoginSuccess(user, true);
     } catch (error: any) {
-      if (error.code === 'auth/user-not-found') {
-        setPopupMessage('No user found with this email. Please sign up.');
-      } else if (error.code === 'auth/wrong-password') {
-        setPopupMessage('Incorrect password. Please try again.');
-      } else if (error.code === 'auth/invalid-email') {
-        setPopupMessage('Invalid email address.');
-      } else {
-        setPopupMessage('Email login failed. Please try again.');
-      }
-      setShowPopup(true);
+      onLoginFailure(error);
     }
   };
 
   const closePopup = () => {
     setShowPopup(false);
+    setIsLoading(false);
   };
 
   const handleSubscriptionClick = (subscriptionType: "user" | "studio") => {
@@ -219,6 +244,7 @@ const HypeModeProfile = () => {
     setIsSignup(!isSignup);
     setEmail('');
     setPassword('');
+    setSelectedSubscription(null);
   };
 
   useEffect(() => {
@@ -247,7 +273,7 @@ const HypeModeProfile = () => {
       )}
 
       <div className="main-container">
-        <button className="toggle-button" onClick={toggleSignupSignin}>
+        <button className="toggle-button" onClick={toggleSignupSignin} disabled={isLoading}>
           {isSignup ? "Already have an account? Switch to Sign in" : "Don't have an account? Switch to Sign up"}
         </button>
 
@@ -255,7 +281,9 @@ const HypeModeProfile = () => {
           <div className="cards-container">
             <div className="subscription-box">
               <h3 className="subscription-title">Logout</h3>
-              <button className="subscription-button" onClick={handleGoogleLogout}>Logout</button>
+              <button className="subscription-button" onClick={handleGoogleLogout} disabled={isLoading}>
+                {isLoading ? "Processing..." : "Logout"}
+              </button>
             </div>
           </div>
         ) : (
@@ -266,12 +294,14 @@ const HypeModeProfile = () => {
                 <button 
                   className={`user-type-button ${userType === "buyer" ? "active" : ""}`}
                   onClick={() => setUserType("buyer")}
+                  disabled={isLoading}
                 >
                   👤 Sign up as Buyer
                 </button>
                 <button 
                   className={`user-type-button ${userType === "seller" ? "active" : ""}`}
                   onClick={() => setUserType("seller")}
+                  disabled={isLoading}
                 >
                   🏪 Sign up as Seller
                 </button>
@@ -282,8 +312,9 @@ const HypeModeProfile = () => {
               {/* User Subscription Box */}
               <div
                 className={`subscription-box ${selectedSubscription === "user" ? "selected" : ""}`}
-                onClick={() => handleSubscriptionClick("user")}
+                onClick={() => !isLoading && handleSubscriptionClick("user")}
               >
+                <div className="premium-badge">Popular</div>
                 <h3 className="subscription-title">Basic Plan</h3>
                 <div className="subscription-price">$5/month</div>
                 <p className="subscription-description">Perfect for individual users and content enthusiasts</p>
@@ -296,8 +327,12 @@ const HypeModeProfile = () => {
                   <li>5GB Storage</li>
                 </ul>
 
-                <button className="subscription-button" onClick={handleGoogleLogin}>
-                  {isSignup ? "Sign up with Google" : "Sign in with Google"}
+                <button 
+                  className="subscription-button" 
+                  onClick={handleGoogleLogin}
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Processing..." : (isSignup ? "Sign up with Google" : "Sign in with Google")}
                 </button>
                 
                 <div className="email-form">
@@ -307,6 +342,7 @@ const HypeModeProfile = () => {
                     placeholder="Enter your email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
                   />
                   <input
                     type="password"
@@ -314,12 +350,14 @@ const HypeModeProfile = () => {
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    disabled={isLoading}
                   />
                   <button 
                     className="subscription-button email-button"
                     onClick={isSignup ? handleEmailSignup : handleEmailLogin}
+                    disabled={isLoading}
                   >
-                    {isSignup ? "Sign up with Email" : "Sign in with Email"}
+                    {isLoading ? "Processing..." : (isSignup ? "Sign up with Email" : "Sign in with Email")}
                   </button>
                 </div>
               </div>
@@ -327,8 +365,9 @@ const HypeModeProfile = () => {
               {/* Studio Subscription Box */}
               <div
                 className={`subscription-box ${selectedSubscription === "studio" ? "selected" : ""}`}
-                onClick={() => handleSubscriptionClick("studio")}
+                onClick={() => !isLoading && handleSubscriptionClick("studio")}
               >
+                <div className="premium-badge">Pro</div>
                 <h3 className="subscription-title">Pro Plan</h3>
                 <div className="subscription-price">$10/month</div>
                 <p className="subscription-description">Advanced features for studios and professional creators</p>
@@ -343,8 +382,12 @@ const HypeModeProfile = () => {
                   <li>Custom Branding</li>
                 </ul>
 
-                <button className="subscription-button" onClick={handleGoogleLogin}>
-                  {isSignup ? "Sign up with Google" : "Sign in with Google"}
+                <button 
+                  className="subscription-button" 
+                  onClick={handleGoogleLogin}
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Processing..." : (isSignup ? "Sign up with Google" : "Sign in with Google")}
                 </button>
                 
                 <div className="email-form">
@@ -354,6 +397,7 @@ const HypeModeProfile = () => {
                     placeholder="Enter your email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    disabled={isLoading}
                   />
                   <input
                     type="password"
@@ -361,12 +405,14 @@ const HypeModeProfile = () => {
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    disabled={isLoading}
                   />
                   <button 
                     className="subscription-button email-button"
                     onClick={isSignup ? handleEmailSignup : handleEmailLogin}
+                    disabled={isLoading}
                   >
-                    {isSignup ? "Sign up with Email" : "Sign in with Email"}
+                    {isLoading ? "Processing..." : (isSignup ? "Sign up with Email" : "Sign in with Email")}
                   </button>
                 </div>
               </div>
@@ -381,7 +427,9 @@ const HypeModeProfile = () => {
           <div className="overlay" onClick={closePopup} />
           <div className="popup">
             <p>{popupMessage}</p>
-            <button className="subscription-button" onClick={closePopup}>Close</button>
+            <button className="subscription-button" onClick={closePopup}>
+              {isLoading ? "Processing..." : "Close"}
+            </button>
           </div>
         </>
       )}
