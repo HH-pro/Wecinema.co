@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import Confetti from "react-confetti";
 import "../css/HypeModeProfile.css";
 
-const API_BASE_URL = 'http:localhost:3000';
+const API_BASE_URL = 'http://localhost:3000';
 
 const HypeModeProfile = () => {
   const navigate = useNavigate();
