@@ -22,6 +22,7 @@ const HypeModeProfile = () => {
   const [selectedSubscription, setSelectedSubscription] = useState<"user" | "studio" | null>(null);
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer");
   const [isLoading, setIsLoading] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
 
   // Common success handler
   const handleAuthSuccess = (token: string, user: any, message: string) => {
@@ -168,6 +169,11 @@ const HypeModeProfile = () => {
     }
   };
 
+  // Toggle email form visibility
+  const toggleEmailForm = () => {
+    setShowEmailForm(!showEmailForm);
+  };
+
   const closePopup = () => {
     setShowPopup(false);
     setIsLoading(false);
@@ -183,6 +189,7 @@ const HypeModeProfile = () => {
     setPassword('');
     setUsername('');
     setSelectedSubscription(null);
+    setShowEmailForm(false); // Reset form visibility when switching modes
   };
 
   useEffect(() => {
@@ -277,42 +284,54 @@ const HypeModeProfile = () => {
                 >
                   {isLoading ? "Processing..." : (isSignup ? "Sign up with Google" : "Sign in with Google")}
                 </button>
+
+                {/* Email Form Toggle Button */}
+                <button 
+                  className="subscription-button email-toggle-button"
+                  onClick={toggleEmailForm}
+                  disabled={isLoading}
+                >
+                  {showEmailForm ? "Hide Email Form" : (isSignup ? "Sign up with Email" : "Sign in with Email")}
+                </button>
                 
-                <div className="email-form">
-                  {isSignup && (
+                {/* Email Form - Conditionally Rendered */}
+                {showEmailForm && (
+                  <div className="email-form">
+                    {isSignup && (
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="Enter your username"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        disabled={isLoading}
+                      />
+                    )}
                     <input
-                      type="text"
+                      type="email"
                       className="form-input"
-                      placeholder="Enter your username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Enter your email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       disabled={isLoading}
                     />
-                  )}
-                  <input
-                    type="email"
-                    className="form-input"
-                    placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={isLoading}
-                  />
-                  <input
-                    type="password"
-                    className="form-input"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={isLoading}
-                  />
-                  <button 
-                    className="subscription-button email-button"
-                    onClick={isSignup ? handleEmailSignup : handleEmailLogin}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Processing..." : (isSignup ? "Sign up with Email" : "Sign in with Email")}
-                  </button>
-                </div>
+                    <input
+                      type="password"
+                      className="form-input"
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      disabled={isLoading}
+                    />
+                    <button 
+                      className="subscription-button email-submit-button"
+                      onClick={isSignup ? handleEmailSignup : handleEmailLogin}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Studio Subscription Box */}
@@ -342,42 +361,54 @@ const HypeModeProfile = () => {
                 >
                   {isLoading ? "Processing..." : (isSignup ? "Sign up with Google" : "Sign in with Google")}
                 </button>
+
+                {/* Email Form Toggle Button */}
+                <button 
+                  className="subscription-button email-toggle-button"
+                  onClick={toggleEmailForm}
+                  disabled={isLoading}
+                >
+                  {showEmailForm ? "Hide Email Form" : (isSignup ? "Sign up with Email" : "Sign in with Email")}
+                </button>
                 
-                <div className="email-form">
-                  {isSignup && (
+                {/* Email Form - Conditionally Rendered */}
+                {showEmailForm && (
+                  <div className="email-form">
+                    {isSignup && (
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="Enter your username"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        disabled={isLoading}
+                      />
+                    )}
                     <input
-                      type="text"
+                      type="email"
                       className="form-input"
-                      placeholder="Enter your username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Enter your email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       disabled={isLoading}
                     />
-                  )}
-                  <input
-                    type="email"
-                    className="form-input"
-                    placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={isLoading}
-                  />
-                  <input
-                    type="password"
-                    className="form-input"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={isLoading}
-                  />
-                  <button 
-                    className="subscription-button email-button"
-                    onClick={isSignup ? handleEmailSignup : handleEmailLogin}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Processing..." : (isSignup ? "Sign up with Email" : "Sign in with Email")}
-                  </button>
-                </div>
+                    <input
+                      type="password"
+                      className="form-input"
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      disabled={isLoading}
+                    />
+                    <button 
+                      className="subscription-button email-submit-button"
+                      onClick={isSignup ? handleEmailSignup : handleEmailLogin}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </>
