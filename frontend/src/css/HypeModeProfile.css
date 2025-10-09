@@ -436,9 +436,6 @@
   color: #2d3748;
 }
 
-.form-input::placeholder {
-  color: #a0aec0;
-}
 
 .form-input:focus {
   outline: none;
@@ -456,7 +453,9 @@
   border-color: rgba(255, 255, 255, 0.3);
 }
 
-
+.subscription-box.selected .form-input::placeholder {
+  color: #a0aec0;
+}
 
 .subscription-box.selected .form-input:focus {
   background: white;
