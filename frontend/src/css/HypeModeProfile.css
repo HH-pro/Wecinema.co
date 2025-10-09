@@ -144,7 +144,7 @@
 }
 
 .subscription-box.selected {
-  border: 3px solid #f59e0b;
+  border: 0px solid #f59e0b;
   background: linear-gradient(135deg, #1a202c, #2d3748);
   color: white;
   transform: translateY(-20px) scale(1.02);
