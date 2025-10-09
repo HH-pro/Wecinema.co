@@ -56,19 +56,7 @@ const SubscriptionContainer = styled.div`
 const SubscriptionBox = styled.div`
   flex: 1;
   min-width: 300px;
-  max-width: 450px;
-  padding: 30px 25px;
-  border-radius: 20px;
-  background: linear-gradient(145deg, #ffffff, #f3f3f3);
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 8px 8px 20px rgba(0, 0, 0, 0.1), -8px -8px 20px rgba(255, 255, 255, 0.8);
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+ 
 
   &:hover {
     transform: translateY(-10px);
