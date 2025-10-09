@@ -457,6 +457,7 @@
 }
 
 .subscription-box.selected .form-input::placeholder {
+  color: #a0aec0;
 }
 
 .subscription-box.selected .form-input:focus {
