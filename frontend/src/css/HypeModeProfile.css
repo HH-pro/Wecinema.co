@@ -293,11 +293,11 @@
 }
 
 .email-button {
-  background: #4285f4;
+  background: #f59e0b;
 }
 
 .email-button:hover {
-  background: #3367d6;
+  background: #f59e0b;
 }
 
 @media (max-width: 768px) {
