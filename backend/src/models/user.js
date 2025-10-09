@@ -73,6 +73,20 @@ const userSchema = new Schema({
     totalSales: {
         type: Number,
         default: 0
+    },
+
+    // 🆕 NEW: UserType field for HypeMode Signup
+    userType: {
+        type: String,
+        enum: ['buyer', 'seller'],
+        default: 'buyer'
+    },
+    
+    // 🆕 NEW: Authentication provider tracking
+    authProvider: {
+        type: String,
+        enum: ['email', 'google'],
+        default: 'email'
     }
 
 });
