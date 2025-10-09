@@ -6,7 +6,7 @@ import { getAuth, signInWithPopup, signOut, createUserWithEmailAndPassword, sign
 import { googleProvider } from "./firebase";
 import { motion } from "framer-motion";
 import Confetti from "react-confetti";
-import "../styles/HypeModeProfile.css";
+import "../../styles/HypeModeProfile.css";
 
 const HypeModeProfile = () => {
   const navigate = useNavigate();
