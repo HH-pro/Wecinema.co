@@ -117,6 +117,58 @@ const HypeModeProfile = () => {
     }
   };
 
+  // Google Authentication
+  const handleGoogleAuth = async () => {
+    if (!selectedSubscription) {
+      setPopupMessage("Please select a subscription first.");
+      setShowPopup(true);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Simulate Google OAuth data (in real app, this comes from Google OAuth response)
+      const googleUserData = {
+        email: "user@gmail.com", // From Google OAuth
+        username: "Google User", // From Google OAuth  
+        avatar: "https://icon-library.com/images/google-user-icon/google-user-icon-0.jpg", // From Google OAuth
+        userType
+      };
+
+      // Check if user exists - try login first
+      try {
+        // Try to login with Google
+        const loginResponse = await axios.post(`${API_BASE_URL}/user/signin`, {
+          email: googleUserData.email,
+          isGoogleAuth: true
+        });
+
+        const { token, user } = loginResponse.data;
+        handleAuthSuccess(token, user, 'Google login successful!');
+      } catch (loginError: any) {
+        // If login fails, try signup
+        if (loginError.response?.status === 401) {
+          const signupResponse = await axios.post(`${API_BASE_URL}/user/signup`, {
+            username: googleUserData.username,
+            email: googleUserData.email,
+            avatar: googleUserData.avatar,
+            userType: googleUserData.userType,
+            isGoogleAuth: true
+          });
+
+          const { token, user } = signupResponse.data;
+          handleAuthSuccess(token, user, 'Google signup successful!');
+        } else {
+          throw loginError;
+        }
+      }
+    } catch (error: any) {
+      setIsLoading(false);
+      setPopupMessage(error.response?.data?.error || 'Google authentication failed. Please try again.');
+      setShowPopup(true);
+    }
+  };
+
   // Toggle email form visibility
   const toggleEmailForm = () => {
     setShowEmailForm(!showEmailForm);
@@ -144,8 +196,6 @@ const HypeModeProfile = () => {
 
   const handleSubscriptionClick = (subscriptionType: "user" | "studio") => {
     setSelectedSubscription(subscriptionType);
-    // Auto-show email form when subscription is selected
-    setShowEmailForm(true);
   };
 
   const toggleSignupSignin = () => {
@@ -242,9 +292,25 @@ const HypeModeProfile = () => {
                   <li>5GB Storage</li>
                 </ul>
 
-                {/* Email Form Section - Always Visible after selection */}
+                {/* Authentication Section - Show only when subscription is selected */}
                 {selectedSubscription === "user" && (
-                  <div className="email-auth-section">
+                  <div className="auth-section">
+                    {/* Google Auth Button */}
+                    <button 
+                      className="subscription-button google-auth-button"
+                      onClick={handleGoogleAuth}
+                      disabled={isLoading}
+                    >
+                      <span className="google-icon">G</span>
+                      {isLoading ? "Processing..." : (isSignup ? "Sign up with Google" : "Sign in with Google")}
+                    </button>
+
+                    {/* Divider */}
+                    <div className="auth-divider">
+                      <span>or</span>
+                    </div>
+
+                    {/* Email Auth */}
                     {!showEmailForm ? (
                       // Show email button to start
                       <button 
@@ -334,9 +400,25 @@ const HypeModeProfile = () => {
                   <li>Custom Branding</li>
                 </ul>
 
-                {/* Email Form Section - Always Visible after selection */}
+                {/* Authentication Section - Show only when subscription is selected */}
                 {selectedSubscription === "studio" && (
-                  <div className="email-auth-section">
+                  <div className="auth-section">
+                    {/* Google Auth Button */}
+                    <button 
+                      className="subscription-button google-auth-button"
+                      onClick={handleGoogleAuth}
+                      disabled={isLoading}
+                    >
+                      <span className="google-icon">G</span>
+                      {isLoading ? "Processing..." : (isSignup ? "Sign up with Google" : "Sign in with Google")}
+                    </button>
+
+                    {/* Divider */}
+                    <div className="auth-divider">
+                      <span>or</span>
+                    </div>
+
+                    {/* Email Auth */}
                     {!showEmailForm ? (
                       // Show email button to start
                       <button 
