@@ -63,6 +63,16 @@ interface Listing {
 
 type TabType = 'overview' | 'offers' | 'listings';
 
+// Cache configuration
+const CACHE_KEYS = {
+  LISTINGS: 'seller_listings_cache',
+  ORDERS: 'seller_orders_cache',
+  OFFERS: 'seller_offers_cache',
+  STATS: 'seller_stats_cache'
+};
+
+const CACHE_DURATION = 60 * 1000; // 1 minute in milliseconds
+
 const SellerDashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats>({
     totalListings: 0,
@@ -79,37 +89,100 @@ const SellerDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
+  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
+  const [usingCachedData, setUsingCachedData] = useState<boolean>(false);
+
+  // Cache utility functions
+  const getFromCache = <T,>(key: string): T | null => {
+    try {
+      const cached = localStorage.getItem(key);
+      if (!cached) return null;
+
+      const { data, timestamp } = JSON.parse(cached);
+      const isExpired = Date.now() - timestamp > CACHE_DURATION;
+
+      return isExpired ? null : data;
+    } catch {
+      return null;
+    }
+  };
+
+  const setToCache = (key: string, data: any) => {
+    try {
+      const cacheData = {
+        data,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(key, JSON.stringify(cacheData));
+    } catch (error) {
+      console.warn('Failed to cache data:', error);
+    }
+  };
+
+  const clearCache = (key?: string) => {
+    if (key) {
+      localStorage.removeItem(key);
+    } else {
+      Object.values(CACHE_KEYS).forEach(k => localStorage.removeItem(k));
+    }
+  };
+
+  const isCacheValid = (): boolean => {
+    const cachedListings = getFromCache(CACHE_KEYS.LISTINGS);
+    const cachedOrders = getFromCache(CACHE_KEYS.ORDERS);
+    return !!(cachedListings && cachedOrders);
+  };
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (forceRefresh = false) => {
     try {
       setLoading(true);
       setError('');
       setSuccess('');
-      
-      // Fetch all data in parallel
+      setUsingCachedData(false);
+
+      // Try to get cached data first (unless force refresh)
+      if (!forceRefresh && isCacheValid()) {
+        const cachedListings = getFromCache<Listing[]>(CACHE_KEYS.LISTINGS);
+        const cachedOrders = getFromCache<Order[]>(CACHE_KEYS.ORDERS);
+        const cachedOffers = getFromCache<Offer[]>(CACHE_KEYS.OFFERS);
+
+        if (cachedListings && cachedOrders) {
+          setListings(cachedListings);
+          setRecentOrders(cachedOrders.slice(0, 5));
+          setOffers(cachedOffers || []);
+          calculateStats(cachedOrders, cachedListings, cachedOffers || []);
+          setUsingCachedData(true);
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Fetch all data in parallel with cache headers
       const [ordersResponse, listingsData, offersResponse] = await Promise.all([
-        // Fetch seller orders
+        // Fetch seller orders with cache headers
         fetch('/marketplace/orders/seller-orders', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
+            'Cache-Control': 'max-age=60'
           },
           credentials: 'include'
         }),
         // Fetch my listings using API function
         getMyListings(setLoading),
-        // Fetch seller offers
+        // Fetch seller offers with cache headers
         fetch('/marketplace/offers/seller-offers', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
+            'Cache-Control': 'max-age=60'
           },
           credentials: 'include'
-        }).catch(() => ({ ok: false })) // Gracefully handle missing endpoint
+        }).catch(() => ({ ok: false, json: () => Promise.resolve([]) }))
       ]);
 
       // Handle orders response
@@ -118,29 +191,49 @@ const SellerDashboard: React.FC = () => {
       }
       const ordersData = await ordersResponse.json();
       const ordersArray = Array.isArray(ordersData) ? ordersData : ordersData.orders || ordersData.data || [];
-      setRecentOrders(ordersArray.slice(0, 5));
+      const recentOrdersArray = ordersArray.slice(0, 5);
+      setRecentOrders(recentOrdersArray);
+      setToCache(CACHE_KEYS.ORDERS, ordersArray);
 
       // Handle listings data from API function
       const listingsArray = Array.isArray(listingsData) ? listingsData : listingsData.listings || listingsData.data || [];
       setListings(listingsArray);
+      setToCache(CACHE_KEYS.LISTINGS, listingsArray);
 
       // Handle offers response
       let offersArray: Offer[] = [];
       if (offersResponse.ok) {
         const offersData = await offersResponse.json();
         offersArray = Array.isArray(offersData) ? offersData : offersData.offers || offersData.data || [];
+        setToCache(CACHE_KEYS.OFFERS, offersArray);
       }
       setOffers(offersArray);
 
       // Calculate statistics
       calculateStats(ordersArray, listingsArray, offersArray);
+      setLastFetchTime(Date.now());
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      setError('Failed to load dashboard data. Please try again.');
-      setRecentOrders([]);
-      setOffers([]);
-      setListings([]);
+      
+      // Fallback to cached data if available
+      const cachedListings = getFromCache<Listing[]>(CACHE_KEYS.LISTINGS);
+      const cachedOrders = getFromCache<Order[]>(CACHE_KEYS.ORDERS);
+      const cachedOffers = getFromCache<Offer[]>(CACHE_KEYS.OFFERS);
+
+      if (cachedListings && cachedOrders) {
+        setListings(cachedListings);
+        setRecentOrders(cachedOrders.slice(0, 5));
+        setOffers(cachedOffers || []);
+        calculateStats(cachedOrders, cachedListings, cachedOffers || []);
+        setUsingCachedData(true);
+        setError('Using cached data. Some information may be outdated.');
+      } else {
+        setError('Failed to load dashboard data. Please try again.');
+        setRecentOrders([]);
+        setOffers([]);
+        setListings([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -166,9 +259,18 @@ const SellerDashboard: React.FC = () => {
       totalRevenue,
       pendingOffers
     });
+    
+    setToCache(CACHE_KEYS.STATS, {
+      totalListings,
+      activeListings,
+      totalOrders,
+      pendingOrders,
+      totalRevenue,
+      pendingOffers
+    });
   };
 
-  // Listing Management Functions
+  // Enhanced Listing Management Functions with Cache Invalidation
   const handleCreateListing = async () => {
     try {
       setLoading(true);
@@ -184,7 +286,10 @@ const SellerDashboard: React.FC = () => {
       
       await createListing(formData, setLoading);
       setSuccess('Listing created successfully!');
-      await fetchDashboardData(); // Refresh data
+      
+      // Clear listings cache and refresh
+      clearCache(CACHE_KEYS.LISTINGS);
+      await fetchDashboardData(true); // Force refresh
     } catch (error) {
       console.error('Error creating listing:', error);
       setError('Failed to create listing. Please try again.');
@@ -196,7 +301,10 @@ const SellerDashboard: React.FC = () => {
       setError('');
       await updateListing(listingId, updatedData, setLoading);
       setSuccess('Listing updated successfully!');
-      await fetchDashboardData(); // Refresh data
+      
+      // Clear listings cache and refresh
+      clearCache(CACHE_KEYS.LISTINGS);
+      await fetchDashboardData(true); // Force refresh
     } catch (error) {
       console.error('Error updating listing:', error);
       setError('Failed to update listing. Please try again.');
@@ -209,7 +317,10 @@ const SellerDashboard: React.FC = () => {
         setError('');
         await deleteListing(listingId, setLoading);
         setSuccess('Listing deleted successfully!');
-        await fetchDashboardData(); // Refresh data
+        
+        // Clear listings cache and refresh
+        clearCache(CACHE_KEYS.LISTINGS);
+        await fetchDashboardData(true); // Force refresh
       } catch (error) {
         console.error('Error deleting listing:', error);
         setError('Failed to delete listing. Please try again.');
@@ -244,7 +355,10 @@ const SellerDashboard: React.FC = () => {
 
       if (response.ok) {
         setSuccess(`Offer ${action}ed successfully!`);
-        await fetchDashboardData();
+        
+        // Clear offers cache and refresh
+        clearCache(CACHE_KEYS.OFFERS);
+        await fetchDashboardData(true); // Force refresh
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to update offer');
@@ -269,7 +383,10 @@ const SellerDashboard: React.FC = () => {
 
       if (response.ok) {
         setSuccess('Counter offer sent successfully!');
-        await fetchDashboardData();
+        
+        // Clear offers cache and refresh
+        clearCache(CACHE_KEYS.OFFERS);
+        await fetchDashboardData(true); // Force refresh
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to send counter offer');
@@ -278,6 +395,13 @@ const SellerDashboard: React.FC = () => {
       console.error('Error sending counter offer:', error);
       setError(error instanceof Error ? error.message : 'Failed to send counter offer');
     }
+  };
+
+  // Add refresh button handler
+  const handleRefresh = () => {
+    clearCache();
+    setUsingCachedData(false);
+    fetchDashboardData(true);
   };
 
   const getStatusColor = (status: string) => {
@@ -356,9 +480,18 @@ const SellerDashboard: React.FC = () => {
     onClick?: () => void;
   }) => (
     <div 
-      className={`bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow ${onClick ? 'cursor-pointer hover:border-yellow-300' : ''}`}
+      className={`bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow relative ${
+        onClick ? 'cursor-pointer hover:border-yellow-300' : ''
+      }`}
       onClick={onClick}
     >
+      {usingCachedData && (
+        <div className="absolute top-2 right-2">
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+            Cached
+          </span>
+        </div>
+      )}
       <div className="flex items-center">
         <div className="flex-shrink-0">
           <div className={`w-12 h-12 bg-${color}-100 rounded-lg flex items-center justify-center`}>
@@ -425,6 +558,12 @@ const SellerDashboard: React.FC = () => {
           {listing.status === 'active' ? 'Deactivate' : 'Activate'}
         </button>
         <button
+          onClick={() => handleViewListingDetails(listing._id)}
+          className="flex-1 text-xs py-1 px-2 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+        >
+          View
+        </button>
+        <button
           onClick={() => handleDeleteListing(listing._id)}
           className="flex-1 text-xs py-1 px-2 rounded bg-red-100 text-red-700 hover:bg-red-200"
         >
@@ -452,10 +591,36 @@ const SellerDashboard: React.FC = () => {
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Page Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Seller Dashboard</h1>
-            <p className="mt-2 text-gray-600">Manage your listings, offers, and track your sales performance</p>
+          <div className="mb-8 flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Seller Dashboard</h1>
+              <p className="mt-2 text-gray-600">Manage your listings, offers, and track your sales performance</p>
+            </div>
+            <button
+              onClick={handleRefresh}
+              className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition duration-200"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refresh Data
+            </button>
           </div>
+
+          {/* Cache Status Indicator */}
+          {usingCachedData && (
+            <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <svg className="w-5 h-5 text-blue-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p className="text-blue-800 font-medium">Using cached data</p>
+                  <p className="text-blue-600 text-sm">Some information may be outdated. Click refresh to get the latest data.</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Success Message */}
           {success && (
@@ -711,7 +876,7 @@ const SellerDashboard: React.FC = () => {
                   <p className="text-sm text-gray-600 mt-1">Manage and respond to offers from buyers</p>
                 </div>
                 <button
-                  onClick={fetchDashboardData}
+                  onClick={handleRefresh}
                   className="text-sm text-gray-500 hover:text-gray-700 flex items-center"
                 >
                   <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -841,7 +1006,7 @@ const SellerDashboard: React.FC = () => {
                 </div>
                 <div className="flex space-x-3">
                   <button
-                    onClick={fetchDashboardData}
+                    onClick={handleRefresh}
                     className="text-sm text-gray-500 hover:text-gray-700 flex items-center"
                   >
                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
