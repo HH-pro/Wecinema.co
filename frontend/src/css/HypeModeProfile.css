@@ -293,11 +293,11 @@
 }
 
 .email-button {
-  background: #f59e0b;
+  background: #4285f4;
 }
 
 .email-button:hover {
-  background: #f59e0b;
+  background: #3367d6;
 }
 
 @media (max-width: 768px) {
@@ -403,6 +403,11 @@
   border: 1px solid #e2e8f0;
 }
 
+.subscription-box.selected .email-form {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
 @media (max-width: 768px) {
   .email-form {
     padding: 16px;
@@ -418,7 +423,7 @@
   }
 }
 
-//* Input Fields */
+/* Input Fields */
 .form-input {
   width: 100%;
   padding: 12px 15px;
@@ -444,7 +449,7 @@
   color: #2d3748;
 }
 
-/* For selected subscription boxes - ensure inputs remain readable */
+/* For selected subscription boxes - ensure inputs remain white and readable */
 .subscription-box.selected .form-input {
   background: white;
   color: #2d3748;
@@ -459,20 +464,7 @@
   background: white;
   color: #2d3748;
   border-color: #7b5af3;
-}
-
-@media (max-width: 768px) {
-  .form-input {
-    padding: 10px 12px;
-    font-size: 13px;
-  }
-}
-
-@media (max-width: 480px) {
-  .form-input {
-    padding: 8px 10px;
-    font-size: 12px;
-  }
+  box-shadow: 0 0 0 3px rgba(123, 90, 243, 0.2);
 }
 
 @media (max-width: 768px) {
