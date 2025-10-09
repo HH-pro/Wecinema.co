@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import OrderSummary from '../../components/marketplae/OrderSummary';
 import { getMyListings, createListing, updateListing, deleteListing } from '../../api';
-
+import { useNavigate } from "react-router-dom";
 interface DashboardStats {
   totalListings: number;
   activeListings: number;
@@ -64,6 +64,7 @@ interface Listing {
 type TabType = 'overview' | 'offers' | 'listings';
 
 const SellerDashboard: React.FC = () => {
+    const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats>({
     totalListings: 0,
     activeListings: 0,
@@ -169,27 +170,10 @@ const SellerDashboard: React.FC = () => {
   };
 
   // Listing Management Functions
-  const handleCreateListing = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      
-      // Create sample form data - in real app, this would come from a form
-      const formData = new FormData();
-      formData.append('title', 'New Product Listing');
-      formData.append('description', 'This is a sample product description');
-      formData.append('price', '99.99');
-      formData.append('category', 'electronics');
-      formData.append('tags', 'new,popular');
-      
-      await createListing(formData, setLoading);
-      setSuccess('Listing created successfully!');
-      await fetchDashboardData(); // Refresh data
-    } catch (error) {
-      console.error('Error creating listing:', error);
-      setError('Failed to create listing. Please try again.');
-    }
+  const handleCreateListing = () => {
+    navigate("/create-listing");
   };
+      
 
   const handleUpdateListing = async (listingId: string, updatedData: Partial<Listing>) => {
     try {
