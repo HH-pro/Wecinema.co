@@ -171,7 +171,7 @@ const SellerDashboard: React.FC = () => {
 
   // Listing Management Functions
   const handleCreateListing = () => {
-    navigate("/create-listing");
+    navigate("/marketplace/create-listing");
   };
       
 
