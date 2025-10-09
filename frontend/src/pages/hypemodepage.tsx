@@ -4,7 +4,7 @@ import { Layout } from "../components";
 import { useNavigate } from 'react-router-dom';
 import { motion } from "framer-motion";
 import Confetti from "react-confetti";
-import "../css/HypeModeProfile.csss";
+import "../css/HypeModeProfile.css";
 
 const API_BASE_URL = 'https://wecinema.co/api';
 
