@@ -2,11 +2,11 @@ import { useState, useEffect } from "react";
 import axios from 'axios';
 import { Layout } from "../components";
 import { useNavigate } from 'react-router-dom';
-import { getAuth, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
-import { googleProvider } from "./firebase";
 import { motion } from "framer-motion";
 import Confetti from "react-confetti";
-import "../css/HypeModeProfile.css";
+import "./styles/HypeModeProfile.css";
+
+const API_BASE_URL = 'https://wecinema.co/api';
 
 const HypeModeProfile = () => {
   const navigate = useNavigate();
@@ -16,167 +16,35 @@ const HypeModeProfile = () => {
   const [isSignup, setIsSignup] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
   const [userId, setUserId] = useState('');
   const [showFireworks, setShowFireworks] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState<"user" | "studio" | null>(null);
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer");
   const [isLoading, setIsLoading] = useState(false);
 
-  const registerUser = async (username: string, email: string, avatar: string, userType: string, callback: any) => {
-    try {
-      const res = await axios.post('https://wecinema.co/api/user/signup', {
-        username,
-        email,
-        avatar,
-        dob: "--------",
-        userType
-      });
-
-      const token = res.data.token;
-      const userId = res.data.id;
-
-      setPopupMessage(`Registration successful as ${userType}! Redirecting...`);
-      setShowPopup(true);
-
-      if (token) {
-        setIsLoggedIn(true);
-        setUserId(userId);
-
-        setTimeout(() => {
-          setShowPopup(false);
-          if (callback) callback();
-        }, 2000);
-      }
-    } catch (error: any) {
-      setIsLoading(false);
-      if (error.response && error.response.data && error.response.data.error === 'Email already exists.') {
-        setPopupMessage('Email already exists. Please sign in instead.');
-      } else {
-        setPopupMessage('Registration failed. Please try again.');
-      }
-      setShowPopup(true);
-    }
-  };
-
-  const loginUser = async (email: any, callback: any) => {
-    try {
-      const res = await axios.post('https://wecinema.co/api/user/signin', { email });
-
-      const backendToken = res.data.token;
-      const userId = res.data.id;
-
-      if (backendToken) {
-        localStorage.setItem('token', backendToken);
-        setIsLoggedIn(true);
-        setUserId(userId);
-        setPopupMessage('Login successful!');
-        setShowPopup(true);
-        if (callback) callback();
-      }
-    } catch (error: any) {
-      setIsLoading(false);
-      if (error.response) {
-        setPopupMessage(error.response.data.message || 'Login failed.');
-      } else {
-        setPopupMessage('Login failed. Please check your credentials.');
-      }
-      setShowPopup(true);
-    }
-  };
-
-  const onLoginSuccess = async (user: any, isEmailAuth: boolean = false) => {
-    const profile = user.providerData[0];
-    const email = profile.email;
-    const username = profile.displayName || email.split('@')[0];
-    const avatar = profile.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`;
-
-    try {
-      const callback = () => {
-        setIsLoading(false);
-        navigate('/payment', { 
-          state: { 
-            subscriptionType: selectedSubscription, 
-            amount: selectedSubscription === 'user' ? 5 : 10, 
-            userId,
-            userType 
-          } 
-        });
-      };
-
-      // For email authentication, we need to check if user exists in backend
-      if (isEmailAuth) {
-        if (isSignup) {
-          await registerUser(username, email, avatar, userType, callback);
-        } else {
-          await loginUser(email, callback);
-        }
-      } else {
-        // For Google auth, proceed directly
-        if (isSignup) {
-          await registerUser(username, email, avatar, userType, callback);
-        } else {
-          await loginUser(email, callback);
-        }
-      }
-    } catch (error) {
-      setIsLoading(false);
-      setPopupMessage('Authentication failed. Please try again.');
-      setShowPopup(true);
-    }
-  };
-
-  const onLoginFailure = (error: any) => {
-    setIsLoading(false);
-    console.error('Authentication error:', error);
-    
-    // More specific error messages
-    if (error.code === 'auth/invalid-email') {
-      setPopupMessage('Invalid email address format.');
-    } else if (error.code === 'auth/user-disabled') {
-      setPopupMessage('This account has been disabled.');
-    } else if (error.code === 'auth/user-not-found') {
-      setPopupMessage('No account found with this email. Please sign up.');
-    } else if (error.code === 'auth/wrong-password') {
-      setPopupMessage('Incorrect password. Please try again.');
-    } else if (error.code === 'auth/network-request-failed') {
-      setPopupMessage('Network error. Please check your connection.');
-    } else {
-      setPopupMessage('Authentication failed. Please try again.');
-    }
+  // Common success handler
+  const handleAuthSuccess = (token: string, user: any, message: string) => {
+    localStorage.setItem('token', token);
+    setIsLoggedIn(true);
+    setUserId(user.id);
+    setPopupMessage(message);
     setShowPopup(true);
+
+    setTimeout(() => {
+      setShowPopup(false);
+      navigate('/payment', { 
+        state: { 
+          subscriptionType: selectedSubscription, 
+          amount: selectedSubscription === 'user' ? 5 : 10, 
+          userId: user.id,
+          userType: user.userType || 'buyer'
+        } 
+      });
+    }, 2000);
   };
 
-  const handleGoogleLogin = async () => {
-    if (!selectedSubscription) {
-      setPopupMessage("Please select a subscription first.");
-      setShowPopup(true);
-      return;
-    }
-
-    setIsLoading(true);
-    const auth = getAuth();
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-      await onLoginSuccess(user);
-    } catch (error: any) {
-      onLoginFailure(error);
-    }
-  };
-
-  const handleGoogleLogout = async () => {
-    const auth = getAuth();
-    try {
-      await signOut(auth);
-      setIsLoggedIn(false);
-      setPopupMessage('Logout successful.');
-      setShowPopup(true);
-    } catch (error) {
-      setPopupMessage('Logout failed. Please try again.');
-      setShowPopup(true);
-    }
-  };
-
+  // Email & Password Signup
   const handleEmailSignup = async () => {
     if (!selectedSubscription) {
       setPopupMessage("Please select a subscription first.");
@@ -184,8 +52,8 @@ const HypeModeProfile = () => {
       return;
     }
 
-    if (!email || !password) {
-      setPopupMessage("Please enter both email and password.");
+    if (!email || !password || !username) {
+      setPopupMessage("Please enter username, email and password.");
       setShowPopup(true);
       return;
     }
@@ -197,16 +65,27 @@ const HypeModeProfile = () => {
     }
 
     setIsLoading(true);
-    const auth = getAuth();
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      await onLoginSuccess(user, true);
+      const response = await axios.post(`${API_BASE_URL}/user/signup`, {
+        username,
+        email,
+        password,
+        userType,
+        dob: "--------",
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`,
+        isGoogleAuth: false
+      });
+
+      const { token, user } = response.data;
+      handleAuthSuccess(token, user, `Registration successful as ${userType}!`);
     } catch (error: any) {
-      onLoginFailure(error);
+      setIsLoading(false);
+      setPopupMessage(error.response?.data?.error || 'Registration failed. Please try again.');
+      setShowPopup(true);
     }
   };
 
+  // Email & Password Login
   const handleEmailLogin = async () => {
     if (!selectedSubscription) {
       setPopupMessage("Please select a subscription first.");
@@ -221,13 +100,71 @@ const HypeModeProfile = () => {
     }
 
     setIsLoading(true);
-    const auth = getAuth();
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      await onLoginSuccess(user, true);
+      const response = await axios.post(`${API_BASE_URL}/user/signin`, {
+        email,
+        password,
+        isGoogleAuth: false
+      });
+
+      const { token, user } = response.data;
+      handleAuthSuccess(token, user, 'Login successful!');
     } catch (error: any) {
-      onLoginFailure(error);
+      setIsLoading(false);
+      setPopupMessage(error.response?.data?.error || 'Login failed. Please check your credentials.');
+      setShowPopup(true);
+    }
+  };
+
+  // Google Authentication (using same routes)
+  const handleGoogleAuth = async () => {
+    if (!selectedSubscription) {
+      setPopupMessage("Please select a subscription first.");
+      setShowPopup(true);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Simulate Google OAuth data (in real app, this comes from Google OAuth response)
+      const googleUserData = {
+        email: "user@gmail.com", // From Google OAuth
+        username: "Google User", // From Google OAuth  
+        avatar: "https://icon-library.com/images/google-user-icon/google-user-icon-0.jpg", // From Google OAuth
+        userType
+      };
+
+      // Check if user exists - try login first
+      try {
+        // Try to login with Google
+        const loginResponse = await axios.post(`${API_BASE_URL}/user/signin`, {
+          email: googleUserData.email,
+          isGoogleAuth: true
+        });
+
+        const { token, user } = loginResponse.data;
+        handleAuthSuccess(token, user, 'Google login successful!');
+      } catch (loginError: any) {
+        // If login fails, try signup
+        if (loginError.response?.status === 401) {
+          const signupResponse = await axios.post(`${API_BASE_URL}/user/signup`, {
+            username: googleUserData.username,
+            email: googleUserData.email,
+            avatar: googleUserData.avatar,
+            userType: googleUserData.userType,
+            isGoogleAuth: true
+          });
+
+          const { token, user } = signupResponse.data;
+          handleAuthSuccess(token, user, 'Google signup successful!');
+        } else {
+          throw loginError;
+        }
+      }
+    } catch (error: any) {
+      setIsLoading(false);
+      setPopupMessage(error.response?.data?.error || 'Google authentication failed. Please try again.');
+      setShowPopup(true);
     }
   };
 
@@ -244,6 +181,7 @@ const HypeModeProfile = () => {
     setIsSignup(!isSignup);
     setEmail('');
     setPassword('');
+    setUsername('');
     setSelectedSubscription(null);
   };
 
@@ -281,8 +219,13 @@ const HypeModeProfile = () => {
           <div className="cards-container">
             <div className="subscription-box">
               <h3 className="subscription-title">Logout</h3>
-              <button className="subscription-button" onClick={handleGoogleLogout} disabled={isLoading}>
-                {isLoading ? "Processing..." : "Logout"}
+              <button className="subscription-button" onClick={() => {
+                localStorage.removeItem('token');
+                setIsLoggedIn(false);
+                setPopupMessage('Logout successful!');
+                setShowPopup(true);
+              }} disabled={isLoading}>
+                Logout
               </button>
             </div>
           </div>
@@ -329,13 +272,23 @@ const HypeModeProfile = () => {
 
                 <button 
                   className="subscription-button" 
-                  onClick={handleGoogleLogin}
+                  onClick={handleGoogleAuth}
                   disabled={isLoading}
                 >
                   {isLoading ? "Processing..." : (isSignup ? "Sign up with Google" : "Sign in with Google")}
                 </button>
                 
                 <div className="email-form">
+                  {isSignup && (
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Enter your username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      disabled={isLoading}
+                    />
+                  )}
                   <input
                     type="email"
                     className="form-input"
@@ -384,13 +337,23 @@ const HypeModeProfile = () => {
 
                 <button 
                   className="subscription-button" 
-                  onClick={handleGoogleLogin}
+                  onClick={handleGoogleAuth}
                   disabled={isLoading}
                 >
                   {isLoading ? "Processing..." : (isSignup ? "Sign up with Google" : "Sign in with Google")}
                 </button>
                 
                 <div className="email-form">
+                  {isSignup && (
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Enter your username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      disabled={isLoading}
+                    />
+                  )}
                   <input
                     type="email"
                     className="form-input"
@@ -428,7 +391,7 @@ const HypeModeProfile = () => {
           <div className="popup">
             <p>{popupMessage}</p>
             <button className="subscription-button" onClick={closePopup}>
-              {isLoading ? "Processing..." : "Close"}
+              Close
             </button>
           </div>
         </>
