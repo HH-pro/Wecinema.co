@@ -43,14 +43,12 @@
   from {
     padding-top: 30px;
     padding-bottom: 30px;
-    margin-top: 0;
-    margin-bottom: 0;
+    min-height: 500px;
   }
   to {
-    padding-top: 50px;
-    padding-bottom: 50px;
-    margin-top: -20px;
-    margin-bottom: -20px;
+    padding-top: 40px;
+    padding-bottom: 40px;
+    min-height: 650px;
   }
 }
 
@@ -58,7 +56,7 @@
 .main-container {
   display: flex;
   flex-direction: column;
-  min-height: 180vh;
+  min-height: 100vh;
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
   justify-content: flex-start;
   align-items: center;
@@ -70,6 +68,7 @@
   .main-container {
     padding: 20px 10px;
     gap: 20px;
+    min-height: 120vh;
   }
 }
 
@@ -125,7 +124,7 @@
     0 15px 35px rgba(0, 0, 0, 0.3),
     0 10px 25px rgba(0, 0, 0, 0.2);
   position: relative;
-  overflow: visible;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -136,7 +135,7 @@
 }
 
 .subscription-box:hover {
-  transform: translateY(-8px) scale(1.02);
+  transform: translateY(-5px);
   box-shadow: 
     0 20px 45px rgba(245, 158, 11, 0.2),
     0 15px 35px rgba(0, 0, 0, 0.25);
@@ -147,17 +146,36 @@
   border: 3px solid #f59e0b;
   background: linear-gradient(135deg, #1a202c, #2d3748);
   color: white;
-  transform: translateY(-20px) scale(1.02);
+  transform: translateY(-10px);
   box-shadow: 
     0 25px 50px rgba(245, 158, 11, 0.4),
     0 20px 40px rgba(245, 158, 11, 0.3);
-  padding: 50px 25px;
-  margin-top: -20px;
-  margin-bottom: -20px;
+  padding: 40px 25px;
+  min-height: 650px;
   z-index: 10;
   animation: expandCard 0.4s ease-out;
 }
 
+.subscription-box.selected::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b);
+  animation: slideIn 0.5s ease-out;
+}
+
+/* Auth Section - Always visible in selected cards */
+.subscription-box.selected .auth-section {
+  display: block;
+  animation: slideDown 0.4s ease-out 0.2s both;
+}
+
+.subscription-box:not(.selected) .auth-section {
+  display: none;
+}
 
 /* Ensure non-selected cards maintain position */
 .cards-container .subscription-box:not(.selected) {
@@ -173,9 +191,8 @@
   }
   
   .subscription-box.selected {
-    padding: 45px 20px;
-    margin-top: -15px;
-    margin-bottom: -15px;
+    padding: 35px 20px;
+    min-height: 600px;
   }
 }
 
@@ -187,10 +204,9 @@
   }
   
   .subscription-box.selected {
-    padding: 40px 20px;
-    margin-top: -10px;
-    margin-bottom: -10px;
-    transform: translateY(-15px) scale(1.01);
+    padding: 30px 20px;
+    min-height: 550px;
+    transform: translateY(-8px);
   }
 }
 
@@ -203,10 +219,9 @@
   }
   
   .subscription-box.selected {
-    padding: 35px 15px;
-    margin-top: -8px;
-    margin-bottom: -8px;
-    transform: translateY(-12px) scale(1.01);
+    padding: 25px 15px;
+    min-height: 500px;
+    transform: translateY(-5px);
   }
 }
 
@@ -219,10 +234,9 @@
   }
   
   .subscription-box.selected {
-    padding: 30px 12px;
-    margin-top: -6px;
-    margin-bottom: -6px;
-    transform: translateY(-10px) scale(1.01);
+    padding: 22px 12px;
+    min-height: 450px;
+    transform: translateY(-3px);
   }
 }
 
@@ -311,6 +325,7 @@
   padding: 0;
   margin: 20px 0;
   text-align: left;
+  flex-grow: 1;
 }
 
 .features-list li {
@@ -707,8 +722,8 @@
 
 /* Auth Section */
 .auth-section {
-  margin-top: 20px;
   width: 100%;
+  animation: slideDown 0.4s ease-out 0.2s both;
 }
 
 /* Google Auth Button */
