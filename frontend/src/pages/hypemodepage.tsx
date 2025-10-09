@@ -417,10 +417,7 @@ const HypeModeProfile = () => {
                   <li>All Basic Features</li>
                   <li>Early Feature Access</li>
                   <li>Priority Support</li>
-                  <li>Advanced Analytics</li>
-                  <li>50GB Storage</li>
                   <li>Team Collaboration</li>
-                  <li>Custom Branding</li>
                 </ul>
 
                 {selectedSubscription === "studio" && (
