@@ -89,8 +89,8 @@ const SellerDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [error, setError] = useState<string>('');
   const [success, setSuccess] = useState<string>('');
-  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
   const [usingCachedData, setUsingCachedData] = useState<boolean>(false);
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
   // Cache utility functions
   const getFromCache = <T,>(key: string): T | null => {
@@ -102,7 +102,8 @@ const SellerDashboard: React.FC = () => {
       const isExpired = Date.now() - timestamp > CACHE_DURATION;
 
       return isExpired ? null : data;
-    } catch {
+    } catch (error) {
+      console.warn('Cache read error:', error);
       return null;
     }
   };
@@ -120,17 +121,21 @@ const SellerDashboard: React.FC = () => {
   };
 
   const clearCache = (key?: string) => {
-    if (key) {
-      localStorage.removeItem(key);
-    } else {
-      Object.values(CACHE_KEYS).forEach(k => localStorage.removeItem(k));
+    try {
+      if (key) {
+        localStorage.removeItem(key);
+      } else {
+        Object.values(CACHE_KEYS).forEach(k => localStorage.removeItem(k));
+      }
+    } catch (error) {
+      console.warn('Cache clear error:', error);
     }
   };
 
-  const isCacheValid = (): boolean => {
-    const cachedListings = getFromCache(CACHE_KEYS.LISTINGS);
-    const cachedOrders = getFromCache(CACHE_KEYS.ORDERS);
-    return !!(cachedListings && cachedOrders);
+  // Debug function to log API responses
+  const debugLog = (message: string, data?: any) => {
+    console.log(`[Dashboard Debug] ${message}`, data || '');
+    setDebugInfo(prev => `${prev}\n${message}: ${data ? JSON.stringify(data).substring(0, 100) : ''}`);
   };
 
   useEffect(() => {
@@ -143,12 +148,19 @@ const SellerDashboard: React.FC = () => {
       setError('');
       setSuccess('');
       setUsingCachedData(false);
+      debugLog('Starting dashboard data fetch', { forceRefresh });
 
       // Try to get cached data first (unless force refresh)
-      if (!forceRefresh && isCacheValid()) {
+      if (!forceRefresh) {
         const cachedListings = getFromCache<Listing[]>(CACHE_KEYS.LISTINGS);
         const cachedOrders = getFromCache<Order[]>(CACHE_KEYS.ORDERS);
         const cachedOffers = getFromCache<Offer[]>(CACHE_KEYS.OFFERS);
+
+        debugLog('Cache check', { 
+          hasListings: !!cachedListings, 
+          hasOrders: !!cachedOrders, 
+          hasOffers: !!cachedOffers 
+        });
 
         if (cachedListings && cachedOrders) {
           setListings(cachedListings);
@@ -157,69 +169,173 @@ const SellerDashboard: React.FC = () => {
           calculateStats(cachedOrders, cachedListings, cachedOffers || []);
           setUsingCachedData(true);
           setLoading(false);
+          debugLog('Using cached data successfully');
           return;
         }
       }
 
-      // Fetch all data in parallel with cache headers
-      const [ordersResponse, listingsData, offersResponse] = await Promise.all([
-        // Fetch seller orders with cache headers
-        fetch('/marketplace/orders/seller-orders', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'max-age=60'
-          },
-          credentials: 'include'
-        }),
-        // Fetch my listings using API function
-        getMyListings(setLoading),
-        // Fetch seller offers with cache headers
-        fetch('/marketplace/offers/seller-offers', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'max-age=60'
-          },
-          credentials: 'include'
-        }).catch(() => ({ ok: false, json: () => Promise.resolve([]) }))
-      ]);
+      debugLog('Fetching fresh data from APIs');
 
-      // Handle orders response
-      if (!ordersResponse.ok) {
-        throw new Error('Failed to fetch orders');
+      // Fetch data with better error handling and timeouts
+      const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeout = 8000) => {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeout);
+        
+        try {
+          const response = await fetch(url, {
+            ...options,
+            signal: controller.signal,
+            credentials: 'include'
+          });
+          clearTimeout(id);
+          return response;
+        } catch (error) {
+          clearTimeout(id);
+          throw error;
+        }
+      };
+
+      // Fetch data in parallel but handle failures gracefully
+      const fetchPromises = [
+        // Fetch listings using API function
+        (async () => {
+          try {
+            debugLog('Fetching listings...');
+            const listingsData = await getMyListings(setLoading);
+            debugLog('Listings response', listingsData);
+            return { type: 'listings', data: listingsData, error: null };
+          } catch (error) {
+            debugLog('Listings fetch error', error);
+            return { type: 'listings', data: null, error };
+          }
+        })(),
+
+        // Fetch orders
+        (async () => {
+          try {
+            debugLog('Fetching orders...');
+            const response = await fetchWithTimeout('/api/marketplace/orders/seller-orders', {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+              }
+            });
+            
+            if (!response.ok) {
+              throw new Error(`Orders API failed: ${response.status} ${response.statusText}`);
+            }
+            
+            const ordersData = await response.json();
+            debugLog('Orders response', ordersData);
+            return { type: 'orders', data: ordersData, error: null };
+          } catch (error) {
+            debugLog('Orders fetch error', error);
+            return { type: 'orders', data: null, error };
+          }
+        })(),
+
+        // Fetch offers
+        (async () => {
+          try {
+            debugLog('Fetching offers...');
+            const response = await fetchWithTimeout('/api/marketplace/offers/seller-offers', {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+              }
+            });
+            
+            if (!response.ok) {
+              // Offers endpoint might not exist, that's okay
+              debugLog('Offers endpoint not available or failed');
+              return { type: 'offers', data: [], error: null };
+            }
+            
+            const offersData = await response.json();
+            debugLog('Offers response', offersData);
+            return { type: 'offers', data: offersData, error: null };
+          } catch (error) {
+            debugLog('Offers fetch error', error);
+            return { type: 'offers', data: [], error: null }; // Offers are optional
+          }
+        })()
+      ];
+
+      const results = await Promise.all(fetchPromises);
+      debugLog('All fetch results', results);
+
+      // Process results
+      let hasCriticalError = false;
+      const errors: string[] = [];
+
+      results.forEach(result => {
+        switch (result.type) {
+          case 'listings':
+            if (result.error) {
+              errors.push('Failed to fetch listings');
+              hasCriticalError = true;
+            } else {
+              const listingsArray = Array.isArray(result.data) ? result.data : 
+                result.data?.listings || result.data?.data || [];
+              setListings(listingsArray);
+              setToCache(CACHE_KEYS.LISTINGS, listingsArray);
+              debugLog('Listings processed', { count: listingsArray.length });
+            }
+            break;
+
+          case 'orders':
+            if (result.error) {
+              errors.push('Failed to fetch orders');
+              hasCriticalError = true;
+            } else {
+              const ordersArray = Array.isArray(result.data) ? result.data : 
+                result.data?.orders || result.data?.data || [];
+              setRecentOrders(ordersArray.slice(0, 5));
+              setToCache(CACHE_KEYS.ORDERS, ordersArray);
+              debugLog('Orders processed', { count: ordersArray.length });
+            }
+            break;
+
+          case 'offers':
+            if (!result.error) {
+              const offersArray = Array.isArray(result.data) ? result.data : 
+                result.data?.offers || result.data?.data || [];
+              setOffers(offersArray);
+              setToCache(CACHE_KEYS.OFFERS, offersArray);
+              debugLog('Offers processed', { count: offersArray.length });
+            }
+            break;
+        }
+      });
+
+      if (hasCriticalError) {
+        throw new Error(errors.join(', '));
       }
-      const ordersData = await ordersResponse.json();
-      const ordersArray = Array.isArray(ordersData) ? ordersData : ordersData.orders || ordersData.data || [];
-      const recentOrdersArray = ordersArray.slice(0, 5);
-      setRecentOrders(recentOrdersArray);
-      setToCache(CACHE_KEYS.ORDERS, ordersArray);
 
-      // Handle listings data from API function
-      const listingsArray = Array.isArray(listingsData) ? listingsData : listingsData.listings || listingsData.data || [];
-      setListings(listingsArray);
-      setToCache(CACHE_KEYS.LISTINGS, listingsArray);
+      // Calculate statistics with current state
+      calculateStats(
+        getFromCache<Order[]>(CACHE_KEYS.ORDERS) || [],
+        getFromCache<Listing[]>(CACHE_KEYS.LISTINGS) || [],
+        getFromCache<Offer[]>(CACHE_KEYS.OFFERS) || []
+      );
 
-      // Handle offers response
-      let offersArray: Offer[] = [];
-      if (offersResponse.ok) {
-        const offersData = await offersResponse.json();
-        offersArray = Array.isArray(offersData) ? offersData : offersData.offers || offersData.data || [];
-        setToCache(CACHE_KEYS.OFFERS, offersArray);
-      }
-      setOffers(offersArray);
-
-      // Calculate statistics
-      calculateStats(ordersArray, listingsArray, offersArray);
       setLastFetchTime(Date.now());
+      debugLog('Dashboard data fetch completed successfully');
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      debugLog('Dashboard fetch failed', error);
       
       // Fallback to cached data if available
       const cachedListings = getFromCache<Listing[]>(CACHE_KEYS.LISTINGS);
       const cachedOrders = getFromCache<Order[]>(CACHE_KEYS.ORDERS);
       const cachedOffers = getFromCache<Offer[]>(CACHE_KEYS.OFFERS);
+
+      debugLog('Fallback cache check', {
+        hasListings: !!cachedListings,
+        hasOrders: !!cachedOrders,
+        hasOffers: !!cachedOffers
+      });
 
       if (cachedListings && cachedOrders) {
         setListings(cachedListings);
@@ -227,17 +343,30 @@ const SellerDashboard: React.FC = () => {
         setOffers(cachedOffers || []);
         calculateStats(cachedOrders, cachedListings, cachedOffers || []);
         setUsingCachedData(true);
-        setError('Using cached data. Some information may be outdated.');
+        setError('Using cached data. Some information may be outdated. ' + error);
       } else {
-        setError('Failed to load dashboard data. Please try again.');
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load dashboard data';
+        setError(`${errorMessage}. Please check your connection and try again.`);
         setRecentOrders([]);
         setOffers([]);
         setListings([]);
+        
+        // Set empty stats
+        setStats({
+          totalListings: 0,
+          activeListings: 0,
+          totalOrders: 0,
+          pendingOrders: 0,
+          totalRevenue: 0,
+          pendingOffers: 0
+        });
       }
     } finally {
       setLoading(false);
     }
   };
+
+  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
 
   const calculateStats = (orders: Order[], listings: Listing[], offers: Offer[]) => {
     const totalListings = listings.length;
@@ -401,6 +530,7 @@ const SellerDashboard: React.FC = () => {
   const handleRefresh = () => {
     clearCache();
     setUsingCachedData(false);
+    setDebugInfo(''); // Clear debug info on refresh
     fetchDashboardData(true);
   };
 
@@ -573,6 +703,22 @@ const SellerDashboard: React.FC = () => {
     </div>
   );
 
+  // Debug panel component
+  const DebugPanel = () => (
+    <div className="mt-4 p-4 bg-gray-100 rounded-lg">
+      <h3 className="text-sm font-medium text-gray-900 mb-2">Debug Information</h3>
+      <pre className="text-xs text-gray-600 whitespace-pre-wrap max-h-32 overflow-y-auto">
+        {debugInfo || 'No debug information available'}
+      </pre>
+      <button
+        onClick={() => setDebugInfo('')}
+        className="mt-2 text-xs text-gray-500 hover:text-gray-700"
+      >
+        Clear Debug Info
+      </button>
+    </div>
+  );
+
   if (loading) {
     return (
       <MarketplaceLayout>
@@ -641,7 +787,18 @@ const SellerDashboard: React.FC = () => {
                 <svg className="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <p className="text-red-800">{error}</p>
+                <div>
+                  <p className="text-red-800 font-medium">{error}</p>
+                  <p className="text-red-600 text-sm mt-1">
+                    Check your network connection and make sure the backend server is running.
+                  </p>
+                  <button
+                    onClick={handleRefresh}
+                    className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+                  >
+                    Try Again
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -1050,6 +1207,9 @@ const SellerDashboard: React.FC = () => {
               </div>
             </div>
           )}
+
+          {/* Debug Panel - Only show in development */}
+          {process.env.NODE_ENV === 'development' && <DebugPanel />}
         </div>
       </div>
     </MarketplaceLayout>
