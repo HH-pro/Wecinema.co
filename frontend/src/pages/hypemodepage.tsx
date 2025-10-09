@@ -9,13 +9,7 @@ import { motion } from "framer-motion";
 import Confetti from "react-confetti";
 
 const MainContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  background: linear-gradient(to right, #ffffa1 0%, #ffc800 100%);
-  justify-content: center;
-  align-items: center;
-  padding: 20px;
+  
   box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
 
   @media (max-width: 768px) {
