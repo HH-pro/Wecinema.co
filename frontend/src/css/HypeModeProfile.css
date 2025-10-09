@@ -418,7 +418,7 @@
   }
 }
 
-/* Input Fields */
+//* Input Fields */
 .form-input {
   width: 100%;
   padding: 12px 15px;
@@ -428,6 +428,11 @@
   box-sizing: border-box;
   transition: all 0.3s ease;
   background: white;
+  color: #2d3748;
+}
+
+.form-input::placeholder {
+  color: #a0aec0;
 }
 
 .form-input:focus {
@@ -435,6 +440,39 @@
   border-color: #7b5af3;
   box-shadow: 0 0 0 3px rgba(123, 90, 243, 0.2);
   transform: translateY(-1px);
+  background: white;
+  color: #2d3748;
+}
+
+/* For selected subscription boxes - ensure inputs remain readable */
+.subscription-box.selected .form-input {
+  background: white;
+  color: #2d3748;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.subscription-box.selected .form-input::placeholder {
+  color: #a0aec0;
+}
+
+.subscription-box.selected .form-input:focus {
+  background: white;
+  color: #2d3748;
+  border-color: #7b5af3;
+}
+
+@media (max-width: 768px) {
+  .form-input {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .form-input {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
 }
 
 @media (max-width: 768px) {
