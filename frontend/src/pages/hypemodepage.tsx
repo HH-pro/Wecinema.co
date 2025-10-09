@@ -54,51 +54,66 @@ const SubscriptionContainer = styled.div`
 `;
 
 const SubscriptionBox = styled.div`
- display: flex;
-  flex-direction: row;
-  justify-content: center;
-  align-items: stretch;
-  width: 90%;
-  max-width: 1200px;
-  gap: 30px;
-  padding: 30px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-  background: linear-gradient(145deg, #ffffff, #f3f3f3);
+  flex: 1;
+  min-width: 400px;
+  max-width: 550px;
+  padding: 40px 35px;
+  border-radius: 25px;
+  background: rgba(255, 255, 255, 0.95);
   text-align: center;
   cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 8px 8px 20px rgba(0, 0, 0, 0.1), -8px -8px 20px rgba(255, 255, 255, 0.8);
+  transition: all 0.4s ease;
+  box-shadow: 
+    0 20px 40px rgba(0, 0, 0, 0.1),
+    0 15px 35px rgba(0, 0, 0, 0.08);
   position: relative;
   overflow: hidden;
   display: flex;
+  flex-direction: column;
   justify-content: space-between;
+  border: 2px solid transparent;
 
   &:hover {
-    transform: translateY(-10px);
-    box-shadow: 12px 12px 30px rgba(0, 0, 0, 0.15), -12px -12px 30px rgba(255, 255, 255, 0.9);
+    transform: translateY(-12px) scale(1.02);
+    box-shadow: 
+      0 30px 60px rgba(0, 0, 0, 0.15),
+      0 25px 50px rgba(0, 0, 0, 0.12);
+    border-color: rgba(123, 90, 243, 0.3);
   }
 
   &.selected {
-    border: 3px solid #ff4500;
-    box-shadow: 0px 8px 25px rgba(255, 69, 0, 0.4);
-    background: linear-gradient(145deg, #ff6347, #ff4500);
+    border: 3px solid #7b5af3;
+    background: linear-gradient(135deg, #7b5af3, #6541d7);
     color: white;
-    transform: translateY(-5px);
+    transform: translateY(-8px) scale(1.01);
+    box-shadow: 
+      0 25px 50px rgba(123, 90, 243, 0.3),
+      0 20px 40px rgba(123, 90, 243, 0.2);
+  }
+
+  @media (max-width: 1200px) {
+    min-width: 350px;
+    max-width: 500px;
+    padding: 35px 30px;
   }
 
   @media (max-width: 1024px) {
     width: 100%;
-    max-width: 500px;
+    max-width: 600px;
     min-width: auto;
   }
 
   @media (max-width: 768px) {
-    padding: 20px 15px;
+    padding: 30px 25px;
+    min-width: 300px;
+    border-radius: 20px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 25px 20px;
     min-width: 280px;
   }
 `;
-
 const Title = styled.h3`
   font-size: 28px;
   font-weight: 800;
