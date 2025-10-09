@@ -676,7 +676,6 @@ const HypeModeProfile = () => {
                 </UserTypeSelector>
               )}
 
-              <SubscriptionContainer>
                 {/* User Subscription Box */}
                 <SubscriptionBox
                   onClick={() => handleSubscriptionClick("user")}
@@ -760,7 +759,6 @@ const HypeModeProfile = () => {
                     </EmailButton>
                   </EmailForm>
                 </SubscriptionBox>
-              </SubscriptionContainer>
             </>
           )}
         </RightContainer>
