@@ -54,6 +54,15 @@ const SubscriptionContainer = styled.div`
 `;
 
 const SubscriptionBox = styled.div`
+ display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: stretch;
+  width: 90%;
+  max-width: 1200px;
+  gap: 30px;
+  padding: 30px;
+  background: rgba(255, 255, 255, 0.1);
   flex: 1;
   min-width: 300px;
   max-width: 450px;
