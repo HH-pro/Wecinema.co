@@ -111,7 +111,6 @@
   box-shadow: 
     0 20px 45px rgba(245, 158, 11, 0.3),
     0 15px 35px rgba(245, 158, 11, 0.2);
-  animation: pulse 2s infinite;
 }
 
 .subscription-box.selected::before {
