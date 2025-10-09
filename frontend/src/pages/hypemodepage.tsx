@@ -11,7 +11,7 @@ import Confetti from "react-confetti";
 const MainContainer = styled.div`
   display: flex;
   flex-direction: column;
-  height: 90vh;
+  min-height: 100vh;
   background: linear-gradient(to right, #ffffa1 0%, #ffc800 100%);
   justify-content: center;
   align-items: center;
@@ -19,79 +19,163 @@ const MainContainer = styled.div`
   box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
 
   @media (max-width: 768px) {
-    padding: 1px;
-    height: 120vh;
+    padding: 10px;
     justify-content: flex-start;
   }
 `;
 
 const SubscriptionContainer = styled.div`
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   justify-content: center;
-  align-items: center;
+  align-items: stretch;
   width: 90%;
-  max-width: 800px;
-  gap: 20px;
-  padding: 25px;
+  max-width: 1200px;
+  gap: 30px;
+  padding: 30px;
   background: rgba(255, 255, 255, 0.1);
-  border-radius: 15px;
+  border-radius: 20px;
   backdrop-filter: blur(12px);
   box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.2);
   transition: all 0.3s ease-in-out;
 
-  @media (min-width: 768px) {
-    flex-direction: row;
-    flex-wrap: wrap;
+  @media (max-width: 1024px) {
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+  }
+
+  @media (max-width: 768px) {
+    width: 95%;
+    padding: 15px;
+    gap: 15px;
   }
 `;
 
 const SubscriptionBox = styled.div`
-  width: 100%;
-  max-width: 350px;
-  padding: 20px;
-  border-radius: 12px;
+  flex: 1;
+  min-width: 300px;
+  max-width: 450px;
+  padding: 30px 25px;
+  border-radius: 20px;
   background: linear-gradient(145deg, #ffffff, #f3f3f3);
   text-align: center;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.1), -4px -4px 10px rgba(255, 255, 255, 0.6);
+  box-shadow: 8px 8px 20px rgba(0, 0, 0, 0.1), -8px -8px 20px rgba(255, 255, 255, 0.8);
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 
   &:hover {
-    transform: scale(1.07);
-    box-shadow: 6px 6px 15px rgba(0, 0, 0, 0.15), -6px -6px 15px rgba(255, 255, 255, 0.7);
+    transform: translateY(-10px);
+    box-shadow: 12px 12px 30px rgba(0, 0, 0, 0.15), -12px -12px 30px rgba(255, 255, 255, 0.9);
   }
 
   &.selected {
-    border: 2px solid #ff4500;
-    box-shadow: 0px 4px 15px rgba(255, 69, 0, 0.4);
+    border: 3px solid #ff4500;
+    box-shadow: 0px 8px 25px rgba(255, 69, 0, 0.4);
     background: linear-gradient(145deg, #ff6347, #ff4500);
     color: white;
+    transform: translateY(-5px);
+  }
+
+  @media (max-width: 1024px) {
+    width: 100%;
+    max-width: 500px;
+    min-width: auto;
+  }
+
+  @media (max-width: 768px) {
+    padding: 20px 15px;
+    min-width: 280px;
   }
 `;
 
 const Title = styled.h3`
-  font-size: 20px;
-  font-weight: 700;
-  margin-bottom: 10px;
+  font-size: 28px;
+  font-weight: 800;
+  margin-bottom: 15px;
   color: #333;
   transition: color 0.3s ease;
   
   ${SubscriptionBox}.selected & {
     color: white;
   }
+
+  @media (max-width: 768px) {
+    font-size: 24px;
+  }
 `;
 
 const Description = styled.p`
-  font-size: 16px;
+  font-size: 18px;
   color: #777;
-  margin-bottom: 12px;
+  margin-bottom: 20px;
+  line-height: 1.5;
   transition: color 0.3s ease;
   
   ${SubscriptionBox}.selected & {
     color: white;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 16px;
+  }
+`;
+
+const Price = styled.div`
+  font-size: 32px;
+  font-weight: 900;
+  color: #ff4500;
+  margin: 15px 0;
+  transition: color 0.3s ease;
+  
+  ${SubscriptionBox}.selected & {
+    color: white;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 28px;
+  }
+`;
+
+const FeaturesList = styled.ul`
+  list-style: none;
+  padding: 0;
+  margin: 20px 0;
+  text-align: left;
+  
+  li {
+    padding: 8px 0;
+    font-size: 16px;
+    color: #555;
+    transition: color 0.3s ease;
+    
+    &:before {
+      content: "✓ ";
+      color: #4CAF50;
+      font-weight: bold;
+      margin-right: 10px;
+    }
+    
+    ${SubscriptionBox}.selected & {
+      color: white;
+      
+      &:before {
+        color: #90EE90;
+      }
+    }
+  }
+
+  @media (max-width: 768px) {
+    li {
+      font-size: 14px;
+      padding: 6px 0;
+    }
   }
 `;
 
@@ -100,40 +184,52 @@ const RightContainer = styled.div`
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 30px;
   width: 100%;
-  max-width: 400px;
-  padding: 25px;
+  max-width: 500px;
+  padding: 30px;
   background: rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
+  border-radius: 15px;
   backdrop-filter: blur(10px);
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.15);
   transition: all 0.3s ease-in-out;
 
   @media (max-width: 768px) {
-    width: 100%;
+    width: 95%;
+    padding: 20px;
+    margin-bottom: 20px;
   }
 `;
 
 const Button = styled.button`
   width: 100%;
-  max-width: 200px;
-  padding: 12px 18px;
-  font-size: 16px;
-  font-weight: 600;
+  max-width: 250px;
+  padding: 15px 25px;
+  font-size: 18px;
+  font-weight: 700;
   color: white;
   background: #7b5af3;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0px 4px 10px rgba(123, 90, 243, 0.3);
-  margin: 5px 0;
+  box-shadow: 0px 6px 15px rgba(123, 90, 243, 0.4);
+  margin: 8px 0;
 
   &:hover {
     background: #6541d7;
-    box-shadow: 0px 6px 15px rgba(123, 90, 243, 0.5);
-    transform: scale(1.05);
+    box-shadow: 0px 8px 20px rgba(123, 90, 243, 0.6);
+    transform: translateY(-2px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+
+  @media (max-width: 768px) {
+    padding: 12px 20px;
+    font-size: 16px;
+    max-width: 220px;
   }
 `;
 
@@ -147,23 +243,28 @@ const EmailButton = styled(Button)`
 
 const ToggleButton = styled.button`
   color: #000;
-  border: 2px solid #000;
-  padding: 10px 18px;
+  border: 3px solid #000;
+  padding: 12px 24px;
   margin-bottom: 30px;
   cursor: pointer;
-  transition: background 0.3s, transform 0.2s;
-  border-radius: 5px;
-  font-size: 16px;
+  transition: all 0.3s ease;
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
 
   &:hover {
-    background: #f0f0f0;
+    background: #000;
+    color: white;
     transform: scale(1.05);
   }
 
   @media (max-width: 768px) {
-    padding: 8px 14px;
-    margin-top: 80px;
-    font-size: 14px;
+    padding: 10px 20px;
+    margin-top: 20px;
+    font-size: 16px;
+    margin-bottom: 20px;
   }
 `;
 
@@ -172,14 +273,21 @@ const Popup = styled.div`
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  padding: 20px;
+  padding: 30px;
   background: #fff;
-  border: 2px solid #000;
+  border: 3px solid #000;
   z-index: 1000;
   max-width: 90%;
-  border-radius: 10px;
-  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.3);
+  width: 400px;
+  border-radius: 15px;
+  box-shadow: 0px 8px 25px rgba(0, 0, 0, 0.3);
   box-sizing: border-box;
+  text-align: center;
+
+  @media (max-width: 768px) {
+    width: 90%;
+    padding: 20px;
+  }
 `;
 
 const Overlay = styled.div`
@@ -197,25 +305,73 @@ const EmailForm = styled.div`
   flex-direction: column;
   gap: 15px;
   width: 100%;
-  margin-top: 20px;
-  padding: 20px;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 10px;
-  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+  margin-top: 25px;
+  padding: 25px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 15px;
+  box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.1);
+  border: 2px solid #e0e0e0;
+
+  @media (max-width: 768px) {
+    padding: 20px;
+    gap: 12px;
+  }
 `;
 
 const Input = styled.input`
   width: 100%;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
+  padding: 15px;
+  border: 2px solid #ddd;
+  border-radius: 10px;
   font-size: 16px;
   box-sizing: border-box;
+  transition: all 0.3s ease;
   
   &:focus {
     outline: none;
     border-color: #7b5af3;
-    box-shadow: 0 0 0 2px rgba(123, 90, 243, 0.2);
+    box-shadow: 0 0 0 3px rgba(123, 90, 243, 0.2);
+    transform: translateY(-2px);
+  }
+
+  @media (max-width: 768px) {
+    padding: 12px;
+    font-size: 14px;
+  }
+`;
+
+const UserTypeSelector = styled.div`
+  display: flex;
+  gap: 15px;
+  margin: 15px 0;
+  width: 100%;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    gap: 10px;
+  }
+`;
+
+const UserTypeButton = styled.button<{ active: boolean }>`
+  flex: 1;
+  padding: 12px 20px;
+  border: 2px solid ${props => props.active ? '#7b5af3' : '#ddd'};
+  background: ${props => props.active ? '#7b5af3' : 'white'};
+  color: ${props => props.active ? 'white' : '#333'};
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  font-size: 16px;
+
+  &:hover {
+    border-color: #7b5af3;
+    transform: translateY(-2px);
+  }
+
+  @media (max-width: 768px) {
+    padding: 10px 15px;
+    font-size: 14px;
   }
 `;
 
@@ -235,13 +391,20 @@ const Banner = styled.div`
   background: linear-gradient(to right, #ff4e50, #f9d423);
   color: white;
   text-align: center;
-  padding: 20px;
-  font-size: 22px;
+  padding: 25px;
+  font-size: 24px;
   font-weight: bold;
   position: relative;
   animation: ${slideIn} 1s ease-in-out;
-  border-radius: 5px;
-  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  box-shadow: 0px 6px 15px rgba(0, 0, 0, 0.2);
+  margin-bottom: 30px;
+
+  @media (max-width: 768px) {
+    font-size: 20px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
 `;
 
 const HypeModeProfile = () => {
@@ -255,20 +418,22 @@ const HypeModeProfile = () => {
   const [userId, setUserId] = useState('');
   const [showFireworks, setShowFireworks] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState<"user" | "studio" | null>(null);
+  const [userType, setUserType] = useState<"buyer" | "seller">("buyer");
 
-  const registerUser = async (username: string, email: string, avatar: string, callback: any) => {
+  const registerUser = async (username: string, email: string, avatar: string, userType: string, callback: any) => {
     try {
       const res = await axios.post('https://wecinema.co/api/user/signup', {
         username,
         email,
         avatar,
-        dob: "--------"
+        dob: "--------",
+        userType // Add userType to the registration
       });
 
       const token = res.data.token;
       const userId = res.data.id;
 
-      setPopupMessage('Registration successful Go back to logged in!');
+      setPopupMessage(`Registration successful as ${userType}! Redirecting...`);
       setShowPopup(true);
 
       if (token) {
@@ -318,14 +483,21 @@ const HypeModeProfile = () => {
   const onLoginSuccess = async (user: any) => {
     const profile = user.providerData[0];
     const email = profile.email;
-    const username = profile.displayName || email.split('@')[0]; // Fallback to email username
+    const username = profile.displayName || email.split('@')[0];
     const avatar = profile.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`;
 
     try {
-      const callback = () => navigate('/payment', { state: { subscriptionType: selectedSubscription, amount: selectedSubscription === 'user' ? 5 : 10, userId } });
+      const callback = () => navigate('/payment', { 
+        state: { 
+          subscriptionType: selectedSubscription, 
+          amount: selectedSubscription === 'user' ? 5 : 10, 
+          userId,
+          userType 
+        } 
+      });
 
       if (isSignup) {
-        await registerUser(username, email, avatar, callback);
+        await registerUser(username, email, avatar, userType, callback);
       } else {
         await loginUser(email, callback);
       }
@@ -341,6 +513,12 @@ const HypeModeProfile = () => {
   };
 
   const handleGoogleLogin = async () => {
+    if (!selectedSubscription) {
+      setPopupMessage("Please select a subscription first.");
+      setShowPopup(true);
+      return;
+    }
+
     const auth = getAuth();
     try {
       const result = await signInWithPopup(auth, googleProvider);
@@ -436,19 +614,6 @@ const HypeModeProfile = () => {
     setSelectedSubscription(subscriptionType);
   };
 
-  const handleLogin = async (method: "google" | "email") => {
-    if (!selectedSubscription) {
-      setShowPopup(true);
-      setPopupMessage("Please select a subscription first.");
-      return;
-    }
-
-    if (method === "google") {
-      await handleGoogleLogin();
-    }
-    // Email login/signup is handled separately through the form buttons
-  };
-
   const toggleSignupSignin = () => {
     setIsSignup(!isSignup);
     setEmail('');
@@ -492,69 +657,111 @@ const HypeModeProfile = () => {
               </SubscriptionBox>
             </SubscriptionContainer>
           ) : (
-            <SubscriptionContainer>
-              {/* User Subscription Box */}
-              <SubscriptionBox
-                onClick={() => handleSubscriptionClick("user")}
-                className={selectedSubscription === "user" ? "selected" : ""}
-              >
-                <Title>User Subscription</Title>
-                <Description>$5/month – Buy & Sell Films & Scripts</Description>
-                <Button onClick={() => handleLogin("google")}>
-                  {isSignup ? "Sign up with Google" : "Sign in with Google"}
-                </Button>
-                
-                {/* Email Form */}
-                <EmailForm>
-                  <Input
-                    type="email"
-                    placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                  <Input
-                    type="password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                  <EmailButton onClick={isSignup ? handleEmailSignup : handleEmailLogin}>
-                    {isSignup ? "Sign up with Email" : "Sign in with Email"}
-                  </EmailButton>
-                </EmailForm>
-              </SubscriptionBox>
+            <>
+              {/* User Type Selector - Only show for signup */}
+              {isSignup && (
+                <UserTypeSelector>
+                  <UserTypeButton 
+                    active={userType === "buyer"} 
+                    onClick={() => setUserType("buyer")}
+                  >
+                    👤 Sign up as Buyer
+                  </UserTypeButton>
+                  <UserTypeButton 
+                    active={userType === "seller"} 
+                    onClick={() => setUserType("seller")}
+                  >
+                    🏪 Sign up as Seller
+                  </UserTypeButton>
+                </UserTypeSelector>
+              )}
 
-              {/* Studio Subscription Box */}
-              <SubscriptionBox
-                onClick={() => handleSubscriptionClick("studio")}
-                className={selectedSubscription === "studio" ? "selected" : ""}
-              >
-                <Title>Studio Subscription</Title>
-                <Description>$10/month – Buy, Sell & Get Early Feature Access</Description>
-                <Button onClick={() => handleLogin("google")}>
-                  {isSignup ? "Sign up with Google" : "Sign in with Google"}
-                </Button>
-                
-                {/* Email Form */}
-                <EmailForm>
-                  <Input
-                    type="email"
-                    placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                  <Input
-                    type="password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                  <EmailButton onClick={isSignup ? handleEmailSignup : handleEmailLogin}>
-                    {isSignup ? "Sign up with Email" : "Sign in with Email"}
-                  </EmailButton>
-                </EmailForm>
-              </SubscriptionBox>
-            </SubscriptionContainer>
+              <SubscriptionContainer>
+                {/* User Subscription Box */}
+                <SubscriptionBox
+                  onClick={() => handleSubscriptionClick("user")}
+                  className={selectedSubscription === "user" ? "selected" : ""}
+                >
+                  <Title>Basic Plan</Title>
+                  <Price>$5/month</Price>
+                  <Description>Perfect for individual users and content enthusiasts</Description>
+                  
+                  <FeaturesList>
+                    <li>Buy Films & Scripts</li>
+                    <li>Sell Your Content</li>
+                    <li>Basic Support</li>
+                    <li>Access to Community</li>
+                    <li>5GB Storage</li>
+                  </FeaturesList>
+
+                  <Button onClick={() => handleGoogleLogin()}>
+                    {isSignup ? "Sign up with Google" : "Sign in with Google"}
+                  </Button>
+                  
+                  {/* Email Form */}
+                  <EmailForm>
+                    <Input
+                      type="email"
+                      placeholder="Enter your email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                    <Input
+                      type="password"
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <EmailButton onClick={isSignup ? handleEmailSignup : handleEmailLogin}>
+                      {isSignup ? "Sign up with Email" : "Sign in with Email"}
+                    </EmailButton>
+                  </EmailForm>
+                </SubscriptionBox>
+
+                {/* Studio Subscription Box */}
+                <SubscriptionBox
+                  onClick={() => handleSubscriptionClick("studio")}
+                  className={selectedSubscription === "studio" ? "selected" : ""}
+                >
+                  <Title>Pro Plan</Title>
+                  <Price>$10/month</Price>
+                  <Description>Advanced features for studios and professional creators</Description>
+                  
+                  <FeaturesList>
+                    <li>All Basic Features</li>
+                    <li>Early Feature Access</li>
+                    <li>Priority Support</li>
+                    <li>Advanced Analytics</li>
+                    <li>50GB Storage</li>
+                    <li>Team Collaboration</li>
+                    <li>Custom Branding</li>
+                  </FeaturesList>
+
+                  <Button onClick={() => handleGoogleLogin()}>
+                    {isSignup ? "Sign up with Google" : "Sign in with Google"}
+                  </Button>
+                  
+                  {/* Email Form */}
+                  <EmailForm>
+                    <Input
+                      type="email"
+                      placeholder="Enter your email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                    <Input
+                      type="password"
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <EmailButton onClick={isSignup ? handleEmailSignup : handleEmailLogin}>
+                      {isSignup ? "Sign up with Email" : "Sign in with Email"}
+                    </EmailButton>
+                  </EmailForm>
+                </SubscriptionBox>
+              </SubscriptionContainer>
+            </>
           )}
         </RightContainer>
       </MainContainer>
