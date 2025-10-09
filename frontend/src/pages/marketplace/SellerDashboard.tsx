@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { getMyListings } from "../../api";
+import { getMyListings } from "../../api"; // keep this one only
 import { motion } from "framer-motion";
 import { FaBox, FaClipboardList, FaHandshake, FaChartLine } from "react-icons/fa";
+import { toast } from "react-toastify";
 
 interface Listing {
   _id: string;
@@ -34,6 +35,7 @@ const SellerDashboard: React.FC = () => {
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
+  // ✅ Keep only fetching user listings from backend
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -41,7 +43,7 @@ const SellerDashboard: React.FC = () => {
         const listingsData = await getMyListings();
         setListings(listingsData);
 
-        // Mock Data for Orders & Offers
+        // Mock data for now
         setOrders([
           { _id: "1", buyer: "Ali", item: "Product A", total: 1200, status: "Shipped" },
           { _id: "2", buyer: "Sara", item: "Product B", total: 800, status: "Pending" },
@@ -51,7 +53,7 @@ const SellerDashboard: React.FC = () => {
           { _id: "2", buyer: "Zara", item: "Product D", offerAmount: 700, status: "Pending" },
         ]);
       } catch (error) {
-        console.error("Error fetching seller dashboard data:", error);
+        console.error("Error fetching listings:", error);
       } finally {
         setLoading(false);
       }
@@ -60,16 +62,29 @@ const SellerDashboard: React.FC = () => {
     fetchData();
   }, []);
 
+  // ⚙️ Buttons still exist but no API actions
+  const handleCreateListing = () => {
+    toast.info("Create Listing feature disabled for now.");
+  };
+
+  const handleEditListing = (id: string) => {
+    toast.info(`Edit listing feature disabled (ID: ${id})`);
+  };
+
+  const handleDeleteListing = (id: string) => {
+    toast.warn(`Delete feature disabled (ID: ${id})`);
+  };
+
+  const handleToggleStatus = (id: string) => {
+    toast.info(`Toggle status feature disabled (ID: ${id})`);
+  };
+
   const stats = [
     { title: "Total Listings", value: listings.length, icon: <FaBox className="text-blue-500" /> },
     { title: "Total Orders", value: orders.length, icon: <FaClipboardList className="text-green-500" /> },
     { title: "Total Offers", value: offers.length, icon: <FaHandshake className="text-yellow-500" /> },
     { title: "Active Listings", value: listings.filter(l => l.status === "active").length, icon: <FaChartLine className="text-purple-500" /> },
   ];
-
-  const handleViewListingDetails = (id: string) => {
-    alert(`View details for listing ID: ${id}`);
-  };
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -90,6 +105,19 @@ const SellerDashboard: React.FC = () => {
             </div>
           </motion.div>
         ))}
+      </div>
+
+      {/* Quick Actions */}
+      <div className="flex justify-end mb-6">
+        <button
+          onClick={handleCreateListing}
+          className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-xl shadow hover:bg-blue-700 transition"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Create New Listing
+        </button>
       </div>
 
       {/* Listings Section */}
@@ -117,12 +145,26 @@ const SellerDashboard: React.FC = () => {
                 >
                   Status: {listing.status}
                 </p>
-                <button
-                  onClick={() => handleViewListingDetails(listing._id)}
-                  className="mt-3 w-full text-sm py-2 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
-                >
-                  View Details
-                </button>
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => handleEditListing(listing._id)}
+                    className="text-sm px-3 py-1 rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteListing(listing._id)}
+                    className="text-sm px-3 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    onClick={() => handleToggleStatus(listing._id)}
+                    className="text-sm px-3 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+                  >
+                    Toggle
+                  </button>
+                </div>
               </motion.div>
             ))}
           </div>
