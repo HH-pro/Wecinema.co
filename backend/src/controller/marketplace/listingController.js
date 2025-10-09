@@ -18,18 +18,60 @@ router.get("/listings", async (req, res) => {
 });
 
 // ===================================================
-// ✅ PROTECTED ROUTE — Get current user's listings
+// ✅ PROTECTED ROUTE — Get current user's listings (OPTIMIZED)
 // ===================================================
 router.get("/my-listings", authenticateMiddleware, async (req, res) => {
   try {
-    const listings = await MarketplaceListing.find({ sellerId: req.user._id });
+    const sellerId = req.user._id;
+    
+    // Generate a cache key based on the user's listings
+    const cacheKey = `user_listings_${sellerId}`;
+    
+    // Check if client has a cached version
+    const ifModifiedSince = req.headers['if-modified-since'];
+    const ifNoneMatch = req.headers['if-none-match'];
+    
+    // Get the latest update timestamp for user's listings
+    const lastUpdated = await MarketplaceListing.findOne(
+      { sellerId },
+      { updatedAt: 1 }
+    ).sort({ updatedAt: -1 });
+    
+    // If no listings exist or couldn't determine last update
+    if (!lastUpdated) {
+      const listings = await MarketplaceListing.find({ sellerId });
+      if (listings.length === 0) {
+        // Cache empty results for shorter time
+        res.setHeader('Cache-Control', 'no-cache');
+        return res.status(200).json([]);
+      }
+    }
+    
+    const lastModified = lastUpdated?.updatedAt || new Date();
+    const etag = `"${lastModified.getTime()}"`;
+    
+    // Set cache headers
+    res.setHeader('Cache-Control', 'public, max-age=60'); // Cache for 60 seconds
+    res.setHeader('Last-Modified', lastModified.toUTCString());
+    res.setHeader('ETag', etag);
+    
+    // Check if content is unchanged
+    if (
+      (ifModifiedSince && new Date(ifModifiedSince) >= lastModified) ||
+      (ifNoneMatch && ifNoneMatch === etag)
+    ) {
+      return res.status(304).send(); // Not Modified - stop here
+    }
+    
+    // Fetch and return fresh data
+    const listings = await MarketplaceListing.find({ sellerId });
     res.status(200).json(listings);
+    
   } catch (error) {
     console.error("❌ Error fetching my listings:", error);
     res.status(500).json({ error: "Failed to fetch my listings" });
   }
 });
-
 // ===================================================
 // ✅ CREATE LISTING (like your working video route)
 // ===================================================
