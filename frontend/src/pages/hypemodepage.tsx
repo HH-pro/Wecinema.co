@@ -63,10 +63,6 @@ const SubscriptionBox = styled.div`
   gap: 30px;
   padding: 30px;
   background: rgba(255, 255, 255, 0.1);
-  flex: 1;
-  min-width: 300px;
-  max-width: 450px;
-  padding: 30px 25px;
   border-radius: 20px;
   background: linear-gradient(145deg, #ffffff, #f3f3f3);
   text-align: center;
