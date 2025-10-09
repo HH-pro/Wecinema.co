@@ -72,7 +72,6 @@ const SubscriptionBox = styled.div`
   position: relative;
   overflow: hidden;
   display: flex;
-  flex-direction: column;
   justify-content: space-between;
 
   &:hover {
