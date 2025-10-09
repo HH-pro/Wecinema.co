@@ -14,7 +14,7 @@
 .main-container {
   display: flex;
   flex-direction: column;
-  min-height: 150vh;
+  min-height: 170vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   justify-content: center;
   align-items: center;
