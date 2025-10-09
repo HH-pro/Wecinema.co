@@ -457,7 +457,6 @@
 }
 
 .subscription-box.selected .form-input::placeholder {
-  color: #a0aec0;
 }
 
 .subscription-box.selected .form-input:focus {
@@ -502,6 +501,7 @@
   flex: 1;
   padding: 12px 20px;
   border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
   color: white;
   border-radius: 10px;
   cursor: pointer;
