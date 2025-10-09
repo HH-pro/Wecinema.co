@@ -1,13 +1,12 @@
-import { useState,useEffect } from "react";
+import { useState, useEffect } from "react";
 import axios from 'axios';
-import styled , { keyframes } from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 import { Layout } from "../components";
 import { useNavigate } from 'react-router-dom';
 import { getAuth, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { googleProvider } from "./firebase";
 import { motion } from "framer-motion";
 import Confetti from "react-confetti";
-
 
 const MainContainer = styled.div`
   display: flex;
@@ -25,6 +24,7 @@ const MainContainer = styled.div`
     justify-content: flex-start;
   }
 `;
+
 const SubscriptionContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -128,6 +128,7 @@ const Button = styled.button`
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 0px 4px 10px rgba(123, 90, 243, 0.3);
+  margin: 5px 0;
 
   &:hover {
     background: #6541d7;
@@ -136,13 +137,18 @@ const Button = styled.button`
   }
 `;
 
+const EmailButton = styled(Button)`
+  background: #4285f4;
 
+  &:hover {
+    background: #3367d6;
+  }
+`;
 
 const ToggleButton = styled.button`
   color: #000;
   border: 2px solid #000;
   padding: 10px 18px;
-
   margin-bottom: 30px;
   cursor: pointer;
   transition: background 0.3s, transform 0.2s;
@@ -186,6 +192,33 @@ const Overlay = styled.div`
   z-index: 999;
 `;
 
+const EmailForm = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  width: 100%;
+  margin-top: 20px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+`;
+
+const Input = styled.input`
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 16px;
+  box-sizing: border-box;
+  
+  &:focus {
+    outline: none;
+    border-color: #7b5af3;
+    box-shadow: 0 0 0 2px rgba(123, 90, 243, 0.2);
+  }
+`;
+
 const slideIn = keyframes`
   from {
     transform: translateY(-100%);
@@ -211,7 +244,6 @@ const Banner = styled.div`
   box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
 `;
 
-
 const HypeModeProfile = () => {
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -222,8 +254,9 @@ const HypeModeProfile = () => {
   const [password, setPassword] = useState('');
   const [userId, setUserId] = useState('');
   const [showFireworks, setShowFireworks] = useState(false);
+  const [selectedSubscription, setSelectedSubscription] = useState<"user" | "studio" | null>(null);
 
-  const registerUser = async (username:string, email:string, avatar:string, callback:any) => {
+  const registerUser = async (username: string, email: string, avatar: string, callback: any) => {
     try {
       const res = await axios.post('https://wecinema.co/api/user/signup', {
         username,
@@ -235,7 +268,6 @@ const HypeModeProfile = () => {
       const token = res.data.token;
       const userId = res.data.id;
 
-      // console.log('Registration Response:', res); // Debugging line
       setPopupMessage('Registration successful Go back to logged in!');
       setShowPopup(true);
 
@@ -246,27 +278,24 @@ const HypeModeProfile = () => {
         setTimeout(() => {
           setShowPopup(false);
           if (callback) callback();
-        }, 2000); // Show popup for 2 seconds before executing the callback
+        }, 2000);
       }
-    } catch (error:any) {
-      // console.error('Registration Error:', error); // Debugging line
+    } catch (error: any) {
       if (error.response && error.response.data && error.response.data.error === 'Email already exists.') {
         setPopupMessage('Email already exists.');
       } else {
-        setPopupMessage('Email already exists. Please sigin.');
+        setPopupMessage('Email already exists. Please sign in.');
       }
       setShowPopup(true);
     }
   };
 
-  const loginUser = async (email:any, callback:any) => {
+  const loginUser = async (email: any, callback: any) => {
     try {
       const res = await axios.post('https://wecinema.co/api/user/signin', { email });
 
       const backendToken = res.data.token;
       const userId = res.data.id;
-
-      // console.log('Login Response:', res); // Debugging line
 
       if (backendToken) {
         localStorage.setItem('token', backendToken);
@@ -276,8 +305,7 @@ const HypeModeProfile = () => {
         setShowPopup(true);
         if (callback) callback();
       }
-    } catch (error:any) {
-      // console.error('Login Error:', error); // Debugging line
+    } catch (error: any) {
       if (error.response) {
         setPopupMessage(error.response.data.message || 'Login failed.');
       } else {
@@ -287,11 +315,11 @@ const HypeModeProfile = () => {
     }
   };
 
-  const onLoginSuccess = async (user:any) => {
+  const onLoginSuccess = async (user: any) => {
     const profile = user.providerData[0];
     const email = profile.email;
-    const username = profile.displayName;
-    const avatar = profile.photoURL;
+    const username = profile.displayName || email.split('@')[0]; // Fallback to email username
+    const avatar = profile.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`;
 
     try {
       const callback = () => navigate('/payment', { state: { subscriptionType: selectedSubscription, amount: selectedSubscription === 'user' ? 5 : 10, userId } });
@@ -302,15 +330,13 @@ const HypeModeProfile = () => {
         await loginUser(email, callback);
       }
     } catch (error) {
-      // console.error('Failed to get Firebase token:', error);
       setPopupMessage('Failed to get Firebase token. Please try again.');
       setShowPopup(true);
     }
   };
 
-  const onLoginFailure = (error:any) => {
-    // console.error('Google login failed:', error);
-    setPopupMessage('Google login failed. Please try again.');
+  const onLoginFailure = (error: any) => {
+    setPopupMessage('Login failed. Please try again.');
     setShowPopup(true);
   };
 
@@ -333,61 +359,83 @@ const HypeModeProfile = () => {
       setPopupMessage('Logout successful.');
       setShowPopup(true);
     } catch (error) {
-      // console.error('Logout failed:', error);
       setPopupMessage('Logout failed. Please try again.');
       setShowPopup(true);
     }
   };
 
   const handleEmailSignup = async () => {
+    if (!selectedSubscription) {
+      setPopupMessage("Please select a subscription first.");
+      setShowPopup(true);
+      return;
+    }
+
+    if (!email || !password) {
+      setPopupMessage("Please enter both email and password.");
+      setShowPopup(true);
+      return;
+    }
+
     const auth = getAuth();
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       await onLoginSuccess(user);
-    } catch (error:any) {
-      // console.error('Email signup failed:', error);
+    } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
         setPopupMessage('Email already in use. Please try logging in.');
+      } else if (error.code === 'auth/weak-password') {
+        setPopupMessage('Password should be at least 6 characters.');
+      } else if (error.code === 'auth/invalid-email') {
+        setPopupMessage('Invalid email address.');
       } else {
         setPopupMessage('Email signup failed. Please try again.');
       }
       setShowPopup(true);
     }
   };
-  
+
   const handleEmailLogin = async () => {
+    if (!selectedSubscription) {
+      setPopupMessage("Please select a subscription first.");
+      setShowPopup(true);
+      return;
+    }
+
+    if (!email || !password) {
+      setPopupMessage("Please enter both email and password.");
+      setShowPopup(true);
+      return;
+    }
+
     const auth = getAuth();
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       await onLoginSuccess(user);
-    } catch (error:any) {
-      // console.error('Email login failed:', error);
+    } catch (error: any) {
       if (error.code === 'auth/user-not-found') {
         setPopupMessage('No user found with this email. Please sign up.');
       } else if (error.code === 'auth/wrong-password') {
         setPopupMessage('Incorrect password. Please try again.');
+      } else if (error.code === 'auth/invalid-email') {
+        setPopupMessage('Invalid email address.');
       } else {
         setPopupMessage('Email login failed. Please try again.');
       }
       setShowPopup(true);
     }
   };
-  
+
   const closePopup = () => {
     setShowPopup(false);
   };
 
-  
-  const [selectedSubscription, setSelectedSubscription] = useState<"user" | "studio" | null>(null);
-
-   // Handle Subscription Selection
-   const handleSubscriptionClick = (subscriptionType: "user" | "studio") => {
+  const handleSubscriptionClick = (subscriptionType: "user" | "studio") => {
     setSelectedSubscription(subscriptionType);
   };
 
-  // Handle Login & Navigate After Login
   const handleLogin = async (method: "google" | "email") => {
     if (!selectedSubscription) {
       setShowPopup(true);
@@ -397,99 +445,132 @@ const HypeModeProfile = () => {
 
     if (method === "google") {
       await handleGoogleLogin();
-    } else {
-      await (isSignup ? handleEmailSignup() : handleEmailLogin());
     }
-
-    if (isLoggedIn) {
-      const amount = selectedSubscription === "user" ? 5 : 10;
-      navigate("/payment", { state: { subscriptionType: selectedSubscription, amount, userId } });
-    }
-  }
-
-  
+    // Email login/signup is handled separately through the form buttons
+  };
 
   const toggleSignupSignin = () => {
     setIsSignup(!isSignup);
+    setEmail('');
+    setPassword('');
   };
+
   useEffect(() => {
-        setShowFireworks(true);
-        setTimeout(() => setShowFireworks(false), 1000); // Fireworks for 5 seconds
-    }, []);
-    return (
-      <Layout expand={false} hasHeader={true}>
-        <Banner>🔥 HypeMode is Here! Exclusive Features Await! 🔥</Banner>
-    
-        {/* Fireworks Animation */}
-        {showFireworks && (
-          <motion.div
-            className="absolute inset-0 flex justify-center items-center"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.2 }}
-            transition={{ duration: 1.5, ease: "easeOut" }}
-          >
-            <div className="relative w-full h-full pointer-events-none">
-              <Confetti width={window.innerWidth} height={window.innerHeight} numberOfPieces={200} recycle={false} />
-            </div>
-          </motion.div>
-        )}
-    
-        <MainContainer>
-          <ToggleButton onClick={toggleSignupSignin}>
-            {isSignup ? "Already have an account? Switch to Sign in" : "Don't have an account? Switch to Sign up"}
-          </ToggleButton>
-    
-          <RightContainer>
-            {isLoggedIn ? (
-              <SubscriptionContainer>
-                <SubscriptionBox>
-                  <Title>Logout</Title>
-                  <Button onClick={handleGoogleLogout}>Logout</Button>
-                </SubscriptionBox>
-              </SubscriptionContainer>
-            ) : (
-              <SubscriptionContainer>
-                {/* User Subscription Box */}
-                <SubscriptionBox
-                  onClick={() => handleSubscriptionClick("user")}
-                  className={selectedSubscription === "user" ? "selected" : ""}
-                >
-                  <Title>User Subscription</Title>
-                  <Description>$5/month – Buy & Sell Films & Scripts</Description>
-                  <Button onClick={() => handleLogin("google")}>
-                    {isSignup ? "Sign up with Google" : "Sign in with Google"}
-                  </Button>
-                </SubscriptionBox>
-    
-                {/* Studio Subscription Box */}
-                <SubscriptionBox
-                  onClick={() => handleSubscriptionClick("studio")}
-                  className={selectedSubscription === "studio" ? "selected" : ""}
-                >
-                  <Title>Studio Subscription</Title>
-                  <Description>$10/month – Buy, Sell & Get Early Feature Access</Description>
-                  <Button onClick={() => handleLogin("google")}>
-                    {isSignup ? "Sign up with Google" : "Sign in with Google"}
-                  </Button>
-                </SubscriptionBox>
-              </SubscriptionContainer>
-            )}
-          </RightContainer>
-        </MainContainer>
-  
-        {/* Popup Message */}
-        {showPopup && (
-          <>
-            <Overlay onClick={() => setShowPopup(false)} />
-            <Popup>
-              <p>{popupMessage}</p>
-              <Button onClick={() => setShowPopup(false)}>Close</Button>
-            </Popup>
-          </>
-        )}
-      </Layout>
-    );
-  };
+    setShowFireworks(true);
+    setTimeout(() => setShowFireworks(false), 1000);
+  }, []);
+
+  return (
+    <Layout expand={false} hasHeader={true}>
+      <Banner>🔥 HypeMode is Here! Exclusive Features Await! 🔥</Banner>
+
+      {showFireworks && (
+        <motion.div
+          className="absolute inset-0 flex justify-center items-center"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 1.2 }}
+          transition={{ duration: 1.5, ease: "easeOut" }}
+        >
+          <div className="relative w-full h-full pointer-events-none">
+            <Confetti width={window.innerWidth} height={window.innerHeight} numberOfPieces={200} recycle={false} />
+          </div>
+        </motion.div>
+      )}
+
+      <MainContainer>
+        <ToggleButton onClick={toggleSignupSignin}>
+          {isSignup ? "Already have an account? Switch to Sign in" : "Don't have an account? Switch to Sign up"}
+        </ToggleButton>
+
+        <RightContainer>
+          {isLoggedIn ? (
+            <SubscriptionContainer>
+              <SubscriptionBox>
+                <Title>Logout</Title>
+                <Button onClick={handleGoogleLogout}>Logout</Button>
+              </SubscriptionBox>
+            </SubscriptionContainer>
+          ) : (
+            <SubscriptionContainer>
+              {/* User Subscription Box */}
+              <SubscriptionBox
+                onClick={() => handleSubscriptionClick("user")}
+                className={selectedSubscription === "user" ? "selected" : ""}
+              >
+                <Title>User Subscription</Title>
+                <Description>$5/month – Buy & Sell Films & Scripts</Description>
+                <Button onClick={() => handleLogin("google")}>
+                  {isSignup ? "Sign up with Google" : "Sign in with Google"}
+                </Button>
+                
+                {/* Email Form */}
+                <EmailForm>
+                  <Input
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                  <Input
+                    type="password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <EmailButton onClick={isSignup ? handleEmailSignup : handleEmailLogin}>
+                    {isSignup ? "Sign up with Email" : "Sign in with Email"}
+                  </EmailButton>
+                </EmailForm>
+              </SubscriptionBox>
+
+              {/* Studio Subscription Box */}
+              <SubscriptionBox
+                onClick={() => handleSubscriptionClick("studio")}
+                className={selectedSubscription === "studio" ? "selected" : ""}
+              >
+                <Title>Studio Subscription</Title>
+                <Description>$10/month – Buy, Sell & Get Early Feature Access</Description>
+                <Button onClick={() => handleLogin("google")}>
+                  {isSignup ? "Sign up with Google" : "Sign in with Google"}
+                </Button>
+                
+                {/* Email Form */}
+                <EmailForm>
+                  <Input
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                  <Input
+                    type="password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <EmailButton onClick={isSignup ? handleEmailSignup : handleEmailLogin}>
+                    {isSignup ? "Sign up with Email" : "Sign in with Email"}
+                  </EmailButton>
+                </EmailForm>
+              </SubscriptionBox>
+            </SubscriptionContainer>
+          )}
+        </RightContainer>
+      </MainContainer>
+
+      {/* Popup Message */}
+      {showPopup && (
+        <>
+          <Overlay onClick={closePopup} />
+          <Popup>
+            <p>{popupMessage}</p>
+            <Button onClick={closePopup}>Close</Button>
+          </Popup>
+        </>
+      )}
+    </Layout>
+  );
+};
 
 export default HypeModeProfile;
