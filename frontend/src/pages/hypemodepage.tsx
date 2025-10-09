@@ -351,56 +351,54 @@ const HypeModeProfile = () => {
                   <li>5GB Storage</li>
                 </ul>
 
-                {selectedSubscription === "user" && (
-                  <div className="auth-section">
-                    <button className="subscription-button google-auth-button" onClick={handleGoogleLogin} disabled={isLoading}>
-                      <span className="google-icon">G</span>
-                      {isLoading ? "Processing..." : (isSignup ? "Sign up with Google" : "Sign in with Google")}
-                    </button>
+               // Remove showEmailForm state and related toggles
+// Auth section automatically show hoga jab card selected hoga
 
-                    <div className="auth-divider">
-                      <span>or</span>
-                    </div>
+{selectedSubscription === "user" && (
+  <div className="auth-section">
+    <button className="subscription-button google-auth-button" onClick={handleGoogleLogin} disabled={isLoading}>
+      <span className="google-icon">G</span>
+      {isLoading ? "Processing..." : (isSignup ? "Sign up with Google" : "Sign in with Google")}
+    </button>
 
-                    {!showEmailForm ? (
-                      <button className="subscription-button email-toggle-button" onClick={toggleEmailForm} disabled={isLoading}>
-                        {isSignup ? "Sign up with Email" : "Sign in with Email"}
-                      </button>
-                    ) : (
-                      <div className="email-form">
-                        {isSignup && (
-                          <input
-                            type="text"
-                            className="form-input"
-                            placeholder="Enter your username"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            disabled={isLoading}
-                          />
-                        )}
-                        <input
-                          type="email"
-                          className="form-input"
-                          placeholder="Enter your email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          disabled={isLoading}
-                        />
-                        <input
-                          type="password"
-                          className="form-input"
-                          placeholder="Enter your password"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          disabled={isLoading}
-                        />
-                        <button className="subscription-button email-submit-button" onClick={handleEmailSubmit} disabled={isLoading}>
-                          {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
+    <div className="auth-divider">
+      <span>or</span>
+    </div>
+
+    {/* Email Form - Always show when card is selected */}
+    <div className="email-form">
+      {isSignup && (
+        <input
+          type="text"
+          className="form-input"
+          placeholder="Enter your username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          disabled={isLoading}
+        />
+      )}
+      <input
+        type="email"
+        className="form-input"
+        placeholder="Enter your email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        disabled={isLoading}
+      />
+      <input
+        type="password"
+        className="form-input"
+        placeholder="Enter your password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        disabled={isLoading}
+      />
+      <button className="subscription-button email-submit-button" onClick={handleEmailSubmit} disabled={isLoading}>
+        {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
+      </button>
+    </div>
+  </div>
+)}
               </div>
 
               {/* Pro Plan */}
