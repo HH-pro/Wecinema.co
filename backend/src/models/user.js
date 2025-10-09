@@ -50,12 +50,12 @@ const userSchema = new Schema({
     isSubAdmin: { type: Boolean, default: false },
     isVerified: { type: Boolean, default: false },
 
-    // 🆕 MARKETPLACE FIELDS ADD KAR DIYE
-    role: {
-        type: String,
-        enum: ['creator', 'buyer', 'both'],
-        default: 'creator'
-    },
+    // // 🆕 MARKETPLACE FIELDS ADD KAR DIYE
+    // role: {
+    //     type: String,
+    //     enum: ['creator', 'buyer', 'both'],
+    //     default: 'creator'
+    // },
     isHypeModeUser: {
         type: Boolean,
         default: false
