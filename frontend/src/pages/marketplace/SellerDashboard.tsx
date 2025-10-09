@@ -1,877 +1,196 @@
-import React, { useState, useEffect } from 'react';
-import MarketplaceLayout from '../../components/Layout';
-import OrderSummary from '../../components/marketplae/OrderSummary';
-import { getMyListings, createListing, updateListing, deleteListing } from '../../api';
-import { useNavigate } from "react-router-dom";
-interface DashboardStats {
-  totalListings: number;
-  activeListings: number;
-  totalOrders: number;
-  pendingOrders: number;
-  totalRevenue: number;
-  pendingOffers: number;
-}
-
-interface Order {
-  _id: string;
-  amount: number;
-  status: string;
-  createdAt: string;
-  buyerId: {
-    username: string;
-    avatar?: string;
-  };
-  listingId?: {
-    title: string;
-    mediaUrls: string[];
-    price: number;
-  };
-}
-
-interface Offer {
-  _id: string;
-  amount: number;
-  status: 'pending' | 'accepted' | 'rejected' | 'expired' | 'countered';
-  createdAt: string;
-  buyerId: {
-    username: string;
-    avatar?: string;
-  };
-  listingId: {
-    _id: string;
-    title: string;
-    mediaUrls: string[];
-    price: number;
-    status: string;
-  };
-  message?: string;
-  expiresAt?: string;
-}
+import React, { useEffect, useState } from "react";
+import { getMyListings } from "../../api";
+import { motion } from "framer-motion";
+import { FaBox, FaClipboardList, FaHandshake, FaChartLine } from "react-icons/fa";
 
 interface Listing {
   _id: string;
   title: string;
+  category: string;
   price: number;
   status: string;
-  mediaUrls: string[];
-  sellerId: string;
   createdAt: string;
-  description?: string;
-  category?: string;
-  tags?: string[];
 }
 
-type TabType = 'overview' | 'offers' | 'listings';
+interface Order {
+  _id: string;
+  buyer: string;
+  item: string;
+  total: number;
+  status: string;
+}
+
+interface Offer {
+  _id: string;
+  buyer: string;
+  item: string;
+  offerAmount: number;
+  status: string;
+}
 
 const SellerDashboard: React.FC = () => {
-    const navigate = useNavigate();
-  const [stats, setStats] = useState<DashboardStats>({
-    totalListings: 0,
-    activeListings: 0,
-    totalOrders: 0,
-    pendingOrders: 0,
-    totalRevenue: 0,
-    pendingOffers: 0
-  });
-  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
-  const [offers, setOffers] = useState<Offer[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [error, setError] = useState<string>('');
-  const [success, setSuccess] = useState<string>('');
 
   useEffect(() => {
-    fetchDashboardData();
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const listingsData = await getMyListings();
+        setListings(listingsData);
+
+        // Mock Data for Orders & Offers
+        setOrders([
+          { _id: "1", buyer: "Ali", item: "Product A", total: 1200, status: "Shipped" },
+          { _id: "2", buyer: "Sara", item: "Product B", total: 800, status: "Pending" },
+        ]);
+        setOffers([
+          { _id: "1", buyer: "Usman", item: "Product C", offerAmount: 900, status: "Accepted" },
+          { _id: "2", buyer: "Zara", item: "Product D", offerAmount: 700, status: "Pending" },
+        ]);
+      } catch (error) {
+        console.error("Error fetching seller dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, []);
 
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      setSuccess('');
-      
-      // Fetch all data in parallel
-      const [ordersResponse, listingsData, offersResponse] = await Promise.all([
-        // Fetch seller orders
-        fetch('/marketplace/orders/seller-orders', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include'
-        }),
-        // Fetch my listings using API function
-        getMyListings(setLoading),
-        // Fetch seller offers
-        fetch('/marketplace/offers/seller-offers', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include'
-        }).catch(() => ({ ok: false })) // Gracefully handle missing endpoint
-      ]);
+  const stats = [
+    { title: "Total Listings", value: listings.length, icon: <FaBox className="text-blue-500" /> },
+    { title: "Total Orders", value: orders.length, icon: <FaClipboardList className="text-green-500" /> },
+    { title: "Total Offers", value: offers.length, icon: <FaHandshake className="text-yellow-500" /> },
+    { title: "Active Listings", value: listings.filter(l => l.status === "active").length, icon: <FaChartLine className="text-purple-500" /> },
+  ];
 
-      // Handle orders response
-      if (!ordersResponse.ok) {
-        throw new Error('Failed to fetch orders');
-      }
-      const ordersData = await ordersResponse.json();
-      const ordersArray = Array.isArray(ordersData) ? ordersData : ordersData.orders || ordersData.data || [];
-      setRecentOrders(ordersArray.slice(0, 5));
-
-      // Handle listings data from API function
-      const listingsArray = Array.isArray(listingsData) ? listingsData : listingsData.listings || listingsData.data || [];
-      setListings(listingsArray);
-
-      // Handle offers response
-      let offersArray: Offer[] = [];
-      if (offersResponse.ok) {
-        const offersData = await offersResponse.json();
-        offersArray = Array.isArray(offersData) ? offersData : offersData.offers || offersData.data || [];
-      }
-      setOffers(offersArray);
-
-      // Calculate statistics
-      calculateStats(ordersArray, listingsArray, offersArray);
-
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      setError('Failed to load dashboard data. Please try again.');
-      setRecentOrders([]);
-      setOffers([]);
-      setListings([]);
-    } finally {
-      setLoading(false);
-    }
+  const handleViewListingDetails = (id: string) => {
+    alert(`View details for listing ID: ${id}`);
   };
-
-  const calculateStats = (orders: Order[], listings: Listing[], offers: Offer[]) => {
-    const totalListings = listings.length;
-    const activeListings = listings.filter(listing => listing.status === 'active').length;
-    const totalOrders = orders.length;
-    const pendingOrders = orders.filter(order => 
-      ['pending', 'pending_payment', 'paid', 'in_progress', 'processing'].includes(order.status)
-    ).length;
-    const totalRevenue = orders
-      .filter(order => ['completed', 'delivered', 'fulfilled'].includes(order.status))
-      .reduce((sum, order) => sum + (order.amount || 0), 0);
-    const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
-
-    setStats({
-      totalListings,
-      activeListings,
-      totalOrders,
-      pendingOrders,
-      totalRevenue,
-      pendingOffers
-    });
-  };
-
-  // Listing Management Functions
-  const handleCreateListing = () => {
-    navigate("/marketplace/create");
-  };
-      
-
-  const handleUpdateListing = async (listingId: string, updatedData: Partial<Listing>) => {
-    try {
-      setError('');
-      await updateListing(listingId, updatedData, setLoading);
-      setSuccess('Listing updated successfully!');
-      await fetchDashboardData(); // Refresh data
-    } catch (error) {
-      console.error('Error updating listing:', error);
-      setError('Failed to update listing. Please try again.');
-    }
-  };
-
-  const handleDeleteListing = async (listingId: string) => {
-    if (window.confirm('Are you sure you want to delete this listing? This action cannot be undone.')) {
-      try {
-        setError('');
-        await deleteListing(listingId, setLoading);
-        setSuccess('Listing deleted successfully!');
-        await fetchDashboardData(); // Refresh data
-      } catch (error) {
-        console.error('Error deleting listing:', error);
-        setError('Failed to delete listing. Please try again.');
-      }
-    }
-  };
-
-  const handleToggleListingStatus = async (listing: Listing) => {
-    const newStatus = listing.status === 'active' ? 'inactive' : 'active';
-    await handleUpdateListing(listing._id, { status: newStatus });
-  };
-
-  const handleViewOrderDetails = (orderId: string) => {
-    window.location.href = `/orders/${orderId}`;
-  };
-
-  const handleViewListingDetails = (listingId: string) => {
-    window.location.href = `/listings/${listingId}`;
-  };
-
-  const handleOfferAction = async (offerId: string, action: 'accept' | 'reject' | 'counter') => {
-    try {
-      setError('');
-      const response = await fetch(`/api/marketplace/offers/${offerId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ action }),
-      });
-
-      if (response.ok) {
-        setSuccess(`Offer ${action}ed successfully!`);
-        await fetchDashboardData();
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update offer');
-      }
-    } catch (error) {
-      console.error('Error updating offer:', error);
-      setError(error instanceof Error ? error.message : 'Failed to update offer');
-    }
-  };
-
-  const handleCounterOffer = async (offerId: string, counterAmount: number) => {
-    try {
-      setError('');
-      const response = await fetch(`/api/marketplace/offers/${offerId}/counter`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ counterAmount }),
-      });
-
-      if (response.ok) {
-        setSuccess('Counter offer sent successfully!');
-        await fetchDashboardData();
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send counter offer');
-      }
-    } catch (error) {
-      console.error('Error sending counter offer:', error);
-      setError(error instanceof Error ? error.message : 'Failed to send counter offer');
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'accepted': return 'bg-green-100 text-green-800 border-green-200';
-      case 'rejected': return 'bg-red-100 text-red-800 border-red-200';
-      case 'expired': return 'bg-gray-100 text-gray-800 border-gray-200';
-      case 'countered': return 'bg-blue-100 text-blue-800 border-blue-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const getListingStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-green-100 text-green-800 border-green-200';
-      case 'inactive': return 'bg-gray-100 text-gray-800 border-gray-200';
-      case 'sold': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'draft': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const getOrderStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-      case 'delivered':
-      case 'fulfilled':
-        return 'bg-green-100 text-green-800';
-      case 'pending':
-      case 'pending_payment':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'cancelled':
-      case 'rejected':
-      case 'declined':
-        return 'bg-red-100 text-red-800';
-      case 'in_progress':
-      case 'processing':
-      case 'shipped':
-        return 'bg-blue-100 text-blue-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  const calculateDiscount = (originalPrice: number, offerAmount: number) => {
-    return ((1 - offerAmount / originalPrice) * 100).toFixed(1);
-  };
-
-  const StatCard = ({ 
-    title, 
-    value, 
-    icon, 
-    color = 'gray',
-    onClick
-  }: { 
-    title: string; 
-    value: string | number; 
-    icon: React.ReactNode; 
-    color?: string;
-    onClick?: () => void;
-  }) => (
-    <div 
-      className={`bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow ${onClick ? 'cursor-pointer hover:border-yellow-300' : ''}`}
-      onClick={onClick}
-    >
-      <div className="flex items-center">
-        <div className="flex-shrink-0">
-          <div className={`w-12 h-12 bg-${color}-100 rounded-lg flex items-center justify-center`}>
-            {icon}
-          </div>
-        </div>
-        <div className="ml-4">
-          <p className="text-sm font-medium text-gray-600">{title}</p>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
-        </div>
-      </div>
-    </div>
-  );
-
-  const QuickActionButton = ({ 
-    title, 
-    onClick, 
-    icon, 
-    variant = 'primary' 
-  }: { 
-    title: string; 
-    onClick: () => void; 
-    icon: React.ReactNode; 
-    variant?: 'primary' | 'secondary'; 
-  }) => (
-    <button
-      onClick={onClick}
-      className={`w-full font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center ${
-        variant === 'primary' 
-          ? 'bg-yellow-600 hover:bg-yellow-700 text-white' 
-          : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-300'
-      }`}
-    >
-      {icon}
-      <span className="ml-2">{title}</span>
-    </button>
-  );
-
-  const ListingCard = ({ listing }: { listing: Listing }) => (
-    <div className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
-      <div className="flex items-start justify-between mb-3">
-        <h4 className="font-medium text-gray-900 truncate">{listing.title}</h4>
-        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getListingStatusColor(listing.status)}`}>
-          {listing.status}
-        </span>
-      </div>
-      
-      <p className="text-sm text-gray-600 mb-2 line-clamp-2">{listing.description}</p>
-      
-      <div className="flex items-center justify-between text-sm">
-        <span className="font-semibold text-green-600">{formatCurrency(listing.price)}</span>
-        <span className="text-gray-500">{formatDate(listing.createdAt)}</span>
-      </div>
-
-      <div className="flex space-x-2 mt-3">
-        <button
-          onClick={() => handleToggleListingStatus(listing)}
-          className={`flex-1 text-xs py-1 px-2 rounded ${
-            listing.status === 'active' 
-              ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' 
-              : 'bg-green-100 text-green-700 hover:bg-green-200'
-          }`}
-        >
-          {listing.status === 'active' ? 'Deactivate' : 'Activate'}
-        </button>
-        <button
-          onClick={() => handleDeleteListing(listing._id)}
-          className="flex-1 text-xs py-1 px-2 rounded bg-red-100 text-red-700 hover:bg-red-200"
-        >
-          Delete
-        </button>
-      </div>
-    </div>
-  );
-
-  if (loading) {
-    return (
-      <MarketplaceLayout>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600 mx-auto"></div>
-            <p className="mt-4 text-lg text-gray-600">Loading dashboard...</p>
-          </div>
-        </div>
-      </MarketplaceLayout>
-    );
-  }
 
   return (
-    <MarketplaceLayout>
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Page Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Seller Dashboard</h1>
-            <p className="mt-2 text-gray-600">Manage your listings, offers, and track your sales performance</p>
-          </div>
+    <div className="p-6 bg-gray-50 min-h-screen">
+      <h1 className="text-3xl font-bold text-gray-800 mb-6">Seller Dashboard</h1>
 
-          {/* Success Message */}
-          {success && (
-            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex items-center">
-                <svg className="w-5 h-5 text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <p className="text-green-800">{success}</p>
-              </div>
+      {/* Stats Section */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {stats.map((stat, index) => (
+          <motion.div
+            key={index}
+            whileHover={{ scale: 1.05 }}
+            className="bg-white rounded-2xl p-5 shadow hover:shadow-lg transition flex items-center gap-4"
+          >
+            <div className="text-3xl">{stat.icon}</div>
+            <div>
+              <p className="text-gray-600 text-sm">{stat.title}</p>
+              <p className="text-2xl font-semibold text-gray-800">{stat.value}</p>
             </div>
-          )}
-
-          {/* Error Message */}
-          {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex items-center">
-                <svg className="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p className="text-red-800">{error}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Tabs */}
-          <div className="mb-8 border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setActiveTab('overview')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'overview'
-                    ? 'border-yellow-600 text-yellow-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Overview
-              </button>
-              <button
-                onClick={() => setActiveTab('offers')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
-                  activeTab === 'offers'
-                    ? 'border-yellow-600 text-yellow-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Offers
-                {stats.pendingOffers > 0 && (
-                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                    {stats.pendingOffers}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setActiveTab('listings')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
-                  activeTab === 'listings'
-                    ? 'border-yellow-600 text-yellow-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                My Listings
-                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  {stats.totalListings}
-                </span>
-              </button>
-            </nav>
-          </div>
-
-          {activeTab === 'overview' && (
-            <>
-              {/* Stats Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
-                <StatCard
-                  title="Total Revenue"
-                  value={formatCurrency(stats.totalRevenue)}
-                  icon={<span className="text-green-600 text-lg font-semibold">$</span>}
-                  color="green"
-                />
-                <StatCard
-                  title="Total Listings"
-                  value={stats.totalListings}
-                  icon={
-                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                  }
-                  color="yellow"
-                  onClick={() => setActiveTab('listings')}
-                />
-                <StatCard
-                  title="Active Listings"
-                  value={stats.activeListings}
-                  icon={
-                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  }
-                  color="green"
-                />
-                <StatCard
-                  title="Total Orders"
-                  value={stats.totalOrders}
-                  icon={
-                    <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                    </svg>
-                  }
-                  color="purple"
-                />
-                <StatCard
-                  title="Pending Orders"
-                  value={stats.pendingOrders}
-                  icon={
-                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  }
-                  color="yellow"
-                />
-                <StatCard
-                  title="Pending Offers"
-                  value={stats.pendingOffers}
-                  icon={
-                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  }
-                  color="blue"
-                  onClick={() => setActiveTab('offers')}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Recent Orders */}
-                <div className="lg:col-span-2">
-                  <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                    <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                      <h2 className="text-lg font-semibold text-gray-900">Recent Orders</h2>
-                      <button 
-                        onClick={() => window.location.href = '/orders'}
-                        className="text-sm text-yellow-600 hover:text-yellow-700 font-medium"
-                      >
-                        View All
-                      </button>
-                    </div>
-                    <div className="p-6">
-                      {recentOrders.length === 0 ? (
-                        <div className="text-center py-8">
-                          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                          </svg>
-                          <p className="mt-4 text-gray-500">No orders yet</p>
-                          <p className="text-sm text-gray-400">When you receive orders, they'll appear here.</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          {recentOrders.map(order => (
-                            <OrderSummary
-                              key={order._id}
-                              order={order}
-                              onViewDetails={handleViewOrderDetails}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Quick Actions & Tips */}
-                <div className="space-y-6">
-                  {/* Quick Actions */}
-                  <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                      <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
-                    </div>
-                    <div className="p-6 space-y-4">
-                      <QuickActionButton
-                        title="Create New Listing"
-                        onClick={handleCreateListing}
-                        icon={
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                          </svg>
-                        }
-                        variant="primary"
-                      />
-                      <QuickActionButton
-                        title="View All Orders"
-                        onClick={() => window.location.href = '/orders'}
-                        icon={
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                          </svg>
-                        }
-                        variant="secondary"
-                      />
-                      <QuickActionButton
-                        title="Manage Listings"
-                        onClick={() => setActiveTab('listings')}
-                        icon={
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                          </svg>
-                        }
-                        variant="secondary"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Success Tips */}
-                  <div className="bg-yellow-50 rounded-lg border border-yellow-200 p-6">
-                    <h3 className="text-sm font-semibold text-yellow-900 mb-3 flex items-center">
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Tips for Success
-                    </h3>
-                    <ul className="text-sm text-yellow-700 space-y-2">
-                      <li className="flex items-start">
-                        <span className="mr-2">•</span>
-                        <span>Upload high-quality photos of your items</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="mr-2">•</span>
-                        <span>Write clear and detailed descriptions</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="mr-2">•</span>
-                        <span>Respond quickly to buyer inquiries</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="mr-2">•</span>
-                        <span>Ship orders promptly</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="mr-2">•</span>
-                        <span>Consider offers from serious buyers</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-
-          {activeTab === 'offers' && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">Received Offers</h2>
-                  <p className="text-sm text-gray-600 mt-1">Manage and respond to offers from buyers</p>
-                </div>
-                <button
-                  onClick={fetchDashboardData}
-                  className="text-sm text-gray-500 hover:text-gray-700 flex items-center"
-                >
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh
-                </button>
-              </div>
-              <div className="p-6">
-                {offers.length === 0 ? (
-                  <div className="text-center py-12">
-                    <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <h3 className="mt-4 text-lg font-medium text-gray-900">No offers yet</h3>
-                    <p className="mt-2 text-gray-500">When buyers make offers on your listings, they'll appear here.</p>
-                    <button
-                      onClick={() => setActiveTab('listings')}
-                      className="mt-4 bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
-                    >
-                      View Your Listings
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {offers.map(offer => (
-                      <div key={offer._id} className="border border-gray-200 rounded-lg p-6 hover:border-gray-300 transition-colors">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-3">
-                              <h3 
-                                className="text-lg font-medium text-gray-900 hover:text-yellow-600 cursor-pointer"
-                                onClick={() => handleViewListingDetails(offer.listingId._id)}
-                              >
-                                {offer.listingId.title}
-                              </h3>
-                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(offer.status)}`}>
-                                {offer.status.charAt(0).toUpperCase() + offer.status.slice(1)}
-                              </span>
-                            </div>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                              <div>
-                                <p className="text-sm text-gray-600">Buyer</p>
-                                <p className="font-medium text-gray-900">{offer.buyerId.username}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-gray-600">Original Price</p>
-                                <p className="font-medium text-gray-900">{formatCurrency(offer.listingId.price)}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-gray-600">Offer Amount</p>
-                                <p className="font-medium text-green-600">{formatCurrency(offer.amount)}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-gray-600">Discount</p>
-                                <p className="font-medium text-orange-600">
-                                  {calculateDiscount(offer.listingId.price, offer.amount)}% off
-                                </p>
-                              </div>
-                            </div>
-
-                            {offer.message && (
-                              <div className="mb-4">
-                                <p className="text-sm text-gray-600 mb-1">Buyer's Message</p>
-                                <p className="text-gray-900 bg-gray-50 rounded-lg p-3 text-sm border border-gray-200">
-                                  {offer.message}
-                                </p>
-                              </div>
-                            )}
-
-                            <div className="flex items-center justify-between text-sm text-gray-500">
-                              <span>Received {formatDate(offer.createdAt)}</span>
-                              {offer.expiresAt && (
-                                <span className="text-orange-600">
-                                  Expires {formatDate(offer.expiresAt)}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {offer.status === 'pending' && (
-                          <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 mt-4 pt-4 border-t border-gray-200">
-                            <button
-                              onClick={() => handleOfferAction(offer._id, 'accept')}
-                              className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 flex items-center justify-center"
-                            >
-                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                              Accept Offer
-                            </button>
-                            <button
-                              onClick={() => handleOfferAction(offer._id, 'reject')}
-                              className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 flex items-center justify-center"
-                            >
-                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                              Decline Offer
-                            </button>
-                          </div>
-                        )}
-
-                        {offer.status === 'countered' && (
-                          <div className="mt-4 pt-4 border-t border-gray-200">
-                            <p className="text-sm text-blue-600 font-medium">
-                              You've sent a counter offer for this listing
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'listings' && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">My Listings</h2>
-                  <p className="text-sm text-gray-600 mt-1">Manage your product listings</p>
-                </div>
-                <div className="flex space-x-3">
-                  <button
-                    onClick={fetchDashboardData}
-                    className="text-sm text-gray-500 hover:text-gray-700 flex items-center"
-                  >
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Refresh
-                  </button>
-                  <button
-                    onClick={handleCreateListing}
-                    className="bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 flex items-center"
-                  >
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Create Listing
-                  </button>
-                </div>
-              </div>
-              <div className="p-6">
-                {listings.length === 0 ? (
-                  <div className="text-center py-12">
-                    <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                    <h3 className="mt-4 text-lg font-medium text-gray-900">No listings yet</h3>
-                    <p className="mt-2 text-gray-500">Get started by creating your first listing.</p>
-                    <button
-                      onClick={handleCreateListing}
-                      className="mt-4 bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
-                    >
-                      Create Your First Listing
-                    </button>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {listings.map(listing => (
-                      <ListingCard key={listing._id} listing={listing} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+          </motion.div>
+        ))}
       </div>
-    </MarketplaceLayout>
+
+      {/* Listings Section */}
+      <section className="mb-10">
+        <h2 className="text-2xl font-semibold text-gray-700 mb-4">Your Listings</h2>
+        {loading ? (
+          <p className="text-gray-500">Loading listings...</p>
+        ) : listings.length === 0 ? (
+          <p className="text-gray-500">No listings available.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {listings.map((listing) => (
+              <motion.div
+                key={listing._id}
+                whileHover={{ scale: 1.03 }}
+                className="bg-white rounded-2xl p-5 shadow hover:shadow-lg transition"
+              >
+                <h3 className="text-lg font-semibold text-gray-800 mb-1">{listing.title}</h3>
+                <p className="text-sm text-gray-600 mb-2">{listing.category}</p>
+                <p className="text-gray-700 font-medium mb-2">Rs. {listing.price}</p>
+                <p
+                  className={`text-sm font-medium ${
+                    listing.status === "active" ? "text-green-600" : "text-gray-500"
+                  }`}
+                >
+                  Status: {listing.status}
+                </p>
+                <button
+                  onClick={() => handleViewListingDetails(listing._id)}
+                  className="mt-3 w-full text-sm py-2 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+                >
+                  View Details
+                </button>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Orders Section */}
+      <section className="mb-10">
+        <h2 className="text-2xl font-semibold text-gray-700 mb-4">Orders</h2>
+        {orders.length === 0 ? (
+          <p className="text-gray-500">No orders yet.</p>
+        ) : (
+          <div className="overflow-x-auto bg-white shadow rounded-2xl">
+            <table className="min-w-full text-sm text-left">
+              <thead className="bg-gray-100 text-gray-700 uppercase text-xs">
+                <tr>
+                  <th className="px-4 py-2">Buyer</th>
+                  <th className="px-4 py-2">Item</th>
+                  <th className="px-4 py-2">Total</th>
+                  <th className="px-4 py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order) => (
+                  <tr key={order._id} className="border-b hover:bg-gray-50">
+                    <td className="px-4 py-2">{order.buyer}</td>
+                    <td className="px-4 py-2">{order.item}</td>
+                    <td className="px-4 py-2">Rs. {order.total}</td>
+                    <td className="px-4 py-2 text-green-600 font-medium">{order.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* Offers Section */}
+      <section>
+        <h2 className="text-2xl font-semibold text-gray-700 mb-4">Offers</h2>
+        {offers.length === 0 ? (
+          <p className="text-gray-500">No offers yet.</p>
+        ) : (
+          <div className="overflow-x-auto bg-white shadow rounded-2xl">
+            <table className="min-w-full text-sm text-left">
+              <thead className="bg-gray-100 text-gray-700 uppercase text-xs">
+                <tr>
+                  <th className="px-4 py-2">Buyer</th>
+                  <th className="px-4 py-2">Item</th>
+                  <th className="px-4 py-2">Offer Amount</th>
+                  <th className="px-4 py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {offers.map((offer) => (
+                  <tr key={offer._id} className="border-b hover:bg-gray-50">
+                    <td className="px-4 py-2">{offer.buyer}</td>
+                    <td className="px-4 py-2">{offer.item}</td>
+                    <td className="px-4 py-2">Rs. {offer.offerAmount}</td>
+                    <td className="px-4 py-2 text-yellow-600 font-medium">{offer.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </div>
   );
 };
 
