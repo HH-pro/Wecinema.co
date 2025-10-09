@@ -122,7 +122,6 @@
   right: 0;
   height: 4px;
   background: linear-gradient(90deg, #f59e0b, #fbbf24, #f59e0b);
-  animation: slideIn 0.5s ease-out;
 }
 
 @media (max-width: 1200px) {
