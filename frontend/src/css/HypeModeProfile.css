@@ -364,7 +364,7 @@
 
 .toggle-button:hover {
   background: #f59e0b;
-  color: #0f172a;
+  color: #ffffff;
   transform: scale(1.03);
   box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
 }
