@@ -284,10 +284,11 @@ router.post("/contact", async (req, res) => {
     }
 });
 
-// User registration route
+// User registration route (for both Email/Password and Google)
 router.post('/signup', async (req, res) => {
 	try {
-		const { username, email, password, avatar, dob } = req.body;
+		const { username, email, password, avatar, dob, userType, isGoogleAuth } = req.body;
+		
 		// Check if the user already exists
 		const existingUser = await User.findOne({ email });
 		if (existingUser) {
@@ -296,9 +297,21 @@ router.post('/signup', async (req, res) => {
 				.json({ error: "User already exists with this email" });
 		}
 
-		// Hash the password using bcrypt
-		const hashedPassword = !password
-			? await argon2.hash("wecinema")
+		// For Google auth, username and email are required
+		// For email/password auth, username, email and password are required
+		if (isGoogleAuth) {
+			if (!username || !email) {
+				return res.status(400).json({ error: "Username and email are required for Google signup" });
+			}
+		} else {
+			if (!username || !email || !password) {
+				return res.status(400).json({ error: "Username, email and password are required" });
+			}
+		}
+
+		// Hash the password - different approach for Google vs Email
+		const hashedPassword = isGoogleAuth 
+			? await argon2.hash("wecinema_google_auth") // Fixed password for Google users
 			: await argon2.hash(password);
 
 		// Create a new user
@@ -306,24 +319,41 @@ router.post('/signup', async (req, res) => {
 			username,
 			email,
 			password: hashedPassword,
-			avatar: avatar
-				? avatar
-				: "https://icon-library.com/images/anonymous-avatar-icon/anonymous-avatar-icon-25.jpg",
-			dob,
+			userType: userType || 'buyer',
+			avatar: avatar || "https://icon-library.com/images/anonymous-avatar-icon/anonymous-avatar-icon-25.jpg",
+			dob: dob || "--------",
+			authProvider: isGoogleAuth ? 'google' : 'email' // Track auth method
 		});
-		res
-			.status(201)
-			.json({ message: "User registered successfully", user: newUser.email });
+
+		// Generate token for immediate login
+		const key = "weloremcium.secret_key";
+		const token = jwt.sign(
+			{ userId: newUser._id, username: newUser.username, avatar: newUser.avatar },
+			key,
+			{ expiresIn: "8h" }
+		);
+
+		res.status(201).json({ 
+			message: "User registered successfully", 
+			token,
+			user: {
+				id: newUser._id,
+				username: newUser.username,
+				email: newUser.email,
+				userType: newUser.userType,
+				avatar: newUser.avatar
+			}
+		});
 	} catch (error) {
 		console.error("Error creating user:", error);
 		res.status(500).json({ error: "Internal Server Error" });
 	}
-  });
-  
-  // User login route
-  router.post('/signin', async (req, res) => {
+});
+
+// User login route (for both Email/Password and Google)
+router.post('/signin', async (req, res) => {
 	try {
-		const { email } = req.body;
+		const { email, password, isGoogleAuth } = req.body;
 
 		// Find the user by email
 		const user = await User.findOne({ email });
@@ -332,28 +362,61 @@ router.post('/signup', async (req, res) => {
 		if (!user) {
 			return res.status(401).json({ error: "Invalid credentials" });
 		}
-		// Compare the provided password with the hashed password in the database
 
-		if (email) {
+		// For Google login
+		if (isGoogleAuth) {
 			const key = "weloremcium.secret_key";
-			// If the passwords match, generate a JWT token for authentication
 			const token = jwt.sign(
 				{ userId: user._id, username: user.username, avatar: user.avatar },
 				key,
-				{
-					expiresIn: "8h",
-				}
+				{ expiresIn: "8h" }
 			);
 
-			res.status(200).json({ token });
-		} else {
-			res.status(401).json({ error: "Invalid credentials" });
+			return res.status(200).json({ 
+				token,
+				user: {
+					id: user._id,
+					username: user.username,
+					email: user.email,
+					userType: user.userType,
+					avatar: user.avatar
+				}
+			});
 		}
+
+		// For email/password login
+		if (password) {
+			const isPasswordValid = await argon2.verify(user.password, password);
+			
+			if (isPasswordValid) {
+				const key = "weloremcium.secret_key";
+				const token = jwt.sign(
+					{ userId: user._id, username: user.username, avatar: user.avatar },
+					key,
+					{ expiresIn: "8h" }
+				);
+
+				return res.status(200).json({ 
+					token,
+					user: {
+						id: user._id,
+						username: user.username,
+						email: user.email,
+						userType: user.userType,
+						avatar: user.avatar
+					}
+				});
+			} else {
+				return res.status(401).json({ error: "Invalid credentials" });
+			}
+		}
+
+		res.status(401).json({ error: "Invalid credentials" });
 	} catch (error) {
 		console.error("Error during login:", error);
 		res.status(500).json({ error: "Internal Server Error" });
 	}
-  });
+});
   
   // Route for creating a user account
   router.post("/register", async (req, res) => {
