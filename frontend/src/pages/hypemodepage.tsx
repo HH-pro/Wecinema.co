@@ -26,6 +26,17 @@ const MainContainer = styled.div`
 
 const SubscriptionContainer = styled.div`
   display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: stretch;
+  width: 90%;
+  max-width: 1200px;
+  gap: 30px;
+  padding: 30px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.2);
   transition: all 0.3s ease-in-out;
 
   @media (max-width: 1024px) {
