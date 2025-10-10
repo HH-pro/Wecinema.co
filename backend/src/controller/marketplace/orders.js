@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Order = require("../../models/marketplace/order");
 const Listing = require("../../models/marketplace/listing");
+const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils");
 
 // Create new order (Fiverr Style)
 router.post("/create-order", async (req, res) => {
@@ -78,7 +79,7 @@ router.get("/my-orders", async (req, res) => {
 });
 
 // Get seller orders
-router.get("/seller-orders", async (req, res) => {
+router.get("/seller-orders", authenticateMiddleware, async (req, res) => {
   try {
     const orders = await Order.find({ sellerId: req.user.id })
       .populate('buyerId', 'username avatar')
