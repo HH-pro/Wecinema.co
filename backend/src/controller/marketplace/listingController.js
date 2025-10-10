@@ -22,7 +22,7 @@ router.get("/listings", async (req, res) => {
 // ===================================================
 router.get("/my-listings", authenticateMiddleware, async (req, res) => {
   try {
-    const sellerId = req.user.id;
+    const sellerId = req.user._id;
     
     const { status, page = 1, limit = 20 } = req.query;
     
