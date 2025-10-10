@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
-import { getMyListings } from '../../api';
+import { getMyListings, getSellerOrders, getReceivedOffers } from '../../api';
 
 interface Listing {
   _id: string;
@@ -8,103 +8,112 @@ interface Listing {
   price: number;
   status: string;
   updatedAt: string;
+  description?: string;
+  mediaUrls?: string[];
 }
+
+interface Order {
+  _id: string;
+  amount: number;
+  status: string;
+  createdAt: string;
+  buyerId: {
+    username: string;
+    avatar?: string;
+  };
+  listingId?: {
+    title: string;
+    price: number;
+  };
+}
+
+interface Offer {
+  _id: string;
+  amount: number;
+  status: 'pending' | 'accepted' | 'rejected' | 'expired';
+  createdAt: string;
+  buyerId: {
+    username: string;
+    avatar?: string;
+  };
+  listingId: {
+    _id: string;
+    title: string;
+    price: number;
+  };
+  message?: string;
+}
+
+type TabType = 'overview' | 'offers' | 'listings';
 
 const SellerDashboard: React.FC = () => {
   const [listings, setListings] = useState<Listing[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [error, setError] = useState<string>('');
 
+  // Stats calculation
+  const totalListings = listings.length;
+  const activeListings = listings.filter(listing => listing.status === 'active').length;
+  const totalOrders = orders.length;
+  const pendingOrders = orders.filter(order => order.status === 'pending').length;
+  const totalRevenue = orders
+    .filter(order => order.status === 'completed')
+    .reduce((sum, order) => sum + order.amount, 0);
+  const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
+
   useEffect(() => {
-    fetchListings();
+    fetchDashboardData();
   }, []);
 
-  const fetchListings = async () => {
+  const fetchDashboardData = async () => {
     try {
       setLoading(true);
       setError('');
-      
-      console.log('🔄 Starting fetchListings...');
-      
-      // Direct API call
-      const response = await getMyListings(setLoading);
-      
-      console.log('📝 getMyListings response:', response);
-      console.log('📝 Response type:', typeof response);
-      console.log('📝 Is array:', Array.isArray(response));
-      
-      if (Array.isArray(response)) {
-        console.log('✅ Listings array received, length:', response.length);
-        if (response.length > 0) {
-          console.log('📝 First listing:', response[0]);
-        }
-        setListings(response);
-      } else {
-        console.warn('⚠️ Response is not array:', response);
-        setListings([]);
-        setError('Invalid response format from server');
-      }
-      
+
+      // Direct API calls - simple and clean
+      const [listingsData, ordersData, offersData] = await Promise.all([
+        getMyListings(setLoading),
+        getSellerOrders(setLoading),
+        getReceivedOffers(setLoading)
+      ]);
+
+      setListings(listingsData || []);
+      setOrders(ordersData || []);
+      setOffers(offersData || []);
+
     } catch (error) {
-      console.error('❌ Error in fetchListings:', error);
-      setError('Failed to load listings: ' + error.message);
+      console.error('Error fetching dashboard data:', error);
+      setError('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
   };
 
-  // Direct fetch test
-  const testDirectFetch = async () => {
+  const handleViewListingDetails = (listingId: string) => {
+    window.location.href = `/listings/${listingId}`;
+  };
+
+  const handleViewOrderDetails = (orderId: string) => {
+    window.location.href = `/orders/${orderId}`;
+  };
+
+  const handleOfferAction = async (offerId: string, action: 'accept' | 'reject') => {
     try {
-      console.log('🧪 Testing direct fetch...');
-      setLoading(true);
-      
-      const response = await fetch('/marketplace/listings/my-listings', {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      console.log('🧪 Direct fetch status:', response.status);
-      console.log('🧪 Direct fetch headers:', Object.fromEntries(response.headers.entries()));
-      
-      const text = await response.text();
-      console.log('🧪 Direct fetch raw text:', text);
-      console.log('🧪 Text length:', text.length);
-      
-      if (text) {
-        try {
-          const jsonData = JSON.parse(text);
-          console.log('🧪 Parsed JSON:', jsonData);
-        } catch (parseError) {
-          console.error('🧪 JSON parse error:', parseError);
-        }
-      }
-      
+      // You can add accept/reject offer functions in api.ts
+      setError('');
+      // await acceptOffer(offerId, setLoading);
+      // or await rejectOffer(offerId, setLoading);
+      await fetchDashboardData(); // Refresh data
     } catch (error) {
-      console.error('🧪 Direct fetch error:', error);
-    } finally {
-      setLoading(false);
+      console.error('Error updating offer:', error);
+      setError('Failed to update offer');
     }
   };
 
-  // Check if user has any listings in database
-  const checkDatabase = async () => {
-    try {
-      console.log('🗄️ Checking all listings...');
-      const response = await fetch('/marketplace/listings', {
-        credentials: 'include'
-      });
-      const allListings = await response.json();
-      console.log('🗄️ All listings in database:', allListings);
-      console.log('🗄️ Total listings count:', Array.isArray(allListings) ? allListings.length : 'N/A');
-    } catch (error) {
-      console.error('🗄️ Database check error:', error);
-    }
-  };
-
+  // Utility functions
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -125,6 +134,111 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return 'bg-green-100 text-green-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'completed': return 'bg-blue-100 text-blue-800';
+      case 'accepted': return 'bg-green-100 text-green-800';
+      case 'rejected': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getListingStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return 'bg-green-100 text-green-800 border-green-200';
+      case 'inactive': return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'draft': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  // Stat Card Component
+  const StatCard = ({ 
+    title, 
+    value, 
+    icon, 
+    color = 'gray',
+    onClick 
+  }: { 
+    title: string; 
+    value: string | number; 
+    icon: React.ReactNode; 
+    color?: string;
+    onClick?: () => void;
+  }) => (
+    <div 
+      className={`bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow ${
+        onClick ? 'cursor-pointer hover:border-yellow-300' : ''
+      }`}
+      onClick={onClick}
+    >
+      <div className="flex items-center">
+        <div className="flex-shrink-0">
+          <div className={`w-12 h-12 bg-${color}-100 rounded-lg flex items-center justify-center`}>
+            {icon}
+          </div>
+        </div>
+        <div className="ml-4">
+          <p className="text-sm font-medium text-gray-600">{title}</p>
+          <p className="text-2xl font-bold text-gray-900">{value}</p>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Listing Card Component
+  const ListingCard = ({ listing }: { listing: Listing }) => (
+    <div className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors bg-white">
+      {listing.mediaUrls && listing.mediaUrls.length > 0 ? (
+        <div className="mb-3 h-40 bg-gray-100 rounded-lg overflow-hidden">
+          <img 
+            src={listing.mediaUrls[0]} 
+            alt={listing.title}
+            className="w-full h-full object-cover"
+          />
+        </div>
+      ) : (
+        <div className="mb-3 h-40 bg-gray-100 rounded-lg flex items-center justify-center">
+          <span className="text-gray-400 text-sm">No Image</span>
+        </div>
+      )}
+      
+      <div className="flex items-start justify-between mb-3">
+        <h4 className="font-medium text-gray-900 truncate flex-1 mr-2">
+          {listing.title}
+        </h4>
+        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getListingStatusColor(listing.status)}`}>
+          {listing.status}
+        </span>
+      </div>
+      
+      <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+        {listing.description || 'No description available'}
+      </p>
+      
+      <div className="flex items-center justify-between text-sm mb-3">
+        <span className="font-semibold text-green-600">
+          {formatCurrency(listing.price)}
+        </span>
+        <span className="text-gray-500">
+          {formatDate(listing.updatedAt)}
+        </span>
+      </div>
+
+      <div className="mt-3">
+        <button
+          onClick={() => handleViewListingDetails(listing._id)}
+          className="w-full text-sm py-2 px-3 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+        >
+          View Details
+        </button>
+      </div>
+    </div>
+  );
+
+  // Loading State
   if (loading) {
     return (
       <MarketplaceLayout>
@@ -142,49 +256,10 @@ const SellerDashboard: React.FC = () => {
     <MarketplaceLayout>
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Debug Panel */}
-          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h3 className="text-sm font-semibold text-blue-900 mb-2">Debug Panel</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs mb-3">
-              <div className="text-blue-700">
-                <strong>Listings:</strong> {listings.length}
-              </div>
-              <div className="text-blue-700">
-                <strong>Loading:</strong> {loading.toString()}
-              </div>
-              <div className="text-blue-700">
-                <strong>Error:</strong> {error ? 'Yes' : 'No'}
-              </div>
-              <div className="text-blue-700">
-                <strong>User ID:</strong> Check console
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button 
-                onClick={testDirectFetch}
-                className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded"
-              >
-                Test Direct Fetch
-              </button>
-              <button 
-                onClick={fetchListings}
-                className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded"
-              >
-                Refresh via API
-              </button>
-              <button 
-                onClick={checkDatabase}
-                className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded"
-              >
-                Check All Listings
-              </button>
-            </div>
-          </div>
-
           {/* Page Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900">Seller Dashboard</h1>
-            <p className="mt-2 text-gray-600">Manage your product listings</p>
+            <p className="mt-2 text-gray-600">Manage your listings, offers, and track your sales performance</p>
           </div>
 
           {/* Error Message */}
@@ -199,87 +274,377 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* Listings Section */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">My Listings</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                {listings.length} {listings.length === 1 ? 'listing' : 'listings'} found
-              </p>
-            </div>
-            
-            <div className="p-6">
-              {listings.length === 0 ? (
-                <div className="text-center py-12">
-                  <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                  <h3 className="mt-4 text-lg font-medium text-gray-900">
-                    {error ? 'API Error' : 'No Listings Found'}
-                  </h3>
-                  <p className="mt-2 text-gray-500">
-                    {error 
-                      ? 'There was an error fetching your listings.' 
-                      : 'You currently don\'t have any listings. Create your first listing to get started.'
-                    }
-                  </p>
-                  <div className="mt-4 space-x-3">
-                    <button
-                      onClick={fetchListings}
-                      className="bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg"
-                    >
-                      Try Again
-                    </button>
-                    <button
-                      onClick={() => window.location.href = '/create-listing'}
-                      className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg"
-                    >
-                      Create Listing
-                    </button>
+          {/* Tabs */}
+          <div className="mb-8 border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'overview'
+                    ? 'border-yellow-600 text-yellow-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Overview
+              </button>
+              <button
+                onClick={() => setActiveTab('offers')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
+                  activeTab === 'offers'
+                    ? 'border-yellow-600 text-yellow-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Offers
+                {pendingOffers > 0 && (
+                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    {pendingOffers}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab('listings')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
+                  activeTab === 'listings'
+                    ? 'border-yellow-600 text-yellow-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                My Listings
+                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  {totalListings}
+                </span>
+              </button>
+            </nav>
+          </div>
+
+          {/* Overview Tab */}
+          {activeTab === 'overview' && (
+            <>
+              {/* Stats Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
+                <StatCard
+                  title="Total Revenue"
+                  value={formatCurrency(totalRevenue)}
+                  icon={<span className="text-green-600 text-lg font-semibold">$</span>}
+                  color="green"
+                />
+                <StatCard
+                  title="Total Listings"
+                  value={totalListings}
+                  icon={
+                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                  }
+                  color="yellow"
+                  onClick={() => setActiveTab('listings')}
+                />
+                <StatCard
+                  title="Active Listings"
+                  value={activeListings}
+                  icon={
+                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  }
+                  color="green"
+                />
+                <StatCard
+                  title="Total Orders"
+                  value={totalOrders}
+                  icon={
+                    <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
+                  }
+                  color="purple"
+                />
+                <StatCard
+                  title="Pending Orders"
+                  value={pendingOrders}
+                  icon={
+                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  }
+                  color="yellow"
+                />
+                <StatCard
+                  title="Pending Offers"
+                  value={pendingOffers}
+                  icon={
+                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  }
+                  color="blue"
+                  onClick={() => setActiveTab('offers')}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Recent Orders */}
+                <div className="lg:col-span-2">
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                    <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                      <h2 className="text-lg font-semibold text-gray-900">Recent Orders</h2>
+                      <button 
+                        onClick={() => window.location.href = '/orders'}
+                        className="text-sm text-yellow-600 hover:text-yellow-700 font-medium"
+                      >
+                        View All
+                      </button>
+                    </div>
+                    <div className="p-6">
+                      {orders.length === 0 ? (
+                        <div className="text-center py-8">
+                          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                          </svg>
+                          <p className="mt-4 text-gray-500">No orders yet</p>
+                          <p className="text-sm text-gray-400">When you receive orders, they'll appear here.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {orders.slice(0, 5).map(order => (
+                            <div key={order._id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                              <div className="flex items-center space-x-4">
+                                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                                  <span className="text-sm font-medium text-gray-600">
+                                    {order.buyerId.username.charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="font-medium text-gray-900">
+                                    {order.listingId?.title || 'Unknown Listing'}
+                                  </p>
+                                  <p className="text-sm text-gray-500">{order.buyerId.username}</p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-semibold text-green-600">{formatCurrency(order.amount)}</p>
+                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                                  {order.status}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {listings.map((listing) => (
-                    <div key={listing._id} className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors bg-white">
-                      <div className="flex items-start justify-between mb-3">
-                        <h4 className="font-medium text-gray-900 truncate flex-1 mr-2">
-                          {listing.title}
-                        </h4>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${
-                          listing.status === 'active' 
-                            ? 'bg-green-100 text-green-800 border-green-200'
-                            : listing.status === 'draft'
-                            ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
-                            : 'bg-gray-100 text-gray-800 border-gray-200'
-                        }`}>
-                          {listing.status}
-                        </span>
-                      </div>
-                      
-                      <div className="flex items-center justify-between text-sm mb-3">
-                        <span className="font-semibold text-green-600">
-                          {formatCurrency(listing.price)}
-                        </span>
-                        <span className="text-gray-500">
-                          Updated: {formatDate(listing.updatedAt)}
-                        </span>
-                      </div>
 
-                      <div className="mt-3">
-                        <button
-                          onClick={() => window.location.href = `/listings/${listing._id}`}
-                          className="w-full text-sm py-2 px-3 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-                        >
-                          View Details
-                        </button>
-                      </div>
+                {/* Quick Actions */}
+                <div className="space-y-6">
+                  <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                    <div className="px-6 py-4 border-b border-gray-200">
+                      <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
                     </div>
-                  ))}
+                    <div className="p-6 space-y-4">
+                      <button
+                        onClick={() => window.location.href = '/create-listing'}
+                        className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center"
+                      >
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Create New Listing
+                      </button>
+                      <button
+                        onClick={() => window.location.href = '/orders'}
+                        className="w-full bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center"
+                      >
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        View All Orders
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Success Tips */}
+                  <div className="bg-yellow-50 rounded-lg border border-yellow-200 p-6">
+                    <h3 className="text-sm font-semibold text-yellow-900 mb-3 flex items-center">
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Tips for Success
+                    </h3>
+                    <ul className="text-sm text-yellow-700 space-y-2">
+                      <li className="flex items-start">
+                        <span className="mr-2">•</span>
+                        <span>Upload high-quality photos of your items</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-2">•</span>
+                        <span>Write clear and detailed descriptions</span>
+                      </li>
+                      <li className="flex items-start">
+                        <span className="mr-2">•</span>
+                        <span>Respond quickly to buyer inquiries</span>
+                      </li>
+                    </ul>
+                  </div>
                 </div>
-              )}
+              </div>
+            </>
+          )}
+
+          {/* Offers Tab */}
+          {activeTab === 'offers' && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Received Offers</h2>
+                  <p className="text-sm text-gray-600 mt-1">Manage and respond to offers from buyers</p>
+                </div>
+                <button
+                  onClick={fetchDashboardData}
+                  className="text-sm text-gray-500 hover:text-gray-700 flex items-center"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh
+                </button>
+              </div>
+              <div className="p-6">
+                {offers.length === 0 ? (
+                  <div className="text-center py-12">
+                    <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <h3 className="mt-4 text-lg font-medium text-gray-900">No offers yet</h3>
+                    <p className="mt-2 text-gray-500">When buyers make offers on your listings, they'll appear here.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {offers.map(offer => (
+                      <div key={offer._id} className="border border-gray-200 rounded-lg p-6 hover:border-gray-300 transition-colors">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-3">
+                              <h3 
+                                className="text-lg font-medium text-gray-900 hover:text-yellow-600 cursor-pointer"
+                                onClick={() => handleViewListingDetails(offer.listingId._id)}
+                              >
+                                {offer.listingId.title}
+                              </h3>
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(offer.status)}`}>
+                                {offer.status.charAt(0).toUpperCase() + offer.status.slice(1)}
+                              </span>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                              <div>
+                                <p className="text-sm text-gray-600">Buyer</p>
+                                <p className="font-medium text-gray-900">{offer.buyerId.username}</p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-gray-600">Original Price</p>
+                                <p className="font-medium text-gray-900">{formatCurrency(offer.listingId.price)}</p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-gray-600">Offer Amount</p>
+                                <p className="font-medium text-green-600">{formatCurrency(offer.amount)}</p>
+                              </div>
+                            </div>
+
+                            {offer.message && (
+                              <div className="mb-4">
+                                <p className="text-sm text-gray-600 mb-1">Buyer's Message</p>
+                                <p className="text-gray-900 bg-gray-50 rounded-lg p-3 text-sm border border-gray-200">
+                                  {offer.message}
+                                </p>
+                              </div>
+                            )}
+
+                            <div className="text-sm text-gray-500">
+                              Received {formatDate(offer.createdAt)}
+                            </div>
+                          </div>
+                        </div>
+
+                        {offer.status === 'pending' && (
+                          <div className="flex space-x-3 mt-4 pt-4 border-t border-gray-200">
+                            <button
+                              onClick={() => handleOfferAction(offer._id, 'accept')}
+                              className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
+                            >
+                              Accept Offer
+                            </button>
+                            <button
+                              onClick={() => handleOfferAction(offer._id, 'reject')}
+                              className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
+                            >
+                              Decline Offer
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Listings Tab */}
+          {activeTab === 'listings' && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">My Listings</h2>
+                  <p className="text-sm text-gray-600 mt-1">View and manage your product listings</p>
+                </div>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={fetchDashboardData}
+                    className="text-sm text-gray-500 hover:text-gray-700 flex items-center"
+                  >
+                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Refresh
+                  </button>
+                  <button
+                    onClick={() => window.location.href = '/create-listing'}
+                    className="bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 flex items-center"
+                  >
+                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Create Listing
+                  </button>
+                </div>
+              </div>
+              <div className="p-6">
+                {listings.length === 0 ? (
+                  <div className="text-center py-12">
+                    <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    <h3 className="mt-4 text-lg font-medium text-gray-900">No listings yet</h3>
+                    <p className="mt-2 text-gray-500">Get started by creating your first listing.</p>
+                    <button
+                      onClick={() => window.location.href = '/create-listing'}
+                      className="mt-4 bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
+                    >
+                      Create Your First Listing
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {listings.map(listing => (
+                      <ListingCard key={listing._id} listing={listing} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </MarketplaceLayout>
