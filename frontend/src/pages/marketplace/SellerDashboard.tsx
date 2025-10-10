@@ -48,14 +48,17 @@ interface Offer {
   expiresAt?: string;
 }
 
+// Updated Listing interface to match backend response
 interface Listing {
   _id: string;
   title: string;
   price: number;
   status: string;
-  mediaUrls: string[];
-  sellerId: string;
-  createdAt: string;
+  updatedAt: string; // Backend returns updatedAt instead of createdAt
+  // Optional fields that might not come from backend
+  mediaUrls?: string[];
+  sellerId?: string;
+  createdAt?: string;
   description?: string;
   category?: string;
   tags?: string[];
@@ -90,17 +93,39 @@ const SellerDashboard: React.FC = () => {
       setError('');
       setSuccess('');
       
-      // Sirf listings fetch karo, baaki APIs optional hain
-      const listingsData = await getMyListings(setLoading);
-      const listingsArray = Array.isArray(listingsData) ? listingsData : listingsData.listings || listingsData.data || [];
-      setListings(listingsArray);
+      console.log('🔄 Fetching dashboard data...');
+      
+      // Fetch listings with proper debugging
+      let listingsArray: Listing[] = [];
+      try {
+        console.log('📝 Calling getMyListings API...');
+        const listingsData = await getMyListings(setLoading);
+        console.log('📝 Raw listings API response:', listingsData);
+        
+        // Backend direct array return karta hai
+        if (Array.isArray(listingsData)) {
+          console.log('✅ Listings data is array, length:', listingsData.length);
+          listingsArray = listingsData;
+          console.log('📝 Sample listing:', listingsData[0]);
+        } else {
+          console.warn('⚠️ Listings data is not array:', typeof listingsData, listingsData);
+          listingsArray = [];
+        }
+        
+      } catch (listingsError) {
+        console.error('❌ Listings fetch error:', listingsError);
+        setError('Failed to fetch listings');
+      }
 
-      // Orders aur offers ko optional banayein - agar available nahi hain toh empty array use karo
+      setListings(listingsArray);
+      console.log('✅ Final listings array:', listingsArray);
+
+      // Orders aur offers ko optional banayein
       let ordersArray: Order[] = [];
       let offersArray: Offer[] = [];
 
       try {
-        // Orders fetch karo - agar available ho
+        console.log('📦 Fetching orders...');
         const ordersResponse = await fetch('/marketplace/orders/seller-orders', {
           method: 'GET',
           headers: {
@@ -109,17 +134,27 @@ const SellerDashboard: React.FC = () => {
           credentials: 'include'
         });
         
+        console.log('📦 Orders response status:', ordersResponse.status);
         if (ordersResponse.ok) {
           const ordersData = await ordersResponse.json();
-          ordersArray = Array.isArray(ordersData) ? ordersData : ordersData.orders || ordersData.data || [];
+          console.log('📦 Orders API response:', ordersData);
+          
+          if (Array.isArray(ordersData)) {
+            ordersArray = ordersData;
+          } else if (ordersData && ordersData.orders) {
+            ordersArray = ordersData.orders;
+          } else if (ordersData && ordersData.data) {
+            ordersArray = ordersData.data;
+          }
+        } else {
+          console.warn('📦 Orders API returned non-OK status');
         }
       } catch (orderError) {
-        console.log('Orders API not available, using empty orders');
-        ordersArray = [];
+        console.log('📦 Orders API not available:', orderError);
       }
 
       try {
-        // Offers fetch karo - agar available ho
+        console.log('💼 Fetching offers...');
         const offersResponse = await fetch('/marketplace/offers/seller-offers', {
           method: 'GET',
           headers: {
@@ -128,13 +163,23 @@ const SellerDashboard: React.FC = () => {
           credentials: 'include'
         });
         
+        console.log('💼 Offers response status:', offersResponse.status);
         if (offersResponse.ok) {
           const offersData = await offersResponse.json();
-          offersArray = Array.isArray(offersData) ? offersData : offersData.offers || offersData.data || [];
+          console.log('💼 Offers API response:', offersData);
+          
+          if (Array.isArray(offersData)) {
+            offersArray = offersData;
+          } else if (offersData && offersData.offers) {
+            offersArray = offersData.offers;
+          } else if (offersData && offersData.data) {
+            offersArray = offersData.data;
+          }
+        } else {
+          console.warn('💼 Offers API returned non-OK status');
         }
       } catch (offerError) {
-        console.log('Offers API not available, using empty offers');
-        offersArray = [];
+        console.log('💼 Offers API not available:', offerError);
       }
 
       setRecentOrders(ordersArray.slice(0, 5));
@@ -143,18 +188,16 @@ const SellerDashboard: React.FC = () => {
       // Calculate statistics with available data
       calculateStats(ordersArray, listingsArray, offersArray);
 
+      console.log('✅ Dashboard data loaded successfully');
+      console.log('📊 Final counts:', {
+        listings: listingsArray.length,
+        orders: ordersArray.length, 
+        offers: offersArray.length
+      });
+
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      // Sirf error show karo agar listings bhi fetch nahi ho payi
-      const listingsData = await getMyListings(setLoading);
-      if (!listingsData || (Array.isArray(listingsData) && listingsData.length === 0)) {
-        setError('Failed to load dashboard data. Please try again.');
-      } else {
-        // Agar listings mil gayi hain, toh error nahi dikhao
-        const listingsArray = Array.isArray(listingsData) ? listingsData : listingsData.listings || listingsData.data || [];
-        setListings(listingsArray);
-        calculateStats([], listingsArray, []);
-      }
+      console.error('💥 Main dashboard fetch error:', error);
+      setError('Failed to load dashboard data. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -162,7 +205,9 @@ const SellerDashboard: React.FC = () => {
 
   const calculateStats = (orders: Order[], listings: Listing[], offers: Offer[]) => {
     const totalListings = listings.length;
-    const activeListings = listings.filter(listing => listing.status === 'active').length;
+    const activeListings = listings.filter(listing => 
+      listing.status === 'active' || listing.status === 'published'
+    ).length;
     const totalOrders = orders.length;
     const pendingOrders = orders.filter(order => 
       ['pending', 'pending_payment', 'paid', 'in_progress', 'processing'].includes(order.status)
@@ -228,10 +273,13 @@ const SellerDashboard: React.FC = () => {
 
   const getListingStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-100 text-green-800 border-green-200';
-      case 'inactive': return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'active': 
+      case 'published':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'inactive': 
+      case 'draft':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
       case 'sold': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'draft': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
@@ -262,18 +310,24 @@ const SellerDashboard: React.FC = () => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-    }).format(amount);
+    }).format(amount || 0);
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    if (!dateString) return 'No date';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch {
+      return 'Invalid date';
+    }
   };
 
   const calculateDiscount = (originalPrice: number, offerAmount: number) => {
+    if (!originalPrice || !offerAmount) return '0';
     return ((1 - offerAmount / originalPrice) * 100).toFixed(1);
   };
 
@@ -332,32 +386,71 @@ const SellerDashboard: React.FC = () => {
     </button>
   );
 
-  const ListingCard = ({ listing }: { listing: Listing }) => (
-    <div className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
-      <div className="flex items-start justify-between mb-3">
-        <h4 className="font-medium text-gray-900 truncate">{listing.title}</h4>
-        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getListingStatusColor(listing.status)}`}>
-          {listing.status}
-        </span>
-      </div>
-      
-      <p className="text-sm text-gray-600 mb-2 line-clamp-2">{listing.description}</p>
-      
-      <div className="flex items-center justify-between text-sm">
-        <span className="font-semibold text-green-600">{formatCurrency(listing.price)}</span>
-        <span className="text-gray-500">{formatDate(listing.createdAt)}</span>
-      </div>
+  const ListingCard = ({ listing }: { listing: Listing }) => {
+    console.log('🎨 Rendering listing:', listing); // Debug each listing
+    
+    return (
+      <div className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors bg-white">
+        {/* Listing Image - with fallback since mediaUrls might not exist */}
+        {listing.mediaUrls && listing.mediaUrls.length > 0 ? (
+          <div className="mb-3 h-40 bg-gray-100 rounded-lg overflow-hidden">
+            <img 
+              src={listing.mediaUrls[0]} 
+              alt={listing.title}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=No+Image';
+              }}
+            />
+          </div>
+        ) : (
+          <div className="mb-3 h-40 bg-gray-100 rounded-lg flex items-center justify-center">
+            <span className="text-gray-400 text-sm">No Image</span>
+          </div>
+        )}
+        
+        <div className="flex items-start justify-between mb-3">
+          <h4 className="font-medium text-gray-900 truncate flex-1 mr-2">
+            {listing.title || 'Untitled Listing'}
+          </h4>
+          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getListingStatusColor(listing.status)}`}>
+            {listing.status || 'unknown'}
+          </span>
+        </div>
+        
+        <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+          {listing.description || 'No description available'}
+        </p>
+        
+        <div className="flex items-center justify-between text-sm mb-3">
+          <span className="font-semibold text-green-600">
+            {formatCurrency(listing.price)}
+          </span>
+          <span className="text-gray-500">
+            {/* Use updatedAt since that's what backend returns */}
+            {formatDate(listing.updatedAt)}
+          </span>
+        </div>
 
-      <div className="mt-3">
-        <button
-          onClick={() => handleViewListingDetails(listing._id)}
-          className="w-full text-xs py-2 px-3 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
-        >
-          View Details
-        </button>
+        {listing.category && (
+          <div className="mb-2">
+            <span className="inline-block bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">
+              {listing.category}
+            </span>
+          </div>
+        )}
+
+        <div className="mt-3">
+          <button
+            onClick={() => handleViewListingDetails(listing._id)}
+            className="w-full text-sm py-2 px-3 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+          >
+            View Details
+          </button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -376,6 +469,36 @@ const SellerDashboard: React.FC = () => {
     <MarketplaceLayout>
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Debug Panel - Temporary */}
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-semibold text-blue-900">Debug Information</h3>
+              <button 
+                onClick={() => {
+                  console.log('🔍 Current state:', { listings, recentOrders, offers, stats });
+                  fetchDashboardData();
+                }}
+                className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded"
+              >
+                Refresh & Log
+              </button>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 text-xs">
+              <div className="text-blue-700">
+                <strong>Listings:</strong> {listings.length}
+              </div>
+              <div className="text-blue-700">
+                <strong>Orders:</strong> {recentOrders.length}
+              </div>
+              <div className="text-blue-700">
+                <strong>Offers:</strong> {offers.length}
+              </div>
+              <div className="text-blue-700">
+                <strong>Active Tab:</strong> {activeTab}
+              </div>
+            </div>
+          </div>
+
           {/* Page Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900">Seller Dashboard</h1>
@@ -394,8 +517,8 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* Error Message - sirf tabhi dikhao agar listings bhi fetch nahi hui */}
-          {error && listings.length === 0 && (
+          {/* Error Message */}
+          {error && (
             <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-center">
                 <svg className="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -450,6 +573,8 @@ const SellerDashboard: React.FC = () => {
             </nav>
           </div>
 
+          {/* Rest of the JSX remains the same as your previous code */}
+          {/* ... overview, offers, and listings tabs content ... */}
           {activeTab === 'overview' && (
             <>
               {/* Stats Grid */}
@@ -744,7 +869,9 @@ const SellerDashboard: React.FC = () => {
               <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">My Listings</h2>
-                  <p className="text-sm text-gray-600 mt-1">View your product listings</p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    View your product listings ({listings.length} items)
+                  </p>
                 </div>
                 <div className="flex space-x-3">
                   <button
@@ -764,13 +891,21 @@ const SellerDashboard: React.FC = () => {
                     <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
-                    <h3 className="mt-4 text-lg font-medium text-gray-900">No listings yet</h3>
-                    <p className="mt-2 text-gray-500">You don't have any listings at the moment.</p>
+                    <h3 className="mt-4 text-lg font-medium text-gray-900">No listings found</h3>
+                    <p className="mt-2 text-gray-500">
+                      {listings.length === 0 ? 'No listings available or API response issue.' : 'Check console for API response details.'}
+                    </p>
+                    <button
+                      onClick={fetchDashboardData}
+                      className="mt-4 bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
+                    >
+                      Retry Fetch
+                    </button>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {listings.map(listing => (
-                      <ListingCard key={listing._id} listing={listing} />
+                    {listings.map((listing, index) => (
+                      <ListingCard key={listing._id || `listing-${index}`} listing={listing} />
                     ))}
                   </div>
                 )}
