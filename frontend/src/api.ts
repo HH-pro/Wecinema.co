@@ -1,4 +1,4 @@
-// api.ts - Complete & Organized Version
+// api.ts - Complete & Organized Version with marketplaceAPI export
 import axios, { AxiosResponse, AxiosError, Method } from "axios";
 import { toast } from "react-toastify";
 
@@ -415,6 +415,54 @@ export const dashboardAPI = {
   getBuyerStats: (
     setLoading?: React.Dispatch<React.SetStateAction<boolean>>
   ) => getRequest('/api/marketplace/dashboard/buyer-stats', setLoading)
+};
+
+// ========================
+// MARKETPLACE API GROUP (Added for MarketplaceContext)
+// ========================
+
+export const marketplaceAPI = {
+  listings: {
+    get: listingAPI.getListings,
+    getById: listingAPI.getListingById,
+    getMy: listingAPI.getMyListings,
+    create: listingAPI.createListing,
+    update: listingAPI.updateListing,
+    delete: listingAPI.deleteListing
+  },
+  offers: {
+    make: offerAPI.makeOffer,
+    getMy: offerAPI.getMyOffers,
+    getReceived: offerAPI.getReceivedOffers,
+    accept: offerAPI.acceptOffer,
+    reject: offerAPI.rejectOffer,
+    cancel: offerAPI.cancelOffer
+  },
+  orders: {
+    create: orderAPI.createOrder,
+    getMy: orderAPI.getMyOrders,
+    getSeller: orderAPI.getSellerOrders,
+    getDetails: orderAPI.getOrderDetails,
+    updateStatus: orderAPI.updateOrderStatus,
+    deliver: orderAPI.deliverOrder,
+    requestRevision: orderAPI.requestRevision
+  },
+  payments: {
+    createIntent: paymentAPI.createPaymentIntent,
+    confirm: paymentAPI.confirmPayment,
+    capture: paymentAPI.capturePayment,
+    cancel: paymentAPI.cancelPayment,
+    getStatus: paymentAPI.getPaymentStatus
+  },
+  messages: {
+    get: messageAPI.getOrderMessages,
+    send: messageAPI.sendMessage,
+    markRead: messageAPI.markMessageAsRead
+  },
+  dashboard: {
+    getSellerStats: dashboardAPI.getSellerStats,
+    getBuyerStats: dashboardAPI.getBuyerStats
+  }
 };
 
 // ========================
