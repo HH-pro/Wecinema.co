@@ -301,7 +301,7 @@ export const offerAPI = {
     getRequest('/api/marketplace/offers/my-offers', setLoading),
 
   getReceivedOffers: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest('/api/marketplace/offers/received-offers', setLoading),
+    getRequest('/marketplace/offers/received-offers', setLoading),
 
   acceptOffer: (offerId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
     putRequest(`/api/marketplace/offers/accept-offer/${offerId}`, {}, setLoading, "Offer accepted"),
@@ -330,7 +330,7 @@ export const orderAPI = {
     getRequest('/api/marketplace/orders/my-orders', setLoading),
 
   getSellerOrders: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest('/api/marketplace/orders/seller-orders', setLoading),
+    getRequest('/marketplace/orders/seller-orders', setLoading),
 
   getOrderDetails: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
     getRequest(`/api/marketplace/orders/${orderId}`, setLoading),
