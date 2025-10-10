@@ -145,7 +145,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
 });
 
 // Get offers received (seller) - Add authentication middleware
-router.get("/received-offers", async (req, res) => {
+router.get("/received-offers",authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
     
@@ -169,7 +169,7 @@ router.get("/received-offers", async (req, res) => {
 });
 
 // Get offers made (buyer) - Add authentication middleware
-router.get("/my-offers", async (req, res) => {
+router.get("/my-offers", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
     
