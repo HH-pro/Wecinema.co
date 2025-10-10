@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import OrderSummary from '../../components/marketplae/OrderSummary';
-import { getMyListings } from '../../api'; // Only import getMyListings
+import { getMyListings } from '../../api';
 
 interface DashboardStats {
   totalListings: number;
@@ -90,57 +90,71 @@ const SellerDashboard: React.FC = () => {
       setError('');
       setSuccess('');
       
-      // Fetch all data in parallel
-      const [ordersResponse, listingsData, offersResponse] = await Promise.all([
-        // Fetch seller orders
-        fetch('/marketplace/orders/seller-orders', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include'
-        }),
-        // Fetch my listings using API function
-        getMyListings(setLoading),
-        // Fetch seller offers
-        fetch('/marketplace/offers/seller-offers', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include'
-        }).catch(() => ({ ok: false })) // Gracefully handle missing endpoint
-      ]);
-
-      // Handle orders response
-      if (!ordersResponse.ok) {
-        throw new Error('Failed to fetch orders');
-      }
-      const ordersData = await ordersResponse.json();
-      const ordersArray = Array.isArray(ordersData) ? ordersData : ordersData.orders || ordersData.data || [];
-      setRecentOrders(ordersArray.slice(0, 5));
-
-      // Handle listings data from API function
+      // Sirf listings fetch karo, baaki APIs optional hain
+      const listingsData = await getMyListings(setLoading);
       const listingsArray = Array.isArray(listingsData) ? listingsData : listingsData.listings || listingsData.data || [];
       setListings(listingsArray);
 
-      // Handle offers response
+      // Orders aur offers ko optional banayein - agar available nahi hain toh empty array use karo
+      let ordersArray: Order[] = [];
       let offersArray: Offer[] = [];
-      if (offersResponse.ok) {
-        const offersData = await offersResponse.json();
-        offersArray = Array.isArray(offersData) ? offersData : offersData.offers || offersData.data || [];
+
+      try {
+        // Orders fetch karo - agar available ho
+        const ordersResponse = await fetch('/marketplace/orders/seller-orders', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include'
+        });
+        
+        if (ordersResponse.ok) {
+          const ordersData = await ordersResponse.json();
+          ordersArray = Array.isArray(ordersData) ? ordersData : ordersData.orders || ordersData.data || [];
+        }
+      } catch (orderError) {
+        console.log('Orders API not available, using empty orders');
+        ordersArray = [];
       }
+
+      try {
+        // Offers fetch karo - agar available ho
+        const offersResponse = await fetch('/marketplace/offers/seller-offers', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include'
+        });
+        
+        if (offersResponse.ok) {
+          const offersData = await offersResponse.json();
+          offersArray = Array.isArray(offersData) ? offersData : offersData.offers || offersData.data || [];
+        }
+      } catch (offerError) {
+        console.log('Offers API not available, using empty offers');
+        offersArray = [];
+      }
+
+      setRecentOrders(ordersArray.slice(0, 5));
       setOffers(offersArray);
 
-      // Calculate statistics
+      // Calculate statistics with available data
       calculateStats(ordersArray, listingsArray, offersArray);
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      setError('Failed to load dashboard data. Please try again.');
-      setRecentOrders([]);
-      setOffers([]);
-      setListings([]);
+      // Sirf error show karo agar listings bhi fetch nahi ho payi
+      const listingsData = await getMyListings(setLoading);
+      if (!listingsData || (Array.isArray(listingsData) && listingsData.length === 0)) {
+        setError('Failed to load dashboard data. Please try again.');
+      } else {
+        // Agar listings mil gayi hain, toh error nahi dikhao
+        const listingsArray = Array.isArray(listingsData) ? listingsData : listingsData.listings || listingsData.data || [];
+        setListings(listingsArray);
+        calculateStats([], listingsArray, []);
+      }
     } finally {
       setLoading(false);
     }
@@ -167,8 +181,6 @@ const SellerDashboard: React.FC = () => {
       pendingOffers
     });
   };
-
-  // REMOVED: All listing management functions (create, update, delete, toggle status)
 
   const handleViewOrderDetails = (orderId: string) => {
     window.location.href = `/orders/${orderId}`;
@@ -200,31 +212,6 @@ const SellerDashboard: React.FC = () => {
     } catch (error) {
       console.error('Error updating offer:', error);
       setError(error instanceof Error ? error.message : 'Failed to update offer');
-    }
-  };
-
-  const handleCounterOffer = async (offerId: string, counterAmount: number) => {
-    try {
-      setError('');
-      const response = await fetch(`/api/marketplace/offers/${offerId}/counter`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ counterAmount }),
-      });
-
-      if (response.ok) {
-        setSuccess('Counter offer sent successfully!');
-        await fetchDashboardData();
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send counter offer');
-      }
-    } catch (error) {
-      console.error('Error sending counter offer:', error);
-      setError(error instanceof Error ? error.message : 'Failed to send counter offer');
     }
   };
 
@@ -361,7 +348,6 @@ const SellerDashboard: React.FC = () => {
         <span className="text-gray-500">{formatDate(listing.createdAt)}</span>
       </div>
 
-      {/* REMOVED: Action buttons for listing management */}
       <div className="mt-3">
         <button
           onClick={() => handleViewListingDetails(listing._id)}
@@ -408,8 +394,8 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* Error Message */}
-          {error && (
+          {/* Error Message - sirf tabhi dikhao agar listings bhi fetch nahi hui */}
+          {error && listings.length === 0 && (
             <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-center">
                 <svg className="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -567,7 +553,7 @@ const SellerDashboard: React.FC = () => {
 
                 {/* Quick Actions & Tips */}
                 <div className="space-y-6">
-                  {/* Quick Actions - REMOVED Create Listing button */}
+                  {/* Quick Actions */}
                   <div className="bg-white rounded-lg shadow-sm border border-gray-200">
                     <div className="px-6 py-4 border-b border-gray-200">
                       <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
@@ -745,14 +731,6 @@ const SellerDashboard: React.FC = () => {
                             </button>
                           </div>
                         )}
-
-                        {offer.status === 'countered' && (
-                          <div className="mt-4 pt-4 border-t border-gray-200">
-                            <p className="text-sm text-blue-600 font-medium">
-                              You've sent a counter offer for this listing
-                            </p>
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -778,7 +756,6 @@ const SellerDashboard: React.FC = () => {
                     </svg>
                     Refresh
                   </button>
-                  {/* REMOVED: Create Listing button */}
                 </div>
               </div>
               <div className="p-6">
