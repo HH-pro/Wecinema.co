@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import OrderSummary from '../../components/marketplae/OrderSummary';
-import { getMyListings, createListing, updateListing, deleteListing } from '../../api';
+import { getMyListings } from '../../api'; // Only import getMyListings
 
 interface DashboardStats {
   totalListings: number;
@@ -168,59 +168,7 @@ const SellerDashboard: React.FC = () => {
     });
   };
 
-  // Listing Management Functions
-  const handleCreateListing = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      
-      // Create sample form data - in real app, this would come from a form
-      const formData = new FormData();
-      formData.append('title', 'New Product Listing');
-      formData.append('description', 'This is a sample product description');
-      formData.append('price', '99.99');
-      formData.append('category', 'electronics');
-      formData.append('tags', 'new,popular');
-      
-      await createListing(formData, setLoading);
-      setSuccess('Listing created successfully!');
-      await fetchDashboardData(); // Refresh data
-    } catch (error) {
-      console.error('Error creating listing:', error);
-      setError('Failed to create listing. Please try again.');
-    }
-  };
-
-  const handleUpdateListing = async (listingId: string, updatedData: Partial<Listing>) => {
-    try {
-      setError('');
-      await updateListing(listingId, updatedData, setLoading);
-      setSuccess('Listing updated successfully!');
-      await fetchDashboardData(); // Refresh data
-    } catch (error) {
-      console.error('Error updating listing:', error);
-      setError('Failed to update listing. Please try again.');
-    }
-  };
-
-  const handleDeleteListing = async (listingId: string) => {
-    if (window.confirm('Are you sure you want to delete this listing? This action cannot be undone.')) {
-      try {
-        setError('');
-        await deleteListing(listingId, setLoading);
-        setSuccess('Listing deleted successfully!');
-        await fetchDashboardData(); // Refresh data
-      } catch (error) {
-        console.error('Error deleting listing:', error);
-        setError('Failed to delete listing. Please try again.');
-      }
-    }
-  };
-
-  const handleToggleListingStatus = async (listing: Listing) => {
-    const newStatus = listing.status === 'active' ? 'inactive' : 'active';
-    await handleUpdateListing(listing._id, { status: newStatus });
-  };
+  // REMOVED: All listing management functions (create, update, delete, toggle status)
 
   const handleViewOrderDetails = (orderId: string) => {
     window.location.href = `/orders/${orderId}`;
@@ -413,22 +361,13 @@ const SellerDashboard: React.FC = () => {
         <span className="text-gray-500">{formatDate(listing.createdAt)}</span>
       </div>
 
-      <div className="flex space-x-2 mt-3">
+      {/* REMOVED: Action buttons for listing management */}
+      <div className="mt-3">
         <button
-          onClick={() => handleToggleListingStatus(listing)}
-          className={`flex-1 text-xs py-1 px-2 rounded ${
-            listing.status === 'active' 
-              ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' 
-              : 'bg-green-100 text-green-700 hover:bg-green-200'
-          }`}
+          onClick={() => handleViewListingDetails(listing._id)}
+          className="w-full text-xs py-2 px-3 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
         >
-          {listing.status === 'active' ? 'Deactivate' : 'Activate'}
-        </button>
-        <button
-          onClick={() => handleDeleteListing(listing._id)}
-          className="flex-1 text-xs py-1 px-2 rounded bg-red-100 text-red-700 hover:bg-red-200"
-        >
-          Delete
+          View Details
         </button>
       </div>
     </div>
@@ -628,22 +567,12 @@ const SellerDashboard: React.FC = () => {
 
                 {/* Quick Actions & Tips */}
                 <div className="space-y-6">
-                  {/* Quick Actions */}
+                  {/* Quick Actions - REMOVED Create Listing button */}
                   <div className="bg-white rounded-lg shadow-sm border border-gray-200">
                     <div className="px-6 py-4 border-b border-gray-200">
                       <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
                     </div>
                     <div className="p-6 space-y-4">
-                      <QuickActionButton
-                        title="Create New Listing"
-                        onClick={handleCreateListing}
-                        icon={
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                          </svg>
-                        }
-                        variant="primary"
-                      />
                       <QuickActionButton
                         title="View All Orders"
                         onClick={() => window.location.href = '/orders'}
@@ -655,7 +584,7 @@ const SellerDashboard: React.FC = () => {
                         variant="secondary"
                       />
                       <QuickActionButton
-                        title="Manage Listings"
+                        title="View Listings"
                         onClick={() => setActiveTab('listings')}
                         icon={
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -837,7 +766,7 @@ const SellerDashboard: React.FC = () => {
               <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">My Listings</h2>
-                  <p className="text-sm text-gray-600 mt-1">Manage your product listings</p>
+                  <p className="text-sm text-gray-600 mt-1">View your product listings</p>
                 </div>
                 <div className="flex space-x-3">
                   <button
@@ -849,15 +778,7 @@ const SellerDashboard: React.FC = () => {
                     </svg>
                     Refresh
                   </button>
-                  <button
-                    onClick={handleCreateListing}
-                    className="bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 flex items-center"
-                  >
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Create Listing
-                  </button>
+                  {/* REMOVED: Create Listing button */}
                 </div>
               </div>
               <div className="p-6">
@@ -867,13 +788,7 @@ const SellerDashboard: React.FC = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
                     <h3 className="mt-4 text-lg font-medium text-gray-900">No listings yet</h3>
-                    <p className="mt-2 text-gray-500">Get started by creating your first listing.</p>
-                    <button
-                      onClick={handleCreateListing}
-                      className="mt-4 bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
-                    >
-                      Create Your First Listing
-                    </button>
+                    <p className="mt-2 text-gray-500">You don't have any listings at the moment.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
