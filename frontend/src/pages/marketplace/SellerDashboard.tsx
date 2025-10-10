@@ -47,7 +47,7 @@ interface Offer {
 type TabType = 'overview' | 'offers' | 'listings';
 
 const SellerDashboard: React.FC = () => {
-  const [listings, setListings] = useState<Listing[]>([]);
+ const [listingsData, setListingsData] = useState({ listings: [], pagination: {} });
   const [orders, setOrders] = useState<Order[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -55,8 +55,8 @@ const SellerDashboard: React.FC = () => {
   const [error, setError] = useState<string>('');
 
   // Stats calculation
-  const totalListings = listings.length;// After - Properly access the listings array from response
-const activeListings = listings?.listings?.filter(listing => listing.status === 'active').length || 0;
+  const activeListings = listingsData.listings.filter(listing => listing.status === 'active').length;
+const totalListings = listingsData.pagination.total || 0;
   const totalOrders = orders.length;
   const pendingOrders = orders.filter(order => order.status === 'pending').length;
   const totalRevenue = orders
