@@ -56,14 +56,15 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
     }
     
     res.status(200).json({
-      listings,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / parseInt(limit))
-      }
-    });
+  listings,
+  pagination: {
+    page: parseInt(page),
+    limit: parseInt(limit),
+    total,
+    pages: Math.ceil(total / parseInt(limit))
+  }
+});
+
     
   } catch (error) {
     console.error("❌ Error fetching my listings:", error);
