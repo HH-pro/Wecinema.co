@@ -44,6 +44,12 @@ interface Offer {
   message?: string;
 }
 
+interface ApiResponse<T> {
+  data?: T;
+  message?: string;
+  success?: boolean;
+}
+
 type TabType = 'overview' | 'offers' | 'listings';
 
 const SellerDashboard: React.FC = () => {
@@ -54,23 +60,15 @@ const SellerDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [error, setError] = useState<string>('');
 
-  // Safe stats calculation with array checks
-  const totalListings = Array.isArray(listings) ? listings.length : 0;
-  const activeListings = Array.isArray(listings) 
-    ? listings.filter(listing => listing.status === 'active').length 
-    : 0;
-  const totalOrders = Array.isArray(orders) ? orders.length : 0;
-  const pendingOrders = Array.isArray(orders) 
-    ? orders.filter(order => order.status === 'pending').length 
-    : 0;
-  const totalRevenue = Array.isArray(orders) 
-    ? orders
-        .filter(order => order.status === 'completed')
-        .reduce((sum, order) => sum + (order.amount || 0), 0)
-    : 0;
-  const pendingOffers = Array.isArray(offers) 
-    ? offers.filter(offer => offer.status === 'pending').length 
-    : 0;
+  // Stats calculation
+  const totalListings = listings.length;
+  const activeListings = listings.filter(listing => listing.status === 'active').length;
+  const totalOrders = orders.length;
+  const pendingOrders = orders.filter(order => order.status === 'pending').length;
+  const totalRevenue = orders
+    .filter(order => order.status === 'completed')
+    .reduce((sum, order) => sum + order.amount, 0);
+  const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
 
   useEffect(() => {
     fetchDashboardData();
@@ -81,26 +79,30 @@ const SellerDashboard: React.FC = () => {
       setLoading(true);
       setError('');
 
-      // API calls with proper error handling
+      // API calls with proper response handling
       const [listingsResponse, ordersResponse, offersResponse] = await Promise.all([
-        getMyListings(setLoading).catch(error => {
-          console.error('Error fetching listings:', error);
-          return [];
-        }),
-        getSellerOrders(setLoading).catch(error => {
-          console.error('Error fetching orders:', error);
-          return [];
-        }),
-        getReceivedOffers(setLoading).catch(error => {
-          console.error('Error fetching offers:', error);
-          return [];
-        })
+        getMyListings(setLoading),
+        getSellerOrders(setLoading),
+        getReceivedOffers(setLoading)
       ]);
 
-      // Ensure we always set arrays, even if API returns undefined or null
-      setListings(Array.isArray(listingsResponse) ? listingsResponse : []);
-      setOrders(Array.isArray(ordersResponse) ? ordersResponse : []);
-      setOffers(Array.isArray(offersResponse) ? offersResponse : []);
+      // Extract data from API responses - handle both direct arrays and { data: array } responses
+      const listingsData = Array.isArray(listingsResponse) 
+        ? listingsResponse 
+        : (listingsResponse?.data || []);
+      
+      const ordersData = Array.isArray(ordersResponse) 
+        ? ordersResponse 
+        : (ordersResponse?.data || []);
+      
+      const offersData = Array.isArray(offersResponse) 
+        ? offersResponse 
+        : (offersResponse?.data || []);
+
+      // Ensure we always set arrays
+      setListings(Array.isArray(listingsData) ? listingsData : []);
+      setOrders(Array.isArray(ordersData) ? ordersData : []);
+      setOffers(Array.isArray(offersData) ? offersData : []);
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -423,7 +425,7 @@ const SellerDashboard: React.FC = () => {
                       </button>
                     </div>
                     <div className="p-6">
-                      {!Array.isArray(orders) || orders.length === 0 ? (
+                      {orders.length === 0 ? (
                         <div className="text-center py-8">
                           <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
@@ -537,7 +539,7 @@ const SellerDashboard: React.FC = () => {
                 </button>
               </div>
               <div className="p-6">
-                {!Array.isArray(offers) || offers.length === 0 ? (
+                {offers.length === 0 ? (
                   <div className="text-center py-12">
                     <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -647,7 +649,7 @@ const SellerDashboard: React.FC = () => {
                 </div>
               </div>
               <div className="p-6">
-                {!Array.isArray(listings) || listings.length === 0 ? (
+                {listings.length === 0 ? (
                   <div className="text-center py-12">
                     <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
