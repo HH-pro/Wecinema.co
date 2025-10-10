@@ -59,7 +59,7 @@ const SellerDashboard: React.FC = () => {
       console.log('🧪 Testing direct fetch...');
       setLoading(true);
       
-      const response = await fetch('//listings/my-listings', {
+      const response = await fetch('/marketplace/listings/my-listings', {
         method: 'GET',
         credentials: 'include',
         headers: {
