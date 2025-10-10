@@ -55,8 +55,8 @@ const SellerDashboard: React.FC = () => {
   const [error, setError] = useState<string>('');
 
   // Stats calculation
-  const totalListings = listings.length;
-  const activeListings = listings.filter(listing => listing.status === 'active').length;
+  const totalListings = listings.length;// After - Properly access the listings array from response
+const activeListings = listings?.listings?.filter(listing => listing.status === 'active').length || 0;
   const totalOrders = orders.length;
   const pendingOrders = orders.filter(order => order.status === 'pending').length;
   const totalRevenue = orders
