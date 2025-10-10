@@ -55,7 +55,10 @@ const SellerDashboard: React.FC = () => {
   const [error, setError] = useState<string>('');
 
   // Stats calculation
-  const activeListings = listingsData.listings.filter(listing => listing.status === 'active').length;
+  // Safe filtering with fallbacks
+const activeListings = Array.isArray(listingsData.listings) 
+  ? listingsData.listings.filter(listing => listing?.status === 'active').length 
+  : 0;
 const totalListings = listingsData.pagination.total || 0;
   const totalOrders = orders.length;
   const pendingOrders = orders.filter(order => order.status === 'pending').length;
