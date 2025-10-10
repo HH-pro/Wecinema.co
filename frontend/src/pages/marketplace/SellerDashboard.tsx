@@ -54,15 +54,23 @@ const SellerDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [error, setError] = useState<string>('');
 
-  // Stats calculation
-  const totalListings = listings.length;
-  const activeListings = listings.filter(listing => listing.status === 'active').length;
-  const totalOrders = orders.length;
-  const pendingOrders = orders.filter(order => order.status === 'pending').length;
-  const totalRevenue = orders
-    .filter(order => order.status === 'completed')
-    .reduce((sum, order) => sum + order.amount, 0);
-  const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
+  // Safe stats calculation with array checks
+  const totalListings = Array.isArray(listings) ? listings.length : 0;
+  const activeListings = Array.isArray(listings) 
+    ? listings.filter(listing => listing.status === 'active').length 
+    : 0;
+  const totalOrders = Array.isArray(orders) ? orders.length : 0;
+  const pendingOrders = Array.isArray(orders) 
+    ? orders.filter(order => order.status === 'pending').length 
+    : 0;
+  const totalRevenue = Array.isArray(orders) 
+    ? orders
+        .filter(order => order.status === 'completed')
+        .reduce((sum, order) => sum + (order.amount || 0), 0)
+    : 0;
+  const pendingOffers = Array.isArray(offers) 
+    ? offers.filter(offer => offer.status === 'pending').length 
+    : 0;
 
   useEffect(() => {
     fetchDashboardData();
@@ -73,20 +81,34 @@ const SellerDashboard: React.FC = () => {
       setLoading(true);
       setError('');
 
-      // Direct API calls - simple and clean
-      const [listingsData, ordersData, offersData] = await Promise.all([
-        getMyListings(setLoading),
-        getSellerOrders(setLoading),
-        getReceivedOffers(setLoading)
+      // API calls with proper error handling
+      const [listingsResponse, ordersResponse, offersResponse] = await Promise.all([
+        getMyListings(setLoading).catch(error => {
+          console.error('Error fetching listings:', error);
+          return [];
+        }),
+        getSellerOrders(setLoading).catch(error => {
+          console.error('Error fetching orders:', error);
+          return [];
+        }),
+        getReceivedOffers(setLoading).catch(error => {
+          console.error('Error fetching offers:', error);
+          return [];
+        })
       ]);
 
-      setListings(listingsData || []);
-      setOrders(ordersData || []);
-      setOffers(offersData || []);
+      // Ensure we always set arrays, even if API returns undefined or null
+      setListings(Array.isArray(listingsResponse) ? listingsResponse : []);
+      setOrders(Array.isArray(ordersResponse) ? ordersResponse : []);
+      setOffers(Array.isArray(offersResponse) ? offersResponse : []);
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       setError('Failed to load dashboard data');
+      // Ensure arrays are set to empty on error
+      setListings([]);
+      setOrders([]);
+      setOffers([]);
     } finally {
       setLoading(false);
     }
@@ -102,8 +124,8 @@ const SellerDashboard: React.FC = () => {
 
   const handleOfferAction = async (offerId: string, action: 'accept' | 'reject') => {
     try {
-      // You can add accept/reject offer functions in api.ts
       setError('');
+      // TODO: Add accept/reject offer functions in api.ts
       // await acceptOffer(offerId, setLoading);
       // or await rejectOffer(offerId, setLoading);
       await fetchDashboardData(); // Refresh data
@@ -197,6 +219,10 @@ const SellerDashboard: React.FC = () => {
             src={listing.mediaUrls[0]} 
             alt={listing.title}
             className="w-full h-full object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+            }}
           />
         </div>
       ) : (
@@ -207,10 +233,10 @@ const SellerDashboard: React.FC = () => {
       
       <div className="flex items-start justify-between mb-3">
         <h4 className="font-medium text-gray-900 truncate flex-1 mr-2">
-          {listing.title}
+          {listing.title || 'Untitled Listing'}
         </h4>
         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getListingStatusColor(listing.status)}`}>
-          {listing.status}
+          {listing.status || 'unknown'}
         </span>
       </div>
       
@@ -220,7 +246,7 @@ const SellerDashboard: React.FC = () => {
       
       <div className="flex items-center justify-between text-sm mb-3">
         <span className="font-semibold text-green-600">
-          {formatCurrency(listing.price)}
+          {formatCurrency(listing.price || 0)}
         </span>
         <span className="text-gray-500">
           {formatDate(listing.updatedAt)}
@@ -397,7 +423,7 @@ const SellerDashboard: React.FC = () => {
                       </button>
                     </div>
                     <div className="p-6">
-                      {orders.length === 0 ? (
+                      {!Array.isArray(orders) || orders.length === 0 ? (
                         <div className="text-center py-8">
                           <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
@@ -412,20 +438,20 @@ const SellerDashboard: React.FC = () => {
                               <div className="flex items-center space-x-4">
                                 <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
                                   <span className="text-sm font-medium text-gray-600">
-                                    {order.buyerId.username.charAt(0).toUpperCase()}
+                                    {order.buyerId?.username?.charAt(0).toUpperCase() || 'U'}
                                   </span>
                                 </div>
                                 <div>
                                   <p className="font-medium text-gray-900">
                                     {order.listingId?.title || 'Unknown Listing'}
                                   </p>
-                                  <p className="text-sm text-gray-500">{order.buyerId.username}</p>
+                                  <p className="text-sm text-gray-500">{order.buyerId?.username || 'Unknown Buyer'}</p>
                                 </div>
                               </div>
                               <div className="text-right">
-                                <p className="font-semibold text-green-600">{formatCurrency(order.amount)}</p>
+                                <p className="font-semibold text-green-600">{formatCurrency(order.amount || 0)}</p>
                                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                                  {order.status}
+                                  {order.status || 'unknown'}
                                 </span>
                               </div>
                             </div>
@@ -511,7 +537,7 @@ const SellerDashboard: React.FC = () => {
                 </button>
               </div>
               <div className="p-6">
-                {offers.length === 0 ? (
+                {!Array.isArray(offers) || offers.length === 0 ? (
                   <div className="text-center py-12">
                     <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -530,25 +556,25 @@ const SellerDashboard: React.FC = () => {
                                 className="text-lg font-medium text-gray-900 hover:text-yellow-600 cursor-pointer"
                                 onClick={() => handleViewListingDetails(offer.listingId._id)}
                               >
-                                {offer.listingId.title}
+                                {offer.listingId?.title || 'Unknown Listing'}
                               </h3>
                               <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(offer.status)}`}>
-                                {offer.status.charAt(0).toUpperCase() + offer.status.slice(1)}
+                                {offer.status ? offer.status.charAt(0).toUpperCase() + offer.status.slice(1) : 'Unknown'}
                               </span>
                             </div>
                             
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                               <div>
                                 <p className="text-sm text-gray-600">Buyer</p>
-                                <p className="font-medium text-gray-900">{offer.buyerId.username}</p>
+                                <p className="font-medium text-gray-900">{offer.buyerId?.username || 'Unknown Buyer'}</p>
                               </div>
                               <div>
                                 <p className="text-sm text-gray-600">Original Price</p>
-                                <p className="font-medium text-gray-900">{formatCurrency(offer.listingId.price)}</p>
+                                <p className="font-medium text-gray-900">{formatCurrency(offer.listingId?.price || 0)}</p>
                               </div>
                               <div>
                                 <p className="text-sm text-gray-600">Offer Amount</p>
-                                <p className="font-medium text-green-600">{formatCurrency(offer.amount)}</p>
+                                <p className="font-medium text-green-600">{formatCurrency(offer.amount || 0)}</p>
                               </div>
                             </div>
 
@@ -621,7 +647,7 @@ const SellerDashboard: React.FC = () => {
                 </div>
               </div>
               <div className="p-6">
-                {listings.length === 0 ? (
+                {!Array.isArray(listings) || listings.length === 0 ? (
                   <div className="text-center py-12">
                     <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
