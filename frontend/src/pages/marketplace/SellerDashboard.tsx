@@ -10,12 +10,9 @@ interface Listing {
   updatedAt: string;
 }
 
-type TabType = 'overview' | 'offers' | 'listings';
-
 const SellerDashboard: React.FC = () => {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<TabType>('listings');
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
@@ -27,19 +24,47 @@ const SellerDashboard: React.FC = () => {
       setLoading(true);
       setError('');
       
-      const listingsData = await getMyListings(setLoading);
+      console.log('🔄 Fetching listings...');
       
-      if (Array.isArray(listingsData)) {
-        setListings(listingsData);
+      // Direct API call with debugging
+      const response = await getMyListings(setLoading);
+      
+      console.log('📝 API Response:', response);
+      console.log('📝 Response type:', typeof response);
+      console.log('📝 Is array:', Array.isArray(response));
+      
+      if (Array.isArray(response)) {
+        console.log('✅ Listings received:', response.length);
+        console.log('📝 Sample listing:', response[0]);
+        setListings(response);
       } else {
-        setError('Invalid listings data received');
+        console.warn('⚠️ Response is not array:', response);
+        setListings([]);
+        setError('No listings data received');
       }
       
     } catch (error) {
-      console.error('Error fetching listings:', error);
+      console.error('❌ Error fetching listings:', error);
       setError('Failed to load listings');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Temporary: Manual API test function
+  const testAPI = async () => {
+    try {
+      console.log('🧪 Testing API directly...');
+      const response = await fetch('/marketplace/listings/my-listings', {
+        credentials: 'include'
+      });
+      console.log('🧪 Response status:', response.status);
+      console.log('🧪 Response headers:', response.headers);
+      const data = await response.text();
+      console.log('🧪 Raw response:', data);
+      console.log('🧪 Response length:', data.length);
+    } catch (error) {
+      console.error('🧪 API test error:', error);
     }
   };
 
@@ -63,50 +88,6 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  const getListingStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': 
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'inactive': 
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-      case 'draft':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      default: 
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const ListingCard = ({ listing }: { listing: Listing }) => (
-    <div className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors bg-white">
-      <div className="flex items-start justify-between mb-3">
-        <h4 className="font-medium text-gray-900 truncate flex-1 mr-2">
-          {listing.title || 'Untitled Listing'}
-        </h4>
-        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getListingStatusColor(listing.status)}`}>
-          {listing.status || 'unknown'}
-        </span>
-      </div>
-      
-      <div className="flex items-center justify-between text-sm mb-3">
-        <span className="font-semibold text-green-600">
-          {formatCurrency(listing.price)}
-        </span>
-        <span className="text-gray-500">
-          {formatDate(listing.updatedAt)}
-        </span>
-      </div>
-
-      <div className="mt-3">
-        <button
-          onClick={() => window.location.href = `/listings/${listing._id}`}
-          className="w-full text-sm py-2 px-3 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-        >
-          View Details
-        </button>
-      </div>
-    </div>
-  );
-
   if (loading) {
     return (
       <MarketplaceLayout>
@@ -124,6 +105,31 @@ const SellerDashboard: React.FC = () => {
     <MarketplaceLayout>
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Debug Panel */}
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h3 className="text-sm font-semibold text-blue-900 mb-2">Debug Info</h3>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="text-blue-700">
+                <strong>Listings Count:</strong> {listings.length}
+              </div>
+              <div className="text-blue-700">
+                <strong>Loading:</strong> {loading.toString()}
+              </div>
+            </div>
+            <button 
+              onClick={testAPI}
+              className="mt-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded"
+            >
+              Test API Directly
+            </button>
+            <button 
+              onClick={fetchListings}
+              className="mt-2 ml-2 text-xs bg-green-100 text-green-700 px-2 py-1 rounded"
+            >
+              Refresh Listings
+            </button>
+          </div>
+
           {/* Page Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900">Seller Dashboard</h1>
@@ -142,44 +148,15 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* Tabs - Simple */}
-          <div className="mb-8 border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
-              <button
-                onClick={() => setActiveTab('listings')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
-                  activeTab === 'listings'
-                    ? 'border-yellow-600 text-yellow-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                My Listings
-                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  {listings.length}
-                </span>
-              </button>
-            </nav>
-          </div>
-
           {/* Listings Section */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">My Listings</h2>
-                <p className="text-sm text-gray-600 mt-1">
-                  View your product listings ({listings.length} items)
-                </p>
-              </div>
-              <button
-                onClick={fetchListings}
-                className="text-sm text-gray-500 hover:text-gray-700 flex items-center"
-              >
-                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                Refresh
-              </button>
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">My Listings</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                {listings.length} {listings.length === 1 ? 'listing' : 'listings'} found
+              </p>
             </div>
+            
             <div className="p-6">
               {listings.length === 0 ? (
                 <div className="text-center py-12">
@@ -188,13 +165,58 @@ const SellerDashboard: React.FC = () => {
                   </svg>
                   <h3 className="mt-4 text-lg font-medium text-gray-900">No listings found</h3>
                   <p className="mt-2 text-gray-500">
-                    You don't have any listings at the moment.
+                    You don't have any listings or there might be an API issue.
                   </p>
+                  <div className="mt-4 space-x-3">
+                    <button
+                      onClick={fetchListings}
+                      className="bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg"
+                    >
+                      Try Again
+                    </button>
+                    <button
+                      onClick={testAPI}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg"
+                    >
+                      Test API
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {listings.map((listing) => (
-                    <ListingCard key={listing._id} listing={listing} />
+                    <div key={listing._id} className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors bg-white">
+                      <div className="flex items-start justify-between mb-3">
+                        <h4 className="font-medium text-gray-900 truncate flex-1 mr-2">
+                          {listing.title}
+                        </h4>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${
+                          listing.status === 'active' 
+                            ? 'bg-green-100 text-green-800 border-green-200'
+                            : 'bg-gray-100 text-gray-800 border-gray-200'
+                        }`}>
+                          {listing.status}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-sm mb-3">
+                        <span className="font-semibold text-green-600">
+                          {formatCurrency(listing.price)}
+                        </span>
+                        <span className="text-gray-500">
+                          {formatDate(listing.updatedAt)}
+                        </span>
+                      </div>
+
+                      <div className="mt-3">
+                        <button
+                          onClick={() => window.location.href = `/listings/${listing._id}`}
+                          className="w-full text-sm py-2 px-3 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                        >
+                          View Details
+                        </button>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
