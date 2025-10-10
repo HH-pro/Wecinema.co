@@ -144,18 +144,26 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
   }
 });
 
-// Get all offers (no authentication for testing)
-router.get("/received-offers", async (req, res) => {
+// Get offers received (seller) - Add authentication middleware
+router.get("/received-offers",authenticateMiddleware, async (req, res) => {
   try {
-    // Get all offers directly (no user filter)
-    const offers = await Offer.find()
+    const userId = req.user.id || req.user._id || req.user.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const myListings = await MarketplaceListing.find({ sellerId: userId });
+    const listingIds = myListings.map(listing => listing._id);
+    
+    const offers = await Offer.find({ listingId: { $in: listingIds } })
       .populate('buyerId', 'username avatar email')
       .populate('listingId', 'title price mediaUrls status')
       .sort({ createdAt: -1 });
-
+    
     res.status(200).json(offers);
   } catch (error) {
-    console.error('Error fetching offers:', error);
+    console.error('Error fetching received offers:', error);
     res.status(500).json({ error: 'Failed to fetch offers' });
   }
 });
