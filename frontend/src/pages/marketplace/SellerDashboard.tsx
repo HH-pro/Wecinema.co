@@ -24,47 +24,84 @@ const SellerDashboard: React.FC = () => {
       setLoading(true);
       setError('');
       
-      console.log('🔄 Fetching listings...');
+      console.log('🔄 Starting fetchListings...');
       
-      // Direct API call with debugging
+      // Direct API call
       const response = await getMyListings(setLoading);
       
-      console.log('📝 API Response:', response);
+      console.log('📝 getMyListings response:', response);
       console.log('📝 Response type:', typeof response);
       console.log('📝 Is array:', Array.isArray(response));
       
       if (Array.isArray(response)) {
-        console.log('✅ Listings received:', response.length);
-        console.log('📝 Sample listing:', response[0]);
+        console.log('✅ Listings array received, length:', response.length);
+        if (response.length > 0) {
+          console.log('📝 First listing:', response[0]);
+        }
         setListings(response);
       } else {
         console.warn('⚠️ Response is not array:', response);
         setListings([]);
-        setError('No listings data received');
+        setError('Invalid response format from server');
       }
       
     } catch (error) {
-      console.error('❌ Error fetching listings:', error);
-      setError('Failed to load listings');
+      console.error('❌ Error in fetchListings:', error);
+      setError('Failed to load listings: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Temporary: Manual API test function
-  const testAPI = async () => {
+  // Direct fetch test
+  const testDirectFetch = async () => {
     try {
-      console.log('🧪 Testing API directly...');
+      console.log('🧪 Testing direct fetch...');
+      setLoading(true);
+      
       const response = await fetch('/marketplace/listings/my-listings', {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      console.log('🧪 Direct fetch status:', response.status);
+      console.log('🧪 Direct fetch headers:', Object.fromEntries(response.headers.entries()));
+      
+      const text = await response.text();
+      console.log('🧪 Direct fetch raw text:', text);
+      console.log('🧪 Text length:', text.length);
+      
+      if (text) {
+        try {
+          const jsonData = JSON.parse(text);
+          console.log('🧪 Parsed JSON:', jsonData);
+        } catch (parseError) {
+          console.error('🧪 JSON parse error:', parseError);
+        }
+      }
+      
+    } catch (error) {
+      console.error('🧪 Direct fetch error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Check if user has any listings in database
+  const checkDatabase = async () => {
+    try {
+      console.log('🗄️ Checking all listings...');
+      const response = await fetch('/marketplace/listings', {
         credentials: 'include'
       });
-      console.log('🧪 Response status:', response.status);
-      console.log('🧪 Response headers:', response.headers);
-      const data = await response.text();
-      console.log('🧪 Raw response:', data);
-      console.log('🧪 Response length:', data.length);
+      const allListings = await response.json();
+      console.log('🗄️ All listings in database:', allListings);
+      console.log('🗄️ Total listings count:', Array.isArray(allListings) ? allListings.length : 'N/A');
     } catch (error) {
-      console.error('🧪 API test error:', error);
+      console.error('🗄️ Database check error:', error);
     }
   };
 
@@ -107,27 +144,41 @@ const SellerDashboard: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Debug Panel */}
           <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h3 className="text-sm font-semibold text-blue-900 mb-2">Debug Info</h3>
-            <div className="grid grid-cols-2 gap-2 text-xs">
+            <h3 className="text-sm font-semibold text-blue-900 mb-2">Debug Panel</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs mb-3">
               <div className="text-blue-700">
-                <strong>Listings Count:</strong> {listings.length}
+                <strong>Listings:</strong> {listings.length}
               </div>
               <div className="text-blue-700">
                 <strong>Loading:</strong> {loading.toString()}
               </div>
+              <div className="text-blue-700">
+                <strong>Error:</strong> {error ? 'Yes' : 'No'}
+              </div>
+              <div className="text-blue-700">
+                <strong>User ID:</strong> Check console
+              </div>
             </div>
-            <button 
-              onClick={testAPI}
-              className="mt-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded"
-            >
-              Test API Directly
-            </button>
-            <button 
-              onClick={fetchListings}
-              className="mt-2 ml-2 text-xs bg-green-100 text-green-700 px-2 py-1 rounded"
-            >
-              Refresh Listings
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button 
+                onClick={testDirectFetch}
+                className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded"
+              >
+                Test Direct Fetch
+              </button>
+              <button 
+                onClick={fetchListings}
+                className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded"
+              >
+                Refresh via API
+              </button>
+              <button 
+                onClick={checkDatabase}
+                className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded"
+              >
+                Check All Listings
+              </button>
+            </div>
           </div>
 
           {/* Page Header */}
@@ -163,9 +214,14 @@ const SellerDashboard: React.FC = () => {
                   <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                   </svg>
-                  <h3 className="mt-4 text-lg font-medium text-gray-900">No listings found</h3>
+                  <h3 className="mt-4 text-lg font-medium text-gray-900">
+                    {error ? 'API Error' : 'No Listings Found'}
+                  </h3>
                   <p className="mt-2 text-gray-500">
-                    You don't have any listings or there might be an API issue.
+                    {error 
+                      ? 'There was an error fetching your listings.' 
+                      : 'You currently don\'t have any listings. Create your first listing to get started.'
+                    }
                   </p>
                   <div className="mt-4 space-x-3">
                     <button
@@ -175,10 +231,10 @@ const SellerDashboard: React.FC = () => {
                       Try Again
                     </button>
                     <button
-                      onClick={testAPI}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg"
+                      onClick={() => window.location.href = '/create-listing'}
+                      className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg"
                     >
-                      Test API
+                      Create Listing
                     </button>
                   </div>
                 </div>
@@ -193,6 +249,8 @@ const SellerDashboard: React.FC = () => {
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${
                           listing.status === 'active' 
                             ? 'bg-green-100 text-green-800 border-green-200'
+                            : listing.status === 'draft'
+                            ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
                             : 'bg-gray-100 text-gray-800 border-gray-200'
                         }`}>
                           {listing.status}
@@ -204,7 +262,7 @@ const SellerDashboard: React.FC = () => {
                           {formatCurrency(listing.price)}
                         </span>
                         <span className="text-gray-500">
-                          {formatDate(listing.updatedAt)}
+                          Updated: {formatDate(listing.updatedAt)}
                         </span>
                       </div>
 
