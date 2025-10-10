@@ -17,26 +17,35 @@ router.get("/listings", async (req, res) => {
   }
 });
 
+/// ===================================================
+// ✅ GET USER'S LISTINGS (My Listings)
 // ===================================================
-// Add this index to your MarketplaceListing model schema:
-// { sellerId: 1, updatedAt: -1 }
-
 router.get("/my-listings", authenticateMiddleware, async (req, res) => {
   try {
     const sellerId = req.user._id;
     
-    // More efficient query with projection and sorting
-    const listings = await MarketplaceListing.find(
-      { sellerId },
-      { title: 1, price: 1, status: 1, updatedAt: 1 } // Only needed fields
-    ).sort({ updatedAt: -1 });
+    const { status, page = 1, limit = 20 } = req.query;
     
-    // Get the most recent update time for cache validation
+    const filter = { sellerId };
+    if (status) filter.status = status;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    console.log("📝 Fetching my listings for seller:", sellerId);
+
+    const listings = await MarketplaceListing.find(filter)
+      .select("title price status mediaUrls description category tags createdAt updatedAt")
+      .sort({ updatedAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await MarketplaceListing.countDocuments(filter);
+
+    // Cache headers
     const lastModified = listings[0]?.updatedAt || new Date();
     const etag = `"${lastModified.getTime()}"`;
     
-    // Cache headers
-    res.setHeader('Cache-Control', 'private, max-age=60'); // private for user-specific data
+    res.setHeader('Cache-Control', 'private, max-age=60');
     res.setHeader('Last-Modified', lastModified.toUTCString());
     res.setHeader('ETag', etag);
     
@@ -46,7 +55,15 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
       return res.status(304).send();
     }
     
-    res.status(200).json(listings);
+    res.status(200).json({
+      listings,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
     
   } catch (error) {
     console.error("❌ Error fetching my listings:", error);
