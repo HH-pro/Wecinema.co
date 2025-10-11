@@ -313,7 +313,7 @@ const SellerDashboard: React.FC = () => {
                     : 'border-transparent text-gray-500 hover:text-yellow-700 hover:border-yellow-300'
                 }`}
               >
-                Overview
+                Overvew
               </button>
               <button
                 onClick={() => setActiveTab('offers')}
