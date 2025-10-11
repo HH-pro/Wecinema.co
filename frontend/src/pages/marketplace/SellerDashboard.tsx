@@ -335,11 +335,11 @@ const SellerDashboard: React.FC = () => {
                 className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
                   activeTab === 'listings'
                     ? 'border-yellow-600 text-yellow-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    : 'border-transparent '
                 }`}
               >
                 My Listings
-                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-blue-800">
+                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                   {totalListings}
                 </span>
               </button>
