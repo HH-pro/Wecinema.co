@@ -260,7 +260,6 @@ export const listingAPI = {
   deleteListing: (listingId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
     deleteRequest(`/marketplace/listings/${listingId}`, setLoading, "Listing deleted")
 };
-// Change user type
 export const changeUserType = async (userId, userType, setLoading) => {
     try {
         setLoading(true);
@@ -277,6 +276,50 @@ export const changeUserType = async (userId, userType, setLoading) => {
         return response.data;
     } catch (error) {
         console.error("Error changing user type:", error);
+        throw error;
+    } finally {
+        setLoading(false);
+    }
+};
+
+// Get user profile
+export const getUserProfile = async (userId, setLoading) => {
+    try {
+        setLoading(true);
+        const response = await axios.get(
+            `${BASE_URL}/user/${userId}`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                }
+            }
+        );
+        return response.data;
+    } catch (error) {
+        console.error("Error fetching user profile:", error);
+        throw error;
+    } finally {
+        setLoading(false);
+    }
+};
+
+// Update user profile
+export const updateUserProfile = async (userId, userData, setLoading) => {
+    try {
+        setLoading(true);
+        const response = await axios.put(
+            `${BASE_URL}/user/edit/${userId}`,
+            userData,
+            {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+        return response.data;
+    } catch (error) {
+        console.error("Error updating user profile:", error);
         throw error;
     } finally {
         setLoading(false);
