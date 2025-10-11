@@ -8,7 +8,7 @@ import { toast } from "react-toastify";
 
 // Create an axios instance with default configurations
 const api = axios.create({
-  baseURL: "https://wecinema.co/api/", // Updated to your production URL
+  baseURL: "http://localhost:3000/", // Base URL for all requests  https://wecinema.co/api/
   withCredentials: true, // Important for cookies
   headers: {
     "Content-Type": "application/json",
@@ -50,50 +50,7 @@ interface ApiResponse {
   message?: string;
   error?: string;
   data?: any;
-  listings?: any[];
 }
-
-// Generic response handler function
-const handleApiResponse = (response: any, endpointName: string) => {
-  console.log(`📦 ${endpointName} Raw Response:`, response);
-  
-  // If response is already an array, return it
-  if (Array.isArray(response)) {
-    console.log(`✅ ${endpointName}: Response is directly an array`);
-    return response;
-  }
-  
-  // If response has listings array (from your backend structure)
-  if (response && response.listings && Array.isArray(response.listings)) {
-    console.log(`✅ ${endpointName}: Found listings array`);
-    return response.listings;
-  }
-  
-  // If response has data array
-  if (response && response.data && Array.isArray(response.data)) {
-    console.log(`✅ ${endpointName}: Found data array`);
-    return response.data;
-  }
-  
-  // If response is an object with pagination
-  if (response && response.listings && Array.isArray(response.listings)) {
-    console.log(`✅ ${endpointName}: Found listings in paginated response`);
-    return response.listings;
-  }
-  
-  // Try to find any array in the response object
-  if (response && typeof response === 'object') {
-    for (let key in response) {
-      if (Array.isArray(response[key])) {
-        console.log(`✅ ${endpointName}: Found array in key: ${key}`);
-        return response[key];
-      }
-    }
-  }
-  
-  console.warn(`❌ ${endpointName}: No array found in response, returning empty array`);
-  return [];
-};
 
 // Handle successful API responses
 const handleSuccess = <T extends ApiResponse>(
@@ -226,7 +183,7 @@ export const authAPI = {
   }
 };
 
-// Marketplace Listing APIs - UPDATED
+// Marketplace Listing APIs
 export const listingAPI = {
   getListings: (
     params?: {
@@ -262,117 +219,15 @@ export const listingAPI = {
   getListingById: (listingId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
     getRequest(`/marketplace/listings/listings/${listingId}`, setLoading),
 
-  // Get listings by specific user ID (Public route)
-  getUserListings: async (userId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) => {
-    try {
-      if (setLoading) setLoading(true);
-      
-      console.log("🔄 Fetching listings for user:", userId);
-      
-      const response = await api.get(
-        `/marketplace/listings/user/${userId}/listings`,
-        {
-          timeout: 15000
-        }
-      );
-
-      console.log("🔍 User Listings API Response:", response.data);
-
-      // Handle the response structure from the new route
-      if (response.data && response.data.success && response.data.listings) {
-        console.log(`✅ Found ${response.data.listings.length} listings for user`);
-        return {
-          listings: response.data.listings,
-          user: response.data.user,
-          pagination: response.data.pagination
-        };
-      } else {
-        console.warn("Unexpected response structure:", response.data);
-        return {
-          listings: [],
-          user: null,
-          pagination: { page: 1, limit: 20, total: 0, pages: 0 }
-        };
-      }
-    } catch (error: any) {
-      console.error("❌ Error fetching user listings:", error);
-      
-      if (error.response) {
-        console.error("Error Response:", error.response.data);
-        console.error("Error Status:", error.response.status);
-        
-        if (error.response.status === 404) {
-          throw new Error("User not found or no listings available");
-        }
-      }
-      
-      throw error;
-    } finally {
-      if (setLoading) setLoading(false);
-    }
-  },
-
-  getMyListings: async (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) => {
-    try {
-      if (setLoading) setLoading(true);
-      
-      console.log("🔄 Fetching my listings...");
-      const token = localStorage.getItem("token");
-      
-      if (!token) {
-        throw new Error("No authentication token found");
-      }
-
-      const response = await api.get(
-        '/marketplace/listings/my-listings',
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          timeout: 15000
-        }
-      );
-
-      console.log("🔍 My Listings Full Response:", response.data);
-      
-      // Use the response handler
-      const listings = handleApiResponse(response.data, 'getMyListings');
-      
-      console.log(`✅ Extracted ${listings.length} listings`);
-      return listings;
-
-    } catch (error: any) {
-      console.error("❌ Error in getMyListings:", error);
-      
-      if (error.response) {
-        console.error("📊 Error Response Data:", error.response.data);
-        console.error("🔢 Error Status:", error.response.status);
-        console.error("🚩 Error Headers:", error.response.headers);
-        
-        if (error.response.status === 401) {
-          throw new Error("Authentication failed. Please login again.");
-        } else if (error.response.status === 403) {
-          throw new Error("You don't have permission to access these listings.");
-        } else if (error.response.status === 404) {
-          throw new Error("Listings not found.");
-        }
-      } else if (error.request) {
-        console.error("🌐 Network Error - No response received:", error.request);
-        throw new Error("Network error. Please check your connection.");
-      }
-      
-      throw error;
-    } finally {
-      if (setLoading) setLoading(false);
-    }
-  },
+  getMyListings: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest('/marketplace/listings/my-listings', setLoading),
 
   createListing: (formData: FormData, setLoading: React.Dispatch<React.SetStateAction<boolean>>) => {
     return new Promise((resolve, reject) => {
       setLoading(true);
       const token = localStorage.getItem("token");
       
-      fetch('http://localhost:3000/marketplace/create-listing', {
+      fetch('http://localhost:3000/api/marketplace/create-listing', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -442,31 +297,11 @@ export const offerAPI = {
     }
   },
 
-  getMyOffers: async (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) => {
-    try {
-      if (setLoading) setLoading(true);
-      const response = await api.get('/marketplace/offers/my-offers');
-      return handleApiResponse(response.data, 'getMyOffers');
-    } catch (error) {
-      console.error('Error fetching my offers:', error);
-      throw error;
-    } finally {
-      if (setLoading) setLoading(false);
-    }
-  },
+  getMyOffers: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest('/api/marketplace/offers/my-offers', setLoading),
 
-  getReceivedOffers: async (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) => {
-    try {
-      if (setLoading) setLoading(true);
-      const response = await api.get('/marketplace/offers/received-offers');
-      return handleApiResponse(response.data, 'getReceivedOffers');
-    } catch (error) {
-      console.error('Error fetching received offers:', error);
-      throw error;
-    } finally {
-      if (setLoading) setLoading(false);
-    }
-  },
+  getReceivedOffers: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest('/marketplace/offers/received-offers', setLoading),
 
   acceptOffer: (offerId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
     putRequest(`/api/marketplace/offers/accept-offer/${offerId}`, {}, setLoading, "Offer accepted"),
@@ -491,31 +326,11 @@ export const orderAPI = {
     setLoading: React.Dispatch<React.SetStateAction<boolean>>
   ) => postRequest('/api/marketplace/orders/create-order', orderData, setLoading, "Order created successfully"),
 
-  getMyOrders: async (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) => {
-    try {
-      if (setLoading) setLoading(true);
-      const response = await api.get('/api/marketplace/orders/my-orders');
-      return handleApiResponse(response.data, 'getMyOrders');
-    } catch (error) {
-      console.error('Error fetching my orders:', error);
-      throw error;
-    } finally {
-      if (setLoading) setLoading(false);
-    }
-  },
+  getMyOrders: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest('/api/marketplace/orders/my-orders', setLoading),
 
-  getSellerOrders: async (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) => {
-    try {
-      if (setLoading) setLoading(true);
-      const response = await api.get('/marketplace/orders/seller-orders');
-      return handleApiResponse(response.data, 'getSellerOrders');
-    } catch (error) {
-      console.error('Error fetching seller orders:', error);
-      throw error;
-    } finally {
-      if (setLoading) setLoading(false);
-    }
-  },
+  getSellerOrders: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest('/marketplace/orders/seller-orders', setLoading),
 
   getOrderDetails: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
     getRequest(`/api/marketplace/orders/${orderId}`, setLoading),
@@ -593,31 +408,13 @@ export const messageAPI = {
 
 // Dashboard APIs
 export const dashboardAPI = {
-  getSellerStats: async (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) => {
-    try {
-      if (setLoading) setLoading(true);
-      const response = await api.get('/api/marketplace/dashboard/seller-stats');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching seller stats:', error);
-      throw error;
-    } finally {
-      if (setLoading) setLoading(false);
-    }
-  },
+  getSellerStats: (
+    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+  ) => getRequest('/api/marketplace/dashboard/seller-stats', setLoading),
 
-  getBuyerStats: async (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) => {
-    try {
-      if (setLoading) setLoading(true);
-      const response = await api.get('/api/marketplace/dashboard/buyer-stats');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching buyer stats:', error);
-      throw error;
-    } finally {
-      if (setLoading) setLoading(false);
-    }
-  }
+  getBuyerStats: (
+    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+  ) => getRequest('/api/marketplace/dashboard/buyer-stats', setLoading)
 };
 
 // ========================
