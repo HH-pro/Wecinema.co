@@ -105,7 +105,7 @@ const SellerDashboard: React.FC = () => {
         throw new Error('No authentication token found');
       }
 
-      const response = await axios.get(`/marketplace/listings/user/${userId}/listings`, {
+      const response = await axios.get(`http://localhost:3000/marketplace/listings/user/${userId}/listings`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
