@@ -260,7 +260,28 @@ export const listingAPI = {
   deleteListing: (listingId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
     deleteRequest(`/marketplace/listings/${listingId}`, setLoading, "Listing deleted")
 };
-
+// Change user type
+export const changeUserType = async (userId, userType, setLoading) => {
+    try {
+        setLoading(true);
+        const response = await axios.put(
+            `${BASE_URL}/user/change-type/${userId}`,
+            { userType },
+            {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+        return response.data;
+    } catch (error) {
+        console.error("Error changing user type:", error);
+        throw error;
+    } finally {
+        setLoading(false);
+    }
+};
 // Offer APIs
 export const offerAPI = {
   makeOffer: async (
