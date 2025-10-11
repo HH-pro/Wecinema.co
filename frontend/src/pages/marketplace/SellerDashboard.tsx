@@ -78,6 +78,7 @@ const SellerDashboard: React.FC = () => {
     try {
       setLoading(true);
       setError('');
+      console.log("🔄 Fetching dashboard data...");
 
       // API calls with proper response handling
       const [listingsResponse, ordersResponse, offersResponse] = await Promise.all([
@@ -86,26 +87,62 @@ const SellerDashboard: React.FC = () => {
         getReceivedOffers(setLoading)
       ]);
 
-      // Extract data from API responses - handle both direct arrays and { data: array } responses
-      const listingsData = Array.isArray(listingsResponse) 
-        ? listingsResponse 
-        : (listingsResponse?.data || []);
-      
-      const ordersData = Array.isArray(ordersResponse) 
-        ? ordersResponse 
-        : (ordersResponse?.data || []);
-      
-      const offersData = Array.isArray(offersResponse) 
-        ? offersResponse 
-        : (offersResponse?.data || []);
+      // Debug responses
+      debugAPIResponse(listingsResponse, 'Listings');
+      debugAPIResponse(ordersResponse, 'Orders');
+      debugAPIResponse(offersResponse, 'Offers');
 
-      // Ensure we always set arrays
-      setListings(Array.isArray(listingsData) ? listingsData : []);
-      setOrders(Array.isArray(ordersData) ? ordersData : []);
-      setOffers(Array.isArray(offersData) ? offersData : []);
+      // Extract data from API responses
+      const extractData = (response: any, endpoint: string) => {
+        console.log(`🔧 Processing ${endpoint}:`, response);
+        
+        // If response has listings array (from your backend)
+        if (response && response.listings && Array.isArray(response.listings)) {
+          console.log(`✅ Found listings array in ${endpoint}`);
+          return response.listings;
+        }
+        // If response has data array
+        else if (response && response.data && Array.isArray(response.data)) {
+          console.log(`✅ Found data array in ${endpoint}`);
+          return response.data;
+        }
+        // If response is already an array
+        else if (Array.isArray(response)) {
+          console.log(`✅ Response is already array in ${endpoint}`);
+          return response;
+        }
+        // If response is an object with array inside
+        else if (response && typeof response === 'object') {
+          console.log(`🔍 Searching for array in ${endpoint} object:`, response);
+          // Look for any array property
+          const arrayKey = Object.keys(response).find(key => Array.isArray(response[key]));
+          if (arrayKey) {
+            console.log(`✅ Found array in key '${arrayKey}' for ${endpoint}`);
+            return response[arrayKey];
+          }
+        }
+        
+        console.warn(`❌ No array found in ${endpoint}, returning empty array`);
+        return [];
+      };
+
+      const listingsData = extractData(listingsResponse, 'listings');
+      const ordersData = extractData(ordersResponse, 'orders');
+      const offersData = extractData(offersResponse, 'offers');
+
+      console.log("📦 Final data:", {
+        listings: listingsData,
+        orders: ordersData,
+        offers: offersData
+      });
+
+      // Set the data
+      setListings(listingsData);
+      setOrders(ordersData);
+      setOffers(offersData);
 
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('❌ Error fetching dashboard data:', error);
       setError('Failed to load dashboard data');
       // Ensure arrays are set to empty on error
       setListings([]);
