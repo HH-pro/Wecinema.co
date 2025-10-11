@@ -260,71 +260,7 @@ export const listingAPI = {
   deleteListing: (listingId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
     deleteRequest(`/marketplace/listings/${listingId}`, setLoading, "Listing deleted")
 };
-export const changeUserType = async (userId, userType, setLoading) => {
-    try {
-        setLoading(true);
-        const response = await axios.put(
-            `/user/change-type/${userId}`,
-            { userType },
-            {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
-        return response.data;
-    } catch (error) {
-        console.error("Error changing user type:", error);
-        throw error;
-    } finally {
-        setLoading(false);
-    }
-};
 
-// Get user profile
-export const getUserProfile = async (userId, setLoading) => {
-    try {
-        setLoading(true);
-        const response = await axios.get(
-            `${BASE_URL}/user/${userId}`,
-            {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                }
-            }
-        );
-        return response.data;
-    } catch (error) {
-        console.error("Error fetching user profile:", error);
-        throw error;
-    } finally {
-        setLoading(false);
-    }
-};
-
-// Update user profile
-export const updateUserProfile = async (userId, userData, setLoading) => {
-    try {
-        setLoading(true);
-        const response = await axios.put(
-            `${BASE_URL}/user/edit/${userId}`,
-            userData,
-            {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
-        return response.data;
-    } catch (error) {
-        console.error("Error updating user profile:", error);
-        throw error;
-    } finally {
-        setLoading(false);
-    }
-};
 // Offer APIs
 export const offerAPI = {
   makeOffer: async (
@@ -955,7 +891,37 @@ export const getCurrentUserFromToken = () => {
 export const isAuthenticated = () => {
   return !!localStorage.getItem("token");
 };
+// api.js - Update getMyListings function
+export const getMyListings = async (setLoading) => {
+    try {
+        setLoading(true);
+        const token = localStorage.getItem("token");
+        
+        const response = await axios.get(
+            `${BASE_URL}/marketplace/listings/my-listings`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                }
+            }
+        );
 
+        // Handle the response structure from backend
+        if (response.data && response.data.listings) {
+            return response.data.listings; // Return just the listings array
+        } else if (Array.isArray(response.data)) {
+            return response.data; // If it's already an array
+        } else {
+            console.warn("Unexpected response structure:", response.data);
+            return [];
+        }
+    } catch (error) {
+        console.error("Error fetching my listings:", error);
+        throw error;
+    } finally {
+        setLoading(false);
+    }
+};
 // ========================
 // LEGACY INDIVIDUAL EXPORTS (All Preserved)
 // ========================
