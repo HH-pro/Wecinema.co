@@ -306,16 +306,15 @@ const SellerDashboard: React.FC = () => {
           <div className="mb-8 border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
               <button
-  onClick={() => setActiveTab('overview')}
-  className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
-    activeTab === 'overview'
-      ? 'border-yellow-600 text-yellow-600'
-      : 'border-transparent text-gray-500 hover:text-yellow-700 hover:border-yellow-600'
-  }`}
->
-  Overview
-</button>
-
+                onClick={() => setActiveTab('overview')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'overview'
+                    ? 'border-yellow-600 text-yellow-600'
+                    : 'border-transparent text-gray-500 hover:text-white-700 hover:border-gray-300'
+                }`}
+              >
+                Overview
+              </button>
               <button
                 onClick={() => setActiveTab('offers')}
                 className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
@@ -340,7 +339,7 @@ const SellerDashboard: React.FC = () => {
                 }`}
               >
                 My Listings
-                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-blue-800">
                   {totalListings}
                 </span>
               </button>
