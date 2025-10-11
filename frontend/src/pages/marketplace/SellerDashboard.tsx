@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import { getSellerOrders, getReceivedOffers } from '../../api';
-import { decodeToken } from '../../utilities/helperFunction'; // Your token decoder
+import { decodeToken } from '../../utilities/helperfFunction'; // Your token decoder
 import axios from 'axios'; // Direct axios import
 
 interface Listing {
