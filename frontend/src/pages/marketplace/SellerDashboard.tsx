@@ -310,7 +310,7 @@ const SellerDashboard: React.FC = () => {
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${
                   activeTab === 'overview'
                     ? 'border-yellow-600 text-yellow-600'
-                    : 'border-transparent text-gray-500 hover:text-yellow-700 hover:border-gray-300'
+                    : 'border-transparent text-gray-500 hover:text-yellow-700 hover:border-yellow-300'
                 }`}
               >
                 Overview
