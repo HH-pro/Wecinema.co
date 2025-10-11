@@ -425,7 +425,6 @@ export const marketplaceAPI = {
   listings: {
     get: listingAPI.getListings,
     getById: listingAPI.getListingById,
-    getMy: listingAPI.getMyListings,
     create: listingAPI.createListing,
     update: listingAPI.updateListing,
     delete: listingAPI.deleteListing
