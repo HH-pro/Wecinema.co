@@ -372,7 +372,7 @@ export const listingAPI = {
       setLoading(true);
       const token = localStorage.getItem("token");
       
-      fetch('https://wecinema.co/api/marketplace/create-listing', {
+      fetch('http://localhost:3000/marketplace/create-listing', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
