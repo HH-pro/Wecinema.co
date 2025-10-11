@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
-import { getMyListings, getSellerOrders, getReceivedOffers } from '../../api';
+import { getSellerOrders, getReceivedOffers } from '../../api';
+import { api } from '../../api'; // Your axios instance
+import { decodeToken } from '../../utilities/helperfFunction'; // Your token decoder
 
 interface Listing {
   _id: string;
@@ -44,12 +46,6 @@ interface Offer {
   message?: string;
 }
 
-interface ApiResponse<T> {
-  data?: T;
-  message?: string;
-  success?: boolean;
-}
-
 type TabType = 'overview' | 'offers' | 'listings';
 
 const SellerDashboard: React.FC = () => {
@@ -59,6 +55,7 @@ const SellerDashboard: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [error, setError] = useState<string>('');
+  const [userId, setUserId] = useState<string>('');
 
   // Stats calculation
   const totalListings = listings.length;
@@ -71,24 +68,72 @@ const SellerDashboard: React.FC = () => {
   const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
 
   useEffect(() => {
-    fetchDashboardData();
+    // Get user ID from token
+    const getUserIdFromToken = () => {
+      try {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        if (token) {
+          const tokenData = decodeToken(token);
+          if (tokenData && tokenData.userId) {
+            setUserId(tokenData.userId);
+            return tokenData.userId;
+          }
+        }
+        throw new Error('User not authenticated');
+      } catch (error) {
+        console.error('❌ Error getting user ID from token:', error);
+        setError('User authentication failed');
+        return null;
+      }
+    };
+
+    const userId = getUserIdFromToken();
+    if (userId) {
+      fetchDashboardData(userId);
+    } else {
+      setLoading(false);
+    }
   }, []);
 
-  const fetchDashboardData = async () => {
+  // Direct API call for listings
+  const fetchMyListings = async (userId: string) => {
+    try {
+      console.log("🔄 Direct API call for listings for user:", userId);
+      
+      const response = await api.get(`/user/${userId}/listings`);
+      console.log("📦 Direct listings response:", response.data);
+
+      // Handle different response structures
+      if (response.data && response.data.listings && Array.isArray(response.data.listings)) {
+        return response.data.listings;
+      } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
+        return response.data.data;
+      } else if (Array.isArray(response.data)) {
+        return response.data;
+      } else if (response.data && response.data.success && Array.isArray(response.data.listings)) {
+        return response.data.listings;
+      }
+      
+      console.warn("❌ No listings data found in response");
+      return [];
+    } catch (error) {
+      console.error('❌ Error in direct listings API call:', error);
+      throw error;
+    }
+  };
+
+  const fetchDashboardData = async (userId: string) => {
     try {
       setLoading(true);
       setError('');
-      console.log("🔄 Fetching dashboard data...");
+      console.log("🔄 Fetching dashboard data for user:", userId);
 
-      // API calls with proper response handling
+      // Direct API call for listings, imported functions for others
       const [listingsResponse, ordersResponse, offersResponse] = await Promise.all([
-        getMyListings(setLoading),
-        getSellerOrders(setLoading),
-        getReceivedOffers(setLoading)
+        fetchMyListings(userId), // Direct API call with user ID
+        getSellerOrders(setLoading), // Imported function
+        getReceivedOffers(setLoading) // Imported function
       ]);
-
-      // Debug responses
-     
 
       // Extract data from API responses
       const extractData = (response: any, endpoint: string) => {
@@ -165,7 +210,13 @@ const SellerDashboard: React.FC = () => {
       // TODO: Add accept/reject offer functions in api.ts
       // await acceptOffer(offerId, setLoading);
       // or await rejectOffer(offerId, setLoading);
-      await fetchDashboardData(); // Refresh data
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (token) {
+        const tokenData = decodeToken(token);
+        if (tokenData && tokenData.userId) {
+          await fetchDashboardData(tokenData.userId); // Refresh data
+        }
+      }
     } catch (error) {
       console.error('Error updating offer:', error);
       setError('Failed to update offer');
@@ -300,6 +351,17 @@ const SellerDashboard: React.FC = () => {
       </div>
     </div>
   );
+
+  // Refresh function
+  const handleRefresh = () => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (token) {
+      const tokenData = decodeToken(token);
+      if (tokenData && tokenData.userId) {
+        fetchDashboardData(tokenData.userId);
+      }
+    }
+  };
 
   // Loading State
   if (loading) {
@@ -564,7 +626,7 @@ const SellerDashboard: React.FC = () => {
                   <p className="text-sm text-gray-600 mt-1">Manage and respond to offers from buyers</p>
                 </div>
                 <button
-                  onClick={fetchDashboardData}
+                  onClick={handleRefresh}
                   className="text-sm text-gray-500 hover:text-gray-700 flex items-center"
                 >
                   <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -664,7 +726,7 @@ const SellerDashboard: React.FC = () => {
                 </div>
                 <div className="flex space-x-3">
                   <button
-                    onClick={fetchDashboardData}
+                    onClick={handleRefresh}
                     className="text-sm text-gray-500 hover:text-gray-700 flex items-center"
                   >
                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
