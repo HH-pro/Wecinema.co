@@ -9,9 +9,9 @@ import { FaEdit } from 'react-icons/fa';
 import axios from 'axios';
 import cover from '.././assets/public/cover.jpg';
 import avatar from '.././assets/public/avatar.jpg';
-import '../App.css'; // Import the CSS file for additional styling
+import '../App.css';
+import { FaEllipsisV } from "react-icons/fa";
 
-import { FaEllipsisV } from "react-icons/fa"; // Three dots icon
 const token = localStorage.getItem("token") || null;
 
 const GenrePage: React.FC = () => {
@@ -25,8 +25,10 @@ const GenrePage: React.FC = () => {
     const [currentUserHasPaid, setCurrentUserHasPaid] = useState(false);
     const [data, setData] = useState<any>([]);
     const [showMoreIndex, setShowMoreIndex] = useState<number | null>(null);
+    const [marketplaceMode, setMarketplaceMode] = useState<'buyer' | 'seller'>('buyer');
     const nav = useNavigate();
     const [scripts, setScripts] = useState<any>([]);
+
     useEffect(() => {
         const isMounted = true;
 
@@ -54,14 +56,20 @@ const GenrePage: React.FC = () => {
         };
 
         fetchData();
+        
+        // Load marketplace mode from localStorage
+        const savedMode = localStorage.getItem('marketplaceMode');
+        if (savedMode) {
+            setMarketplaceMode(savedMode as 'buyer' | 'seller');
+        }
     }, [id]);
+
     useEffect(() => {
         const fetchScripts = async () => {
           try {
             const result: any = await getRequest(`video/authors/${id}/scripts`, setLoading);
             if (result) {
               setScripts(result.map((res: any) => res.script));
-              
               setData(result);
             }
           } catch (error) {
@@ -70,49 +78,31 @@ const GenrePage: React.FC = () => {
         };
       
         if (id) {
-          fetchScripts(); // Run only when `id` changes
+          fetchScripts();
         }
-      }, [id]); // Dependency array ensures it runs only when `id` changes
-       useEffect(() => {
-        const fetchScripts = async () => {
-          try {
-            const result: any = await getRequest(`video/authors/${id}/scripts`, setLoading);
-            if (result) {
-              setScripts(result.map((res: any) => res.script));
-              
-              setData(result);
-            }
-          } catch (error) {
-            // console.error("Error fetching scripts:", error);
-          }
-        };
-      
-        if (id) {
-          fetchScripts(); // Run only when `id` changes
-        }
-      }, [id]); // Dependency array ensures it runs only when `id` changes
-       // Delete script function
-       const deleteScript = async (scriptId: string) => {
-        // console.log("Deleting script with ID:", scriptId); // Debugging check
+      }, [id]);
 
+    const toggleMarketplaceMode = () => {
+        const newMode = marketplaceMode === 'buyer' ? 'seller' : 'buyer';
+        setMarketplaceMode(newMode);
+        localStorage.setItem('marketplaceMode', newMode);
+        toast.info(`Switched to ${newMode} mode`);
+    };
+
+    const deleteScript = async (scriptId: string) => {
         try {
           const result: any = await deleteRequest(`video/scripts/${scriptId}`, setLoading);
       
           if (result) {
             alert(result.message || "Script deleted successfully");
-            window.location.reload(); // Refresh the page after deletion
-
-      
-            // Remove deleted script from state
+            window.location.reload();
             setScripts(prevScripts => prevScripts.filter(script => script._id !== scriptId));
           }
         } catch (error) {
-          // console.error("Error deleting script:", error);
           alert("Error deleting script");
         }
-      };
-      
-    
+    };
+
     useEffect(() => {
         if (userHasPaid && !currentUserHasPaid) {
             // Logic for userHasPaid and currentUserHasPaid
@@ -171,7 +161,6 @@ const GenrePage: React.FC = () => {
             setEditMode(false);
             window.location.reload();
         } catch (error) {
-            // console.error("Error updating profile:", error);
             toast.error("Failed to update profile");
         }
     }
@@ -197,8 +186,6 @@ const GenrePage: React.FC = () => {
                     <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"></div>
                 </div>
  
-            
-                
                 {/* Avatar and Stats */}
                 <div className="flex flex-col sm:flex-row items-center mt-4">
                     <div className="w-full sm:w-auto sm:mr-4 -mt-16 sm:-mt-20">
@@ -224,6 +211,19 @@ const GenrePage: React.FC = () => {
                         <button className="mb-1 text-sm sm:text-xl bg-white text-black py-2 px-4 rounded-lg border border-gray-200 shadow-md hover:shadow-lg transition-all duration-300">
                             {user?.bookmarks?.length} Bookmarks
                         </button>
+                        
+                        {/* Marketplace Mode Toggle */}
+                        <button 
+                            onClick={toggleMarketplaceMode}
+                            className={`mb-1 text-sm sm:text-xl py-2 px-4 rounded-lg border shadow-md hover:shadow-lg transition-all duration-300 ${
+                                marketplaceMode === 'buyer' 
+                                    ? 'bg-blue-500 text-white border-blue-600' 
+                                    : 'bg-green-500 text-white border-green-600'
+                            }`}
+                        >
+                            {marketplaceMode === 'buyer' ? 'Buyer Mode' : 'Seller Mode'}
+                        </button>
+
                         {userHasPaid && (
                             <a href="/hypemodeprofile">
                                 <button className="mb-1 text-sm sm:text-xl bg-yellow-500 text-white py-2 px-4 rounded-lg border border-yellow-600 shadow-md hover:shadow-lg transition-all duration-300">
@@ -292,7 +292,7 @@ const GenrePage: React.FC = () => {
 
   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-2">
     {scripts?.map((script: any, index: number) => {
-      const scriptData = data?.[index]; // Ensure corresponding data exists
+      const scriptData = data?.[index];
 
       return (
         <div
@@ -304,26 +304,21 @@ const GenrePage: React.FC = () => {
           onMouseLeave={handleScriptMouseLeave}
           onClick={() => nav(`/script/${scriptData?._id}`, { state: JSON.stringify(scriptData) })}
         >
-          {/* Script Title */}
           <h2 className="font-semibold text-lg">{scriptData?.title}</h2>
 
-          {/* Script Content Preview */}
           <Render htmlString={script} />
 
-          {/* Read More Button */}
           {showMoreIndex === index && (
             <button
               className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-600 transition-all duration-300"
               onClick={(e) => {
                 e.stopPropagation();
-                // console.log("Read more clicked");
               }}
             >
               Read More
             </button>
           )}
 
-          {/* Three-Dots Menu */}
           <div className="absolute top-2 right-2">
             <button
               onClick={(e) => {
@@ -335,7 +330,6 @@ const GenrePage: React.FC = () => {
               <FaEllipsisV className="text-gray-600" />
             </button>
 
-            {/* Dropdown Menu */}
             {menuOpen === index && (
               <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-300 shadow-md rounded-lg overflow-hidden z-10">
                 <button
@@ -350,7 +344,6 @@ const GenrePage: React.FC = () => {
                 >
                   Delete
                 </button>
-               
               </div>
             )}
           </div>
@@ -359,9 +352,6 @@ const GenrePage: React.FC = () => {
     })}
   </div>
 </div>
-
-                          
-
                     </div>
                 </div>
             </div>
