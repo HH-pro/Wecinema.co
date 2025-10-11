@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
-import { getSellerOrders, getReceivedOffers,getRequest } from '../../api';
+import { getSellerOrders, getReceivedOffers, putRequest } from '../../api';
 import { decodeToken } from '../../utilities/helperfFunction'; // Your token decoder
 import axios from 'axios'; // Direct axios import
 
@@ -96,42 +96,41 @@ const SellerDashboard: React.FC = () => {
   }, []);
 
   // Direct API call for listings using axios
-  const fetchMyListings = async (userId: string) => {
-    try {
-      console.log("🔄 Direct API call for listings for user:", userId);
-      
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
+ const fetchMyListings = async (userId: string) => {
+  try {
+    console.log("🔄 Fetching listings using getRequest for user:", userId);
 
-      const response = await getRequest(`/marketplace/listings/user/${userId}/listings`, {
+    const token =
+      localStorage.getItem("token") || sessionStorage.getItem("token");
+    if (!token) throw new Error("No authentication token found");
+
+    // ✅ Use your getRequest helper
+    const response = await getRequest(
+      `/marketplace/listings/user/${userId}/listings`,
+      {
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      console.log("📦 Direct listings response:", response.data);
-
-      // Handle different response structures
-      if (response.data && response.data.listings && Array.isArray(response.data.listings)) {
-        return response.data.listings;
-      } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
-        return response.data.data;
-      } else if (Array.isArray(response.data)) {
-        return response.data;
-      } else if (response.data && response.data.success && Array.isArray(response.data.listings)) {
-        return response.data.listings;
+          Authorization: `Bearer ${token}`,
+        },
       }
-      
-      console.warn("❌ No listings data found in response");
-      return [];
-    } catch (error) {
-      console.error('❌ Error in direct listings API call:', error);
-      throw error;
-    }
-  };
+    );
+
+    console.log("📦 API Response:", response);
+
+    // ✅ Normalize the response structure
+    const data = response.data || response;
+
+    if (Array.isArray(data)) return data;
+    if (data?.listings && Array.isArray(data.listings)) return data.listings;
+    if (data?.data && Array.isArray(data.data)) return data.data;
+    if (data?.success && Array.isArray(data.listings)) return data.listings;
+
+    console.warn("⚠️ No listings array found in response");
+    return [];
+  } catch (error) {
+    console.error("❌ Error fetching listings via getRequest:", error);
+    throw error;
+  }
+};
 
   const fetchDashboardData = async (userId: string) => {
     try {
