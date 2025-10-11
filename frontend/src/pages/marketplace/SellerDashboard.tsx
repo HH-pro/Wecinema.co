@@ -88,9 +88,7 @@ const SellerDashboard: React.FC = () => {
       ]);
 
       // Debug responses
-      debugAPIResponse(listingsResponse, 'Listings');
-      debugAPIResponse(ordersResponse, 'Orders');
-      debugAPIResponse(offersResponse, 'Offers');
+     
 
       // Extract data from API responses
       const extractData = (response: any, endpoint: string) => {
