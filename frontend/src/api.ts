@@ -219,7 +219,8 @@ export const listingAPI = {
   getListingById: (listingId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
     getRequest(`/marketplace/listings/listings/${listingId}`, setLoading),
 
- 
+  getMyListings: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest('/marketplace/listings/my-listings', setLoading),
 
   createListing: (formData: FormData, setLoading: React.Dispatch<React.SetStateAction<boolean>>) => {
     return new Promise((resolve, reject) => {
@@ -424,6 +425,7 @@ export const marketplaceAPI = {
   listings: {
     get: listingAPI.getListings,
     getById: listingAPI.getListingById,
+    getMy: listingAPI.getMyListings,
     create: listingAPI.createListing,
     update: listingAPI.updateListing,
     delete: listingAPI.deleteListing
@@ -889,37 +891,7 @@ export const getCurrentUserFromToken = () => {
 export const isAuthenticated = () => {
   return !!localStorage.getItem("token");
 };
-// api.js - Update getMyListings function
-export const getMyListings = async (setLoading) => {
-    try {
-        setLoading(true);
-        const token = localStorage.getItem("token");
-        
-        const response = await axios.get(
-            `$/marketplace/listings/my-listings`,
-            {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                }
-            }
-        );
 
-        // Handle the response structure from backend
-        if (response.data && response.data.listings) {
-            return response.data.listings; // Return just the listings array
-        } else if (Array.isArray(response.data)) {
-            return response.data; // If it's already an array
-        } else {
-            console.warn("Unexpected response structure:", response.data);
-            return [];
-        }
-    } catch (error) {
-        console.error("Error fetching my listings:", error);
-        throw error;
-    } finally {
-        setLoading(false);
-    }
-};
 // ========================
 // LEGACY INDIVIDUAL EXPORTS (All Preserved)
 // ========================
@@ -933,6 +905,7 @@ export const updateProfile = authAPI.updateProfile;
 // Marketplace exports
 export const getListings = listingAPI.getListings;
 export const getListingById = listingAPI.getListingById;
+export const getMyListings = listingAPI.getMyListings;
 export const createListing = listingAPI.createListing;
 export const updateListing = listingAPI.updateListing;
 export const deleteListing = listingAPI.deleteListing;
