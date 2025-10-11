@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
-import { getSellerOrders, getReceivedOffers, getListingById } from '../../api';
+import { getSellerOrders, getReceivedOffers, getRequest } from '../../api';
 import { decodeToken } from '../../utilities/helperfFunction'; // Your token decoder
 import axios from 'axios'; // Direct axios import
 
@@ -105,7 +105,7 @@ const SellerDashboard: React.FC = () => {
     if (!token) throw new Error("No authentication token found");
 
     // Use your helper
-    const data = await getListingById(`/marketplace/listings/user/${userId}/listings`, {
+    const data = await getRequest(`/marketplace/listings/user/${userId}/listings`, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
