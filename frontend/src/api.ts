@@ -264,7 +264,7 @@ export const changeUserType = async (userId, userType, setLoading) => {
     try {
         setLoading(true);
         const response = await axios.put(
-            `${baseURL}/user/change-type/${userId}`,
+            `${BASE_URL}/user/change-type/${userId}`,
             { userType },
             {
                 headers: {
