@@ -933,7 +933,6 @@ export const updateProfile = authAPI.updateProfile;
 // Marketplace exports
 export const getListings = listingAPI.getListings;
 export const getListingById = listingAPI.getListingById;
-export const getMyListings = listingAPI.getMyListings;
 export const createListing = listingAPI.createListing;
 export const updateListing = listingAPI.updateListing;
 export const deleteListing = listingAPI.deleteListing;
