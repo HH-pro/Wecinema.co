@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
-import { getSellerOrders, getReceivedOffers, getRequest } from '../../api';
+import { getSellerOrders, getReceivedOffers } from '../../api';
 import { decodeToken } from '../../utilities/helperfFunction'; // Your token decoder
 import axios from 'axios'; // Direct axios import
 
@@ -98,37 +98,29 @@ const SellerDashboard: React.FC = () => {
   // Direct API call for listings using axios
  const fetchMyListings = async (userId: string) => {
   try {
-    console.log("🔄 Fetching listings using getRequest for user:", userId);
+    console.log("🔄 Fetching listings for user:", userId);
 
     const token =
       localStorage.getItem("token") || sessionStorage.getItem("token");
     if (!token) throw new Error("No authentication token found");
 
-    // ✅ Use your getRequest helper
-    const response = await getRequest(
-      `/marketplace/listings/user/${userId}/listings`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
+    // Use your helper
+    const data = await getRequest(`/marketplace/listings/user/${userId}/listings`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
-    console.log("📦 API Response:", response);
+    console.log("📦 Listings response data:", data);
 
-    // ✅ Normalize the response structure
-    const data = response.data || response;
-
+    // Normalize response
     if (Array.isArray(data)) return data;
     if (data?.listings && Array.isArray(data.listings)) return data.listings;
     if (data?.data && Array.isArray(data.data)) return data.data;
-    if (data?.success && Array.isArray(data.listings)) return data.listings;
 
     console.warn("⚠️ No listings array found in response");
     return [];
   } catch (error) {
-    console.error("❌ Error fetching listings via getRequest:", error);
-    throw error;
+    console.error("❌ Error fetching listings:", error);
+    return [];
   }
 };
 
