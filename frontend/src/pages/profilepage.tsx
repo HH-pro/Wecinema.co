@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Delete, Layout, Render } from "../components";
-import { deleteRequest, getRequest, putRequest, changeUserType } from "../api";
+import { deleteRequest, getRequest, putRequest } from "../api";
 import { decodeToken } from "../utilities/helperfFunction";
 import '../components/header/drowpdown.css';
-import { FaEdit, FaStore, FaShoppingCart, FaUserTie, FaUser } from 'react-icons/fa';
+import { FaEdit, FaStore, FaShoppingCart, FaUserTie, FaUser, FaSync } from 'react-icons/fa';
 import axios from 'axios';
 import cover from '.././assets/public/cover.jpg';
 import avatar from '.././assets/public/avatar.jpg';
@@ -16,7 +16,7 @@ const token = localStorage.getItem("token") || null;
 
 const GenrePage: React.FC = () => {
     const { id } = useParams();
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [user, setUser] = useState<any>({});
     const [menuOpen, setMenuOpen] = useState<number | null>(null);
     const [editMode, setEditMode] = useState(false);
@@ -32,6 +32,33 @@ const GenrePage: React.FC = () => {
     const [scripts, setScripts] = useState<any>([]);
     const [videos, setVideos] = useState<any>([]);
     const [isCurrentUser, setIsCurrentUser] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+
+    // Direct API call for changing user type
+    const changeUserTypeDirect = async (userId: string, userType: string) => {
+        try {
+            setChangingMode(true);
+            const token = localStorage.getItem("token");
+            
+            const response = await axios.put(
+                `https://wecinema.co/api/user/change-type/${userId}`,
+                { userType },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            return response.data;
+        } catch (error: any) {
+            console.error("Error changing user type:", error);
+            throw new Error(error.response?.data?.error || "Failed to change user type");
+        } finally {
+            setChangingMode(false);
+        }
+    };
 
     useEffect(() => {
         if (!id) {
@@ -39,75 +66,76 @@ const GenrePage: React.FC = () => {
             return;
         }
 
-        const fetchData = async () => {
-            try {
-                setLoading(true);
-                
-                // Fetch user data
-                const result: any = await getRequest("/user/" + id, setLoading);
-                setUser(result);
-                
-                // Set marketplace mode from user data
-                if (result.userType) {
-                    setMarketplaceMode(result.userType);
-                    localStorage.setItem('marketplaceMode', result.userType);
-                }
-                
-                // Set form data
-                setFormData({ 
-                    username: result.username, 
-                    dob: result.dob,
-                    bio: result.bio || '' 
-                });
-
-                // Check if current user is viewing their own profile
-                const tokenData = decodeToken(token);
-                if (tokenData && tokenData.userId === id) {
-                    setIsCurrentUser(true);
-                }
-
-                // Fetch payment status for profile user
-                const paymentResponse = await axios.get(`https://wecinema.co/api/user/payment-status/${id}`);
-                setUserHasPaid(paymentResponse.data.hasPaid);
-
-                // Fetch payment status for current logged-in user
-                if (tokenData) {
-                    const currentUserResponse = await axios.get(`https://wecinema.co/api/user/payment-status/${tokenData.userId}`);
-                    setCurrentUserHasPaid(currentUserResponse.data.hasPaid);
-                }
-
-                // Fetch user scripts and videos
-                await fetchUserContent();
-
-            } catch (error) {
-                console.error("Error fetching data:", error);
-                toast.error("Failed to load user profile");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        const fetchUserContent = async () => {
-            try {
-                // Fetch scripts
-                const scriptsResult: any = await getRequest(`video/authors/${id}/scripts`, setLoading);
-                if (scriptsResult) {
-                    setScripts(scriptsResult.map((res: any) => res.script));
-                    setData(scriptsResult);
-                }
-
-                // Fetch videos
-                const videosResult: any = await getRequest(`video/authors/${id}/videos`, setLoading);
-                if (videosResult) {
-                    setVideos(videosResult);
-                }
-            } catch (error) {
-                console.error("Error fetching user content:", error);
-            }
-        };
-
-        fetchData();
+        fetchUserData();
     }, [id]);
+
+    const fetchUserData = async () => {
+        try {
+            setLoading(true);
+            
+            // Fetch user data
+            const result: any = await getRequest("/user/" + id, setLoading);
+            setUser(result);
+            
+            // Set marketplace mode from user data
+            if (result.userType) {
+                setMarketplaceMode(result.userType);
+                localStorage.setItem('marketplaceMode', result.userType);
+            }
+            
+            // Set form data
+            setFormData({ 
+                username: result.username, 
+                dob: result.dob,
+                bio: result.bio || '' 
+            });
+
+            // Check if current user is viewing their own profile
+            const tokenData = decodeToken(token);
+            if (tokenData && tokenData.userId === id) {
+                setIsCurrentUser(true);
+            }
+
+            // Fetch payment status for profile user
+            const paymentResponse = await axios.get(`https://wecinema.co/api/user/payment-status/${id}`);
+            setUserHasPaid(paymentResponse.data.hasPaid);
+
+            // Fetch payment status for current logged-in user
+            if (tokenData) {
+                const currentUserResponse = await axios.get(`https://wecinema.co/api/user/payment-status/${tokenData.userId}`);
+                setCurrentUserHasPaid(currentUserResponse.data.hasPaid);
+            }
+
+            // Fetch user scripts and videos
+            await fetchUserContent();
+
+        } catch (error) {
+            console.error("Error fetching data:", error);
+            toast.error("Failed to load user profile");
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    };
+
+    const fetchUserContent = async () => {
+        try {
+            // Fetch scripts
+            const scriptsResult: any = await getRequest(`video/authors/${id}/scripts`, setLoading);
+            if (scriptsResult) {
+                setScripts(scriptsResult.map((res: any) => res.script));
+                setData(scriptsResult);
+            }
+
+            // Fetch videos
+            const videosResult: any = await getRequest(`video/authors/${id}/videos`, setLoading);
+            if (videosResult) {
+                setVideos(videosResult);
+            }
+        } catch (error) {
+            console.error("Error fetching user content:", error);
+        }
+    };
 
     const toggleMarketplaceMode = async () => {
         if (!id) {
@@ -123,31 +151,46 @@ const GenrePage: React.FC = () => {
         const newMode = marketplaceMode === 'buyer' ? 'seller' : 'buyer';
         
         try {
-            setChangingMode(true);
-            const result = await changeUserType(id, newMode, setChangingMode);
+            const result = await changeUserTypeDirect(id, newMode);
             
             if (result) {
-                // Update local state
+                // Update local state immediately for smooth UX
                 setMarketplaceMode(newMode);
-                setUser({ ...user, userType: newMode });
+                setUser(prev => ({ ...prev, userType: newMode }));
                 localStorage.setItem('marketplaceMode', newMode);
                 
-                // Show success message
-                toast.success(`Switched to ${newMode} mode successfully!`);
-                
-                // Refresh user data to ensure consistency
-                const updatedUser: any = await getRequest("/user/" + id, setLoading);
-                setUser(updatedUser);
+                // Show success message with smooth animation
+                toast.success(
+                    <div className="flex items-center space-x-2">
+                        <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                            <span className="text-white text-sm">✓</span>
+                        </div>
+                        <span>Switched to {newMode} mode!</span>
+                    </div>,
+                    {
+                        autoClose: 2000,
+                        hideProgressBar: true,
+                    }
+                );
             }
         } catch (error: any) {
             console.error("Error changing user type:", error);
-            toast.error(error.message || "Failed to change mode");
-        } finally {
-            setChangingMode(false);
+            toast.error(
+                <div className="flex items-center space-x-2">
+                    <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-sm">!</span>
+                    </div>
+                    <span>{error.message}</span>
+                </div>
+            );
         }
     };
 
-    // Rest of the component remains the same...
+    const handleRefresh = () => {
+        setRefreshing(true);
+        fetchUserData();
+    };
+
     const deleteScript = async (scriptId: string) => {
         if (!window.confirm("Are you sure you want to delete this script?")) {
             return;
@@ -252,7 +295,7 @@ const GenrePage: React.FC = () => {
                     textColor = "text-gray-800";
             }
             return (
-                <span key={genre} className={`inline-block ${bgColor} ${textColor} text-xs font-semibold px-3 py-1 rounded-full mr-2 mb-2`}>
+                <span key={genre} className={`inline-block ${bgColor} ${textColor} text-xs font-semibold px-3 py-1 rounded-full mr-2 mb-2 transition-all duration-200 hover:scale-105`}>
                     {genre}
                 </span>
             );
@@ -263,45 +306,51 @@ const GenrePage: React.FC = () => {
         switch (activeTab) {
             case 'scripts':
                 return (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
                         {scripts?.map((script: any, index: number) => {
                             const scriptData = data?.[index];
                             return (
                                 <div
                                     key={scriptData?._id || index}
-                                    className={`relative border border-gray-200 w-full max-h-64 p-4 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer ${
-                                        showMoreIndex === index ? "bg-black text-white bg-opacity-50" : "bg-white text-black"
+                                    className={`relative border border-gray-200 w-full max-h-64 p-4 rounded-lg shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1 ${
+                                        showMoreIndex === index ? "bg-gray-50 border-blue-300" : "bg-white"
                                     }`}
                                     onMouseEnter={() => handleScriptMouseEnter(index)}
                                     onMouseLeave={handleScriptMouseLeave}
                                     onClick={() => nav(`/script/${scriptData?._id}`, { state: JSON.stringify(scriptData) })}
                                 >
-                                    <h2 className="font-semibold text-lg mb-2">{scriptData?.title}</h2>
-                                    <Render htmlString={script} />
+                                    <h2 className="font-semibold text-lg mb-2 text-gray-800 line-clamp-2">
+                                        {scriptData?.title}
+                                    </h2>
+                                    <div className="text-gray-600 text-sm line-clamp-3">
+                                        <Render htmlString={script} />
+                                    </div>
 
                                     {showMoreIndex === index && (
-                                        <button
-                                            className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-600 transition-all duration-300"
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            Read More
-                                        </button>
+                                        <div className="absolute inset-0 bg-black bg-opacity-70 rounded-lg flex items-center justify-center transition-all duration-300">
+                                            <button
+                                                className="bg-white text-gray-800 px-6 py-2 rounded-lg shadow-lg font-semibold hover:bg-gray-100 transition-colors"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                Read More
+                                            </button>
+                                        </div>
                                     )}
 
                                     {isCurrentUser && (
-                                        <div className="absolute top-2 right-2">
+                                        <div className="absolute top-3 right-3">
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     setMenuOpen(menuOpen === index ? null : index);
                                                 }}
-                                                className="p-2 rounded-full hover:bg-gray-100 transition duration-200"
+                                                className="p-2 rounded-full hover:bg-gray-100 transition duration-200 bg-white shadow-sm"
                                             >
-                                                <FaEllipsisV className="text-gray-600" />
+                                                <FaEllipsisV className="text-gray-600 text-sm" />
                                             </button>
 
                                             {menuOpen === index && (
-                                                <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-300 shadow-md rounded-lg overflow-hidden z-10">
+                                                <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-200 shadow-lg rounded-lg overflow-hidden z-10 animate-fadeIn">
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
@@ -310,7 +359,7 @@ const GenrePage: React.FC = () => {
                                                                 setMenuOpen(null);
                                                             }
                                                         }}
-                                                        className="w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100"
+                                                        className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 transition-colors text-sm"
                                                     >
                                                         Delete
                                                     </button>
@@ -322,8 +371,10 @@ const GenrePage: React.FC = () => {
                             );
                         })}
                         {scripts.length === 0 && (
-                            <div className="col-span-full text-center py-8 text-gray-500">
-                                No scripts found
+                            <div className="col-span-full text-center py-12 text-gray-500">
+                                <div className="text-4xl mb-4">📝</div>
+                                <p className="text-lg">No scripts found</p>
+                                <p className="text-sm text-gray-400 mt-2">This user hasn't created any scripts yet</p>
                             </div>
                         )}
                     </div>
@@ -331,29 +382,39 @@ const GenrePage: React.FC = () => {
             
             case 'videos':
                 return (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
                         {videos?.map((video: any) => (
                             <div
                                 key={video._id}
-                                className="border border-gray-200 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer"
+                                className="border border-gray-200 rounded-lg shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1 bg-white"
                                 onClick={() => nav(`/video/${video._id}`)}
                             >
-                                {video.thumbnail && (
+                                {video.thumbnail ? (
                                     <img
                                         src={video.thumbnail}
                                         alt={video.title}
                                         className="w-full h-48 object-cover rounded-t-lg"
                                     />
+                                ) : (
+                                    <div className="w-full h-48 bg-gradient-to-br from-blue-400 to-purple-500 rounded-t-lg flex items-center justify-center">
+                                        <span className="text-white text-2xl">🎬</span>
+                                    </div>
                                 )}
                                 <div className="p-4">
-                                    <h3 className="font-semibold text-lg mb-2">{video.title}</h3>
-                                    <p className="text-gray-600 text-sm">{video.description}</p>
+                                    <h3 className="font-semibold text-lg mb-2 text-gray-800 line-clamp-2">
+                                        {video.title}
+                                    </h3>
+                                    <p className="text-gray-600 text-sm line-clamp-2">
+                                        {video.description || "No description available"}
+                                    </p>
                                 </div>
                             </div>
                         ))}
                         {videos.length === 0 && (
-                            <div className="col-span-full text-center py-8 text-gray-500">
-                                No videos found
+                            <div className="col-span-full text-center py-12 text-gray-500">
+                                <div className="text-4xl mb-4">🎥</div>
+                                <p className="text-lg">No videos found</p>
+                                <p className="text-sm text-gray-400 mt-2">This user hasn't uploaded any videos yet</p>
                             </div>
                         )}
                     </div>
@@ -361,50 +422,83 @@ const GenrePage: React.FC = () => {
             
             case 'about':
                 return (
-                    <div className="mt-4 p-6 bg-white rounded-lg shadow-md">
-                        <h3 className="text-xl font-bold mb-4">About</h3>
-                        <div className="space-y-4">
-                            <div>
-                                <h4 className="font-semibold text-gray-700">Bio</h4>
-                                <p className="text-gray-600 mt-1">{user.bio || "No bio provided"}</p>
-                            </div>
-                            <div>
-                                <h4 className="font-semibold text-gray-700">Joined</h4>
-                                <p className="text-gray-600 mt-1">
-                                    {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown'}
-                                </p>
-                            </div>
-                            <div>
-                                <h4 className="font-semibold text-gray-700">Marketplace Role</h4>
-                                <div className="flex items-center mt-1">
-                                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                                        user.userType === 'seller' 
-                                            ? 'bg-green-100 text-green-800' 
-                                            : 'bg-blue-100 text-blue-800'
-                                    }`}>
-                                        {user.userType === 'seller' ? (
-                                            <>
-                                                <FaUserTie className="mr-1" />
-                                                Seller
-                                            </>
-                                        ) : (
-                                            <>
-                                                <FaShoppingCart className="mr-1" />
-                                                Buyer
-                                            </>
-                                        )}
-                                    </span>
+                    <div className="mt-4 p-6 bg-white rounded-lg shadow-md border border-gray-100">
+                        <h3 className="text-xl font-bold mb-6 text-gray-800 border-b pb-3">About</h3>
+                        <div className="space-y-6">
+                            <div className="flex items-start space-x-4">
+                                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <FaUser className="text-blue-600" />
+                                </div>
+                                <div>
+                                    <h4 className="font-semibold text-gray-700">Bio</h4>
+                                    <p className="text-gray-600 mt-1">
+                                        {user.bio || "No bio provided yet. This user prefers to keep an air of mystery."}
+                                    </p>
                                 </div>
                             </div>
-                            <div>
-                                <h4 className="font-semibold text-gray-700">Subscription Status</h4>
-                                <p className="text-gray-600 mt-1">
-                                    {userHasPaid ? (
-                                        <span className="text-green-600 font-semibold">Premium User</span>
-                                    ) : (
-                                        <span className="text-gray-600">Free User</span>
-                                    )}
-                                </p>
+                            
+                            <div className="flex items-start space-x-4">
+                                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <span className="text-green-600 font-bold">📅</span>
+                                </div>
+                                <div>
+                                    <h4 className="font-semibold text-gray-700">Joined</h4>
+                                    <p className="text-gray-600 mt-1">
+                                        {user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', {
+                                            year: 'numeric',
+                                            month: 'long',
+                                            day: 'numeric'
+                                        }) : 'Unknown'}
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-start space-x-4">
+                                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <FaStore className="text-purple-600" />
+                                </div>
+                                <div>
+                                    <h4 className="font-semibold text-gray-700">Marketplace Role</h4>
+                                    <div className="flex items-center mt-1">
+                                        <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+                                            user.userType === 'seller' 
+                                                ? 'bg-green-100 text-green-800 border border-green-200' 
+                                                : 'bg-blue-100 text-blue-800 border border-blue-200'
+                                        }`}>
+                                            {user.userType === 'seller' ? (
+                                                <>
+                                                    <FaUserTie className="mr-2" />
+                                                    Professional Seller
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <FaShoppingCart className="mr-2" />
+                                                    Active Buyer
+                                                </>
+                                            )}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-start space-x-4">
+                                <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <span className="text-yellow-600 font-bold">⭐</span>
+                                </div>
+                                <div>
+                                    <h4 className="font-semibold text-gray-700">Subscription Status</h4>
+                                    <p className="text-gray-600 mt-1">
+                                        {userHasPaid ? (
+                                            <span className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-full text-sm font-semibold">
+                                                🚀 Premium Member
+                                            </span>
+                                        ) : (
+                                            <span className="text-gray-600 bg-gray-100 px-3 py-1 rounded-full text-sm">
+                                                Free Account
+                                            </span>
+                                        )}
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -419,8 +513,11 @@ const GenrePage: React.FC = () => {
         return (
             <Layout expand={false} hasHeader={false}>
                 <div className="mt-12 px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-center items-center h-64">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                    <div className="flex justify-center items-center h-96">
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
+                            <p className="text-gray-600">Loading profile...</p>
+                        </div>
                     </div>
                 </div>
             </Layout>
@@ -430,41 +527,67 @@ const GenrePage: React.FC = () => {
     return (
         <Layout expand={false} hasHeader={false}>
             <div className="mt-12 px-4 sm:px-6 lg:px-8">
+                {/* Header with Refresh Button */}
+                <div className="flex justify-between items-center mb-6">
+                    <h1 className="text-2xl font-bold text-gray-900">User Profile</h1>
+                    <button
+                        onClick={handleRefresh}
+                        disabled={refreshing}
+                        className="flex items-center space-x-2 bg-white border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    >
+                        <FaSync className={`text-gray-600 ${refreshing ? 'animate-spin' : ''}`} />
+                        <span>Refresh</span>
+                    </button>
+                </div>
+
                 {/* Cover Image */}
-                <div className="flex justify-center w-full items-start my-0 mx-auto h-52 sm:h-80 relative overflow-hidden rounded-lg shadow-lg">
+                <div className="relative w-full h-52 sm:h-80 rounded-2xl overflow-hidden shadow-xl mb-8">
                     <img
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
                         src={user.coverImage || cover}
                         alt="Cover"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent"></div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
                 </div>
 
                 {/* Avatar and Stats */}
-                <div className="flex flex-col sm:flex-row items-start mt-4">
-                    <div className="w-full sm:w-auto sm:mr-6 -mt-16 sm:-mt-20 flex-shrink-0">
-                        <img
-                            className="rounded-full bg-white h-24 w-24 sm:h-36 sm:w-36 border-4 border-white shadow-lg transition-transform transform hover:scale-105"
-                            src={user.avatar || avatar}
-                            alt="Avatar"
-                        />
+                <div className="flex flex-col sm:flex-row items-start -mt-20 sm:-mt-24 mb-8">
+                    {/* Avatar */}
+                    <div className="relative z-10 flex-shrink-0 mx-auto sm:mx-0">
+                        <div className="relative">
+                            <img
+                                className="rounded-full bg-white h-24 w-24 sm:h-32 sm:w-32 border-4 border-white shadow-2xl transition-all duration-300 hover:scale-105"
+                                src={user.avatar || avatar}
+                                alt="Avatar"
+                            />
+                            {isCurrentUser && (
+                                <div className="absolute -bottom-2 -right-2 bg-green-500 text-white p-1 rounded-full border-2 border-white">
+                                    <FaUser className="text-xs" />
+                                </div>
+                            )}
+                        </div>
                     </div>
                     
-                    <div className="flex-1 mt-4 sm:mt-0">
+                    {/* User Info and Actions */}
+                    <div className="flex-1 mt-4 sm:mt-0 sm:ml-8 text-center sm:text-left">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex-1">
-                                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{user.username}</h1>
-                                <p className="text-gray-600 mt-1">{user.email}</p>
+                                <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
+                                    {user.username}
+                                </h1>
+                                <p className="text-gray-600 text-lg mb-3">{user.email}</p>
                                 {user.bio && (
-                                    <p className="text-gray-700 mt-2 max-w-2xl">{user.bio}</p>
+                                    <p className="text-gray-700 text-base max-w-2xl leading-relaxed">
+                                        {user.bio}
+                                    </p>
                                 )}
                             </div>
                             
-                            <div className="flex space-x-3 mt-4 sm:mt-0">
+                            <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 mt-4 sm:mt-0">
                                 {!isCurrentUser && (
                                     <button
                                         onClick={handleFollow}
-                                        className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg shadow-md transition-all duration-300"
+                                        className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 font-semibold"
                                     >
                                         Follow
                                     </button>
@@ -474,21 +597,21 @@ const GenrePage: React.FC = () => {
                                     <button 
                                         onClick={toggleMarketplaceMode}
                                         disabled={changingMode}
-                                        className={`px-6 py-2 rounded-lg border shadow-md hover:shadow-lg transition-all duration-300 flex items-center space-x-2 ${
+                                        className={`px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 font-semibold flex items-center space-x-3 ${
                                             marketplaceMode === 'buyer' 
-                                                ? 'bg-blue-500 text-white border-blue-600' 
-                                                : 'bg-green-500 text-white border-green-600'
+                                                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700' 
+                                                : 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700'
                                         } ${changingMode ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     >
                                         {changingMode ? (
-                                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                                         ) : marketplaceMode === 'seller' ? (
-                                            <FaUserTie className="text-sm" />
+                                            <FaUserTie className="text-lg" />
                                         ) : (
-                                            <FaShoppingCart className="text-sm" />
+                                            <FaShoppingCart className="text-lg" />
                                         )}
-                                        <span>
-                                            {changingMode ? 'Changing...' : `${marketplaceMode === 'buyer' ? 'Buyer' : 'Seller'} Mode`}
+                                        <span className="text-lg">
+                                            {changingMode ? 'Switching...' : `${marketplaceMode === 'buyer' ? 'Buyer' : 'Seller'} Mode`}
                                         </span>
                                     </button>
                                 )}
@@ -496,28 +619,28 @@ const GenrePage: React.FC = () => {
                         </div>
 
                         {/* Stats */}
-                        <div className="flex flex-wrap gap-3 mt-6">
-                            <div className="bg-white border border-gray-200 rounded-lg px-4 py-3 text-center min-w-24 shadow-sm">
+                        <div className="flex flex-wrap justify-center sm:justify-start gap-4 mt-8">
+                            <div className="bg-white border border-gray-200 rounded-xl px-6 py-4 text-center min-w-28 shadow-sm hover:shadow-md transition-shadow duration-300">
                                 <div className="text-2xl font-bold text-gray-900">{user.followers?.length || 0}</div>
-                                <div className="text-sm text-gray-600">Followers</div>
+                                <div className="text-sm text-gray-600 font-medium">Followers</div>
                             </div>
-                            <div className="bg-white border border-gray-200 rounded-lg px-4 py-3 text-center min-w-24 shadow-sm">
+                            <div className="bg-white border border-gray-200 rounded-xl px-6 py-4 text-center min-w-28 shadow-sm hover:shadow-md transition-shadow duration-300">
                                 <div className="text-2xl font-bold text-gray-900">{user.followings?.length || 0}</div>
-                                <div className="text-sm text-gray-600">Following</div>
+                                <div className="text-sm text-gray-600 font-medium">Following</div>
                             </div>
-                            <div className="bg-white border border-gray-200 rounded-lg px-4 py-3 text-center min-w-24 shadow-sm">
+                            <div className="bg-white border border-gray-200 rounded-xl px-6 py-4 text-center min-w-28 shadow-sm hover:shadow-md transition-shadow duration-300">
                                 <div className="text-2xl font-bold text-gray-900">{scripts.length}</div>
-                                <div className="text-sm text-gray-600">Scripts</div>
+                                <div className="text-sm text-gray-600 font-medium">Scripts</div>
                             </div>
-                            <div className="bg-white border border-gray-200 rounded-lg px-4 py-3 text-center min-w-24 shadow-sm">
+                            <div className="bg-white border border-gray-200 rounded-xl px-6 py-4 text-center min-w-28 shadow-sm hover:shadow-md transition-shadow duration-300">
                                 <div className="text-2xl font-bold text-gray-900">{videos.length}</div>
-                                <div className="text-sm text-gray-600">Videos</div>
+                                <div className="text-sm text-gray-600 font-medium">Videos</div>
                             </div>
                             {userHasPaid && (
                                 <a href="/hypemodeprofile">
-                                    <div className="bg-yellow-500 border border-yellow-600 rounded-lg px-4 py-3 text-center min-w-24 shadow-sm cursor-pointer hover:bg-yellow-600 transition-colors">
+                                    <div className="bg-gradient-to-r from-yellow-400 to-orange-500 border border-yellow-600 rounded-xl px-6 py-4 text-center min-w-28 shadow-sm cursor-pointer hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5">
                                         <div className="text-2xl font-bold text-white">Hype</div>
-                                        <div className="text-sm text-white">Mode</div>
+                                        <div className="text-sm text-white font-medium">Mode</div>
                                     </div>
                                 </a>
                             )}
@@ -525,17 +648,17 @@ const GenrePage: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Profile Details and Content */}
+                {/* Main Content */}
                 <div className="mt-8 flex flex-col lg:flex-row gap-8">
                     {/* Left Sidebar - Profile Info */}
                     <div className="w-full lg:w-1/3">
-                        <div className="bg-white rounded-lg shadow-md p-6">
-                            <div className="flex items-center justify-between mb-4">
+                        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sticky top-24">
+                            <div className="flex items-center justify-between mb-6">
                                 <h2 className="text-xl font-bold text-gray-900">Profile Information</h2>
                                 {isCurrentUser && !editMode && (
                                     <button
                                         onClick={handleEdit}
-                                        className="text-blue-500 hover:text-blue-600 transition-colors"
+                                        className="text-blue-500 hover:text-blue-600 transition-colors bg-blue-50 hover:bg-blue-100 p-2 rounded-lg"
                                     >
                                         <FaEdit size="18" />
                                     </button>
@@ -543,9 +666,9 @@ const GenrePage: React.FC = () => {
                             </div>
 
                             {editMode ? (
-                                <form onSubmit={handleSubmit} className="space-y-4">
+                                <form onSubmit={handleSubmit} className="space-y-5">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Username
                                         </label>
                                         <input
@@ -553,12 +676,12 @@ const GenrePage: React.FC = () => {
                                             name="username"
                                             value={formData.username}
                                             onChange={handleChange}
-                                            className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                         />
                                     </div>
                                     
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Date of Birth
                                         </label>
                                         <input
@@ -566,63 +689,63 @@ const GenrePage: React.FC = () => {
                                             name="dob"
                                             value={formData.dob}
                                             onChange={handleChange}
-                                            className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                         />
                                     </div>
                                     
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Bio
                                         </label>
                                         <textarea
                                             name="bio"
                                             value={formData.bio}
                                             onChange={handleChange}
-                                            rows={3}
-                                            className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            placeholder="Tell us about yourself..."
+                                            rows={4}
+                                            className="w-full p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+                                            placeholder="Tell your story..."
                                         />
                                     </div>
 
                                     <div className="flex space-x-3">
                                         <button 
                                             type="submit" 
-                                            className="bg-blue-500 text-white py-2 px-4 rounded-lg shadow-md hover:bg-blue-600 transition-all duration-300"
+                                            className="flex-1 bg-blue-500 text-white py-3 px-4 rounded-xl shadow-md hover:bg-blue-600 transition-all duration-300 font-semibold"
                                         >
                                             Save Changes
                                         </button>
                                         <button 
                                             type="button"
                                             onClick={handleCancelEdit}
-                                            className="bg-gray-500 text-white py-2 px-4 rounded-lg shadow-md hover:bg-gray-600 transition-all duration-300"
+                                            className="flex-1 bg-gray-500 text-white py-3 px-4 rounded-xl shadow-md hover:bg-gray-600 transition-all duration-300 font-semibold"
                                         >
                                             Cancel
                                         </button>
                                     </div>
                                 </form>
                             ) : (
-                                <div className="space-y-4">
+                                <div className="space-y-5">
                                     <div>
-                                        <h3 className="font-semibold text-gray-700">Username</h3>
-                                        <p className="text-gray-900">{user.username}</p>
+                                        <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Username</h3>
+                                        <p className="text-gray-900 text-lg mt-1">{user.username}</p>
                                     </div>
                                     <div>
-                                        <h3 className="font-semibold text-gray-700">Email</h3>
-                                        <p className="text-gray-900">{user.email}</p>
+                                        <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Email</h3>
+                                        <p className="text-gray-900 text-lg mt-1">{user.email}</p>
                                     </div>
                                     <div>
-                                        <h3 className="font-semibold text-gray-700">Date of Birth</h3>
-                                        <p className="text-gray-900">{user.dob}</p>
+                                        <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Date of Birth</h3>
+                                        <p className="text-gray-900 text-lg mt-1">{user.dob}</p>
                                     </div>
                                     {user.bio && (
                                         <div>
-                                            <h3 className="font-semibold text-gray-700">Bio</h3>
-                                            <p className="text-gray-900">{user.bio}</p>
+                                            <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Bio</h3>
+                                            <p className="text-gray-900 mt-1 leading-relaxed">{user.bio}</p>
                                         </div>
                                     )}
                                     <div>
-                                        <h3 className="font-semibold text-gray-700 mb-2">Allowed Ratings</h3>
-                                        <div className="flex flex-wrap">
+                                        <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide mb-3">Allowed Ratings</h3>
+                                        <div className="flex flex-wrap gap-2">
                                             {renderAllowedGenres()}
                                         </div>
                                     </div>
@@ -634,39 +757,32 @@ const GenrePage: React.FC = () => {
                     {/* Right Content - Tabs */}
                     <div className="w-full lg:w-2/3">
                         {/* Navigation Tabs */}
-                        <div className="bg-white rounded-lg shadow-md">
+                        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
                             <div className="border-b border-gray-200">
                                 <nav className="flex -mb-px">
-                                    <button
-                                        onClick={() => setActiveTab('scripts')}
-                                        className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                                            activeTab === 'scripts'
-                                                ? 'border-blue-500 text-blue-600'
-                                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                        }`}
-                                    >
-                                        Scripts ({scripts.length})
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveTab('videos')}
-                                        className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                                            activeTab === 'videos'
-                                                ? 'border-blue-500 text-blue-600'
-                                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                        }`}
-                                    >
-                                        Videos ({videos.length})
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveTab('about')}
-                                        className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                                            activeTab === 'about'
-                                                ? 'border-blue-500 text-blue-600'
-                                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                        }`}
-                                    >
-                                        About
-                                    </button>
+                                    {[
+                                        { key: 'scripts', label: 'Scripts', count: scripts.length, icon: '📝' },
+                                        { key: 'videos', label: 'Videos', count: videos.length, icon: '🎥' },
+                                        { key: 'about', label: 'About', count: null, icon: '👤' }
+                                    ].map((tab) => (
+                                        <button
+                                            key={tab.key}
+                                            onClick={() => setActiveTab(tab.key)}
+                                            className={`flex items-center py-5 px-6 text-center border-b-2 font-medium text-sm transition-all duration-300 ${
+                                                activeTab === tab.key
+                                                    ? 'border-blue-500 text-blue-600 bg-blue-50'
+                                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                                            }`}
+                                        >
+                                            <span className="mr-2 text-lg">{tab.icon}</span>
+                                            <span>{tab.label}</span>
+                                            {tab.count !== null && (
+                                                <span className="ml-2 bg-gray-200 text-gray-700 px-2 py-1 rounded-full text-xs">
+                                                    {tab.count}
+                                                </span>
+                                            )}
+                                        </button>
+                                    ))}
                                 </nav>
                             </div>
                             
@@ -678,6 +794,29 @@ const GenrePage: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Custom CSS for animations */}
+            <style jsx>{`
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: translateY(10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                .animate-fadeIn {
+                    animation: fadeIn 0.3s ease-out;
+                }
+                .line-clamp-2 {
+                    display: -webkit-box;
+                    -webkit-line-clamp: 2;
+                    -webkit-box-orient: vertical;
+                    overflow: hidden;
+                }
+                .line-clamp-3 {
+                    display: -webkit-box;
+                    -webkit-line-clamp: 3;
+                    -webkit-box-orient: vertical;
+                    overflow: hidden;
+                }
+            `}</style>
         </Layout>
     );
 };
