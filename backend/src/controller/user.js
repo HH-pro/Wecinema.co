@@ -691,6 +691,44 @@ router.put("/edit/:id", authenticateMiddleware, async (req, res) => {
 	}
 });
 
+
+// Change user type (buyer/seller)
+router.put("/change-type/:id", authenticateMiddleware, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { userType } = req.body;
+
+        // Validate userType
+        if (!userType || !['buyer', 'seller'].includes(userType)) {
+            return res.status(400).json({ error: "Invalid user type. Must be 'buyer' or 'seller'" });
+        }
+
+        // Find the user by ID
+        const user = await User.findById(id);
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        // Update user type
+        user.userType = userType;
+
+        // Save the updated user
+        await user.save();
+
+        res.status(200).json({ 
+            message: "User type updated successfully", 
+            user: {
+                id: user._id,
+                username: user.username,
+                email: user.email,
+                userType: user.userType
+            }
+        });
+    } catch (error) {
+        console.error("Error updating user type:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
 //delete a particular user - only admin function
 router.delete("/delete/:id",   authenticateMiddleware, isAdmin,async (req, res) => {
 	try {
