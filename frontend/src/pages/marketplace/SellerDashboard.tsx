@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import { getSellerOrders, getReceivedOffers } from '../../api';
-import { api } from '../../api'; // Your axios instance
-import { decodeToken } from '../../utilities/helperfFunction'; // Your token decoder
+import { decodeToken } from '../../utilities/helperFunction'; // Your token decoder
+import axios from 'axios'; // Direct axios import
 
 interface Listing {
   _id: string;
@@ -95,12 +95,23 @@ const SellerDashboard: React.FC = () => {
     }
   }, []);
 
-  // Direct API call for listings
+  // Direct API call for listings using axios
   const fetchMyListings = async (userId: string) => {
     try {
       console.log("🔄 Direct API call for listings for user:", userId);
       
-      const response = await api.get(`/user/${userId}/listings`);
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await axios.get(`/api/user/${userId}/listings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
       console.log("📦 Direct listings response:", response.data);
 
       // Handle different response structures
