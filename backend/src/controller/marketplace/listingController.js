@@ -114,7 +114,7 @@ router.post("/create-listing", async (req, res) => {
 // ===================================================
 // Get listings by specific user ID (Public route)
 // ===================================================
-router.get("/user/:userId/listings", async (req, res) => {
+router.get("/user/:userId/listings",authenticateMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
     const { status, page = 1, limit = 20 } = req.query;
@@ -163,7 +163,7 @@ router.get("/user/:userId/listings", async (req, res) => {
 });
 // ===================================================
 // ✅ DELETE LISTING
-router.delete("/listing/:id",authenticateMiddleware, async (req, res) => {
+router.delete("/listing/:id", async (req, res) => {
   try {
     console.log("=== DELETE LISTING REQUEST ===");
     console.log("Listing ID to delete:", req.params.id);
