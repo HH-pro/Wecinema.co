@@ -111,7 +111,56 @@ router.post("/create-listing", async (req, res) => {
     res.status(500).json({ error: "Failed to create listing", details: error.message });
   }
 });
+// ===================================================
+// Get listings by specific user ID (Public route)
+// ===================================================
+router.get("/user/:userId/listings", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { status, page = 1, limit = 20 } = req.query;
+    
+    const filter = { sellerId: userId, status: 'active' }; // Only show active listings
+    if (status) filter.status = status;
 
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    console.log("📝 Fetching listings for user:", userId);
+
+    // Verify user exists
+    const user = await User.findById(userId).select('username');
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const listings = await MarketplaceListing.find(filter)
+      .select("title price status mediaUrls description category tags createdAt updatedAt sellerId")
+      .populate('sellerId', 'username avatar')
+      .sort({ updatedAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await MarketplaceListing.countDocuments(filter);
+
+    res.status(200).json({
+      success: true,
+      listings,
+      user: {
+        id: user._id,
+        username: user.username
+      },
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+    
+  } catch (error) {
+    console.error("❌ Error fetching user listings:", error);
+    res.status(500).json({ error: "Failed to fetch user listings" });
+  }
+});
 // ===================================================
 // ✅ DELETE LISTING
 router.delete("/listing/:id", async (req, res) => {
