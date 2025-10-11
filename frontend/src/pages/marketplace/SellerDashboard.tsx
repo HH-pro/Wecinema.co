@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
-import { getSellerOrders, getReceivedOffers, getRequest } from '../../api';
-import { decodeToken } from '../../utilities/helperfFunction'; // Your token decoder
-import axios from 'axios'; // Direct axios import
+import { getMyListings, getSellerOrders, getReceivedOffers } from '../../api';
 
 interface Listing {
   _id: string;
@@ -46,6 +44,12 @@ interface Offer {
   message?: string;
 }
 
+interface ApiResponse<T> {
+  data?: T;
+  message?: string;
+  success?: boolean;
+}
+
 type TabType = 'overview' | 'offers' | 'listings';
 
 const SellerDashboard: React.FC = () => {
@@ -55,7 +59,6 @@ const SellerDashboard: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [error, setError] = useState<string>('');
-  const [userId, setUserId] = useState<string>('');
 
   // Stats calculation
   const totalListings = listings.length;
@@ -68,126 +71,41 @@ const SellerDashboard: React.FC = () => {
   const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
 
   useEffect(() => {
-    // Get user ID from token
-    const getUserIdFromToken = () => {
-      try {
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        if (token) {
-          const tokenData = decodeToken(token);
-          if (tokenData && tokenData.userId) {
-            setUserId(tokenData.userId);
-            return tokenData.userId;
-          }
-        }
-        throw new Error('User not authenticated');
-      } catch (error) {
-        console.error('❌ Error getting user ID from token:', error);
-        setError('User authentication failed');
-        return null;
-      }
-    };
-
-    const userId = getUserIdFromToken();
-    if (userId) {
-      fetchDashboardData(userId);
-    } else {
-      setLoading(false);
-    }
+    fetchDashboardData();
   }, []);
 
-  // Direct API call for listings using axios
- const fetchMyListings = async (userId: string) => {
-  try {
-    console.log("🔄 Fetching listings for user:", userId);
-
-    const token =
-      localStorage.getItem("token") || sessionStorage.getItem("token");
-    if (!token) throw new Error("No authentication token found");
-
-    // Use your helper
-    const data = await getRequest(`/marketplace/listings/user/${userId}/listings`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    console.log("📦 Listings response data:", data);
-
-    // Normalize response
-    if (Array.isArray(data)) return data;
-    if (data?.listings && Array.isArray(data.listings)) return data.listings;
-    if (data?.data && Array.isArray(data.data)) return data.data;
-
-    console.warn("⚠️ No listings array found in response");
-    return [];
-  } catch (error) {
-    console.error("❌ Error fetching listings:", error);
-    return [];
-  }
-};
-
-  const fetchDashboardData = async (userId: string) => {
+  const fetchDashboardData = async () => {
     try {
       setLoading(true);
       setError('');
-      console.log("🔄 Fetching dashboard data for user:", userId);
 
-      // Direct API call for listings, imported functions for others
+      // API calls with proper response handling
       const [listingsResponse, ordersResponse, offersResponse] = await Promise.all([
-        fetchMyListings(userId), // Direct API call with user ID
-        getSellerOrders(setLoading), // Imported function
-        getReceivedOffers(setLoading) // Imported function
+        getMyListings(setLoading),
+        getSellerOrders(setLoading),
+        getReceivedOffers(setLoading)
       ]);
 
-      // Extract data from API responses
-      const extractData = (response: any, endpoint: string) => {
-        console.log(`🔧 Processing ${endpoint}:`, response);
-        
-        // If response has listings array (from your backend)
-        if (response && response.listings && Array.isArray(response.listings)) {
-          console.log(`✅ Found listings array in ${endpoint}`);
-          return response.listings;
-        }
-        // If response has data array
-        else if (response && response.data && Array.isArray(response.data)) {
-          console.log(`✅ Found data array in ${endpoint}`);
-          return response.data;
-        }
-        // If response is already an array
-        else if (Array.isArray(response)) {
-          console.log(`✅ Response is already array in ${endpoint}`);
-          return response;
-        }
-        // If response is an object with array inside
-        else if (response && typeof response === 'object') {
-          console.log(`🔍 Searching for array in ${endpoint} object:`, response);
-          // Look for any array property
-          const arrayKey = Object.keys(response).find(key => Array.isArray(response[key]));
-          if (arrayKey) {
-            console.log(`✅ Found array in key '${arrayKey}' for ${endpoint}`);
-            return response[arrayKey];
-          }
-        }
-        
-        console.warn(`❌ No array found in ${endpoint}, returning empty array`);
-        return [];
-      };
+      // Extract data from API responses - handle both direct arrays and { data: array } responses
+      const listingsData = Array.isArray(listingsResponse) 
+        ? listingsResponse 
+        : (listingsResponse?.data || []);
+      
+      const ordersData = Array.isArray(ordersResponse) 
+        ? ordersResponse 
+        : (ordersResponse?.data || []);
+      
+      const offersData = Array.isArray(offersResponse) 
+        ? offersResponse 
+        : (offersResponse?.data || []);
 
-      const listingsData = extractData(listingsResponse, 'listings');
-      const ordersData = extractData(ordersResponse, 'orders');
-      const offersData = extractData(offersResponse, 'offers');
-
-      console.log("📦 Final data:", {
-        listings: listingsData,
-        orders: ordersData,
-        offers: offersData
-      });
-
-      // Set the data
-      setListings(listingsData);
-      setOrders(ordersData);
-      setOffers(offersData);
+      // Ensure we always set arrays
+      setListings(Array.isArray(listingsData) ? listingsData : []);
+      setOrders(Array.isArray(ordersData) ? ordersData : []);
+      setOffers(Array.isArray(offersData) ? offersData : []);
 
     } catch (error) {
-      console.error('❌ Error fetching dashboard data:', error);
+      console.error('Error fetching dashboard data:', error);
       setError('Failed to load dashboard data');
       // Ensure arrays are set to empty on error
       setListings([]);
@@ -212,13 +130,7 @@ const SellerDashboard: React.FC = () => {
       // TODO: Add accept/reject offer functions in api.ts
       // await acceptOffer(offerId, setLoading);
       // or await rejectOffer(offerId, setLoading);
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      if (token) {
-        const tokenData = decodeToken(token);
-        if (tokenData && tokenData.userId) {
-          await fetchDashboardData(tokenData.userId); // Refresh data
-        }
-      }
+      await fetchDashboardData(); // Refresh data
     } catch (error) {
       console.error('Error updating offer:', error);
       setError('Failed to update offer');
@@ -354,17 +266,6 @@ const SellerDashboard: React.FC = () => {
     </div>
   );
 
-  // Refresh function
-  const handleRefresh = () => {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    if (token) {
-      const tokenData = decodeToken(token);
-      if (tokenData && tokenData.userId) {
-        fetchDashboardData(tokenData.userId);
-      }
-    }
-  };
-
   // Loading State
   if (loading) {
     return (
@@ -409,7 +310,7 @@ const SellerDashboard: React.FC = () => {
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${
                   activeTab === 'overview'
                     ? 'border-yellow-600 text-yellow-600'
-                    : 'border-transparent text-gray-500 hover:text-white-700 hover:border-gray-300'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
                 Overview
@@ -628,7 +529,7 @@ const SellerDashboard: React.FC = () => {
                   <p className="text-sm text-gray-600 mt-1">Manage and respond to offers from buyers</p>
                 </div>
                 <button
-                  onClick={handleRefresh}
+                  onClick={fetchDashboardData}
                   className="text-sm text-gray-500 hover:text-gray-700 flex items-center"
                 >
                   <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -728,7 +629,7 @@ const SellerDashboard: React.FC = () => {
                 </div>
                 <div className="flex space-x-3">
                   <button
-                    onClick={handleRefresh}
+                    onClick={fetchDashboardData}
                     className="text-sm text-gray-500 hover:text-gray-700 flex items-center"
                   >
                     <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
