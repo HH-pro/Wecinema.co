@@ -896,7 +896,7 @@ export const getMyListings = async (setLoading) => {
         const token = localStorage.getItem("token");
         
         const response = await axios.get(
-            `${BASE_URL}/marketplace/listings/my-listings`,
+            `$/marketplace/listings/my-listings`,
             {
                 headers: {
                     'Authorization': `Bearer ${token}`,
