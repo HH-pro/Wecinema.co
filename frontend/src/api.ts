@@ -395,7 +395,7 @@ export const offerAPI = {
   getMyOffers: async (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) => {
     try {
       if (setLoading) setLoading(true);
-      const response = await api.get('/api/marketplace/offers/my-offers');
+      const response = await api.get('/marketplace/offers/my-offers');
       return handleApiResponse(response.data, 'getMyOffers');
     } catch (error) {
       console.error('Error fetching my offers:', error);
