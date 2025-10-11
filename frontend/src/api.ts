@@ -220,7 +220,7 @@ export const listingAPI = {
     getRequest(`/marketplace/listings/listings/${listingId}`, setLoading),
 
   getMyListings: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest('/marketplace/listings/my-listing', setLoading),
+    getRequest('/marketplace/listings/my-listings', setLoading),
 
   createListing: (formData: FormData, setLoading: React.Dispatch<React.SetStateAction<boolean>>) => {
     return new Promise((resolve, reject) => {
