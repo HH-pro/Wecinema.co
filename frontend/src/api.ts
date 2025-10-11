@@ -226,7 +226,7 @@ export const authAPI = {
   }
 };
 
-// Marketplace Listing APIs
+// Marketplace Listing APIs - UPDATED
 export const listingAPI = {
   getListings: (
     params?: {
@@ -261,6 +261,56 @@ export const listingAPI = {
 
   getListingById: (listingId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
     getRequest(`/marketplace/listings/listings/${listingId}`, setLoading),
+
+  // Get listings by specific user ID (Public route)
+  getUserListings: async (userId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) => {
+    try {
+      if (setLoading) setLoading(true);
+      
+      console.log("🔄 Fetching listings for user:", userId);
+      
+      const response = await api.get(
+        `/marketplace/listings/user/${userId}/listings`,
+        {
+          timeout: 15000
+        }
+      );
+
+      console.log("🔍 User Listings API Response:", response.data);
+
+      // Handle the response structure from the new route
+      if (response.data && response.data.success && response.data.listings) {
+        console.log(`✅ Found ${response.data.listings.length} listings for user`);
+        return {
+          listings: response.data.listings,
+          user: response.data.user,
+          pagination: response.data.pagination
+        };
+      } else {
+        console.warn("Unexpected response structure:", response.data);
+        return {
+          listings: [],
+          user: null,
+          pagination: { page: 1, limit: 20, total: 0, pages: 0 }
+        };
+      }
+    } catch (error: any) {
+      console.error("❌ Error fetching user listings:", error);
+      
+      if (error.response) {
+        console.error("Error Response:", error.response.data);
+        console.error("Error Status:", error.response.status);
+        
+        if (error.response.status === 404) {
+          throw new Error("User not found or no listings available");
+        }
+      }
+      
+      throw error;
+    } finally {
+      if (setLoading) setLoading(false);
+    }
+  },
 
   getMyListings: async (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) => {
     try {
