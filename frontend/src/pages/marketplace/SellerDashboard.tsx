@@ -28,6 +28,9 @@ const UserListings = ({ userId }) => {
   // Listings fetch karne ka function
   const fetchListings = async (page = 1, status = '') => {
     try {
+       useEffect(() => {
+   
+  }, [tokenData]);
       console.log('🚀 Starting fetchListings...');
       console.log('🔍 URL:', `${API_BASE_URL}/marketplace/listings/user/${tokenData.userId}/listings`);
       console.log('🔍 Params:', { page, limit: pagination.limit, status });
