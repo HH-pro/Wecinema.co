@@ -4,8 +4,6 @@ import { decodeToken } from '../../utilities/helperfFunction';
 
 const UserListings = ({ userId }) => {
   const [listings, setListings] = useState([]);
-   const token = localStorage.getItem("token") || null;
-    const tokenData = decodeToken(token);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [pagination, setPagination] = useState({
@@ -24,15 +22,35 @@ const UserListings = ({ userId }) => {
   console.log('🔍 Component rendered with userId:', userId);
   console.log('🔍 Current loading state:', loading);
 
-  
+  // Token se current user ID nikalne ka function
+  const getCurrentUserId = () => {
+    try {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      console.log('🔍 Token found:', !!token);
+      if (token) {
+        const tokenData = decodeToken(token);
+        console.log('🔍 Decoded token data:', tokenData);
+        return tokenData?.userId || null;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error decoding token:', error);
+      return null;
+    }
+  };
+
+  // Check if current user is viewing their own profile
+  const checkIfCurrentUser = (targetUserId) => {
+    const currentUserId = getCurrentUserId();
+    console.log('🔍 Current User ID:', currentUserId, 'Target User ID:', targetUserId);
+    return currentUserId === targetUserId;
+  };
+
   // Listings fetch karne ka function
   const fetchListings = async (page = 1, status = '') => {
     try {
-       useEffect(() => {
-   
-  }, [tokenData]);
       console.log('🚀 Starting fetchListings...');
-      console.log('🔍 URL:', `${API_BASE_URL}/marketplace/listings/user/${tokenData.userId}/listings`);
+      console.log('🔍 URL:', `${API_BASE_URL}/marketplace/listings/user/${userId}/listings`);
       console.log('🔍 Params:', { page, limit: pagination.limit, status });
       
       setLoading(true);
