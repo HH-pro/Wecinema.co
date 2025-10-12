@@ -24,7 +24,7 @@ const UserListings = ({ userId }) => {
       setError('');
       
       const response = await axios.get(
-        `${API_BASE_URL}/user/${userId}/listings`,
+        `${API_BASE_URL}marketplace/listings/user/${userId}/listings`,
         {
           params: { 
             page, 
