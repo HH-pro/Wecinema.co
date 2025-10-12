@@ -51,7 +51,7 @@ const UserListings = ({ userId }) => {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
       const response = await axios.get(
-        `${API_BASE_URL}/user/${userId}/listings`,
+        `${API_BASE_URL}/marketplace/listings/user/${userId}/listings`,
         {
           params: { 
             page, 
