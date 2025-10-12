@@ -50,7 +50,7 @@ const UserListings = ({ userId }) => {
   const fetchListings = async (page = 1, status = '') => {
     try {
       console.log('🚀 Starting fetchListings...');
-      console.log('🔍 URL:', `${API_BASE_URL}/marketplace/listings/user/${userId}/listings`);
+      console.log('🔍 URL:', `${API_BASE_URL}/marketplace/listings/user/689a42a9ff8d14366c6df9c1/listings`);
       console.log('🔍 Params:', { page, limit: pagination.limit, status });
       
       setLoading(true);
