@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
-import { getMyListings, getSellerOrders, getReceivedOffers } from '../../api';
+import { getSellerOrders, getReceivedOffers } from '../../api';
 import axios from 'axios';
 import { decodeToken } from '../../utilities/helperfFunction';
 
@@ -517,17 +517,7 @@ const ListingCard = ({ listing, isCurrentUser, onEdit, onDelete }) => {
   );
 };
 
-// Original SellerDashboard Interfaces and Component
-interface Listing {
-  _id: string;
-  title: string;
-  price: number;
-  status: string;
-  updatedAt: string;
-  description?: string;
-  mediaUrls?: string[];
-}
-
+// Original SellerDashboard Interfaces
 interface Order {
   _id: string;
   amount: number;
@@ -560,19 +550,16 @@ interface Offer {
   message?: string;
 }
 
-type TabType = 'overview' | 'offers' | 'listings' | 'userListings';
+type TabType = 'overview' | 'offers' | 'listings';
 
 const SellerDashboard: React.FC = () => {
-  const [listings, setListings] = useState<Listing[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [error, setError] = useState<string>('');
 
-  // Stats calculation
-  const totalListings = listings.length;
-  const activeListings = listings.filter(listing => listing.status === 'active').length;
+  // Stats calculation - listings count ab UserListings component se aayega
   const totalOrders = orders.length;
   const pendingOrders = orders.filter(order => order.status === 'pending').length;
   const totalRevenue = orders
@@ -589,16 +576,12 @@ const SellerDashboard: React.FC = () => {
       setLoading(true);
       setError('');
 
-      const [listingsResponse, ordersResponse, offersResponse] = await Promise.all([
-        getMyListings(setLoading),
+      // Sirf orders aur offers fetch karenge
+      const [ordersResponse, offersResponse] = await Promise.all([
         getSellerOrders(setLoading),
         getReceivedOffers(setLoading)
       ]);
 
-      const listingsData = Array.isArray(listingsResponse) 
-        ? listingsResponse 
-        : (listingsResponse?.data || []);
-      
       const ordersData = Array.isArray(ordersResponse) 
         ? ordersResponse 
         : (ordersResponse?.data || []);
@@ -607,14 +590,12 @@ const SellerDashboard: React.FC = () => {
         ? offersResponse 
         : (offersResponse?.data || []);
 
-      setListings(Array.isArray(listingsData) ? listingsData : []);
       setOrders(Array.isArray(ordersData) ? ordersData : []);
       setOffers(Array.isArray(offersData) ? offersData : []);
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       setError('Failed to load dashboard data');
-      setListings([]);
       setOrders([]);
       setOffers([]);
     } finally {
@@ -673,15 +654,6 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  const getListingStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-green-100 text-green-800 border-green-200';
-      case 'inactive': return 'bg-gray-100 text-gray-800 border-gray-200';
-      case 'draft': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
   // Stat Card Component
   const StatCard = ({ 
     title, 
@@ -712,60 +684,6 @@ const SellerDashboard: React.FC = () => {
           <p className="text-sm font-medium text-gray-600">{title}</p>
           <p className="text-2xl font-bold text-gray-900">{value}</p>
         </div>
-      </div>
-    </div>
-  );
-
-  // Original Listing Card Component for Dashboard
-  const DashboardListingCard = ({ listing }: { listing: Listing }) => (
-    <div className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors bg-white">
-      {listing.mediaUrls && listing.mediaUrls.length > 0 ? (
-        <div className="mb-3 h-40 bg-gray-100 rounded-lg overflow-hidden">
-          <img 
-            src={listing.mediaUrls[0]} 
-            alt={listing.title}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.style.display = 'none';
-            }}
-          />
-        </div>
-      ) : (
-        <div className="mb-3 h-40 bg-gray-100 rounded-lg flex items-center justify-center">
-          <span className="text-gray-400 text-sm">No Image</span>
-        </div>
-      )}
-      
-      <div className="flex items-start justify-between mb-3">
-        <h4 className="font-medium text-gray-900 truncate flex-1 mr-2">
-          {listing.title || 'Untitled Listing'}
-        </h4>
-        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getListingStatusColor(listing.status)}`}>
-          {listing.status || 'unknown'}
-        </span>
-      </div>
-      
-      <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-        {listing.description || 'No description available'}
-      </p>
-      
-      <div className="flex items-center justify-between text-sm mb-3">
-        <span className="font-semibold text-green-600">
-          {formatCurrency(listing.price || 0)}
-        </span>
-        <span className="text-gray-500">
-          {formatDate(listing.updatedAt)}
-        </span>
-      </div>
-
-      <div className="mt-3">
-        <button
-          onClick={() => handleViewListingDetails(listing._id)}
-          className="w-full text-sm py-2 px-3 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-        >
-          View Details
-        </button>
       </div>
     </div>
   );
@@ -836,26 +754,13 @@ const SellerDashboard: React.FC = () => {
               </button>
               <button
                 onClick={() => setActiveTab('listings')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
                   activeTab === 'listings'
                     ? 'border-yellow-600 text-yellow-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
                 My Listings
-                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  {totalListings}
-                </span>
-              </button>
-              <button
-                onClick={() => setActiveTab('userListings')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'userListings'
-                    ? 'border-yellow-600 text-yellow-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Advanced Listings
               </button>
             </nav>
           </div>
@@ -863,33 +768,12 @@ const SellerDashboard: React.FC = () => {
           {/* Overview Tab */}
           {activeTab === 'overview' && (
             <>
-              {/* Stats Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
+              {/* Stats Grid - Listings stats remove kar diye */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 <StatCard
                   title="Total Revenue"
                   value={formatCurrency(totalRevenue)}
                   icon={<span className="text-green-600 text-lg font-semibold">$</span>}
-                  color="green"
-                />
-                <StatCard
-                  title="Total Listings"
-                  value={totalListings}
-                  icon={
-                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                  }
-                  color="yellow"
-                  onClick={() => setActiveTab('listings')}
-                />
-                <StatCard
-                  title="Active Listings"
-                  value={activeListings}
-                  icon={
-                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  }
                   color="green"
                 />
                 <StatCard
@@ -1133,63 +1017,8 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* Listings Tab */}
+          {/* Listings Tab - Ab sirf UserListings component show hoga */}
           {activeTab === 'listings' && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">My Listings</h2>
-                  <p className="text-sm text-gray-600 mt-1">View and manage your product listings</p>
-                </div>
-                <div className="flex space-x-3">
-                  <button
-                    onClick={fetchDashboardData}
-                    className="text-sm text-gray-500 hover:text-gray-700 flex items-center"
-                  >
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Refresh
-                  </button>
-                  <button
-                    onClick={() => window.location.href = '/create-listing'}
-                    className="bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 flex items-center"
-                  >
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Create Listing
-                  </button>
-                </div>
-              </div>
-              <div className="p-6">
-                {listings.length === 0 ? (
-                  <div className="text-center py-12">
-                    <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                    <h3 className="mt-4 text-lg font-medium text-gray-900">No listings yet</h3>
-                    <p className="mt-2 text-gray-500">Get started by creating your first listing.</p>
-                    <button
-                      onClick={() => window.location.href = '/create-listing'}
-                      className="mt-4 bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200"
-                    >
-                      Create Your First Listing
-                    </button>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {listings.map(listing => (
-                      <DashboardListingCard key={listing._id} listing={listing} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* UserListings Tab */}
-          {activeTab === 'userListings' && (
             <UserListings />
           )}
         </div>
