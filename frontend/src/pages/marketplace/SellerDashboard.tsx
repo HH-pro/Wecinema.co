@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { decodeToken } from '../../utilities/helperfFunction';
 
-const UserListings = ({ userId }) => {
+const UserListings = ({ userId: propUserId }) => {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -15,22 +15,26 @@ const UserListings = ({ userId }) => {
   const [userInfo, setUserInfo] = useState(null);
   const [selectedStatus, setSelectedStatus] = useState('');
   const [isCurrentUser, setIsCurrentUser] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState(null);
 
-  // API Base URL - aapki backend URL yahan dalen
+  // API Base URL
   const API_BASE_URL = 'http://localhost:3000';
 
-  console.log('🔍 Component rendered with userId:', userId);
-  console.log('🔍 Current loading state:', loading);
+  console.log('🔍 Component rendered with propUserId:', propUserId);
 
   // Token se current user ID nikalne ka function
-  const getCurrentUserId = () => {
+  const getCurrentUserIdFromToken = () => {
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       console.log('🔍 Token found:', !!token);
       if (token) {
         const tokenData = decodeToken(token);
         console.log('🔍 Decoded token data:', tokenData);
-        return tokenData?.userId || null;
+        
+        // Different possible fields where userId might be stored in token
+        const userId = tokenData?.userId || tokenData?.id || tokenData?.user?.id || tokenData?.user?._id;
+        console.log('🔍 Extracted userId:', userId);
+        return userId;
       }
       return null;
     } catch (error) {
@@ -39,18 +43,36 @@ const UserListings = ({ userId }) => {
     }
   };
 
+  // Determine which userId to use
+  const getTargetUserId = () => {
+    // If propUserId is provided, use that (viewing other user's profile)
+    // Otherwise use current user's ID from token (viewing own profile)
+    const targetUserId = propUserId || currentUserId;
+    console.log('🎯 Target UserId:', targetUserId);
+    return targetUserId;
+  };
+
   // Check if current user is viewing their own profile
   const checkIfCurrentUser = (targetUserId) => {
-    const currentUserId = getCurrentUserId();
-    console.log('🔍 Current User ID:', currentUserId, 'Target User ID:', targetUserId);
+    console.log('🔍 Checking if current user - Current:', currentUserId, 'Target:', targetUserId);
     return currentUserId === targetUserId;
   };
 
   // Listings fetch karne ka function
   const fetchListings = async (page = 1, status = '') => {
+    const targetUserId = getTargetUserId();
+    
+    if (!targetUserId) {
+      console.log('❌ No target userId available');
+      setError('User ID not available. Please login again.');
+      setLoading(false);
+      return;
+    }
+
     try {
       console.log('🚀 Starting fetchListings...');
-      console.log('🔍 URL:', `${API_BASE_URL}/marketplace/listings/user/689a42a9ff8d14366c6df9c1/listings`);
+      console.log('🔍 Target UserId:', targetUserId);
+      console.log('🔍 URL:', `${API_BASE_URL}/marketplace/listings/user/${targetUserId}/listings`);
       console.log('🔍 Params:', { page, limit: pagination.limit, status });
       
       setLoading(true);
@@ -62,7 +84,7 @@ const UserListings = ({ userId }) => {
       console.log('🔍 Headers:', headers);
 
       const response = await axios.get(
-        `${API_BASE_URL}/marketplace/listings/user/${userId}/listings`,
+        `${API_BASE_URL}/marketplace/listings/user/${targetUserId}/listings`,
         {
           params: { 
             page, 
@@ -70,7 +92,7 @@ const UserListings = ({ userId }) => {
             status: status || undefined 
           },
           headers,
-          timeout: 10000 // 10 seconds timeout
+          timeout: 10000
         }
       );
 
@@ -88,12 +110,13 @@ const UserListings = ({ userId }) => {
         setSelectedStatus(status);
         
         // Check if current user is viewing their own profile
-        const currentUser = checkIfCurrentUser(userId);
-        setIsCurrentUser(currentUser);
+        const isOwnProfile = checkIfCurrentUser(targetUserId);
+        setIsCurrentUser(isOwnProfile);
         
         console.log('✅ Listings set:', response.data.listings?.length || 0, 'items');
         console.log('✅ User info set:', response.data.user);
         console.log('✅ Pagination set:', response.data.pagination);
+        console.log('✅ Is Current User:', isOwnProfile);
       } else {
         console.log('❌ API success false:', response.data);
         setError(response.data.error || 'API returned success: false');
@@ -105,15 +128,12 @@ const UserListings = ({ userId }) => {
       let errorMessage = 'Failed to load listings';
       
       if (err.response) {
-        // Server responded with error status
         errorMessage = err.response.data?.error || `Server error: ${err.response.status}`;
         console.log('❌ Server error details:', err.response.data);
       } else if (err.request) {
-        // Request was made but no response received
         errorMessage = 'No response from server. Check if backend is running.';
         console.log('❌ No response received');
       } else {
-        // Something else happened
         errorMessage = err.message;
       }
       
@@ -135,7 +155,7 @@ const UserListings = ({ userId }) => {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
       await axios.delete(
-        `${API_BASE_URL}/listings/${listingId}`,
+        `${API_BASE_URL}/marketplace/listings/${listingId}`,
         { headers }
       );
 
@@ -150,22 +170,28 @@ const UserListings = ({ userId }) => {
 
   // Edit listing function (only for current user)
   const handleEditListing = (listingId) => {
-    // Redirect to edit page or open modal
     window.location.href = `/edit-listing/${listingId}`;
   };
 
-  // Component load hote hi data fetch karein
+  // Component load hote hi current userId set karen aur data fetch karein
   useEffect(() => {
-    console.log('🔄 useEffect triggered with userId:', userId);
-    if (userId) {
+    console.log('🔄 useEffect triggered');
+    
+    // Get current user ID from token
+    const userIdFromToken = getCurrentUserIdFromToken();
+    console.log('🔄 UserId from token:', userIdFromToken);
+    
+    setCurrentUserId(userIdFromToken);
+
+    if (userIdFromToken || propUserId) {
       console.log('🔄 Calling fetchListings...');
       fetchListings();
     } else {
-      console.log('❌ No userId provided, setting loading to false');
+      console.log('❌ No userId available');
       setLoading(false);
-      setError('No user ID provided');
+      setError('Please login to view listings');
     }
-  }, [userId]);
+  }, [propUserId]); // propUserId change hone par re-fetch
 
   // Pagination handle karein
   const handlePageChange = (newPage) => {
@@ -177,16 +203,35 @@ const UserListings = ({ userId }) => {
     fetchListings(1, status);
   };
 
+  // Refresh data
+  const handleRefresh = () => {
+    fetchListings(pagination.page, selectedStatus);
+  };
+
   // Temporary debug button
   const debugInfo = () => {
     console.log('=== DEBUG INFO ===');
-    console.log('userId:', userId);
+    console.log('propUserId:', propUserId);
+    console.log('currentUserId:', currentUserId);
+    console.log('targetUserId:', getTargetUserId());
     console.log('loading:', loading);
     console.log('error:', error);
     console.log('listings count:', listings.length);
     console.log('userInfo:', userInfo);
     console.log('pagination:', pagination);
     console.log('isCurrentUser:', isCurrentUser);
+    
+    // Token info
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    console.log('token exists:', !!token);
+    if (token) {
+      try {
+        const tokenData = decodeToken(token);
+        console.log('full token data:', tokenData);
+      } catch (e) {
+        console.log('token decode error:', e);
+      }
+    }
     console.log('=== END DEBUG ===');
   };
 
@@ -195,13 +240,21 @@ const UserListings = ({ userId }) => {
     return (
       <div className="flex justify-center items-center py-12 flex-col">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-        <span className="ml-3 text-lg">Loading listings...</span>
-        <button 
-          onClick={debugInfo}
-          className="mt-4 bg-gray-500 text-white px-4 py-2 rounded"
-        >
-          Debug Info
-        </button>
+        <span className="ml-3 text-lg mt-3">Loading listings...</span>
+        <div className="mt-4 flex gap-2">
+          <button 
+            onClick={debugInfo}
+            className="bg-gray-500 text-white px-4 py-2 rounded text-sm"
+          >
+            Debug Info
+          </button>
+          <button 
+            onClick={handleRefresh}
+            className="bg-blue-500 text-white px-4 py-2 rounded text-sm"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
     );
   }
@@ -217,9 +270,9 @@ const UserListings = ({ userId }) => {
             {error}
           </div>
         </div>
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex gap-2 flex-wrap">
           <button 
-            onClick={() => fetchListings()} 
+            onClick={handleRefresh} 
             className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors"
           >
             Try Again
@@ -230,6 +283,14 @@ const UserListings = ({ userId }) => {
           >
             Debug Info
           </button>
+          {!currentUserId && (
+            <button 
+              onClick={() => window.location.href = '/login'}
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+            >
+              Login
+            </button>
+          )}
         </div>
       </div>
     );
@@ -262,23 +323,167 @@ const UserListings = ({ userId }) => {
               <p className="text-gray-600 text-lg">
                 Total {pagination.total} listings found
               </p>
+              <p className="text-gray-500 text-sm mt-1">
+                User ID: {getTargetUserId()}
+              </p>
             </div>
             
-            {/* Add New Listing Button (only for current user) */}
+            <div className="flex gap-3">
+              {/* Refresh Button */}
+              <button
+                onClick={handleRefresh}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold transition-colors flex items-center"
+              >
+                🔄 Refresh
+              </button>
+              
+              {/* Add New Listing Button (only for current user) */}
+              {isCurrentUser && (
+                <button
+                  onClick={() => window.location.href = '/create-listing'}
+                  className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center"
+                >
+                  <span className="mr-2">+</span> Add New Listing
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <h3 className="font-semibold mb-3 text-gray-700">Filter by Status:</h3>
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => handleStatusFilter('')}
+            className={`px-4 py-2 rounded transition-colors ${
+              selectedStatus === '' 
+                ? 'bg-blue-500 text-white' 
+                : 'bg-gray-200 hover:bg-gray-300'
+            }`}
+          >
+            All Listings
+          </button>
+          <button
+            onClick={() => handleStatusFilter('active')}
+            className={`px-4 py-2 rounded transition-colors ${
+              selectedStatus === 'active' 
+                ? 'bg-green-500 text-white' 
+                : 'bg-gray-200 hover:bg-gray-300'
+            }`}
+          >
+            Active
+          </button>
+          <button
+            onClick={() => handleStatusFilter('sold')}
+            className={`px-4 py-2 rounded transition-colors ${
+              selectedStatus === 'sold' 
+                ? 'bg-orange-500 text-white' 
+                : 'bg-gray-200 hover:bg-gray-300'
+            }`}
+          >
+            Sold
+          </button>
+          <button
+            onClick={() => handleStatusFilter('draft')}
+            className={`px-4 py-2 rounded transition-colors ${
+              selectedStatus === 'draft' 
+                ? 'bg-gray-500 text-white' 
+                : 'bg-gray-200 hover:bg-gray-300'
+            }`}
+          >
+            Draft
+          </button>
+        </div>
+      </div>
+
+      {/* Listings Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
+        {listings.map((listing) => (
+          <ListingCard 
+            key={listing._id} 
+            listing={listing} 
+            isCurrentUser={isCurrentUser}
+            onEdit={handleEditListing}
+            onDelete={handleDeleteListing}
+          />
+        ))}
+      </div>
+
+      {/* Empty State */}
+      {listings.length === 0 && (
+        <div className="text-center py-16 bg-white rounded-lg shadow border border-gray-200">
+          <div className="text-6xl mb-4">🏠</div>
+          <h3 className="text-2xl font-semibold text-gray-700 mb-3">
+            No listings found
+          </h3>
+          <p className="text-gray-500 text-lg mb-6">
+            {selectedStatus ? `No ${selectedStatus} listings available` : 'No listings available yet'}
+          </p>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={handleRefresh}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+            >
+              Refresh
+            </button>
             {isCurrentUser && (
               <button
                 onClick={() => window.location.href = '/create-listing'}
-                className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center"
+                className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
               >
-                <span className="mr-2">+</span> Add New Listing
+                Create Your First Listing
               </button>
             )}
           </div>
         </div>
       )}
 
-      {/* Rest of your JSX remains same */}
-      {/* ... */}
+      {/* Pagination */}
+      {pagination.pages > 1 && (
+        <div className="flex justify-center items-center gap-2 mt-8">
+          <button
+            onClick={() => handlePageChange(pagination.page - 1)}
+            disabled={pagination.page === 1}
+            className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
+          >
+            ← Previous
+          </button>
+          
+          <div className="flex gap-1">
+            {[...Array(pagination.pages)].map((_, index) => (
+              <button
+                key={index + 1}
+                onClick={() => handlePageChange(index + 1)}
+                className={`px-4 py-2 rounded transition-colors ${
+                  pagination.page === index + 1
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-200 hover:bg-gray-300'
+                }`}
+              >
+                {index + 1}
+              </button>
+            ))}
+          </div>
+          
+          <button
+            onClick={() => handlePageChange(pagination.page + 1)}
+            disabled={pagination.page === pagination.pages}
+            className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
+          >
+            Next →
+          </button>
+        </div>
+      )}
+
+      {/* Pagination Info */}
+      {pagination.total > 0 && (
+        <div className="text-center mt-4 text-gray-600">
+          Page {pagination.page} of {pagination.pages} • 
+          Showing {listings.length} of {pagination.total} items
+        </div>
+      )}
     </div>
   );
 };
@@ -422,4 +627,3 @@ const ListingCard = ({ listing, isCurrentUser, onEdit, onDelete }) => {
 };
 
 export default UserListings;
-
