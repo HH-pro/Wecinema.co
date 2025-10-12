@@ -47,7 +47,6 @@ const UserListings = ({ userId: propUserId }) => {
   const checkIfCurrentUser = (targetUserId) => {
     return currentUserId === targetUserId;
   };
-     window.location.reload(); // Force reload if still missing
 
   // Listings fetch karne ka function
   const fetchListings = async (page = 1, status = '') => {
