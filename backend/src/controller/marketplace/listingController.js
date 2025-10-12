@@ -116,7 +116,7 @@ router.post("/create-listing", async (req, res) => {
 // ===================================================
 // Get listings by specific user ID (Public route)
 // ===================================================
-router.get("/user/:userId/listings", async (req, res) => {
+router.get("/user/:userId/listings", authenticateMiddleware, async (req, res) => {
   try {
     const { userId } = req.params;
     const { status, page = 1, limit = 20 } = req.query;
