@@ -62,7 +62,7 @@ const UserListings = ({ userId }) => {
       console.log('🔍 Headers:', headers);
 
       const response = await axios.get(
-        `${API_BASE_URL}/marketplace/listings/user/${userId}/listings`,
+        `${API_BASE_URL}/marketplace/listings/user/689a42a9ff8d14366c6df9c1/listings`,
         {
           params: { 
             page, 
