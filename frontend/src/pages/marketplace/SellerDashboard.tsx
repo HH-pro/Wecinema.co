@@ -46,8 +46,8 @@ const UserListings = ({ userId: propUserId }) => {
   // Check if current user is viewing their own profile
   const checkIfCurrentUser = (targetUserId) => {
     return currentUserId === targetUserId;
-     window.location.reload(); // Force reload if still missing
   };
+     window.location.reload(); // Force reload if still missing
 
   // Listings fetch karne ka function
   const fetchListings = async (page = 1, status = '') => {
