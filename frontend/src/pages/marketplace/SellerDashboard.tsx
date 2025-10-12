@@ -15,7 +15,7 @@ const UserListings = ({ userId }) => {
   const [selectedStatus, setSelectedStatus] = useState('');
 
   // API Base URL - aapki backend URL yahan dalen
-  const API_BASE_URL = 'http://localhost:5000/api'; // Change to your backend URL
+  const API_BASE_URL = 'http://localhost:3000'; // Change to your backend URL
 
   // Listings fetch karne ka function
   const fetchListings = async (page = 1, status = '') => {
