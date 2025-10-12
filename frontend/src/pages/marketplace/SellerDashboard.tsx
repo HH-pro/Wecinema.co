@@ -39,18 +39,18 @@ const UserListings = ({ userId }) => {
     }
   };
 
-  // Check if current user is viewing their own profile
-  const checkIfCurrentUser = (targetUserId) => {
-    const currentUserId = getCurrentUserId();
-    console.log('🔍 Current User ID:', currentUserId, 'Target User ID:', targetUserId);
-    return currentUserId === targetUserId;
-  };
+     // Check if current user is viewing their own profile
+             const tokenData = decodeToken(token);
+             if (tokenData && tokenData.userId === id) {
+                 setIsCurrentUser(true);
+             }
+ 
 
   // Listings fetch karne ka function
   const fetchListings = async (page = 1, status = '') => {
     try {
       console.log('🚀 Starting fetchListings...');
-      console.log('🔍 URL:', `${API_BASE_URL}/marketplace/listings/user/${currentUserId}/listings`);
+      console.log('🔍 URL:', `${API_BASE_URL}/marketplace/listings/user/${userId}/listings`);
       console.log('🔍 Params:', { page, limit: pagination.limit, status });
       
       setLoading(true);
