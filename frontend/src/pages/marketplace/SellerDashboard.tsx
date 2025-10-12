@@ -4,6 +4,8 @@ import { decodeToken } from '../../utilities/helperfFunction';
 
 const UserListings = ({ userId }) => {
   const [listings, setListings] = useState([]);
+   const token = localStorage.getItem("token") || null;
+    const tokenData = decodeToken(token);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [pagination, setPagination] = useState({
@@ -50,7 +52,7 @@ const UserListings = ({ userId }) => {
   const fetchListings = async (page = 1, status = '') => {
     try {
       console.log('🚀 Starting fetchListings...');
-      console.log('🔍 URL:', `${API_BASE_URL}/marketplace/listings/user/${targetUserId}/listings`);
+      console.log('🔍 URL:', `${API_BASE_URL}/marketplace/listings/user/${tokenData.userId}/listings`);
       console.log('🔍 Params:', { page, limit: pagination.limit, status });
       
       setLoading(true);
