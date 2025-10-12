@@ -22,20 +22,13 @@ const UserListings = ({ userId: propUserId }) => {
 
   const API_BASE_URL = 'http://localhost:3000';
 
-  console.log('🔍 Component rendered with propUserId:', propUserId);
-
   // Token se current user ID nikalne ka function
   const getCurrentUserIdFromToken = () => {
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      console.log('🔍 Token found:', !!token);
       if (token) {
         const tokenData = decodeToken(token);
-        console.log('🔍 Decoded token data:', tokenData);
-        
-        // Different possible fields where userId might be stored in token
         const userId = tokenData?.userId || tokenData?.id || tokenData?.user?.id || tokenData?.user?._id;
-        console.log('🔍 Extracted userId:', userId);
         return userId;
       }
       return null;
@@ -47,16 +40,11 @@ const UserListings = ({ userId: propUserId }) => {
 
   // Determine which userId to use
   const getTargetUserId = () => {
-    // If propUserId is provided, use that (viewing other user's profile)
-    // Otherwise use current user's ID from token (viewing own profile)
-    const targetUserId = propUserId || currentUserId;
-    console.log('🎯 Target UserId:', targetUserId);
-    return targetUserId;
+    return propUserId || currentUserId;
   };
 
   // Check if current user is viewing their own profile
   const checkIfCurrentUser = (targetUserId) => {
-    console.log('🔍 Checking if current user - Current:', currentUserId, 'Target:', targetUserId);
     return currentUserId === targetUserId;
   };
 
@@ -65,25 +53,17 @@ const UserListings = ({ userId: propUserId }) => {
     const targetUserId = getTargetUserId();
     
     if (!targetUserId) {
-      console.log('❌ No target userId available');
-      setError('User ID not available. Please login again.');
+      setError('Please login to view listings');
       setLoading(false);
       return;
     }
 
     try {
-      console.log('🚀 Starting fetchListings...');
-      console.log('🔍 Target UserId:', targetUserId);
-      console.log('🔍 URL:', `${API_BASE_URL}/marketplace/listings/user/${targetUserId}/listings`);
-      console.log('🔍 Params:', { page, limit: pagination.limit, status });
-      
       setLoading(true);
       setError('');
       
-      // Token header mein add karen
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      console.log('🔍 Headers:', headers);
 
       const response = await axios.get(
         `${API_BASE_URL}/marketplace/listings/user/${targetUserId}/listings`,
@@ -97,8 +77,6 @@ const UserListings = ({ userId: propUserId }) => {
           timeout: 10000
         }
       );
-
-      console.log('✅ API Response received:', response.data);
       
       if (response.data.success) {
         setListings(response.data.listings || []);
@@ -111,37 +89,24 @@ const UserListings = ({ userId: propUserId }) => {
         });
         setSelectedStatus(status);
         
-        // Check if current user is viewing their own profile
         const isOwnProfile = checkIfCurrentUser(targetUserId);
         setIsCurrentUser(isOwnProfile);
-        
-        console.log('✅ Listings set:', response.data.listings?.length || 0, 'items');
-        console.log('✅ User info set:', response.data.user);
-        console.log('✅ Pagination set:', response.data.pagination);
-        console.log('✅ Is Current User:', isOwnProfile);
       } else {
-        console.log('❌ API success false:', response.data);
-        setError(response.data.error || 'API returned success: false');
+        setError(response.data.error || 'Failed to load listings');
       }
     } catch (err) {
-      console.error('❌ Error in fetchListings:', err);
-      console.error('❌ Error response:', err.response);
-      
       let errorMessage = 'Failed to load listings';
       
       if (err.response) {
         errorMessage = err.response.data?.error || `Server error: ${err.response.status}`;
-        console.log('❌ Server error details:', err.response.data);
       } else if (err.request) {
-        errorMessage = 'No response from server. Check if backend is running.';
-        console.log('❌ No response received');
+        errorMessage = 'No response from server. Please check your connection.';
       } else {
         errorMessage = err.message;
       }
       
       setError(errorMessage);
     } finally {
-      console.log('🏁 fetchListings completed, setting loading to false');
       setLoading(false);
     }
   };
@@ -161,12 +126,10 @@ const UserListings = ({ userId: propUserId }) => {
         { headers }
       );
 
-      // Refresh listings after deletion
       fetchListings(pagination.page, selectedStatus);
       alert('Listing deleted successfully!');
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to delete listing');
-      console.error('Error deleting listing:', err);
     }
   };
 
@@ -177,23 +140,16 @@ const UserListings = ({ userId: propUserId }) => {
 
   // Component load hote hi current userId set karen aur data fetch karein
   useEffect(() => {
-    console.log('🔄 useEffect triggered');
-    
-    // Get current user ID from token
     const userIdFromToken = getCurrentUserIdFromToken();
-    console.log('🔄 UserId from token:', userIdFromToken);
-    
     setCurrentUserId(userIdFromToken);
 
     if (userIdFromToken || propUserId) {
-      console.log('🔄 Calling fetchListings...');
       fetchListings();
     } else {
-      console.log('❌ No userId available');
       setLoading(false);
       setError('Please login to view listings');
     }
-  }, [propUserId]); // propUserId change hone par re-fetch
+  }, [propUserId]);
 
   // Pagination handle karein
   const handlePageChange = (newPage) => {
@@ -205,110 +161,39 @@ const UserListings = ({ userId: propUserId }) => {
     fetchListings(1, status);
   };
 
-  // Refresh data
-  const handleRefresh = () => {
-    fetchListings(pagination.page, selectedStatus);
-  };
-
-  // Temporary debug button
-  const debugInfo = () => {
-    console.log('=== DEBUG INFO ===');
-    console.log('propUserId:', propUserId);
-    console.log('currentUserId:', currentUserId);
-    console.log('targetUserId:', getTargetUserId());
-    console.log('loading:', loading);
-    console.log('error:', error);
-    console.log('listings count:', listings.length);
-    console.log('userInfo:', userInfo);
-    console.log('pagination:', pagination);
-    console.log('isCurrentUser:', isCurrentUser);
-    
-    // Token info
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    console.log('token exists:', !!token);
-    if (token) {
-      try {
-        const tokenData = decodeToken(token);
-        console.log('full token data:', tokenData);
-      } catch (e) {
-        console.log('token decode error:', e);
-      }
-    }
-    console.log('=== END DEBUG ===');
-  };
-
   if (loading) {
-    console.log('🔄 Rendering loading state...');
     return (
       <div className="flex justify-center items-center py-12 flex-col">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
         <span className="ml-3 text-lg mt-3">Loading listings...</span>
-        <div className="mt-4 flex gap-2">
-          <button 
-            onClick={debugInfo}
-            className="bg-gray-500 text-white px-4 py-2 rounded text-sm"
-          >
-            Debug Info
-          </button>
-          <button 
-            onClick={handleRefresh}
-            className="bg-blue-500 text-white px-4 py-2 rounded text-sm"
-          >
-            Refresh
-          </button>
-        </div>
       </div>
     );
   }
 
-  if (error) {
-    console.log('❌ Rendering error state:', error);
+  if (error && listings.length === 0) {
     return (
-      <div className="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg mx-4 my-8">
-        <div className="flex items-center">
-          <span className="text-xl mr-3">⚠️</span>
-          <div>
-            <strong className="font-bold">Error: </strong> 
-            {error}
-          </div>
-        </div>
-        <div className="mt-3 flex gap-2 flex-wrap">
+      <div className="text-center py-16 bg-white rounded-lg shadow border border-gray-200">
+        <div className="text-6xl mb-4">⚠️</div>
+        <h3 className="text-2xl font-semibold text-gray-700 mb-3">
+          Unable to Load Listings
+        </h3>
+        <p className="text-gray-500 text-lg mb-6">
+          {error}
+        </p>
+        {!currentUserId && (
           <button 
-            onClick={handleRefresh} 
-            className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors"
+            onClick={() => window.location.href = '/login'}
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
           >
-            Try Again
+            Login to Continue
           </button>
-          <button 
-            onClick={debugInfo}
-            className="bg-gray-500 text-white px-4 py-2 rounded"
-          >
-            Debug Info
-          </button>
-          {!currentUserId && (
-            <button 
-              onClick={() => window.location.href = '/login'}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
-            >
-              Login
-            </button>
-          )}
-        </div>
+        )}
       </div>
     );
   }
 
-  console.log('✅ Rendering main content with', listings.length, 'listings');
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* Debug Button */}
-      <button 
-        onClick={debugInfo}
-        className="fixed top-4 right-4 bg-gray-800 text-white px-3 py-1 rounded text-sm z-50"
-      >
-        Debug
-      </button>
-
       {/* User Info Section */}
       {userInfo && (
         <div className="mb-6 p-6 bg-white rounded-lg shadow-md border border-gray-200">
@@ -325,20 +210,9 @@ const UserListings = ({ userId: propUserId }) => {
               <p className="text-gray-600 text-lg">
                 Total {pagination.total} listings found
               </p>
-              <p className="text-gray-500 text-sm mt-1">
-                User ID: {getTargetUserId()}
-              </p>
             </div>
             
             <div className="flex gap-3">
-              {/* Refresh Button */}
-              <button
-                onClick={handleRefresh}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold transition-colors flex items-center"
-              >
-                🔄 Refresh
-              </button>
-              
               {/* Add New Listing Button (only for current user) */}
               {isCurrentUser && (
                 <button
@@ -400,6 +274,16 @@ const UserListings = ({ userId: propUserId }) => {
         </div>
       </div>
 
+      {/* Error message agar listings hain but koi error hai */}
+      {error && listings.length > 0 && (
+        <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <span className="text-yellow-600 mr-2">⚠️</span>
+            <p className="text-yellow-800 text-sm">{error}</p>
+          </div>
+        </div>
+      )}
+
       {/* Listings Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
         {listings.map((listing) => (
@@ -414,7 +298,7 @@ const UserListings = ({ userId: propUserId }) => {
       </div>
 
       {/* Empty State */}
-      {listings.length === 0 && (
+      {listings.length === 0 && !error && (
         <div className="text-center py-16 bg-white rounded-lg shadow border border-gray-200">
           <div className="text-6xl mb-4">🏠</div>
           <h3 className="text-2xl font-semibold text-gray-700 mb-3">
@@ -423,22 +307,14 @@ const UserListings = ({ userId: propUserId }) => {
           <p className="text-gray-500 text-lg mb-6">
             {selectedStatus ? `No ${selectedStatus} listings available` : 'No listings available yet'}
           </p>
-          <div className="flex gap-3 justify-center">
+          {isCurrentUser && (
             <button
-              onClick={handleRefresh}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+              onClick={() => window.location.href = '/create-listing'}
+              className="bg-green-500 hover:bg-green-600 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
             >
-              Refresh
+              Create Your First Listing
             </button>
-            {isCurrentUser && (
-              <button
-                onClick={() => window.location.href = '/create-listing'}
-                className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-              >
-                Create Your First Listing
-              </button>
-            )}
-          </div>
+          )}
         </div>
       )}
 
@@ -653,11 +529,10 @@ const ListingCard = ({ listing, isCurrentUser, onEdit, onDelete }) => {
                 className="w-6 h-6 rounded-full object-cover"
                 onError={(e) => {
                   e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
                 }}
               />
             ) : null}
-            <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center text-xs">
+            <div className={`w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center text-xs ${listing.sellerId.avatar ? 'hidden' : ''}`}>
               👤
             </div>
             <span className="text-sm text-gray-600 font-medium">
@@ -718,17 +593,22 @@ type TabType = 'overview' | 'offers' | 'listings';
 const SellerDashboard: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
+  const [listingsData, setListingsData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [error, setError] = useState<string>('');
 
-  // Stats calculation
+  // Stats calculation - ab listings data bhi include hai
   const totalOrders = orders.length;
   const pendingOrders = orders.filter(order => order.status === 'pending').length;
   const totalRevenue = orders
     .filter(order => order.status === 'completed')
     .reduce((sum, order) => sum + order.amount, 0);
   const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
+  
+  // Listings stats
+  const totalListings = listingsData?.listings?.length || 0;
+  const activeListings = listingsData?.listings?.filter((listing: any) => listing.status === 'active').length || 0;
 
   useEffect(() => {
     fetchDashboardData();
@@ -739,10 +619,47 @@ const SellerDashboard: React.FC = () => {
       setLoading(true);
       setError('');
 
+      // Get current user ID for listings
+      const getCurrentUserIdFromToken = () => {
+        try {
+          const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+          if (token) {
+            const tokenData = decodeToken(token);
+            return tokenData?.userId || tokenData?.id || tokenData?.user?.id || tokenData?.user?._id;
+          }
+          return null;
+        } catch (error) {
+          return null;
+        }
+      };
+
+      const currentUserId = getCurrentUserIdFromToken();
+
+      // Fetch all data in parallel
       const [ordersResponse, offersResponse] = await Promise.all([
         getSellerOrders(setLoading),
         getReceivedOffers(setLoading)
       ]);
+
+      // Fetch listings data if user is logged in
+      let listingsResponse = null;
+      if (currentUserId) {
+        try {
+          const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+          const headers = token ? { Authorization: `Bearer ${token}` } : {};
+          
+          listingsResponse = await axios.get(
+            `http://localhost:3000/marketplace/listings/user/${currentUserId}/listings`,
+            {
+              params: { page: 1, limit: 1000 }, // Large limit to get all listings for stats
+              headers,
+              timeout: 5000
+            }
+          );
+        } catch (err) {
+          console.log('Listings fetch failed, continuing without listings data');
+        }
+      }
 
       const ordersData = Array.isArray(ordersResponse) 
         ? ordersResponse 
@@ -754,12 +671,15 @@ const SellerDashboard: React.FC = () => {
 
       setOrders(Array.isArray(ordersData) ? ordersData : []);
       setOffers(Array.isArray(offersData) ? offersData : []);
+      
+      // Set listings data for stats
+      if (listingsResponse?.data?.success) {
+        setListingsData(listingsResponse.data);
+      }
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       setError('Failed to load dashboard data');
-      setOrders([]);
-      setOffers([]);
     } finally {
       setLoading(false);
     }
@@ -915,13 +835,18 @@ const SellerDashboard: React.FC = () => {
               </button>
               <button
                 onClick={() => setActiveTab('listings')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center ${
                   activeTab === 'listings'
                     ? 'border-yellow-600 text-yellow-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
                 My Listings
+                {totalListings > 0 && (
+                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    {totalListings}
+                  </span>
+                )}
               </button>
             </nav>
           </div>
@@ -929,12 +854,33 @@ const SellerDashboard: React.FC = () => {
           {/* Overview Tab */}
           {activeTab === 'overview' && (
             <>
-              {/* Stats Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              {/* Stats Grid - Now includes Listings stats */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
                 <StatCard
                   title="Total Revenue"
                   value={formatCurrency(totalRevenue)}
                   icon={<span className="text-green-600 text-lg font-semibold">$</span>}
+                  color="green"
+                />
+                <StatCard
+                  title="Total Listings"
+                  value={totalListings}
+                  icon={
+                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                  }
+                  color="yellow"
+                  onClick={() => setActiveTab('listings')}
+                />
+                <StatCard
+                  title="Active Listings"
+                  value={activeListings}
+                  icon={
+                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  }
                   color="green"
                 />
                 <StatCard
