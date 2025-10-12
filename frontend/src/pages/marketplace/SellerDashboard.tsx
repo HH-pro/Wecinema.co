@@ -17,7 +17,7 @@ const UserListings = ({ userId }) => {
   const [isCurrentUser, setIsCurrentUser] = useState(false);
 
   // API Base URL - aapki backend URL yahan dalen
-  const API_BASE_URL = 'http://localhost:3000/';
+  const API_BASE_URL = 'http://localhost:3000';
 
   // Token se current user ID nikalne ka function
   const getCurrentUserId = () => {
