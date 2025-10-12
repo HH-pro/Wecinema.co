@@ -39,12 +39,12 @@ const UserListings = ({ userId }) => {
     }
   };
 
-     // Check if current user is viewing their own profile
-             const tokenData = decodeToken(token);
-             if (tokenData && tokenData.userId === id) {
-                 setIsCurrentUser(true);
-             }
- 
+  // Check if current user is viewing their own profile
+  const checkIfCurrentUser = (targetUserId) => {
+    const currentUserId = getCurrentUserId();
+    console.log('🔍 Current User ID:', currentUserId, 'Target User ID:', targetUserId);
+    return currentUserId === targetUserId;
+  };
 
   // Listings fetch karne ka function
   const fetchListings = async (page = 1, status = '') => {
