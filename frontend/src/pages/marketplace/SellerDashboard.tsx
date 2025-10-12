@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { decodeToken } from '../../utilities/helperfFunction';
 
-const UserListings = ({  }) => {
+const UserListings = ({ userId }) => {
   const [listings, setListings] = useState([]);
    const token = localStorage.getItem("token") || null;
     const tokenData = decodeToken(token);
