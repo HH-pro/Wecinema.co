@@ -8,6 +8,13 @@ export interface Itoken {
   avatar: string;
   hasPaid: boolean;
   username?: string;
+  id?: string;
+  user?: {
+    id?: string;
+    _id?: string;
+    userId?: string;
+  };
+  sub?: string;
 }
 
 type MongooseId = string;
@@ -22,20 +29,206 @@ export const generateSlug = (text: string): string =>
 export const truncateText = (text: string, maxLength: number): string =>
   text.length <= maxLength ? text : text.slice(0, maxLength - 3) + "...";
 
-// Decode and validate JWT token
+// Enhanced token decoding with multiple fallback methods
 export const decodeToken = (token: any) => {
-  // console.log(token);
-  if (!token) return null;
+  if (!token) {
+    console.log("❌ No token provided");
+    return null;
+  }
+  
   try {
+    console.log("🔐 Attempting to decode token...");
     const decodedToken: any = jwtDecode(token) as Itoken;
     const currentTime = Math.floor(Date.now() / 1000);
+    
     if (decodedToken.exp && decodedToken.exp < currentTime) {
       console.error("Token has expired");
       localStorage.removeItem("token");
+      sessionStorage.removeItem("token");
+      localStorage.removeItem("userId");
       return null;
     }
+    
+    console.log("✅ Token decoded successfully:", decodedToken);
     return decodedToken;
-  } catch (error) {}
+  } catch (error) {
+    console.error("❌ JWT decode failed, trying manual decode:", error);
+    
+    // Manual JWT decoding as fallback
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        throw new Error('Invalid token format');
+      }
+      
+      const payload = parts[1];
+      const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+      const paddedBase64 = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+      const decodedPayload = JSON.parse(atob(paddedBase64));
+      
+      console.log("✅ Manual token decode successful:", decodedPayload);
+      return decodedPayload;
+    } catch (manualError) {
+      console.error("❌ Manual token decode also failed:", manualError);
+      return null;
+    }
+  }
+};
+
+// DIRECT USER ID EXTRACTION - Multiple reliable methods
+export const getCurrentUserId = (): string | null => {
+  try {
+    console.log("🆔 Starting user ID extraction...");
+    
+    // Method 1: Direct from localStorage/sessionStorage
+    const directUserId = localStorage.getItem("userId") || sessionStorage.getItem("userId");
+    if (directUserId) {
+      console.log("✅ User ID found directly in storage:", directUserId);
+      return directUserId;
+    }
+
+    // Method 2: From user object in storage
+    const userData = localStorage.getItem("user") || sessionStorage.getItem("user");
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        const userId = user.id || user._id || user.userId;
+        if (userId) {
+          console.log("✅ User ID from user object:", userId);
+          // Store for future quick access
+          localStorage.setItem("userId", userId);
+          return userId;
+        }
+      } catch (e) {
+        console.error("Error parsing user data:", e);
+      }
+    }
+
+    // Method 3: Decode from token
+    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+    if (token) {
+      console.log("🔐 Token found, extracting user ID...");
+      const tokenData = decodeToken(token);
+      
+      if (tokenData) {
+        // Try multiple possible locations for user ID in token
+        const userId = tokenData.userId || tokenData.id || tokenData.user?.id || 
+                      tokenData.user?._id || tokenData.user?.userId || tokenData.sub;
+        
+        if (userId) {
+          console.log("✅ User ID extracted from token:", userId);
+          // Store for future quick access
+          localStorage.setItem("userId", userId);
+          return userId;
+        } else {
+          console.warn("⚠️ Token decoded but no user ID found:", tokenData);
+        }
+      }
+    }
+
+    // Method 4: Check common storage patterns
+    const storedAuth = localStorage.getItem("auth") || sessionStorage.getItem("auth");
+    if (storedAuth) {
+      try {
+        const authData = JSON.parse(storedAuth);
+        const userId = authData.userId || authData.user?.id || authData.user?._id;
+        if (userId) {
+          console.log("✅ User ID from auth data:", userId);
+          localStorage.setItem("userId", userId);
+          return userId;
+        }
+      } catch (e) {
+        console.error("Error parsing auth data:", e);
+      }
+    }
+
+    console.log("❌ No user ID found in any storage location");
+    return null;
+  } catch (error) {
+    console.error("💥 Error in getCurrentUserId:", error);
+    return null;
+  }
+};
+
+// Enhanced token validation with user ID extraction
+export const validateTokenAndGetUserId = (): { isValid: boolean; userId: string | null } => {
+  try {
+    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+    
+    if (!token) {
+      console.log("❌ No token found");
+      return { isValid: false, userId: null };
+    }
+
+    const tokenData = decodeToken(token);
+    if (!tokenData) {
+      console.log("❌ Invalid token");
+      return { isValid: false, userId: null };
+    }
+
+    const userId = getCurrentUserId();
+    if (!userId) {
+      console.log("❌ Could not extract user ID from token");
+      return { isValid: false, userId: null };
+    }
+
+    console.log("✅ Token valid, user ID:", userId);
+    return { isValid: true, userId };
+  } catch (error) {
+    console.error("Error validating token:", error);
+    return { isValid: false, userId: null };
+  }
+};
+
+// Store user ID for quick access
+export const storeUserId = (userId: string): void => {
+  try {
+    localStorage.setItem("userId", userId);
+    console.log("💾 User ID stored:", userId);
+  } catch (error) {
+    console.error("Error storing user ID:", error);
+  }
+};
+
+// Clear all auth data
+export const clearAuthData = (): void => {
+  localStorage.removeItem("token");
+  sessionStorage.removeItem("token");
+  localStorage.removeItem("userId");
+  sessionStorage.removeItem("userId");
+  localStorage.removeItem("user");
+  sessionStorage.removeItem("user");
+  localStorage.removeItem("auth");
+  sessionStorage.removeItem("auth");
+  console.log("🧹 All auth data cleared");
+};
+
+// Check if user is authenticated
+export const isAuthenticated = (): boolean => {
+  const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+  if (!token) return false;
+  
+  const tokenData = decodeToken(token);
+  return !!tokenData;
+};
+
+// Get user info with fallbacks
+export const getUserInfo = (): { userId: string | null; username: string | null } => {
+  const userId = getCurrentUserId();
+  
+  // Try to get username
+  let username = null;
+  const userData = localStorage.getItem("user") || sessionStorage.getItem("user");
+  if (userData) {
+    try {
+      const user = JSON.parse(userData);
+      username = user.username || user.name || null;
+    } catch (e) {
+      console.error("Error parsing user data for username:", e);
+    }
+  }
+
+  return { userId, username };
 };
 
 // Check if an object is empty
@@ -64,9 +257,10 @@ export const formatDateAgo = (dateTime: string): string => {
 export const isUserIdInArray = (userId: MongooseId, idArray: MongooseId[]): boolean =>
   idArray.includes(userId);
 
-// src/utils/auth.ts
+// Enhanced logout function
 export const logout = () => {
-  localStorage.removeItem("token"); // Clear the token
+  console.log("🚪 Logging out...");
+  clearAuthData();
   window.location.href = "/admin"; // Redirect to sign-in page
 };
 
@@ -94,9 +288,8 @@ export const chartOptions = {
         font: {
           size: 8,
         },
-        
-        usePointStyle: true, // This will show point-style indicators instead of the color block
-        pointStyleWidth: 0, // This will hide the point style altogether
+        usePointStyle: true,
+        pointStyleWidth: 0,
       },
     },
     title: {
@@ -158,7 +351,6 @@ export const chartOptions = {
         font: {
           size: 10,
         },
-        
       },
     },
   },
