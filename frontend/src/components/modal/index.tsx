@@ -130,7 +130,7 @@ checkUserPaymentStatus();
 			  setLoading(true);
 			  const payload = { email, password };
 		  
-			  const result: any = await postRequest("user/login", payload, setLoading);
+			  const result: any = await postRequest("user", payload, setLoading);
 		  
 			  if (!result.isVerified) {
 				setLoading(false);
