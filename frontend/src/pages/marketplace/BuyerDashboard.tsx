@@ -141,7 +141,6 @@ const BuyerDashboard: React.FC = () => {
       <div className="dashboard-header">
         <div className="header-left">
           <h1>Buyer Dashboard</h1>
-          <p>Manage your purchases and track orders</p>
         </div>
         <button className="refresh-btn" onClick={handleRefresh}>
           <FaSync /> Refresh
