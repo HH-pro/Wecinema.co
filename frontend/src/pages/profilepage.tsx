@@ -5,7 +5,7 @@ import { Delete, Layout, Render } from "../components";
 import { deleteRequest, getRequest, putRequest } from "../api";
 import { decodeToken } from "../utilities/helperfFunction";
 import '../components/header/drowpdown.css';
-import { FaEdit, FaStore, FaShoppingCart, FaUserTie, FaUser, FaSync, FaHeart, FaUsers, FaVideo, FaFileAlt, FaBox, FaShoppingBag, FaList, FaChartBar } from 'react-icons/fa';
+import { FaEdit, FaStore, FaShoppingCart, FaUserTie, FaUser, FaSync, FaHeart, FaUsers, FaVideo, FaFileAlt } from 'react-icons/fa';
 import axios from 'axios';
 import cover from '.././assets/public/cover.jpg';
 import avatar from '.././assets/public/avatar.jpg';
@@ -34,9 +34,6 @@ const GenrePage: React.FC = () => {
     const [isCurrentUser, setIsCurrentUser] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [contentLoading, setContentLoading] = useState(false);
-    const [userOrders, setUserOrders] = useState<any[]>([]);
-    const [sellerOrders, setSellerOrders] = useState<any[]>([]);
-    const [listings, setListings] = useState<any[]>([]);
 
     // Direct API call for changing user type
     const changeUserTypeDirect = async (userId: string, userType: string) => {
@@ -105,8 +102,6 @@ const GenrePage: React.FC = () => {
             const tokenData = decodeToken(token);
             if (tokenData && tokenData.userId === id) {
                 setIsCurrentUser(true);
-                // Fetch user-specific data
-                await fetchUserDashboardData(result.userType);
             }
 
             // Fetch payment status for profile user
@@ -138,25 +133,6 @@ const GenrePage: React.FC = () => {
             setLoading(false);
             setRefreshing(false);
             setContentLoading(false);
-        }
-    };
-
-    const fetchUserDashboardData = async (userType: string) => {
-        try {
-            if (userType === 'buyer') {
-                // Fetch buyer orders
-                const ordersResult: any = await getRequest(`/orders/user/${id}`, setContentLoading);
-                setUserOrders(ordersResult || []);
-            } else if (userType === 'seller') {
-                // Fetch seller orders and listings
-                const sellerOrdersResult: any = await getRequest(`/orders/seller/${id}`, setContentLoading);
-                setSellerOrders(sellerOrdersResult || []);
-                
-                const listingsResult: any = await getRequest(`/listings/seller/${id}`, setContentLoading);
-                setListings(listingsResult || []);
-            }
-        } catch (error) {
-            console.error("Error fetching dashboard data:", error);
         }
     };
 
@@ -207,9 +183,6 @@ const GenrePage: React.FC = () => {
                 setUser(prev => ({ ...prev, userType: newMode }));
                 localStorage.setItem('marketplaceMode', newMode);
                 
-                // Refresh dashboard data
-                await fetchUserDashboardData(newMode);
-                
                 // Show success message
                 toast.success(`✅ Switched to ${newMode} mode successfully!`, {
                     autoClose: 3000,
@@ -243,14 +216,6 @@ const GenrePage: React.FC = () => {
             console.error("Error deleting script:", error);
             toast.error("❌ Error deleting script");
         }
-    };
-
-    const createListing = () => {
-        if (marketplaceMode === 'buyer') {
-            toast.error("Please switch to seller mode to create listings");
-            return;
-        }
-        nav('/create-listing');
     };
 
     const handleEdit = () => {
@@ -356,187 +321,6 @@ const GenrePage: React.FC = () => {
         });
     };
 
-    const renderBuyerDashboard = () => {
-        return (
-            <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                    <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-2xl shadow-lg">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-blue-100 text-sm">Total Orders</p>
-                                <p className="text-3xl font-bold mt-2">{userOrders.length}</p>
-                            </div>
-                            <FaShoppingBag className="text-3xl opacity-80" />
-                        </div>
-                    </div>
-                    <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-6 rounded-2xl shadow-lg">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-green-100 text-sm">Pending</p>
-                                <p className="text-3xl font-bold mt-2">
-                                    {userOrders.filter((order: any) => order.status === 'pending').length}
-                                </p>
-                            </div>
-                            <FaSync className="text-3xl opacity-80" />
-                        </div>
-                    </div>
-                    <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-6 rounded-2xl shadow-lg">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-purple-100 text-sm">Completed</p>
-                                <p className="text-3xl font-bold mt-2">
-                                    {userOrders.filter((order: any) => order.status === 'completed').length}
-                                </p>
-                            </div>
-                            <FaBox className="text-3xl opacity-80" />
-                        </div>
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-                    <h3 className="text-xl font-bold text-gray-900 mb-4">My Orders</h3>
-                    {userOrders.length > 0 ? (
-                        <div className="space-y-4">
-                            {userOrders.slice(0, 5).map((order: any) => (
-                                <div key={order._id} className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <h4 className="font-semibold text-gray-800">{order.productName || `Order #${order._id.slice(-6)}`}</h4>
-                                            <p className="text-sm text-gray-600">Price: ${order.price}</p>
-                                        </div>
-                                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                            order.status === 'completed' 
-                                                ? 'bg-green-100 text-green-800'
-                                                : order.status === 'pending'
-                                                ? 'bg-yellow-100 text-yellow-800'
-                                                : 'bg-gray-100 text-gray-800'
-                                        }`}>
-                                            {order.status}
-                                        </span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center py-8">
-                            <FaShoppingBag className="text-6xl text-gray-300 mx-auto mb-4" />
-                            <p className="text-gray-500 text-lg">No orders yet</p>
-                            <p className="text-gray-400 mt-2">Start shopping to see your orders here</p>
-                        </div>
-                    )}
-                </div>
-            </div>
-        );
-    };
-
-    const renderSellerDashboard = () => {
-        return (
-            <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-3 gap-6 mb-6">
-                    <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-2xl shadow-lg">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-blue-100 text-sm">Total Listings</p>
-                                <p className="text-3xl font-bold mt-2">{listings.length}</p>
-                            </div>
-                            <FaList className="text-3xl opacity-80" />
-                        </div>
-                    </div>
-                    <div className="bg-gradient-to-br from-green-500 to-green-600 text-white p-6 rounded-2xl shadow-lg">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-green-100 text-sm">Orders Received</p>
-                                <p className="text-3xl font-bold mt-2">{sellerOrders.length}</p>
-                            </div>
-                            <FaShoppingBag className="text-3xl opacity-80" />
-                        </div>
-                    </div>
-                    <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white p-6 rounded-2xl shadow-lg">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-purple-100 text-sm">Pending Orders</p>
-                                <p className="text-3xl font-bold mt-2">
-                                    {sellerOrders.filter((order: any) => order.status === 'pending').length}
-                                </p>
-                            </div>
-                            <FaChartBar className="text-3xl opacity-80" />
-                        </div>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-bold text-gray-900">My Listings</h3>
-                            <button
-                                onClick={createListing}
-                                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold transition-colors flex items-center space-x-2"
-                            >
-                                <FaEdit size={14} />
-                                <span>Create Listing</span>
-                            </button>
-                        </div>
-                        {listings.length > 0 ? (
-                            <div className="space-y-3">
-                                {listings.slice(0, 3).map((listing: any) => (
-                                    <div key={listing._id} className="border border-gray-200 rounded-lg p-3 hover:shadow-sm transition-shadow">
-                                        <h4 className="font-semibold text-gray-800 text-sm">{listing.title}</h4>
-                                        <p className="text-xs text-gray-600">Price: ${listing.price}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center py-6">
-                                <FaList className="text-4xl text-gray-300 mx-auto mb-3" />
-                                <p className="text-gray-500">No listings yet</p>
-                                <button
-                                    onClick={createListing}
-                                    className="mt-3 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold transition-colors text-sm"
-                                >
-                                    Create Your First Listing
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-                        <h3 className="text-xl font-bold text-gray-900 mb-4">Recent Orders</h3>
-                        {sellerOrders.length > 0 ? (
-                            <div className="space-y-3">
-                                {sellerOrders.slice(0, 3).map((order: any) => (
-                                    <div key={order._id} className="border border-gray-200 rounded-lg p-3 hover:shadow-sm transition-shadow">
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <h4 className="font-semibold text-gray-800 text-sm">
-                                                    {order.productName || `Order #${order._id.slice(-6)}`}
-                                                </h4>
-                                                <p className="text-xs text-gray-600">From: {order.buyerName || 'Customer'}</p>
-                                            </div>
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                                order.status === 'completed' 
-                                                    ? 'bg-green-100 text-green-800'
-                                                    : order.status === 'pending'
-                                                    ? 'bg-yellow-100 text-yellow-800'
-                                                    : 'bg-gray-100 text-gray-800'
-                                            }`}>
-                                                {order.status}
-                                            </span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center py-6">
-                                <FaShoppingBag className="text-4xl text-gray-300 mx-auto mb-3" />
-                                <p className="text-gray-500">No orders received yet</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
     const renderContent = () => {
         if (contentLoading) {
             return (
@@ -550,17 +334,6 @@ const GenrePage: React.FC = () => {
         }
 
         switch (activeTab) {
-            case 'dashboard':
-                return isCurrentUser ? (
-                    marketplaceMode === 'buyer' ? renderBuyerDashboard() : renderSellerDashboard()
-                ) : (
-                    <div className="text-center py-12">
-                        <div className="text-6xl mb-4">🔒</div>
-                        <p className="text-lg text-gray-600 font-medium">Dashboard is private</p>
-                        <p className="text-gray-400 mt-2">You can only view your own dashboard</p>
-                    </div>
-                );
-
             case 'scripts':
                 return (
                     <div className="space-y-4">
@@ -1039,7 +812,6 @@ const GenrePage: React.FC = () => {
                             <div className="border-b border-gray-200">
                                 <nav className="flex overflow-x-auto">
                                     {[
-                                        { key: 'dashboard', label: 'Dashboard', count: null, icon: '📊' },
                                         { key: 'scripts', label: 'Scripts', count: scripts.length, icon: '📝' },
                                         { key: 'videos', label: 'Videos', count: videos.length, icon: '🎥' },
                                         { key: 'about', label: 'About', count: null, icon: '👤' }
