@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-
 import { IoMdHome } from "react-icons/io";
 import {
   RiHeartLine,
@@ -20,16 +19,15 @@ import { IoSunnyOutline } from "react-icons/io5";
 import { CgProfile } from "react-icons/cg";
 import { Link } from "react-router-dom";
 import { TbVideoPlus } from "react-icons/tb";
-import { FaUser, FaSignOutAlt } from "react-icons/fa";
+import { FaUser, FaSignOutAlt, FaUserTie, FaShoppingCart } from "react-icons/fa";
 import { RiCustomerService2Line } from "react-icons/ri";
 import { MdOutlinePrivacyTip } from "react-icons/md";
 import { toast } from "react-toastify";
 import { decodeToken } from "../../utilities/helperfFunction";
 import "./Sidebar.css";
 import { useNavigate } from "react-router-dom";
-
-
 import axios from "axios";
+
 interface SidebarProps {
   expand: boolean;
   darkMode: boolean;
@@ -52,17 +50,20 @@ const Sidebar: React.FC<SidebarProps> = ({
   setDarkMode,
   darkMode,
   isLoggedIn,
-    toggleUploadScriptModal,
+  toggleUploadScriptModal,
   toggleUploadModal,
 }) => {
   const token = localStorage.getItem("token") || null;
   const tokenData = decodeToken(token);
-   const [hasPaid, setHasPaid] = useState(false);
+  const [hasPaid, setHasPaid] = useState(false);
+  const [userType, setUserType] = useState<'buyer' | 'seller'>('buyer');
+  const [userData, setUserData] = useState<any>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     if (tokenData) {
       fetchPaymentStatus(tokenData.userId);
+      fetchUserData(tokenData.userId);
     }
   }, [tokenData]);
 
@@ -76,6 +77,21 @@ const Sidebar: React.FC<SidebarProps> = ({
       console.error("Payment status error:", error);
     }
   };
+
+  const fetchUserData = async (userId: any) => {
+    try {
+      const response = await axios.get(
+        `http://localhost:3000/user/${userId}`
+      );
+      setUserData(response.data);
+      if (response.data.userType) {
+        setUserType(response.data.userType);
+      }
+    } catch (error) {
+      console.error("User data fetch error:", error);
+    }
+  };
+
   const handleHypemodeClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (hasPaid) {
       event.preventDefault();
@@ -87,6 +103,182 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const getActiveClass = (path: string) => {
     return window.location.pathname === path ? "text-active" : "";
+  };
+
+  // Function to change user type
+  const changeUserType = async (newType: 'buyer' | 'seller') => {
+    if (!tokenData) {
+      toast.error("Please login first");
+      return;
+    }
+
+    try {
+      const response = await axios.put(
+        `http://localhost:3000/user/change-type/${tokenData.userId}`,
+        { userType: newType },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.data) {
+        setUserType(newType);
+        setUserData((prev: any) => ({ ...prev, userType: newType }));
+        localStorage.setItem('marketplaceMode', newType);
+        toast.success(`Switched to ${newType} mode successfully!`);
+      }
+    } catch (error: any) {
+      console.error("Error changing user type:", error);
+      toast.error(error.response?.data?.error || "Failed to switch mode");
+    }
+  };
+
+  // Render marketplace section based on user type
+  const renderMarketplaceSection = () => {
+    if (!tokenData) return null;
+
+    return (
+      <nav className="sidebar-section-container">
+        <div className="sidebar-section-header">
+          <h2 className={`sidebar-section-title ${expand ? "" : "collapsed"}`}>
+            Marketplace
+          </h2>
+          {expand && (
+            <div className="user-type-switcher">
+              <button
+                className={`type-btn ${userType === 'buyer' ? 'active' : ''}`}
+                onClick={() => changeUserType('buyer')}
+                title="Switch to Buyer Mode"
+              >
+                <FaShoppingCart size={12} />
+              </button>
+              <button
+                className={`type-btn ${userType === 'seller' ? 'active' : ''}`}
+                onClick={() => changeUserType('seller')}
+                title="Switch to Seller Mode"
+              >
+                <FaUserTie size={12} />
+              </button>
+            </div>
+          )}
+        </div>
+        
+        <ul className="sidebar-section">
+          {/* Common Links for Both */}
+          <Link
+            to="/marketplace"
+            className={`sidebar-item ${getActiveClass("/marketplace")} ${
+              expand ? "" : "collapsed"
+            }`}
+          >
+            <RiStoreLine className="sidebar-icon" />
+            <span className="sidebar-text">Browse Listings</span>
+          </Link>
+
+          <Link
+            to="/marketplace/messages"
+            className={`sidebar-item ${getActiveClass(
+              "/marketplace/messages"
+            )} ${expand ? "" : "collapsed"}`}
+          >
+            <RiMessageLine className="sidebar-icon" />
+            <span className="sidebar-text">Messages</span>
+          </Link>
+
+          {/* Buyer Specific Links */}
+          {userType === 'buyer' && (
+            <>
+              <Link
+                to="/marketplace/orders"
+                className={`sidebar-item ${getActiveClass(
+                  "/marketplace/orders"
+                )} ${expand ? "" : "collapsed"}`}
+              >
+                <RiShoppingBagLine className="sidebar-icon" />
+                <span className="sidebar-text">My Orders</span>
+              </Link>
+
+              <Link
+                to="/marketplace/dashboard"
+                className={`sidebar-item ${getActiveClass(
+                  "/marketplace/dashboard"
+                )} ${expand ? "" : "collapsed"}`}
+              >
+                <RiListCheck className="sidebar-icon" />
+                <span className="sidebar-text">Buyer Dashboard</span>
+              </Link>
+            </>
+          )}
+
+          {/* Seller Specific Links */}
+          {userType === 'seller' && (
+            <>
+              <Link
+                to="/marketplace/create"
+                className={`sidebar-item ${getActiveClass(
+                  "/marketplace/create"
+                )} ${expand ? "" : "collapsed"}`}
+              >
+                <RiAddCircleLine className="sidebar-icon" />
+                <span className="sidebar-text">Create Listing</span>
+              </Link>
+
+              <Link
+                to="/marketplace/seller-orders"
+                className={`sidebar-item ${getActiveClass(
+                  "/marketplace/seller-orders"
+                )} ${expand ? "" : "collapsed"}`}
+              >
+                <RiShoppingBagLine className="sidebar-icon" />
+                <span className="sidebar-text">Orders Received</span>
+              </Link>
+
+              <Link
+                to="/marketplace/dashboard"
+                className={`sidebar-item ${getActiveClass(
+                  "/marketplace/dashboard"
+                )} ${expand ? "" : "collapsed"}`}
+              >
+                <RiListCheck className="sidebar-icon" />
+                <span className="sidebar-text">Seller Dashboard</span>
+              </Link>
+
+              <Link
+                to="/marketplace/my-listings"
+                className={`sidebar-item ${getActiveClass(
+                  "/marketplace/my-listings"
+                )} ${expand ? "" : "collapsed"}`}
+              >
+                <RiListCheck className="sidebar-icon" />
+                <span className="sidebar-text">My Listings</span>
+              </Link>
+            </>
+          )}
+        </ul>
+
+        {/* User Type Badge */}
+        {expand && (
+          <div className="user-type-badge">
+            <span className={`badge ${userType}`}>
+              {userType === 'seller' ? (
+                <>
+                  <FaUserTie className="badge-icon" />
+                  Seller Mode
+                </>
+              ) : (
+                <>
+                  <FaShoppingCart className="badge-icon" />
+                  Buyer Mode
+                </>
+              )}
+            </span>
+          </div>
+        )}
+      </nav>
+    );
   };
 
   return (
@@ -176,64 +368,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       {/* -------- MARKETPLACE -------- */}
-      {tokenData && (
-        <nav className="sidebar-section-container">
-          <h2 className={`sidebar-section-title ${expand ? "" : "collapsed"}`}>
-            Marketplace
-          </h2>
-          <ul className="sidebar-section">
-            <Link
-              to="/marketplace"
-              className={`sidebar-item ${getActiveClass("/marketplace")} ${
-                expand ? "" : "collapsed"
-              }`}
-            >
-              <RiStoreLine className="sidebar-icon" />
-              <span className="sidebar-text">Browse Listings</span>
-            </Link>
-
-            <Link
-              to="/marketplace/create"
-              className={`sidebar-item ${getActiveClass(
-                "/marketplace/create"
-              )} ${expand ? "" : "collapsed"}`}
-            >
-              <RiAddCircleLine className="sidebar-icon" />
-              <span className="sidebar-text">Create Listing</span>
-            </Link>
-
-            <Link
-              to="/marketplace/orders"
-              className={`sidebar-item ${getActiveClass(
-                "/marketplace/orders"
-              )} ${expand ? "" : "collapsed"}`}
-            >
-              <RiShoppingBagLine className="sidebar-icon" />
-              <span className="sidebar-text">My Orders</span>
-            </Link>
-
-            <Link
-              to="/marketplace/dashboard"
-              className={`sidebar-item ${getActiveClass(
-                "/marketplace/dashboard"
-              )} ${expand ? "" : "collapsed"}`}
-            >
-              <RiListCheck className="sidebar-icon" />
-              <span className="sidebar-text">Seller Dashboard</span>
-            </Link>
-
-            <Link
-              to="/marketplace/messages"
-              className={`sidebar-item ${getActiveClass(
-                "/marketplace/messages"
-              )} ${expand ? "" : "collapsed"}`}
-            >
-              <RiMessageLine className="sidebar-icon" />
-              <span className="sidebar-text">Messages</span>
-            </Link>
-          </ul>
-        </nav>
-      )}
+      {renderMarketplaceSection()}
 
       {/* -------- SETTINGS / ACCOUNT -------- */}
       <nav className="sidebar-section-container">
