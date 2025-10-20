@@ -37,6 +37,8 @@ import Layout from "../components/admin/Layout";
 import Browse from "../pages/marketplace/Browse";
 import CreateListing from "../pages/marketplace/CreateListing";
 import SellerDashboard from "../pages/marketplace/SellerDashboard";
+import BuyerDashboard from "../pages/marketplace/BuyerDashboard";
+
 import MyOrders from "../pages/marketplace/MyOrders";
 import OrderDetails from "../pages/marketplace/OrderDetails";
 import Messages from "../pages/marketplace/Messages";
@@ -72,6 +74,8 @@ const Router: React.FC = () => {
           <Route path="/marketplace" element={<Browse />} />
           <Route path="/marketplace/create" element={<CreateListing />} />
           <Route path="/marketplace/dashboard" element={<SellerDashboard />} />
+          <Route path="/marketplace/buyer-dashboard" element={<BuyerDashboard />} />
+
           <Route path="/marketplace/orders" element={<MyOrders />} />
           <Route path="/marketplace/orders/:orderId" element={<OrderDetails />} />
           <Route path="/marketplace/messages" element={<Messages />} />
