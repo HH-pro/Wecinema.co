@@ -19,6 +19,7 @@ import {
 import { toast } from 'react-toastify';
 import { getRequest } from '../../api';
 import './BuyerDashboard.css';
+import MarketplaceLayout from '../../components/Layout';
 
 interface Order {
   _id: string;
@@ -162,6 +163,8 @@ const BuyerDashboard: React.FC = () => {
   }
 
   return (
+      <MarketplaceLayout>
+
     <div className="buyer-dashboard">
       {/* Header */}
       <div className="dashboard-header">
@@ -459,6 +462,8 @@ const BuyerDashboard: React.FC = () => {
         </div>
       </div>
     </div>
+      </MarketplaceLayout>
+
   );
 };
 
