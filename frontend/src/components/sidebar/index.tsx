@@ -189,7 +189,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           </Link>
 
           {/* Buyer Specific Links */}
-          {userType === 'seller' && (
+          {userType === 'buyer' && (
             <>
               <Link
                 to="/marketplace/orders"
