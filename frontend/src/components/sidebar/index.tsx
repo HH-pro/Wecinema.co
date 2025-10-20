@@ -202,7 +202,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               </Link>
 
               <Link
-                to="/marketplace/dashboard"
+                to="/marketplace/buyer-dashboard"
                 className={`sidebar-item ${getActiveClass(
                   "/marketplace/dashboard"
                 )} ${expand ? "" : "collapsed"}`}
