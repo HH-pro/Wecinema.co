@@ -205,7 +205,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               <Link
                 to="/marketplace/orders"
                 className={`sidebar-item ${getActiveClass(
-                  "/marketplace/orders"
+                  "/marketplace/my-orders"
                 )} ${expand ? "" : "collapsed"}`}
               >
                 <RiShoppingBagLine className="sidebar-icon" />
