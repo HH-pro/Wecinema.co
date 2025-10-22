@@ -1,103 +1,123 @@
+// models/marketplace/order.js
 const mongoose = require('mongoose');
 
-const offerSchema = new mongoose.Schema({
-  buyerId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+const orderSchema = new mongoose.Schema({
+  buyerId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'User', 
+    required: true 
+  },
+  sellerId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'User', 
+    required: true 
+  },
+  listingId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'MarketplaceListing', 
+    required: true 
+  },
+  offerId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Offer' 
+  },
+  
+  // Order Details
+  orderType: {
+    type: String,
+    enum: ['direct_purchase', 'accepted_offer', 'commission'],
     required: true
   },
-  listingId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'MarketplaceListing',
-    required: true
+  amount: { 
+    type: Number, 
+    required: true 
   },
-  amount: {
-    type: Number,
-    required: true,
-    min: 0.01
-  },
-  message: {
-    type: String,
-    default: ''
-  },
-  // NEW FIELDS FOR PAYMENT FLOW
-  requirements: {
-    type: String,
-    default: ''
-  },
-  expectedDelivery: {
-    type: Date
-  },
+  
+  // Escrow Status Flow
   status: {
     type: String,
     enum: [
-      'pending', 
-      'accepted', 
-      'rejected', 
-      'countered', 
-      'cancelled',
-      'pending_payment',  // NEW: Waiting for payment
-      'payment_failed',   // NEW: Payment failed
-      'paid'              // NEW: Payment completed
+      'pending_payment',    // Order created, payment pending
+      'paid',              // Payment received, funds in escrow
+      'in_progress',       // Seller working on order
+      'delivered',         // Seller delivered work
+      'in_revision',       // Buyer requested revision
+      'completed',         // Buyer accepted, funds released
+      'cancelled',         // Order cancelled
+      'disputed'           // Dispute raised
     ],
-    default: 'pending'
+    default: 'pending_payment'
   },
-  // PAYMENT FIELDS
-  paymentIntentId: {
-    type: String,
-    sparse: true
+  
+  // Payment & Escrow
+  stripePaymentIntentId: String,
+  paymentReleased: { 
+    type: Boolean, 
+    default: false 
   },
-  paidAt: {
-    type: Date
+  releaseDate: Date,
+  platformFee: Number,
+  sellerAmount: Number,
+  
+  // Payment Timeline
+  paidAt: Date,
+  deliveredAt: Date,
+  completedAt: Date,
+  
+  // Delivery & Revisions
+  revisions: { 
+    type: Number, 
+    default: 0 
   },
-  // ADDITIONAL TRACKING FIELDS
-  sellerViewed: {
-    type: Boolean,
-    default: false
+  maxRevisions: { 
+    type: Number, 
+    default: 3 
   },
-  expiresAt: {
-    type: Date,
-    default: function() {
-      return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-    }
-  },
-  counterOffer: {
-    amount: Number,
-    message: String,
-    createdAt: Date
-  }
-}, {
-  timestamps: true
+  revisionNotes: String,
+  
+  // Requirements & Delivery
+  requirements: String,
+  deliveryMessage: String,
+  deliveryFiles: [String],
+  
+  // Timelines
+  expectedDelivery: Date,
+  
+  // Order Communication
+  buyerNotes: String,
+  sellerNotes: String,
+
+}, { 
+  timestamps: true,
+  // Add this to fix the population issue
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 });
 
-// Indexes for better performance
-offerSchema.index({ listingId: 1, buyerId: 1 });
-offerSchema.index({ status: 1 });
-offerSchema.index({ paymentIntentId: 1 }, { sparse: true });
-offerSchema.index({ expiresAt: 1 });
-offerSchema.index({ createdAt: -1 });
-
-// Virtual for checking if offer is expired
-offerSchema.virtual('isExpired').get(function() {
-  return this.expiresAt && this.expiresAt < new Date();
+// Virtual for calculating days since order
+orderSchema.virtual('daysSinceOrder').get(function() {
+  return Math.floor((Date.now() - this.createdAt) / (1000 * 60 * 60 * 24));
 });
 
-// Method to check if offer can be accepted
-offerSchema.methods.canBeAccepted = function() {
-  return this.status === 'pending' && !this.isExpired;
+// Virtual for revision status
+orderSchema.virtual('revisionsLeft').get(function() {
+  return this.maxRevisions - this.revisions;
+});
+
+// Method to check if order can be revised
+orderSchema.methods.canRequestRevision = function() {
+  return this.status === 'delivered' && this.revisions < this.maxRevisions;
 };
 
-// Method to check if offer can be paid
-offerSchema.methods.canBePaid = function() {
-  return this.status === 'pending_payment' && this.paymentIntentId;
+// Method to check if payment can be released
+orderSchema.methods.canReleasePayment = function() {
+  return this.status === 'delivered' && !this.paymentReleased;
 };
 
-// Static method to find expired offers
-offerSchema.statics.findExpiredOffers = function() {
-  return this.find({
-    status: 'pending',
-    expiresAt: { $lt: new Date() }
-  });
-};
+// Add indexes for better performance
+orderSchema.index({ buyerId: 1, status: 1 });
+orderSchema.index({ sellerId: 1, status: 1 });
+orderSchema.index({ stripePaymentIntentId: 1 });
+orderSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model('Offer', offerSchema);
+module.exports = mongoose.models.Order || mongoose.model('Order', orderSchema);
