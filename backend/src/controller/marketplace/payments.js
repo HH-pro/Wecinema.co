@@ -38,7 +38,7 @@ router.post("/create-payment-intent", async (req, res) => {
     await order.save();
 
     res.status(200).json({
-      clientSecret: paymentIntent.STRIPE_SECRET_KEY,
+      clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
       amount: order.amount
     });
