@@ -7,7 +7,7 @@ const { authenticateMiddleware } = require("../../utils");
 const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
 
 // Get my orders (buyer)
-router.get("/my-orders", async (req, res) => {
+router.get("/my-orders", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
     
