@@ -100,7 +100,6 @@ const MyOrders: React.FC = () => {
   });
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [error, setError] = useState<string>('');
-  const [debugInfo, setDebugInfo] = useState<any>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -108,16 +107,13 @@ const MyOrders: React.FC = () => {
   }, []);
 
   const getAuthToken = (): string | null => {
-    const token = localStorage.getItem('token');
-    console.log('🔐 Token from localStorage:', token);
-    return token;
+    return localStorage.getItem('token');
   };
 
   const fetchOrders = async (): Promise<void> => {
     try {
       setLoading(true);
       setError('');
-      setDebugInfo(null);
       
       const token = getAuthToken();
       
@@ -127,7 +123,6 @@ const MyOrders: React.FC = () => {
         return;
       }
 
-      console.log('🔄 Fetching orders...');
       const response = await axios.get<OrdersResponse>(
         'http://localhost:3000/marketplace/orders/my-orders',
         { 
@@ -138,17 +133,6 @@ const MyOrders: React.FC = () => {
         }
       );
 
-      console.log('✅ Full API Response:', response);
-      console.log('📦 Response data:', response.data);
-
-      // Set debug info
-      setDebugInfo({
-        responseStatus: response.status,
-        responseData: response.data,
-        ordersCount: response.data.orders?.length || 0,
-        firstOrder: response.data.orders?.[0] || null
-      });
-
       if (response.data.success) {
         setOrders(response.data.orders || []);
         setStats(response.data.stats || {
@@ -157,20 +141,10 @@ const MyOrders: React.FC = () => {
           completed: 0,
           pending: 0
         });
-        
-        console.log('📊 Orders set:', response.data.orders);
-        console.log('📈 Stats set:', response.data.stats);
       } else {
-        setError('Failed to load orders: API returned success=false');
+        setError('Failed to load orders');
       }
     } catch (error: any) {
-      console.error('❌ Error fetching orders:', error);
-      setDebugInfo({
-        error: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
-      
       if (error.response?.status === 401) {
         setError('Please login to view your orders');
         localStorage.removeItem('token');
@@ -287,16 +261,6 @@ const MyOrders: React.FC = () => {
     });
   };
 
-  // Debug component to show what's happening
-  const DebugPanel = () => (
-    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-      <h3 className="font-semibold text-yellow-800 mb-2">Debug Information:</h3>
-      <pre className="text-xs text-yellow-700 overflow-auto">
-        {JSON.stringify(debugInfo, null, 2)}
-      </pre>
-    </div>
-  );
-
   // Loading State
   if (loading) {
     return (
@@ -315,10 +279,6 @@ const MyOrders: React.FC = () => {
     <MarketplaceLayout>
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          {/* Debug Panel - Remove this in production */}
-          {debugInfo && <DebugPanel />}
-
           {/* Header */}
           <div className="mb-8">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
