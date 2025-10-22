@@ -255,7 +255,7 @@ router.get("/test-stripe", async (req, res) => {
   }
 });
 
-// In your offerRoutes.js - Update confirm-offer-payment route
+/// In your offerRoutes.js - FIXED confirm-offer-payment route
 router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) => {
   try {
     const { offerId, paymentIntentId } = req.body;
@@ -263,18 +263,29 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
 
     console.log("🔍 Confirming offer payment:", { offerId, paymentIntentId, userId });
 
-    // Find the offer
+    // Find the offer and POPULATE the listing to get sellerId
     const offer = await Offer.findOne({
       _id: offerId,
       buyerId: userId,
       paymentIntentId: paymentIntentId
-    });
+    }).populate('listingId', 'sellerId title'); // POPULATE to get sellerId
 
-    console.log("📋 Offer found:", offer);
+    console.log("📋 Offer found with populated listing:", offer);
 
     if (!offer) {
       return res.status(404).json({ error: 'Offer not found or access denied' });
     }
+
+    // Check if listing and sellerId exist
+    if (!offer.listingId) {
+      return res.status(400).json({ error: 'Associated listing not found' });
+    }
+
+    if (!offer.listingId.sellerId) {
+      return res.status(400).json({ error: 'Seller ID not found in listing' });
+    }
+
+    console.log("👤 Seller ID from populated listing:", offer.listingId.sellerId);
 
     // Verify payment intent with Stripe
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
@@ -294,12 +305,12 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
 
     console.log("✅ Offer payment confirmed:", offer._id);
 
-    // CREATE ORDER FROM THE OFFER
+    // CREATE ORDER FROM THE OFFER - NOW WITH PROPER sellerId
     console.log("🛒 Creating order from offer...");
     const order = new Order({
       buyerId: userId,
-      sellerId: offer.listingId.sellerId, // Make sure this is populated
-      listingId: offer.listingId,
+      sellerId: offer.listingId.sellerId, // This should now work
+      listingId: offer.listingId._id,
       offerId: offer._id,
       orderType: 'accepted_offer',
       amount: offer.amount,
@@ -334,13 +345,19 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
 
   } catch (error) {
     console.error('❌ Error confirming offer payment:', error);
+    
+    // More detailed error logging
+    if (error.name === 'ValidationError') {
+      console.error('📋 Validation errors:', error.errors);
+    }
+    
     res.status(500).json({ 
       error: 'Failed to confirm payment',
-      details: error.message 
+      details: error.message,
+      ...(error.name === 'ValidationError' && { validationErrors: error.errors })
     });
   }
 });
-
 // Get offers received (seller) - Add authentication middleware
 router.get("/received-offers",authenticateMiddleware, async (req, res) => {
   try {
