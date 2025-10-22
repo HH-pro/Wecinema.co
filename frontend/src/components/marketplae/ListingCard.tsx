@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Listing } from '../../types/marketplace';
-import { FiPlay, FiImage, FiTag, FiDollarSign, FiCheck, FiX } from 'react-icons/fi';
+import { FiPlay, FiImage, FiTag, FiDollarSign, FiCheck, FiX, FiShoppingCart, FiCreditCard } from 'react-icons/fi';
 import { decodeToken } from "../../utilities/helperfFunction";
 import { toast } from 'react-toastify';
 import axios from 'axios';
@@ -9,12 +9,19 @@ interface ListingCardProps {
   listing: Listing;
   onViewDetails: (listingId: string) => void;
   onOfferSuccess?: () => void;
+  onMakeOffer: (listing: Listing) => void;
+  onDirectPayment: (listing: Listing) => void;
 }
 
-const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOfferSuccess }) => {
+const ListingCard: React.FC<ListingCardProps> = ({ 
+  listing, 
+  onViewDetails, 
+  onOfferSuccess, 
+  onMakeOffer,
+  onDirectPayment 
+}) => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [showVideoModal, setShowVideoModal] = useState(false);
-  
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [offerError, setOfferError] = useState('');
@@ -43,47 +50,47 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onViewDetails, onOff
   }, [token]);
 
   // Direct API function for making an offer using Axios
-  // Direct API function for making an offer using Axios
-const makeOffer = async (listingId: string, offerData: { amount: number; message: string }) => {
-  const token = localStorage.getItem("token");
-  
-  console.log('🚀 Making offer with:', {
-    token: token ? `${token.substring(0, 20)}...` : 'No token',
-    listingId,
-    offerData
-  });
-
-  if (!token) {
-    throw new Error('No authentication token found');
-  }
-
-  try {
-    const response = await axios.post(
-      "http://localhost:3000/marketplace/offers/make-offer",
-      {
-        listingId,
-        amount: offerData.amount,
-        message: offerData.message
-      },
-      {
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-      }
-    );
-
-    console.log('✅ Offer successful:', response.data);
-    return response.data;
-  } catch (error: any) {
-    console.error('❌ Offer failed:', {
-      status: error.response?.status,
-      data: error.response?.data,
-      message: error.message
+  const makeOffer = async (listingId: string, offerData: { amount: number; message: string }) => {
+    const token = localStorage.getItem("token");
+    
+    console.log('🚀 Making offer with:', {
+      token: token ? `${token.substring(0, 20)}...` : 'No token',
+      listingId,
+      offerData
     });
-    throw error;
-  }
-};
+
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    try {
+      const response = await axios.post(
+        "http://localhost:3000/marketplace/offers/make-offer",
+        {
+          listingId,
+          amount: offerData.amount,
+          message: offerData.message
+        },
+        {
+          headers: { 
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}` 
+          },
+        }
+      );
+
+      console.log('✅ Offer successful:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Offer failed:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+      });
+      throw error;
+    }
+  };
+
   // Check if media is video or image
   const isVideo = (url: string) => {
     return url?.match(/\.(mp4|mov|avi|wmv|flv|webm|mkv)$/i);
@@ -127,42 +134,73 @@ const makeOffer = async (listingId: string, offerData: { amount: number; message
     setImageLoaded(true);
   };
 
- const handleMakeOfferClick = () => {
-  console.log('🔐 Auth Debug:', {
-    hasToken: !!token,
-    token: token ? `${token.substring(0, 20)}...` : 'No token',
-    currentUser: currentUser,
-    localStorageToken: localStorage.getItem("token")
-  });
+  const handleMakeOfferClick = () => {
+    console.log('🔐 Auth Debug:', {
+      hasToken: !!token,
+      token: token ? `${token.substring(0, 20)}...` : 'No token',
+      currentUser: currentUser,
+      localStorageToken: localStorage.getItem("token")
+    });
 
-  if (!token || !currentUser) {
-    toast.error("Please login to make an offer");
-    return;
-  }
-  
-  // Check if user is the seller
-  const userId = currentUser.id;
-  const sellerId = listing.sellerId?.id || listing.sellerId?._id || listing.sellerId;
-  
-  console.log('👤 User Comparison:', {
-    userId,
-    sellerId,
-    isOwnListing: userId === sellerId
-  });
+    if (!token || !currentUser) {
+      toast.error("Please login to make an offer");
+      return;
+    }
+    
+    // Check if user is the seller
+    const userId = currentUser.id;
+    const sellerId = listing.sellerId?.id || listing.sellerId?._id || listing.sellerId;
+    
+    console.log('👤 User Comparison:', {
+      userId,
+      sellerId,
+      isOwnListing: userId === sellerId
+    });
 
-  if (userId === sellerId) {
-    toast.error("You cannot make an offer on your own listing");
-    return;
-  }
+    if (userId === sellerId) {
+      toast.error("You cannot make an offer on your own listing");
+      return;
+    }
 
-  setShowOfferModal(true);
-  setOfferError('');
-  setOfferSuccess(false);
-  setOfferData({
-    amount: (listing.price * 0.8).toFixed(2),
-    message: ''
-  });
-};
+    setShowOfferModal(true);
+    setOfferError('');
+    setOfferSuccess(false);
+    setOfferData({
+      amount: (listing.price * 0.8).toFixed(2),
+      message: ''
+    });
+  };
+
+  const handleBuyNowClick = () => {
+    console.log('🛒 Buy Now clicked:', {
+      hasToken: !!token,
+      currentUser: currentUser,
+      listingId: listing._id
+    });
+
+    if (!token || !currentUser) {
+      toast.error("Please login to purchase this item");
+      return;
+    }
+
+    // Check if user is the seller
+    const userId = currentUser.id;
+    const sellerId = listing.sellerId?.id || listing.sellerId?._id || listing.sellerId;
+
+    if (userId === sellerId) {
+      toast.error("You cannot purchase your own listing");
+      return;
+    }
+
+    if (listing.status !== 'active') {
+      toast.error("This listing is not available for purchase");
+      return;
+    }
+
+    // Call the parent handler for direct payment
+    onDirectPayment(listing);
+  };
+
   const handleOfferSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setOfferError('');
@@ -231,6 +269,8 @@ const makeOffer = async (listingId: string, offerData: { amount: number; message
   const userId = currentUser?.id || currentUser?._id;
   const sellerId = listing.sellerId?._id || listing.sellerId;
   const isOwnListing = userId === sellerId;
+  const canMakeOffer = isUserLoggedIn && !isOwnListing && listing.status === 'active';
+  const canBuyNow = isUserLoggedIn && !isOwnListing && listing.status === 'active';
 
   return (
     <>
@@ -364,22 +404,35 @@ const makeOffer = async (listingId: string, offerData: { amount: number; message
             </div>
           )}
 
-          {/* Single Make Offer Button - Yellow */}
-          <button
-            onClick={handleMakeOfferClick}
-            disabled={listing.status !== 'active' || !isUserLoggedIn || isOwnListing}
-            className="w-full bg-yellow-500 hover:bg-yellow-600 text-white py-3 rounded-xl font-semibold text-sm transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:bg-yellow-500 flex items-center justify-center gap-2"
-          >
-            <FiTag size={16} />
-            <span>Make Offer</span>
-          </button>
+          {/* Dual Action Buttons */}
+          <div className="flex gap-2">
+            {/* Buy Now Button - Primary */}
+            <button
+              onClick={handleBuyNowClick}
+              disabled={!canBuyNow}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-semibold text-sm transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:bg-red-600 flex items-center justify-center gap-2"
+            >
+              <FiShoppingCart size={16} />
+              <span>Buy Now</span>
+            </button>
+            
+            {/* Make Offer Button - Secondary */}
+            <button
+              onClick={handleMakeOfferClick}
+              disabled={!canMakeOffer}
+              className="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white py-3 rounded-xl font-semibold text-sm transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:bg-yellow-500 flex items-center justify-center gap-2"
+            >
+              <FiTag size={16} />
+              <span>Offer</span>
+            </button>
+          </div>
 
           {/* Status Messages */}
           <div className="mt-3 space-y-1">
             {listing.status !== 'active' && (
               <div className="text-center">
                 <span className="text-xs font-medium text-red-600">
-                  {listing.status === 'sold' ? 'Sold Out' : 'Not Available for Offers'}
+                  {listing.status === 'sold' ? 'Sold Out' : 'Not Available'}
                 </span>
               </div>
             )}
@@ -395,9 +448,18 @@ const makeOffer = async (listingId: string, offerData: { amount: number; message
             {!isUserLoggedIn && (
               <div className="text-center">
                 <span className="text-xs font-medium text-blue-600">
-                  Login to make offers
+                  Login to purchase or make offers
                 </span>
               </div>
+            )}
+          </div>
+
+          {/* Quick Stats */}
+          <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-100 text-xs text-gray-500">
+            <span>⭐ {listing.sellerId?.sellerRating || 'New'}</span>
+            <span>🕒 {new Date(listing.createdAt).toLocaleDateString()}</span>
+            {listing.viewCount !== undefined && (
+              <span>👁️ {listing.viewCount} views</span>
             )}
           </div>
         </div>
@@ -515,6 +577,17 @@ const makeOffer = async (listingId: string, offerData: { amount: number; message
                   placeholder="Tell the seller why you're interested..."
                   disabled={isSubmitting || offerSuccess}
                 />
+              </div>
+
+              {/* Payment Notice */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                <div className="flex items-center gap-2 text-yellow-800 mb-1">
+                  <FiCreditCard size={16} />
+                  <span className="font-semibold text-sm">Payment Required</span>
+                </div>
+                <p className="text-xs text-yellow-700">
+                  Your offer will be submitted and payment will be processed immediately. Funds are held securely until the seller accepts your offer.
+                </p>
               </div>
 
               {/* Actions */}
