@@ -95,8 +95,22 @@ router.post("/create-listing", async (req, res) => {
 
     console.log("Creating listing for seller:", sellerId);
 
+    // 🆕 Get seller email from User model
+    let sellerEmail = null;
+    try {
+      const User = mongoose.model('User');
+      const seller = await User.findById(sellerId).select('email');
+      if (seller && seller.email) {
+        sellerEmail = seller.email;
+        console.log("✅ Seller email found:", sellerEmail);
+      }
+    } catch (emailError) {
+      console.error("❌ Error fetching seller email:", emailError);
+    }
+
     const listing = await MarketplaceListing.create({
       sellerId: sellerId,
+      sellerEmail: sellerEmail, // 🆕 Add seller email to listing
       title,
       description,
       price,
