@@ -130,99 +130,98 @@ const Browse: React.FC = () => {
     });
     setShowOfferModal(true);
   };
-// In handleSubmitOffer function:
-const handleSubmitOffer = async (e: React.FormEvent) => {
-  e.preventDefault();
-  
-  if (!selectedListing) return;
 
-  try {
-    setPaymentStatus('processing');
+  const handleSubmitOffer = async (e: React.FormEvent) => {
+    e.preventDefault();
     
-    console.log('🔄 Submitting offer with payment...');
+    if (!selectedListing) return;
 
-    const response = await axios.post(
-      `http://localhost:3000/marketplace/offers/make-offer`, // ✅ Use the correct endpoint
-      {
-        listingId: selectedListing._id,
-        amount: parseFloat(offerForm.amount),
-        message: offerForm.message,
-        requirements: offerForm.requirements,
-        expectedDelivery: offerForm.expectedDelivery
-      },
-      { 
-        headers: { 
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        } 
+    try {
+      setPaymentStatus('processing');
+      
+      console.log('🔄 Submitting offer with payment...');
+
+      const response = await axios.post(
+        `http://localhost:3000/marketplace/offers/make-offer`,
+        {
+          listingId: selectedListing._id,
+          amount: parseFloat(offerForm.amount),
+          message: offerForm.message,
+          requirements: offerForm.requirements,
+          expectedDelivery: offerForm.expectedDelivery
+        },
+        { 
+          headers: { 
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          } 
+        }
+      );
+
+      console.log('✅ Offer with payment response:', response.data);
+
+      // Check if clientSecret is present
+      if (!response.data.clientSecret) {
+        throw new Error('No client secret received from server');
       }
-    );
 
-    console.log('✅ Offer with payment response:', response.data);
-
-    // Check if clientSecret is present
-    if (!response.data.clientSecret) {
-      throw new Error('No client secret received from server');
+      setClientSecret(response.data.clientSecret);
+      setOfferData(response.data);
+      setShowOfferModal(false);
+      setShowPaymentModal(true);
+      setPaymentStatus('idle');
+      
+    } catch (error: any) {
+      console.error('❌ Error submitting offer with payment:', error);
+      setPaymentStatus('failed');
+      alert(error.response?.data?.error || error.message || 'Failed to submit offer');
     }
+  };
 
-    setClientSecret(response.data.clientSecret);
-    setOfferData(response.data);
-    setShowOfferModal(false);
-    setShowPaymentModal(true);
-    setPaymentStatus('idle');
+  const handleDirectPayment = async (listing: Listing) => {
+    if (!listing._id) return;
     
-  } catch (error: any) {
-    console.error('❌ Error submitting offer with payment:', error);
-    setPaymentStatus('failed');
-    alert(error.response?.data?.error || error.message || 'Failed to submit offer');
-  }
-};
+    try {
+      setPaymentStatus('processing');
+      
+      console.log('🔄 Creating direct payment for listing:', listing._id);
 
-// In handleDirectPayment function:
-const handleDirectPayment = async (listing: Listing) => {
-  if (!listing._id) return;
-  
-  try {
-    setPaymentStatus('processing');
-    
-    console.log('🔄 Creating direct payment for listing:', listing._id);
+      const response = await axios.post(
+        `http://localhost:3000/marketplace/offers/create-direct-payment`,
+        {
+          listingId: listing._id
+        },
+        { 
+          headers: { 
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          } 
+        }
+      );
 
-    const response = await axios.post(
-      `http://localhost:3000/marketplace/offers/create-direct-payment`, // ✅ Use the new endpoint
-      {
-        listingId: listing._id
-      },
-      { 
-        headers: { 
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        } 
+      console.log('✅ Direct payment response:', response.data);
+
+      if (!response.data.clientSecret) {
+        throw new Error('No client secret received from server');
       }
-    );
 
-    console.log('✅ Direct payment response:', response.data);
-
-    if (!response.data.clientSecret) {
-      throw new Error('No client secret received from server');
+      setClientSecret(response.data.clientSecret);
+      setOfferData({
+        amount: listing.price,
+        listing: listing,
+        type: 'direct_purchase',
+        paymentIntentId: response.data.paymentIntentId,
+        order: response.data.order
+      });
+      setShowPaymentModal(true);
+      setPaymentStatus('idle');
+      
+    } catch (error: any) {
+      console.error('❌ Error creating direct payment:', error);
+      setPaymentStatus('failed');
+      alert(error.response?.data?.error || error.message || 'Failed to initiate payment');
     }
-
-    setClientSecret(response.data.clientSecret);
-    setOfferData({
-      amount: listing.price,
-      listing: listing,
-      type: 'direct_purchase',
-      paymentIntentId: response.data.paymentIntentId,
-      order: response.data.order
-    });
-    setShowPaymentModal(true);
-    setPaymentStatus('idle');
-    
-  } catch (error: any) {
-    console.error('❌ Error creating direct payment:', error);
-    setPaymentStatus('failed');
-    alert(error.response?.data?.error || error.message || 'Failed to initiate payment');
-  }
-};
+  };
   
   const handlePaymentSuccess = () => {
     setShowPaymentModal(false);
@@ -280,23 +279,164 @@ const handleDirectPayment = async (listing: Listing) => {
     <MarketplaceLayout>
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header and filters section remains same */}
-          {/* ... */}
+          {/* Header Section */}
+          <div className="mb-8">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Marketplace</h1>
+                <p className="mt-2 text-gray-600">
+                  Discover and trade amazing video content and scripts
+                </p>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button 
+                  onClick={() => navigate('/marketplace/create')}
+                  className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                >
+                  <FiPlus className="mr-2" size={18} />
+                  <span className="hidden sm:inline">Create Listing</span>
+                  <span className="sm:hidden">Create</span>
+                </button>
+                
+                <button 
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                >
+                  <FiFilter className="mr-2" size={18} />
+                  <span className="hidden sm:inline">Filters</span>
+                  <span className="sm:hidden">Filter</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Search Bar */}
+            <div className="mt-6 max-w-2xl">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <FiSearch className="text-gray-400" size={20} />
+                </div>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search listings by title, description, or tags..."
+                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm sm:text-base"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Filters Section */}
+          {showFilters && (
+            <div className="mb-8 bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Filters</h3>
+                <button
+                  onClick={clearFilters}
+                  className="text-sm text-yellow-600 hover:text-yellow-500 font-medium"
+                >
+                  Clear all
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Listing Type
+                  </label>
+                  <select 
+                    value={filters.type}
+                    onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm"
+                  >
+                    <option value="">All Types</option>
+                    <option value="for_sale">For Sale</option>
+                    <option value="licensing">Licensing</option>
+                    <option value="adaptation_rights">Adaptation Rights</option>
+                    <option value="commission">Commission</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Category
+                  </label>
+                  <input
+                    type="text"
+                    value={filters.category}
+                    onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
+                    placeholder="Video, Script, Music..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Min Price
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="$0"
+                    value={filters.minPrice}
+                    onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Sort By
+                  </label>
+                  <select 
+                    value={filters.sortBy}
+                    onChange={(e) => setFilters(prev => ({ ...prev, sortBy: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm"
+                  >
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                    <option value="price_low">Price: Low to High</option>
+                    <option value="price_high">Price: High to Low</option>
+                    <option value="rating">Highest Rated</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Results Count */}
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <p className="text-gray-600 text-sm sm:text-base">
+              Showing <span className="font-semibold">{filteredListings.length}</span> listings
+              {searchQuery && (
+                <span> for "<span className="font-semibold">{searchQuery}</span>"</span>
+              )}
+            </p>
+            
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="text-sm text-yellow-600 hover:text-yellow-500 font-medium self-start sm:self-auto"
+              >
+                Clear search
+              </button>
+            )}
+          </div>
 
           {/* Listings Grid */}
           {filteredListings.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 sm:p-12 text-center">
               <div className="max-w-md mx-auto">
-                <div className="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                  <FiSearch size={32} className="text-gray-400" />
+                <div className="w-16 h-16 sm:w-24 sm:h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                  <FiSearch size={24} className="text-gray-400 sm:w-8 sm:h-8" />
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
                   {searchQuery || Object.values(filters).some(Boolean) 
                     ? 'No listings found' 
                     : 'No listings yet'
                   }
                 </h3>
-                <p className="text-gray-600 mb-6">
+                <p className="text-gray-600 text-sm sm:text-base mb-6">
                   {searchQuery || Object.values(filters).some(Boolean)
                     ? 'Try adjusting your search or filters to find what you\'re looking for.'
                     : 'Be the first to create a listing and start trading!'
@@ -305,7 +445,7 @@ const handleDirectPayment = async (listing: Listing) => {
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   <button 
                     onClick={() => navigate('/marketplace/create')}
-                    className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                    className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-transparent text-sm sm:text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
                   >
                     <FiPlus className="mr-2" size={18} />
                     Create First Listing
@@ -314,22 +454,23 @@ const handleDirectPayment = async (listing: Listing) => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6">
               {filteredListings.map(listing => (
-                <ListingCard
-                  key={listing._id}
-                  listing={listing}
-                  onViewDetails={handleViewDetails}
-                  onMakeOffer={handleMakeOffer}
-                  onDirectPayment={handleDirectPayment}
-                />
+                <div key={listing._id} className="flex justify-center">
+                  <ListingCard
+                    listing={listing}
+                    onViewDetails={handleViewDetails}
+                    onMakeOffer={handleMakeOffer}
+                    onDirectPayment={handleDirectPayment}
+                  />
+                </div>
               ))}
             </div>
           )}
 
           {/* Load More */}
           {filteredListings.length > 0 && filteredListings.length >= 12 && (
-            <div className="mt-12 text-center">
+            <div className="mt-8 sm:mt-12 text-center">
               <button 
                 onClick={fetchListings}
                 className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
@@ -341,105 +482,113 @@ const handleDirectPayment = async (listing: Listing) => {
         </div>
       </div>
 
-      {/* Offer Modal */}
+      {/* Scrollable Offer Modal */}
       {showOfferModal && selectedListing && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
+          <div className="bg-white rounded-lg w-full max-w-md max-h-[95vh] flex flex-col">
+            {/* Header - Fixed */}
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b shrink-0">
               <h3 className="text-lg font-semibold">Make an Offer</h3>
               <button 
                 onClick={() => setShowOfferModal(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 p-1"
               >
                 <FiX size={24} />
               </button>
             </div>
             
-            <form onSubmit={handleSubmitOffer} className="p-6 space-y-4">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-gray-900">{selectedListing.title}</h4>
-                <p className="text-sm text-gray-600">Listed Price: ${selectedListing.price}</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Offer Amount ($)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  min="0.01"
-                  value={offerForm.amount}
-                  onChange={(e) => setOfferForm({ ...offerForm, amount: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                  placeholder="Enter your offer amount"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Message to Seller
-                </label>
-                <textarea
-                  value={offerForm.message}
-                  onChange={(e) => setOfferForm({ ...offerForm, message: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                  rows="3"
-                  placeholder="Introduce yourself and your requirements..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Detailed Requirements
-                </label>
-                <textarea
-                  required
-                  value={offerForm.requirements}
-                  onChange={(e) => setOfferForm({ ...offerForm, requirements: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                  rows="4"
-                  placeholder="Describe exactly what you need..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Expected Delivery Date
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={offerForm.expectedDelivery}
-                  onChange={(e) => setOfferForm({ ...offerForm, expectedDelivery: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                  min={new Date().toISOString().split('T')[0]}
-                />
-              </div>
-
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-yellow-800 mb-2">
-                  <FiCreditCard />
-                  <span className="font-semibold">Payment Required</span>
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto">
+              <form onSubmit={handleSubmitOffer} className="p-4 sm:p-6 space-y-4">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-gray-900 text-sm sm:text-base">{selectedListing.title}</h4>
+                  <p className="text-sm text-gray-600 mt-1">Listed Price: ${selectedListing.price}</p>
                 </div>
-                <p className="text-sm text-yellow-700">
-                  Your offer will be submitted and payment will be processed immediately. The funds will be held securely until the seller accepts your offer.
-                </p>
-              </div>
 
-              <div className="flex gap-3 pt-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Offer Amount ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    min="0.01"
+                    value={offerForm.amount}
+                    onChange={(e) => setOfferForm({ ...offerForm, amount: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm"
+                    placeholder="Enter your offer amount"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Message to Seller
+                  </label>
+                  <textarea
+                    value={offerForm.message}
+                    onChange={(e) => setOfferForm({ ...offerForm, message: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm resize-none"
+                    rows={3}
+                    placeholder="Introduce yourself and your requirements..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Detailed Requirements
+                  </label>
+                  <textarea
+                    required
+                    value={offerForm.requirements}
+                    onChange={(e) => setOfferForm({ ...offerForm, requirements: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm resize-none"
+                    rows={4}
+                    placeholder="Describe exactly what you need..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Expected Delivery Date
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={offerForm.expectedDelivery}
+                    onChange={(e) => setOfferForm({ ...offerForm, expectedDelivery: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm"
+                    min={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-yellow-800 mb-2">
+                    <FiCreditCard size={16} />
+                    <span className="font-semibold text-sm">Payment Required</span>
+                  </div>
+                  <p className="text-sm text-yellow-700">
+                    Your offer will be submitted and payment will be processed immediately. The funds will be held securely until the seller accepts your offer.
+                  </p>
+                </div>
+              </form>
+            </div>
+
+            {/* Footer - Fixed */}
+            <div className="p-4 sm:p-6 border-t shrink-0">
+              <div className="flex gap-3">
                 <button
                   type="button"
                   onClick={() => setShowOfferModal(false)}
-                  className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                  className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
+                  onClick={handleSubmitOffer}
                   disabled={paymentStatus === 'processing'}
-                  className="flex-1 py-2 px-4 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 disabled:bg-gray-400 transition-colors flex items-center justify-center"
+                  className="flex-1 py-2 px-4 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 disabled:bg-gray-400 transition-colors flex items-center justify-center text-sm font-medium"
                 >
                   {paymentStatus === 'processing' ? (
                     <>
@@ -448,39 +597,39 @@ const handleDirectPayment = async (listing: Listing) => {
                     </>
                   ) : (
                     <>
-                      Submit Offer & Pay <FiArrowRight className="ml-2" />
+                      Submit Offer & Pay <FiArrowRight className="ml-2" size={16} />
                     </>
                   )}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
 
       {/* Payment Modal */}
       {showPaymentModal && clientSecret && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full">
-            <div className="flex items-center justify-between p-6 border-b">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
+          <div className="bg-white rounded-lg w-full max-w-md">
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b">
               <h3 className="text-lg font-semibold">
                 {offerData?.type === 'direct_purchase' ? 'Complete Purchase' : 'Complete Offer Payment'}
               </h3>
               <button 
                 onClick={handlePaymentClose}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 p-1"
                 disabled={paymentStatus === 'processing'}
               >
                 <FiX size={24} />
               </button>
             </div>
             
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-yellow-800">
-                    <FiCreditCard />
-                    <span className="font-semibold">
+                    <FiCreditCard size={16} />
+                    <span className="font-semibold text-sm">
                       {offerData?.type === 'direct_purchase' ? 'Purchase Amount' : 'Offer Amount'}: 
                       ${offerData?.amount}
                     </span>
@@ -521,77 +670,77 @@ const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentS
   const elements = useElements();
   const [error, setError] = useState('');
 
- // In PaymentForm component handleSubmit:
-const handleSubmit = async (event: React.FormEvent) => {
-  event.preventDefault();
-  
-  if (!stripe || !elements) {
-    setError('Payment system not ready. Please try again.');
-    return;
-  }
-
-  setPaymentStatus('processing');
-  setError('');
-
-  try {
-    const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        return_url: `${window.location.origin}/marketplace/payment/success`,
-      },
-      redirect: 'if_required'
-    });
-
-    if (stripeError) {
-      setError(stripeError.message || 'Payment failed');
-      setPaymentStatus('failed');
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    
+    if (!stripe || !elements) {
+      setError('Payment system not ready. Please try again.');
       return;
     }
 
-    // Confirm payment based on type
-    if (offerData?.type === 'direct_purchase') {
-      // Confirm direct purchase
-      await axios.post(
-        'http://localhost:3000/marketplace/payments/confirm-payment',
-        { 
-          orderId: offerData.order._id,
-          paymentIntentId: paymentIntent?.id
+    setPaymentStatus('processing');
+    setError('');
+
+    try {
+      const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/marketplace/payment/success`,
         },
-        { 
-          headers: { 
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          } 
-        }
-      );
-    } else {
-      // Confirm offer payment
-      await axios.post(
-        'http://localhost:3000/marketplace/offers/confirm-offer-payment',
-        { 
-          offerId: offerData.offer._id,
-          paymentIntentId: paymentIntent?.id
-        },
-        { 
-          headers: { 
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          } 
-        }
-      );
+        redirect: 'if_required'
+      });
+
+      if (stripeError) {
+        setError(stripeError.message || 'Payment failed');
+        setPaymentStatus('failed');
+        return;
+      }
+
+      // Confirm payment based on type
+      if (offerData?.type === 'direct_purchase') {
+        // Confirm direct purchase
+        await axios.post(
+          'http://localhost:3000/marketplace/payments/confirm-payment',
+          { 
+            orderId: offerData.order._id,
+            paymentIntentId: paymentIntent?.id
+          },
+          { 
+            headers: { 
+              Authorization: `Bearer ${localStorage.getItem('token')}`,
+              'Content-Type': 'application/json'
+            } 
+          }
+        );
+      } else {
+        // Confirm offer payment
+        await axios.post(
+          'http://localhost:3000/marketplace/offers/confirm-offer-payment',
+          { 
+            offerId: offerData.offer._id,
+            paymentIntentId: paymentIntent?.id
+          },
+          { 
+            headers: { 
+              Authorization: `Bearer ${localStorage.getItem('token')}`,
+              'Content-Type': 'application/json'
+            } 
+          }
+        );
+      }
+
+      setPaymentStatus('success');
+      setTimeout(() => {
+        onSuccess();
+      }, 1500);
+
+    } catch (err: any) {
+      console.error('Payment confirmation error:', err);
+      setError(err.response?.data?.error || err.message || 'Payment failed');
+      setPaymentStatus('failed');
     }
+  };
 
-    setPaymentStatus('success');
-    setTimeout(() => {
-      onSuccess();
-    }, 1500);
-
-  } catch (err: any) {
-    console.error('Payment confirmation error:', err);
-    setError(err.response?.data?.error || err.message || 'Payment failed');
-    setPaymentStatus('failed');
-  }
-};
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="mb-4">
@@ -611,8 +760,8 @@ const handleSubmit = async (event: React.FormEvent) => {
       {paymentStatus === 'success' && (
         <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
           <div className="flex items-center gap-2 text-green-700">
-            <FiCheck />
-            <span>Payment successful! Redirecting...</span>
+            <FiCheck size={16} />
+            <span className="text-sm">Payment successful! Redirecting...</span>
           </div>
         </div>
       )}
@@ -622,14 +771,14 @@ const handleSubmit = async (event: React.FormEvent) => {
           type="button"
           onClick={onClose}
           disabled={paymentStatus === 'processing' || paymentStatus === 'success'}
-          className="flex-1 py-3 px-4 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 transition-colors"
+          className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 transition-colors text-sm font-medium"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={!stripe || paymentStatus === 'processing' || paymentStatus === 'success'}
-          className="flex-1 py-3 px-4 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white rounded-md transition-colors flex items-center justify-center"
+          className="flex-1 py-2 px-4 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white rounded-md transition-colors flex items-center justify-center text-sm font-medium"
         >
           {paymentStatus === 'processing' ? (
             <>
