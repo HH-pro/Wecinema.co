@@ -202,13 +202,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <RiListCheck className="sidebar-icon" />
                 <span className="sidebar-text">Buyer Dashboard</span>
               </Link>
-            </>
-          )}
-
-          {/* Seller Specific Links */}
-          {userType === 'seller' && (
-            <>
-             <Link
+              <Link
                 to="/marketplace/orders"
                 className={`sidebar-item ${getActiveClass(
                   "/marketplace/orders"
@@ -217,6 +211,13 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <RiShoppingBagLine className="sidebar-icon" />
                 <span className="sidebar-text">My Orders</span>
               </Link>
+            </>
+          )}
+
+          {/* Seller Specific Links */}
+          {userType === 'seller' && (
+            <>
+             
               <Link
                 to="/marketplace/create"
                 className={`sidebar-item ${getActiveClass(
