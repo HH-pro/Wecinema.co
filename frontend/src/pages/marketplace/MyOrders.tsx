@@ -111,7 +111,7 @@ const MyOrders: React.FC = () => {
       const token = localStorage.getItem('token');
       
       const response = await axios.get<OrdersResponse>(
-        'http://localhost:3000/marketplace/orders/orders',
+        'http://localhost:3000/marketplace/orders/my-orders',
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
