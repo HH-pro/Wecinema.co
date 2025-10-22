@@ -255,6 +255,91 @@ router.get("/test-stripe", async (req, res) => {
   }
 });
 
+// In your offerRoutes.js - Update confirm-offer-payment route
+router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) => {
+  try {
+    const { offerId, paymentIntentId } = req.body;
+    const userId = req.user.id || req.user._id || req.user.userId;
+
+    console.log("🔍 Confirming offer payment:", { offerId, paymentIntentId, userId });
+
+    // Find the offer
+    const offer = await Offer.findOne({
+      _id: offerId,
+      buyerId: userId,
+      paymentIntentId: paymentIntentId
+    });
+
+    console.log("📋 Offer found:", offer);
+
+    if (!offer) {
+      return res.status(404).json({ error: 'Offer not found or access denied' });
+    }
+
+    // Verify payment intent with Stripe
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    console.log("💳 Payment intent status:", paymentIntent.status);
+    
+    if (paymentIntent.status !== 'succeeded') {
+      return res.status(400).json({ 
+        error: 'Payment not completed', 
+        paymentStatus: paymentIntent.status 
+      });
+    }
+
+    // Update offer status
+    offer.status = 'pending'; // Now waiting for seller acceptance
+    offer.paidAt = new Date();
+    await offer.save();
+
+    console.log("✅ Offer payment confirmed:", offer._id);
+
+    // CREATE ORDER FROM THE OFFER
+    console.log("🛒 Creating order from offer...");
+    const order = new Order({
+      buyerId: userId,
+      sellerId: offer.listingId.sellerId, // Make sure this is populated
+      listingId: offer.listingId,
+      offerId: offer._id,
+      orderType: 'accepted_offer',
+      amount: offer.amount,
+      status: 'paid', // Start as paid since payment is complete
+      stripePaymentIntentId: paymentIntentId,
+      paidAt: new Date(),
+      requirements: offer.requirements,
+      expectedDelivery: offer.expectedDelivery,
+      revisions: 0,
+      maxRevisions: 3,
+      paymentReleased: false
+    });
+
+    await order.save();
+    console.log("✅ Order created from offer:", order._id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Offer payment confirmed and order created successfully',
+      offer: {
+        _id: offer._id,
+        status: offer.status,
+        amount: offer.amount,
+        paidAt: offer.paidAt
+      },
+      order: {
+        _id: order._id,
+        status: order.status,
+        amount: order.amount
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error confirming offer payment:', error);
+    res.status(500).json({ 
+      error: 'Failed to confirm payment',
+      details: error.message 
+    });
+  }
+});
 
 // Confirm payment for offers
 router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) => {
