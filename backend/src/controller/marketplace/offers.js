@@ -4,12 +4,17 @@ const Offer = require("../../models/marketplace/offer");
 const MarketplaceListing = require("../../models/marketplace/listing");
 const Order = require("../../models/marketplace/order");
 const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils");
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); // Use environment variable
+const express = require("express");
+
+
+// Direct Stripe keys (replace with your actual keys)
+const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
+
+// Make Offer Route with Stripe Payment
 router.post("/make-offer", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== MAKE OFFER WITH PAYMENT REQUEST ===");
-    console.log("Request body:", JSON.stringify(req.body, null, 2));
-    console.log("User ID:", req.user?.id || req.user?._id);
+    console.log("Request body:", req.body);
     
     const { listingId, amount, message, requirements, expectedDelivery } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
@@ -29,6 +34,12 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
     if (isNaN(offerAmount) || offerAmount <= 0) {
       console.log("❌ Invalid amount:", amount);
       return res.status(400).json({ error: 'Valid amount is required' });
+    }
+
+    // Check minimum amount for Stripe
+    if (offerAmount < 0.50) {
+      console.log("❌ Amount too low for Stripe");
+      return res.status(400).json({ error: 'Amount must be at least $0.50' });
     }
 
     console.log("🔍 Looking for listing:", listingId);
@@ -61,7 +72,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'You already have a pending offer for this listing' });
     }
 
-    // ✅ CREATE STRIPE PAYMENT INTENT WITH ERROR HANDLING
+    // ✅ CREATE STRIPE PAYMENT INTENT
     console.log("💳 Creating Stripe payment intent...");
     console.log("Amount:", offerAmount);
     console.log("Amount in cents:", Math.round(offerAmount * 100));
@@ -79,12 +90,12 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
         automatic_payment_methods: {
           enabled: true,
         },
-        description: `Offer for: ${listing.title.substring(0, 22)}...`,
+        description: `Offer for: ${listing.title}`,
       });
 
       console.log("✅ Stripe payment intent created successfully");
       console.log("Payment Intent ID:", paymentIntent.id);
-      console.log("Client Secret exists:", !!paymentIntent.client_secret);
+      console.log("Client Secret:", paymentIntent.client_secret ? '***' : 'MISSING');
 
       // Create offer in database
       const offerData = {
@@ -105,7 +116,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
 
       console.log("✅ Offer saved to database:", offer._id);
 
-      // Return success response
+      // Return success response with clientSecret
       res.status(201).json({
         success: true,
         message: 'Offer submitted. Please complete payment.',
@@ -115,19 +126,18 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
           status: offer.status,
           paymentIntentId: offer.paymentIntentId
         },
-        clientSecret: paymentIntent.client_secret,
+        clientSecret: paymentIntent.client_secret, // ✅ THIS IS WHAT FRONTEND NEEDS
         paymentIntentId: paymentIntent.id,
         amount: offerAmount
       });
 
     } catch (stripeError) {
-      console.error('❌ STRIPE ERROR DETAILS:');
+      console.error('❌ STRIPE ERROR:');
       console.error('Error Type:', stripeError.type);
       console.error('Error Code:', stripeError.code);
       console.error('Error Message:', stripeError.message);
-      console.error('Stripe Request ID:', stripeError.requestId);
-      console.error('Raw Error:', JSON.stringify(stripeError, null, 2));
       
+      // Return specific Stripe error
       return res.status(500).json({ 
         error: 'Payment processing failed',
         details: stripeError.message,
@@ -144,7 +154,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
   }
 });
 
-// Add this new route for direct purchases (Buy Now)
+// Direct Purchase Route
 router.post("/create-direct-payment", authenticateMiddleware, async (req, res) => {
   try {
     const { listingId } = req.body;
@@ -164,15 +174,18 @@ router.post("/create-direct-payment", authenticateMiddleware, async (req, res) =
       return res.status(404).json({ error: 'Listing not found' });
     }
 
-    // Check if listing is available
     if (listing.status !== 'active') {
       return res.status(400).json({ error: 'Listing is not available for purchase' });
     }
 
     // Check if user is not the seller
-    const sellerId = listing.sellerId.toString();
-    if (userId.toString() === sellerId) {
+    if (listing.sellerId.toString() === userId.toString()) {
       return res.status(400).json({ error: 'Cannot purchase your own listing' });
+    }
+
+    // Check minimum amount
+    if (listing.price < 0.50) {
+      return res.status(400).json({ error: 'Listing price must be at least $0.50' });
     }
 
     // ✅ CREATE STRIPE PAYMENT INTENT FOR DIRECT PURCHASE
@@ -184,9 +197,8 @@ router.post("/create-direct-payment", authenticateMiddleware, async (req, res) =
       metadata: {
         listingId: listingId.toString(),
         buyerId: userId.toString(),
-        sellerId: sellerId,
-        type: 'direct_purchase',
-        amount: listing.price.toString()
+        sellerId: listing.sellerId.toString(),
+        type: 'direct_purchase'
       },
       automatic_payment_methods: {
         enabled: true,
@@ -199,7 +211,7 @@ router.post("/create-direct-payment", authenticateMiddleware, async (req, res) =
     // Create order for direct purchase
     const order = new Order({
       buyerId: userId,
-      sellerId: sellerId,
+      sellerId: listing.sellerId,
       listingId: listingId,
       orderType: 'direct_purchase',
       amount: listing.price,
@@ -219,7 +231,7 @@ router.post("/create-direct-payment", authenticateMiddleware, async (req, res) =
         amount: order.amount,
         status: order.status
       },
-      clientSecret: paymentIntent.client_secret, // ✅ CLIENT SECRET
+      clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
       amount: listing.price
     });
@@ -228,10 +240,40 @@ router.post("/create-direct-payment", authenticateMiddleware, async (req, res) =
     console.error('❌ Error creating direct payment:', error);
     res.status(500).json({ 
       error: 'Failed to create payment intent',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: error.message
     });
   }
 });
+
+// Test Stripe Connection
+router.get("/test-stripe", async (req, res) => {
+  try {
+    console.log("🧪 Testing Stripe connection...");
+    
+    // Test Stripe connection
+    const testIntent = await stripe.paymentIntents.create({
+      amount: 1000, // $10.00
+      currency: 'usd',
+      metadata: { test: 'true' }
+    });
+
+    res.json({
+      success: true,
+      message: 'Stripe is working correctly',
+      testIntentId: testIntent.id,
+      clientSecret: testIntent.client_secret
+    });
+
+  } catch (error) {
+    console.error('Stripe test failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Stripe test failed',
+      details: error.message
+    });
+  }
+});
+
 
 // Confirm payment for offers
 router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) => {
