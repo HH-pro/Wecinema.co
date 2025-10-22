@@ -154,8 +154,8 @@ const Browse: React.FC = () => {
         dashboard_url: `${window.location.origin}/marketplace/seller/dashboard`
       };
 
-      const serviceID = 'YOUR_EMAILJS_SERVICE_ID'; // Replace with your EmailJS service ID
-      const templateID = type === 'offer' ? 'YOUR_OFFER_TEMPLATE_ID' : 'YOUR_PURCHASE_TEMPLATE_ID'; // Replace with your template IDs
+      const serviceID = 'service_pykwrta'; // Replace with your EmailJS service ID
+      const templateID = type === 'offer' ? 'template_xtnsrmg' : 'template_h4gtoxd'; // Replace with your template IDs
 
       await emailjs.send(serviceID, templateID, templateParams);
       
