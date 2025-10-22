@@ -130,103 +130,100 @@ const Browse: React.FC = () => {
     });
     setShowOfferModal(true);
   };
+// In handleSubmitOffer function:
+const handleSubmitOffer = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  if (!selectedListing) return;
 
-  const handleSubmitOffer = async (e: React.FormEvent) => {
-    e.preventDefault();
+  try {
+    setPaymentStatus('processing');
     
-    if (!selectedListing) return;
+    console.log('🔄 Submitting offer with payment...');
 
-    try {
-      setPaymentStatus('processing');
-      
-      console.log('🔄 Submitting offer with data:', {
+    const response = await axios.post(
+      `http://localhost:3000/marketplace/offers/make-offer`, // ✅ Use the correct endpoint
+      {
         listingId: selectedListing._id,
-        ...offerForm
-      });
-
-      const response = await axios.post(
-        `http://localhost:3000/marketplace/offers/make-offer`,
-        {
-          listingId: selectedListing._id,
-          amount: parseFloat(offerForm.amount),
-          message: offerForm.message,
-          requirements: offerForm.requirements,
-          expectedDelivery: offerForm.expectedDelivery
-        },
-        { 
-          headers: { 
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          } 
-        }
-      );
-
-      console.log('✅ Offer submission response:', response.data);
-
-      // Check if clientSecret is present in response
-      if (!response.data.clientSecret) {
-        throw new Error('No client secret received from server');
+        amount: parseFloat(offerForm.amount),
+        message: offerForm.message,
+        requirements: offerForm.requirements,
+        expectedDelivery: offerForm.expectedDelivery
+      },
+      { 
+        headers: { 
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        } 
       }
+    );
 
-      setClientSecret(response.data.clientSecret);
-      setOfferData(response.data);
-      setShowOfferModal(false);
-      setShowPaymentModal(true);
-      setPaymentStatus('idle');
-      
-    } catch (error: any) {
-      console.error('❌ Error submitting offer:', error);
-      setPaymentStatus('failed');
-      alert(error.response?.data?.error || error.message || 'Failed to submit offer');
+    console.log('✅ Offer with payment response:', response.data);
+
+    // Check if clientSecret is present
+    if (!response.data.clientSecret) {
+      throw new Error('No client secret received from server');
     }
-  };
 
-  const handleDirectPayment = async (listing: Listing) => {
-    if (!listing._id) return;
+    setClientSecret(response.data.clientSecret);
+    setOfferData(response.data);
+    setShowOfferModal(false);
+    setShowPaymentModal(true);
+    setPaymentStatus('idle');
     
-    try {
-      setPaymentStatus('processing');
-      
-      console.log('🔄 Creating direct payment for listing:', listing._id);
+  } catch (error: any) {
+    console.error('❌ Error submitting offer with payment:', error);
+    setPaymentStatus('failed');
+    alert(error.response?.data?.error || error.message || 'Failed to submit offer');
+  }
+};
 
-      // Create direct payment intent for immediate purchase
-      const response = await axios.post(
-        `http://localhost:3000/marketplace/payments/create-payment-intent`,
-        {
-          listingId: listing._id,
-          amount: listing.price
-        },
-        { 
-          headers: { 
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          } 
-        }
-      );
+// In handleDirectPayment function:
+const handleDirectPayment = async (listing: Listing) => {
+  if (!listing._id) return;
+  
+  try {
+    setPaymentStatus('processing');
+    
+    console.log('🔄 Creating direct payment for listing:', listing._id);
 
-      console.log('✅ Direct payment response:', response.data);
-
-      if (!response.data.clientSecret) {
-        throw new Error('No client secret received from server');
+    const response = await axios.post(
+      `http://localhost:3000/marketplace/offers/create-direct-payment`, // ✅ Use the new endpoint
+      {
+        listingId: listing._id
+      },
+      { 
+        headers: { 
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        } 
       }
+    );
 
-      setClientSecret(response.data.clientSecret);
-      setOfferData({
-        amount: listing.price,
-        listing: listing,
-        type: 'direct_purchase',
-        paymentIntentId: response.data.paymentIntentId
-      });
-      setShowPaymentModal(true);
-      setPaymentStatus('idle');
-      
-    } catch (error: any) {
-      console.error('❌ Error creating payment:', error);
-      setPaymentStatus('failed');
-      alert(error.response?.data?.error || error.message || 'Failed to initiate payment');
+    console.log('✅ Direct payment response:', response.data);
+
+    if (!response.data.clientSecret) {
+      throw new Error('No client secret received from server');
     }
-  };
 
+    setClientSecret(response.data.clientSecret);
+    setOfferData({
+      amount: listing.price,
+      listing: listing,
+      type: 'direct_purchase',
+      paymentIntentId: response.data.paymentIntentId,
+      order: response.data.order
+    });
+    setShowPaymentModal(true);
+    setPaymentStatus('idle');
+    
+  } catch (error: any) {
+    console.error('❌ Error creating direct payment:', error);
+    setPaymentStatus('failed');
+    alert(error.response?.data?.error || error.message || 'Failed to initiate payment');
+  }
+};
+  
   const handlePaymentSuccess = () => {
     setShowPaymentModal(false);
     setSelectedListing(null);
