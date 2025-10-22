@@ -48,7 +48,7 @@ router.post("/create-payment-intent", async (req, res) => {
   }
 });
 
-/// In your offerRoutes.js - Update confirm-offer-payment route
+// In your offerRoutes.js - Update confirm-offer-payment route
 router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) => {
   try {
     const { offerId, paymentIntentId } = req.body;
