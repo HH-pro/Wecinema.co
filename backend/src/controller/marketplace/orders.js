@@ -6,7 +6,7 @@ const Offer = require("../../models/marketplace/offer");
 const { authenticateMiddleware } = require("../../utils");
 const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
 
-// Get my orders (buyer)
+// Get my orders (buyer) - FIXED VERSION
 router.get("/my-orders", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
@@ -17,11 +17,29 @@ router.get("/my-orders", authenticateMiddleware, async (req, res) => {
 
     console.log("📦 Fetching orders for user:", userId);
 
+    // First, let's check if the Order model exists and has the correct schema
+    const orderSample = await Order.findOne({ buyerId: userId }).limit(1);
+    console.log("Order sample:", orderSample);
+
+    // Use lean() to get plain JavaScript objects and avoid population issues
     const orders = await Order.find({ buyerId: userId })
-      .populate('sellerId', 'username avatar sellerRating email')
-      .populate('listingId', 'title mediaUrls price category type description tags')
-      .populate('offerId', 'amount message requirements expectedDelivery')
-      .sort({ createdAt: -1 });
+      .populate({
+        path: 'sellerId',
+        select: 'username avatar sellerRating email',
+        model: 'User' // Explicitly specify the model
+      })
+      .populate({
+        path: 'listingId',
+        select: 'title mediaUrls price category type description tags',
+        model: 'MarketplaceListing' // Explicitly specify the model
+      })
+      .populate({
+        path: 'offerId',
+        select: 'amount message requirements expectedDelivery',
+        model: 'Offer' // Explicitly specify the model
+      })
+      .sort({ createdAt: -1 })
+      .lean(); // Convert to plain JavaScript objects
 
     console.log(`✅ Found ${orders.length} orders for user`);
 
@@ -41,6 +59,15 @@ router.get("/my-orders", authenticateMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error fetching orders:', error);
+    
+    // More detailed error information
+    if (error.name === 'StrictPopulateError') {
+      return res.status(500).json({ 
+        error: 'Database schema error',
+        details: 'Please check your Order model schema definitions'
+      });
+    }
+    
     res.status(500).json({ 
       error: 'Failed to fetch orders',
       details: error.message 
@@ -48,7 +75,7 @@ router.get("/my-orders", authenticateMiddleware, async (req, res) => {
   }
 });
 
-// Get my sales (seller)
+// Get my sales (seller) - FIXED VERSION
 router.get("/my-sales", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
@@ -60,10 +87,23 @@ router.get("/my-sales", authenticateMiddleware, async (req, res) => {
     console.log("💰 Fetching sales for seller:", userId);
 
     const sales = await Order.find({ sellerId: userId })
-      .populate('buyerId', 'username avatar email')
-      .populate('listingId', 'title mediaUrls price category type')
-      .populate('offerId', 'amount message requirements')
-      .sort({ createdAt: -1 });
+      .populate({
+        path: 'buyerId',
+        select: 'username avatar email',
+        model: 'User'
+      })
+      .populate({
+        path: 'listingId',
+        select: 'title mediaUrls price category type',
+        model: 'MarketplaceListing'
+      })
+      .populate({
+        path: 'offerId',
+        select: 'amount message requirements',
+        model: 'Offer'
+      })
+      .sort({ createdAt: -1 })
+      .lean();
 
     console.log(`✅ Found ${sales.length} sales for seller`);
 
@@ -73,7 +113,7 @@ router.get("/my-sales", authenticateMiddleware, async (req, res) => {
       active: sales.filter(o => ['paid', 'in_progress', 'delivered', 'in_revision'].includes(o.status)).length,
       completed: sales.filter(o => o.status === 'completed').length,
       pending: sales.filter(o => o.status === 'pending_payment').length,
-      totalRevenue: sales.filter(o => o.status === 'completed').reduce((sum, order) => sum + order.amount, 0)
+      totalRevenue: sales.filter(o => o.status === 'completed').reduce((sum, order) => sum + (order.amount || 0), 0)
     };
 
     res.status(200).json({
@@ -91,7 +131,7 @@ router.get("/my-sales", authenticateMiddleware, async (req, res) => {
   }
 });
 
-// Get order details
+// Get order details - FIXED VERSION
 router.get("/:orderId", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -100,18 +140,35 @@ router.get("/:orderId", authenticateMiddleware, async (req, res) => {
     console.log("🔍 Fetching order details:", orderId);
 
     const order = await Order.findById(orderId)
-      .populate('buyerId', 'username avatar email')
-      .populate('sellerId', 'username avatar sellerRating email')
-      .populate('listingId', 'title mediaUrls price category type description tags')
-      .populate('offerId', 'amount message requirements expectedDelivery');
+      .populate({
+        path: 'buyerId',
+        select: 'username avatar email',
+        model: 'User'
+      })
+      .populate({
+        path: 'sellerId',
+        select: 'username avatar sellerRating email',
+        model: 'User'
+      })
+      .populate({
+        path: 'listingId',
+        select: 'title mediaUrls price category type description tags',
+        model: 'MarketplaceListing'
+      })
+      .populate({
+        path: 'offerId',
+        select: 'amount message requirements expectedDelivery',
+        model: 'Offer'
+      })
+      .lean();
 
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
 
     // Check if user has access to this order
-    const isBuyer = order.buyerId._id.toString() === userId.toString();
-    const isSeller = order.sellerId._id.toString() === userId.toString();
+    const isBuyer = order.buyerId && order.buyerId._id.toString() === userId.toString();
+    const isSeller = order.sellerId && order.sellerId._id.toString() === userId.toString();
 
     if (!isBuyer && !isSeller) {
       return res.status(403).json({ error: 'Access denied to this order' });
@@ -132,6 +189,7 @@ router.get("/:orderId", authenticateMiddleware, async (req, res) => {
     });
   }
 });
+
 
 // Update order status (seller - start working)
 router.put("/:orderId/start-work", authenticateMiddleware, async (req, res) => {
