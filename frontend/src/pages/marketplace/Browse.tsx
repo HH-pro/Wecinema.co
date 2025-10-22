@@ -521,57 +521,41 @@ const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentS
   const elements = useElements();
   const [error, setError] = useState('');
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    
-    if (!stripe || !elements) {
-      setError('Payment system not ready. Please try again.');
+ // In PaymentForm component handleSubmit:
+const handleSubmit = async (event: React.FormEvent) => {
+  event.preventDefault();
+  
+  if (!stripe || !elements) {
+    setError('Payment system not ready. Please try again.');
+    return;
+  }
+
+  setPaymentStatus('processing');
+  setError('');
+
+  try {
+    const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: `${window.location.origin}/marketplace/payment/success`,
+      },
+      redirect: 'if_required'
+    });
+
+    if (stripeError) {
+      setError(stripeError.message || 'Payment failed');
+      setPaymentStatus('failed');
       return;
     }
 
-    setPaymentStatus('processing');
-    setError('');
-
-    try {
-      const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        confirmParams: {
-          return_url: `${window.location.origin}/marketplace/payment/success`,
-        },
-        redirect: 'if_required'
-      });
-
-      if (stripeError) {
-        setError(stripeError.message || 'Payment failed');
-        setPaymentStatus('failed');
-        return;
-      }
-
-      // If payment requires action, Stripe will handle redirect
-      if (paymentIntent?.status === 'requires_action') {
-        return; // Stripe will redirect to 3D Secure or other authentication
-      }
-
-      // Confirm payment on backend
-      const endpoint = offerData?.type === 'direct_purchase' 
-        ? 'http://localhost:3000/marketplace/payments/confirm-purchase'
-        : 'http://localhost:3000/marketplace/offers/confirm-payment';
-
-      const response = await axios.post(
-        endpoint,
+    // Confirm payment based on type
+    if (offerData?.type === 'direct_purchase') {
+      // Confirm direct purchase
+      await axios.post(
+        'http://localhost:3000/marketplace/payments/confirm-payment',
         { 
-          ...(offerData?.type === 'direct_purchase' 
-            ? { 
-                listingId: offerData.listing._id, 
-                paymentIntentId: paymentIntent?.id,
-                amount: offerData.amount
-              }
-            : { 
-                offerId: offerData.offer._id, 
-                paymentIntentId: paymentIntent?.id,
-                amount: offerData.amount
-              }
-          )
+          orderId: offerData.order._id,
+          paymentIntentId: paymentIntent?.id
         },
         { 
           headers: { 
@@ -580,23 +564,34 @@ const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentS
           } 
         }
       );
-
-      if (response.data.success) {
-        setPaymentStatus('success');
-        setTimeout(() => {
-          onSuccess();
-        }, 1500);
-      } else {
-        throw new Error(response.data.error || 'Payment confirmation failed');
-      }
-
-    } catch (err: any) {
-      console.error('Payment error:', err);
-      setError(err.response?.data?.error || err.message || 'Payment failed');
-      setPaymentStatus('failed');
+    } else {
+      // Confirm offer payment
+      await axios.post(
+        'http://localhost:3000/marketplace/offers/confirm-offer-payment',
+        { 
+          offerId: offerData.offer._id,
+          paymentIntentId: paymentIntent?.id
+        },
+        { 
+          headers: { 
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          } 
+        }
+      );
     }
-  };
 
+    setPaymentStatus('success');
+    setTimeout(() => {
+      onSuccess();
+    }, 1500);
+
+  } catch (err: any) {
+    console.error('Payment confirmation error:', err);
+    setError(err.response?.data?.error || err.message || 'Payment failed');
+    setPaymentStatus('failed');
+  }
+};
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="mb-4">
