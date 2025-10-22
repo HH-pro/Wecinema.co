@@ -45,9 +45,9 @@ interface Offer {
 
 interface Order {
   _id: string;
-  buyerId: User | string; // Can be string if not populated
-  sellerId: User | string; // Can be string if not populated
-  listingId: Listing | string; // Can be string if not populated
+  buyerId: User | string;
+  sellerId: User | string;
+  listingId: Listing | string;
   offerId?: Offer | string;
   orderType: 'direct_purchase' | 'accepted_offer' | 'commission';
   amount: number;
@@ -100,6 +100,7 @@ const MyOrders: React.FC = () => {
   });
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const [debugInfo, setDebugInfo] = useState<any>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -107,19 +108,8 @@ const MyOrders: React.FC = () => {
   }, []);
 
   const getAuthToken = (): string | null => {
-    // Try multiple possible token storage locations
-    const token = 
-      localStorage.getItem('token') ||
-      sessionStorage.getItem('token') ||
-      localStorage.getItem('authToken') ||
-      sessionStorage.getItem('authToken');
-    
-    console.log('🔐 Token retrieval:', { 
-      hasToken: !!token,
-      tokenLength: token?.length,
-      source: 'localStorage/sessionStorage'
-    });
-    
+    const token = localStorage.getItem('token');
+    console.log('🔐 Token from localStorage:', token);
     return token;
   };
 
@@ -127,6 +117,7 @@ const MyOrders: React.FC = () => {
     try {
       setLoading(true);
       setError('');
+      setDebugInfo(null);
       
       const token = getAuthToken();
       
@@ -136,11 +127,7 @@ const MyOrders: React.FC = () => {
         return;
       }
 
-      console.log('🔄 Fetching orders with token:', {
-        tokenExists: !!token,
-        tokenPreview: token.substring(0, 20) + '...'
-      });
-
+      console.log('🔄 Fetching orders...');
       const response = await axios.get<OrdersResponse>(
         'http://localhost:3000/marketplace/orders/my-orders',
         { 
@@ -151,22 +138,42 @@ const MyOrders: React.FC = () => {
         }
       );
 
-      console.log('✅ Orders response:', response.data);
+      console.log('✅ Full API Response:', response);
+      console.log('📦 Response data:', response.data);
+
+      // Set debug info
+      setDebugInfo({
+        responseStatus: response.status,
+        responseData: response.data,
+        ordersCount: response.data.orders?.length || 0,
+        firstOrder: response.data.orders?.[0] || null
+      });
 
       if (response.data.success) {
-        setOrders(response.data.orders);
-        setStats(response.data.stats);
+        setOrders(response.data.orders || []);
+        setStats(response.data.stats || {
+          total: 0,
+          active: 0,
+          completed: 0,
+          pending: 0
+        });
+        
+        console.log('📊 Orders set:', response.data.orders);
+        console.log('📈 Stats set:', response.data.stats);
       } else {
-        setError('Failed to load orders');
+        setError('Failed to load orders: API returned success=false');
       }
     } catch (error: any) {
       console.error('❌ Error fetching orders:', error);
+      setDebugInfo({
+        error: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       
       if (error.response?.status === 401) {
         setError('Please login to view your orders');
-        // Clear invalid token
         localStorage.removeItem('token');
-        sessionStorage.removeItem('token');
       } else if (error.response?.data?.error) {
         setError(error.response.data.error);
       } else {
@@ -219,23 +226,21 @@ const MyOrders: React.FC = () => {
     return texts[status] || status;
   };
 
-  // Helper function to get username from order (handles both populated and non-populated cases)
+  // Helper functions to handle populated data
   const getSellerUsername = (order: Order): string => {
     if (typeof order.sellerId === 'object' && order.sellerId !== null) {
       return (order.sellerId as User).username || 'Unknown Seller';
     }
-    return 'Loading...';
+    return 'Seller';
   };
 
-  // Helper function to get listing title
   const getListingTitle = (order: Order): string => {
     if (typeof order.listingId === 'object' && order.listingId !== null) {
       return (order.listingId as Listing).title || 'Unknown Listing';
     }
-    return 'Loading...';
+    return 'Listing';
   };
 
-  // Helper function to get listing media
   const getListingMedia = (order: Order): string | undefined => {
     if (typeof order.listingId === 'object' && order.listingId !== null) {
       return (order.listingId as Listing).mediaUrls?.[0];
@@ -264,7 +269,7 @@ const MyOrders: React.FC = () => {
   };
 
   const handleLoginRedirect = (): void => {
-    navigate('/'); // Adjust to your login route
+    navigate('/login');
   };
 
   const formatPrice = (price: number): string => {
@@ -282,6 +287,16 @@ const MyOrders: React.FC = () => {
     });
   };
 
+  // Debug component to show what's happening
+  const DebugPanel = () => (
+    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+      <h3 className="font-semibold text-yellow-800 mb-2">Debug Information:</h3>
+      <pre className="text-xs text-yellow-700 overflow-auto">
+        {JSON.stringify(debugInfo, null, 2)}
+      </pre>
+    </div>
+  );
+
   // Loading State
   if (loading) {
     return (
@@ -296,62 +311,14 @@ const MyOrders: React.FC = () => {
     );
   }
 
-  // Error State
-  if (error) {
-    return (
-      <MarketplaceLayout>
-        <div className="min-h-screen bg-gray-50 py-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-              <div className="max-w-md mx-auto">
-                <div className="w-24 h-24 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
-                  <FiAlertCircle size={32} className="text-red-600" />
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                  {error}
-                </h3>
-                <p className="text-gray-600 mb-6">
-                  {error.includes('login') 
-                    ? 'Please login to access your orders'
-                    : 'There was a problem loading your orders'
-                  }
-                </p>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  {error.includes('login') ? (
-                    <button 
-                      onClick={handleLoginRedirect}
-                      className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700"
-                    >
-                      Go to Login
-                    </button>
-                  ) : (
-                    <button 
-                      onClick={handleRetry}
-                      className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700"
-                    >
-                      Try Again
-                    </button>
-                  )}
-                  <button 
-                    onClick={() => navigate('/marketplace')}
-                    className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                  >
-                    <FiShoppingBag className="mr-2" size={18} />
-                    Browse Marketplace
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </MarketplaceLayout>
-    );
-  }
-
   return (
     <MarketplaceLayout>
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          {/* Debug Panel - Remove this in production */}
+          {debugInfo && <DebugPanel />}
+
           {/* Header */}
           <div className="mb-8">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -384,74 +351,101 @@ const MyOrders: React.FC = () => {
             </div>
           </div>
 
-          {/* Search and Filters */}
-          <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex flex-col lg:flex-row gap-4">
-              {/* Search */}
-              <div className="flex-1">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <FiSearch className="text-gray-400" size={20} />
+          {/* Error State */}
+          {error && (
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-6">
+              <div className="flex items-center gap-3">
+                <FiAlertCircle className="text-red-600 flex-shrink-0" size={24} />
+                <div>
+                  <h3 className="text-red-800 font-semibold">{error}</h3>
+                  <div className="flex gap-3 mt-3">
+                    {error.includes('login') ? (
+                      <button 
+                        onClick={handleLoginRedirect}
+                        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                      >
+                        Go to Login
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={handleRetry}
+                        className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 text-sm"
+                      >
+                        Try Again
+                      </button>
+                    )}
                   </div>
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
-                    placeholder="Search orders by title or seller..."
-                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
-                  />
                 </div>
-              </div>
-
-              {/* Tabs */}
-              <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
-                {[
-                  { key: 'all', label: 'All', count: orders.length },
-                  { key: 'active', label: 'Active', count: stats.active || 0 },
-                  { key: 'completed', label: 'Completed', count: stats.completed || 0 },
-                  { key: 'pending', label: 'Pending', count: stats.pending || 0 }
-                ].map(tab => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveTab(tab.key)}
-                    className={`px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
-                      activeTab === tab.key
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    {tab.label} ({tab.count})
-                  </button>
-                ))}
               </div>
             </div>
-          </div>
+          )}
+
+          {/* Search and Filters */}
+          {!error && (
+            <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <div className="flex flex-col lg:flex-row gap-4">
+                {/* Search */}
+                <div className="flex-1">
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <FiSearch className="text-gray-400" size={20} />
+                    </div>
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+                      placeholder="Search orders by title or seller..."
+                      className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
+                  {[
+                    { key: 'all', label: 'All', count: orders.length },
+                    { key: 'active', label: 'Active', count: stats.active || 0 },
+                    { key: 'completed', label: 'Completed', count: stats.completed || 0 },
+                    { key: 'pending', label: 'Pending', count: stats.pending || 0 }
+                  ].map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key)}
+                      className={`px-4 py-2 text-sm font-medium rounded-md transition-colors duration-200 ${
+                        activeTab === tab.key
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      {tab.label} ({tab.count})
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Orders List */}
-          {filteredOrders.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          {!error && filteredOrders.length === 0 && orders.length > 0 ? (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
               <div className="max-w-md mx-auto">
-                <div className="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                  <FiPackage size={32} className="text-gray-400" />
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                  {searchQuery || activeTab !== 'all' ? 'No orders found' : 'No orders yet'}
-                </h3>
-                <p className="text-gray-600 mb-6">
-                  {searchQuery || activeTab !== 'all'
-                    ? 'Try adjusting your search or filters'
-                    : 'Start shopping to see your orders here!'}
+                <FiSearch size={48} className="text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No matching orders</h3>
+                <p className="text-gray-600 mb-4">
+                  Try adjusting your search or filter criteria
                 </p>
                 <button 
-                  onClick={() => navigate('/marketplace')}
-                  className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setActiveTab('all');
+                  }}
+                  className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 text-sm"
                 >
-                  <FiShoppingBag className="mr-2" size={18} />
-                  Browse Marketplace
+                  Clear Filters
                 </button>
               </div>
             </div>
-          ) : (
+          ) : !error && filteredOrders.length > 0 ? (
             <div className="space-y-4">
               {filteredOrders.map((order: Order) => (
                 <div key={order._id} className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
@@ -465,12 +459,14 @@ const MyOrders: React.FC = () => {
                               src={getListingMedia(order)} 
                               alt={getListingTitle(order)}
                               className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
                             />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                              <FiPackage className="text-gray-400" size={24} />
-                            </div>
-                          )}
+                          ) : null}
+                          <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                            <FiPackage className="text-gray-400" size={24} />
+                          </div>
                         </div>
                       </div>
 
@@ -478,7 +474,7 @@ const MyOrders: React.FC = () => {
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-2">
                           <div>
-                            <h3 className="text-lg font-semibold text-gray-900 truncate">
+                            <h3 className="text-lg font-semibold text-gray-900">
                               {getListingTitle(order)}
                             </h3>
                             <p className="text-gray-600 text-sm mt-1">
@@ -555,7 +551,28 @@ const MyOrders: React.FC = () => {
                 </div>
               ))}
             </div>
-          )}
+          ) : !error && orders.length === 0 ? (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+              <div className="max-w-md mx-auto">
+                <div className="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                  <FiPackage size={32} className="text-gray-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  No orders yet
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  Start shopping to see your orders here!
+                </p>
+                <button 
+                  onClick={() => navigate('/marketplace')}
+                  className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                >
+                  <FiShoppingBag className="mr-2" size={18} />
+                  Browse Marketplace
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </MarketplaceLayout>
