@@ -443,7 +443,7 @@ const MyOrders: React.FC = () => {
                     : 'Start shopping to see your orders here!'}
                 </p>
                 <button 
-                  onClick={() => navigate('/marketplace/browse')}
+                  onClick={() => navigate('/marketplace')}
                   className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
                 >
                   <FiShoppingBag className="mr-2" size={18} />
