@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ListingCard from '../../components/marketplae/ListingCard';
 import MarketplaceLayout from '../../components/Layout';
 import { Listing } from '../../types/marketplace';
-import { FiFilter, FiPlus, FiSearch, FiX, FiCreditCard } from 'react-icons/fi';
+import { FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiArrowRight } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { loadStripe } from '@stripe/stripe-js';
@@ -10,7 +10,6 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
 
 // Temporary: Stripe test key for development
 const stripePromise = loadStripe("pk_test_51SKw7ZHYamYyPYbDUlqbeydcW1hVGrHOvCZ8mBwSU1gw77TIRyzng31iSqAvPIQzTYKG8UWfDew7kdKgBxsw7vtq00WTLU3YCZ");
-
 
 const Browse: React.FC = () => {
   const [listings, setListings] = useState<Listing[]>([]);
@@ -22,6 +21,7 @@ const Browse: React.FC = () => {
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [clientSecret, setClientSecret] = useState<string>('');
   const [offerData, setOfferData] = useState<any>(null);
+  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
   const navigate = useNavigate();
 
   const [filters, setFilters] = useState({
@@ -137,6 +137,8 @@ const Browse: React.FC = () => {
     if (!selectedListing) return;
 
     try {
+      setPaymentStatus('processing');
+      
       const response = await axios.post(
         `http://localhost:3000/marketplace/offers/submit`,
         {
@@ -150,9 +152,11 @@ const Browse: React.FC = () => {
       setOfferData(response.data);
       setShowOfferModal(false);
       setShowPaymentModal(true);
+      setPaymentStatus('idle');
       
     } catch (error: any) {
       console.error('Error submitting offer:', error);
+      setPaymentStatus('failed');
       alert(error.response?.data?.error || 'Failed to submit offer');
     }
   };
@@ -162,7 +166,12 @@ const Browse: React.FC = () => {
     setSelectedListing(null);
     setClientSecret('');
     setOfferData(null);
-    navigate('/marketplace/my-orders');
+    setPaymentStatus('success');
+    
+    // Redirect to orders page with success message
+    navigate('/marketplace/my-orders', { 
+      state: { message: 'Payment completed successfully! Your order has been placed.' } 
+    });
   };
 
   const handlePaymentClose = () => {
@@ -170,6 +179,39 @@ const Browse: React.FC = () => {
     setSelectedListing(null);
     setClientSecret('');
     setOfferData(null);
+    setPaymentStatus('idle');
+  };
+
+  const handleDirectPayment = async (listing: Listing) => {
+    if (!listing._id) return;
+    
+    try {
+      setPaymentStatus('processing');
+      
+      // Create direct payment intent for immediate purchase
+      const response = await axios.post(
+        `http://localhost:3000/marketplace/payments/create-payment-intent`,
+        {
+          listingId: listing._id,
+          amount: listing.price
+        },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+
+      setClientSecret(response.data.clientSecret);
+      setOfferData({
+        amount: listing.price,
+        listing: listing,
+        type: 'direct_purchase'
+      });
+      setShowPaymentModal(true);
+      setPaymentStatus('idle');
+      
+    } catch (error: any) {
+      console.error('Error creating payment:', error);
+      setPaymentStatus('failed');
+      alert(error.response?.data?.error || 'Failed to initiate payment');
+    }
   };
 
   const clearFilters = () => {
@@ -387,6 +429,7 @@ const Browse: React.FC = () => {
                   listing={listing}
                   onViewDetails={handleViewDetails}
                   onMakeOffer={handleMakeOffer}
+                  onDirectPayment={handleDirectPayment}
                 />
               ))}
             </div>
@@ -421,6 +464,11 @@ const Browse: React.FC = () => {
             </div>
             
             <form onSubmit={handleSubmitOffer} className="p-6 space-y-4">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-semibold text-gray-900">{selectedListing.title}</h4>
+                <p className="text-sm text-gray-600">Listed Price: ${selectedListing.price}</p>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Offer Amount ($)
@@ -429,6 +477,7 @@ const Browse: React.FC = () => {
                   type="number"
                   step="0.01"
                   required
+                  min="0.01"
                   value={offerForm.amount}
                   onChange={(e) => setOfferForm({ ...offerForm, amount: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500"
@@ -477,6 +526,16 @@ const Browse: React.FC = () => {
                 />
               </div>
 
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-yellow-800 mb-2">
+                  <FiCreditCard />
+                  <span className="font-semibold">Payment Required</span>
+                </div>
+                <p className="text-sm text-yellow-700">
+                  Your offer will be submitted and payment will be processed immediately. The funds will be held securely until the seller accepts your offer.
+                </p>
+              </div>
+
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
@@ -487,9 +546,19 @@ const Browse: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 px-4 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
+                  disabled={paymentStatus === 'processing'}
+                  className="flex-1 py-2 px-4 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 disabled:bg-gray-400 transition-colors flex items-center justify-center"
                 >
-                  Submit Offer & Pay
+                  {paymentStatus === 'processing' ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      Submit Offer & Pay <FiArrowRight className="ml-2" />
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -502,10 +571,13 @@ const Browse: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full">
             <div className="flex items-center justify-between p-6 border-b">
-              <h3 className="text-lg font-semibold">Complete Payment</h3>
+              <h3 className="text-lg font-semibold">
+                {offerData?.type === 'direct_purchase' ? 'Complete Purchase' : 'Complete Offer Payment'}
+              </h3>
               <button 
                 onClick={handlePaymentClose}
                 className="text-gray-400 hover:text-gray-600"
+                disabled={paymentStatus === 'processing'}
               >
                 <FiX size={24} />
               </button>
@@ -513,10 +585,20 @@ const Browse: React.FC = () => {
             
             <div className="p-6">
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                <div className="flex items-center gap-2 text-yellow-800">
-                  <FiCreditCard />
-                  <span className="font-semibold">Offer Amount: ${offerData?.amount}</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-yellow-800">
+                    <FiCreditCard />
+                    <span className="font-semibold">
+                      {offerData?.type === 'direct_purchase' ? 'Purchase Amount' : 'Offer Amount'}: 
+                      ${offerData?.amount}
+                    </span>
+                  </div>
                 </div>
+                {offerData?.listing && (
+                  <p className="text-sm text-yellow-700 mt-2">
+                    {offerData.listing.title}
+                  </p>
+                )}
               </div>
 
               <Elements stripe={stripePromise} options={{ clientSecret }}>
@@ -524,6 +606,8 @@ const Browse: React.FC = () => {
                   offerData={offerData}
                   onSuccess={handlePaymentSuccess}
                   onClose={handlePaymentClose}
+                  paymentStatus={paymentStatus}
+                  setPaymentStatus={setPaymentStatus}
                 />
               </Elements>
             </div>
@@ -534,11 +618,10 @@ const Browse: React.FC = () => {
   );
 };
 
-// Payment Form Component
-const PaymentForm = ({ offerData, onSuccess, onClose }: any) => {
+// Enhanced Payment Form Component
+const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentStatus }: any) => {
   const stripe = useStripe();
   const elements = useElements();
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -548,10 +631,11 @@ const PaymentForm = ({ offerData, onSuccess, onClose }: any) => {
       return;
     }
 
-    setLoading(true);
+    setPaymentStatus('processing');
+    setError('');
 
     try {
-      const { error: stripeError } = await stripe.confirmPayment({
+      const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
           return_url: `${window.location.origin}/marketplace/payment/success`,
@@ -560,35 +644,61 @@ const PaymentForm = ({ offerData, onSuccess, onClose }: any) => {
       });
 
       if (stripeError) {
-        setError(stripeError.message);
-        setLoading(false);
+        setError(stripeError.message || 'Payment failed');
+        setPaymentStatus('failed');
         return;
       }
 
-      // Confirm payment on backend and create order
+      // If payment requires action, Stripe will handle redirect
+      if (paymentIntent?.status === 'requires_action') {
+        return; // Stripe will redirect to 3D Secure or other authentication
+      }
+
+      // Confirm payment on backend
+      const endpoint = offerData?.type === 'direct_purchase' 
+        ? 'http://localhost:3000/marketplace/payments/confirm-purchase'
+        : 'http://localhost:3000/marketplace/offers/confirm-payment';
+
       const response = await axios.post(
-        'http://localhost:3000/marketplace/offers/confirm-payment',
+        endpoint,
         { 
-          offerId: offerData.offer._id,
-          paymentIntentId: offerData.paymentIntentId
+          ...(offerData?.type === 'direct_purchase' 
+            ? { listingId: offerData.listing._id, paymentIntentId: paymentIntent?.id }
+            : { offerId: offerData.offer._id, paymentIntentId: paymentIntent?.id }
+          )
         },
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
 
-      if (response.data.message === 'Payment confirmed and order created successfully') {
-        onSuccess();
+      if (response.data.success) {
+        setPaymentStatus('success');
+        setTimeout(() => {
+          onSuccess();
+        }, 1500);
+      } else {
+        throw new Error(response.data.error || 'Payment confirmation failed');
       }
 
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Payment failed');
-    } finally {
-      setLoading(false);
+      console.error('Payment error:', err);
+      setError(err.response?.data?.error || err.message || 'Payment failed');
+      setPaymentStatus('failed');
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <PaymentElement />
+      <div className="mb-4">
+        <PaymentElement 
+          options={{
+            layout: 'tabs',
+            wallets: {
+              applePay: 'auto',
+              googlePay: 'auto'
+            }
+          }}
+        />
+      </div>
       
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -596,20 +706,36 @@ const PaymentForm = ({ offerData, onSuccess, onClose }: any) => {
         </div>
       )}
       
+      {paymentStatus === 'success' && (
+        <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+          <p className="text-green-700 text-sm">Payment successful! Redirecting...</p>
+        </div>
+      )}
+      
       <div className="flex gap-3 pt-2">
         <button
           type="button"
           onClick={onClose}
-          className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+          disabled={paymentStatus === 'processing' || paymentStatus === 'success'}
+          className="flex-1 py-3 px-4 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 transition-colors"
         >
           Cancel
         </button>
         <button
           type="submit"
-          disabled={!stripe || loading}
-          className="flex-1 py-2 px-4 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white rounded-md transition-colors"
+          disabled={!stripe || paymentStatus === 'processing' || paymentStatus === 'success'}
+          className="flex-1 py-3 px-4 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white rounded-md transition-colors flex items-center justify-center"
         >
-          {loading ? 'Processing...' : `Pay $${offerData?.amount}`}
+          {paymentStatus === 'processing' ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              Processing...
+            </>
+          ) : paymentStatus === 'success' ? (
+            'Success!'
+          ) : (
+            `Pay $${offerData?.amount}`
+          )}
         </button>
       </div>
     </form>
