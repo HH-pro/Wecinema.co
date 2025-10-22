@@ -152,7 +152,6 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
     });
   }
 });
-
 // In your offerRoutes.js - Update create-direct-payment route
 router.post("/create-direct-payment", authenticateMiddleware, async (req, res) => {
   try {
