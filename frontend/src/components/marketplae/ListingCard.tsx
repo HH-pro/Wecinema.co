@@ -42,8 +42,6 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onMakeOffer }) => {
       minimumFractionDigits: price % 1 === 0 ? 0 : 2,
     }).format(price);
 
-  const handleImageLoad = () => setImageLoaded(true);
-
   const handleMakeOfferClick = () => {
     if (!token || !currentUser) {
       toast.error("Please login to make an offer");
@@ -76,8 +74,8 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onMakeOffer }) => {
 
   return (
     <>
-      <div className="group relative w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 hover:border-gray-300 shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden">
-        {/* Media */}
+      <div className="group relative bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 hover:border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden">
+        {/* Media Section */}
         <div className="relative h-52 overflow-hidden bg-gray-100">
           {firstMedia ? (
             isVideo(firstMedia) ? (
@@ -116,7 +114,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onMakeOffer }) => {
                   className={`w-full h-full object-cover transition-all duration-500 ${
                     imageLoaded ? "opacity-100" : "opacity-0 scale-105"
                   } group-hover:scale-110`}
-                  onLoad={handleImageLoad}
+                  onLoad={() => setImageLoaded(true)}
                 />
               </div>
             )
@@ -127,15 +125,15 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onMakeOffer }) => {
           )}
 
           {/* Price Tag */}
-          <div className="absolute bottom-3 left-3 bg-green-600 text-white px-3 py-1.5 rounded-xl font-semibold text-sm shadow-md">
+          <div className="absolute bottom-3 left-3 bg-white text-green-600 px-3 py-1.5 rounded-xl font-bold text-sm shadow-md border border-green-200">
             {formatPrice(listing.price)}
           </div>
         </div>
 
-        {/* Content */}
+        {/* Content Section */}
         <div className="p-5">
           {/* Title */}
-          <h3 className="font-semibold text-gray-900 dark:text-white text-lg mb-2 line-clamp-2 leading-snug">
+          <h3 className="font-semibold text-gray-900 dark:text-white text-base sm:text-lg mb-2 line-clamp-2 leading-snug">
             {listing.title}
           </h3>
 
@@ -148,14 +146,14 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onMakeOffer }) => {
           <button
             onClick={handleMakeOfferClick}
             disabled={!canMakeOffer}
-            className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-semibold text-sm transition-all duration-300 shadow-sm hover:shadow-md transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full bg-yellow-500 hover:bg-yellow-600 text-white py-2.5 rounded-xl font-semibold text-sm transition-all duration-300 shadow-sm hover:shadow-md transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <FiTag size={16} />
-            <span>Make an Offer</span>
+            <span>Make Offer</span>
           </button>
 
           {/* Footer */}
-          <div className="flex justify-between items-center mt-5 pt-3 border-t border-gray-100 text-xs text-gray-500">
+          <div className="flex justify-between items-center mt-4 pt-3 border-t border-gray-100 text-xs text-gray-500">
             <span className="capitalize">{listing.category}</span>
             <span>{new Date(listing.createdAt).toLocaleDateString()}</span>
           </div>
