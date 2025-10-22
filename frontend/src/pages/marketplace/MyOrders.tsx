@@ -333,7 +333,7 @@ const MyOrders: React.FC = () => {
                     </button>
                   )}
                   <button 
-                    onClick={() => navigate('/marketplace/browse')}
+                    onClick={() => navigate('/marketplace')}
                     className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                   >
                     <FiShoppingBag className="mr-2" size={18} />
