@@ -153,45 +153,29 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
   }
 });
 
-// Direct Purchase Route
+// In your offerRoutes.js - Update create-direct-payment route
 router.post("/create-direct-payment", authenticateMiddleware, async (req, res) => {
   try {
     const { listingId } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
 
-    if (!userId) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
+    console.log("🔍 Creating direct payment for listing:", listingId, "user:", userId);
 
-    if (!listingId) {
-      return res.status(400).json({ error: 'Listing ID is required' });
-    }
-
-    console.log("🔍 Looking for listing for direct purchase:", listingId);
     const listing = await MarketplaceListing.findById(listingId);
     if (!listing) {
       return res.status(404).json({ error: 'Listing not found' });
     }
 
-    if (listing.status !== 'active') {
-      return res.status(400).json({ error: 'Listing is not available for purchase' });
-    }
+    console.log("📋 Listing found:", {
+      id: listing._id,
+      title: listing.title,
+      sellerId: listing.sellerId,
+      price: listing.price
+    });
 
-    // Check if user is not the seller
-    if (listing.sellerId.toString() === userId.toString()) {
-      return res.status(400).json({ error: 'Cannot purchase your own listing' });
-    }
-
-    // Check minimum amount
-    if (listing.price < 0.50) {
-      return res.status(400).json({ error: 'Listing price must be at least $0.50' });
-    }
-
-    // ✅ CREATE STRIPE PAYMENT INTENT FOR DIRECT PURCHASE
-    console.log("💳 Creating direct purchase payment intent for amount:", listing.price);
-    
+    // Create payment intent
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(listing.price * 100), // Convert to cents
+      amount: Math.round(listing.price * 100),
       currency: 'usd',
       metadata: {
         listingId: listingId.toString(),
@@ -199,28 +183,28 @@ router.post("/create-direct-payment", authenticateMiddleware, async (req, res) =
         sellerId: listing.sellerId.toString(),
         type: 'direct_purchase'
       },
-      automatic_payment_methods: {
-        enabled: true,
-      },
+      automatic_payment_methods: { enabled: true },
       description: `Direct purchase: ${listing.title}`,
     });
 
-    console.log("✅ Direct purchase payment intent created:", paymentIntent.id);
+    console.log("✅ Payment intent created:", paymentIntent.id);
 
-    // Create order for direct purchase
+    // Create order immediately for direct purchase
     const order = new Order({
       buyerId: userId,
       sellerId: listing.sellerId,
       listingId: listingId,
       orderType: 'direct_purchase',
       amount: listing.price,
-      status: 'pending_payment',
-      stripePaymentIntentId: paymentIntent.id
+      status: 'pending_payment', // Will be updated to 'paid' after payment confirmation
+      stripePaymentIntentId: paymentIntent.id,
+      revisions: 0,
+      maxRevisions: 3,
+      paymentReleased: false
     });
 
     await order.save();
-
-    console.log("✅ Direct purchase order created:", order._id);
+    console.log("✅ Order created for direct purchase:", order._id);
 
     res.status(201).json({
       success: true,
@@ -239,11 +223,10 @@ router.post("/create-direct-payment", authenticateMiddleware, async (req, res) =
     console.error('❌ Error creating direct payment:', error);
     res.status(500).json({ 
       error: 'Failed to create payment intent',
-      details: error.message
+      details: error.message 
     });
   }
 });
-
 // Test Stripe Connection
 router.get("/test-stripe", async (req, res) => {
   try {
