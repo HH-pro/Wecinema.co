@@ -52,6 +52,20 @@ const marketplaceListingSchema = new mongoose.Schema({
     lowercase: true
   }],
   
+  // 🆕 EMAIL FIELD ADDED
+  sellerEmail: {
+    type: String,
+    trim: true,
+    lowercase: true,
+    validate: {
+      validator: function(email) {
+        // Email validation regex
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      },
+      message: 'Invalid email format'
+    }
+  },
+  
   // 🆕 OPTIONAL ENHANCEMENTS:
   
   // For better search and filtering
@@ -127,10 +141,12 @@ marketplaceListingSchema.index({ status: 1, createdAt: -1 });
 marketplaceListingSchema.index({ category: 1 });
 marketplaceListingSchema.index({ tags: 1 });
 marketplaceListingSchema.index({ price: 1 });
+marketplaceListingSchema.index({ sellerEmail: 1 }); // 🆕 Index for email
 marketplaceListingSchema.index({ title: 'text', description: 'text', tags: 'text' });
 
-// 🆕 Pre-save middleware to generate slug
-marketplaceListingSchema.pre('save', function(next) {
+// 🆕 Pre-save middleware to generate slug and populate sellerEmail
+marketplaceListingSchema.pre('save', async function(next) {
+  // Generate slug from title
   if (this.isModified('title')) {
     this.slug = this.title
       .toLowerCase()
@@ -138,6 +154,21 @@ marketplaceListingSchema.pre('save', function(next) {
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
   }
+  
+  // 🆕 Populate sellerEmail from User model if not provided
+  if (!this.sellerEmail && this.sellerId) {
+    try {
+      const User = mongoose.model('User');
+      const seller = await User.findById(this.sellerId).select('email');
+      if (seller && seller.email) {
+        this.sellerEmail = seller.email;
+      }
+    } catch (error) {
+      console.error('Error fetching seller email:', error);
+      // Continue without email - it's optional
+    }
+  }
+  
   next();
 });
 
@@ -160,6 +191,27 @@ marketplaceListingSchema.statics.findActive = function() {
       { expiresAt: { $gt: new Date() } }
     ]
   });
+};
+
+// 🆕 Method to get seller contact info
+marketplaceListingSchema.methods.getSellerContact = function() {
+  return {
+    email: this.sellerEmail,
+    // You can add more contact methods here
+  };
+};
+
+// 🆕 Static method to find listings by seller email
+marketplaceListingSchema.statics.findBySellerEmail = function(email) {
+  return this.find({ sellerEmail: email.toLowerCase() });
+};
+
+// 🆕 Update email when seller updates their email
+marketplaceListingSchema.statics.updateSellerEmail = async function(sellerId, newEmail) {
+  return this.updateMany(
+    { sellerId: sellerId },
+    { sellerEmail: newEmail.toLowerCase() }
+  );
 };
 
 const MarketplaceListing = mongoose.model('MarketplaceListing', marketplaceListingSchema);
