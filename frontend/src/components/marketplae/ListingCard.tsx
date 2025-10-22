@@ -1,11 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Listing } from "../../types/marketplace";
-import {
-  FiPlay,
-  FiImage,
-  FiTag,
-  FiX,
-} from "react-icons/fi";
+import { FiPlay, FiImage, FiTag, FiX } from "react-icons/fi";
 import { decodeToken } from "../../utilities/helperfFunction";
 import { toast } from "react-toastify";
 
@@ -26,8 +21,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onMakeOffer }) => {
       try {
         const decodedUser = decodeToken(token);
         setCurrentUser(decodedUser);
-      } catch (error) {
-        console.error("Error decoding token:", error);
+      } catch {
         localStorage.removeItem("token");
       }
     }
@@ -48,16 +42,6 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onMakeOffer }) => {
       minimumFractionDigits: price % 1 === 0 ? 0 : 2,
     }).format(price);
 
-  const getTypeLabel = (type: string) => {
-    const labels = {
-      for_sale: "For Sale",
-      licensing: "Licensing",
-      adaptation_rights: "Adaptation Rights",
-      commission: "Commission",
-    };
-    return labels[type as keyof typeof labels] || type;
-  };
-
   const handleImageLoad = () => setImageLoaded(true);
 
   const handleMakeOfferClick = () => {
@@ -68,9 +52,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onMakeOffer }) => {
 
     const userId = currentUser.id;
     const sellerId =
-      listing.sellerId?.id ||
-      listing.sellerId?._id ||
-      listing.sellerId;
+      listing.sellerId?.id || listing.sellerId?._id || listing.sellerId;
 
     if (userId === sellerId) {
       toast.error("You cannot make an offer on your own listing");
@@ -94,7 +76,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onMakeOffer }) => {
 
   return (
     <>
-      <div className="group relative w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-100 overflow-hidden hover:-translate-y-1">
+      <div className="group relative w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 hover:border-gray-300 shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden">
         {/* Media */}
         <div className="relative h-52 overflow-hidden bg-gray-100">
           {firstMedia ? (
@@ -118,7 +100,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onMakeOffer }) => {
                 </video>
 
                 <div className="absolute top-3 left-3 bg-black/70 text-white px-2 py-1 rounded-full text-xs flex items-center gap-1 backdrop-blur-sm">
-                  <FiPlay size={10} /> <span>VIDEO</span>
+                  <FiPlay size={10} /> <span>Video</span>
                 </div>
               </div>
             ) : (
@@ -145,50 +127,37 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, onMakeOffer }) => {
           )}
 
           {/* Price Tag */}
-          <div className="absolute bottom-3 left-3 bg-gradient-to-r from-red-600 to-orange-500 text-white px-3 py-1.5 rounded-xl font-semibold text-sm shadow-md">
+          <div className="absolute bottom-3 left-3 bg-green-600 text-white px-3 py-1.5 rounded-xl font-semibold text-sm shadow-md">
             {formatPrice(listing.price)}
           </div>
         </div>
 
         {/* Content */}
         <div className="p-5">
-          {/* Badges */}
-          <div className="flex flex-wrap gap-2 mb-3">
-            <span className="bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-1 rounded-full">
-              {listing.category}
-            </span>
-            <span className="bg-purple-100 text-purple-700 text-xs font-semibold px-2 py-1 rounded-full">
-              {getTypeLabel(listing.type)}
-            </span>
-          </div>
-
           {/* Title */}
-          <h3 className="font-semibold text-gray-900 dark:text-white text-lg mb-2 line-clamp-2">
+          <h3 className="font-semibold text-gray-900 dark:text-white text-lg mb-2 line-clamp-2 leading-snug">
             {listing.title}
           </h3>
 
           {/* Description */}
-          <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-3">
+          <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-3 leading-relaxed">
             {listing.description}
           </p>
 
-          {/* Offer Button */}
+          {/* Make Offer Button */}
           <button
             onClick={handleMakeOfferClick}
             disabled={!canMakeOffer}
-            className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white py-3 rounded-xl font-semibold text-sm transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-semibold text-sm transition-all duration-300 shadow-sm hover:shadow-md transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            <FiTag className="inline mr-2" size={16} />
-            Make an Offer
+            <FiTag size={16} />
+            <span>Make an Offer</span>
           </button>
 
           {/* Footer */}
-          <div className="flex justify-between items-center mt-4 pt-3 border-t border-gray-100 text-xs text-gray-500">
-            <span>⭐ {listing.sellerId?.sellerRating || "New"}</span>
-            <span>🕒 {new Date(listing.createdAt).toLocaleDateString()}</span>
-            {listing.viewCount !== undefined && (
-              <span>👁️ {listing.viewCount} views</span>
-            )}
+          <div className="flex justify-between items-center mt-5 pt-3 border-t border-gray-100 text-xs text-gray-500">
+            <span className="capitalize">{listing.category}</span>
+            <span>{new Date(listing.createdAt).toLocaleDateString()}</span>
           </div>
         </div>
       </div>
