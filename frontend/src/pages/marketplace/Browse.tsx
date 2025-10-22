@@ -482,31 +482,31 @@ const Browse: React.FC = () => {
         </div>
       </div>
 
- {/* Fully Responsive Scrollable Offer Modal */}
+     {/* Scrollable Offer Modal - Improved Version */}
 {showOfferModal && selectedListing && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 xs:p-3 sm:p-4 z-50">
-    <div className="bg-white rounded-lg xs:rounded-xl w-full max-w-[95vw] xs:max-w-[90vw] sm:max-w-[80vw] md:max-w-[70vw] lg:max-w-[60vw] xl:max-w-[50vw] max-h-[95vh] xs:max-h-[90vh] flex flex-col mx-auto">
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+    <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col mx-4">
       {/* Header - Fixed */}
-      <div className="flex items-center justify-between p-3 xs:p-4 sm:p-6 border-b border-gray-200 bg-white rounded-t-lg xs:rounded-t-xl shrink-0">
-        <div className="flex-1 min-w-0">
-          <h3 className="text-base xs:text-lg sm:text-xl font-bold text-gray-900 truncate">Make an Offer</h3>
-          <p className="text-xs xs:text-sm text-gray-600 mt-1 truncate">Submit your offer for: {selectedListing.title}</p>
+      <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-white rounded-t-xl shrink-0">
+        <div>
+          <h3 className="text-xl font-bold text-gray-900">Make an Offer</h3>
+          <p className="text-sm text-gray-600 mt-1">Submit your offer for this listing</p>
         </div>
         <button 
           onClick={() => setShowOfferModal(false)}
-          className="text-gray-400 hover:text-gray-600 transition-colors p-1 xs:p-2 hover:bg-gray-100 rounded-lg flex-shrink-0 ml-2"
+          className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-lg"
         >
-          <FiX className="w-4 h-4 xs:w-5 xs:h-5 sm:w-6 sm:h-6" />
+          <FiX size={24} />
         </button>
       </div>
       
       {/* Scrollable Content Area */}
       <div className="flex-1 overflow-y-auto">
-        <div className="p-3 xs:p-4 sm:p-6 space-y-3 xs:space-y-4 sm:space-y-6">
+        <div className="p-6">
           {/* Listing Info */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 xs:p-4 rounded-lg border border-blue-200">
-            <div className="flex items-start gap-2 xs:gap-3 sm:gap-4">
-              <div className="w-12 h-12 xs:w-14 xs:h-14 sm:w-16 sm:h-16 bg-white rounded-lg border border-blue-200 overflow-hidden flex-shrink-0">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200 mb-6">
+            <div className="flex items-start gap-4">
+              <div className="w-16 h-16 bg-white rounded-lg border border-blue-200 overflow-hidden flex-shrink-0">
                 {selectedListing.mediaUrls?.[0] ? (
                   <img 
                     src={selectedListing.mediaUrls[0]} 
@@ -515,15 +515,15 @@ const Browse: React.FC = () => {
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                    <FiPackage className="text-gray-400 w-4 h-4 xs:w-5 xs:h-5" />
+                    <FiPackage className="text-gray-400" size={20} />
                   </div>
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <h4 className="font-semibold text-gray-900 text-sm xs:text-base sm:text-lg truncate">{selectedListing.title}</h4>
-                <p className="text-gray-600 text-xs xs:text-sm mt-1 line-clamp-2">{selectedListing.description}</p>
-                <div className="flex items-center gap-2 xs:gap-3 sm:gap-4 mt-2">
-                  <span className="text-lg xs:text-xl sm:text-2xl font-bold text-green-600">${selectedListing.price}</span>
+                <h4 className="font-semibold text-gray-900 text-lg truncate">{selectedListing.title}</h4>
+                <p className="text-gray-600 text-sm mt-1 line-clamp-2">{selectedListing.description}</p>
+                <div className="flex items-center gap-4 mt-2">
+                  <span className="text-2xl font-bold text-green-600">${selectedListing.price}</span>
                   <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">
                     {selectedListing.category}
                   </span>
@@ -532,15 +532,15 @@ const Browse: React.FC = () => {
             </div>
           </div>
 
-          <form onSubmit={handleSubmitOffer} className="space-y-3 xs:space-y-4 sm:space-y-6">
+          <form onSubmit={handleSubmitOffer} className="space-y-6">
             {/* Offer Amount */}
-            <div className="bg-white border border-gray-200 rounded-lg p-3 xs:p-4">
-              <label className="block text-sm font-semibold text-gray-900 mb-2 xs:mb-3">
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <label className="block text-sm font-semibold text-gray-900 mb-3">
                 Offer Amount
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500 text-sm xs:text-base">$</span>
+                  <span className="text-gray-500 sm:text-sm">$</span>
                 </div>
                 <input
                   type="number"
@@ -550,49 +550,49 @@ const Browse: React.FC = () => {
                   max={selectedListing.price * 3}
                   value={offerForm.amount}
                   onChange={(e) => setOfferForm({ ...offerForm, amount: e.target.value })}
-                  className="block w-full pl-7 pr-3 py-2 xs:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 text-sm xs:text-base"
+                  className="block w-full pl-7 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 text-base"
                   placeholder="Enter your offer amount"
                 />
               </div>
               <div className="flex justify-between text-xs text-gray-500 mt-2">
-                <span>Min: $0.01</span>
-                <span>Max: ${(selectedListing.price * 3).toFixed(2)}</span>
+                <span>Minimum: $0.01</span>
+                <span>Maximum: ${(selectedListing.price * 3).toFixed(2)}</span>
               </div>
             </div>
 
             {/* Message to Seller */}
-            <div className="bg-white border border-gray-200 rounded-lg p-3 xs:p-4">
-              <label className="block text-sm font-semibold text-gray-900 mb-2 xs:mb-3">
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <label className="block text-sm font-semibold text-gray-900 mb-3">
                 Message to Seller (Optional)
               </label>
               <textarea
                 value={offerForm.message}
                 onChange={(e) => setOfferForm({ ...offerForm, message: e.target.value })}
-                className="w-full px-3 py-2 xs:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 resize-none text-xs xs:text-sm"
-                rows={2}
-                placeholder="Introduce yourself and explain why you're interested..."
+                className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 resize-none text-sm"
+                rows={3}
+                placeholder="Introduce yourself and explain why you're interested in this listing..."
               />
             </div>
 
             {/* Detailed Requirements */}
-            <div className="bg-white border border-gray-200 rounded-lg p-3 xs:p-4">
-              <label className="block text-sm font-semibold text-gray-900 mb-2 xs:mb-3">
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <label className="block text-sm font-semibold text-gray-900 mb-3">
                 Detailed Requirements *
               </label>
               <textarea
                 required
                 value={offerForm.requirements}
                 onChange={(e) => setOfferForm({ ...offerForm, requirements: e.target.value })}
-                className="w-full px-3 py-2 xs:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 resize-none text-xs xs:text-sm"
-                rows={3}
-                placeholder="Please provide detailed requirements for what you need..."
+                className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 resize-none text-sm"
+                rows={4}
+                placeholder="Please provide detailed requirements for what you need. Be as specific as possible about deliverables, format, timeline, and any other important details..."
               />
               <p className="text-xs text-gray-500 mt-2">This information helps the seller understand exactly what you need</p>
             </div>
 
             {/* Expected Delivery */}
-            <div className="bg-white border border-gray-200 rounded-lg p-3 xs:p-4">
-              <label className="block text-sm font-semibold text-gray-900 mb-2 xs:mb-3">
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <label className="block text-sm font-semibold text-gray-900 mb-3">
                 Expected Delivery Date *
               </label>
               <input
@@ -600,7 +600,7 @@ const Browse: React.FC = () => {
                 required
                 value={offerForm.expectedDelivery}
                 onChange={(e) => setOfferForm({ ...offerForm, expectedDelivery: e.target.value })}
-                className="w-full px-3 py-2 xs:py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 text-xs xs:text-sm"
+                className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 text-sm"
                 min={new Date().toISOString().split('T')[0]}
                 max={new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
               />
@@ -608,15 +608,15 @@ const Browse: React.FC = () => {
             </div>
 
             {/* Payment Notice */}
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 xs:p-4">
-              <div className="flex items-start gap-2 xs:gap-3">
-                <div className="flex-shrink-0 w-5 h-5 xs:w-6 xs:h-6 bg-yellow-100 rounded-full flex items-center justify-center mt-0.5">
-                  <FiCreditCard className="text-yellow-600 w-3 h-3 xs:w-4 xs:h-4" />
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-6 h-6 bg-yellow-100 rounded-full flex items-center justify-center mt-0.5">
+                  <FiCreditCard className="text-yellow-600" size={14} />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold text-yellow-800 text-xs xs:text-sm mb-1 xs:mb-2">Payment Required</h4>
-                  <p className="text-yellow-700 text-xs xs:text-sm leading-relaxed">
-                    Your offer will be submitted and payment will be processed immediately. The funds will be held securely in escrow until the seller accepts your offer.
+                <div>
+                  <h4 className="font-semibold text-yellow-800 text-sm mb-2">Payment Required</h4>
+                  <p className="text-yellow-700 text-sm leading-relaxed">
+                    Your offer will be submitted and payment will be processed immediately. The funds will be held securely in escrow until the seller accepts your offer. If the seller declines or doesn't respond within 7 days, your payment will be fully refunded.
                   </p>
                 </div>
               </div>
@@ -626,36 +626,36 @@ const Browse: React.FC = () => {
       </div>
 
       {/* Footer - Fixed */}
-      <div className="border-t border-gray-200 bg-gray-50 rounded-b-lg xs:rounded-b-xl p-3 xs:p-4 sm:p-6 shrink-0">
-        <div className="flex flex-col xs:flex-row gap-2 xs:gap-3">
+      <div className="border-t border-gray-200 bg-gray-50 rounded-b-xl p-6 shrink-0">
+        <div className="flex flex-col sm:flex-row gap-3">
           <button
             type="button"
             onClick={() => setShowOfferModal(false)}
-            className="flex-1 py-2 xs:py-3 px-4 xs:px-6 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium text-xs xs:text-sm"
+            className="flex-1 py-3 px-6 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium text-sm sm:text-base"
           >
-            Cancel
+            Cancel Offer
           </button>
           <button
             type="submit"
             onClick={handleSubmitOffer}
             disabled={paymentStatus === 'processing'}
-            className="flex-1 py-2 xs:py-3 px-4 xs:px-6 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg transition-all duration-200 flex items-center justify-center font-medium text-xs xs:text-sm"
+            className="flex-1 py-3 px-6 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-lg transition-all duration-200 flex items-center justify-center font-medium text-sm sm:text-base shadow-lg hover:shadow-xl disabled:shadow-none"
           >
             {paymentStatus === 'processing' ? (
               <>
-                <div className="animate-spin rounded-full h-3 w-3 xs:h-4 xs:w-4 border-b-2 border-white mr-2"></div>
-                <span className="truncate">Processing...</span>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                Processing Your Offer...
               </>
             ) : (
               <>
-                <FiCreditCard className="mr-1 xs:mr-2 w-3 h-3 xs:w-4 xs:h-4" />
-                <span className="truncate">Submit & Pay ${offerForm.amount || '0.00'}</span>
-                <FiArrowRight className="ml-1 xs:ml-2 w-3 h-3 xs:w-4 xs:h-4" />
+                <FiCreditCard className="mr-2" size={18} />
+                Submit Offer & Pay ${offerForm.amount || '0.00'}
+                <FiArrowRight className="ml-2" size={16} />
               </>
             )}
           </button>
         </div>
-        <p className="text-xs text-gray-500 text-center mt-2 xs:mt-3">
+        <p className="text-xs text-gray-500 text-center mt-3">
           By submitting this offer, you agree to our terms of service
         </p>
       </div>
