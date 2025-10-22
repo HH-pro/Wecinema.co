@@ -424,13 +424,17 @@ const Browse: React.FC = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
               {filteredListings.map(listing => (
-                <ListingCard
-                  key={listing._id}
-                  listing={listing}
-                  onViewDetails={handleViewDetails}
-                  onMakeOffer={handleMakeOffer}
-                  onDirectPayment={handleDirectPayment}
-                />
+              <ListingCard
+  key={listing._id}
+  listing={listing}
+  onViewDetails={handleViewDetails}
+  onMakeOffer={handleMakeOffer}
+  onDirectPayment={handleDirectPayment}
+  onOfferSuccess={() => {
+    // Refresh listings or show success message
+    fetchListings();
+  }}
+/>
               ))}
             </div>
           )}
