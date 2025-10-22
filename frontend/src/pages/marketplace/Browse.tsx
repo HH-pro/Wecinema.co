@@ -145,7 +145,7 @@ const Browse: React.FC = () => {
       });
 
       const response = await axios.post(
-        `http://localhost:3000/marketplace/offers/submit`,
+        `http://localhost:3000/marketplace/offers//make-offer`,
         {
           listingId: selectedListing._id,
           amount: parseFloat(offerForm.amount),
