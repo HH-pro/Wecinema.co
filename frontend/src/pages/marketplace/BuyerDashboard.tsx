@@ -129,7 +129,6 @@ const BuyerDashboard: React.FC = () => {
         const buyerOrders = response.data.orders || [];
         setOrders(buyerOrders);
         calculateStats(buyerOrders);
-        toast.success(`Loaded ${buyerOrders.length} orders`);
       } else {
         throw new Error(response.data.error || 'Failed to fetch orders');
       }
