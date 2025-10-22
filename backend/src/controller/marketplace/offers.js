@@ -6,7 +6,7 @@ const Order = require("../../models/marketplace/order");
 const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils");
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); // Use environment variable
 // Make Offer Route with Stripe Payment
-router.post("/make-offer", authenticateMiddleware, async (req, res) => {
+router.post("/himake-offer", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== MAKE OFFER WITH PAYMENT REQUEST ===");
     console.log("Received offer request body:", req.body);
