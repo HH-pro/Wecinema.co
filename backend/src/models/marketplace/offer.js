@@ -1,3 +1,4 @@
+// models/marketplace/offer.js
 const mongoose = require('mongoose');
 
 const offerSchema = new mongoose.Schema({
@@ -20,6 +21,7 @@ const offerSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  // NEW FIELDS FOR PAYMENT FLOW
   requirements: {
     type: String,
     default: ''
@@ -29,18 +31,27 @@ const offerSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'accepted', 'rejected', 'countered', 'cancelled', 'pending_payment', 'payment_failed'],
+    enum: [
+      'pending', 
+      'accepted', 
+      'rejected', 
+      'countered', 
+      'cancelled',
+      'pending_payment',  // NEW: Waiting for payment
+      'payment_failed',   // NEW: Payment failed
+      'paid'              // NEW: Payment completed
+    ],
     default: 'pending'
   },
-  // Payment fields
+  // PAYMENT FIELDS
   paymentIntentId: {
     type: String,
-    sparse: true // Allows null values but ensures uniqueness for non-null values
+    sparse: true
   },
   paidAt: {
     type: Date
   },
-  // Additional fields for better tracking
+  // ADDITIONAL TRACKING FIELDS
   sellerViewed: {
     type: Boolean,
     default: false
@@ -48,8 +59,7 @@ const offerSchema = new mongoose.Schema({
   expiresAt: {
     type: Date,
     default: function() {
-      // Offers expire after 7 days if not responded to
-      return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
     }
   },
   counterOffer: {
@@ -61,7 +71,7 @@ const offerSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Add index for better query performance
+// Indexes for better performance
 offerSchema.index({ listingId: 1, buyerId: 1 });
 offerSchema.index({ status: 1 });
 offerSchema.index({ paymentIntentId: 1 }, { sparse: true });
@@ -91,4 +101,5 @@ offerSchema.statics.findExpiredOffers = function() {
   });
 };
 
-module.exports = mongoose.model('Offer', offerSchema);
+// Check if model already exists to prevent OverwriteModelError
+module.exports = mongoose.models.Offer || mongoose.model('Offer', offerSchema);
