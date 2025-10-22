@@ -139,7 +139,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
         paymentIntentId: offer.paymentIntentId,
         createdAt: offer.createdAt
       },
-      clientSecret: paymentIntent.STRIPE_SECRET_KEY, // ✅ THIS IS CRUCIAL
+      clientSecret: paymentIntent.client_secret, // ✅ THIS IS CRUCIAL
       paymentIntentId: paymentIntent.id
     });
 
