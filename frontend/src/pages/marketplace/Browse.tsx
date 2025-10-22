@@ -482,28 +482,28 @@ const Browse: React.FC = () => {
         </div>
       </div>
 {showOfferModal && selectedListing && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4">
-    <div className="bg-white w-full max-w-lg sm:max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto">
+    <div className="bg-white w-full max-w-md sm:max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden scale-95 sm:scale-100 transition-transform duration-200 ease-out">
       
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-gradient-to-r from-yellow-50 to-white border-b border-gray-200 p-4 sm:p-5 flex justify-between items-center">
+      <div className="sticky top-0 z-10 bg-gradient-to-r from-yellow-50 to-white border-b border-gray-200 p-3 sm:p-4 flex justify-between items-center">
         <div>
-          <h3 className="text-lg sm:text-xl font-semibold text-gray-900">Make an Offer</h3>
-          <p className="text-xs sm:text-sm text-gray-600">Submit your offer for this listing</p>
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900">Make an Offer</h3>
+          <p className="text-xs text-gray-600">Submit your offer for this listing</p>
         </div>
         <button
           onClick={() => setShowOfferModal(false)}
-          className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          className="p-1 rounded-md hover:bg-gray-100 transition-colors"
         >
-          <FiX size={22} className="text-gray-600" />
+          <FiX size={18} className="text-gray-600" />
         </button>
       </div>
 
       {/* Scrollable Body */}
-      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-6">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-5 py-3 space-y-4">
         {/* Listing Preview */}
-        <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl shadow-sm flex items-start gap-4">
-          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border border-blue-300 flex-shrink-0">
+        <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg shadow-sm flex items-start gap-3">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg overflow-hidden border border-blue-300 flex-shrink-0">
             {selectedListing.mediaUrls?.[0] ? (
               <img
                 src={selectedListing.mediaUrls[0]}
@@ -512,16 +512,16 @@ const Browse: React.FC = () => {
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                <FiPackage className="text-gray-400" size={22} />
+                <FiPackage className="text-gray-400" size={20} />
               </div>
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-gray-900 text-base sm:text-lg truncate">{selectedListing.title}</h4>
-            <p className="text-gray-600 text-sm mt-1 line-clamp-2">{selectedListing.description}</p>
-            <div className="flex items-center gap-3 mt-2">
-              <span className="text-green-600 text-lg sm:text-2xl font-bold">${selectedListing.price}</span>
-              <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">
+            <h4 className="font-semibold text-gray-900 text-sm sm:text-base truncate">{selectedListing.title}</h4>
+            <p className="text-gray-600 text-xs mt-1 line-clamp-2">{selectedListing.description}</p>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-green-600 text-base sm:text-lg font-bold">${selectedListing.price}</span>
+              <span className="bg-blue-100 text-blue-800 text-[10px] font-medium px-2 py-0.5 rounded-full">
                 {selectedListing.category}
               </span>
             </div>
@@ -529,28 +529,28 @@ const Browse: React.FC = () => {
         </div>
 
         {/* Offer Form */}
-        <form onSubmit={handleSubmitOffer} className="space-y-5">
+        <form onSubmit={handleSubmitOffer} className="space-y-3">
           {/* Amount */}
           <div>
-            <label className="block text-sm font-semibold text-gray-800 mb-2">Offer Amount</label>
+            <label className="block text-xs font-semibold text-gray-800 mb-1.5">Offer Amount</label>
             <input
               type="number"
               required
               min="0.01"
               value={offerForm.amount}
               onChange={(e) => setOfferForm({ ...offerForm, amount: e.target.value })}
-              className="w-full px-3 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none text-sm sm:text-base"
+              className="w-full px-2.5 py-1.5 sm:py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none text-xs sm:text-sm"
               placeholder="Enter your offer amount"
             />
           </div>
 
           {/* Message */}
           <div>
-            <label className="block text-sm font-semibold text-gray-800 mb-2">Message to Seller</label>
+            <label className="block text-xs font-semibold text-gray-800 mb-1.5">Message to Seller</label>
             <textarea
               value={offerForm.message}
               onChange={(e) => setOfferForm({ ...offerForm, message: e.target.value })}
-              className="w-full px-3 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 resize-none outline-none text-sm"
+              className="w-full px-2.5 py-1.5 sm:py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 resize-none outline-none text-xs sm:text-sm"
               rows={3}
               placeholder="Introduce yourself and explain your requirements..."
             />
@@ -558,20 +558,20 @@ const Browse: React.FC = () => {
 
           {/* Date */}
           <div>
-            <label className="block text-sm font-semibold text-gray-800 mb-2">Expected Delivery Date</label>
+            <label className="block text-xs font-semibold text-gray-800 mb-1.5">Expected Delivery Date</label>
             <input
               type="date"
               required
               value={offerForm.expectedDelivery}
               onChange={(e) => setOfferForm({ ...offerForm, expectedDelivery: e.target.value })}
-              className="w-full px-3 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none text-sm"
+              className="w-full px-2.5 py-1.5 sm:py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none text-xs sm:text-sm"
               min={new Date().toISOString().split('T')[0]}
             />
           </div>
 
           {/* Info Box */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-700 flex gap-3 items-start">
-            <FiCreditCard className="text-yellow-600 mt-1" size={16} />
+          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 text-xs text-yellow-700 flex gap-2 items-start">
+            <FiCreditCard className="text-yellow-600 mt-0.5" size={14} />
             <p>
               Payment will be processed immediately and securely held in escrow until the seller accepts your offer.
             </p>
@@ -580,17 +580,17 @@ const Browse: React.FC = () => {
       </div>
 
       {/* Sticky Footer */}
-      <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 sm:p-5 flex flex-col sm:flex-row gap-3">
+      <div className="sticky bottom-0 bg-white border-t border-gray-200 p-3 flex flex-col sm:flex-row gap-2">
         <button
           onClick={() => setShowOfferModal(false)}
-          className="flex-1 py-2 sm:py-3 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition-all text-sm sm:text-base"
+          className="flex-1 py-2 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-100 transition-all text-xs sm:text-sm"
         >
           Cancel
         </button>
         <button
           onClick={handleSubmitOffer}
           disabled={paymentStatus === 'processing'}
-          className="flex-1 py-2 sm:py-3 rounded-lg bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white transition-all text-sm sm:text-base font-medium"
+          className="flex-1 py-2 rounded-md bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white transition-all text-xs sm:text-sm font-medium"
         >
           {paymentStatus === 'processing' ? 'Processing...' : `Submit Offer & Pay $${offerForm.amount || '0.00'}`}
         </button>
