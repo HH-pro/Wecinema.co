@@ -264,7 +264,7 @@ const MyOrders: React.FC = () => {
   };
 
   const handleLoginRedirect = (): void => {
-    navigate('/login'); // Adjust to your login route
+    navigate('/'); // Adjust to your login route
   };
 
   const formatPrice = (price: number): string => {
