@@ -11,7 +11,7 @@ const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require(".
 router.get("/listings", async (req, res) => {
   try {
     const listings = await MarketplaceListing.find({ status: "active" })
-      .populate("sellerId", "username avatar sellerRating emaail");
+      .populate("sellerId", "username avatar sellerRating email");
     res.status(200).json(listings);
   } catch (error) {
     console.error("❌ Error fetching listings:", error);
