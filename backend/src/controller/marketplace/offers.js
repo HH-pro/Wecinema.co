@@ -329,7 +329,7 @@ router.put("/cancel-offer/:id", authenticateMiddleware, async (req, res) => {
   }
 });
 // Delete all offers - Admin or Dev Utility Route (use with caution)
-router.delete("/delete-all-offers", authenticateMiddleware, async (req, res) => {
+router.delete("/delete-all-offers", async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
 
