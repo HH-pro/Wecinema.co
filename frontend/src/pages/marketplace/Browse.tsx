@@ -10,7 +10,7 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
 import emailjs from '@emailjs/browser';
 
 // Initialize EmailJS with your credentials
-emailjs.init("YOUR_EMAILJS_PUBLIC_KEY"); // Replace with your actual EmailJS public key
+emailjs.init("MIfBtNPcnoqBFU0LR"); // Replace with your actual EmailJS public key
 
 // Temporary: Stripe test key for development
 const stripePromise = loadStripe("pk_test_51SKw7ZHYamYyPYbDUlqbeydcW1hVGrHOvCZ8mBwSU1gw77TIRyzng31iSqAvPIQzTYKG8UWfDew7kdKgBxsw7vtq00WTLU3YCZ");
