@@ -183,11 +183,7 @@ const GenrePage: React.FC = () => {
                 setUser(prev => ({ ...prev, userType: newMode }));
                 localStorage.setItem('marketplaceMode', newMode);
                 
-                // Show success message
-                toast.success(`✅ Switched to ${newMode} mode successfully!`, {
-                    autoClose: 3000,
-                    hideProgressBar: false,
-                });
+              
             }
         } catch (error: any) {
             console.error("Error changing user type:", error);
