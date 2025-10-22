@@ -5,68 +5,51 @@ const MarketplaceListing = require("../../models/marketplace/listing");
 const Order = require("../../models/marketplace/order");
 const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils");
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY); // Use environment variable
-// Make Offer Route with Stripe Payment
 router.post("/make-offer", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== MAKE OFFER WITH PAYMENT REQUEST ===");
-    console.log("Received offer request body:", req.body);
+    console.log("Request body:", JSON.stringify(req.body, null, 2));
+    console.log("User ID:", req.user?.id || req.user?._id);
     
     const { listingId, amount, message, requirements, expectedDelivery } = req.body;
-
-    // Enhanced user authentication validation
-    if (!req.user) {
-      console.log("❌ No user object found in request");
-      return res.status(401).json({ error: 'Authentication required - no user data' });
-    }
-
-    // Extract user ID
     const userId = req.user.id || req.user._id || req.user.userId;
-    console.log("Extracted user ID:", userId);
 
+    // Validation
     if (!userId) {
-      return res.status(401).json({ 
-        error: 'Authentication required - invalid user data'
-      });
+      console.log("❌ No user ID found");
+      return res.status(401).json({ error: 'Authentication required' });
     }
 
-    // Validate required fields
     if (!listingId || !amount) {
+      console.log("❌ Missing required fields");
       return res.status(400).json({ error: 'Listing ID and amount are required' });
     }
 
-    // Ensure amount is a number
     const offerAmount = parseFloat(amount);
     if (isNaN(offerAmount) || offerAmount <= 0) {
+      console.log("❌ Invalid amount:", amount);
       return res.status(400).json({ error: 'Valid amount is required' });
     }
 
     console.log("🔍 Looking for listing:", listingId);
     const listing = await MarketplaceListing.findById(listingId);
     if (!listing) {
-      console.log("❌ Listing not found:", listingId);
+      console.log("❌ Listing not found");
       return res.status(404).json({ error: 'Listing not found' });
     }
 
-    console.log("📋 Listing found:", {
-      id: listing._id,
-      title: listing.title,
-      sellerId: listing.sellerId,
-      status: listing.status,
-      price: listing.price
-    });
-
-    // Check if listing is available for offers
     if (listing.status !== 'active') {
+      console.log("❌ Listing not active");
       return res.status(400).json({ error: 'Listing is not available for offers' });
     }
 
     // Check if user is not the seller
-    const sellerId = listing.sellerId.toString();
-    if (userId.toString() === sellerId) {
+    if (listing.sellerId.toString() === userId.toString()) {
+      console.log("❌ User is seller");
       return res.status(400).json({ error: 'Cannot make offer on your own listing' });
     }
 
-    // Check for existing pending offer from same user
+    // Check for existing offers
     const existingOffer = await Offer.findOne({
       listingId,
       buyerId: userId,
@@ -74,11 +57,14 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
     });
 
     if (existingOffer) {
+      console.log("❌ Existing offer found");
       return res.status(400).json({ error: 'You already have a pending offer for this listing' });
     }
 
-    // ✅ CREATE STRIPE PAYMENT INTENT
-    console.log("💳 Creating Stripe payment intent for amount:", offerAmount);
+    // ✅ CREATE STRIPE PAYMENT INTENT WITH ERROR HANDLING
+    console.log("💳 Creating Stripe payment intent...");
+    console.log("Amount:", offerAmount);
+    console.log("Amount in cents:", Math.round(offerAmount * 100));
     
     try {
       const paymentIntent = await stripe.paymentIntents.create({
@@ -87,91 +73,73 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
         metadata: {
           listingId: listingId.toString(),
           buyerId: userId.toString(),
-          sellerId: sellerId,
-          type: 'offer_payment',
-          offerAmount: offerAmount.toString()
+          sellerId: listing.sellerId.toString(),
+          type: 'offer_payment'
         },
         automatic_payment_methods: {
           enabled: true,
         },
-        description: `Offer for listing: ${listing.title}`,
+        description: `Offer for: ${listing.title.substring(0, 22)}...`,
       });
 
-      console.log("✅ Stripe payment intent created:", {
-        paymentIntentId: paymentIntent.id,
-        clientSecret: paymentIntent.client_secret ? '***' : 'MISSING'
-      });
+      console.log("✅ Stripe payment intent created successfully");
+      console.log("Payment Intent ID:", paymentIntent.id);
+      console.log("Client Secret exists:", !!paymentIntent.client_secret);
 
-      // Create offer in database with payment intent ID
-      console.log("✅ Creating new offer with payment data");
-      
-      const offer = new Offer({
+      // Create offer in database
+      const offerData = {
         buyerId: userId,
         listingId,
         amount: offerAmount,
         message: message || '',
-        requirements: requirements || '',
-        expectedDelivery: expectedDelivery ? new Date(expectedDelivery) : undefined,
-        paymentIntentId: paymentIntent.id, // Store payment intent ID
-        status: 'pending_payment' // New status indicating payment required
-      });
+        paymentIntentId: paymentIntent.id,
+        status: 'pending_payment'
+      };
 
+      // Add optional fields if they exist
+      if (requirements) offerData.requirements = requirements;
+      if (expectedDelivery) offerData.expectedDelivery = new Date(expectedDelivery);
+
+      const offer = new Offer(offerData);
       await offer.save();
-      
-      // Populate the offer for response
-      await offer.populate('buyerId', 'username avatar email');
-      await offer.populate('listingId', 'title price sellerId');
 
-      console.log("✅ Offer created successfully with payment:", {
-        offerId: offer._id,
-        paymentIntentId: offer.paymentIntentId,
-        status: offer.status
-      });
+      console.log("✅ Offer saved to database:", offer._id);
 
-      // ✅ RETURN CLIENT SECRET TO FRONTEND
+      // Return success response
       res.status(201).json({
         success: true,
-        message: 'Offer submitted successfully. Please complete payment.',
+        message: 'Offer submitted. Please complete payment.',
         offer: {
           _id: offer._id,
-          buyerId: offer.buyerId,
-          listingId: offer.listingId,
           amount: offer.amount,
-          message: offer.message,
-          requirements: offer.requirements,
-          expectedDelivery: offer.expectedDelivery,
           status: offer.status,
-          paymentIntentId: offer.paymentIntentId,
-          createdAt: offer.createdAt
+          paymentIntentId: offer.paymentIntentId
         },
-        clientSecret: paymentIntent.client_secret, // ✅ THIS IS CRUCIAL
+        clientSecret: paymentIntent.client_secret,
         paymentIntentId: paymentIntent.id,
         amount: offerAmount
       });
 
     } catch (stripeError) {
-      console.error('❌ Stripe payment intent creation failed:', stripeError);
+      console.error('❌ STRIPE ERROR DETAILS:');
+      console.error('Error Type:', stripeError.type);
+      console.error('Error Code:', stripeError.code);
+      console.error('Error Message:', stripeError.message);
+      console.error('Stripe Request ID:', stripeError.requestId);
+      console.error('Raw Error:', JSON.stringify(stripeError, null, 2));
+      
       return res.status(500).json({ 
-        error: 'Payment processing failed', 
-        details: stripeError.message 
+        error: 'Payment processing failed',
+        details: stripeError.message,
+        code: stripeError.code
       });
     }
 
   } catch (error) {
-    console.error('❌ Error making offer with payment:', error);
-    
-    // More specific error handling
-    if (error.name === 'CastError') {
-      return res.status(400).json({ error: 'Invalid listing ID format' });
-    }
-    
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({ error: 'Invalid offer data', details: error.message });
-    }
-    
+    console.error('❌ GENERAL ERROR:', error);
     res.status(500).json({ 
-      error: 'Failed to make offer with payment',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: 'Failed to make offer',
+      details: error.message
     });
   }
 });
