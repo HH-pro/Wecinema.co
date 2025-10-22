@@ -328,21 +328,9 @@ router.put("/cancel-offer/:id", authenticateMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Failed to cancel offer' });
   }
 });
-// Delete all offers - Admin or Dev Utility Route (use with caution)
+// ⚠️ Delete all offers (No Auth) — use only for testing or local cleanup
 router.delete("/delete-all-offers", async (req, res) => {
   try {
-    const userId = req.user.id || req.user._id || req.user.userId;
-
-    if (!userId) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    // Optional: Restrict access (only for admin/dev use)
-    // Uncomment this if you want only a specific user or admin role to use it
-    // if (req.user.role !== 'admin') {
-    //   return res.status(403).json({ error: 'Access denied' });
-    // }
-
     const result = await Offer.deleteMany({});
     console.log(`🗑️ Deleted ${result.deletedCount} offers from the database.`);
 
