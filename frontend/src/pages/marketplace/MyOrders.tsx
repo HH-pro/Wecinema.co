@@ -11,7 +11,7 @@ import {
   FiUser,
   FiCalendar,
   FiSearch,
-  FiFilter
+  FiAlertCircle
 } from 'react-icons/fi';
 import axios from 'axios';
 
@@ -45,10 +45,10 @@ interface Offer {
 
 interface Order {
   _id: string;
-  buyerId: User;
-  sellerId: User;
-  listingId: Listing;
-  offerId?: Offer;
+  buyerId: User | string; // Can be string if not populated
+  sellerId: User | string; // Can be string if not populated
+  listingId: Listing | string; // Can be string if not populated
+  offerId?: Offer | string;
   orderType: 'direct_purchase' | 'accepted_offer' | 'commission';
   amount: number;
   status: 'pending_payment' | 'paid' | 'in_progress' | 'delivered' | 'in_revision' | 'completed' | 'cancelled' | 'disputed';
@@ -99,29 +99,79 @@ const MyOrders: React.FC = () => {
     pending: 0
   });
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [error, setError] = useState<string>('');
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchOrders();
   }, []);
 
+  const getAuthToken = (): string | null => {
+    // Try multiple possible token storage locations
+    const token = 
+      localStorage.getItem('token') ||
+      sessionStorage.getItem('token') ||
+      localStorage.getItem('authToken') ||
+      sessionStorage.getItem('authToken');
+    
+    console.log('🔐 Token retrieval:', { 
+      hasToken: !!token,
+      tokenLength: token?.length,
+      source: 'localStorage/sessionStorage'
+    });
+    
+    return token;
+  };
+
   const fetchOrders = async (): Promise<void> => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      setError('');
       
+      const token = getAuthToken();
+      
+      if (!token) {
+        setError('Please login to view your orders');
+        setLoading(false);
+        return;
+      }
+
+      console.log('🔄 Fetching orders with token:', {
+        tokenExists: !!token,
+        tokenPreview: token.substring(0, 20) + '...'
+      });
+
       const response = await axios.get<OrdersResponse>(
         'http://localhost:3000/marketplace/orders/my-orders',
-        { headers: { Authorization: `Bearer ${token}` } }
+        { 
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          } 
+        }
       );
+
+      console.log('✅ Orders response:', response.data);
 
       if (response.data.success) {
         setOrders(response.data.orders);
         setStats(response.data.stats);
+      } else {
+        setError('Failed to load orders');
       }
-    } catch (error) {
-      console.error('Error fetching orders:', error);
-      alert('Failed to load orders');
+    } catch (error: any) {
+      console.error('❌ Error fetching orders:', error);
+      
+      if (error.response?.status === 401) {
+        setError('Please login to view your orders');
+        // Clear invalid token
+        localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
+      } else if (error.response?.data?.error) {
+        setError(error.response.data.error);
+      } else {
+        setError('Failed to load orders. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -169,9 +219,33 @@ const MyOrders: React.FC = () => {
     return texts[status] || status;
   };
 
+  // Helper function to get username from order (handles both populated and non-populated cases)
+  const getSellerUsername = (order: Order): string => {
+    if (typeof order.sellerId === 'object' && order.sellerId !== null) {
+      return (order.sellerId as User).username || 'Unknown Seller';
+    }
+    return 'Loading...';
+  };
+
+  // Helper function to get listing title
+  const getListingTitle = (order: Order): string => {
+    if (typeof order.listingId === 'object' && order.listingId !== null) {
+      return (order.listingId as Listing).title || 'Unknown Listing';
+    }
+    return 'Loading...';
+  };
+
+  // Helper function to get listing media
+  const getListingMedia = (order: Order): string | undefined => {
+    if (typeof order.listingId === 'object' && order.listingId !== null) {
+      return (order.listingId as Listing).mediaUrls?.[0];
+    }
+    return undefined;
+  };
+
   const filteredOrders = orders.filter((order: Order) => {
-    const matchesSearch = order.listingId?.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         order.sellerId?.username?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = getListingTitle(order).toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         getSellerUsername(order).toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesTab = activeTab === 'all' || 
                       (activeTab === 'active' && ['paid', 'in_progress', 'delivered', 'in_revision'].includes(order.status)) ||
@@ -183,6 +257,14 @@ const MyOrders: React.FC = () => {
 
   const handleViewOrder = (orderId: string): void => {
     navigate(`/marketplace/orders/${orderId}`);
+  };
+
+  const handleRetry = (): void => {
+    fetchOrders();
+  };
+
+  const handleLoginRedirect = (): void => {
+    navigate('/login'); // Adjust to your login route
   };
 
   const formatPrice = (price: number): string => {
@@ -200,6 +282,7 @@ const MyOrders: React.FC = () => {
     });
   };
 
+  // Loading State
   if (loading) {
     return (
       <MarketplaceLayout>
@@ -207,6 +290,58 @@ const MyOrders: React.FC = () => {
           <div className="text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-600 mx-auto"></div>
             <p className="mt-4 text-gray-600 text-lg">Loading your orders...</p>
+          </div>
+        </div>
+      </MarketplaceLayout>
+    );
+  }
+
+  // Error State
+  if (error) {
+    return (
+      <MarketplaceLayout>
+        <div className="min-h-screen bg-gray-50 py-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+              <div className="max-w-md mx-auto">
+                <div className="w-24 h-24 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
+                  <FiAlertCircle size={32} className="text-red-600" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  {error}
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  {error.includes('login') 
+                    ? 'Please login to access your orders'
+                    : 'There was a problem loading your orders'
+                  }
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  {error.includes('login') ? (
+                    <button 
+                      onClick={handleLoginRedirect}
+                      className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700"
+                    >
+                      Go to Login
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={handleRetry}
+                      className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700"
+                    >
+                      Try Again
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => navigate('/marketplace/browse')}
+                    className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    <FiShoppingBag className="mr-2" size={18} />
+                    Browse Marketplace
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </MarketplaceLayout>
@@ -308,7 +443,7 @@ const MyOrders: React.FC = () => {
                     : 'Start shopping to see your orders here!'}
                 </p>
                 <button 
-                  onClick={() => navigate('/marketplace')}
+                  onClick={() => navigate('/marketplace/browse')}
                   className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
                 >
                   <FiShoppingBag className="mr-2" size={18} />
@@ -325,10 +460,10 @@ const MyOrders: React.FC = () => {
                       {/* Listing Image */}
                       <div className="flex-shrink-0">
                         <div className="w-20 h-20 bg-gray-200 rounded-lg overflow-hidden">
-                          {order.listingId?.mediaUrls?.[0] ? (
+                          {getListingMedia(order) ? (
                             <img 
-                              src={order.listingId.mediaUrls[0]} 
-                              alt={order.listingId.title}
+                              src={getListingMedia(order)} 
+                              alt={getListingTitle(order)}
                               className="w-full h-full object-cover"
                             />
                           ) : (
@@ -344,15 +479,10 @@ const MyOrders: React.FC = () => {
                         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-2">
                           <div>
                             <h3 className="text-lg font-semibold text-gray-900 truncate">
-                              {order.listingId?.title || 'Unknown Listing'}
+                              {getListingTitle(order)}
                             </h3>
                             <p className="text-gray-600 text-sm mt-1">
-                              Seller: <span className="font-medium">@{order.sellerId?.username}</span>
-                              {order.sellerId?.sellerRating && (
-                                <span className="ml-2 text-yellow-600">
-                                  ⭐ {order.sellerId.sellerRating}
-                                </span>
-                              )}
+                              Seller: <span className="font-medium">@{getSellerUsername(order)}</span>
                             </p>
                             {order.offerId && (
                               <p className="text-sm text-gray-500 mt-1">
@@ -390,12 +520,6 @@ const MyOrders: React.FC = () => {
                               Custom Offer
                             </div>
                           )}
-                          {order.deliveredAt && (
-                            <div className="flex items-center gap-1">
-                              <FiTruck size={14} />
-                              Delivered: {formatDate(order.deliveredAt)}
-                            </div>
-                          )}
                         </div>
 
                         {/* Actions */}
@@ -422,15 +546,6 @@ const MyOrders: React.FC = () => {
                               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors duration-200"
                             >
                               Complete Payment
-                            </button>
-                          )}
-
-                          {order.status === 'in_revision' && (
-                            <button
-                              onClick={() => handleViewOrder(order._id)}
-                              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-md transition-colors duration-200"
-                            >
-                              View Revision
                             </button>
                           )}
                         </div>
