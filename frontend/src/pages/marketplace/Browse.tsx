@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ListingCard from '../../components/marketplae/ListingCard';
 import MarketplaceLayout from '../../components/Layout';
 import { Listing } from '../../types/marketplace';
-import { FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiArrowRight, FiCheck } from 'react-icons/fi';
+import { FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiArrowRight, FiCheck, FiMail } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { loadStripe } from '@stripe/stripe-js';
@@ -10,7 +10,7 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
 import emailjs from '@emailjs/browser';
 
 // Initialize EmailJS with your credentials
-emailjs.init("MIfBtNPcnoqBFU0LR"); // Replace with your actual EmailJS public key
+emailjs.init("MIfBtNPcnoqBFU0LR");
 
 // Temporary: Stripe test key for development
 const stripePromise = loadStripe("pk_test_51SKw7ZHYamYyPYbDUlqbeydcW1hVGrHOvCZ8mBwSU1gw77TIRyzng31iSqAvPIQzTYKG8UWfDew7kdKgBxsw7vtq00WTLU3YCZ");
@@ -26,6 +26,7 @@ const Browse: React.FC = () => {
   const [clientSecret, setClientSecret] = useState<string>('');
   const [offerData, setOfferData] = useState<any>(null);
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const navigate = useNavigate();
 
   const [filters, setFilters] = useState({
@@ -43,10 +44,28 @@ const Browse: React.FC = () => {
     expectedDelivery: ''
   });
 
-  // Fetch listings on component mount and when filters change
+  // Fetch listings and user data on component mount
   useEffect(() => {
     fetchListings();
+    fetchCurrentUser();
   }, [filters]);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        // Get user info from token
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setCurrentUser({
+          id: payload.userId || payload.id,
+          username: payload.username || 'Buyer',
+          email: payload.email
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching current user:', error);
+    }
+  };
 
   const fetchListings = async () => {
     try {
@@ -135,7 +154,31 @@ const Browse: React.FC = () => {
     setShowOfferModal(true);
   };
 
-  // Function to send email notification to seller
+  // 🆕 IMPROVED: Function to extract seller email from listing data
+  const getSellerEmail = (listing: Listing): string => {
+    // Check if sellerId is populated and has email
+    if (listing.sellerId && typeof listing.sellerId === 'object' && 'email' in listing.sellerId) {
+      return (listing.sellerId as any).email;
+    }
+    
+    // Check if sellerEmail is directly on the listing
+    if ((listing as any).sellerEmail) {
+      return (listing as any).sellerEmail;
+    }
+    
+    console.warn('Seller email not found for listing:', listing._id);
+    return ''; // Return empty string if no email found
+  };
+
+  // 🆕 IMPROVED: Function to extract seller name from listing data
+  const getSellerName = (listing: Listing): string => {
+    if (listing.sellerId && typeof listing.sellerId === 'object' && 'username' in listing.sellerId) {
+      return (listing.sellerId as any).username;
+    }
+    return 'Seller';
+  };
+
+  // 🆕 IMPROVED: Function to send email notification to seller
   const sendSellerNotification = async (type: 'offer' | 'direct_purchase', data: any) => {
     try {
       const templateParams = {
@@ -154,12 +197,14 @@ const Browse: React.FC = () => {
         dashboard_url: `${window.location.origin}/marketplace/seller/dashboard`
       };
 
-      const serviceID = 'service_pykwrta'; // Replace with your EmailJS service ID
-      const templateID = type === 'offer' ? 'template_xtnsrmg' : 'template_h4gtoxd'; // Replace with your template IDs
+      console.log('📧 Sending email with data:', templateParams);
 
-      await emailjs.send(serviceID, templateID, templateParams);
+      const serviceID = 'service_pykwrta';
+      const templateID = type === 'offer' ? 'template_xtnsrmg' : 'template_h4gtoxd';
+
+      const result = await emailjs.send(serviceID, templateID, templateParams);
+      console.log(`✅ ${type === 'offer' ? 'Offer' : 'Purchase'} notification email sent successfully:`, result);
       
-      console.log(`✅ ${type === 'offer' ? 'Offer' : 'Purchase'} notification email sent successfully to seller`);
     } catch (error) {
       console.error('❌ Failed to send email notification:', error);
       // Don't throw error here - email failure shouldn't block the main flow
@@ -258,37 +303,54 @@ const Browse: React.FC = () => {
     }
   };
   
+  // 🆕 IMPROVED: Handle payment success with proper email extraction
   const handlePaymentSuccess = async () => {
     try {
+      const buyerName = currentUser?.username || 'A buyer';
+
       // Send email notification based on payment type
-      if (offerData?.type === 'direct_purchase') {
-        await sendSellerNotification('direct_purchase', {
-          sellerEmail: offerData.listing.sellerId?.email, // Make sure seller email is available
-          sellerName: offerData.listing.sellerId?.username,
-          buyerName: 'Buyer', // You might want to get this from user context
-          listingTitle: offerData.listing.title,
-          amount: offerData.amount,
-          orderId: offerData.order?._id,
-          type: 'direct_purchase'
-        });
-      } else {
-        // For offers
-        await sendSellerNotification('offer', {
-          sellerEmail: offerData.offer?.sellerId?.email,
-          sellerName: offerData.offer?.sellerId?.username,
-          buyerName: 'Buyer', // You might want to get this from user context
-          listingTitle: offerData.offer?.listingId?.title,
-          amount: offerData.amount,
-          message: offerForm.message,
-          expectedDelivery: offerForm.expectedDelivery,
-          requirements: offerForm.requirements,
-          offerId: offerData.offer?._id,
-          type: 'offer'
-        });
+      if (offerData?.type === 'direct_purchase' && offerData?.listing) {
+        const sellerEmail = getSellerEmail(offerData.listing);
+        const sellerName = getSellerName(offerData.listing);
+        
+        if (sellerEmail) {
+          await sendSellerNotification('direct_purchase', {
+            sellerEmail: sellerEmail,
+            sellerName: sellerName,
+            buyerName: buyerName,
+            listingTitle: offerData.listing.title,
+            amount: offerData.amount,
+            orderId: offerData.order?._id,
+            type: 'direct_purchase'
+          });
+        } else {
+          console.warn('No seller email found for direct purchase notification');
+        }
+      } else if (offerData?.offer) {
+        // For offers - extract seller info from offer data
+        const sellerEmail = offerData.offer.sellerId?.email || getSellerEmail(offerData.offer.listingId);
+        const sellerName = offerData.offer.sellerId?.username || getSellerName(offerData.offer.listingId);
+        
+        if (sellerEmail) {
+          await sendSellerNotification('offer', {
+            sellerEmail: sellerEmail,
+            sellerName: sellerName,
+            buyerName: buyerName,
+            listingTitle: offerData.offer.listingId?.title,
+            amount: offerData.amount,
+            message: offerForm.message,
+            expectedDelivery: offerForm.expectedDelivery,
+            requirements: offerForm.requirements,
+            offerId: offerData.offer._id,
+            type: 'offer'
+          });
+        } else {
+          console.warn('No seller email found for offer notification');
+        }
       }
+
     } catch (error) {
       console.error('Failed to send notification email:', error);
-      // Continue with success flow even if email fails
     }
 
     setShowPaymentModal(false);
@@ -594,6 +656,15 @@ const Browse: React.FC = () => {
                       {selectedListing.category}
                     </span>
                   </div>
+                  
+                  {/* 🆕 Seller Email Info */}
+                  <div className="flex items-center gap-1 mt-2 text-xs text-gray-500">
+                    <FiMail size={12} />
+                    <span>Seller: {getSellerName(selectedListing)}</span>
+                    {getSellerEmail(selectedListing) && (
+                      <span className="text-gray-400">({getSellerEmail(selectedListing)})</span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -715,8 +786,6 @@ const Browse: React.FC = () => {
                   onClose={handlePaymentClose}
                   paymentStatus={paymentStatus}
                   setPaymentStatus={setPaymentStatus}
-                  sendSellerNotification={sendSellerNotification}
-                  offerForm={offerForm}
                 />
               </Elements>
             </div>
@@ -727,8 +796,8 @@ const Browse: React.FC = () => {
   );
 };
 
-// Enhanced Payment Form Component
-const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentStatus, sendSellerNotification, offerForm }: any) => {
+// Payment Form Component (unchanged)
+const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentStatus }: any) => {
   const stripe = useStripe();
   const elements = useElements();
   const [error, setError] = useState('');
@@ -761,7 +830,6 @@ const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentS
 
       // Confirm payment based on type
       if (offerData?.type === 'direct_purchase') {
-        // Confirm direct purchase
         await axios.post(
           'http://localhost:3000/marketplace/payments/confirm-payment',
           { 
@@ -776,7 +844,6 @@ const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentS
           }
         );
       } else {
-        // Confirm offer payment
         await axios.post(
           'http://localhost:3000/marketplace/offers/confirm-offer-payment',
           { 
