@@ -291,15 +291,8 @@ const HypeModeProfile = () => {
           {isSignup ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
         </button>
 
-        {/* {isLoggedIn ? (
-          <div className="cards-container-small">
-            <div className="subscription-box-small">
-              <h3 className="subscription-title-small">Logout</h3>
-              <button className="subscription-button-small" onClick={handleGoogleLogout} disabled={isLoading}>
-                Logout
-              </button>
-            </div>
-          </div> */}
+        {isLoggedIn ? (
+          
         ) : (
           <>
             {isSignup && (
