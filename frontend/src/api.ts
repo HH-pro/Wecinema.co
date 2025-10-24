@@ -304,7 +304,7 @@ export const offerAPI = {
     getRequest('/marketplace/offers/received-offers', setLoading),
 
   acceptOffer: (offerId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/api/marketplace/offers/accept-offer/${offerId}`, {}, setLoading, "Offer accepted"),
+    putRequest(`/marketplace/offers/accept-offer/${offerId}`, {}, setLoading, "Offer accepted"),
 
   rejectOffer: (offerId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
     putRequest(`/api/marketplace/offers/reject-offer/${offerId}`, {}, setLoading, "Offer rejected"),
