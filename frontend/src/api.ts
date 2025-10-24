@@ -313,6 +313,7 @@ export const offerAPI = {
     putRequest(`/marketplace/offers/cancel-offer/${offerId}`, {}, setLoading, "Offer cancelled")
 };
 
+/// api.ts - Updated Order APIs section
 // Order APIs
 export const orderAPI = {
   // Create new order from accepted offer
@@ -328,14 +329,14 @@ export const orderAPI = {
       notes?: string;
       status?: string;
     },
-    setLoading: React.Dispatch<React.SetStateAction<boolean>>
+    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
   ) => {
     try {
-      setLoading(true);
+      setLoading?.(true);
       
       console.log("🛒 Creating order with data:", orderData);
 
-      const response = await api.post('/marketplace/orders/create', orderData);
+      const response = await api.post('/api/orders/create', orderData);
       
       toast.success("Order created successfully!");
       return response.data;
@@ -345,7 +346,7 @@ export const orderAPI = {
       toast.error(errorMessage);
       throw new Error(errorMessage);
     } finally {
-      setLoading(false);
+      setLoading?.(false);
     }
   },
 
@@ -398,7 +399,6 @@ export const orderAPI = {
   cancelOrder: (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
     putRequest(`/api/orders/${orderId}/cancel`, {}, setLoading, "Order cancelled")
 };
-
 // Payment APIs
 export const paymentAPI = {
   createPaymentIntent: (
