@@ -315,29 +315,61 @@ export const offerAPI = {
 
 // Order APIs
 export const orderAPI = {
-  createOrder: (
+  // Create new order from accepted offer
+  createOrder: async (
     orderData: {
+      offerId: string;
       listingId: string;
-      orderType: string;
+      buyerId: string;
+      sellerId: string;
       amount: number;
-      requirements?: string;
-      expectedDelivery?: string;
+      shippingAddress?: string;
+      paymentMethod?: string;
+      notes?: string;
+      status?: string;
     },
     setLoading: React.Dispatch<React.SetStateAction<boolean>>
-  ) => postRequest('/marketplace/orders/create-order', orderData, setLoading, "Order created successfully"),
+  ) => {
+    try {
+      setLoading(true);
+      
+      console.log("🛒 Creating order with data:", orderData);
 
+      const response = await api.post('/api/orders/create', orderData);
+      
+      toast.success("Order created successfully!");
+      return response.data;
+    } catch (error: any) {
+      console.error('Error creating order:', error);
+      const errorMessage = error.response?.data?.error || 'Failed to create order';
+      toast.error(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  },
+
+  // Get orders for buyer
   getMyOrders: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest('/api/marketplace/orders/my-orders', setLoading),
+    getRequest('/api/orders/my-orders', setLoading),
 
+  // Get orders for seller
   getSellerOrders: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest('/marketplace/orders/seller-orders', setLoading),
+    getRequest('/api/orders/my-sales', setLoading),
 
+  // Get order details
   getOrderDetails: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(`/api/marketplace/orders/${orderId}`, setLoading),
+    getRequest(`/api/orders/${orderId}`, setLoading),
 
+  // Update order status
   updateOrderStatus: (orderId: string, status: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/api/marketplace/orders/${orderId}/status`, { status }, setLoading, "Order status updated"),
+    putRequest(`/api/orders/${orderId}/status`, { status }, setLoading, "Order status updated"),
 
+  // Seller starts work on order
+  startWork: (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    putRequest(`/api/orders/${orderId}/start-work`, {}, setLoading, "Work started on order"),
+
+  // Seller delivers order
   deliverOrder: (
     orderId: string,
     deliveryData: {
@@ -345,13 +377,26 @@ export const orderAPI = {
       deliveryFiles: string[];
     },
     setLoading: React.Dispatch<React.SetStateAction<boolean>>
-  ) => putRequest(`/api/marketplace/orders/${orderId}/deliver`, deliveryData, setLoading, "Order delivered"),
+  ) => putRequest(`/api/orders/${orderId}/deliver`, deliveryData, setLoading, "Order delivered"),
 
+  // Buyer requests revision
   requestRevision: (
     orderId: string,
     revisionNotes: string,
     setLoading: React.Dispatch<React.SetStateAction<boolean>>
-  ) => putRequest(`/api/marketplace/orders/${orderId}/request-revision`, { revisionNotes }, setLoading, "Revision requested")
+  ) => putRequest(`/api/orders/${orderId}/request-revision`, { revisionNotes }, setLoading, "Revision requested"),
+
+  // Buyer completes order
+  completeOrder: (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    putRequest(`/api/orders/${orderId}/complete`, {}, setLoading, "Order completed"),
+
+  // Get order timeline
+  getOrderTimeline: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest(`/api/orders/${orderId}/timeline`, setLoading),
+
+  // Cancel order
+  cancelOrder: (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    putRequest(`/api/orders/${orderId}/cancel`, {}, setLoading, "Order cancelled")
 };
 
 // Payment APIs
@@ -444,8 +489,12 @@ export const marketplaceAPI = {
     getSeller: orderAPI.getSellerOrders,
     getDetails: orderAPI.getOrderDetails,
     updateStatus: orderAPI.updateOrderStatus,
+    startWork: orderAPI.startWork,
     deliver: orderAPI.deliverOrder,
-    requestRevision: orderAPI.requestRevision
+    requestRevision: orderAPI.requestRevision,
+    complete: orderAPI.completeOrder,
+    getTimeline: orderAPI.getOrderTimeline,
+    cancel: orderAPI.cancelOrder
   },
   payments: {
     createIntent: paymentAPI.createPaymentIntent,
@@ -779,7 +828,8 @@ export const formatOrderStatus = (status: string) => {
     in_revision: 'Revision Requested',
     completed: 'Completed',
     cancelled: 'Cancelled',
-    disputed: 'Disputed'
+    disputed: 'Disputed',
+    confirmed: 'Confirmed'
   };
   return statusMap[status] || status;
 };
@@ -793,7 +843,8 @@ export const getStatusColor = (status: string) => {
     in_revision: 'var(--warning)',
     completed: 'var(--success)',
     cancelled: 'var(--danger)',
-    disputed: 'var(--danger)'
+    disputed: 'var(--danger)',
+    confirmed: 'var(--info)'
   };
   return statusColors[status] || 'var(--secondary)';
 };
@@ -821,18 +872,28 @@ export const validateListingData = (data: {
 };
 
 export const validateOrderData = (data: {
+  offerId: string;
   listingId: string;
-  orderType: string;
+  buyerId: string;
+  sellerId: string;
   amount: number;
 }) => {
   const errors: string[] = [];
+
+  if (!data.offerId) {
+    errors.push('Offer ID is required');
+  }
 
   if (!data.listingId) {
     errors.push('Listing ID is required');
   }
 
-  if (!data.orderType) {
-    errors.push('Order type is required');
+  if (!data.buyerId) {
+    errors.push('Buyer ID is required');
+  }
+
+  if (!data.sellerId) {
+    errors.push('Seller ID is required');
   }
 
   if (!data.amount || data.amount <= 0) {
@@ -917,13 +978,18 @@ export const acceptOffer = offerAPI.acceptOffer;
 export const rejectOffer = offerAPI.rejectOffer;
 export const cancelOffer = offerAPI.cancelOffer;
 
+// Order exports - UPDATED
 export const createOrder = orderAPI.createOrder;
 export const getMyOrders = orderAPI.getMyOrders;
 export const getSellerOrders = orderAPI.getSellerOrders;
 export const getOrderDetails = orderAPI.getOrderDetails;
 export const updateOrderStatus = orderAPI.updateOrderStatus;
+export const startWorkOnOrder = orderAPI.startWork;
 export const deliverOrder = orderAPI.deliverOrder;
 export const requestRevision = orderAPI.requestRevision;
+export const completeOrder = orderAPI.completeOrder;
+export const getOrderTimeline = orderAPI.getOrderTimeline;
+export const cancelOrder = orderAPI.cancelOrder;
 
 export const createPaymentIntent = paymentAPI.createPaymentIntent;
 export const confirmPayment = paymentAPI.confirmPayment;
