@@ -292,7 +292,9 @@ const HypeModeProfile = () => {
         </button>
 
         {isLoggedIn ? (
-          
+          <div className="cards-container-small">
+            
+          </div>
         ) : (
           <>
             {isSignup && (
