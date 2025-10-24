@@ -336,7 +336,7 @@ export const orderAPI = {
       
       console.log("🛒 Creating order with data:", orderData);
 
-      const response = await api.post('/orders/create', orderData);
+      const response = await api.post('/marketplace/orders/create', orderData);
       
       toast.success("Order created successfully!");
       return response.data;
