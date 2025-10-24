@@ -26,7 +26,7 @@ const orderSchema = new mongoose.Schema({
   orderType: {
     type: String,
     enum: ['direct_purchase', 'accepted_offer', 'commission'],
-    required: true
+    default: 'accepted_offer' // Add default value
   },
   amount: { 
     type: Number, 
@@ -86,6 +86,18 @@ const orderSchema = new mongoose.Schema({
   // Order Communication
   buyerNotes: String,
   sellerNotes: String,
+
+  // Shipping & Address Information (Add these fields)
+  shippingAddress: String,
+  paymentMethod: {
+    type: String,
+    default: 'card'
+  },
+  notes: String,
+  orderDate: {
+    type: Date,
+    default: Date.now
+  }
 
 }, { 
   timestamps: true,
