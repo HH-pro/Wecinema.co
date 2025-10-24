@@ -352,23 +352,23 @@ export const orderAPI = {
 
   // Get orders for buyer
   getMyOrders: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest('/api/orders/my-orders', setLoading),
+    getRequest('/orders/my-orders', setLoading),
 
   // Get orders for seller
   getSellerOrders: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest('/api/orders/my-sales', setLoading),
+    getRequest('/orders/my-sales', setLoading),
 
   // Get order details
   getOrderDetails: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(`/api/orders/${orderId}`, setLoading),
+    getRequest(`/orders/${orderId}`, setLoading),
 
   // Update order status
   updateOrderStatus: (orderId: string, status: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/api/orders/${orderId}/status`, { status }, setLoading, "Order status updated"),
+    putRequest(`/orders/${orderId}/status`, { status }, setLoading, "Order status updated"),
 
   // Seller starts work on order
   startWork: (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/api/orders/${orderId}/start-work`, {}, setLoading, "Work started on order"),
+    putRequest(`/orders/${orderId}/start-work`, {}, setLoading, "Work started on order"),
 
   // Seller delivers order
   deliverOrder: (
