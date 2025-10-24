@@ -22,7 +22,6 @@ const HypeModeProfile = () => {
   const [selectedSubscription, setSelectedSubscription] = useState<"user" | "studio" | null>(null);
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer");
   const [isLoading, setIsLoading] = useState(false);
-  const [showEmailForm, setShowEmailForm] = useState(false);
 
   // Register user with backend
   const registerUser = async (username: string, email: string, avatar: string, userType: string) => {
@@ -237,15 +236,6 @@ const HypeModeProfile = () => {
     }
   };
 
-  const toggleEmailForm = () => {
-    setShowEmailForm(!showEmailForm);
-    if (showEmailForm) {
-      setEmail('');
-      setPassword('');
-      setUsername('');
-    }
-  };
-
   const handleEmailSubmit = () => {
     if (isSignup) {
       handleEmailSignup();
@@ -269,7 +259,6 @@ const HypeModeProfile = () => {
     setPassword('');
     setUsername('');
     setSelectedSubscription(null);
-    setShowEmailForm(false);
   };
 
   useEffect(() => {
@@ -279,7 +268,7 @@ const HypeModeProfile = () => {
 
   return (
     <Layout expand={false} hasHeader={true}>
-      <div className="banner">
+      <div className="banner-small">
         🔥 HypeMode is Here! Exclusive Features Await! 🔥
       </div>
 
@@ -297,16 +286,16 @@ const HypeModeProfile = () => {
         </motion.div>
       )}
 
-      <div className="main-container">
-        <button className="toggle-button" onClick={toggleSignupSignin} disabled={isLoading}>
-          {isSignup ? "Already have an account? Switch to Sign in" : "Don't have an account? Switch to Sign up"}
+      <div className="main-container-small">
+        <button className="toggle-button-small" onClick={toggleSignupSignin} disabled={isLoading}>
+          {isSignup ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
         </button>
 
         {isLoggedIn ? (
-          <div className="cards-container">
-            <div className="subscription-box">
-              <h3 className="subscription-title">Logout</h3>
-              <button className="subscription-button" onClick={handleGoogleLogout} disabled={isLoading}>
+          <div className="cards-container-small">
+            <div className="subscription-box-small">
+              <h3 className="subscription-title-small">Logout</h3>
+              <button className="subscription-button-small" onClick={handleGoogleLogout} disabled={isLoading}>
                 Logout
               </button>
             </div>
@@ -314,36 +303,36 @@ const HypeModeProfile = () => {
         ) : (
           <>
             {isSignup && (
-              <div className="user-type-selector">
+              <div className="user-type-selector-small">
                 <button 
-                  className={`user-type-button ${userType === "buyer" ? "active" : ""}`}
+                  className={`user-type-button-small ${userType === "buyer" ? "active-small" : ""}`}
                   onClick={() => setUserType("buyer")}
                   disabled={isLoading}
                 >
-                  👤 Sign up as Buyer
+                  👤 Buyer
                 </button>
                 <button 
-                  className={`user-type-button ${userType === "seller" ? "active" : ""}`}
+                  className={`user-type-button-small ${userType === "seller" ? "active-small" : ""}`}
                   onClick={() => setUserType("seller")}
                   disabled={isLoading}
                 >
-                  🏪 Sign up as Seller
+                  🏪 Seller
                 </button>
               </div>
             )}
 
-            <div className="cards-container">
+            <div className="cards-container-small">
               {/* Basic Plan */}
               <div
-                className={`subscription-box ${selectedSubscription === "user" ? "selected" : ""}`}
+                className={`subscription-box-small ${selectedSubscription === "user" ? "selected-small" : ""}`}
                 onClick={() => !isLoading && handleSubscriptionClick("user")}
               >
-                <div className="premium-badge">Popular</div>
-                <h3 className="subscription-title">Basic Plan</h3>
-                <div className="subscription-price">$5/month</div>
-                <p className="subscription-description">Perfect for individual users and content enthusiasts</p>
+                <div className="premium-badge-small">Popular</div>
+                <h3 className="subscription-title-small">Basic Plan</h3>
+                <div className="subscription-price-small">$5/month</div>
+                <p className="subscription-description-small">Perfect for individual users</p>
                 
-                <ul className="features-list">
+                <ul className="features-list-small">
                   <li>Buy Films & Scripts</li>
                   <li>Sell Your Content</li>
                   <li>Basic Support</li>
@@ -351,65 +340,63 @@ const HypeModeProfile = () => {
                   <li>5GB Storage</li>
                 </ul>
 
+                {selectedSubscription === "user" && (
+                  <div className="auth-section-small">
+                    <button className="subscription-button-small google-auth-button-small" onClick={handleGoogleLogin} disabled={isLoading}>
+                      <span className="google-icon-small">G</span>
+                      {isLoading ? "Processing..." : (isSignup ? "Google Sign up" : "Google Sign in")}
+                    </button>
 
-{selectedSubscription === "user" && (
-  <div className="auth-section">
-    <button className="subscription-button google-auth-button" onClick={handleGoogleLogin} disabled={isLoading}>
-      <span className="google-icon">G</span>
-      {isLoading ? "Processing..." : (isSignup ? "Sign up with Google" : "Sign in with Google")}
-    </button>
+                    <div className="auth-divider-small">
+                      <span>or</span>
+                    </div>
 
-    <div className="auth-divider">
-      <span>or</span>
-    </div>
-
-    {/* Email Form - Always show when card is selected */}
-    <div className="email-form">
-      {isSignup && (
-        <input
-          type="text"
-          className="form-input"
-          placeholder="Enter your username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          disabled={isLoading}
-        />
-      )}
-      <input
-        type="email"
-        className="form-input"
-        placeholder="Enter your email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        disabled={isLoading}
-      />
-      <input
-        type="password"
-        className="form-input"
-        placeholder="Enter your password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        disabled={isLoading}
-      />
-      <button className="subscription-button email-submit-button" onClick={handleEmailSubmit} disabled={isLoading}>
-        {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
-      </button>
-    </div>
-  </div>
-)}
+                    <div className="email-form-small">
+                      {isSignup && (
+                        <input
+                          type="text"
+                          className="form-input-small"
+                          placeholder="Username"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          disabled={isLoading}
+                        />
+                      )}
+                      <input
+                        type="email"
+                        className="form-input-small"
+                        placeholder="Email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        disabled={isLoading}
+                      />
+                      <input
+                        type="password"
+                        className="form-input-small"
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disabled={isLoading}
+                      />
+                      <button className="subscription-button-small email-submit-button-small" onClick={handleEmailSubmit} disabled={isLoading}>
+                        {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Pro Plan */}
               <div
-                className={`subscription-box ${selectedSubscription === "studio" ? "selected" : ""}`}
+                className={`subscription-box-small ${selectedSubscription === "studio" ? "selected-small" : ""}`}
                 onClick={() => !isLoading && handleSubscriptionClick("studio")}
               >
-                <div className="premium-badge">Pro</div>
-                <h3 className="subscription-title">Pro Plan</h3>
-                <div className="subscription-price">$10/month</div>
-                <p className="subscription-description">Advanced features for studios and professional creators</p>
+                <div className="premium-badge-small">Pro</div>
+                <h3 className="subscription-title-small">Pro Plan</h3>
+                <div className="subscription-price-small">$10/month</div>
+                <p className="subscription-description-small">Advanced features for professionals</p>
                 
-                <ul className="features-list">
+                <ul className="features-list-small">
                   <li>All Basic Features</li>
                   <li>Early Feature Access</li>
                   <li>Priority Support</li>
@@ -417,53 +404,47 @@ const HypeModeProfile = () => {
                 </ul>
 
                 {selectedSubscription === "studio" && (
-                  <div className="auth-section">
-                    <button className="subscription-button google-auth-button" onClick={handleGoogleLogin} disabled={isLoading}>
-                      <span className="google-icon">G</span>
-                      {isLoading ? "Processing..." : (isSignup ? "Sign up with Google" : "Sign in with Google")}
+                  <div className="auth-section-small">
+                    <button className="subscription-button-small google-auth-button-small" onClick={handleGoogleLogin} disabled={isLoading}>
+                      <span className="google-icon-small">G</span>
+                      {isLoading ? "Processing..." : (isSignup ? "Google Sign up" : "Google Sign in")}
                     </button>
 
-                    <div className="auth-divider">
+                    <div className="auth-divider-small">
                       <span>or</span>
                     </div>
 
-                    {!showEmailForm ? (
-                      <button className="subscription-button email-toggle-button" onClick={toggleEmailForm} disabled={isLoading}>
-                        {isSignup ? "Sign up with Email" : "Sign in with Email"}
+                    <div className="email-form-small">
+                      {isSignup && (
+                        <input
+                          type="text"
+                          className="form-input-small"
+                          placeholder="Username"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          disabled={isLoading}
+                        />
+                      )}
+                      <input
+                        type="email"
+                        className="form-input-small"
+                        placeholder="Email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        disabled={isLoading}
+                      />
+                      <input
+                        type="password"
+                        className="form-input-small"
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disabled={isLoading}
+                      />
+                      <button className="subscription-button-small email-submit-button-small" onClick={handleEmailSubmit} disabled={isLoading}>
+                        {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
                       </button>
-                    ) : (
-                      <div className="email-form">
-                        {isSignup && (
-                          <input
-                            type="text"
-                            className="form-input"
-                            placeholder="Enter your username"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            disabled={isLoading}
-                          />
-                        )}
-                        <input
-                          type="email"
-                          className="form-input"
-                          placeholder="Enter your email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          disabled={isLoading}
-                        />
-                        <input
-                          type="password"
-                          className="form-input"
-                          placeholder="Enter your password"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          disabled={isLoading}
-                        />
-                        <button className="subscription-button email-submit-button" onClick={handleEmailSubmit} disabled={isLoading}>
-                          {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
-                        </button>
-                      </div>
-                    )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -475,9 +456,9 @@ const HypeModeProfile = () => {
       {showPopup && (
         <>
           <div className="overlay" onClick={closePopup} />
-          <div className="popup">
-            <p>{popupMessage}</p>
-            <button className="subscription-button" onClick={closePopup}>Close</button>
+          <div className="popup-small">
+            <p className="popup-text-small">{popupMessage}</p>
+            <button className="subscription-button-small" onClick={closePopup}>Close</button>
           </div>
         </>
       )}
