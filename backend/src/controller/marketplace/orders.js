@@ -6,6 +6,149 @@ const Offer = require("../../models/marketplace/offer");
 const { authenticateMiddleware } = require("../../utils");
 const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
 
+// Create new order (from accepted offer)
+router.post("/create", authenticateMiddleware, async (req, res) => {
+  try {
+    const {
+      offerId,
+      listingId,
+      buyerId,
+      sellerId,
+      amount,
+      shippingAddress,
+      paymentMethod,
+      notes,
+      status = 'confirmed'
+    } = req.body;
+
+    const currentUserId = req.user.id || req.user._id || req.user.userId;
+
+    console.log("🛒 Creating new order:", {
+      offerId,
+      listingId,
+      buyerId,
+      sellerId,
+      amount,
+      currentUserId
+    });
+
+    // Validate required fields
+    if (!offerId || !listingId || !buyerId || !sellerId || !amount) {
+      return res.status(400).json({
+        error: 'Missing required fields: offerId, listingId, buyerId, sellerId, amount'
+      });
+    }
+
+    // Verify that the current user is the seller
+    if (sellerId !== currentUserId) {
+      return res.status(403).json({
+        error: 'You can only create orders for your own listings'
+      });
+    }
+
+    // Check if offer exists and is still pending
+    const offer = await Offer.findById(offerId);
+    if (!offer) {
+      return res.status(404).json({ error: 'Offer not found' });
+    }
+
+    if (offer.status !== 'pending') {
+      return res.status(400).json({
+        error: 'Offer is no longer available for order creation'
+      });
+    }
+
+    // Check if listing exists and is active
+    const listing = await MarketplaceListing.findById(listingId);
+    if (!listing) {
+      return res.status(404).json({ error: 'Listing not found' });
+    }
+
+    if (listing.status !== 'active') {
+      return res.status(400).json({
+        error: 'Listing is not available for purchase'
+      });
+    }
+
+    // Check if order already exists for this offer
+    const existingOrder = await Order.findOne({ offerId });
+    if (existingOrder) {
+      return res.status(400).json({
+        error: 'Order already exists for this offer'
+      });
+    }
+
+    // Create new order
+    const order = new Order({
+      offerId,
+      listingId,
+      buyerId,
+      sellerId,
+      amount,
+      shippingAddress: shippingAddress || 'Not provided',
+      paymentMethod: paymentMethod || 'card',
+      notes: notes || '',
+      status: status,
+      orderDate: new Date(),
+      expectedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+      maxRevisions: 3,
+      revisions: 0
+    });
+
+    await order.save();
+
+    // Update offer status to accepted
+    offer.status = 'accepted';
+    offer.acceptedAt = new Date();
+    await offer.save();
+
+    // Update listing status to sold if it's a one-time purchase
+    if (listing.availability === 'single') {
+      listing.status = 'sold';
+      await listing.save();
+    }
+
+    console.log("✅ Order created successfully:", order._id);
+
+    // Populate the order with related data
+    const populatedOrder = await Order.findById(order._id)
+      .populate({
+        path: 'buyerId',
+        select: 'username avatar email',
+        model: 'User'
+      })
+      .populate({
+        path: 'sellerId',
+        select: 'username avatar sellerRating email',
+        model: 'User'
+      })
+      .populate({
+        path: 'listingId',
+        select: 'title mediaUrls price category type description tags',
+        model: 'MarketplaceListing'
+      })
+      .populate({
+        path: 'offerId',
+        select: 'amount message requirements expectedDelivery',
+        model: 'Offer'
+      })
+      .lean();
+
+    res.status(201).json({
+      success: true,
+      message: 'Order created successfully',
+      order: populatedOrder
+    });
+
+  } catch (error) {
+    console.error('❌ Error creating order:', error);
+    res.status(500).json({
+      error: 'Failed to create order',
+      details: error.message
+    });
+  }
+});
+
 // Get my orders (buyer) - FIXED VERSION
 router.get("/my-orders", authenticateMiddleware, async (req, res) => {
   try {
@@ -189,7 +332,6 @@ router.get("/:orderId", authenticateMiddleware, async (req, res) => {
     });
   }
 });
-
 
 // Update order status (seller - start working)
 router.put("/:orderId/start-work", authenticateMiddleware, async (req, res) => {
