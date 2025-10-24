@@ -6,7 +6,7 @@ const Offer = require("../../models/marketplace/offer");
 const { authenticateMiddleware } = require("../../utils");
 const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
 
-// Create new order (from accepted offer)
+// In your orders.js backend route
 router.post("/create", authenticateMiddleware, async (req, res) => {
   try {
     const {
@@ -17,13 +17,13 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
       amount,
       shippingAddress,
       paymentMethod,
-      notes,
-      status = 'confirmed'
+      notes
+      // Remove status from destructuring to prevent invalid values
     } = req.body;
 
     const currentUserId = req.user.id || req.user._id || req.user.userId;
 
-    console.log("🛒 Creating new order:", {
+    console.log("🛒 Creating new order with data:", {
       offerId,
       listingId,
       buyerId,
@@ -78,7 +78,7 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    // Create new order
+    // Create new order - let mongoose use schema defaults
     const order = new Order({
       offerId,
       listingId,
@@ -88,9 +88,9 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
       shippingAddress: shippingAddress || 'Not provided',
       paymentMethod: paymentMethod || 'card',
       notes: notes || '',
-      status: status,
+      // Let schema handle defaults: status='pending_payment', orderType='accepted_offer'
       orderDate: new Date(),
-      expectedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+      expectedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       maxRevisions: 3,
       revisions: 0
     });
