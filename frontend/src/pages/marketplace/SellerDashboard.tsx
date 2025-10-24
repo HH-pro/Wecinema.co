@@ -799,17 +799,18 @@ const OrderCreation = ({ offer, onOrderCreated, onClose }) => {
       setLoading(true);
       setError('');
 
-      const orderData = {
-        offerId: offer._id,
-        listingId: offer.listingId._id,
-        buyerId: offer.buyerId._id,
-        sellerId: getCurrentUserIdFromToken(), // Current user is the seller
-        amount: offer.amount,
-        shippingAddress: orderDetails.shippingAddress,
-        paymentMethod: orderDetails.paymentMethod,
-        notes: orderDetails.notes,
-        status: 'confirmed'
-      };
+     const orderData = {
+  offerId: offer._id,
+  listingId: offer.listingId._id,
+  buyerId: offer.buyerId._id,
+  sellerId: getCurrentUserIdFromToken(), // Current user is the seller
+  amount: offer.amount,
+  shippingAddress: orderDetails.shippingAddress,
+  paymentMethod: orderDetails.paymentMethod,
+  notes: orderDetails.notes,
+  // Remove status field - it will use the default 'pending_payment' from schema
+  // Remove orderType field - it will use the default 'accepted_offer' from schema
+};
 
       const result = await createOrder(orderData);
       
