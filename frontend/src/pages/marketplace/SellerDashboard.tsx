@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
-import { getSellerOrders, getReceivedOffers } from '../../api';
+import { getSellerOrders, getReceivedOffers, createOrder } from '../../api';
 import axios from 'axios';
 import { decodeToken } from '../../utilities/helperfFunction';
 
@@ -779,6 +779,393 @@ const ListingCard = ({ listing, isCurrentUser, onEdit, onDelete }) => {
   );
 };
 
+// Order Creation Component
+const OrderCreation = ({ offer, onOrderCreated, onClose }) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [orderDetails, setOrderDetails] = useState({
+    shippingAddress: '',
+    paymentMethod: 'card',
+    notes: ''
+  });
+
+  const handleCreateOrder = async () => {
+    if (!orderDetails.shippingAddress.trim()) {
+      setError('Please enter shipping address');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+
+      const orderData = {
+        offerId: offer._id,
+        listingId: offer.listingId._id,
+        buyerId: offer.buyerId._id,
+        sellerId: getCurrentUserIdFromToken(), // Current user is the seller
+        amount: offer.amount,
+        shippingAddress: orderDetails.shippingAddress,
+        paymentMethod: orderDetails.paymentMethod,
+        notes: orderDetails.notes,
+        status: 'confirmed'
+      };
+
+      const result = await createOrder(orderData);
+      
+      if (result.success) {
+        alert('Order created successfully!');
+        onOrderCreated(result.order);
+        onClose();
+      } else {
+        setError(result.error || 'Failed to create order');
+      }
+    } catch (err) {
+      console.error('Error creating order:', err);
+      setError('Failed to create order. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getCurrentUserIdFromToken = () => {
+    try {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (token) {
+        const tokenData = decodeToken(token);
+        return tokenData?.userId || tokenData?.id;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting user ID:', error);
+      return null;
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-gray-200">
+          <h2 className="text-xl font-bold text-gray-900">Create Order</h2>
+          <p className="text-gray-600 mt-1">Confirm order details and create order</p>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Order Summary */}
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <h3 className="font-semibold text-gray-900 mb-2">Order Summary</h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Listing:</span>
+                <span className="font-medium">{offer.listingId?.title}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Buyer:</span>
+                <span className="font-medium">{offer.buyerId?.username}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Offer Amount:</span>
+                <span className="font-medium text-green-600">₹{offer.amount?.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Shipping Address */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Shipping Address *
+            </label>
+            <textarea
+              value={orderDetails.shippingAddress}
+              onChange={(e) => setOrderDetails(prev => ({
+                ...prev,
+                shippingAddress: e.target.value
+              }))}
+              placeholder="Enter complete shipping address"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+              rows={3}
+            />
+          </div>
+
+          {/* Payment Method */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Payment Method
+            </label>
+            <select
+              value={orderDetails.paymentMethod}
+              onChange={(e) => setOrderDetails(prev => ({
+                ...prev,
+                paymentMethod: e.target.value
+              }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="card">Credit/Debit Card</option>
+              <option value="upi">UPI</option>
+              <option value="cod">Cash on Delivery</option>
+              <option value="bank">Bank Transfer</option>
+            </select>
+          </div>
+
+          {/* Additional Notes */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Additional Notes (Optional)
+            </label>
+            <textarea
+              value={orderDetails.notes}
+              onChange={(e) => setOrderDetails(prev => ({
+                ...prev,
+                notes: e.target.value
+              }))}
+              placeholder="Any additional instructions or notes..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+              rows={2}
+            />
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-red-800 text-sm">{error}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="p-6 border-t border-gray-200 flex gap-3">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleCreateOrder}
+            disabled={loading}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50 flex items-center justify-center"
+          >
+            {loading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Creating Order...
+              </>
+            ) : (
+              'Create Order'
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Order Received Page Component
+const OrderReceivedPage = () => {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchReceivedOrders();
+  }, []);
+
+  const fetchReceivedOrders = async () => {
+    try {
+      setLoading(true);
+      const response = await getSellerOrders(setLoading);
+      const ordersData = Array.isArray(response) ? response : (response?.data || []);
+      setOrders(ordersData);
+    } catch (err) {
+      console.error('Error fetching received orders:', err);
+      setError('Failed to load orders');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+    }).format(amount || 0);
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'confirmed':
+      case 'completed':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'shipped':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'cancelled':
+      case 'rejected':
+        return 'bg-red-100 text-red-800 border-red-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  if (loading) {
+    return (
+      <MarketplaceLayout>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-lg text-gray-600 font-medium">Loading orders...</p>
+          </div>
+        </div>
+      </MarketplaceLayout>
+    );
+  }
+
+  return (
+    <MarketplaceLayout>
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Page Header */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900">Orders Received</h1>
+            <p className="mt-2 text-gray-600">Manage and track all orders received from buyers</p>
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <svg className="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-red-800">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Orders List */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">All Orders ({orders.length})</h2>
+            </div>
+            
+            <div className="p-6">
+              {orders.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4">📦</div>
+                  <h3 className="text-lg font-medium text-gray-900">No orders received yet</h3>
+                  <p className="mt-2 text-gray-500">When buyers purchase your items, orders will appear here.</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {orders.map(order => (
+                    <div key={order._id} className="border border-gray-200 rounded-xl p-6 hover:border-gray-300 transition-colors">
+                      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                        {/* Order Info */}
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between mb-4">
+                            <div>
+                              <h3 className="text-lg font-medium text-gray-900">
+                                Order #{order._id.slice(-8).toUpperCase()}
+                              </h3>
+                              <p className="text-gray-600 mt-1">
+                                From: {order.buyerId?.username || 'Unknown Buyer'}
+                              </p>
+                            </div>
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(order.status)}`}>
+                              {order.status ? order.status.charAt(0).toUpperCase() + order.status.slice(1) : 'Unknown'}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                            <div>
+                              <p className="text-sm text-gray-600">Amount</p>
+                              <p className="font-semibold text-green-600">{formatCurrency(order.amount)}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-600">Order Date</p>
+                              <p className="font-medium text-gray-900">{formatDate(order.createdAt)}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-600">Payment Method</p>
+                              <p className="font-medium text-gray-900 capitalize">{order.paymentMethod || 'Not specified'}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-600">Shipping Address</p>
+                              <p className="font-medium text-gray-900 line-clamp-1">{order.shippingAddress || 'Not provided'}</p>
+                            </div>
+                          </div>
+
+                          {order.listingId && (
+                            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                              <p className="text-sm text-gray-600 mb-1">Listing</p>
+                              <p className="font-medium text-gray-900">{order.listingId.title}</p>
+                              {order.listingId.price && (
+                                <p className="text-sm text-gray-600">
+                                  Original Price: {formatCurrency(order.listingId.price)}
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {order.notes && (
+                            <div className="mt-3">
+                              <p className="text-sm text-gray-600 mb-1">Seller Notes</p>
+                              <p className="text-gray-900 bg-blue-50 rounded-lg p-3 text-sm border border-blue-200">
+                                {order.notes}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex flex-col gap-2 lg:w-48">
+                          <button
+                            onClick={() => window.location.href = `/orders/${order._id}`}
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 text-sm"
+                          >
+                            View Details
+                          </button>
+                          {order.status === 'confirmed' && (
+                            <button
+                              onClick={() => handleOrderUpdate(order._id, 'shipped')}
+                              className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 text-sm"
+                            >
+                              Mark as Shipped
+                            </button>
+                          )}
+                          {order.status === 'shipped' && (
+                            <button
+                              onClick={() => handleOrderUpdate(order._id, 'completed')}
+                              className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 text-sm"
+                            >
+                              Mark as Completed
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </MarketplaceLayout>
+  );
+};
+
 // Original SellerDashboard Interfaces
 interface Order {
   _id: string;
@@ -812,7 +1199,7 @@ interface Offer {
   message?: string;
 }
 
-type TabType = 'overview' | 'offers' | 'listings';
+type TabType = 'overview' | 'offers' | 'listings' | 'orders';
 
 const SellerDashboard: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -821,8 +1208,10 @@ const SellerDashboard: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [error, setError] = useState<string>('');
+  const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
+  const [showOrderCreation, setShowOrderCreation] = useState(false);
 
-  // Stats calculation - ab listings data bhi include hai
+  // Stats calculation
   const totalOrders = orders.length;
   const pendingOrders = orders.filter(order => order.status === 'pending').length;
   const totalRevenue = orders
@@ -935,12 +1324,40 @@ const SellerDashboard: React.FC = () => {
   const handleOfferAction = async (offerId: string, action: 'accept' | 'reject') => {
     try {
       setError('');
-      // Implement offer action logic here
-      console.log(`🎯 ${action} offer:`, offerId);
-      await fetchDashboardData(); // Refresh data
+      
+      if (action === 'accept') {
+        // Find the offer and show order creation modal
+        const offer = offers.find(o => o._id === offerId);
+        if (offer) {
+          setSelectedOffer(offer);
+          setShowOrderCreation(true);
+        }
+      } else {
+        // Implement reject offer logic here
+        console.log(`🎯 Rejecting offer:`, offerId);
+        await fetchDashboardData(); // Refresh data
+      }
     } catch (error) {
       console.error('Error updating offer:', error);
       setError('Failed to update offer');
+    }
+  };
+
+  const handleOrderCreated = (newOrder: Order) => {
+    // Add the new order to the orders list
+    setOrders(prev => [newOrder, ...prev]);
+    // Refresh offers to update the accepted offer status
+    fetchDashboardData();
+  };
+
+  const handleOrderUpdate = async (orderId: string, newStatus: string) => {
+    try {
+      // Implement order status update logic here
+      console.log(`🔄 Updating order ${orderId} to ${newStatus}`);
+      await fetchDashboardData(); // Refresh data
+    } catch (error) {
+      console.error('Error updating order:', error);
+      setError('Failed to update order');
     }
   };
 
@@ -1071,7 +1488,8 @@ const SellerDashboard: React.FC = () => {
               {[
                 { id: 'overview', label: 'Overview', icon: '📊' },
                 { id: 'offers', label: 'Offers', icon: '💼', badge: pendingOffers },
-                { id: 'listings', label: 'My Listings', icon: '🏠', badge: totalListings }
+                { id: 'listings', label: 'My Listings', icon: '🏠', badge: totalListings },
+                { id: 'orders', label: 'Orders Received', icon: '📦', badge: totalOrders }
               ].map(({ id, label, icon, badge }) => (
                 <button
                   key={id}
@@ -1093,6 +1511,18 @@ const SellerDashboard: React.FC = () => {
               ))}
             </nav>
           </div>
+
+          {/* Order Creation Modal */}
+          {showOrderCreation && selectedOffer && (
+            <OrderCreation
+              offer={selectedOffer}
+              onOrderCreated={handleOrderCreated}
+              onClose={() => {
+                setShowOrderCreation(false);
+                setSelectedOffer(null);
+              }}
+            />
+          )}
 
           {/* Overview Tab */}
           {activeTab === 'overview' && (
@@ -1129,6 +1559,7 @@ const SellerDashboard: React.FC = () => {
                   value={totalOrders}
                   icon="📦"
                   color="purple"
+                  onClick={() => setActiveTab('orders')}
                 />
                 <StatCard
                   title="Pending Offers"
@@ -1146,7 +1577,7 @@ const SellerDashboard: React.FC = () => {
                     <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                       <h2 className="text-lg font-semibold text-gray-900">Recent Orders</h2>
                       <button 
-                        onClick={() => window.location.href = '/orders'}
+                        onClick={() => setActiveTab('orders')}
                         className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center"
                       >
                         View All
@@ -1210,7 +1641,7 @@ const SellerDashboard: React.FC = () => {
                         Create New Listing
                       </button>
                       <button
-                        onClick={() => window.location.href = '/orders'}
+                        onClick={() => setActiveTab('orders')}
                         className="w-full bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center"
                       >
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1353,6 +1784,11 @@ const SellerDashboard: React.FC = () => {
           {/* Listings Tab */}
           {activeTab === 'listings' && (
             <UserListings />
+          )}
+
+          {/* Orders Tab */}
+          {activeTab === 'orders' && (
+            <OrderReceivedPage />
           )}
         </div>
       </div>
