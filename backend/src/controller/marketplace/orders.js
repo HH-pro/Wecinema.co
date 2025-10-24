@@ -17,6 +17,7 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
       amount,
       shippingAddress,
       paymentMethod,
+      notes,
     } = req.body;
 
     const currentUserId = req.user.id || req.user._id || req.user.userId;
