@@ -356,7 +356,7 @@ export const orderAPI = {
 
   // Get orders for seller
   getSellerOrders: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest('/orders/my-sales', setLoading),
+    getRequest('/marketplace/orders/my-sales', setLoading),
 
   // Get order details
   getOrderDetails: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
