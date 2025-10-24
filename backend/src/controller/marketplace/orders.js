@@ -148,6 +148,43 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
     });
   }
 });
+router.delete("/delete-all-orders", async (req, res) => {
+  try {
+    console.log("🗑️ Attempting to delete ALL orders...");
+
+    // Get count before deletion for reporting
+    const orderCount = await Order.countDocuments();
+    console.log(`📊 Total orders found: ${orderCount}`);
+
+    if (orderCount === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No orders found to delete",
+        deletedCount: 0
+      });
+    }
+
+    // Delete all orders
+    const deleteResult = await Order.deleteMany({});
+    
+    console.log(`✅ Successfully deleted ${deleteResult.deletedCount} orders`);
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully deleted all ${deleteResult.deletedCount} orders`,
+      deletedCount: deleteResult.deletedCount,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Error deleting all orders:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to delete all orders',
+      details: error.message 
+    });
+  }
+});
 
 // Get my orders (buyer) - FIXED VERSION
 router.get("/my-orders", authenticateMiddleware, async (req, res) => {
