@@ -324,7 +324,7 @@ export const orderAPI = {
       expectedDelivery?: string;
     },
     setLoading: React.Dispatch<React.SetStateAction<boolean>>
-  ) => postRequest('/api/marketplace/orders/create-order', orderData, setLoading, "Order created successfully"),
+  ) => postRequest('/marketplace/orders/create-order', orderData, setLoading, "Order created successfully"),
 
   getMyOrders: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
     getRequest('/api/marketplace/orders/my-orders', setLoading),
