@@ -298,7 +298,7 @@ export const offerAPI = {
   },
 
   getMyOffers: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest('/api/marketplace/offers/my-offers', setLoading),
+    getRequest('/marketplace/offers/my-offers', setLoading),
 
   getReceivedOffers: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
     getRequest('/marketplace/offers/received-offers', setLoading),
@@ -307,10 +307,10 @@ export const offerAPI = {
     putRequest(`/marketplace/offers/accept-offer/${offerId}`, {}, setLoading, "Offer accepted"),
 
   rejectOffer: (offerId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/api/marketplace/offers/reject-offer/${offerId}`, {}, setLoading, "Offer rejected"),
+    putRequest(`/marketplace/offers/reject-offer/${offerId}`, {}, setLoading, "Offer rejected"),
 
   cancelOffer: (offerId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/api/marketplace/offers/cancel-offer/${offerId}`, {}, setLoading, "Offer cancelled")
+    putRequest(`/marketplace/offers/cancel-offer/${offerId}`, {}, setLoading, "Offer cancelled")
 };
 
 // Order APIs
