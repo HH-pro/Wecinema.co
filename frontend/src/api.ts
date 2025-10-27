@@ -400,7 +400,7 @@ export const offerAPI = {
         message: offerData.message || ''
       };
 
-      const response = await api.post<ApiResponse<Offer>>('/api/marketplace/offers/make', requestData);
+      const response = await api.post<ApiResponse<Offer>>('/marketplace/offers/make', requestData);
       
       toast.success("Offer sent successfully!");
       return response.data;
@@ -415,19 +415,19 @@ export const offerAPI = {
   },
 
   getMyOffers: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest<Offer[]>('/api/marketplace/offers/my/offers', setLoading),
+    getRequest<Offer[]>('/marketplace/offers/my/offers', setLoading),
 
   getReceivedOffers: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest<Offer[]>('/api/marketplace/offers/received', setLoading),
+    getRequest<Offer[]>('/marketplace/offers/received', setLoading),
 
   acceptOffer: (offerId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest<Offer>(`/api/marketplace/offers/${offerId}/accept`, {}, setLoading, "Offer accepted"),
+    putRequest<Offer>(`/marketplace/offers/${offerId}/accept`, {}, setLoading, "Offer accepted"),
 
   rejectOffer: (offerId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest<Offer>(`/api/marketplace/offers/${offerId}/reject`, {}, setLoading, "Offer rejected"),
+    putRequest<Offer>(`/marketplace/offers/${offerId}/reject`, {}, setLoading, "Offer rejected"),
 
   cancelOffer: (offerId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest<Offer>(`/api/marketplace/offers/${offerId}/cancel`, {}, setLoading, "Offer cancelled")
+    putRequest<Offer>(`/marketplace/offers/${offerId}/cancel`, {}, setLoading, "Offer cancelled")
 };
 
 // Order APIs - UPDATED ROUTES
