@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
-import { getSellerOrders, getReceivedOffers, createOrder } from '../../api';
+import { 
+  getSellerOrders, 
+  getReceivedOffers, 
+  createOrder,
+  listingAPI,
+  offerAPI,
+  orderAPI,
+  dashboardAPI 
+} from '../../api';
 import axios from 'axios';
 import { decodeToken } from '../../utilities/helperfFunction';
 
@@ -10,7 +18,7 @@ const API_BASE_URL = 'http://localhost:3000';
 // Utility Functions
 const getCurrentUserIdFromToken = () => {
   try {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
     if (!token) return null;
 
     let tokenData;
@@ -24,7 +32,7 @@ const getCurrentUserIdFromToken = () => {
           tokenData = JSON.parse(atob(paddedPayload));
         }
       } catch (manualError) {
-        const storedUser = localStorage.getItem('user');
+        const storedUser = localStorage.getItem("user");
         if (storedUser) {
           const userData = JSON.parse(storedUser);
           return userData.id || userData._id || userData.userId;
@@ -113,7 +121,7 @@ const OrderCreation = ({ offer, onOrderCreated, onClose }) => {
         notes: orderDetails.notes,
       };
 
-      const result = await createOrder(orderData);
+      const result = await orderAPI.createOrder(orderData, setLoading);
       
       if (result.success) {
         alert('Order created successfully!');
@@ -506,30 +514,21 @@ const UserListings = ({ userId: propUserId }) => {
       setLoading(true);
       setError('');
       
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const headers = token ? { 
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      } : {};
-
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/listings/user/${targetUserId}/listings`,
-        {
-          params: { 
-            page, 
-            limit: pagination.limit, 
-            status: status || undefined 
-          },
-          headers,
-          timeout: 15000,
-          withCredentials: true
-        }
+      // Use the API function from your api.ts
+      const response = await listingAPI.getListings(
+        { 
+          userId: targetUserId,
+          page, 
+          limit: pagination.limit, 
+          status: status || undefined 
+        },
+        setLoading
       );
       
-      if (response.data.success) {
-        setListings(response.data.listings || []);
-        setUserInfo(response.data.user);
-        setPagination(response.data.pagination || {
+      if (response.success) {
+        setListings(response.listings || []);
+        setUserInfo(response.user);
+        setPagination(response.pagination || {
           page: 1,
           limit: 20,
           total: 0,
@@ -538,7 +537,7 @@ const UserListings = ({ userId: propUserId }) => {
         setSelectedStatus(status);
         setIsCurrentUser(checkIfCurrentUser(targetUserId));
       } else {
-        setError(response.data.error || 'Failed to load listings');
+        setError(response.error || 'Failed to load listings');
       }
     } catch (err) {
       let errorMessage = 'Failed to load listings';
@@ -546,8 +545,8 @@ const UserListings = ({ userId: propUserId }) => {
       if (err.response) {
         if (err.response.status === 401) {
           errorMessage = 'Authentication failed. Please login again.';
-          localStorage.removeItem('token');
-          sessionStorage.removeItem('token');
+          localStorage.removeItem("token");
+          sessionStorage.removeItem("token");
         } else if (err.response.status === 403) {
           errorMessage = 'You do not have permission to view these listings.';
         } else if (err.response.status === 404) {
@@ -575,17 +574,7 @@ const UserListings = ({ userId: propUserId }) => {
     }
 
     try {
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const headers = token ? { 
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      } : {};
-
-      await axios.delete(
-        `${API_BASE_URL}/marketplace/listings/${listingId}`,
-        { headers }
-      );
-
+      await listingAPI.deleteListing(listingId, setLoading);
       fetchListings(pagination.page, selectedStatus);
       alert('Listing deleted successfully!');
     } catch (err) {
@@ -835,7 +824,7 @@ const OrderReceivedPage = () => {
   const fetchReceivedOrders = async () => {
     try {
       setLoading(true);
-      const response = await getSellerOrders(setLoading);
+      const response = await orderAPI.getSellerOrders(setLoading);
       const ordersData = Array.isArray(response) ? response : (response?.data || []);
       setOrders(ordersData);
     } catch (err) {
@@ -1064,12 +1053,13 @@ const SellerDashboard = () => {
 
       const currentUserId = getCurrentUserIdFromToken();
 
+      // Use API functions from your api.ts
       const [ordersResponse, offersResponse] = await Promise.all([
-        getSellerOrders(setLoading).catch(err => {
+        orderAPI.getSellerOrders(setLoading).catch(err => {
           console.error('Error fetching orders:', err);
           return [];
         }),
-        getReceivedOffers(setLoading).catch(err => {
+        offerAPI.getReceivedOffers(setLoading).catch(err => {
           console.error('Error fetching offers:', err);
           return [];
         })
@@ -1078,16 +1068,9 @@ const SellerDashboard = () => {
       let listingsResponse = null;
       if (currentUserId) {
         try {
-          const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-          const headers = token ? { Authorization: `Bearer ${token}` } : {};
-          
-          listingsResponse = await axios.get(
-            `${API_BASE_URL}/marketplace/listings/user/${currentUserId}/listings`,
-            {
-              params: { page: 1, limit: 1000 },
-              headers,
-              timeout: 10000
-            }
+          listingsResponse = await listingAPI.getListings(
+            { userId: currentUserId, page: 1, limit: 1000 },
+            setLoading
           );
         } catch (err) {
           console.log('Listings fetch failed, continuing without listings data');
@@ -1105,8 +1088,8 @@ const SellerDashboard = () => {
       setOrders(Array.isArray(ordersData) ? ordersData : []);
       setOffers(Array.isArray(offersData) ? offersData : []);
       
-      if (listingsResponse?.data?.success) {
-        setListingsData(listingsResponse.data);
+      if (listingsResponse?.success) {
+        setListingsData(listingsResponse);
       }
 
     } catch (error) {
@@ -1132,7 +1115,8 @@ const SellerDashboard = () => {
           setShowOrderCreation(true);
         }
       } else {
-        console.log(`Rejecting offer:`, offerId);
+        // Reject offer
+        await offerAPI.rejectOffer(offerId, setLoading);
         await fetchDashboardData();
       }
     } catch (error) {
@@ -1148,7 +1132,7 @@ const SellerDashboard = () => {
 
   const handleOrderUpdate = async (orderId, newStatus) => {
     try {
-      console.log(`Updating order ${orderId} to ${newStatus}`);
+      await orderAPI.updateOrderStatus(orderId, newStatus, setLoading);
       await fetchDashboardData();
     } catch (error) {
       console.error('Error updating order:', error);
