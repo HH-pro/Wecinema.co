@@ -248,7 +248,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <span className="sidebar-text">Seller Dashboard</span>
               </Link>
 
-              <Link
+              {/* <Link
                 to="/marketplace/my-listings"
                 className={`sidebar-item ${getActiveClass(
                   "/marketplace/my-listings"
@@ -256,7 +256,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               >
                 <RiListCheck className="sidebar-icon" />
                 <span className="sidebar-text">My Listings</span>
-              </Link>
+              </Link> */}
             </>
           )}
         </ul>
