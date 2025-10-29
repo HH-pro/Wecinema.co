@@ -34,13 +34,14 @@ interface Pagination {
 
 interface UserListingsProps {
   userId?: string;
+  show?: boolean; // Add this prop to control visibility
 }
 
 const API_BASE_URL = 'http://localhost:3000';
 
-const UserListings: React.FC<UserListingsProps> = ({ userId: propUserId }) => {
+const UserListings: React.FC<UserListingsProps> = ({ userId: propUserId, show = false }) => {
   const [listings, setListings] = useState<Listing[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Changed to false initially
   const [error, setError] = useState('');
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
@@ -52,6 +53,7 @@ const UserListings: React.FC<UserListingsProps> = ({ userId: propUserId }) => {
   const [selectedStatus, setSelectedStatus] = useState('');
   const [isCurrentUser, setIsCurrentUser] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [hasFetched, setHasFetched] = useState(false); // Track if data has been fetched
 
   const getTargetUserId = (): string | null => {
     return propUserId || currentUserId;
@@ -105,6 +107,7 @@ const UserListings: React.FC<UserListingsProps> = ({ userId: propUserId }) => {
         });
         setSelectedStatus(status);
         setIsCurrentUser(checkIfCurrentUser(targetUserId));
+        setHasFetched(true); // Mark as fetched
       } else {
         setError(response.data.error || 'Failed to load listings');
       }
@@ -169,17 +172,17 @@ const UserListings: React.FC<UserListingsProps> = ({ userId: propUserId }) => {
     const initializeUser = async () => {
       const userIdFromToken = getCurrentUserId();
       setCurrentUserId(userIdFromToken);
-
-      if (userIdFromToken || propUserId) {
-        await fetchListings();
-      } else {
-        setLoading(false);
-        setError('Please login to view listings');
-      }
     };
 
     initializeUser();
   }, [propUserId]);
+
+  // Fetch data only when show prop becomes true and hasn't been fetched yet
+  useEffect(() => {
+    if (show && !hasFetched) {
+      fetchListings();
+    }
+  }, [show, hasFetched]);
 
   const handlePageChange = (newPage: number) => {
     fetchListings(newPage, selectedStatus);
@@ -189,41 +192,50 @@ const UserListings: React.FC<UserListingsProps> = ({ userId: propUserId }) => {
     fetchListings(1, status);
   };
 
+  // Don't render anything if show is false
+  if (!show) {
+    return null;
+  }
+
   if (loading) {
     return (
-      <div className="flex justify-center items-center py-20 flex-col">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mb-4"></div>
-        <span className="text-lg text-gray-600">Loading listings...</span>
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-center items-center py-20 flex-col">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mb-4"></div>
+          <span className="text-lg text-gray-600">Loading listings...</span>
+        </div>
       </div>
     );
   }
 
   if (error && listings.length === 0) {
     return (
-      <div className="max-w-2xl mx-auto text-center py-16 bg-white rounded-lg shadow border border-gray-200 px-6">
-        <div className="text-6xl mb-4">⚠️</div>
-        <h3 className="text-2xl font-semibold text-gray-700 mb-3">
-          Unable to Load Listings
-        </h3>
-        <p className="text-gray-500 text-lg mb-6 leading-relaxed">
-          {error}
-        </p>
-        <div className="flex justify-center gap-4 flex-wrap">
-          {!currentUserId ? (
-            <button 
-              onClick={() => window.location.href = '/login'}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors shadow-md"
-            >
-              Login to Continue
-            </button>
-          ) : (
-            <button 
-              onClick={() => fetchListings()}
-              className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors shadow-md"
-            >
-              Try Again
-            </button>
-          )}
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-2xl mx-auto text-center py-16 bg-white rounded-lg shadow border border-gray-200 px-6">
+          <div className="text-6xl mb-4">⚠️</div>
+          <h3 className="text-2xl font-semibold text-gray-700 mb-3">
+            Unable to Load Listings
+          </h3>
+          <p className="text-gray-500 text-lg mb-6 leading-relaxed">
+            {error}
+          </p>
+          <div className="flex justify-center gap-4 flex-wrap">
+            {!currentUserId ? (
+              <button 
+                onClick={() => window.location.href = '/login'}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors shadow-md"
+              >
+                Login to Continue
+              </button>
+            ) : (
+              <button 
+                onClick={() => fetchListings()}
+                className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors shadow-md"
+              >
+                Try Again
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
