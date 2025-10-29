@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
-import { getSellerOrders, getReceivedOffers, createOrder } from '../../api';
+import { getSellerOrders, getReceivedOffers, createOrder, checkStripeStatus, createStripeAccount } from '../../api';
 import axios from 'axios';
 import { decodeToken } from '../../utilities/helperfFunction';
 
@@ -65,15 +65,19 @@ const getStatusColor = (status) => {
     case 'completed':
     case 'accepted':
     case 'active':
+    case 'paid':
       return 'bg-green-100 text-green-800 border-green-200';
     case 'pending':
+    case 'pending_payment':
       return 'bg-yellow-100 text-yellow-800 border-yellow-200';
     case 'shipped':
     case 'sold':
+    case 'in_progress':
       return 'bg-blue-100 text-blue-800 border-blue-200';
     case 'cancelled':
     case 'rejected':
     case 'inactive':
+    case 'failed':
       return 'bg-red-100 text-red-800 border-red-200';
     case 'draft':
       return 'bg-gray-100 text-gray-800 border-gray-200';
@@ -82,19 +86,160 @@ const getStatusColor = (status) => {
   }
 };
 
-// Order Creation Component
+// Stripe Setup Modal Component
+const StripeSetupModal = ({ show, onClose, onSuccess }) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleStripeConnect = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const response = await createStripeAccount();
+      
+      if (response.url) {
+        // Redirect to Stripe onboarding
+        window.location.href = response.url;
+      } else {
+        setError('Failed to start Stripe setup');
+      }
+    } catch (err) {
+      console.error('Stripe connect error:', err);
+      setError(err.response?.data?.error || 'Failed to connect Stripe account');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!show) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+        <div className="p-6 border-b border-gray-200">
+          <h2 className="text-xl font-bold text-gray-900">Connect Stripe Account</h2>
+          <p className="text-gray-600 mt-1">Required to accept payments</p>
+        </div>
+
+        <div className="p-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <div className="flex items-start">
+              <div className="text-blue-600 mr-3 mt-1">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <h4 className="font-medium text-blue-900">Why Stripe?</h4>
+                <p className="text-blue-700 text-sm mt-1">
+                  Stripe is required to securely process payments and transfer funds to your bank account.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3 text-sm text-gray-600">
+            <div className="flex items-center">
+              <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Secure payment processing
+            </div>
+            <div className="flex items-center">
+              <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Direct bank transfers
+            </div>
+            <div className="flex items-center">
+              <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Industry-leading security
+            </div>
+            <div className="flex items-center">
+              <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Takes only 2 minutes to set up
+            </div>
+          </div>
+
+          {error && (
+            <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-red-800 text-sm">{error}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="p-6 border-t border-gray-200 flex gap-3">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleStripeConnect}
+            disabled={loading}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50 flex items-center justify-center"
+          >
+            {loading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Connecting...
+              </>
+            ) : (
+              'Connect Stripe Account'
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Order Creation Component with Stripe Validation
 const OrderCreation = ({ offer, onOrderCreated, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [stripeCheckLoading, setStripeCheckLoading] = useState(true);
+  const [stripeStatus, setStripeStatus] = useState(null);
   const [orderDetails, setOrderDetails] = useState({
     shippingAddress: '',
     paymentMethod: 'card',
-    notes: ''
+    notes: '',
+    expectedDeliveryDays: 7
   });
+
+  useEffect(() => {
+    checkStripeAccount();
+  }, []);
+
+  const checkStripeAccount = async () => {
+    try {
+      setStripeCheckLoading(true);
+      const response = await checkStripeStatus();
+      setStripeStatus(response);
+    } catch (err) {
+      console.error('Error checking Stripe status:', err);
+      setStripeStatus({ connected: false, status: 'unknown' });
+    } finally {
+      setStripeCheckLoading(false);
+    }
+  };
 
   const handleCreateOrder = async () => {
     if (!orderDetails.shippingAddress.trim()) {
       setError('Please enter shipping address');
+      return;
+    }
+
+    // Check Stripe status before creating order
+    if (!stripeStatus?.connected || stripeStatus?.status !== 'active') {
+      setError('Please connect and activate your Stripe account before creating orders');
       return;
     }
 
@@ -111,24 +256,46 @@ const OrderCreation = ({ offer, onOrderCreated, onClose }) => {
         shippingAddress: orderDetails.shippingAddress,
         paymentMethod: orderDetails.paymentMethod,
         notes: orderDetails.notes,
+        expectedDeliveryDays: orderDetails.expectedDeliveryDays
       };
 
       const result = await createOrder(orderData);
       
       if (result.success) {
-        alert('Order created successfully!');
+        alert('Order created successfully! The buyer will now complete the payment.');
         onOrderCreated(result.order);
         onClose();
       } else {
-        setError(result.error || 'Failed to create order');
+        if (result.stripeSetupRequired) {
+          setError('Stripe account setup required. Please connect your Stripe account.');
+        } else {
+          setError(result.error || 'Failed to create order');
+        }
       }
     } catch (err) {
       console.error('Error creating order:', err);
-      setError('Failed to create order. Please try again.');
+      if (err.response?.data?.stripeSetupRequired) {
+        setError('Stripe account setup required. Please connect your Stripe account.');
+      } else {
+        setError(err.response?.data?.error || 'Failed to create order. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  if (stripeCheckLoading) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
+            <span className="text-gray-700">Checking payment setup...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -139,6 +306,39 @@ const OrderCreation = ({ offer, onOrderCreated, onClose }) => {
         </div>
 
         <div className="p-6 space-y-4">
+          {/* Stripe Status Indicator */}
+          <div className={`rounded-lg p-4 border ${
+            stripeStatus?.connected && stripeStatus?.status === 'active'
+              ? 'bg-green-50 border-green-200'
+              : 'bg-red-50 border-red-200'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className={`w-3 h-3 rounded-full mr-2 ${
+                  stripeStatus?.connected && stripeStatus?.status === 'active'
+                    ? 'bg-green-500'
+                    : 'bg-red-500'
+                }`}></div>
+                <span className="font-medium text-sm">
+                  Stripe Account: {stripeStatus?.connected && stripeStatus?.status === 'active' ? 'Connected' : 'Not Connected'}
+                </span>
+              </div>
+              {!(stripeStatus?.connected && stripeStatus?.status === 'active') && (
+                <button
+                  onClick={() => window.location.href = '/seller/settings?tab=payments'}
+                  className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                >
+                  Setup
+                </button>
+              )}
+            </div>
+            {stripeStatus?.connected && stripeStatus?.status !== 'active' && (
+              <p className="text-red-600 text-xs mt-1">
+                Complete your Stripe onboarding to receive payments
+              </p>
+            )}
+          </div>
+
           <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
             <h3 className="font-semibold text-gray-900 mb-2">Order Summary</h3>
             <div className="space-y-2 text-sm">
@@ -154,6 +354,13 @@ const OrderCreation = ({ offer, onOrderCreated, onClose }) => {
                 <span className="text-gray-600">Offer Amount:</span>
                 <span className="font-medium text-green-600">₹{offer.amount?.toLocaleString()}</span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Your Payout:</span>
+                <span className="font-medium text-blue-600">
+                  ₹{Math.round(offer.amount * 0.85)?.toLocaleString()}
+                  <span className="text-gray-500 text-xs ml-1">(after 15% fee)</span>
+                </span>
+              </div>
             </div>
           </div>
 
@@ -167,10 +374,29 @@ const OrderCreation = ({ offer, onOrderCreated, onClose }) => {
                 ...prev,
                 shippingAddress: e.target.value
               }))}
-              placeholder="Enter complete shipping address"
+              placeholder="Enter complete shipping address including city, state, and PIN code"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
               rows={3}
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Expected Delivery (Days)
+            </label>
+            <select
+              value={orderDetails.expectedDeliveryDays}
+              onChange={(e) => setOrderDetails(prev => ({
+                ...prev,
+                expectedDeliveryDays: parseInt(e.target.value)
+              }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value={3}>3 days (Express)</option>
+              <option value={7}>7 days (Standard)</option>
+              <option value={14}>14 days (Economy)</option>
+              <option value={30}>30 days (Custom)</option>
+            </select>
           </div>
 
           <div>
@@ -187,8 +413,7 @@ const OrderCreation = ({ offer, onOrderCreated, onClose }) => {
             >
               <option value="card">Credit/Debit Card</option>
               <option value="upi">UPI</option>
-              <option value="cod">Cash on Delivery</option>
-              <option value="bank">Bank Transfer</option>
+              <option value="netbanking">Net Banking</option>
             </select>
           </div>
 
@@ -202,7 +427,7 @@ const OrderCreation = ({ offer, onOrderCreated, onClose }) => {
                 ...prev,
                 notes: e.target.value
               }))}
-              placeholder="Any additional instructions or notes..."
+              placeholder="Any additional instructions or notes for the buyer..."
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
               rows={2}
             />
@@ -211,6 +436,14 @@ const OrderCreation = ({ offer, onOrderCreated, onClose }) => {
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3">
               <p className="text-red-800 text-sm">{error}</p>
+              {error.includes('Stripe') && (
+                <button
+                  onClick={() => window.location.href = '/seller/settings?tab=payments'}
+                  className="text-blue-600 hover:text-blue-700 text-sm font-medium mt-2"
+                >
+                  Go to Payment Settings
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -225,7 +458,7 @@ const OrderCreation = ({ offer, onOrderCreated, onClose }) => {
           </button>
           <button
             onClick={handleCreateOrder}
-            disabled={loading}
+            disabled={loading || !(stripeStatus?.connected && stripeStatus?.status === 'active')}
             className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50 flex items-center justify-center"
           >
             {loading ? (
@@ -243,7 +476,89 @@ const OrderCreation = ({ offer, onOrderCreated, onClose }) => {
   );
 };
 
-// Listing Card Component
+// Payment Status Component
+const PaymentStatusBadge = ({ order }) => {
+  if (!order.stripePaymentIntentId) {
+    return (
+      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-300">
+        Payment Pending
+      </span>
+    );
+  }
+
+  switch (order.paymentStatus) {
+    case 'succeeded':
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+          Paid
+        </span>
+      );
+    case 'processing':
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+          Processing
+        </span>
+      );
+    case 'requires_payment_method':
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
+          Payment Failed
+        </span>
+      );
+    default:
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
+          Payment Pending
+        </span>
+      );
+  }
+};
+
+// Stripe Account Status Component
+const StripeAccountStatus = ({ stripeStatus, onSetupClick }) => {
+  if (!stripeStatus) return null;
+
+  return (
+    <div className="mb-6">
+      <div className={`rounded-xl p-4 border ${
+        stripeStatus.connected && stripeStatus.status === 'active'
+          ? 'bg-green-50 border-green-200'
+          : 'bg-yellow-50 border-yellow-200'
+      }`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <div className={`w-3 h-3 rounded-full mr-3 ${
+              stripeStatus.connected && stripeStatus.status === 'active'
+                ? 'bg-green-500'
+                : 'bg-yellow-500'
+            }`}></div>
+            <div>
+              <h3 className="font-semibold text-gray-900">
+                Payment Account: {stripeStatus.connected && stripeStatus.status === 'active' ? 'Active' : 'Setup Required'}
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                {stripeStatus.connected && stripeStatus.status === 'active'
+                  ? 'Your Stripe account is connected and ready to accept payments'
+                  : 'Connect your Stripe account to start accepting payments from buyers'
+                }
+              </p>
+            </div>
+          </div>
+          {!(stripeStatus.connected && stripeStatus.status === 'active') && (
+            <button
+              onClick={onSetupClick}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition duration-200"
+            >
+              Setup Payments
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Listing Card Component (unchanged, included for completeness)
 const ListingCard = ({ listing, isCurrentUser, onEdit, onDelete }) => {
   const [showActions, setShowActions] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -469,7 +784,7 @@ const ListingCard = ({ listing, isCurrentUser, onEdit, onDelete }) => {
   );
 };
 
-// UserListings Component
+// UserListings Component (unchanged, included for completeness)
 const UserListings = ({ userId: propUserId }) => {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -823,38 +1138,8 @@ const UserListings = ({ userId: propUserId }) => {
 };
 
 // Order Received Page Component
-const OrderReceivedPage = () => {
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    fetchReceivedOrders();
-  }, []);
-
-  const fetchReceivedOrders = async () => {
-    try {
-      setLoading(true);
-      const response = await getSellerOrders(setLoading);
-      const ordersData = Array.isArray(response) ? response : (response?.data || []);
-      setOrders(ordersData);
-    } catch (err) {
-      console.error('Error fetching received orders:', err);
-      setError('Failed to load orders');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOrderUpdate = async (orderId, newStatus) => {
-    try {
-      console.log(`Updating order ${orderId} to ${newStatus}`);
-      await fetchReceivedOrders();
-    } catch (error) {
-      console.error('Error updating order:', error);
-      setError('Failed to update order');
-    }
-  };
+const OrderReceivedPage = ({ orders, onOrderUpdate }) => {
+  const [loading, setLoading] = useState(false);
 
   if (loading) {
     return (
@@ -874,17 +1159,6 @@ const OrderReceivedPage = () => {
           <h1 className="text-3xl font-bold text-gray-900">Orders Received</h1>
           <p className="mt-2 text-gray-600">Manage and track all orders received from buyers</p>
         </div>
-
-        {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <svg className="w-5 h-5 text-red-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-red-800">{error}</p>
-            </div>
-          </div>
-        )}
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200">
           <div className="px-6 py-4 border-b border-gray-200">
@@ -913,9 +1187,12 @@ const OrderReceivedPage = () => {
                               From: {order.buyerId?.username || 'Unknown Buyer'}
                             </p>
                           </div>
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(order.status)}`}>
-                            {order.status ? order.status.charAt(0).toUpperCase() + order.status.slice(1) : 'Unknown'}
-                          </span>
+                          <div className="flex flex-col items-end gap-2">
+                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(order.status)}`}>
+                              {order.status ? order.status.charAt(0).toUpperCase() + order.status.slice(1) : 'Unknown'}
+                            </span>
+                            <PaymentStatusBadge order={order} />
+                          </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
@@ -966,17 +1243,22 @@ const OrderReceivedPage = () => {
                         >
                           View Details
                         </button>
-                        {order.status === 'confirmed' && (
+                        {order.status === 'pending_payment' && (
+                          <div className="text-xs text-gray-500 text-center">
+                            Waiting for buyer payment
+                          </div>
+                        )}
+                        {order.status === 'paid' && (
                           <button
-                            onClick={() => handleOrderUpdate(order._id, 'shipped')}
+                            onClick={() => onOrderUpdate(order._id, 'in_progress')}
                             className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 text-sm"
                           >
-                            Mark as Shipped
+                            Start Work
                           </button>
                         )}
-                        {order.status === 'shipped' && (
+                        {order.status === 'in_progress' && (
                           <button
-                            onClick={() => handleOrderUpdate(order._id, 'completed')}
+                            onClick={() => onOrderUpdate(order._id, 'completed')}
                             className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 text-sm"
                           >
                             Mark as Completed
@@ -1022,7 +1304,14 @@ const StatCard = ({
           </p>
         )}
       </div>
-      <div className={`w-12 h-12 bg-${color}-50 rounded-xl flex items-center justify-center border border-${color}-200`}>
+      <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${
+        color === 'green' ? 'bg-green-50 border-green-200' :
+        color === 'blue' ? 'bg-blue-50 border-blue-200' :
+        color === 'purple' ? 'bg-purple-50 border-purple-200' :
+        color === 'yellow' ? 'bg-yellow-50 border-yellow-200' :
+        color === 'orange' ? 'bg-orange-50 border-orange-200' :
+        'bg-gray-50 border-gray-200'
+      }`}>
         {icon}
       </div>
     </div>
@@ -1039,10 +1328,13 @@ const SellerDashboard = () => {
   const [error, setError] = useState('');
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [showOrderCreation, setShowOrderCreation] = useState(false);
+  const [showStripeSetup, setShowStripeSetup] = useState(false);
+  const [stripeStatus, setStripeStatus] = useState(null);
 
   // Stats calculation
   const totalOrders = orders.length;
-  const pendingOrders = orders.filter(order => order.status === 'pending').length;
+  const pendingOrders = orders.filter(order => order.status === 'pending_payment').length;
+  const completedOrders = orders.filter(order => order.status === 'completed').length;
   const totalRevenue = orders
     .filter(order => order.status === 'completed')
     .reduce((sum, order) => sum + order.amount, 0);
@@ -1055,6 +1347,7 @@ const SellerDashboard = () => {
 
   useEffect(() => {
     fetchDashboardData();
+    checkStripeAccountStatus();
   }, []);
 
   const fetchDashboardData = async () => {
@@ -1117,6 +1410,16 @@ const SellerDashboard = () => {
     }
   };
 
+  const checkStripeAccountStatus = async () => {
+    try {
+      const response = await checkStripeStatus();
+      setStripeStatus(response);
+    } catch (err) {
+      console.error('Error checking Stripe status:', err);
+      setStripeStatus({ connected: false, status: 'unknown' });
+    }
+  };
+
   const handleViewListingDetails = (listingId) => {
     window.location.href = `/listings/${listingId}`;
   };
@@ -1126,6 +1429,14 @@ const SellerDashboard = () => {
       setError('');
       
       if (action === 'accept') {
+        // Check Stripe status before showing order creation
+        await checkStripeAccountStatus();
+        
+        if (!stripeStatus?.connected || stripeStatus?.status !== 'active') {
+          setShowStripeSetup(true);
+          return;
+        }
+
         const offer = offers.find(o => o._id === offerId);
         if (offer) {
           setSelectedOffer(offer);
@@ -1189,6 +1500,12 @@ const SellerDashboard = () => {
             </div>
           )}
 
+          {/* Stripe Account Status */}
+          <StripeAccountStatus 
+            stripeStatus={stripeStatus}
+            onSetupClick={() => setShowStripeSetup(true)}
+          />
+
           <div className="mb-8 border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
               {[
@@ -1217,6 +1534,18 @@ const SellerDashboard = () => {
               ))}
             </nav>
           </div>
+
+          {/* Modals */}
+          {showStripeSetup && (
+            <StripeSetupModal
+              show={showStripeSetup}
+              onClose={() => setShowStripeSetup(false)}
+              onSuccess={() => {
+                setShowStripeSetup(false);
+                checkStripeAccountStatus();
+              }}
+            />
+          )}
 
           {showOrderCreation && selectedOffer && (
             <OrderCreation
@@ -1313,9 +1642,12 @@ const SellerDashboard = () => {
                               </div>
                               <div className="text-right">
                                 <p className="font-semibold text-green-600">{formatCurrency(order.amount || 0)}</p>
-                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(order.status)}`}>
-                                  {order.status || 'unknown'}
-                                </span>
+                                <div className="flex flex-col items-end gap-1 mt-1">
+                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(order.status)}`}>
+                                    {order.status || 'unknown'}
+                                  </span>
+                                  <PaymentStatusBadge order={order} />
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -1340,6 +1672,17 @@ const SellerDashboard = () => {
                         </svg>
                         Create New Listing
                       </button>
+                      {!(stripeStatus?.connected && stripeStatus?.status === 'active') && (
+                        <button
+                          onClick={() => setShowStripeSetup(true)}
+                          className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center shadow-md hover:shadow-lg"
+                        >
+                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                          Setup Payments
+                        </button>
+                      )}
                       <button
                         onClick={() => setActiveTab('orders')}
                         className="w-full bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center"
@@ -1374,7 +1717,7 @@ const SellerDashboard = () => {
                       </li>
                       <li className="flex items-start">
                         <span className="mr-2">•</span>
-                        <span>Price your items competitively</span>
+                        <span>Setup Stripe payments to accept orders</span>
                       </li>
                     </ul>
                   </div>
@@ -1484,7 +1827,10 @@ const SellerDashboard = () => {
           )}
 
           {activeTab === 'orders' && (
-            <OrderReceivedPage />
+            <OrderReceivedPage 
+              orders={orders}
+              onOrderUpdate={handleOrderUpdate}
+            />
           )}
         </div>
       </div>
