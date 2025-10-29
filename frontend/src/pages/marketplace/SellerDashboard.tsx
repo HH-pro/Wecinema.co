@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import { getSellerOrders, getReceivedOffers, checkStripeStatus } from '../../api';
 import axios from 'axios';
-import { getCurrentUserIdFromToken } from '../../utilities/helperfFunction';
+import { getCurrentUserId } from '../../utilities/helperfFunction';
 import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
 import OrderCreation from '../../components/marketplae/seller/OrderCreation';
 import PaymentStatusBadge from '../../components/marketplae/seller/PaymentStatusBadge';
@@ -140,7 +140,7 @@ const SellerDashboard: React.FC = () => {
       setLoading(true);
       setError('');
 
-      const currentUserId = getCurrentUserIdFromToken();
+      const currentUserId = getCurrentUserId();
 
       const [ordersResponse, offersResponse] = await Promise.all([
         getSellerOrders().catch(err => {
