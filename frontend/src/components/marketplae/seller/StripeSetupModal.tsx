@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { createStripeAccount } from '../../api';
+import { createStripeAccount } from '../../../api';
 
 const StripeSetupModal = ({ show, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
