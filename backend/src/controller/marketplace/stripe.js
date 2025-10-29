@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
 
-const { authenticateMiddleware } = require('../middleware/auth');
+const { authenticateMiddleware } = require("../../utils");
+
 const User = require('../../models/user');
 const Order = require("../../models/marketplace/order");
 
