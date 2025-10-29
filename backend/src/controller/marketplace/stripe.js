@@ -116,12 +116,7 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
     await user.save();
 
     // Create account link for onboarding
-    const accountLink = await stripe.accountLinks.create({
-      account: account.id,
-      refresh_url: `${process.env.FRONTEND_URL}/seller/dashboard?stripe=refresh`,
-      return_url: `${process.env.FRONTEND_URL}/seller/dashboard?stripe=success`,
-      type: 'account_onboarding',
-    });
+  
 
     res.json({
       success: true,
