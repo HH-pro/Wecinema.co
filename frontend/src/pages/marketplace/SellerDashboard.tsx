@@ -604,7 +604,6 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-        // Inside SellerDashboard component, update the listings tab section:
 
 {activeTab === 'listings' && (
   <UserListings show={true} />
