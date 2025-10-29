@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
-import { createStripeAccount } from '../../../api';
+import { createStripeAccount } from '../../api';
 
-const StripeSetupModal = ({ show, onClose, onSuccess }) => {
+interface StripeSetupModalProps {
+  show: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const StripeSetupModal: React.FC<StripeSetupModalProps> = ({ show, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -17,7 +23,7 @@ const StripeSetupModal = ({ show, onClose, onSuccess }) => {
       } else {
         setError('Failed to start Stripe setup');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Stripe connect error:', err);
       setError(err.response?.data?.error || 'Failed to connect Stripe account');
     } finally {
@@ -60,4 +66,58 @@ const StripeSetupModal = ({ show, onClose, onSuccess }) => {
               Secure payment processing
             </div>
             <div className="flex items-center">
-              <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="current
+              <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Direct bank transfers
+            </div>
+            <div className="flex items-center">
+              <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Industry-leading security
+            </div>
+            <div className="flex items-center">
+              <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Takes only 2 minutes to set up
+            </div>
+          </div>
+
+          {error && (
+            <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-red-800 text-sm">{error}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="p-6 border-t border-gray-200 flex gap-3">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleStripeConnect}
+            disabled={loading}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50 flex items-center justify-center"
+          >
+            {loading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Connecting...
+              </>
+            ) : (
+              'Connect Stripe Account'
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default StripeSetupModal;
