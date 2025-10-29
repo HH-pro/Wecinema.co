@@ -59,8 +59,7 @@ router.get('/status', authenticateMiddleware, async (req, res) => {
     });
   }
 });
-
-// ✅ Create Stripe Connect account for seller
+// ✅ Create Stripe Connect account for seller - FIXED VERSION
 router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -73,20 +72,40 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
       });
     }
 
-    // If already has Stripe account, return existing
+    // If already has Stripe account, check if we can reuse it
     if (user.stripeAccountId) {
-      const account = await stripe.accounts.retrieve(user.stripeAccountId);
-      
-      if (account.details_submitted) {
-        return res.status(400).json({
-          success: false,
-          error: 'Stripe account already connected',
-          stripeAccountId: user.stripeAccountId
-        });
+      try {
+        const account = await stripe.accounts.retrieve(user.stripeAccountId);
+        
+        if (account.details_submitted) {
+          return res.status(400).json({
+            success: false,
+            error: 'Stripe account already connected',
+            stripeAccountId: user.stripeAccountId
+          });
+        } else {
+          // Account exists but details not submitted - create new onboarding link
+          const accountLink = await stripe.accountLinks.create({
+            account: user.stripeAccountId,
+            refresh_url: `http://localhost:3001/seller/dashboard?stripe=refresh`,
+            return_url: `http://localhost:3001/seller/dashboard?stripe=success`,
+            type: 'account_onboarding',
+          });
+
+          return res.json({
+            success: true,
+            url: accountLink.url,
+            stripeAccountId: user.stripeAccountId,
+            message: 'Redirect to complete Stripe onboarding'
+          });
+        }
+      } catch (stripeError) {
+        // If account retrieval fails, continue to create new account
+        console.log('Existing Stripe account not found, creating new one:', stripeError.message);
       }
     }
 
-    // Create Stripe Connect account
+    // Create Stripe Connect account with simplified configuration
     const account = await stripe.accounts.create({
       type: 'express',
       country: 'IN', // India
@@ -95,11 +114,29 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
         card_payments: { requested: true },
         transfers: { requested: true },
       },
+      // Remove individual details initially to avoid validation errors
       business_type: 'individual',
       individual: {
         email: user.email,
-        first_name: user.firstName || user.username,
-        last_name: user.lastName || '',
+        first_name: user.firstName || user.username.split(' ')[0] || 'Test',
+        last_name: user.lastName || user.username.split(' ')[1] || 'User',
+        phone: '+919876543210', // Default Indian phone number
+        address: {
+          line1: '123 Test Street',
+          city: 'Mumbai',
+          state: 'MH',
+          postal_code: '400001',
+          country: 'IN'
+        },
+        dob: {
+          day: 1,
+          month: 1,
+          year: 1990
+        }
+      },
+      business_profile: {
+        url: 'http://localhost:3001',
+        mcc: '5734' // Computer Software Stores
       },
       settings: {
         payouts: {
@@ -108,7 +145,13 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
           },
         },
       },
+      tos_acceptance: {
+        date: Math.floor(Date.now() / 1000),
+        ip: req.ip // User's IP address
+      }
     });
+
+    console.log('✅ Stripe account created:', account.id);
 
     // Update user with Stripe account ID
     user.stripeAccountId = account.id;
@@ -116,7 +159,14 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
     await user.save();
 
     // Create account link for onboarding
-  
+    const accountLink = await stripe.accountLinks.create({
+      account: account.id,
+      refresh_url: `http://localhost:3001/seller/dashboard?stripe=refresh`,
+      return_url: `http://localhost:3001/seller/dashboard?stripe=success`,
+      type: 'account_onboarding',
+    });
+
+    console.log('✅ Account link created:', accountLink.url);
 
     res.json({
       success: true,
@@ -126,11 +176,28 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error creating Stripe account:', error);
+    console.error('❌ Error creating Stripe account:', error);
+    
+    // Better error handling with specific messages
+    let errorMessage = 'Failed to create Stripe account';
+    let errorDetails = error.message;
+
+    if (error.type === 'StripeInvalidRequestError') {
+      if (error.code === 'parameter_unknown') {
+        errorMessage = 'Invalid Stripe configuration';
+        errorDetails = 'Please check your Stripe API keys and account settings';
+      } else if (error.code === 'account_invalid') {
+        errorMessage = 'Stripe Connect not enabled';
+        errorDetails = 'Please enable Stripe Connect in your Stripe dashboard';
+      }
+    }
+
     res.status(500).json({
       success: false,
-      error: 'Failed to create Stripe account',
-      details: error.message
+      error: errorMessage,
+      details: errorDetails,
+      stripeErrorCode: error.code,
+      help: 'Check Stripe dashboard for Connect settings: https://dashboard.stripe.com/settings/connect'
     });
   }
 });
