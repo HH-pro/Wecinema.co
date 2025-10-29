@@ -604,9 +604,11 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {activeTab === 'listings' && (
-            <UserListings />
-          )}
+        // Inside SellerDashboard component, update the listings tab section:
+
+{activeTab === 'listings' && (
+  <UserListings show={true} />
+)}
 
           {activeTab === 'orders' && (
             <OrderReceivedPage 
