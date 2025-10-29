@@ -182,79 +182,50 @@ export const authAPI = {
     window.location.href = '/';
   }
 };
-export const stripeAPI = {
-  // Check Stripe account status
-  checkStripeStatus: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest<{
-      connected: boolean;
-      status: 'active' | 'pending' | 'restricted' | 'unknown';
-      stripeAccountId?: string;
-      detailsSubmitted?: boolean;
-      payoutsEnabled?: boolean;
-      requirements?: any;
-    }>("/stripe/status", setLoading),
 
-  // Create Stripe Connect account for seller
-  createStripeAccount: (setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest<{ url: string }>("/stripe/onboard-seller", {}, setLoading, "Redirecting to Stripe setup"),
+// ✅ Individual exports for Stripe functions
+export const checkStripeStatus = (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+  getRequest<{
+    connected: boolean;
+    status: 'active' | 'pending' | 'restricted' | 'unknown';
+    stripeAccountId?: string;
+    detailsSubmitted?: boolean;
+    payoutsEnabled?: boolean;
+    requirements?: any;
+  }>("/api/stripe/status", setLoading);
 
-  // Complete Stripe onboarding (after redirect)
-  completeOnboarding: (setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/stripe/complete-onboarding", {}, setLoading, "Stripe account connected successfully"),
+export const createStripeAccount = (setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+  postRequest<{ url: string }>("/api/stripe/onboard-seller", {}, setLoading, "Redirecting to Stripe setup");
 
-  // Create payment intent for order
-  createPaymentIntent: (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest<{
-      clientSecret: string;
-      paymentIntentId: string;
-      amount: number;
-      currency: string;
-    }>("/stripe/create-payment-intent", { orderId }, setLoading),
+export const completeOnboarding = (setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+  postRequest("/api/stripe/complete-onboarding", {}, setLoading, "Stripe account connected successfully");
 
-  // Confirm payment
-  confirmPayment: (paymentIntentId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/stripe/confirm-payment", { paymentIntentId }, setLoading, "Payment confirmed successfully"),
+export const createPaymentIntent = (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+  postRequest<{
+    clientSecret: string;
+    paymentIntentId: string;
+    amount: number;
+    currency: string;
+  }>("/api/stripe/create-payment-intent", { orderId }, setLoading);
 
-  // Get payment methods
-  getPaymentMethods: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest("/stripe/payment-methods", setLoading),
+export const confirmPayment = (paymentIntentId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+  postRequest("/api/stripe/confirm-payment", { paymentIntentId }, setLoading, "Payment confirmed successfully");
 
-  // Add payment method
-  addPaymentMethod: (paymentMethodId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/stripe/add-payment-method", { paymentMethodId }, setLoading, "Payment method added successfully"),
+export const getSellerBalance = (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+  getRequest<{
+    available: number;
+    pending: number;
+    currency: string;
+  }>("/api/stripe/balance", setLoading);
 
-  // Get seller balance
-  getSellerBalance: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest<{
-      available: number;
-      pending: number;
-      currency: string;
-    }>("/stripe/balance", setLoading),
+export const createPayout = (amount: number, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+  postRequest("/api/stripe/create-payout", { amount }, setLoading, "Payout initiated successfully");
 
-  // Create payout to seller
-  createPayout: (amount: number, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/stripe/create-payout", { amount }, setLoading, "Payout initiated successfully"),
+export const getPayouts = (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+  getRequest("/api/stripe/payouts", setLoading);
 
-  // Get payout history
-  getPayouts: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest("/stripe/payouts", setLoading),
-
-  // Get transaction history
-  getTransactions: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest("/stripe/transactions", setLoading),
-
-  // Update Stripe account details
-  updateStripeAccount: (accountData: any, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest("/stripe/account", accountData, setLoading, "Account updated successfully"),
-
-  // Create login link for Stripe Express dashboard
-  createLoginLink: (setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest<{ url: string }>("/stripe/create-login-link", {}, setLoading),
-
-  // Verify Stripe webhook
-  verifyWebhook: (payload: any, signature: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/stripe/verify-webhook", { payload, signature }, setLoading),
-};
+export const createLoginLink = (setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+  postRequest<{ url: string }>("/api/stripe/create-login-link", {}, setLoading);
 // Marketplace Listing APIs
 export const listingAPI = {
   getListings: (
