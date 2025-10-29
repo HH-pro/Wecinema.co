@@ -195,7 +195,7 @@ export const checkStripeStatus = (setLoading?: React.Dispatch<React.SetStateActi
   }>("/stripe/status", setLoading);
 
 export const createStripeAccount = (setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-  postRequest<{ url: string }>("/stripe/onboard-seller", {}, setLoading, "Redirecting to Stripe setup");
+  postRequest<{ url: string }>("/marketplace/stripe/onboard-seller", {}, setLoading, "Redirecting to Stripe setup");
 
 export const completeOnboarding = (setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
   postRequest("/stripe/complete-onboarding", {}, setLoading, "Stripe account connected successfully");
