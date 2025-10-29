@@ -3,7 +3,7 @@ import MarketplaceLayout from '../../components/Layout';
 import { getSellerOrders, getReceivedOffers, checkStripeStatus } from '../../api';
 import axios from 'axios';
 import { getCurrentUserIdFromToken } from '../../utilities/helperfFunction';
-import StripeSetupModal from './seller/StripeSetupModal';
+import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
 import OrderCreation from './seller/OrderCreation';
 import PaymentStatusBadge from './seller/PaymentStatusBadge';
 import StripeAccountStatus from './seller/StripeAccountStatus';
