@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { createOrder, checkStripeStatus } from '../../api';
-import { getCurrentUserIdFromToken } from '../../utilities/helperfFunction';
+import { createOrder, checkStripeStatus } from '../../../api';
+import { getCurrentUserId } from '../../../utilities/helperfFunction';
 
 interface OrderDetails {
   shippingAddress: string;
@@ -82,7 +82,7 @@ const OrderCreation: React.FC<OrderCreationProps> = ({ offer, onOrderCreated, on
         offerId: offer._id,
         listingId: offer.listingId._id,
         buyerId: offer.buyerId._id,
-        sellerId: getCurrentUserIdFromToken(),
+        sellerId: getCurrentUserId(),
         amount: offer.amount,
         shippingAddress: orderDetails.shippingAddress,
         paymentMethod: orderDetails.paymentMethod,
