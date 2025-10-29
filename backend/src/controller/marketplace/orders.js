@@ -5,8 +5,7 @@ const MarketplaceListing = require("../../models/marketplace/listing");
 const Offer = require("../../models/marketplace/offer");
 const { authenticateMiddleware } = require("../../utils");
 const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
-
-// In your orders.js backend route
+// Create Order Route
 router.post("/create", authenticateMiddleware, async (req, res) => {
   try {
     const {
@@ -17,8 +16,8 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
       amount,
       shippingAddress,
       paymentMethod,
-      notes
-      // Remove status from destructuring to prevent invalid values
+      notes,
+      expectedDeliveryDays = 7 // Default 7 days
     } = req.body;
 
     const currentUserId = req.user.id || req.user._id || req.user.userId;
@@ -35,38 +34,101 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
     // Validate required fields
     if (!offerId || !listingId || !buyerId || !sellerId || !amount) {
       return res.status(400).json({
+        success: false,
         error: 'Missing required fields: offerId, listingId, buyerId, sellerId, amount'
+      });
+    }
+
+    // Validate amount is positive
+    if (amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Amount must be greater than 0'
       });
     }
 
     // Verify that the current user is the seller
     if (sellerId !== currentUserId) {
       return res.status(403).json({
+        success: false,
         error: 'You can only create orders for your own listings'
+      });
+    }
+
+    // ✅ Check if seller has connected and active Stripe account
+    const seller = await User.findById(sellerId);
+    if (!seller) {
+      return res.status(404).json({
+        success: false,
+        error: 'Seller not found'
+      });
+    }
+
+    if (!seller.stripeAccountId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please connect your Stripe account before accepting offers',
+        stripeSetupRequired: true,
+        message: 'You need to set up Stripe payments to receive funds from orders'
+      });
+    }
+
+    if (seller.stripeAccountStatus !== 'active') {
+      return res.status(400).json({
+        success: false,
+        error: 'Your Stripe account is not yet active. Please complete the setup process.',
+        stripeSetupRequired: true,
+        message: 'Complete your Stripe onboarding to start accepting payments'
       });
     }
 
     // Check if offer exists and is still pending
     const offer = await Offer.findById(offerId);
     if (!offer) {
-      return res.status(404).json({ error: 'Offer not found' });
+      return res.status(404).json({ 
+        success: false,
+        error: 'Offer not found' 
+      });
     }
 
     if (offer.status !== 'pending') {
       return res.status(400).json({
-        error: 'Offer is no longer available for order creation'
+        success: false,
+        error: 'Offer is no longer available for order creation',
+        currentStatus: offer.status
+      });
+    }
+
+    // Verify offer belongs to the correct listing and buyer
+    if (offer.listingId.toString() !== listingId || offer.buyerId.toString() !== buyerId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Offer details do not match with provided listing or buyer'
       });
     }
 
     // Check if listing exists and is active
     const listing = await MarketplaceListing.findById(listingId);
     if (!listing) {
-      return res.status(404).json({ error: 'Listing not found' });
+      return res.status(404).json({ 
+        success: false,
+        error: 'Listing not found' 
+      });
     }
 
     if (listing.status !== 'active') {
       return res.status(400).json({
-        error: 'Listing is not available for purchase'
+        success: false,
+        error: 'Listing is not available for purchase',
+        currentStatus: listing.status
+      });
+    }
+
+    // Verify listing belongs to the seller
+    if (listing.sellerId.toString() !== sellerId) {
+      return res.status(403).json({
+        success: false,
+        error: 'You are not authorized to create orders for this listing'
       });
     }
 
@@ -74,25 +136,43 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
     const existingOrder = await Order.findOne({ offerId });
     if (existingOrder) {
       return res.status(400).json({
-        error: 'Order already exists for this offer'
+        success: false,
+        error: 'Order already exists for this offer',
+        orderId: existingOrder._id
       });
     }
 
-    // Create new order - let mongoose use schema defaults
+    // Calculate expected delivery date
+    const expectedDelivery = new Date();
+    expectedDelivery.setDate(expectedDelivery.getDate() + parseInt(expectedDeliveryDays));
+
+    // Create new order
     const order = new Order({
       offerId,
       listingId,
       buyerId,
       sellerId,
       amount,
-      shippingAddress: shippingAddress || 'Not provided',
+      shippingAddress: shippingAddress || {
+        address: 'Not provided',
+        city: '',
+        state: '',
+        country: '',
+        zipCode: ''
+      },
       paymentMethod: paymentMethod || 'card',
       notes: notes || '',
-      // Let schema handle defaults: status='pending_payment', orderType='accepted_offer'
+      status: 'pending_payment',
+      orderType: 'accepted_offer',
       orderDate: new Date(),
-      expectedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      maxRevisions: 3,
-      revisions: 0
+      expectedDelivery,
+      maxRevisions: listing.maxRevisions || 3,
+      revisions: 0,
+      // Stripe related fields
+      stripePaymentIntentId: null,
+      stripeTransferId: null,
+      platformFee: calculatePlatformFee(amount), // You can define this function
+      sellerPayoutAmount: calculateSellerPayout(amount) // You can define this function
     });
 
     await order.save();
@@ -100,13 +180,20 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
     // Update offer status to accepted
     offer.status = 'accepted';
     offer.acceptedAt = new Date();
+    offer.orderId = order._id; // Link order to offer
     await offer.save();
 
     // Update listing status to sold if it's a one-time purchase
     if (listing.availability === 'single') {
       listing.status = 'sold';
+      listing.soldAt = new Date();
       await listing.save();
     }
+
+    // Update seller stats
+    await User.findByIdAndUpdate(sellerId, {
+      $inc: { totalOrders: 1 }
+    });
 
     console.log("✅ Order created successfully:", order._id);
 
@@ -114,40 +201,85 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
     const populatedOrder = await Order.findById(order._id)
       .populate({
         path: 'buyerId',
-        select: 'username avatar email',
+        select: 'username avatar email firstName lastName',
         model: 'User'
       })
       .populate({
         path: 'sellerId',
-        select: 'username avatar sellerRating email',
+        select: 'username avatar sellerRating email firstName lastName stripeAccountId',
         model: 'User'
       })
       .populate({
         path: 'listingId',
-        select: 'title mediaUrls price category type description tags',
+        select: 'title mediaUrls price category type description tags availability deliveryTime',
         model: 'MarketplaceListing'
       })
       .populate({
         path: 'offerId',
-        select: 'amount message requirements expectedDelivery',
+        select: 'amount message requirements expectedDelivery createdAt',
         model: 'Offer'
       })
       .lean();
 
+    // Log order creation for analytics
+    console.log(`🎉 New order created: 
+      Order ID: ${order._id}
+      Amount: $${amount}
+      Seller: ${seller.username} (${seller._id})
+      Buyer: ${populatedOrder.buyerId.username}
+      Listing: ${populatedOrder.listingId.title}
+    `);
+
     res.status(201).json({
       success: true,
       message: 'Order created successfully',
-      order: populatedOrder
+      order: populatedOrder,
+      nextSteps: {
+        paymentRequired: true,
+        message: 'Buyer needs to complete payment to start the order'
+      }
     });
 
   } catch (error) {
     console.error('❌ Error creating order:', error);
+    
+    // Mongoose validation error
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: errors
+      });
+    }
+
+    // MongoDB duplicate key error
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        error: 'Order already exists for this offer'
+      });
+    }
+
     res.status(500).json({
+      success: false,
       error: 'Failed to create order',
-      details: error.message
+      details: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 });
+
+// Helper functions for fee calculation
+function calculatePlatformFee(amount) {
+  // Example: 10% platform fee
+  const platformFeePercentage = 0.10;
+  return parseFloat((amount * platformFeePercentage).toFixed(2));
+}
+
+function calculateSellerPayout(amount) {
+  const platformFee = calculatePlatformFee(amount);
+  return parseFloat((amount - platformFee).toFixed(2));
+}
 router.delete("/delete-all-orders", async (req, res) => {
   try {
     console.log("🗑️ Attempting to delete ALL orders...");
