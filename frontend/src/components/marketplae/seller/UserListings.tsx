@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { getCurrentUserIdFromToken } from '../../utilities/helperfFunction';
+import { getCurrentUserId } from '../../../utilities/helperfFunction';
 import ListingCard from './ListingCard';
 
 interface User {
@@ -167,7 +167,7 @@ const UserListings: React.FC<UserListingsProps> = ({ userId: propUserId }) => {
 
   useEffect(() => {
     const initializeUser = async () => {
-      const userIdFromToken = getCurrentUserIdFromToken();
+      const userIdFromToken = getCurrentUserId();
       setCurrentUserId(userIdFromToken);
 
       if (userIdFromToken || propUserId) {
