@@ -10,6 +10,8 @@ const orderRoutes = require("./marketplace/orders");
 const offerRoutes = require("./marketplace/offers");
 const messageRoutes = require("./marketplace/messages");
 const paymentRoutes = require("./marketplace/payments");
+const stripeRoutes = require("./marketplace/stripe");
+
 
 module.exports = {
   UserController,
@@ -22,5 +24,7 @@ module.exports = {
   orderRoutes, 
   offerRoutes,
   messageRoutes,
-  paymentRoutes
+  paymentRoutes,
+
+  stripeRoutes,
 };
