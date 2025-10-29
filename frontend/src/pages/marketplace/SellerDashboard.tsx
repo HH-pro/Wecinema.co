@@ -4,12 +4,12 @@ import { getSellerOrders, getReceivedOffers, checkStripeStatus } from '../../api
 import axios from 'axios';
 import { getCurrentUserIdFromToken } from '../../utilities/helperfFunction';
 import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
-import OrderCreation from './seller/OrderCreation';
-import PaymentStatusBadge from './seller/PaymentStatusBadge';
-import StripeAccountStatus from './seller/StripeAccountStatus';
-import StatCard from './seller/StatCard';
-import UserListings from './seller/UserListings';
-import OrderReceivedPage from './seller/OrderReceivedPage';
+import OrderCreation from '../../components/marketplae/seller/OrderCreation';
+import PaymentStatusBadge from '../../components/marketplae/seller/PaymentStatusBadge';
+import StripeAccountStatus from '../../components/marketplae/seller/StripeAccountStatus';
+import StatCard from '../../components/marketplae/seller/StatCard';
+import UserListings from '../../components/marketplae/seller/UserListings';
+import OrderReceivedPage from '../../components/marketplae/seller/OrderReceivedPage';
 
 const API_BASE_URL = 'http://localhost:3000';
 
