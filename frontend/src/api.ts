@@ -200,7 +200,7 @@ export const createStripeAccount = (setLoading: React.Dispatch<React.SetStateAct
 export const completeOnboarding = (setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
   postRequest("/api/stripe/complete-onboarding", {}, setLoading, "Stripe account connected successfully");
 
-export const createPaymentIntent = (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+export const createPaymentIntents = (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
   postRequest<{
     clientSecret: string;
     paymentIntentId: string;
@@ -208,7 +208,7 @@ export const createPaymentIntent = (orderId: string, setLoading: React.Dispatch<
     currency: string;
   }>("/api/stripe/create-payment-intent", { orderId }, setLoading);
 
-export const confirmPayment = (paymentIntentId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+export const confirmPayments = (paymentIntentId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
   postRequest("/api/stripe/confirm-payment", { paymentIntentId }, setLoading, "Payment confirmed successfully");
 
 export const getSellerBalance = (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
