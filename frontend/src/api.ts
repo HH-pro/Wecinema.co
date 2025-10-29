@@ -14,7 +14,41 @@ const api = axios.create({
     "Content-Type": "application/json",
   },
 });
-  
+  // Stripe related API functions
+export const checkStripeStatus = async () => {
+  try {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const response = await axios.get(`${API_BASE_URL}/stripe/status`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error checking Stripe status:', error);
+    throw error;
+  }
+};
+
+export const createStripeAccount = async () => {
+  try {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const response = await axios.post(`${API_BASE_URL}/stripe/onboard-seller`, {}, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error creating Stripe account:', error);
+    throw error;
+  }
+};
+
+// Updated createOrder function with better error handling
+
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
