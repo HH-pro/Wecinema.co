@@ -59,46 +59,74 @@ router.get('/status', authenticateMiddleware, async (req, res) => {
     });
   }
 });
-// Updated onboard-seller endpoint with detailed logging
+// ✅ UPDATED & IMPROVED Stripe Onboarding Endpoint
 router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
   console.log('=== STRIPE ONBOARDING STARTED ===');
+  const startTime = Date.now();
   
   try {
     const userId = req.user.id;
     console.log('1. User ID:', userId);
 
+    // Get user with better error handling
     const user = await User.findById(userId);
     if (!user) {
       console.log('❌ User not found in database');
       return res.status(404).json({
         success: false,
-        error: 'User not found'
+        error: 'User account not found. Please try logging in again.'
       });
     }
-    console.log('2. User found:', user.email);
+    console.log('2. User found:', user.email, 'Name:', user.firstName, user.lastName);
 
-    // Check for existing Stripe account
+    // Check for existing Stripe account with improved logic
     if (user.stripeAccountId) {
-      console.log('3. Existing Stripe account ID:', user.stripeAccountId);
+      console.log('3. Existing Stripe account ID found:', user.stripeAccountId);
       try {
         console.log('4. Retrieving existing Stripe account...');
         const account = await stripe.accounts.retrieve(user.stripeAccountId);
-        console.log('5. Existing account status - details_submitted:', account.details_submitted);
+        console.log('5. Existing account status:', {
+          details_submitted: account.details_submitted,
+          charges_enabled: account.charges_enabled,
+          payouts_enabled: account.payouts_enabled,
+          requirements: account.requirements
+        });
         
-        if (account.details_submitted) {
-          console.log('6. Account already completed onboarding');
+        // If account is fully onboarded and active
+        if (account.details_submitted && account.charges_enabled) {
+          console.log('6. Account already completed onboarding and active');
           return res.status(400).json({
             success: false,
-            error: 'Stripe account already connected'
+            error: 'Stripe account is already connected and active. You can accept payments.',
+            stripeAccountId: user.stripeAccountId,
+            accountStatus: 'active'
           });
         }
         
-        // Create onboarding link for existing account
+        // If account exists but needs more information
+        if (account.details_submitted && !account.charges_enabled) {
+          console.log('6a. Account needs additional verification');
+          const accountLink = await stripe.accountLinks.create({
+            account: user.stripeAccountId,
+            refresh_url: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/seller/dashboard?stripe=refresh`,
+            return_url: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/seller/dashboard?stripe=success`,
+            type: 'account_onboarding',
+          });
+
+          return res.json({
+            success: true,
+            url: accountLink.url,
+            stripeAccountId: user.stripeAccountId,
+            message: 'Additional verification required for your Stripe account'
+          });
+        }
+        
+        // Create onboarding link for existing incomplete account
         console.log('7. Creating account link for existing account...');
         const accountLink = await stripe.accountLinks.create({
           account: user.stripeAccountId,
-          refresh_url: `http://localhost:3001/seller/dashboard?stripe=refresh`,
-          return_url: `http://localhost:3001/seller/dashboard?stripe=success`,
+          refresh_url: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/seller/dashboard?stripe=refresh`,
+          return_url: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/seller/dashboard?stripe=success`,
           type: 'account_onboarding',
         });
 
@@ -106,73 +134,171 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
         return res.json({
           success: true,
           url: accountLink.url,
-          stripeAccountId: user.stripeAccountId
+          stripeAccountId: user.stripeAccountId,
+          message: 'Continue your Stripe account setup'
         });
       } catch (stripeError) {
-        console.log('9. Existing account retrieval failed:', stripeError.message);
+        console.log('9. Existing account retrieval failed:', {
+          message: stripeError.message,
+          code: stripeError.code,
+          type: stripeError.type
+        });
         console.log('10. Will create new account instead...');
+        // Continue to create new account
       }
     }
 
-    // Create new Stripe account
+    // Create new Stripe account with better configuration
     console.log('11. Creating new Stripe account...');
-    const account = await stripe.accounts.create({
+    const accountData = {
       type: 'express',
-      country: 'US', // Use US for better compatibility
+      country: 'US',
       email: user.email,
       capabilities: {
         card_payments: { requested: true },
         transfers: { requested: true },
+      },
+      business_type: 'individual',
+      individual: {
+        email: user.email,
+        first_name: user.firstName || 'Test',
+        last_name: user.lastName || 'User',
+      },
+      business_profile: {
+        url: process.env.FRONTEND_URL || 'http://localhost:3001',
+        mcc: '5734', // Computer Software Stores
+        product_description: 'Digital products and services'
+      },
+      settings: {
+        payouts: {
+          schedule: {
+            interval: 'manual', // Let users configure this later
+          },
+        },
+      },
+      metadata: {
+        userId: userId.toString(),
+        platform: 'WECINEMA'
       }
-      // Remove all other fields for now
-    });
+    };
+
+    console.log('11a. Account creation data:', JSON.stringify(accountData, null, 2));
+    
+    const account = await stripe.accounts.create(accountData);
     console.log('12. ✅ Stripe account created:', account.id);
 
-    // Update user
+    // Update user with additional fields
     console.log('13. Updating user with Stripe account ID...');
     user.stripeAccountId = account.id;
     user.stripeAccountStatus = 'pending';
+    user.stripeAccountCreatedAt = new Date();
     await user.save();
     console.log('14. ✅ User updated successfully');
 
-    // Create account link
+    // Create account link with proper URLs
     console.log('15. Creating account link...');
     const accountLink = await stripe.accountLinks.create({
       account: account.id,
-      refresh_url: `http://localhost:3001/seller/dashboard?stripe=refresh`,
-      return_url: `http://localhost:3001/seller/dashboard?stripe=success`,
+      refresh_url: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/seller/dashboard?stripe=refresh&account_id=${account.id}`,
+      return_url: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/seller/dashboard?stripe=success&account_id=${account.id}`,
       type: 'account_onboarding',
     });
-    console.log('16. ✅ Account link created');
+    console.log('16. ✅ Account link created:', accountLink.url);
 
-    console.log('17. 🎉 SUCCESS - Returning onboarding URL');
+    const processingTime = Date.now() - startTime;
+    console.log(`17. 🎉 SUCCESS - Onboarding completed in ${processingTime}ms`);
+    
     res.json({
       success: true,
       url: accountLink.url,
-      stripeAccountId: account.id
+      stripeAccountId: account.id,
+      message: 'Redirecting to Stripe to complete your account setup'
     });
 
   } catch (error) {
-    console.error('18. ❌ CATCH BLOCK - FULL ERROR:');
-    console.error('Error message:', error.message);
-    console.error('Error type:', error.type);
-    console.error('Error code:', error.code);
-    console.error('Error stack:', error.stack);
+    const processingTime = Date.now() - startTime;
+    console.error(`18. ❌ CATCH BLOCK - Failed after ${processingTime}ms`);
+    console.error('Error details:', {
+      message: error.message,
+      type: error.type,
+      code: error.code,
+      stack: error.stack
+    });
     
     // Check for specific Stripe errors
     if (error.raw) {
-      console.error('Stripe raw error:', error.raw);
+      console.error('Stripe raw error:', JSON.stringify(error.raw, null, 2));
     }
-    
+
+    // User-friendly error messages based on error type
+    let userMessage = 'Failed to setup Stripe account. Please try again.';
+    let errorDetails = error.message;
+
+    if (error.type === 'StripeInvalidRequestError') {
+      switch (error.code) {
+        case 'parameter_invalid':
+          userMessage = 'Invalid account information. Please check your profile details.';
+          break;
+        case 'resource_missing':
+          userMessage = 'Stripe service temporarily unavailable. Please try again later.';
+          break;
+        default:
+          userMessage = 'Stripe configuration error. Please contact support.';
+      }
+    } else if (error.code === 'STRIPE_CONNECTION_ERROR') {
+      userMessage = 'Unable to connect to Stripe. Please check your internet connection.';
+    }
+
     res.status(500).json({
       success: false,
-      error: error.message,
-      type: error.type,
+      error: userMessage,
+      details: errorDetails,
       code: error.code,
-      help: 'Check backend logs for detailed error information'
+      help: 'If this persists, please contact customer support',
+      timestamp: new Date().toISOString()
     });
   }
 });
+
+// ✅ ADD THIS: Webhook endpoint to handle Stripe account updates
+router.post('/stripe-webhook', async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (err) {
+    console.log(`❌ Webhook signature verification failed.`, err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Handle the event
+  switch (event.type) {
+    case 'account.updated':
+      const account = event.data.object;
+      console.log('Stripe account updated:', account.id);
+      
+      // Update user account status in database
+      try {
+        const user = await User.findOne({ stripeAccountId: account.id });
+        if (user) {
+          user.stripeAccountStatus = account.charges_enabled ? 'verified' : 'pending';
+          user.payoutsEnabled = account.payouts_enabled;
+          await user.save();
+          console.log(`✅ Updated user ${user._id} Stripe status to ${user.stripeAccountStatus}`);
+        }
+      } catch (dbError) {
+        console.error('Error updating user from webhook:', dbError);
+      }
+      break;
+      
+    default:
+      console.log(`Unhandled event type: ${event.type}`);
+  }
+
+  res.json({ received: true });
+});
+
 
 // ✅ Complete onboarding (webhook or manual check)
 router.post('/complete-onboarding', authenticateMiddleware, async (req, res) => {
