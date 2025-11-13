@@ -11,7 +11,7 @@ const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require(".
 const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
 
 // Firebase Chat Service (if using Firebase)
-const FirebaseChatService = require("../../services/firebaseChatService");
+const FirebaseChatService = require("../../services/chatService");
 
 // ✅ VALIDATION HELPER FUNCTIONS
 const validateObjectId = (id) => {
