@@ -3,7 +3,7 @@ const router = express.Router();
 const Offer = require("../../models/marketplace/offer");
 const MarketplaceListing = require("../../models/marketplace/listing");
 const Order = require("../../models/marketplace/order");
-const User = require("../../models/user");
+const User = require("../../models/User");
 const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils");
 
 // Direct Stripe keys (replace with your actual keys)
