@@ -69,7 +69,7 @@ export const decodeToken = (token: any) => {
       console.error("❌ Manual token decode also failed:", manualError);
       return null;
     }
-  }
+  
 };
 
 // DIRECT USER ID EXTRACTION - Multiple reliable methods
