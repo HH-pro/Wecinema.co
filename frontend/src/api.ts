@@ -240,7 +240,37 @@ export const createStripeAccount = async (): Promise<{ url: string }> => {
 };
 export const completeOnboarding = (setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
   postRequest("/stripe/complete-onboarding", {}, setLoading, "Stripe account connected successfully");
+// utils/payment.js
+export const confirmOfferPayment = async (offerId, paymentIntentId) => {
+  try {
+    const token = localStorage.getItem('token');
+    
+    console.log('🔄 Confirming payment...', { offerId, paymentIntentId });
 
+    const response = await fetch('/marketplace/offers/confirm-offer-payment', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        offerId,
+        paymentIntentId
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || data.details || 'Payment confirmation failed');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('❌ Payment confirmation error:', error);
+    throw error;
+  }
+};
 export const createPaymentIntents = (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
   postRequest<{
     clientSecret: string;
