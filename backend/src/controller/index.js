@@ -13,7 +13,6 @@ const paymentRoutes = require("./marketplace/payments");
 const stripeRoutes = require("./marketplace/stripe");
 
 
-
 module.exports = {
   UserController,
   VideoController,
