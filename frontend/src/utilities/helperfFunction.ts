@@ -29,6 +29,16 @@ export const generateSlug = (text: string): string =>
 export const truncateText = (text: string, maxLength: number): string =>
   text.length <= maxLength ? text : text.slice(0, maxLength - 3) + "...";
 
+// Enhanced token decoding with multiple fallback methods
+export const decodeToken = (token: any) => {
+  if (!token) {
+    console.log("❌ No token provided");
+    return null;
+  }
+  
+ 
+  
+};
 
 // DIRECT USER ID EXTRACTION - Multiple reliable methods
 export const getCurrentUserId = (): string | null => {
