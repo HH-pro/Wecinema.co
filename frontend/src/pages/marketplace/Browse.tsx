@@ -190,11 +190,7 @@ const Browse: React.FC = () => {
 
   const handleMakeOffer = (listing: Listing) => {
     // Check Stripe connection before proceeding
-    if (stripeTestStatus === 'failed') {
-      setError('Payment system is currently unavailable. Please try again later.');
-      return;
-    }
-
+   
     setSelectedListing(listing);
     setOfferForm({
       amount: listing.price.toString(),
