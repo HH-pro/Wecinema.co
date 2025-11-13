@@ -132,17 +132,17 @@ const PaymentComponent = () => {
       return;
     }
 
-    const fetchData = async () => {
-      try {
-        const result = await getRequest("/user/" + userId, setLoading);
-        // console.log('Fetched user data:', result);
-        setUser(result);
-      } catch (error) {
-        // console.error("Error fetching data:", error);
-      }
-    }
+    // const fetchData = async () => {
+    //   try {
+    //     const result = await getRequest("/user/" + userId, setLoading);
+    //     // console.log('Fetched user data:', result);
+    //     setUser(result);
+    //   } catch (error) {
+    //     // console.error("Error fetching data:", error);
+    //   }
+    // }
 
-    fetchData();
+    // fetchData();
 
     const checkUserPaymentStatus = async () => {
       try {
