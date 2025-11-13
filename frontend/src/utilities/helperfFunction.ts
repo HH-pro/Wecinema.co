@@ -19,9 +19,6 @@ export interface Itoken {
 
 type MongooseId = string;
 
-// Environment check for logging
-const isDevelopment = process.env.NODE_ENV === 'development';
-
 // Utility Functions
 
 // Generate slug from text
@@ -35,12 +32,10 @@ export const truncateText = (text: string, maxLength: number): string =>
 // Enhanced token decoding with multiple fallback methods
 export const decodeToken = (token: any) => {
   if (!token) {
-    isDevelopment && console.log("❌ No token provided");
     return null;
   }
   
   try {
-    isDevelopment && console.log("🔐 Attempting to decode token...");
     const decodedToken: any = jwtDecode(token) as Itoken;
     const currentTime = Math.floor(Date.now() / 1000);
     
@@ -52,10 +47,9 @@ export const decodeToken = (token: any) => {
       return null;
     }
     
-    isDevelopment && console.log("✅ Token decoded successfully");
     return decodedToken;
   } catch (error) {
-    console.error("❌ JWT decode failed, trying manual decode:", error);
+    console.error("❌ JWT decode failed:", error);
     
     // Manual JWT decoding as fallback
     try {
@@ -69,7 +63,6 @@ export const decodeToken = (token: any) => {
       const paddedBase64 = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
       const decodedPayload = JSON.parse(atob(paddedBase64));
       
-      isDevelopment && console.log("✅ Manual token decode successful");
       return decodedPayload;
     } catch (manualError) {
       console.error("❌ Manual token decode also failed:", manualError);
@@ -81,12 +74,9 @@ export const decodeToken = (token: any) => {
 // DIRECT USER ID EXTRACTION - Multiple reliable methods
 export const getCurrentUserId = (): string | null => {
   try {
-    isDevelopment && console.log("🆔 Starting user ID extraction...");
-    
     // Method 1: Direct from localStorage/sessionStorage
     const directUserId = localStorage.getItem("userId") || sessionStorage.getItem("userId");
     if (directUserId) {
-      isDevelopment && console.log("✅ User ID found directly in storage");
       return directUserId;
     }
 
@@ -97,7 +87,6 @@ export const getCurrentUserId = (): string | null => {
         const user = JSON.parse(userData);
         const userId = user.id || user._id || user.userId;
         if (userId) {
-          isDevelopment && console.log("✅ User ID from user object");
           // Store for future quick access
           localStorage.setItem("userId", userId);
           return userId;
@@ -110,7 +99,6 @@ export const getCurrentUserId = (): string | null => {
     // Method 3: Decode from token
     const token = localStorage.getItem("token") || sessionStorage.getItem("token");
     if (token) {
-      isDevelopment && console.log("🔐 Token found, extracting user ID...");
       const tokenData = decodeToken(token);
       
       if (tokenData) {
@@ -119,12 +107,9 @@ export const getCurrentUserId = (): string | null => {
                       tokenData.user?._id || tokenData.user?.userId || tokenData.sub;
         
         if (userId) {
-          isDevelopment && console.log("✅ User ID extracted from token");
           // Store for future quick access
           localStorage.setItem("userId", userId);
           return userId;
-        } else {
-          isDevelopment && console.warn("⚠️ Token decoded but no user ID found");
         }
       }
     }
@@ -136,7 +121,6 @@ export const getCurrentUserId = (): string | null => {
         const authData = JSON.parse(storedAuth);
         const userId = authData.userId || authData.user?.id || authData.user?._id;
         if (userId) {
-          isDevelopment && console.log("✅ User ID from auth data");
           localStorage.setItem("userId", userId);
           return userId;
         }
@@ -145,7 +129,6 @@ export const getCurrentUserId = (): string | null => {
       }
     }
 
-    isDevelopment && console.log("❌ No user ID found in any storage location");
     return null;
   } catch (error) {
     console.error("💥 Error in getCurrentUserId:", error);
@@ -159,23 +142,19 @@ export const validateTokenAndGetUserId = (): { isValid: boolean; userId: string 
     const token = localStorage.getItem("token") || sessionStorage.getItem("token");
     
     if (!token) {
-      isDevelopment && console.log("❌ No token found");
       return { isValid: false, userId: null };
     }
 
     const tokenData = decodeToken(token);
     if (!tokenData) {
-      isDevelopment && console.log("❌ Invalid token");
       return { isValid: false, userId: null };
     }
 
     const userId = getCurrentUserId();
     if (!userId) {
-      isDevelopment && console.log("❌ Could not extract user ID from token");
       return { isValid: false, userId: null };
     }
 
-    isDevelopment && console.log("✅ Token valid, user ID extracted");
     return { isValid: true, userId };
   } catch (error) {
     console.error("Error validating token:", error);
@@ -187,7 +166,6 @@ export const validateTokenAndGetUserId = (): { isValid: boolean; userId: string 
 export const storeUserId = (userId: string): void => {
   try {
     localStorage.setItem("userId", userId);
-    isDevelopment && console.log("💾 User ID stored");
   } catch (error) {
     console.error("Error storing user ID:", error);
   }
@@ -203,7 +181,6 @@ export const clearAuthData = (): void => {
   sessionStorage.removeItem("user");
   localStorage.removeItem("auth");
   sessionStorage.removeItem("auth");
-  isDevelopment && console.log("🧹 All auth data cleared");
 };
 
 // Check if user is authenticated
@@ -262,7 +239,6 @@ export const isUserIdInArray = (userId: MongooseId, idArray: MongooseId[]): bool
 
 // Enhanced logout function
 export const logout = () => {
-  isDevelopment && console.log("🚪 Logging out...");
   clearAuthData();
   window.location.href = "/admin"; // Redirect to sign-in page
 };
