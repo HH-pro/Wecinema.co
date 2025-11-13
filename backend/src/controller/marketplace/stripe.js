@@ -59,7 +59,7 @@ router.get('/status', authenticateMiddleware, async (req, res) => {
     });
   }
 });
-// ✅ UPDATED & IMPROVED Stripe Onboarding Endpoint
+// ✅ UPDATED Stripe Onboarding Endpoint with Correct Redirect URLs
 router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
   console.log('=== STRIPE ONBOARDING STARTED ===');
   const startTime = Date.now();
@@ -108,8 +108,8 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
           console.log('6a. Account needs additional verification');
           const accountLink = await stripe.accountLinks.create({
             account: user.stripeAccountId,
-            refresh_url: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/seller/dashboard?stripe=refresh`,
-            return_url: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/seller/dashboard?stripe=success`,
+            refresh_url: `http://localhost:5173/marketplace/dashboard?stripe=refresh&account_id=${user.stripeAccountId}`,
+            return_url: `http://localhost:5173/marketplace/dashboard?stripe=success&account_id=${user.stripeAccountId}`,
             type: 'account_onboarding',
           });
 
@@ -125,8 +125,8 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
         console.log('7. Creating account link for existing account...');
         const accountLink = await stripe.accountLinks.create({
           account: user.stripeAccountId,
-          refresh_url: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/seller/dashboard?stripe=refresh`,
-          return_url: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/seller/dashboard?stripe=success`,
+          refresh_url: `http://localhost:5173/marketplace/dashboard?stripe=refresh&account_id=${user.stripeAccountId}`,
+          return_url: `http://localhost:5173/marketplace/dashboard?stripe=success&account_id=${user.stripeAccountId}`,
           type: 'account_onboarding',
         });
 
@@ -165,7 +165,7 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
         last_name: user.lastName || 'User',
       },
       business_profile: {
-        url: process.env.FRONTEND_URL || 'http://localhost:3001',
+        url: 'http://localhost:5173',
         mcc: '5734', // Computer Software Stores
         product_description: 'Digital products and services'
       },
@@ -195,12 +195,12 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
     await user.save();
     console.log('14. ✅ User updated successfully');
 
-    // Create account link with proper URLs
+    // Create account link with CORRECT DASHBOARD URL
     console.log('15. Creating account link...');
     const accountLink = await stripe.accountLinks.create({
       account: account.id,
-      refresh_url: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/seller/dashboard?stripe=refresh&account_id=${account.id}`,
-      return_url: `${process.env.FRONTEND_URL || 'http://localhost:3001'}/seller/dashboard?stripe=success&account_id=${account.id}`,
+      refresh_url: `http://localhost:5173/marketplace/dashboard?stripe=refresh&account_id=${account.id}`,
+      return_url: `http://localhost:5173/marketplace/dashboard?stripe=success&account_id=${account.id}`,
       type: 'account_onboarding',
     });
     console.log('16. ✅ Account link created:', accountLink.url);
@@ -259,46 +259,6 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
     });
   }
 });
-
-// ✅ ADD THIS: Webhook endpoint to handle Stripe account updates
-router.post('/stripe-webhook', async (req, res) => {
-  const sig = req.headers['stripe-signature'];
-  let event;
-
-  try {
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
-  } catch (err) {
-    console.log(`❌ Webhook signature verification failed.`, err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-
-  // Handle the event
-  switch (event.type) {
-    case 'account.updated':
-      const account = event.data.object;
-      console.log('Stripe account updated:', account.id);
-      
-      // Update user account status in database
-      try {
-        const user = await User.findOne({ stripeAccountId: account.id });
-        if (user) {
-          user.stripeAccountStatus = account.charges_enabled ? 'verified' : 'pending';
-          user.payoutsEnabled = account.payouts_enabled;
-          await user.save();
-          console.log(`✅ Updated user ${user._id} Stripe status to ${user.stripeAccountStatus}`);
-        }
-      } catch (dbError) {
-        console.error('Error updating user from webhook:', dbError);
-      }
-      break;
-      
-    default:
-      console.log(`Unhandled event type: ${event.type}`);
-  }
-
-  res.json({ received: true });
-});
-
 
 // ✅ Complete onboarding (webhook or manual check)
 router.post('/complete-onboarding', authenticateMiddleware, async (req, res) => {
