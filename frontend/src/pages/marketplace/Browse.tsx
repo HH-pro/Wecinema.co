@@ -89,25 +89,11 @@ const Browse: React.FC = () => {
   useEffect(() => {
     fetchListings();
     fetchCurrentUser();
-    testStripeConnection(); // Test Stripe connection on load
+
   }, [filters]);
 
-  // Test Stripe connection
-  const testStripeConnection = async () => {
-    try {
-      setStripeTestStatus('testing');
-      console.log('🧪 Testing Stripe connection...');
-      
-      const response = await api.get('/marketplace/offers/test-stripe-connection');
-      
-      console.log('✅ Stripe connection test successful:', response.data);
-      setStripeTestStatus('success');
-    } catch (error: any) {
-      console.error('❌ Stripe connection test failed:', error);
-      setStripeTestStatus('failed');
-      setError('Stripe payment system is currently unavailable. Please try again later.');
-    }
-  };
+  
+
 
   const fetchCurrentUser = async () => {
     try {
