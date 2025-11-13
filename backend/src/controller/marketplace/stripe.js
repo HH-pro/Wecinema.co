@@ -59,7 +59,7 @@ router.get('/status', authenticateMiddleware, async (req, res) => {
     });
   }
 });
-// ✅ Create Stripe Connect account for seller - FIXED VERSION
+// ✅ Create Stripe Connect account - SIMPLIFIED & ROBUST VERSION
 router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -72,7 +72,9 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
       });
     }
 
-    // If already has Stripe account, check if we can reuse it
+    console.log('🔄 Starting Stripe onboarding for user:', userId);
+
+    // Check for existing Stripe account
     if (user.stripeAccountId) {
       try {
         const account = await stripe.accounts.retrieve(user.stripeAccountId);
@@ -84,120 +86,93 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
             stripeAccountId: user.stripeAccountId
           });
         } else {
-          // Account exists but details not submitted - create new onboarding link
+          // Create new onboarding link for existing account
           const accountLink = await stripe.accountLinks.create({
             account: user.stripeAccountId,
-            refresh_url: `http://localhost:3001/seller/dashboard?stripe=refresh`,
-            return_url: `http://localhost:3001/seller/dashboard?stripe=success`,
+            refresh_url: `${process.env.FRONTEND_URL}/seller/dashboard?stripe=refresh`,
+            return_url: `${process.env.FRONTEND_URL}/seller/dashboard?stripe=success`,
             type: 'account_onboarding',
           });
 
           return res.json({
             success: true,
             url: accountLink.url,
-            stripeAccountId: user.stripeAccountId,
-            message: 'Redirect to complete Stripe onboarding'
+            stripeAccountId: user.stripeAccountId
           });
         }
       } catch (stripeError) {
-        // If account retrieval fails, continue to create new account
-        console.log('Existing Stripe account not found, creating new one:', stripeError.message);
+        console.log('Existing Stripe account invalid, creating new one:', stripeError.message);
+        // Continue to create new account
       }
     }
 
-    // Create Stripe Connect account with simplified configuration
+    // **SIMPLIFIED ACCOUNT CREATION** - Remove problematic fields
     const account = await stripe.accounts.create({
       type: 'express',
-      country: 'IN', // India
+      country: 'US', // Changed from IN to US for better compatibility
       email: user.email,
       capabilities: {
         card_payments: { requested: true },
         transfers: { requested: true },
       },
-      // Remove individual details initially to avoid validation errors
+      // Remove individual/business details initially - let Stripe collect them
       business_type: 'individual',
-      individual: {
-        email: user.email,
-        first_name: user.firstName || user.username.split(' ')[0] || 'Test',
-        last_name: user.lastName || user.username.split(' ')[1] || 'User',
-        phone: '+919876543210', // Default Indian phone number
-        address: {
-          line1: '123 Test Street',
-          city: 'Mumbai',
-          state: 'MH',
-          postal_code: '400001',
-          country: 'IN'
-        },
-        dob: {
-          day: 1,
-          month: 1,
-          year: 1990
-        }
-      },
       business_profile: {
-        url: 'http://localhost:3001',
-        mcc: '5734' // Computer Software Stores
-      },
-      settings: {
-        payouts: {
-          schedule: {
-            interval: 'manual',
-          },
-        },
-      },
-      tos_acceptance: {
-        date: Math.floor(Date.now() / 1000),
-        ip: req.ip // User's IP address
+        url: process.env.FRONTEND_URL || 'http://localhost:3001',
+        mcc: '5734'
       }
     });
 
     console.log('✅ Stripe account created:', account.id);
 
-    // Update user with Stripe account ID
+    // Update user
     user.stripeAccountId = account.id;
     user.stripeAccountStatus = 'pending';
     await user.save();
 
-    // Create account link for onboarding
+    // Create account link
     const accountLink = await stripe.accountLinks.create({
       account: account.id,
-      refresh_url: `http://localhost:3001/seller/dashboard?stripe=refresh`,
-      return_url: `http://localhost:3001/seller/dashboard?stripe=success`,
+      refresh_url: `${process.env.FRONTEND_URL}/seller/dashboard?stripe=refresh`,
+      return_url: `${process.env.FRONTEND_URL}/seller/dashboard?stripe=success`,
       type: 'account_onboarding',
     });
 
-    console.log('✅ Account link created:', accountLink.url);
+    console.log('✅ Account link created');
 
     res.json({
       success: true,
       url: accountLink.url,
-      stripeAccountId: account.id,
-      message: 'Redirect to Stripe onboarding'
+      stripeAccountId: account.id
     });
 
   } catch (error) {
-    console.error('❌ Error creating Stripe account:', error);
+    console.error('❌ Stripe onboarding error:', error);
     
-    // Better error handling with specific messages
+    // More specific error handling
     let errorMessage = 'Failed to create Stripe account';
-    let errorDetails = error.message;
-
+    
     if (error.type === 'StripeInvalidRequestError') {
-      if (error.code === 'parameter_unknown') {
-        errorMessage = 'Invalid Stripe configuration';
-        errorDetails = 'Please check your Stripe API keys and account settings';
-      } else if (error.code === 'account_invalid') {
-        errorMessage = 'Stripe Connect not enabled';
-        errorDetails = 'Please enable Stripe Connect in your Stripe dashboard';
+      switch (error.code) {
+        case 'parameter_unknown':
+          errorMessage = 'Invalid Stripe configuration';
+          break;
+        case 'account_invalid':
+          errorMessage = 'Stripe Connect not enabled';
+          break;
+        case 'resource_missing':
+          errorMessage = 'Stripe account not found';
+          break;
+        default:
+          errorMessage = `Stripe error: ${error.code}`;
       }
     }
 
     res.status(500).json({
       success: false,
       error: errorMessage,
-      details: errorDetails,
-      stripeErrorCode: error.code,
-      help: 'Check Stripe dashboard for Connect settings: https://dashboard.stripe.com/settings/connect'
+      details: error.message,
+      code: error.code
     });
   }
 });
