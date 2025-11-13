@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ListingCard from '../../components/marketplae/ListingCard';
 import MarketplaceLayout from '../../components/Layout';
 import { Listing } from '../../types/marketplace';
-import { FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiArrowRight, FiCheck, FiMail } from 'react-icons/fi';
+import { FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiArrowRight, FiCheck, FiMail, FiAlertCircle, FiLoader } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { loadStripe } from '@stripe/stripe-js';
@@ -12,8 +12,11 @@ import emailjs from '@emailjs/browser';
 // Initialize EmailJS with your credentials
 emailjs.init("MIfBtNPcnoqBFU0LR");
 
-// Temporary: Stripe test key for development
+// Stripe test key for development
 const stripePromise = loadStripe("pk_test_51SKw7ZHYamYyPYbDUlqbeydcW1hVGrHOvCZ8mBwSU1gw77TIRyzng31iSqAvPIQzTYKG8UWfDew7kdKgBxsw7vtq00WTLU3YCZ");
+
+// API base URL
+const API_BASE_URL = 'http://localhost:3000';
 
 const Browse: React.FC = () => {
   const [listings, setListings] = useState<Listing[]>([]);
@@ -27,6 +30,8 @@ const Browse: React.FC = () => {
   const [offerData, setOfferData] = useState<any>(null);
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [error, setError] = useState<string>('');
+  const [stripeTestStatus, setStripeTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle');
   const navigate = useNavigate();
 
   const [filters, setFilters] = useState({
@@ -44,11 +49,65 @@ const Browse: React.FC = () => {
     expectedDelivery: ''
   });
 
+  // Enhanced axios instance with better error handling
+  const api = axios.create({
+    baseURL: API_BASE_URL,
+    timeout: 30000, // 30 second timeout
+  });
+
+  // Request interceptor to add auth token
+  api.interceptors.request.use(
+    (config) => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      config.headers['Content-Type'] = 'application/json';
+      return config;
+    },
+    (error) => {
+      console.error('Request interceptor error:', error);
+      return Promise.reject(error);
+    }
+  );
+
+  // Response interceptor for error handling
+  api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      console.error('API Error:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        url: error.config?.url
+      });
+      return Promise.reject(error);
+    }
+  );
+
   // Fetch listings and user data on component mount
   useEffect(() => {
     fetchListings();
     fetchCurrentUser();
+    testStripeConnection(); // Test Stripe connection on load
   }, [filters]);
+
+  // Test Stripe connection
+  const testStripeConnection = async () => {
+    try {
+      setStripeTestStatus('testing');
+      console.log('🧪 Testing Stripe connection...');
+      
+      const response = await api.get('/marketplace/offers/test-stripe-connection');
+      
+      console.log('✅ Stripe connection test successful:', response.data);
+      setStripeTestStatus('success');
+    } catch (error: any) {
+      console.error('❌ Stripe connection test failed:', error);
+      setStripeTestStatus('failed');
+      setError('Stripe payment system is currently unavailable. Please try again later.');
+    }
+  };
 
   const fetchCurrentUser = async () => {
     try {
@@ -70,10 +129,9 @@ const Browse: React.FC = () => {
   const fetchListings = async () => {
     try {
       setLoading(true);
+      setError('');
       
-      const response = await axios.get(
-        'http://localhost:3000/marketplace/listings/listings'
-      );
+      const response = await api.get('/marketplace/listings/listings');
       
       let filteredData = response.data;
       
@@ -104,8 +162,9 @@ const Browse: React.FC = () => {
       filteredData = sortListings(filteredData, filters.sortBy);
       
       setListings(filteredData);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching listings:', error);
+      setError('Failed to load listings. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -144,6 +203,12 @@ const Browse: React.FC = () => {
   };
 
   const handleMakeOffer = (listing: Listing) => {
+    // Check Stripe connection before proceeding
+    if (stripeTestStatus === 'failed') {
+      setError('Payment system is currently unavailable. Please try again later.');
+      return;
+    }
+
     setSelectedListing(listing);
     setOfferForm({
       amount: listing.price.toString(),
@@ -152,9 +217,10 @@ const Browse: React.FC = () => {
       expectedDelivery: ''
     });
     setShowOfferModal(true);
+    setError('');
   };
 
-  // 🆕 IMPROVED: Function to extract seller email from listing data
+  // Function to extract seller email from listing data
   const getSellerEmail = (listing: Listing): string => {
     // Check if sellerId is populated and has email
     if (listing.sellerId && typeof listing.sellerId === 'object' && 'email' in listing.sellerId) {
@@ -170,7 +236,7 @@ const Browse: React.FC = () => {
     return ''; // Return empty string if no email found
   };
 
-  // 🆕 IMPROVED: Function to extract seller name from listing data
+  // Function to extract seller name from listing data
   const getSellerName = (listing: Listing): string => {
     if (listing.sellerId && typeof listing.sellerId === 'object' && 'username' in listing.sellerId) {
       return (listing.sellerId as any).username;
@@ -178,7 +244,7 @@ const Browse: React.FC = () => {
     return 'Seller';
   };
 
-  // 🆕 IMPROVED: Function to send email notification to seller
+  // Function to send email notification to seller
   const sendSellerNotification = async (type: 'offer' | 'direct_purchase', data: any) => {
     try {
       const templateParams = {
@@ -211,6 +277,7 @@ const Browse: React.FC = () => {
     }
   };
 
+  // 🆕 IMPROVED: Handle offer submission with better error handling
   const handleSubmitOffer = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -218,35 +285,27 @@ const Browse: React.FC = () => {
 
     try {
       setPaymentStatus('processing');
+      setError('');
       
       console.log('🔄 Submitting offer with payment...');
 
-      const response = await axios.post(
-        `http://localhost:3000/marketplace/offers/make-offer`,
-        {
-          listingId: selectedListing._id,
-          amount: parseFloat(offerForm.amount),
-          message: offerForm.message,
-          requirements: offerForm.requirements,
-          expectedDelivery: offerForm.expectedDelivery
-        },
-        { 
-          headers: { 
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          } 
-        }
-      );
+      const response = await api.post('/marketplace/offers/make-offer', {
+        listingId: selectedListing._id,
+        amount: parseFloat(offerForm.amount),
+        message: offerForm.message,
+        requirements: offerForm.requirements,
+        expectedDelivery: offerForm.expectedDelivery
+      });
 
       console.log('✅ Offer with payment response:', response.data);
 
       // Check if clientSecret is present
-      if (!response.data.clientSecret) {
-        throw new Error('No client secret received from server');
+      if (!response.data.data?.clientSecret) {
+        throw new Error('No client secret received from server. Please try again.');
       }
 
-      setClientSecret(response.data.clientSecret);
-      setOfferData(response.data);
+      setClientSecret(response.data.data.clientSecret);
+      setOfferData(response.data.data);
       setShowOfferModal(false);
       setShowPaymentModal(true);
       setPaymentStatus('idle');
@@ -254,44 +313,56 @@ const Browse: React.FC = () => {
     } catch (error: any) {
       console.error('❌ Error submitting offer with payment:', error);
       setPaymentStatus('failed');
-      alert(error.response?.data?.error || error.message || 'Failed to submit offer');
+      
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.details?.[0] || 
+                          error.message || 
+                          'Failed to submit offer';
+      
+      setError(errorMessage);
+      
+      // Show specific guidance for common errors
+      if (errorMessage.includes('already have a pending offer')) {
+        setError(`${errorMessage}. You can view your existing offers in the "My Offers" section.`);
+      } else if (errorMessage.includes('minimum')) {
+        setError(`${errorMessage}. Please increase your offer amount.`);
+      }
     }
   };
 
+  // 🆕 IMPROVED: Handle direct payment with better error handling
   const handleDirectPayment = async (listing: Listing) => {
     if (!listing._id) return;
     
+    // Check Stripe connection before proceeding
+    if (stripeTestStatus === 'failed') {
+      setError('Payment system is currently unavailable. Please try again later.');
+      return;
+    }
+
     try {
       setPaymentStatus('processing');
+      setError('');
       
       console.log('🔄 Creating direct payment for listing:', listing._id);
 
-      const response = await axios.post(
-        `http://localhost:3000/marketplace/offers/create-direct-payment`,
-        {
-          listingId: listing._id
-        },
-        { 
-          headers: { 
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          } 
-        }
-      );
+      const response = await api.post('/marketplace/offers/create-direct-payment', {
+        listingId: listing._id
+      });
 
       console.log('✅ Direct payment response:', response.data);
 
-      if (!response.data.clientSecret) {
-        throw new Error('No client secret received from server');
+      if (!response.data.data?.clientSecret) {
+        throw new Error('No client secret received from server. Please try again.');
       }
 
-      setClientSecret(response.data.clientSecret);
+      setClientSecret(response.data.data.clientSecret);
       setOfferData({
         amount: listing.price,
         listing: listing,
         type: 'direct_purchase',
-        paymentIntentId: response.data.paymentIntentId,
-        order: response.data.order
+        paymentIntentId: response.data.data.paymentIntentId,
+        order: response.data.data.order
       });
       setShowPaymentModal(true);
       setPaymentStatus('idle');
@@ -299,7 +370,13 @@ const Browse: React.FC = () => {
     } catch (error: any) {
       console.error('❌ Error creating direct payment:', error);
       setPaymentStatus('failed');
-      alert(error.response?.data?.error || error.message || 'Failed to initiate payment');
+      
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.details?.[0] || 
+                          error.message || 
+                          'Failed to initiate payment';
+      
+      setError(errorMessage);
     }
   };
   
@@ -361,7 +438,10 @@ const Browse: React.FC = () => {
     
     // Redirect to orders page with success message
     navigate('/marketplace/my-orders', { 
-      state: { message: 'Payment completed successfully! Your order has been placed.' } 
+      state: { 
+        message: 'Payment completed successfully! Your order has been placed.',
+        type: 'success'
+      } 
     });
   };
 
@@ -371,6 +451,7 @@ const Browse: React.FC = () => {
     setClientSecret('');
     setOfferData(null);
     setPaymentStatus('idle');
+    setError('');
   };
 
   const clearFilters = () => {
@@ -382,6 +463,7 @@ const Browse: React.FC = () => {
       sortBy: 'newest'
     });
     setSearchQuery('');
+    setError('');
   };
 
   // Filter listings based on search query
@@ -390,6 +472,63 @@ const Browse: React.FC = () => {
     listing.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (listing.tags && listing.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())))
   );
+
+  // 🆕 Render error banner if there's an error
+  const renderErrorBanner = () => {
+    if (!error) return null;
+
+    return (
+      <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+        <div className="flex items-center gap-3">
+          <FiAlertCircle className="text-red-500 flex-shrink-0" size={20} />
+          <div className="flex-1">
+            <p className="text-red-800 text-sm font-medium">{error}</p>
+            {error.includes('Stripe') && (
+              <button
+                onClick={testStripeConnection}
+                className="mt-2 text-red-700 hover:text-red-800 text-sm font-medium underline"
+              >
+                Test Connection Again
+              </button>
+            )}
+          </div>
+          <button
+            onClick={() => setError('')}
+            className="text-red-500 hover:text-red-700 p-1"
+          >
+            <FiX size={16} />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // 🆕 Render Stripe status indicator
+  const renderStripeStatus = () => {
+    if (stripeTestStatus === 'idle' || stripeTestStatus === 'success') return null;
+
+    return (
+      <div className={`mb-4 p-3 rounded-lg border ${
+        stripeTestStatus === 'testing' 
+          ? 'bg-blue-50 border-blue-200 text-blue-800'
+          : 'bg-red-50 border-red-200 text-red-800'
+      }`}>
+        <div className="flex items-center gap-2 text-sm">
+          {stripeTestStatus === 'testing' ? (
+            <>
+              <FiLoader className="animate-spin" size={16} />
+              <span>Testing payment system...</span>
+            </>
+          ) : (
+            <>
+              <FiAlertCircle size={16} />
+              <span>Payment system temporarily unavailable</span>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -408,6 +547,12 @@ const Browse: React.FC = () => {
     <MarketplaceLayout>
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Error Banner */}
+          {renderErrorBanner()}
+          
+          {/* Stripe Status */}
+          {renderStripeStatus()}
+
           {/* Header Section */}
           <div className="mb-8">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -591,6 +736,7 @@ const Browse: React.FC = () => {
                     onViewDetails={handleViewDetails}
                     onMakeOffer={handleMakeOffer}
                     onDirectPayment={handleDirectPayment}
+                    stripeAvailable={stripeTestStatus === 'success'}
                   />
                 </div>
               ))}
@@ -657,7 +803,7 @@ const Browse: React.FC = () => {
                     </span>
                   </div>
                   
-                  {/* 🆕 Seller Email Info */}
+                  {/* Seller Email Info */}
                   <div className="flex items-center gap-1 mt-2 text-xs text-gray-500">
                     <FiMail size={12} />
                     <span>Seller: {getSellerName(selectedListing)}</span>
@@ -676,12 +822,14 @@ const Browse: React.FC = () => {
                   <input
                     type="number"
                     required
-                    min="0.01"
+                    min="0.50"
+                    step="0.01"
                     value={offerForm.amount}
                     onChange={(e) => setOfferForm({ ...offerForm, amount: e.target.value })}
                     className="w-full px-2.5 py-1.5 sm:py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none text-xs sm:text-sm"
                     placeholder="Enter your offer amount"
                   />
+                  <p className="text-xs text-gray-500 mt-1">Minimum offer: $0.50</p>
                 </div>
 
                 {/* Message */}
@@ -716,6 +864,14 @@ const Browse: React.FC = () => {
                     Payment will be processed immediately and securely held in escrow until the seller accepts your offer.
                   </p>
                 </div>
+
+                {/* Error Display */}
+                {error && (
+                  <div className="bg-red-50 border border-red-200 rounded-md p-3 text-xs text-red-700 flex gap-2 items-start">
+                    <FiAlertCircle className="text-red-600 mt-0.5" size={14} />
+                    <p>{error}</p>
+                  </div>
+                )}
               </form>
             </div>
 
@@ -729,10 +885,19 @@ const Browse: React.FC = () => {
               </button>
               <button
                 onClick={handleSubmitOffer}
-                disabled={paymentStatus === 'processing'}
-                className="flex-1 py-2 rounded-md bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white transition-all text-xs sm:text-sm font-medium"
+                disabled={paymentStatus === 'processing' || stripeTestStatus === 'failed'}
+                className="flex-1 py-2 rounded-md bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white transition-all text-xs sm:text-sm font-medium flex items-center justify-center gap-2"
               >
-                {paymentStatus === 'processing' ? 'Processing...' : `Submit Offer & Pay $${offerForm.amount || '0.00'}`}
+                {paymentStatus === 'processing' ? (
+                  <>
+                    <FiLoader className="animate-spin" size={14} />
+                    Processing...
+                  </>
+                ) : stripeTestStatus === 'failed' ? (
+                  'Payment Unavailable'
+                ) : (
+                  `Submit Offer & Pay $${offerForm.amount || '0.00'}`
+                )}
               </button>
             </div>
           </div>
@@ -796,24 +961,28 @@ const Browse: React.FC = () => {
   );
 };
 
-// Payment Form Component (unchanged)
+// 🆕 IMPROVED: Payment Form Component with better error handling
 const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentStatus }: any) => {
   const stripe = useStripe();
   const elements = useElements();
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     
     if (!stripe || !elements) {
-      setError('Payment system not ready. Please try again.');
+      setError('Payment system not ready. Please refresh the page and try again.');
       return;
     }
 
+    setIsSubmitting(true);
     setPaymentStatus('processing');
     setError('');
 
     try {
+      console.log('🔄 Confirming payment...');
+      
       const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
@@ -823,51 +992,67 @@ const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentS
       });
 
       if (stripeError) {
-        setError(stripeError.message || 'Payment failed');
+        console.error('Stripe payment error:', stripeError);
+        setError(stripeError.message || 'Payment failed. Please try again.');
         setPaymentStatus('failed');
+        setIsSubmitting(false);
         return;
       }
 
+      console.log('✅ Stripe payment successful, confirming with server...');
+
       // Confirm payment based on type
-      if (offerData?.type === 'direct_purchase') {
-        await axios.post(
-          'http://localhost:3000/marketplace/payments/confirm-payment',
-          { 
-            orderId: offerData.order._id,
-            paymentIntentId: paymentIntent?.id
-          },
-          { 
-            headers: { 
-              Authorization: `Bearer ${localStorage.getItem('token')}`,
-              'Content-Type': 'application/json'
-            } 
-          }
-        );
-      } else {
-        await axios.post(
-          'http://localhost:3000/marketplace/offers/confirm-offer-payment',
-          { 
-            offerId: offerData.offer._id,
-            paymentIntentId: paymentIntent?.id
-          },
-          { 
-            headers: { 
-              Authorization: `Bearer ${localStorage.getItem('token')}`,
-              'Content-Type': 'application/json'
-            } 
-          }
-        );
+      try {
+        if (offerData?.type === 'direct_purchase') {
+          await axios.post(
+            'http://localhost:3000/marketplace/payments/confirm-payment',
+            { 
+              orderId: offerData.order._id,
+              paymentIntentId: paymentIntent?.id
+            },
+            { 
+              headers: { 
+                Authorization: `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+              } 
+            }
+          );
+        } else {
+          await axios.post(
+            'http://localhost:3000/marketplace/offers/confirm-offer-payment',
+            { 
+              offerId: offerData.offer._id,
+              paymentIntentId: paymentIntent?.id
+            },
+            { 
+              headers: { 
+                Authorization: `Bearer ${localStorage.getItem('token')}`,
+                'Content-Type': 'application/json'
+              } 
+            }
+          );
+        }
+
+        console.log('✅ Server confirmation successful');
+        setPaymentStatus('success');
+        
+        // Wait a moment before redirecting to show success state
+        setTimeout(() => {
+          onSuccess();
+        }, 1500);
+
+      } catch (confirmationError: any) {
+        console.error('Server confirmation error:', confirmationError);
+        setError(confirmationError.response?.data?.error || 'Payment confirmation failed. Please contact support.');
+        setPaymentStatus('failed');
       }
 
-      setPaymentStatus('success');
-      setTimeout(() => {
-        onSuccess();
-      }, 1500);
-
     } catch (err: any) {
-      console.error('Payment confirmation error:', err);
-      setError(err.response?.data?.error || err.message || 'Payment failed');
+      console.error('Payment processing error:', err);
+      setError(err.message || 'An unexpected error occurred. Please try again.');
       setPaymentStatus('failed');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -876,14 +1061,21 @@ const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentS
       <div className="mb-4">
         <PaymentElement 
           options={{
-            layout: 'tabs'
+            layout: 'tabs',
+            wallets: {
+              applePay: 'never',
+              googlePay: 'never'
+            }
           }}
         />
       </div>
       
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-700 text-sm">{error}</p>
+          <div className="flex items-center gap-2 text-red-700">
+            <FiAlertCircle size={16} />
+            <p className="text-sm">{error}</p>
+          </div>
         </div>
       )}
       
@@ -900,19 +1092,19 @@ const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentS
         <button
           type="button"
           onClick={onClose}
-          disabled={paymentStatus === 'processing' || paymentStatus === 'success'}
+          disabled={paymentStatus === 'processing' || paymentStatus === 'success' || isSubmitting}
           className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 transition-colors text-sm font-medium"
         >
           Cancel
         </button>
         <button
           type="submit"
-          disabled={!stripe || paymentStatus === 'processing' || paymentStatus === 'success'}
+          disabled={!stripe || paymentStatus === 'processing' || paymentStatus === 'success' || isSubmitting}
           className="flex-1 py-2 px-4 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white rounded-md transition-colors flex items-center justify-center text-sm font-medium"
         >
-          {paymentStatus === 'processing' ? (
+          {paymentStatus === 'processing' || isSubmitting ? (
             <>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              <FiLoader className="animate-spin mr-2" size={16} />
               Processing...
             </>
           ) : paymentStatus === 'success' ? (
