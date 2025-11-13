@@ -28,64 +28,54 @@ export const generateSlug = (text: string): string =>
 // Truncate text to a specific length
 export const truncateText = (text: string, maxLength: number): string =>
   text.length <= maxLength ? text : text.slice(0, maxLength - 3) + "...";
+// ===== Cached token =====
+let cachedToken: Itoken | null = null;
 
-// Enhanced token decoding with multiple fallback methods
-export const decodeToken = (token: any) => {
-  if (!token) {
-    console.log("❌ No token provided");
-    return null;
-  }
-  
+// Enhanced token decoding with multiple fallback methods (cached)
+export const decodeToken = (token: string | null): Itoken | null => {
+  if (!token) return null;
+
+  if (cachedToken) return cachedToken; // Return cached result
+
   try {
-    console.log("🔐 Attempting to decode token...");
-    const decodedToken: any = jwtDecode(token) as Itoken;
+    const decodedToken: Itoken = jwtDecode<Itoken>(token);
     const currentTime = Math.floor(Date.now() / 1000);
-    
+
     if (decodedToken.exp && decodedToken.exp < currentTime) {
-      console.error("Token has expired");
+      // Token expired
       localStorage.removeItem("token");
       sessionStorage.removeItem("token");
       localStorage.removeItem("userId");
+      cachedToken = null;
       return null;
     }
-    
-    console.log("✅ Token decoded successfully:", decodedToken);
+
+    cachedToken = decodedToken;
     return decodedToken;
-  } catch (error) {
-    console.error("❌ JWT decode failed, trying manual decode:", error);
-    
-    // Manual JWT decoding as fallback
+  } catch {
+    // Manual decode fallback
     try {
-      const parts = token.split('.');
-      if (parts.length !== 3) {
-        throw new Error('Invalid token format');
-      }
-      
+      const parts = token.split(".");
+      if (parts.length !== 3) return null;
+
       const payload = parts[1];
-      const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-      const paddedBase64 = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
-      const decodedPayload = JSON.parse(atob(paddedBase64));
-      
-      console.log("✅ Manual token decode successful:", decodedPayload);
-      return decodedPayload;
-    } catch (manualError) {
-      console.error("❌ Manual token decode also failed:", manualError);
+      const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+      const paddedBase64 = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, "=");
+      cachedToken = JSON.parse(atob(paddedBase64));
+      return cachedToken;
+    } catch {
+      cachedToken = null;
       return null;
     }
   }
 };
 
-// DIRECT USER ID EXTRACTION - Multiple reliable methods
+// DIRECT USER ID EXTRACTION - Multiple reliable methods (cached)
 export const getCurrentUserId = (): string | null => {
   try {
-    console.log("🆔 Starting user ID extraction...");
-    
     // Method 1: Direct from localStorage/sessionStorage
     const directUserId = localStorage.getItem("userId") || sessionStorage.getItem("userId");
-    if (directUserId) {
-      console.log("✅ User ID found directly in storage:", directUserId);
-      return directUserId;
-    }
+    if (directUserId) return directUserId;
 
     // Method 2: From user object in storage
     const userData = localStorage.getItem("user") || sessionStorage.getItem("user");
@@ -94,34 +84,23 @@ export const getCurrentUserId = (): string | null => {
         const user = JSON.parse(userData);
         const userId = user.id || user._id || user.userId;
         if (userId) {
-          console.log("✅ User ID from user object:", userId);
-          // Store for future quick access
           localStorage.setItem("userId", userId);
           return userId;
         }
-      } catch (e) {
-        console.error("Error parsing user data:", e);
-      }
+      } catch {}
     }
 
     // Method 3: Decode from token
     const token = localStorage.getItem("token") || sessionStorage.getItem("token");
     if (token) {
-      console.log("🔐 Token found, extracting user ID...");
       const tokenData = decodeToken(token);
-      
       if (tokenData) {
-        // Try multiple possible locations for user ID in token
-        const userId = tokenData.userId || tokenData.id || tokenData.user?.id || 
-                      tokenData.user?._id || tokenData.user?.userId || tokenData.sub;
-        
+        const userId =
+          tokenData.userId || tokenData.id || tokenData.user?.id ||
+          tokenData.user?._id || tokenData.user?.userId || tokenData.sub;
         if (userId) {
-          console.log("✅ User ID extracted from token:", userId);
-          // Store for future quick access
           localStorage.setItem("userId", userId);
           return userId;
-        } else {
-          console.warn("⚠️ Token decoded but no user ID found:", tokenData);
         }
       }
     }
@@ -133,22 +112,18 @@ export const getCurrentUserId = (): string | null => {
         const authData = JSON.parse(storedAuth);
         const userId = authData.userId || authData.user?.id || authData.user?._id;
         if (userId) {
-          console.log("✅ User ID from auth data:", userId);
           localStorage.setItem("userId", userId);
           return userId;
         }
-      } catch (e) {
-        console.error("Error parsing auth data:", e);
-      }
+      } catch {}
     }
 
-    console.log("❌ No user ID found in any storage location");
     return null;
-  } catch (error) {
-    console.error("💥 Error in getCurrentUserId:", error);
+  } catch {
     return null;
   }
 };
+
 
 // Enhanced token validation with user ID extraction
 export const validateTokenAndGetUserId = (): { isValid: boolean; userId: string | null } => {
