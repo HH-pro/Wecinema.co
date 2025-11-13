@@ -21,11 +21,18 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({ show, onClose, onSu
       if (response.url) {
         window.location.href = response.url;
       } else {
-        setError('Failed to start Stripe setup');
+        setError('Failed to start Stripe setup - no URL returned');
       }
     } catch (err: any) {
       console.error('Stripe connect error:', err);
-      setError(err.response?.data?.error || 'Failed to connect Stripe account');
+      // Handle different error types
+      if (err.response?.data?.error) {
+        setError(err.response.data.error);
+      } else if (err.message) {
+        setError(err.message);
+      } else {
+        setError('Failed to connect Stripe account. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
