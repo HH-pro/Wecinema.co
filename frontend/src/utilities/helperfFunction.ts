@@ -15,99 +15,207 @@ export interface Itoken {
     userId?: string;
   };
   sub?: string;
+  exp?: number;
+  iat?: number;
 }
 
 type MongooseId = string;
 
+// Storage Keys Constants
+const STORAGE_KEYS = {
+  TOKEN: "token",
+  USER_ID: "userId", 
+  USER: "user",
+  AUTH: "auth"
+} as const;
+
+// Cache Configuration
+const CACHE_CONFIG = {
+  USER_ID_TTL: 5 * 60 * 1000, // 5 minutes
+  DEBOUNCE_DELAY: 300, // 300ms
+} as const;
+
+// Cache Store
+const memoryCache = new Map<string, { data: any; timestamp: number }>();
+
 // Utility Functions
 
-// Generate slug from text
+/**
+ * Generate slug from text
+ */
 export const generateSlug = (text: string): string =>
   text.toLowerCase().replace(/\s+/g, "-").replace(/[^\w-]+/g, "");
 
-// Truncate text to a specific length
+/**
+ * Truncate text to a specific length
+ */
 export const truncateText = (text: string, maxLength: number): string =>
   text.length <= maxLength ? text : text.slice(0, maxLength - 3) + "...";
 
-// Enhanced token decoding with multiple fallback methods
-export const decodeToken = (token: any) => {
-  if (!token) {
-    console.log("❌ No token provided");
+/**
+ * Safe storage getter with error handling
+ */
+const getFromStorage = (key: string, useSessionStorage = false): string | null => {
+  try {
+    const storage = useSessionStorage ? sessionStorage : localStorage;
+    return storage.getItem(key);
+  } catch (error) {
+    console.warn(`Failed to get ${key} from storage:`, error);
     return null;
   }
-  
- 
-  
 };
 
-// DIRECT USER ID EXTRACTION - Multiple reliable methods
-export const getCurrentUserId = (): string | null => {
+/**
+ * Safe storage setter with error handling
+ */
+const setToStorage = (key: string, value: string, useSessionStorage = false): boolean => {
   try {
-    console.log("🆔 Starting user ID extraction...");
+    const storage = useSessionStorage ? sessionStorage : localStorage;
+    storage.setItem(key, value);
+    return true;
+  } catch (error) {
+    console.warn(`Failed to set ${key} in storage:`, error);
+    return false;
+  }
+};
+
+/**
+ * Remove item from storage safely
+ */
+const removeFromStorage = (key: string, useSessionStorage = false): boolean => {
+  try {
+    const storage = useSessionStorage ? sessionStorage : localStorage;
+    storage.removeItem(key);
+    return true;
+  } catch (error) {
+    console.warn(`Failed to remove ${key} from storage:`, error);
+    return false;
+  }
+};
+
+/**
+ * Set cache with timestamp
+ */
+const setCache = (key: string, data: any, ttl: number = CACHE_CONFIG.USER_ID_TTL): void => {
+  memoryCache.set(key, {
+    data,
+    timestamp: Date.now() + ttl
+  });
+};
+
+/**
+ * Get cache if not expired
+ */
+const getCache = (key: string): any => {
+  const cached = memoryCache.get(key);
+  if (cached && Date.now() < cached.timestamp) {
+    return cached.data;
+  }
+  memoryCache.delete(key);
+  return null;
+};
+
+/**
+ * Clear specific cache
+ */
+const clearCache = (key: string): void => {
+  memoryCache.delete(key);
+};
+
+/**
+ * Enhanced token decoding with proper error handling
+ */
+export const decodeToken = (token: string): Itoken | null => {
+  if (!token || typeof token !== 'string') {
+    console.warn('Invalid token provided');
+    return null;
+  }
+
+  try {
+    const decodedToken = jwtDecode<Itoken>(token);
+    const currentTime = Math.floor(Date.now() / 1000);
     
+    // Check token expiration
+    if (decodedToken.exp && decodedToken.exp < currentTime) {
+      console.warn("Token has expired");
+      clearAuthData();
+      return null;
+    }
+    
+    return decodedToken;
+  } catch (error) {
+    console.error("❌ JWT decode failed:", error);
+    
+    // Fallback: Try to extract basic info without proper JWT validation
+    try {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        return {
+          userId: payload.userId || payload.sub || '',
+          avatar: payload.avatar || '',
+          hasPaid: payload.hasPaid || false,
+          username: payload.username,
+          id: payload.id,
+          sub: payload.sub
+        };
+      }
+    } catch (fallbackError) {
+      console.error("❌ Token fallback parsing also failed:", fallbackError);
+    }
+    
+    return null;
+  }
+};
+
+/**
+ * Get current user ID with caching and multiple fallback methods
+ */
+export const getCurrentUserId = (): string | null => {
+  // Check memory cache first
+  const cachedUserId = getCache('currentUserId');
+  if (cachedUserId) {
+    return cachedUserId;
+  }
+
+  try {
     // Method 1: Direct from localStorage/sessionStorage
-    const directUserId = localStorage.getItem("userId") || sessionStorage.getItem("userId");
+    const directUserId = getFromStorage(STORAGE_KEYS.USER_ID) || getFromStorage(STORAGE_KEYS.USER_ID, true);
     if (directUserId) {
-      console.log("✅ User ID found directly in storage:", directUserId);
+      setCache('currentUserId', directUserId);
       return directUserId;
     }
 
-    // Method 2: From user object in storage
-    const userData = localStorage.getItem("user") || sessionStorage.getItem("user");
+    // Method 2: From token decoding
+    const token = getFromStorage(STORAGE_KEYS.TOKEN) || getFromStorage(STORAGE_KEYS.TOKEN, true);
+    if (token) {
+      const tokenData = decodeToken(token);
+      if (tokenData) {
+        const userId = tokenData.userId || tokenData.id || tokenData.sub;
+        if (userId) {
+          setToStorage(STORAGE_KEYS.USER_ID, userId); // Cache for future
+          setCache('currentUserId', userId);
+          return userId;
+        }
+      }
+    }
+
+    // Method 3: From user object in storage
+    const userData = getFromStorage(STORAGE_KEYS.USER) || getFromStorage(STORAGE_KEYS.USER, true);
     if (userData) {
       try {
         const user = JSON.parse(userData);
         const userId = user.id || user._id || user.userId;
         if (userId) {
-          console.log("✅ User ID from user object:", userId);
-          // Store for future quick access
-          localStorage.setItem("userId", userId);
+          setToStorage(STORAGE_KEYS.USER_ID, userId);
+          setCache('currentUserId', userId);
           return userId;
         }
-      } catch (e) {
-        console.error("Error parsing user data:", e);
+      } catch (parseError) {
+        console.error("Error parsing user data:", parseError);
       }
     }
 
-    // Method 3: Decode from token
-    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-    if (token) {
-      console.log("🔐 Token found, extracting user ID...");
-      const tokenData = decodeToken(token);
-      
-      if (tokenData) {
-        // Try multiple possible locations for user ID in token
-        const userId = tokenData.userId || tokenData.id || tokenData.user?.id || 
-                      tokenData.user?._id || tokenData.user?.userId || tokenData.sub;
-        
-        if (userId) {
-          console.log("✅ User ID extracted from token:", userId);
-          // Store for future quick access
-          localStorage.setItem("userId", userId);
-          return userId;
-        } else {
-          console.warn("⚠️ Token decoded but no user ID found:", tokenData);
-        }
-      }
-    }
-
-    // Method 4: Check common storage patterns
-    const storedAuth = localStorage.getItem("auth") || sessionStorage.getItem("auth");
-    if (storedAuth) {
-      try {
-        const authData = JSON.parse(storedAuth);
-        const userId = authData.userId || authData.user?.id || authData.user?._id;
-        if (userId) {
-          console.log("✅ User ID from auth data:", userId);
-          localStorage.setItem("userId", userId);
-          return userId;
-        }
-      } catch (e) {
-        console.error("Error parsing auth data:", e);
-      }
-    }
-
-    console.log("❌ No user ID found in any storage location");
     return null;
   } catch (error) {
     console.error("💥 Error in getCurrentUserId:", error);
@@ -115,133 +223,262 @@ export const getCurrentUserId = (): string | null => {
   }
 };
 
-// Enhanced token validation with user ID extraction
-export const validateTokenAndGetUserId = (): { isValid: boolean; userId: string | null } => {
-  try {
-    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-    
-    if (!token) {
-      console.log("❌ No token found");
-      return { isValid: false, userId: null };
-    }
-
-    const tokenData = decodeToken(token);
-    if (!tokenData) {
-      console.log("❌ Invalid token");
-      return { isValid: false, userId: null };
-    }
-
-    const userId = getCurrentUserId();
-    if (!userId) {
-      console.log("❌ Could not extract user ID from token");
-      return { isValid: false, userId: null };
-    }
-
-    console.log("✅ Token valid, user ID:", userId);
-    return { isValid: true, userId };
-  } catch (error) {
-    console.error("Error validating token:", error);
-    return { isValid: false, userId: null };
-  }
-};
-
-// Store user ID for quick access
-export const storeUserId = (userId: string): void => {
-  try {
-    localStorage.setItem("userId", userId);
-    console.log("💾 User ID stored:", userId);
-  } catch (error) {
-    console.error("Error storing user ID:", error);
-  }
-};
-
-// Clear all auth data
-export const clearAuthData = (): void => {
-  localStorage.removeItem("token");
-  sessionStorage.removeItem("token");
-  localStorage.removeItem("userId");
-  sessionStorage.removeItem("userId");
-  localStorage.removeItem("user");
-  sessionStorage.removeItem("user");
-  localStorage.removeItem("auth");
-  sessionStorage.removeItem("auth");
-  console.log("🧹 All auth data cleared");
-};
-
-// Check if user is authenticated
-export const isAuthenticated = (): boolean => {
-  const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-  if (!token) return false;
+/**
+ * Validate token and get user ID in one call
+ */
+export const validateTokenAndGetUserId = (): { isValid: boolean; userId: string | null; tokenData: Itoken | null } => {
+  const token = getFromStorage(STORAGE_KEYS.TOKEN) || getFromStorage(STORAGE_KEYS.TOKEN, true);
   
+  if (!token) {
+    return { isValid: false, userId: null, tokenData: null };
+  }
+
   const tokenData = decodeToken(token);
-  return !!tokenData;
+  const userId = getCurrentUserId();
+
+  return { 
+    isValid: !!tokenData && !!userId, 
+    userId, 
+    tokenData 
+  };
 };
 
-// Get user info with fallbacks
-export const getUserInfo = (): { userId: string | null; username: string | null } => {
+/**
+ * Store user authentication data consistently
+ */
+export const storeUserData = (userData: { 
+  token: string; 
+  userId: string; 
+  user?: any;
+  useSessionStorage?: boolean;
+}): void => {
+  try {
+    const { token, userId, user, useSessionStorage = false } = userData;
+    
+    setToStorage(STORAGE_KEYS.TOKEN, token, useSessionStorage);
+    setToStorage(STORAGE_KEYS.USER_ID, userId, useSessionStorage);
+    
+    if (user) {
+      setToStorage(STORAGE_KEYS.USER, JSON.stringify(user), useSessionStorage);
+    }
+    
+    // Update memory cache
+    setCache('currentUserId', userId);
+    
+    console.log("✅ User data stored successfully");
+  } catch (error) {
+    console.error("❌ Error storing user data:", error);
+    throw new Error("Failed to store user data");
+  }
+};
+
+/**
+ * Clear all authentication data
+ */
+export const clearAuthData = (): void => {
+  try {
+    Object.values(STORAGE_KEYS).forEach(key => {
+      removeFromStorage(key);
+      removeFromStorage(key, true);
+    });
+    
+    // Clear memory cache
+    memoryCache.clear();
+    
+    console.log("✅ Auth data cleared successfully");
+  } catch (error) {
+    console.error("❌ Error clearing auth data:", error);
+  }
+};
+
+/**
+ * Check if user is authenticated
+ */
+export const isAuthenticated = (): boolean => {
+  const { isValid } = validateTokenAndGetUserId();
+  return isValid;
+};
+
+/**
+ * Get complete user info
+ */
+export const getUserInfo = (): { 
+  userId: string | null; 
+  username: string | null;
+  avatar: string | null;
+  hasPaid: boolean;
+} => {
   const userId = getCurrentUserId();
-  
-  // Try to get username
   let username = null;
-  const userData = localStorage.getItem("user") || sessionStorage.getItem("user");
+  let avatar = null;
+  let hasPaid = false;
+
+  // Try to get user data from storage
+  const userData = getFromStorage(STORAGE_KEYS.USER) || getFromStorage(STORAGE_KEYS.USER, true);
   if (userData) {
     try {
       const user = JSON.parse(userData);
       username = user.username || user.name || null;
+      avatar = user.avatar || user.profilePicture || null;
+      hasPaid = user.hasPaid || user.premium || false;
     } catch (e) {
-      console.error("Error parsing user data for username:", e);
+      console.error("Error parsing user data:", e);
     }
   }
 
-  return { userId, username };
+  // Fallback to token data
+  if (!username || !avatar) {
+    const token = getFromStorage(STORAGE_KEYS.TOKEN) || getFromStorage(STORAGE_KEYS.TOKEN, true);
+    if (token) {
+      const tokenData = decodeToken(token);
+      if (tokenData) {
+        username = username || tokenData.username || null;
+        avatar = avatar || tokenData.avatar || null;
+        hasPaid = hasPaid || tokenData.hasPaid || false;
+      }
+    }
+  }
+
+  return { userId, username, avatar, hasPaid };
 };
 
-// Check if an object is empty
-export const isObjectEmpty = (obj: Record<string, any>): boolean =>
-  !Object.keys(obj).length;
+/**
+ * Debounce function to prevent multiple rapid calls
+ */
+export const debounce = <T extends (...args: any[]) => any>(
+  func: T,
+  wait: number = CACHE_CONFIG.DEBOUNCE_DELAY
+): ((...args: Parameters<T>) => void) => {
+  let timeout: NodeJS.Timeout;
+  
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+};
 
-// Format date as "time ago"
-export const formatDateAgo = (dateTime: string): string => {
+/**
+ * Throttle function to limit call frequency
+ */
+export const throttle = <T extends (...args: any[]) => any>(
+  func: T,
+  limit: number
+): ((...args: Parameters<T>) => void) => {
+  let inThrottle: boolean;
+  
+  return (...args: Parameters<T>) => {
+    if (!inThrottle) {
+      func.apply(this, args);
+      inThrottle = true;
+      setTimeout(() => inThrottle = false, limit);
+    }
+  };
+};
+
+/**
+ * Check if an object is empty
+ */
+export const isObjectEmpty = (obj: Record<string, any>): boolean =>
+  !obj || Object.keys(obj).length === 0;
+
+/**
+ * Format date as "time ago" with improved accuracy
+ */
+export const formatDateAgo = (dateTime: string | Date): string => {
+  if (!dateTime) return "Unknown";
+  
   const now = moment();
   const then = moment(dateTime);
+  
+  if (!then.isValid()) return "Invalid date";
+  
   const secondsDiff = now.diff(then, "seconds");
   const minutesDiff = now.diff(then, "minutes");
   const hoursDiff = now.diff(then, "hours");
   const daysDiff = now.diff(then, "days");
+  const weeksDiff = now.diff(then, "weeks");
+  const monthsDiff = now.diff(then, "months");
+  const yearsDiff = now.diff(then, "years");
 
   if (secondsDiff < 60) return "just now";
   if (minutesDiff < 60) return `${minutesDiff} minute${minutesDiff !== 1 ? "s" : ""} ago`;
   if (hoursDiff < 24) return `${hoursDiff} hour${hoursDiff !== 1 ? "s" : ""} ago`;
   if (daysDiff === 1) return "yesterday";
-  if (daysDiff < 365) return `${daysDiff} day${daysDiff !== 1 ? "s" : ""} ago`;
-
-  return moment(dateTime).format("MMM D, YYYY [at] h:mm A");
+  if (daysDiff < 7) return `${daysDiff} day${daysDiff !== 1 ? "s" : ""} ago`;
+  if (weeksDiff < 4) return `${weeksDiff} week${weeksDiff !== 1 ? "s" : ""} ago`;
+  if (monthsDiff < 12) return `${monthsDiff} month${monthsDiff !== 1 ? "s" : ""} ago`;
+  
+  return `${yearsDiff} year${yearsDiff !== 1 ? "s" : ""} ago`;
 };
 
-// Check if a user ID is present in an array
+/**
+ * Check if a user ID is present in an array
+ */
 export const isUserIdInArray = (userId: MongooseId, idArray: MongooseId[]): boolean =>
-  idArray.includes(userId);
+  !!(userId && idArray && idArray.includes(userId));
 
-// Enhanced logout function
-export const logout = () => {
-  console.log("🚪 Logging out...");
+/**
+ * Enhanced logout function with redirect options
+ */
+export const logout = (redirectTo: string = "/admin"): void => {
   clearAuthData();
-  window.location.href = "/admin"; // Redirect to sign-in page
+  console.log("🚪 User logged out");
+  window.location.href = redirectTo;
 };
 
-// Capitalize the first letter of a string
+/**
+ * Capitalize the first letter of a string
+ */
 export const capitalizeFirstLetter = (str: string): string =>
-  str.charAt(0).toUpperCase() + str.slice(1);
+  str ? str.charAt(0).toUpperCase() + str.slice(1) : "";
 
-// Get only the first letter capitalized
+/**
+ * Get only the first letter capitalized
+ */
 export const getCapitalizedFirstLetter = (str: string): string =>
-  str?.charAt(0).toUpperCase();
+  str ? str.charAt(0).toUpperCase() : "?";
 
-// Toggle an item in an array (add or remove it)
+/**
+ * Toggle an item in an array (add or remove it)
+ */
 export const toggleItemInArray = <T>(array: T[], item: T): T[] =>
   array.includes(item) ? array.filter(i => i !== item) : [...array, item];
 
-// Chart options generator
+/**
+ * Safe JSON parse with default value
+ */
+export const safeJsonParse = <T>(str: string, defaultValue: T): T => {
+  try {
+    return JSON.parse(str) as T;
+  } catch {
+    return defaultValue;
+  }
+};
+
+/**
+ * Generate random ID
+ */
+export const generateId = (length: number = 8): string => {
+  return Math.random().toString(36).substring(2, 2 + length);
+};
+
+/**
+ * Check if running in browser
+ */
+export const isBrowser = (): boolean => {
+  return typeof window !== 'undefined';
+};
+
+/**
+ * Wait for specified time
+ */
+export const wait = (ms: number): Promise<void> => {
+  return new Promise(resolve => setTimeout(resolve, ms));
+};
+
+/**
+ * Chart options generator
+ */
 export const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
@@ -263,7 +500,7 @@ export const chartOptions = {
       color: "white",
       font: {
         size: 12,
-        weight: 'bold',
+        weight: 'bold' as const,
       },
       padding: {
         top: 1,
@@ -308,7 +545,7 @@ export const chartOptions = {
           size: 10,
         },
         padding: {
-          bottom : 20,
+          bottom: 20,
         },
       },
       ticks: {
@@ -329,4 +566,77 @@ export const chartOptions = {
       hoverRadius: 3,
     },
   },
+};
+
+/**
+ * API call wrapper with error handling
+ */
+export const apiCall = async (url: string, options: RequestInit = {}) => {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'max-age=300',
+        ...options.headers,
+      },
+      ...options,
+    });
+
+    if (response.status === 304) {
+      return { data: null, fromCache: true };
+    }
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return { data, fromCache: false };
+  } catch (error) {
+    console.error(`API call failed for ${url}:`, error);
+    throw error;
+  }
+};
+
+// Export storage functions for external use
+export const storage = {
+  get: getFromStorage,
+  set: setToStorage,
+  remove: removeFromStorage,
+};
+
+// Export cache functions for external use  
+export const cache = {
+  set: setCache,
+  get: getCache,
+  clear: clearCache,
+};
+
+export default {
+  generateSlug,
+  truncateText,
+  decodeToken,
+  getCurrentUserId,
+  validateTokenAndGetUserId,
+  storeUserData,
+  clearAuthData,
+  isAuthenticated,
+  getUserInfo,
+  debounce,
+  throttle,
+  isObjectEmpty,
+  formatDateAgo,
+  isUserIdInArray,
+  logout,
+  capitalizeFirstLetter,
+  getCapitalizedFirstLetter,
+  toggleItemInArray,
+  safeJsonParse,
+  generateId,
+  isBrowser,
+  wait,
+  chartOptions,
+  apiCall,
+  storage,
+  cache,
 };
