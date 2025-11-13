@@ -1,5 +1,5 @@
 // services/chatService.js
-const { db, collection, addDoc, updateDoc, doc, onSnapshot, query, where, orderBy, serverTimestamp, arrayUnion } = require('./firebase');
+const { db, collection, addDoc, updateDoc, doc, onSnapshot, query, where, orderBy, serverTimestamp, arrayUnion } = require('../firebaseConfig');
 
 class FirebaseChatService {
   // ✅ Create new chat in Firebase
