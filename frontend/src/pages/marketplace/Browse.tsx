@@ -316,12 +316,7 @@ const Browse: React.FC = () => {
   const handleDirectPayment = async (listing: Listing) => {
     if (!listing._id) return;
     
-    // Check Stripe connection before proceeding
-    if (stripeTestStatus === 'failed') {
-      setError('Payment system is currently unavailable. Please try again later.');
-      return;
-    }
-
+   
     try {
       setPaymentStatus('processing');
       setError('');
