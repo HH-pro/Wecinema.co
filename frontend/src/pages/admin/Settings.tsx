@@ -85,7 +85,7 @@ const Settings: React.FC = () => {
           return;
         }
 
-        const result = await getRequest(`/usr/${tokenData.userId}`, setLoading);
+        const result = await getRequest(`/user/${tokenData.userId}`, setLoading);
         if (result) {
           setUser(result);
           setUsername(result.username);
