@@ -10,6 +10,9 @@ const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require(".
 // Direct Stripe keys
 const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
 
+// Firebase Chat Service (if using Firebase)
+const FirebaseChatService = require("../../services/firebaseChatService");
+
 // ✅ VALIDATION HELPER FUNCTIONS
 const validateObjectId = (id) => {
   return mongoose.Types.ObjectId.isValid(id);
@@ -33,6 +36,46 @@ const logRequest = (route) => (req, res, next) => {
     user: req.user ? { id: req.user.id || req.user._id } : 'No user'
   });
   next();
+};
+
+// ✅ FUNCTION TO SEND ORDER DETAILS MESSAGE TO SELLER
+const sendOrderDetailsToSeller = async (chatId, order, offer, buyer, seller) => {
+  try {
+    const orderDetailsMessage = {
+      senderId: 'system',
+      senderName: 'Order System',
+      content: `🎉 **New Order Received!**\n\n` +
+        `**Order Details:**\n` +
+        `📦 Order ID: ${order._id}\n` +
+        `👤 Buyer: ${buyer?.username || 'A buyer'}\n` +
+        `💰 Amount: $${offer.amount}\n` +
+        `📅 Order Date: ${new Date().toLocaleDateString()}\n` +
+        `🛍️ Listing: ${offer.listingId?.title || 'N/A'}\n\n` +
+        `**Delivery Information:**\n` +
+        `📋 Requirements: ${offer.requirements || 'No specific requirements provided'}\n` +
+        `📅 Expected Delivery: ${offer.expectedDelivery ? new Date(offer.expectedDelivery).toLocaleDateString() : 'Not specified'}\n\n` +
+        `💬 **Please contact the buyer to discuss delivery timeline and any additional details.**\n\n` +
+        `🔒 Payment is securely held in escrow and will be released upon order completion.`,
+      messageType: 'system',
+      timestamp: new Date(),
+      readBy: [seller._id.toString()] // Mark as read by seller initially
+    };
+
+    // If using Firebase Chat
+    if (FirebaseChatService) {
+      await FirebaseChatService.sendMessage(chatId, orderDetailsMessage);
+    } else {
+      // If using MongoDB chat only, you might want to save to your Message model
+      console.log("MongoDB Chat - Order details message:", orderDetailsMessage);
+      // You would save this to your Message collection here
+    }
+
+    console.log("✅ Order details sent to seller in chat");
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to send order details to seller:', error);
+    return false;
+  }
 };
 
 // ✅ MAKE OFFER WITH IMMEDIATE PAYMENT
@@ -210,7 +253,7 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
   }
 });
 
-// ✅ FIXED: CONFIRM OFFER PAYMENT (with CORRECT enum values)
+// ✅ UPDATED: CONFIRM OFFER PAYMENT WITH SELLER NOTIFICATION
 router.post("/confirm-offer-payment", authenticateMiddleware, logRequest("CONFIRM_OFFER_PAYMENT"), async (req, res) => {
   console.log("🔍 Confirm Offer Payment Request DETAILS:", {
     body: req.body,
@@ -335,15 +378,27 @@ router.post("/confirm-offer-payment", authenticateMiddleware, logRequest("CONFIR
 
     console.log("✅ Offer status updated to paid:", offer._id);
 
+    // ✅ GET BUYER AND SELLER DETAILS
+    const buyer = await mongoose.model('User').findById(userId).select('username email').session(session);
+    const seller = await mongoose.model('User').findById(offer.listingId.sellerId).select('username email').session(session);
+
+    if (!buyer || !seller) {
+      await session.abortTransaction();
+      return res.status(404).json({
+        success: false,
+        error: 'User details not found'
+      });
+    }
+
     // ✅ CREATE ORDER WITH CORRECT ENUM VALUES
     const orderData = {
       buyerId: userId,
       sellerId: offer.listingId.sellerId,
       listingId: offer.listingId._id,
       offerId: offer._id,
-      orderType: 'accepted_offer', // ✅ CORRECT: Use 'accepted_offer' from your enum
+      orderType: 'accepted_offer',
       amount: offer.amount,
-      status: 'paid', // ✅ CORRECT: Use 'paid' from your enum (payment received, funds in escrow)
+      status: 'paid',
       stripePaymentIntentId: paymentIntentId,
       paidAt: new Date(),
       revisions: 0,
@@ -389,9 +444,27 @@ router.post("/confirm-offer-payment", authenticateMiddleware, logRequest("CONFIR
 
     console.log("✅ Listing status updated to reserved");
 
-    // ✅ COMMIT TRANSACTION
+    // ✅ COMMIT TRANSACTION FIRST
     await session.commitTransaction();
     console.log("🎉 Payment confirmation completed successfully");
+
+    // ✅ SEND ORDER DETAILS TO SELLER (NON-BLOCKING, AFTER TRANSACTION)
+    try {
+      // Use chat._id for Firebase or your chat system
+      const chatId = chat.firebaseChatId || chat._id.toString();
+      await sendOrderDetailsToSeller(chatId, order, offer, buyer, seller);
+    } catch (messageError) {
+      console.error('❌ Failed to send order details message:', messageError);
+      // Don't fail the main process for message errors
+    }
+
+    // ✅ SEND EMAIL NOTIFICATIONS (NON-BLOCKING)
+    try {
+      await sendEmailNotifications(offer, order, buyer, seller);
+    } catch (emailError) {
+      console.error('❌ Email notification failed:', emailError);
+      // Don't fail the main process for email errors
+    }
 
     res.status(200).json({
       success: true,
@@ -417,7 +490,6 @@ router.post("/confirm-offer-payment", authenticateMiddleware, logRequest("CONFIR
     if (error.name === 'ValidationError') {
       errorMessage = 'Order validation failed';
       statusCode = 400;
-      // Log specific validation errors
       if (error.errors) {
         console.error('Validation errors:', Object.keys(error.errors));
         Object.keys(error.errors).forEach(field => {
@@ -440,6 +512,7 @@ router.post("/confirm-offer-payment", authenticateMiddleware, logRequest("CONFIR
     }
   }
 });
+
 
 // ✅ GET OFFERS RECEIVED (SELLER)
 router.get("/received-offers", authenticateMiddleware, logRequest("RECEIVED_OFFERS"), async (req, res) => {
