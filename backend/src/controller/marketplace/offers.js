@@ -210,7 +210,7 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
   }
 });
 
-// ✅ FIXED: CONFIRM OFFER PAYMENT (with proper enum values)
+// ✅ FIXED: CONFIRM OFFER PAYMENT (with CORRECT enum values)
 router.post("/confirm-offer-payment", authenticateMiddleware, logRequest("CONFIRM_OFFER_PAYMENT"), async (req, res) => {
   console.log("🔍 Confirm Offer Payment Request DETAILS:", {
     body: req.body,
@@ -335,21 +335,21 @@ router.post("/confirm-offer-payment", authenticateMiddleware, logRequest("CONFIR
 
     console.log("✅ Offer status updated to paid:", offer._id);
 
-    // ✅ CREATE ORDER WITH PROPER ENUM VALUES
+    // ✅ CREATE ORDER WITH CORRECT ENUM VALUES
     const orderData = {
       buyerId: userId,
       sellerId: offer.listingId.sellerId,
       listingId: offer.listingId._id,
       offerId: offer._id,
-      orderType: 'standard', // ✅ Use existing enum value
+      orderType: 'accepted_offer', // ✅ CORRECT: Use 'accepted_offer' from your enum
       amount: offer.amount,
-      status: 'pending_payment', // ✅ Use existing enum value
-      paymentStatus: 'paid',
+      status: 'paid', // ✅ CORRECT: Use 'paid' from your enum (payment received, funds in escrow)
       stripePaymentIntentId: paymentIntentId,
       paidAt: new Date(),
       revisions: 0,
       maxRevisions: 3,
-      paymentReleased: false
+      paymentReleased: false,
+      orderDate: new Date()
     };
 
     // Add optional fields
@@ -440,6 +440,7 @@ router.post("/confirm-offer-payment", authenticateMiddleware, logRequest("CONFIR
     }
   }
 });
+
 // ✅ GET OFFERS RECEIVED (SELLER)
 router.get("/received-offers", authenticateMiddleware, logRequest("RECEIVED_OFFERS"), async (req, res) => {
   try {
@@ -628,7 +629,7 @@ router.put("/accept-offer/:id", authenticateMiddleware, logRequest("ACCEPT_OFFER
     // ✅ FIND AND UPDATE ORDER
     const order = await Order.findOne({ offerId: offer._id }).session(session);
     if (order) {
-      order.status = 'confirmed';
+      order.status = 'in_progress'; // ✅ CORRECT: Move to 'in_progress' status
       order.acceptedAt = new Date();
       await order.save({ session });
     }
@@ -764,7 +765,7 @@ router.put("/reject-offer/:id", authenticateMiddleware, logRequest("REJECT_OFFER
     if (offer.status === 'paid') {
       await Order.findOneAndUpdate(
         { offerId: offer._id },
-        { status: 'cancelled' },
+        { status: 'cancelled' }, // ✅ CORRECT: Use 'cancelled' status
         { session }
       );
 
@@ -983,13 +984,14 @@ router.post("/create-direct-payment", authenticateMiddleware, logRequest("DIRECT
       buyerId: userId,
       sellerId: listing.sellerId,
       listingId: listingId,
-      orderType: 'direct_purchase',
+      orderType: 'direct_purchase', // ✅ CORRECT: Use 'direct_purchase' from your enum
       amount: listing.price,
-      status: 'pending_payment',
+      status: 'pending_payment', // ✅ CORRECT: Use 'pending_payment' from your enum
       stripePaymentIntentId: paymentIntent.id,
       revisions: 0,
       maxRevisions: 3,
-      paymentReleased: false
+      paymentReleased: false,
+      orderDate: new Date()
     });
 
     await order.save({ session });
