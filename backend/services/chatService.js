@@ -1,5 +1,5 @@
 // services/chatService.js
-const Message = require('../models/marketplace/Message');
+const Message = require('../../../backend/src/models/message');
 
 class ChatService {
   // ✅ Send order confirmation message to both users' personal inbox
