@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
-import { getSellerOrders, getReceivedOffers, checkStripeStatus } from '../../api';
+import { getSellerOrders, getReceivedOffers, checkStripeStatus, createStripeAccount } from '../../api';
 import axios from 'axios';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
 import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
@@ -16,6 +16,9 @@ const API_BASE_URL = 'http://localhost:3000';
 interface StripeStatus {
   connected: boolean;
   status: string;
+  chargesEnabled?: boolean;
+  payoutsEnabled?: boolean;
+  detailsSubmitted?: boolean;
 }
 
 interface Order {
@@ -81,6 +84,7 @@ const SellerDashboard: React.FC = () => {
   const [showOrderCreation, setShowOrderCreation] = useState(false);
   const [showStripeSetup, setShowStripeSetup] = useState(false);
   const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('en-IN', {
@@ -133,6 +137,7 @@ const SellerDashboard: React.FC = () => {
   useEffect(() => {
     fetchDashboardData();
     checkStripeAccountStatus();
+    handleStripeReturn();
   }, []);
 
   const fetchDashboardData = async () => {
@@ -197,12 +202,56 @@ const SellerDashboard: React.FC = () => {
 
   const checkStripeAccountStatus = async () => {
     try {
+      console.log('🔄 Checking Stripe account status...');
       const response = await checkStripeStatus();
+      console.log('✅ Stripe status response:', response);
       setStripeStatus(response);
+      
+      // If Stripe is connected and active, don't show setup modal
+      if (response.connected && response.chargesEnabled) {
+        setShowStripeSetup(false);
+      }
     } catch (err) {
-      console.error('Error checking Stripe status:', err);
-      setStripeStatus({ connected: false, status: 'unknown' });
+      console.error('❌ Error checking Stripe status:', err);
+      setStripeStatus({ 
+        connected: false, 
+        status: 'error',
+        chargesEnabled: false 
+      });
     }
+  };
+
+  const handleStripeReturn = () => {
+    // Check if user just returned from Stripe onboarding
+    const urlParams = new URLSearchParams(window.location.search);
+    const stripeStatus = urlParams.get('stripe');
+    const accountId = urlParams.get('account_id');
+    
+    if (stripeStatus === 'success') {
+      console.log('🎉 Returned from Stripe onboarding - refreshing status');
+      
+      // Show success message
+      setError('');
+      
+      // Refresh status after a delay to allow webhook processing
+      setTimeout(() => {
+        checkStripeAccountStatus();
+        fetchDashboardData();
+        
+        // Clean URL
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }, 3000);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([
+      fetchDashboardData(),
+      checkStripeAccountStatus()
+    ]);
+    setRefreshing(false);
   };
 
   const handleViewListingDetails = (listingId: string) => {
@@ -214,9 +263,10 @@ const SellerDashboard: React.FC = () => {
       setError('');
       
       if (action === 'accept') {
+        // Re-check Stripe status before accepting offer
         await checkStripeAccountStatus();
         
-        if (!stripeStatus?.connected || stripeStatus?.status !== 'active') {
+        if (!stripeStatus?.connected || !stripeStatus?.chargesEnabled) {
           setShowStripeSetup(true);
           return;
         }
@@ -227,8 +277,22 @@ const SellerDashboard: React.FC = () => {
           setShowOrderCreation(true);
         }
       } else {
+        // Handle reject offer
         console.log(`Rejecting offer:`, offerId);
-        await fetchDashboardData();
+        try {
+          const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+          await axios.put(
+            `${API_BASE_URL}/marketplace/offers/${offerId}/reject`,
+            {},
+            {
+              headers: { Authorization: `Bearer ${token}` }
+            }
+          );
+          await fetchDashboardData();
+        } catch (err) {
+          console.error('Error rejecting offer:', err);
+          setError('Failed to reject offer');
+        }
       }
     } catch (error) {
       console.error('Error updating offer:', error);
@@ -251,6 +315,12 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
+  const handleStripeSetupSuccess = () => {
+    setShowStripeSetup(false);
+    checkStripeAccountStatus();
+    fetchDashboardData();
+  };
+
   if (loading) {
     return (
       <MarketplaceLayout>
@@ -268,11 +338,32 @@ const SellerDashboard: React.FC = () => {
     <MarketplaceLayout>
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Seller Dashboard</h1>
-            <p className="mt-2 text-gray-600">Manage your listings, offers, and track your sales performance</p>
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Seller Dashboard</h1>
+                <p className="mt-2 text-gray-600">Manage your listings, offers, and track your sales performance</p>
+              </div>
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="flex items-center space-x-2 bg-white border border-gray-300 rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                <svg 
+                  className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+              </button>
+            </div>
           </div>
 
+          {/* Error Alert */}
           {error && (
             <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-center">
@@ -284,11 +375,13 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
+          {/* Stripe Status */}
           <StripeAccountStatus 
             stripeStatus={stripeStatus}
             onSetupClick={() => setShowStripeSetup(true)}
           />
 
+          {/* Navigation Tabs */}
           <div className="mb-8 border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
               {[
@@ -318,14 +411,12 @@ const SellerDashboard: React.FC = () => {
             </nav>
           </div>
 
+          {/* Modals */}
           {showStripeSetup && (
             <StripeSetupModal
               show={showStripeSetup}
               onClose={() => setShowStripeSetup(false)}
-              onSuccess={() => {
-                setShowStripeSetup(false);
-                checkStripeAccountStatus();
-              }}
+              onSuccess={handleStripeSetupSuccess}
             />
           )}
 
@@ -340,274 +431,39 @@ const SellerDashboard: React.FC = () => {
             />
           )}
 
+          {/* Tab Content */}
           {activeTab === 'overview' && (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
-                <StatCard
-                  title="Total Revenue"
-                  value={formatCurrency(totalRevenue)}
-                  icon="💰"
-                  color="green"
-                />
-                <StatCard
-                  title="Total Listings"
-                  value={totalListings}
-                  icon="🏠"
-                  color="blue"
-                  onClick={() => setActiveTab('listings')}
-                />
-                <StatCard
-                  title="Active Listings"
-                  value={activeListings}
-                  icon="✅"
-                  color="green"
-                />
-                <StatCard
-                  title="Sold Listings"
-                  value={soldListings}
-                  icon="🛒"
-                  color="orange"
-                />
-                <StatCard
-                  title="Total Orders"
-                  value={totalOrders}
-                  icon="📦"
-                  color="purple"
-                  onClick={() => setActiveTab('orders')}
-                />
-                <StatCard
-                  title="Pending Offers"
-                  value={pendingOffers}
-                  icon="💼"
-                  color="yellow"
-                  onClick={() => setActiveTab('offers')}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2">
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-                    <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                      <h2 className="text-lg font-semibold text-gray-900">Recent Orders</h2>
-                      <button 
-                        onClick={() => setActiveTab('orders')}
-                        className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center"
-                      >
-                        View All
-                        <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </button>
-                    </div>
-                    <div className="p-6">
-                      {orders.length === 0 ? (
-                        <div className="text-center py-8">
-                          <div className="text-4xl mb-4">📦</div>
-                          <p className="text-gray-500 font-medium">No orders yet</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          {orders.slice(0, 5).map(order => (
-                            <div key={order._id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
-                              <div className="flex items-center space-x-4">
-                                <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center border border-blue-200">
-                                  <span className="text-sm font-medium text-blue-600">
-                                    {order.buyerId?.username?.charAt(0).toUpperCase() || 'U'}
-                                  </span>
-                                </div>
-                                <div>
-                                  <p className="font-medium text-gray-900">
-                                    {order.listingId?.title || 'Unknown Listing'}
-                                  </p>
-                                  <p className="text-sm text-gray-500">{order.buyerId?.username || 'Unknown Buyer'}</p>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <p className="font-semibold text-green-600">{formatCurrency(order.amount || 0)}</p>
-                                <div className="flex flex-col items-end gap-1 mt-1">
-                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(order.status)}`}>
-                                    {order.status || 'unknown'}
-                                  </span>
-                                  <PaymentStatusBadge order={order} />
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                      <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
-                    </div>
-                    <div className="p-6 space-y-4">
-                      <button
-                        onClick={() => window.location.href = '/create-listing'}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center shadow-md hover:shadow-lg"
-                      >
-                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                        Create New Listing
-                      </button>
-                      {!(stripeStatus?.connected && stripeStatus?.status === 'active') && (
-                        <button
-                          onClick={() => setShowStripeSetup(true)}
-                          className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center shadow-md hover:shadow-lg"
-                        >
-                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                          </svg>
-                          Setup Payments
-                        </button>
-                      )}
-                      <button
-                        onClick={() => setActiveTab('orders')}
-                        className="w-full bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center"
-                      >
-                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
-                        View All Orders
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="bg-blue-50 rounded-xl border border-blue-200 p-6">
-                    <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center">
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Tips for Success
-                    </h3>
-                    <ul className="text-sm text-blue-700 space-y-2">
-                      <li className="flex items-start">
-                        <span className="mr-2">•</span>
-                        <span>Upload high-quality photos of your items</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="mr-2">•</span>
-                        <span>Write clear and detailed descriptions</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="mr-2">•</span>
-                        <span>Respond quickly to buyer inquiries</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="mr-2">•</span>
-                        <span>Setup Stripe payments to accept orders</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </>
+            <OverviewTab
+              orders={orders}
+              totalRevenue={totalRevenue}
+              totalListings={totalListings}
+              activeListings={activeListings}
+              soldListings={soldListings}
+              totalOrders={totalOrders}
+              pendingOffers={pendingOffers}
+              formatCurrency={formatCurrency}
+              getStatusColor={getStatusColor}
+              stripeStatus={stripeStatus}
+              onShowStripeSetup={() => setShowStripeSetup(true)}
+              onSetActiveTab={setActiveTab}
+            />
           )}
 
           {activeTab === 'offers' && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">Received Offers</h2>
-                  <p className="text-sm text-gray-600 mt-1">Manage and respond to offers from buyers</p>
-                </div>
-                <button
-                  onClick={fetchDashboardData}
-                  className="text-sm text-gray-500 hover:text-gray-700 flex items-center bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg transition-colors"
-                >
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh
-                </button>
-              </div>
-              <div className="p-6">
-                {offers.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="text-6xl mb-4">💼</div>
-                    <h3 className="text-lg font-medium text-gray-900">No offers yet</h3>
-                    <p className="mt-2 text-gray-500">When buyers make offers on your listings, they'll appear here.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {offers.map(offer => (
-                      <div key={offer._id} className="border border-gray-200 rounded-xl p-6 hover:border-gray-300 transition-colors">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between mb-3">
-                              <h3 
-                                className="text-lg font-medium text-gray-900 hover:text-blue-600 cursor-pointer transition-colors"
-                                onClick={() => handleViewListingDetails(offer.listingId._id)}
-                              >
-                                {offer.listingId?.title || 'Unknown Listing'}
-                              </h3>
-                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(offer.status)}`}>
-                                {offer.status ? offer.status.charAt(0).toUpperCase() + offer.status.slice(1) : 'Unknown'}
-                              </span>
-                            </div>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                              <div>
-                                <p className="text-sm text-gray-600">Buyer</p>
-                                <p className="font-medium text-gray-900">{offer.buyerId?.username || 'Unknown Buyer'}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-gray-600">Original Price</p>
-                                <p className="font-medium text-gray-900">{formatCurrency(offer.listingId?.price || 0)}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-gray-600">Offer Amount</p>
-                                <p className="font-medium text-green-600">{formatCurrency(offer.amount || 0)}</p>
-                              </div>
-                            </div>
-
-                            {offer.message && (
-                              <div className="mb-4">
-                                <p className="text-sm text-gray-600 mb-1">Buyer's Message</p>
-                                <p className="text-gray-900 bg-gray-50 rounded-lg p-3 text-sm border border-gray-200">
-                                  {offer.message}
-                                </p>
-                              </div>
-                            )}
-
-                            <div className="text-sm text-gray-500">
-                              Received {new Date(offer.createdAt).toLocaleDateString()}
-                            </div>
-                          </div>
-                        </div>
-
-                        {offer.status === 'pending' && (
-                          <div className="flex space-x-3 mt-4 pt-4 border-t border-gray-200">
-                            <button
-                              onClick={() => handleOfferAction(offer._id, 'accept')}
-                              className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 shadow-md hover:shadow-lg"
-                            >
-                              Accept Offer
-                            </button>
-                            <button
-                              onClick={() => handleOfferAction(offer._id, 'reject')}
-                              className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 shadow-md hover:shadow-lg"
-                            >
-                              Decline Offer
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <OffersTab
+              offers={offers}
+              formatCurrency={formatCurrency}
+              getStatusColor={getStatusColor}
+              onViewListingDetails={handleViewListingDetails}
+              onOfferAction={handleOfferAction}
+              onRefresh={handleRefresh}
+              refreshing={refreshing}
+            />
           )}
 
-
-{activeTab === 'listings' && (
-  <UserListings show={true} />
-)}
+          {activeTab === 'listings' && (
+            <UserListings show={true} />
+          )}
 
           {activeTab === 'orders' && (
             <OrderReceivedPage 
@@ -620,5 +476,315 @@ const SellerDashboard: React.FC = () => {
     </MarketplaceLayout>
   );
 };
+
+// Overview Tab Component
+const OverviewTab: React.FC<{
+  orders: Order[];
+  totalRevenue: number;
+  totalListings: number;
+  activeListings: number;
+  soldListings: number;
+  totalOrders: number;
+  pendingOffers: number;
+  formatCurrency: (amount: number) => string;
+  getStatusColor: (status: string) => string;
+  stripeStatus: StripeStatus | null;
+  onShowStripeSetup: () => void;
+  onSetActiveTab: (tab: string) => void;
+}> = ({
+  orders,
+  totalRevenue,
+  totalListings,
+  activeListings,
+  soldListings,
+  totalOrders,
+  pendingOffers,
+  formatCurrency,
+  getStatusColor,
+  stripeStatus,
+  onShowStripeSetup,
+  onSetActiveTab
+}) => (
+  <>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
+      <StatCard
+        title="Total Revenue"
+        value={formatCurrency(totalRevenue)}
+        icon="💰"
+        color="green"
+      />
+      <StatCard
+        title="Total Listings"
+        value={totalListings}
+        icon="🏠"
+        color="blue"
+        onClick={() => onSetActiveTab('listings')}
+      />
+      <StatCard
+        title="Active Listings"
+        value={activeListings}
+        icon="✅"
+        color="green"
+      />
+      <StatCard
+        title="Sold Listings"
+        value={soldListings}
+        icon="🛒"
+        color="orange"
+      />
+      <StatCard
+        title="Total Orders"
+        value={totalOrders}
+        icon="📦"
+        color="purple"
+        onClick={() => onSetActiveTab('orders')}
+      />
+      <StatCard
+        title="Pending Offers"
+        value={pendingOffers}
+        icon="💼"
+        color="yellow"
+        onClick={() => onSetActiveTab('offers')}
+      />
+    </div>
+
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="lg:col-span-2">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-gray-900">Recent Orders</h2>
+            <button 
+              onClick={() => onSetActiveTab('orders')}
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center"
+            >
+              View All
+              <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+          <div className="p-6">
+            {orders.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="text-4xl mb-4">📦</div>
+                <p className="text-gray-500 font-medium">No orders yet</p>
+                <p className="text-sm text-gray-400 mt-1">Start selling to see your orders here</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {orders.slice(0, 5).map(order => (
+                  <div key={order._id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center border border-blue-200">
+                        <span className="text-sm font-medium text-blue-600">
+                          {order.buyerId?.username?.charAt(0).toUpperCase() || 'U'}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">
+                          {order.listingId?.title || 'Unknown Listing'}
+                        </p>
+                        <p className="text-sm text-gray-500">{order.buyerId?.username || 'Unknown Buyer'}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-green-600">{formatCurrency(order.amount || 0)}</p>
+                      <div className="flex flex-col items-end gap-1 mt-1">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(order.status)}`}>
+                          {order.status || 'unknown'}
+                        </span>
+                        <PaymentStatusBadge order={order} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
+          </div>
+          <div className="p-6 space-y-4">
+            <button
+              onClick={() => window.location.href = '/create-listing'}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center shadow-md hover:shadow-lg"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Create New Listing
+            </button>
+            {!(stripeStatus?.connected && stripeStatus?.chargesEnabled) && (
+              <button
+                onClick={onShowStripeSetup}
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center shadow-md hover:shadow-lg"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                Setup Payments
+              </button>
+            )}
+            <button
+              onClick={() => onSetActiveTab('orders')}
+              className="w-full bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              View All Orders
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-blue-50 rounded-xl border border-blue-200 p-6">
+          <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center">
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Tips for Success
+          </h3>
+          <ul className="text-sm text-blue-700 space-y-2">
+            <li className="flex items-start">
+              <span className="mr-2">•</span>
+              <span>Upload high-quality photos of your items</span>
+            </li>
+            <li className="flex items-start">
+              <span className="mr-2">•</span>
+              <span>Write clear and detailed descriptions</span>
+            </li>
+            <li className="flex items-start">
+              <span className="mr-2">•</span>
+              <span>Respond quickly to buyer inquiries</span>
+            </li>
+            <li className="flex items-start">
+              <span className="mr-2">•</span>
+              <span>Setup Stripe payments to accept orders</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </>
+);
+
+// Offers Tab Component
+const OffersTab: React.FC<{
+  offers: Offer[];
+  formatCurrency: (amount: number) => string;
+  getStatusColor: (status: string) => string;
+  onViewListingDetails: (listingId: string) => void;
+  onOfferAction: (offerId: string, action: string) => void;
+  onRefresh: () => void;
+  refreshing: boolean;
+}> = ({
+  offers,
+  formatCurrency,
+  getStatusColor,
+  onViewListingDetails,
+  onOfferAction,
+  onRefresh,
+  refreshing
+}) => (
+  <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+    <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900">Received Offers</h2>
+        <p className="text-sm text-gray-600 mt-1">Manage and respond to offers from buyers</p>
+      </div>
+      <button
+        onClick={onRefresh}
+        disabled={refreshing}
+        className="text-sm text-gray-500 hover:text-gray-700 flex items-center bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg transition-colors disabled:opacity-50"
+      >
+        <svg className={`w-4 h-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+        {refreshing ? 'Refreshing...' : 'Refresh'}
+      </button>
+    </div>
+    <div className="p-6">
+      {offers.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">💼</div>
+          <h3 className="text-lg font-medium text-gray-900">No offers yet</h3>
+          <p className="mt-2 text-gray-500">When buyers make offers on your listings, they'll appear here.</p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {offers.map(offer => (
+            <div key={offer._id} className="border border-gray-200 rounded-xl p-6 hover:border-gray-300 transition-colors">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 
+                      className="text-lg font-medium text-gray-900 hover:text-blue-600 cursor-pointer transition-colors"
+                      onClick={() => onViewListingDetails(offer.listingId._id)}
+                    >
+                      {offer.listingId?.title || 'Unknown Listing'}
+                    </h3>
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(offer.status)}`}>
+                      {offer.status ? offer.status.charAt(0).toUpperCase() + offer.status.slice(1) : 'Unknown'}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Buyer</p>
+                      <p className="font-medium text-gray-900">{offer.buyerId?.username || 'Unknown Buyer'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Original Price</p>
+                      <p className="font-medium text-gray-900">{formatCurrency(offer.listingId?.price || 0)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Offer Amount</p>
+                      <p className="font-medium text-green-600">{formatCurrency(offer.amount || 0)}</p>
+                    </div>
+                  </div>
+
+                  {offer.message && (
+                    <div className="mb-4">
+                      <p className="text-sm text-gray-600 mb-1">Buyer's Message</p>
+                      <p className="text-gray-900 bg-gray-50 rounded-lg p-3 text-sm border border-gray-200">
+                        {offer.message}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="text-sm text-gray-500">
+                    Received {new Date(offer.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+              </div>
+
+              {offer.status === 'pending' && (
+                <div className="flex space-x-3 mt-4 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => onOfferAction(offer._id, 'accept')}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 shadow-md hover:shadow-lg"
+                  >
+                    Accept Offer
+                  </button>
+                  <button
+                    onClick={() => onOfferAction(offer._id, 'reject')}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 shadow-md hover:shadow-lg"
+                  >
+                    Decline Offer
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+);
 
 export default SellerDashboard;
