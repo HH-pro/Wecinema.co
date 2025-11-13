@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
-import { getSellerOrders, getReceivedOffers, checkStripeStatus, createStripeAccount } from '../../api';
+import { getSellerOrders, getReceivedOffers, checkStripeStatus } from '../../api';
 import axios from 'axios';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
 import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
@@ -16,10 +16,6 @@ const API_BASE_URL = 'http://localhost:3000';
 interface StripeStatus {
   connected: boolean;
   status: string;
-  chargesEnabled?: boolean;
-  payoutsEnabled?: boolean;
-  detailsSubmitted?: boolean;
-  stripeAccountId?: string;
 }
 
 interface Order {
@@ -85,9 +81,6 @@ const SellerDashboard: React.FC = () => {
   const [showOrderCreation, setShowOrderCreation] = useState(false);
   const [showStripeSetup, setShowStripeSetup] = useState(false);
   const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<string>('');
-  const [successMessage, setSuccessMessage] = useState('');
 
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('en-IN', {
@@ -106,18 +99,15 @@ const SellerDashboard: React.FC = () => {
         return 'bg-green-100 text-green-800 border-green-200';
       case 'pending':
       case 'pending_payment':
-      case 'pending_acceptance':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'shipped':
       case 'sold':
       case 'in_progress':
-      case 'in_transit':
         return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'cancelled':
       case 'rejected':
       case 'inactive':
       case 'failed':
-      case 'declined':
         return 'bg-red-100 text-red-800 border-red-200';
       case 'draft':
         return 'bg-gray-100 text-gray-800 border-gray-200';
@@ -128,14 +118,10 @@ const SellerDashboard: React.FC = () => {
 
   // Stats calculation
   const totalOrders = orders.length;
-  const pendingOrders = orders.filter(order => 
-    order.status === 'pending_payment' || 
-    order.paymentStatus === 'pending' ||
-    order.status === 'pending_acceptance'
-  ).length;
+  const pendingOrders = orders.filter(order => order.status === 'pending_payment').length;
   const completedOrders = orders.filter(order => order.status === 'completed').length;
   const totalRevenue = orders
-    .filter(order => order.status === 'completed' || order.paymentStatus === 'paid')
+    .filter(order => order.status === 'completed')
     .reduce((sum, order) => sum + order.amount, 0);
   const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
   
@@ -145,10 +131,8 @@ const SellerDashboard: React.FC = () => {
   const soldListings = listingsData?.listings?.filter((listing) => listing.status === 'sold').length || 0;
 
   useEffect(() => {
-    console.log('🎯 SellerDashboard mounted');
     fetchDashboardData();
     checkStripeAccountStatus();
-    handleStripeReturn();
   }, []);
 
   const fetchDashboardData = async () => {
@@ -157,15 +141,8 @@ const SellerDashboard: React.FC = () => {
       setError('');
 
       const currentUserId = getCurrentUserId();
-      console.log('👤 Current User ID:', currentUserId);
 
-      if (!currentUserId) {
-        setError('User not authenticated. Please log in again.');
-        setLoading(false);
-        return;
-      }
-
-      const [ordersResponse, offersResponse, listingsResponse] = await Promise.allSettled([
+      const [ordersResponse, offersResponse] = await Promise.all([
         getSellerOrders().catch(err => {
           console.error('Error fetching orders:', err);
           return [];
@@ -173,52 +150,42 @@ const SellerDashboard: React.FC = () => {
         getReceivedOffers().catch(err => {
           console.error('Error fetching offers:', err);
           return [];
-        }),
-        (async () => {
-          try {
-            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-            const headers = token ? { Authorization: `Bearer ${token}` } : {};
-            
-            const response = await axios.get(
-              `${API_BASE_URL}/marketplace/listings/user/${currentUserId}/listings`,
-              {
-                params: { page: 1, limit: 1000 },
-                headers,
-                timeout: 10000
-              }
-            );
-            console.log('📝 Listings fetched successfully');
-            return response.data;
-          } catch (err) {
-            console.log('Listings fetch failed, continuing without listings data');
-            return null;
-          }
-        })()
+        })
       ]);
 
-      // Process orders response
-      const ordersData = ordersResponse.status === 'fulfilled' 
-        ? (Array.isArray(ordersResponse.value) ? ordersResponse.value : (ordersResponse.value?.data || []))
-        : [];
-
-      // Process offers response
-      const offersData = offersResponse.status === 'fulfilled'
-        ? (Array.isArray(offersResponse.value) ? offersResponse.value : (offersResponse.value?.data || []))
-        : [];
-
-      // Process listings response
-      if (listingsResponse.status === 'fulfilled' && listingsResponse.value?.success) {
-        setListingsData(listingsResponse.value);
+      let listingsResponse = null;
+      if (currentUserId) {
+        try {
+          const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+          const headers = token ? { Authorization: `Bearer ${token}` } : {};
+          
+          listingsResponse = await axios.get(
+            `${API_BASE_URL}/marketplace/listings/user/${currentUserId}/listings`,
+            {
+              params: { page: 1, limit: 1000 },
+              headers,
+              timeout: 10000
+            }
+          );
+        } catch (err) {
+          console.log('Listings fetch failed, continuing without listings data');
+        }
       }
+
+      const ordersData = Array.isArray(ordersResponse) 
+        ? ordersResponse 
+        : (ordersResponse?.data || []);
+      
+      const offersData = Array.isArray(offersResponse) 
+        ? offersResponse 
+        : (offersResponse?.data || []);
 
       setOrders(Array.isArray(ordersData) ? ordersData : []);
       setOffers(Array.isArray(offersData) ? offersData : []);
       
-      console.log('✅ Dashboard data loaded:', {
-        orders: ordersData.length,
-        offers: offersData.length,
-        listings: listingsData?.listings?.length || 0
-      });
+      if (listingsResponse?.data?.success) {
+        setListingsData(listingsResponse.data);
+      }
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -230,89 +197,11 @@ const SellerDashboard: React.FC = () => {
 
   const checkStripeAccountStatus = async () => {
     try {
-      console.log('🔄 Checking Stripe account status...');
-      setDebugInfo('Checking Stripe status...');
-      
       const response = await checkStripeStatus();
-      console.log('✅ Stripe status response:', response);
       setStripeStatus(response);
-      
-      // Update debug info
-      setDebugInfo(`Stripe Status: ${response.connected ? 'Connected' : 'Not Connected'}, Charges Enabled: ${response.chargesEnabled}`);
-      
-      // If Stripe is connected and active, don't show setup modal
-      if (response.connected && response.chargesEnabled) {
-        setShowStripeSetup(false);
-        console.log('🎉 Stripe is connected and active - hiding setup modal');
-      } else {
-        console.log('ℹ️ Stripe not fully setup:', response);
-      }
     } catch (err) {
-      console.error('❌ Error checking Stripe status:', err);
-      setStripeStatus({ 
-        connected: false, 
-        status: 'error',
-        chargesEnabled: false 
-      });
-      setDebugInfo('Error checking Stripe status');
-    }
-  };
-
-  const handleStripeReturn = () => {
-    // Check if user just returned from Stripe onboarding
-    const urlParams = new URLSearchParams(window.location.search);
-    const stripeStatus = urlParams.get('stripe');
-    const accountId = urlParams.get('account_id');
-    
-    console.log('🔍 Checking URL params for Stripe return:', {
-      stripeStatus,
-      accountId,
-      fullUrl: window.location.href
-    });
-    
-    if (stripeStatus === 'success') {
-      console.log('🎉 Returned from Stripe onboarding - refreshing status');
-      setSuccessMessage('Stripe account setup completed successfully!');
-      
-      // Refresh status after a delay to allow webhook processing
-      setTimeout(() => {
-        checkStripeAccountStatus();
-        fetchDashboardData();
-        
-        // Clean URL
-        const newUrl = window.location.pathname;
-        window.history.replaceState({}, '', newUrl);
-        console.log('🧹 Cleaned URL after Stripe return');
-      }, 3000);
-    }
-  };
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    setDebugInfo('Refreshing dashboard...');
-    await Promise.all([
-      fetchDashboardData(),
-      checkStripeAccountStatus()
-    ]);
-    setRefreshing(false);
-    setDebugInfo('Dashboard refreshed');
-  };
-
-  const handleDebugStripe = async () => {
-    try {
-      setDebugInfo('Running debug check...');
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/stripe/debug-stripe-status`,
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-      console.log('🔧 Debug Stripe Status:', response.data);
-      setDebugInfo(JSON.stringify(response.data, null, 2));
-    } catch (error: any) {
-      console.error('Debug error:', error);
-      setDebugInfo('Debug failed: ' + (error.message || 'Unknown error'));
+      console.error('Error checking Stripe status:', err);
+      setStripeStatus({ connected: false, status: 'unknown' });
     }
   };
 
@@ -320,93 +209,30 @@ const SellerDashboard: React.FC = () => {
     window.location.href = `/listings/${listingId}`;
   };
 
-  // ✅ IMPROVED: Accept offer with better error handling
   const handleOfferAction = async (offerId: string, action: string) => {
     try {
       setError('');
-      setSuccessMessage('');
       
-      const offer = offers.find(o => o._id === offerId);
-      if (!offer) {
-        setError('Offer not found');
-        return;
-      }
-
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      if (!token) {
-        setError('Authentication required. Please log in again.');
-        return;
-      }
-
       if (action === 'accept') {
-        try {
-          const response = await axios.put(
-            `${API_BASE_URL}/marketplace/offers/accept-offer/${offerId}`,
-            {},
-            {
-              headers: { Authorization: `Bearer ${token}` },
-              timeout: 10000
-            }
-          );
+        await checkStripeAccountStatus();
+        
+        if (!stripeStatus?.connected || stripeStatus?.status !== 'active') {
+          setShowStripeSetup(true);
+          return;
+        }
 
-          if (response.data.success) {
-            setSuccessMessage('Offer accepted successfully! Buyer will now complete payment.');
-            console.log('✅ Offer accepted:', response.data);
-            
-            // Update local state
-            setOffers(prev => prev.map(o => 
-              o._id === offerId ? { ...o, status: 'accepted' } : o
-            ));
-            
-            // Add new order to orders list if provided
-            if (response.data.order) {
-              setOrders(prev => [response.data.order, ...prev]);
-            }
-            
-            // Refresh data to get latest state
-            setTimeout(() => {
-              fetchDashboardData();
-            }, 1000);
-          }
-        } catch (err: any) {
-          console.error('Error accepting offer:', err);
-          const errorMessage = err.response?.data?.error || 
-                             err.response?.data?.details || 
-                             err.message || 
-                             'Failed to accept offer';
-          setError(errorMessage);
+        const offer = offers.find(o => o._id === offerId);
+        if (offer) {
+          setSelectedOffer(offer);
+          setShowOrderCreation(true);
         }
       } else {
-        // Handle reject offer
-        try {
-          const response = await axios.put(
-            `${API_BASE_URL}/marketplace/offers/reject-offer/${offerId}`,
-            {},
-            {
-              headers: { Authorization: `Bearer ${token}` },
-              timeout: 10000
-            }
-          );
-
-          if (response.data.success) {
-            setSuccessMessage('Offer rejected successfully');
-            // Update local state
-            setOffers(prev => prev.map(o => 
-              o._id === offerId ? { ...o, status: 'rejected' } : o
-            ));
-          }
-        } catch (err: any) {
-          console.error('Error rejecting offer:', err);
-          const errorMessage = err.response?.data?.error || 
-                             err.response?.data?.details || 
-                             err.message || 
-                             'Failed to reject offer';
-          setError(errorMessage);
-        }
+        console.log(`Rejecting offer:`, offerId);
+        await fetchDashboardData();
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error updating offer:', error);
-      setError(error.message || 'Failed to update offer');
+      setError('Failed to update offer');
     }
   };
 
@@ -425,40 +251,6 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  const handleStripeSetupSuccess = () => {
-    console.log('✅ Stripe setup success handler called');
-    setShowStripeSetup(false);
-    setSuccessMessage('Stripe account setup completed!');
-    // Delay slightly to allow Stripe to process
-    setTimeout(() => {
-      checkStripeAccountStatus();
-      fetchDashboardData();
-    }, 2000);
-  };
-
-  // Clear messages after 5 seconds
-  useEffect(() => {
-    const timers: NodeJS.Timeout[] = [];
-    
-    if (successMessage) {
-      const timer = setTimeout(() => {
-        setSuccessMessage('');
-      }, 5000);
-      timers.push(timer);
-    }
-    
-    if (error) {
-      const timer = setTimeout(() => {
-        setError('');
-      }, 8000);
-      timers.push(timer);
-    }
-
-    return () => {
-      timers.forEach(timer => clearTimeout(timer));
-    };
-  }, [successMessage, error]);
-
   if (loading) {
     return (
       <MarketplaceLayout>
@@ -466,7 +258,6 @@ const SellerDashboard: React.FC = () => {
           <div className="text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
             <p className="text-lg text-gray-600 font-medium">Loading dashboard...</p>
-            <p className="text-sm text-gray-500 mt-2">Getting your seller information...</p>
           </div>
         </div>
       </MarketplaceLayout>
@@ -477,73 +268,11 @@ const SellerDashboard: React.FC = () => {
     <MarketplaceLayout>
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
           <div className="mb-8">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Seller Dashboard</h1>
-                <p className="mt-2 text-gray-600">Manage your listings, offers, and track your sales performance</p>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={handleDebugStripe}
-                  className="flex items-center space-x-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                  </svg>
-                  <span>Debug Stripe</span>
-                </button>
-                <button
-                  onClick={handleRefresh}
-                  disabled={refreshing}
-                  className="flex items-center space-x-2 bg-white border border-gray-300 rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                >
-                  <svg 
-                    className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} 
-                    fill="none" 
-                    stroke="currentColor" 
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
-                </button>
-              </div>
-            </div>
+            <h1 className="text-3xl font-bold text-gray-900">Seller Dashboard</h1>
+            <p className="mt-2 text-gray-600">Manage your listings, offers, and track your sales performance</p>
           </div>
 
-          {/* Debug Info */}
-          {debugInfo && (
-            <div className="mb-4 bg-gray-100 border border-gray-300 rounded-lg p-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm font-medium text-gray-700">Debug Info:</span>
-                <button 
-                  onClick={() => setDebugInfo('')}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <pre className="text-xs text-gray-600 mt-2 whitespace-pre-wrap">{debugInfo}</pre>
-            </div>
-          )}
-
-          {/* Success Alert */}
-          {successMessage && (
-            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex items-center">
-                <svg className="w-5 h-5 text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p className="text-green-800">{successMessage}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Error Alert */}
           {error && (
             <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-center">
@@ -555,15 +284,13 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* Stripe Status */}
           <StripeAccountStatus 
             stripeStatus={stripeStatus}
             onSetupClick={() => setShowStripeSetup(true)}
           />
 
-          {/* Navigation Tabs */}
           <div className="mb-8 border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8 overflow-x-auto">
+            <nav className="-mb-px flex space-x-8">
               {[
                 { id: 'overview', label: 'Overview', icon: '📊' },
                 { id: 'offers', label: 'Offers', icon: '💼', badge: pendingOffers },
@@ -573,7 +300,7 @@ const SellerDashboard: React.FC = () => {
                 <button
                   key={id}
                   onClick={() => setActiveTab(id)}
-                  className={`py-3 px-1 border-b-2 font-medium text-sm flex items-center whitespace-nowrap transition-all duration-200 ${
+                  className={`py-3 px-1 border-b-2 font-medium text-sm flex items-center transition-all duration-200 ${
                     activeTab === id
                       ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -591,12 +318,14 @@ const SellerDashboard: React.FC = () => {
             </nav>
           </div>
 
-          {/* Modals */}
           {showStripeSetup && (
             <StripeSetupModal
               show={showStripeSetup}
               onClose={() => setShowStripeSetup(false)}
-              onSuccess={handleStripeSetupSuccess}
+              onSuccess={() => {
+                setShowStripeSetup(false);
+                checkStripeAccountStatus();
+              }}
             />
           )}
 
@@ -611,11 +340,9 @@ const SellerDashboard: React.FC = () => {
             />
           )}
 
-          {/* Tab Content */}
           {activeTab === 'overview' && (
-            <div className="space-y-6">
-              {/* Stats Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
                 <StatCard
                   title="Total Revenue"
                   value={formatCurrency(totalRevenue)}
@@ -657,7 +384,6 @@ const SellerDashboard: React.FC = () => {
                 />
               </div>
 
-              {/* Recent Orders & Quick Actions */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2">
                   <div className="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -678,7 +404,6 @@ const SellerDashboard: React.FC = () => {
                         <div className="text-center py-8">
                           <div className="text-4xl mb-4">📦</div>
                           <p className="text-gray-500 font-medium">No orders yet</p>
-                          <p className="text-sm text-gray-400 mt-1">Start selling to see your orders here</p>
                         </div>
                       ) : (
                         <div className="space-y-4">
@@ -701,7 +426,7 @@ const SellerDashboard: React.FC = () => {
                                 <p className="font-semibold text-green-600">{formatCurrency(order.amount || 0)}</p>
                                 <div className="flex flex-col items-end gap-1 mt-1">
                                   <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(order.status)}`}>
-                                    {order.status ? order.status.replace('_', ' ') : 'unknown'}
+                                    {order.status || 'unknown'}
                                   </span>
                                   <PaymentStatusBadge order={order} />
                                 </div>
@@ -729,7 +454,7 @@ const SellerDashboard: React.FC = () => {
                         </svg>
                         Create New Listing
                       </button>
-                      {!(stripeStatus?.connected && stripeStatus?.chargesEnabled) && (
+                      {!(stripeStatus?.connected && stripeStatus?.status === 'active') && (
                         <button
                           onClick={() => setShowStripeSetup(true)}
                           className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center shadow-md hover:shadow-lg"
@@ -774,13 +499,13 @@ const SellerDashboard: React.FC = () => {
                       </li>
                       <li className="flex items-start">
                         <span className="mr-2">•</span>
-                        <span>Setup Stripe payments to receive payouts</span>
+                        <span>Setup Stripe payments to accept orders</span>
                       </li>
                     </ul>
                   </div>
                 </div>
               </div>
-            </div>
+            </>
           )}
 
           {activeTab === 'offers' && (
@@ -791,14 +516,13 @@ const SellerDashboard: React.FC = () => {
                   <p className="text-sm text-gray-600 mt-1">Manage and respond to offers from buyers</p>
                 </div>
                 <button
-                  onClick={handleRefresh}
-                  disabled={refreshing}
-                  className="text-sm text-gray-500 hover:text-gray-700 flex items-center bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg transition-colors disabled:opacity-50"
+                  onClick={fetchDashboardData}
+                  className="text-sm text-gray-500 hover:text-gray-700 flex items-center bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg transition-colors"
                 >
-                  <svg className={`w-4 h-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  {refreshing ? 'Refreshing...' : 'Refresh'}
+                  Refresh
                 </button>
               </div>
               <div className="p-6">
@@ -872,38 +596,6 @@ const SellerDashboard: React.FC = () => {
                             </button>
                           </div>
                         )}
-
-                        {/* Show info for accepted offers */}
-                        {offer.status === 'accepted' && (
-                          <div className="mt-4 pt-4 border-t border-gray-200">
-                            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                              <div className="flex items-center">
-                                <svg className="w-4 h-4 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <p className="text-green-800 text-sm">
-                                  Offer accepted! Waiting for buyer to complete payment.
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Show info for rejected offers */}
-                        {offer.status === 'rejected' && (
-                          <div className="mt-4 pt-4 border-t border-gray-200">
-                            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                              <div className="flex items-center">
-                                <svg className="w-4 h-4 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                                <p className="text-red-800 text-sm">
-                                  Offer declined.
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -912,9 +604,10 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {activeTab === 'listings' && (
-            <UserListings show={true} />
-          )}
+
+{activeTab === 'listings' && (
+  <UserListings show={true} />
+)}
 
           {activeTab === 'orders' && (
             <OrderReceivedPage 
