@@ -259,12 +259,15 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
     });
   }
 });
-// ADD THIS to your backend routes
+// Backend - Stripe status check endpoint
 router.get('/account-status', authenticateMiddleware, async (req, res) => {
   try {
+    console.log('🔍 Checking Stripe account status for user:', req.user.id);
+    
     const user = await User.findById(req.user.id);
     
     if (!user || !user.stripeAccountId) {
+      console.log('❌ No Stripe account found for user');
       return res.json({
         connected: false,
         status: 'not_connected',
@@ -274,28 +277,38 @@ router.get('/account-status', authenticateMiddleware, async (req, res) => {
       });
     }
 
+    console.log('📝 User has Stripe account ID:', user.stripeAccountId);
+
     // Retrieve account from Stripe
     const account = await stripe.accounts.retrieve(user.stripeAccountId);
     
-    res.json({
+    console.log('✅ Stripe account retrieved:', {
+      id: account.id,
+      charges_enabled: account.charges_enabled,
+      payouts_enabled: account.payouts_enabled,
+      details_submitted: account.details_submitted
+    });
+
+    const responseData = {
       connected: true,
       stripeAccountId: user.stripeAccountId,
       status: account.charges_enabled ? 'active' : 'pending',
       detailsSubmitted: account.details_submitted,
       chargesEnabled: account.charges_enabled,
       payoutsEnabled: account.payouts_enabled,
-      requirements: account.requirements,
       account: {
         business_type: account.business_type,
         country: account.country,
         email: account.email
       }
-    });
+    };
+
+    console.log('📤 Sending response:', responseData);
+    res.json(responseData);
     
   } catch (error) {
-    console.error('Error checking Stripe account status:', error);
+    console.error('❌ Error checking Stripe account status:', error);
     
-    // If Stripe account retrieval fails, mark as not connected
     res.json({
       connected: false,
       status: 'error',
