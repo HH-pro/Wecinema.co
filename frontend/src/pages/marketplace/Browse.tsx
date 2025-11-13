@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ListingCard from '../../components/marketplae/ListingCard';
 import MarketplaceLayout from '../../components/Layout';
 import { Listing } from '../../types/marketplace';
-import { FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiArrowRight, FiCheck, FiMail, FiAlertCircle, FiLoader } from 'react-icons/fi';
+import { FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiCheck, FiMail, FiAlertCircle, FiLoader } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { loadStripe } from '@stripe/stripe-js';
@@ -31,7 +31,6 @@ const Browse: React.FC = () => {
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string>('');
-  const [stripeTestStatus, setStripeTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle');
   const navigate = useNavigate();
 
   const [filters, setFilters] = useState({
@@ -89,11 +88,7 @@ const Browse: React.FC = () => {
   useEffect(() => {
     fetchListings();
     fetchCurrentUser();
-
   }, [filters]);
-
-  
-
 
   const fetchCurrentUser = async () => {
     try {
@@ -189,8 +184,6 @@ const Browse: React.FC = () => {
   };
 
   const handleMakeOffer = (listing: Listing) => {
-    // Check Stripe connection before proceeding
-   
     setSelectedListing(listing);
     setOfferForm({
       amount: listing.price.toString(),
@@ -259,7 +252,7 @@ const Browse: React.FC = () => {
     }
   };
 
-  // 🆕 IMPROVED: Handle offer submission with better error handling
+  // Handle offer submission with better error handling
   const handleSubmitOffer = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -312,11 +305,10 @@ const Browse: React.FC = () => {
     }
   };
 
-  // 🆕 IMPROVED: Handle direct payment with better error handling
+  // Handle direct payment with better error handling
   const handleDirectPayment = async (listing: Listing) => {
     if (!listing._id) return;
-    
-   
+
     try {
       setPaymentStatus('processing');
       setError('');
@@ -357,7 +349,7 @@ const Browse: React.FC = () => {
     }
   };
   
-  // 🆕 IMPROVED: Handle payment success with proper email extraction
+  // Handle payment success with proper email extraction
   const handlePaymentSuccess = async () => {
     try {
       const buyerName = currentUser?.username || 'A buyer';
@@ -450,7 +442,7 @@ const Browse: React.FC = () => {
     (listing.tags && listing.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())))
   );
 
-  // 🆕 Render error banner if there's an error
+  // Render error banner if there's an error
   const renderErrorBanner = () => {
     if (!error) return null;
 
@@ -460,14 +452,6 @@ const Browse: React.FC = () => {
           <FiAlertCircle className="text-red-500 flex-shrink-0" size={20} />
           <div className="flex-1">
             <p className="text-red-800 text-sm font-medium">{error}</p>
-            {error.includes('Stripe') && (
-              <button
-                onClick={testStripeConnection}
-                className="mt-2 text-red-700 hover:text-red-800 text-sm font-medium underline"
-              >
-                Test Connection Again
-              </button>
-            )}
           </div>
           <button
             onClick={() => setError('')}
@@ -475,33 +459,6 @@ const Browse: React.FC = () => {
           >
             <FiX size={16} />
           </button>
-        </div>
-      </div>
-    );
-  };
-
-  // 🆕 Render Stripe status indicator
-  const renderStripeStatus = () => {
-    if (stripeTestStatus === 'idle' || stripeTestStatus === 'success') return null;
-
-    return (
-      <div className={`mb-4 p-3 rounded-lg border ${
-        stripeTestStatus === 'testing' 
-          ? 'bg-blue-50 border-blue-200 text-blue-800'
-          : 'bg-red-50 border-red-200 text-red-800'
-      }`}>
-        <div className="flex items-center gap-2 text-sm">
-          {stripeTestStatus === 'testing' ? (
-            <>
-              <FiLoader className="animate-spin" size={16} />
-              <span>Testing payment system...</span>
-            </>
-          ) : (
-            <>
-              <FiAlertCircle size={16} />
-              <span>Payment system temporarily unavailable</span>
-            </>
-          )}
         </div>
       </div>
     );
@@ -526,9 +483,6 @@ const Browse: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Error Banner */}
           {renderErrorBanner()}
-          
-          {/* Stripe Status */}
-          {renderStripeStatus()}
 
           {/* Header Section */}
           <div className="mb-8">
@@ -713,7 +667,6 @@ const Browse: React.FC = () => {
                     onViewDetails={handleViewDetails}
                     onMakeOffer={handleMakeOffer}
                     onDirectPayment={handleDirectPayment}
-                    stripeAvailable={stripeTestStatus === 'success'}
                   />
                 </div>
               ))}
@@ -862,7 +815,7 @@ const Browse: React.FC = () => {
               </button>
               <button
                 onClick={handleSubmitOffer}
-                disabled={paymentStatus === 'processing' || stripeTestStatus === 'failed'}
+                disabled={paymentStatus === 'processing'}
                 className="flex-1 py-2 rounded-md bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white transition-all text-xs sm:text-sm font-medium flex items-center justify-center gap-2"
               >
                 {paymentStatus === 'processing' ? (
@@ -870,8 +823,6 @@ const Browse: React.FC = () => {
                     <FiLoader className="animate-spin" size={14} />
                     Processing...
                   </>
-                ) : stripeTestStatus === 'failed' ? (
-                  'Payment Unavailable'
                 ) : (
                   `Submit Offer & Pay $${offerForm.amount || '0.00'}`
                 )}
@@ -938,7 +889,7 @@ const Browse: React.FC = () => {
   );
 };
 
-// 🆕 IMPROVED: Payment Form Component with better error handling
+// Payment Form Component with better error handling
 const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentStatus }: any) => {
   const stripe = useStripe();
   const elements = useElements();
