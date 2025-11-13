@@ -280,7 +280,15 @@ const Browse: React.FC = () => {
       }
 
       setClientSecret(response.data.data.clientSecret);
-      setOfferData(response.data.data);
+      
+      // ENSURE PROPER DATA STRUCTURE
+      setOfferData({
+        ...response.data.data,
+        type: 'offer', // Explicitly set type
+        amount: parseFloat(offerForm.amount),
+        offer: response.data.data.offer // Ensure offer object is properly set
+      });
+      
       setShowOfferModal(false);
       setShowPaymentModal(true);
       setPaymentStatus('idle');
@@ -290,9 +298,9 @@ const Browse: React.FC = () => {
       setPaymentStatus('failed');
       
       const errorMessage = error.response?.data?.error || 
-                          error.response?.data?.details?.[0] || 
-                          error.message || 
-                          'Failed to submit offer';
+                        error.response?.data?.details?.[0] || 
+                        error.message || 
+                        'Failed to submit offer';
       
       setError(errorMessage);
       
@@ -326,13 +334,16 @@ const Browse: React.FC = () => {
       }
 
       setClientSecret(response.data.data.clientSecret);
+      
+      // ENSURE PROPER DATA STRUCTURE
       setOfferData({
+        ...response.data.data,
+        type: 'direct_purchase',
         amount: listing.price,
         listing: listing,
-        type: 'direct_purchase',
-        paymentIntentId: response.data.data.paymentIntentId,
-        order: response.data.data.order
+        order: response.data.data.order // Ensure order object is properly set
       });
+      
       setShowPaymentModal(true);
       setPaymentStatus('idle');
       
@@ -341,9 +352,9 @@ const Browse: React.FC = () => {
       setPaymentStatus('failed');
       
       const errorMessage = error.response?.data?.error || 
-                          error.response?.data?.details?.[0] || 
-                          error.message || 
-                          'Failed to initiate payment';
+                        error.response?.data?.details?.[0] || 
+                        error.message || 
+                        'Failed to initiate payment';
       
       setError(errorMessage);
     }
@@ -441,6 +452,26 @@ const Browse: React.FC = () => {
     listing.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (listing.tags && listing.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())))
   );
+
+  // Debug component to see payment data
+  const DebugInfo = () => {
+    if (!showPaymentModal) return null;
+    
+    return (
+      <div className="fixed bottom-4 right-4 bg-gray-800 text-white p-4 rounded-lg text-xs max-w-md z-50">
+        <h4 className="font-bold mb-2">Debug Info:</h4>
+        <pre>{JSON.stringify({
+          hasClientSecret: !!clientSecret,
+          offerType: offerData?.type,
+          hasOfferId: !!offerData?.offer?._id,
+          hasOrderId: !!offerData?.order?._id,
+          offerId: offerData?.offer?._id,
+          orderId: offerData?.order?._id,
+          amount: offerData?.amount
+        }, null, 2)}</pre>
+      </div>
+    );
+  };
 
   // Render error banner if there's an error
   const renderErrorBanner = () => {
@@ -885,11 +916,14 @@ const Browse: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Debug Info */}
+      <DebugInfo />
     </MarketplaceLayout>
   );
 };
 
-// Payment Form Component with better error handling
+// Payment Form Component with enhanced debugging and error handling
 const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentStatus }: any) => {
   const stripe = useStripe();
   const elements = useElements();
@@ -910,6 +944,7 @@ const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentS
 
     try {
       console.log('🔄 Confirming payment...');
+      console.log('📦 Offer Data for confirmation:', offerData);
       
       const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
         elements,
@@ -920,64 +955,92 @@ const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentS
       });
 
       if (stripeError) {
-        console.error('Stripe payment error:', stripeError);
+        console.error('❌ Stripe payment error:', stripeError);
         setError(stripeError.message || 'Payment failed. Please try again.');
         setPaymentStatus('failed');
         setIsSubmitting(false);
         return;
       }
 
-      console.log('✅ Stripe payment successful, confirming with server...');
+      console.log('✅ Stripe payment successful:', {
+        paymentIntentId: paymentIntent?.id,
+        status: paymentIntent?.status
+      });
 
-      // Confirm payment based on type
-      try {
-        if (offerData?.type === 'direct_purchase') {
-          await axios.post(
-            'http://localhost:3000/marketplace/payments/confirm-payment',
-            { 
-              orderId: offerData.order._id,
-              paymentIntentId: paymentIntent?.id
-            },
-            { 
-              headers: { 
-                Authorization: `Bearer ${localStorage.getItem('token')}`,
-                'Content-Type': 'application/json'
-              } 
-            }
-          );
-        } else {
-          await axios.post(
-            'http://localhost:3000/marketplace/offers/confirm-offer-payment',
-            { 
-              offerId: offerData.offer._id,
-              paymentIntentId: paymentIntent?.id
-            },
-            { 
-              headers: { 
-                Authorization: `Bearer ${localStorage.getItem('token')}`,
-                'Content-Type': 'application/json'
-              } 
-            }
-          );
-        }
+      // Prepare confirmation data with proper validation
+      let confirmationPayload;
+      let confirmationEndpoint;
 
-        console.log('✅ Server confirmation successful');
-        setPaymentStatus('success');
-        
-        // Wait a moment before redirecting to show success state
-        setTimeout(() => {
-          onSuccess();
-        }, 1500);
-
-      } catch (confirmationError: any) {
-        console.error('Server confirmation error:', confirmationError);
-        setError(confirmationError.response?.data?.error || 'Payment confirmation failed. Please contact support.');
-        setPaymentStatus('failed');
+      if (offerData?.type === 'direct_purchase') {
+        confirmationEndpoint = '/marketplace/payments/confirm-payment';
+        confirmationPayload = {
+          orderId: offerData.order?._id,
+          paymentIntentId: paymentIntent?.id
+        };
+      } else {
+        confirmationEndpoint = '/marketplace/offers/confirm-offer-payment';
+        confirmationPayload = {
+          offerId: offerData?.offer?._id || offerData?.offerId,
+          paymentIntentId: paymentIntent?.id
+        };
       }
 
+      console.log('📤 Sending confirmation to server:', {
+        endpoint: confirmationEndpoint,
+        payload: confirmationPayload
+      });
+
+      // Validate required fields
+      if (!confirmationPayload.offerId && !confirmationPayload.orderId) {
+        throw new Error('Missing offerId or orderId for confirmation');
+      }
+
+      if (!confirmationPayload.paymentIntentId) {
+        throw new Error('Missing paymentIntentId for confirmation');
+      }
+
+      // Send confirmation to server
+      const response = await axios.post(
+        `http://localhost:3000${confirmationEndpoint}`,
+        confirmationPayload,
+        { 
+          headers: { 
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          } 
+        }
+      );
+
+      console.log('✅ Server confirmation successful:', response.data);
+      setPaymentStatus('success');
+      
+      // Wait a moment before redirecting to show success state
+      setTimeout(() => {
+        onSuccess();
+      }, 1500);
+
     } catch (err: any) {
-      console.error('Payment processing error:', err);
-      setError(err.message || 'An unexpected error occurred. Please try again.');
+      console.error('❌ Payment processing error:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        config: err.config
+      });
+      
+      // Enhanced error message
+      let errorMessage = 'Payment failed. Please try again.';
+      
+      if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.response?.data?.details) {
+        errorMessage = Array.isArray(err.response.data.details) 
+          ? err.response.data.details.join(', ')
+          : err.response.data.details;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      setError(errorMessage);
       setPaymentStatus('failed');
     } finally {
       setIsSubmitting(false);
@@ -1002,7 +1065,12 @@ const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentS
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
           <div className="flex items-center gap-2 text-red-700">
             <FiAlertCircle size={16} />
-            <p className="text-sm">{error}</p>
+            <div>
+              <p className="text-sm font-medium">{error}</p>
+              <p className="text-xs mt-1">
+                If this continues, please contact support.
+              </p>
+            </div>
           </div>
         </div>
       )}
