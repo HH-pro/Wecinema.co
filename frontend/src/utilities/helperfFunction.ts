@@ -19,6 +19,9 @@ export interface Itoken {
 
 type MongooseId = string;
 
+// Environment check for logging
+const isDevelopment = process.env.NODE_ENV === 'development';
+
 // Utility Functions
 
 // Generate slug from text
@@ -32,12 +35,12 @@ export const truncateText = (text: string, maxLength: number): string =>
 // Enhanced token decoding with multiple fallback methods
 export const decodeToken = (token: any) => {
   if (!token) {
-    console.log("❌ No token provided");
+    isDevelopment && console.log("❌ No token provided");
     return null;
   }
   
   try {
-    console.log("🔐 Attempting to decode token...");
+    isDevelopment && console.log("🔐 Attempting to decode token...");
     const decodedToken: any = jwtDecode(token) as Itoken;
     const currentTime = Math.floor(Date.now() / 1000);
     
@@ -49,7 +52,7 @@ export const decodeToken = (token: any) => {
       return null;
     }
     
-    console.log("✅ Token decoded successfully:", decodedToken);
+    isDevelopment && console.log("✅ Token decoded successfully");
     return decodedToken;
   } catch (error) {
     console.error("❌ JWT decode failed, trying manual decode:", error);
@@ -66,7 +69,7 @@ export const decodeToken = (token: any) => {
       const paddedBase64 = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
       const decodedPayload = JSON.parse(atob(paddedBase64));
       
-      console.log("✅ Manual token decode successful:", decodedPayload);
+      isDevelopment && console.log("✅ Manual token decode successful");
       return decodedPayload;
     } catch (manualError) {
       console.error("❌ Manual token decode also failed:", manualError);
@@ -78,12 +81,12 @@ export const decodeToken = (token: any) => {
 // DIRECT USER ID EXTRACTION - Multiple reliable methods
 export const getCurrentUserId = (): string | null => {
   try {
-    console.log("🆔 Starting user ID extraction...");
+    isDevelopment && console.log("🆔 Starting user ID extraction...");
     
     // Method 1: Direct from localStorage/sessionStorage
     const directUserId = localStorage.getItem("userId") || sessionStorage.getItem("userId");
     if (directUserId) {
-      console.log("✅ User ID found directly in storage:", directUserId);
+      isDevelopment && console.log("✅ User ID found directly in storage");
       return directUserId;
     }
 
@@ -94,7 +97,7 @@ export const getCurrentUserId = (): string | null => {
         const user = JSON.parse(userData);
         const userId = user.id || user._id || user.userId;
         if (userId) {
-          console.log("✅ User ID from user object:", userId);
+          isDevelopment && console.log("✅ User ID from user object");
           // Store for future quick access
           localStorage.setItem("userId", userId);
           return userId;
@@ -107,7 +110,7 @@ export const getCurrentUserId = (): string | null => {
     // Method 3: Decode from token
     const token = localStorage.getItem("token") || sessionStorage.getItem("token");
     if (token) {
-      console.log("🔐 Token found, extracting user ID...");
+      isDevelopment && console.log("🔐 Token found, extracting user ID...");
       const tokenData = decodeToken(token);
       
       if (tokenData) {
@@ -116,12 +119,12 @@ export const getCurrentUserId = (): string | null => {
                       tokenData.user?._id || tokenData.user?.userId || tokenData.sub;
         
         if (userId) {
-          console.log("✅ User ID extracted from token:", userId);
+          isDevelopment && console.log("✅ User ID extracted from token");
           // Store for future quick access
           localStorage.setItem("userId", userId);
           return userId;
         } else {
-          console.warn("⚠️ Token decoded but no user ID found:", tokenData);
+          isDevelopment && console.warn("⚠️ Token decoded but no user ID found");
         }
       }
     }
@@ -133,7 +136,7 @@ export const getCurrentUserId = (): string | null => {
         const authData = JSON.parse(storedAuth);
         const userId = authData.userId || authData.user?.id || authData.user?._id;
         if (userId) {
-          console.log("✅ User ID from auth data:", userId);
+          isDevelopment && console.log("✅ User ID from auth data");
           localStorage.setItem("userId", userId);
           return userId;
         }
@@ -142,7 +145,7 @@ export const getCurrentUserId = (): string | null => {
       }
     }
 
-    console.log("❌ No user ID found in any storage location");
+    isDevelopment && console.log("❌ No user ID found in any storage location");
     return null;
   } catch (error) {
     console.error("💥 Error in getCurrentUserId:", error);
@@ -156,23 +159,23 @@ export const validateTokenAndGetUserId = (): { isValid: boolean; userId: string 
     const token = localStorage.getItem("token") || sessionStorage.getItem("token");
     
     if (!token) {
-      console.log("❌ No token found");
+      isDevelopment && console.log("❌ No token found");
       return { isValid: false, userId: null };
     }
 
     const tokenData = decodeToken(token);
     if (!tokenData) {
-      console.log("❌ Invalid token");
+      isDevelopment && console.log("❌ Invalid token");
       return { isValid: false, userId: null };
     }
 
     const userId = getCurrentUserId();
     if (!userId) {
-      console.log("❌ Could not extract user ID from token");
+      isDevelopment && console.log("❌ Could not extract user ID from token");
       return { isValid: false, userId: null };
     }
 
-    console.log("✅ Token valid, user ID:", userId);
+    isDevelopment && console.log("✅ Token valid, user ID extracted");
     return { isValid: true, userId };
   } catch (error) {
     console.error("Error validating token:", error);
@@ -184,7 +187,7 @@ export const validateTokenAndGetUserId = (): { isValid: boolean; userId: string 
 export const storeUserId = (userId: string): void => {
   try {
     localStorage.setItem("userId", userId);
-    console.log("💾 User ID stored:", userId);
+    isDevelopment && console.log("💾 User ID stored");
   } catch (error) {
     console.error("Error storing user ID:", error);
   }
@@ -200,7 +203,7 @@ export const clearAuthData = (): void => {
   sessionStorage.removeItem("user");
   localStorage.removeItem("auth");
   sessionStorage.removeItem("auth");
-  console.log("🧹 All auth data cleared");
+  isDevelopment && console.log("🧹 All auth data cleared");
 };
 
 // Check if user is authenticated
@@ -259,7 +262,7 @@ export const isUserIdInArray = (userId: MongooseId, idArray: MongooseId[]): bool
 
 // Enhanced logout function
 export const logout = () => {
-  console.log("🚪 Logging out...");
+  isDevelopment && console.log("🚪 Logging out...");
   clearAuthData();
   window.location.href = "/admin"; // Redirect to sign-in page
 };
