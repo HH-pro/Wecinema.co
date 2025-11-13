@@ -194,31 +194,17 @@ export const checkStripeStatus = (setLoading?: React.Dispatch<React.SetStateActi
     requirements?: any;
   }>("/stripe/status", setLoading);
 
-// api.ts - Improved version
 export const createStripeAccount = async (): Promise<{ url: string }> => {
-  try {
-    const response = await api.post<{ 
-      success: boolean; 
-      url: string;
-      error?: string;
-    }>("/marketplace/stripe/onboard-seller");
-    
-    if (response.data.success && response.data.url) {
-      return { url: response.data.url };
-    } else {
-      throw new Error(response.data.error || 'Failed to create Stripe account');
-    }
-  } catch (error: any) {
-    console.error('Stripe account creation error:', error);
-    
-    // Provide user-friendly error messages
-    if (error.response?.data?.error) {
-      throw new Error(error.response.data.error);
-    }
-    if (error.response?.data?.details) {
-      throw new Error(error.response.data.details);
-    }
-    throw new Error('Unable to connect to Stripe. Please try again.');
+  const response = await api.post<{ 
+    success: boolean; 
+    url: string;
+    error?: string;
+  }>("/marketplace/stripe/onboard-seller");
+  
+  if (response.data.success && response.data.url) {
+    return { url: response.data.url };
+  } else {
+    throw new Error(response.data.error || 'Failed to create Stripe account');
   }
 };
 export const completeOnboarding = (setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
