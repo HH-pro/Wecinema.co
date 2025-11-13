@@ -5,7 +5,7 @@ const Offer = require("../../models/marketplace/offer");
 const MarketplaceListing = require("../../models/marketplace/listing");
 const Order = require("../../models/marketplace/order");
 const Chat = require("../../models/marketplace/Chat");
-const Message = require("../../models/marketplace/Message"); // Your Message model
+const Message = require("../../models/marketplace/messages"); // Your Message model
 const { authenticateMiddleware } = require("../../utils");
 const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
 
