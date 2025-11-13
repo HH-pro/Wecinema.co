@@ -106,15 +106,18 @@ const SellerDashboard: React.FC = () => {
         return 'bg-green-100 text-green-800 border-green-200';
       case 'pending':
       case 'pending_payment':
+      case 'pending_acceptance':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'shipped':
       case 'sold':
       case 'in_progress':
+      case 'in_transit':
         return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'cancelled':
       case 'rejected':
       case 'inactive':
       case 'failed':
+      case 'declined':
         return 'bg-red-100 text-red-800 border-red-200';
       case 'draft':
         return 'bg-gray-100 text-gray-800 border-gray-200';
@@ -125,10 +128,14 @@ const SellerDashboard: React.FC = () => {
 
   // Stats calculation
   const totalOrders = orders.length;
-  const pendingOrders = orders.filter(order => order.status === 'pending_payment' || order.paymentStatus === 'pending').length;
+  const pendingOrders = orders.filter(order => 
+    order.status === 'pending_payment' || 
+    order.paymentStatus === 'pending' ||
+    order.status === 'pending_acceptance'
+  ).length;
   const completedOrders = orders.filter(order => order.status === 'completed').length;
   const totalRevenue = orders
-    .filter(order => order.status === 'completed')
+    .filter(order => order.status === 'completed' || order.paymentStatus === 'paid')
     .reduce((sum, order) => sum + order.amount, 0);
   const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
   
@@ -152,7 +159,13 @@ const SellerDashboard: React.FC = () => {
       const currentUserId = getCurrentUserId();
       console.log('👤 Current User ID:', currentUserId);
 
-      const [ordersResponse, offersResponse] = await Promise.all([
+      if (!currentUserId) {
+        setError('User not authenticated. Please log in again.');
+        setLoading(false);
+        return;
+      }
+
+      const [ordersResponse, offersResponse, listingsResponse] = await Promise.allSettled([
         getSellerOrders().catch(err => {
           console.error('Error fetching orders:', err);
           return [];
@@ -160,44 +173,47 @@ const SellerDashboard: React.FC = () => {
         getReceivedOffers().catch(err => {
           console.error('Error fetching offers:', err);
           return [];
-        })
+        }),
+        (async () => {
+          try {
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            
+            const response = await axios.get(
+              `${API_BASE_URL}/marketplace/listings/user/${currentUserId}/listings`,
+              {
+                params: { page: 1, limit: 1000 },
+                headers,
+                timeout: 10000
+              }
+            );
+            console.log('📝 Listings fetched successfully');
+            return response.data;
+          } catch (err) {
+            console.log('Listings fetch failed, continuing without listings data');
+            return null;
+          }
+        })()
       ]);
 
-      let listingsResponse = null;
-      if (currentUserId) {
-        try {
-          const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-          const headers = token ? { Authorization: `Bearer ${token}` } : {};
-          
-          listingsResponse = await axios.get(
-            `${API_BASE_URL}/marketplace/listings/user/${currentUserId}/listings`,
-            {
-              params: { page: 1, limit: 1000 },
-              headers,
-              timeout: 10000
-            }
-          );
-          console.log('📝 Listings fetched successfully');
-        } catch (err) {
-          console.log('Listings fetch failed, continuing without listings data');
-        }
-      }
+      // Process orders response
+      const ordersData = ordersResponse.status === 'fulfilled' 
+        ? (Array.isArray(ordersResponse.value) ? ordersResponse.value : (ordersResponse.value?.data || []))
+        : [];
 
-      const ordersData = Array.isArray(ordersResponse) 
-        ? ordersResponse 
-        : (ordersResponse?.data || []);
-      
-      const offersData = Array.isArray(offersResponse) 
-        ? offersResponse 
-        : (offersResponse?.data || []);
+      // Process offers response
+      const offersData = offersResponse.status === 'fulfilled'
+        ? (Array.isArray(offersResponse.value) ? offersResponse.value : (offersResponse.value?.data || []))
+        : [];
+
+      // Process listings response
+      if (listingsResponse.status === 'fulfilled' && listingsResponse.value?.success) {
+        setListingsData(listingsResponse.value);
+      }
 
       setOrders(Array.isArray(ordersData) ? ordersData : []);
       setOffers(Array.isArray(offersData) ? offersData : []);
       
-      if (listingsResponse?.data?.success) {
-        setListingsData(listingsResponse.data);
-      }
-
       console.log('✅ Dashboard data loaded:', {
         orders: ordersData.length,
         offers: offersData.length,
@@ -256,7 +272,7 @@ const SellerDashboard: React.FC = () => {
     
     if (stripeStatus === 'success') {
       console.log('🎉 Returned from Stripe onboarding - refreshing status');
-      setError('Stripe setup completed! Updating status...');
+      setSuccessMessage('Stripe account setup completed successfully!');
       
       // Refresh status after a delay to allow webhook processing
       setTimeout(() => {
@@ -294,9 +310,9 @@ const SellerDashboard: React.FC = () => {
       );
       console.log('🔧 Debug Stripe Status:', response.data);
       setDebugInfo(JSON.stringify(response.data, null, 2));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Debug error:', error);
-      setDebugInfo('Debug failed: ' + error.message);
+      setDebugInfo('Debug failed: ' + (error.message || 'Unknown error'));
     }
   };
 
@@ -304,72 +320,93 @@ const SellerDashboard: React.FC = () => {
     window.location.href = `/listings/${listingId}`;
   };
 
-  // ✅ UPDATED: Accept offer without Stripe requirement
+  // ✅ IMPROVED: Accept offer with better error handling
   const handleOfferAction = async (offerId: string, action: string) => {
     try {
       setError('');
       setSuccessMessage('');
       
-      if (action === 'accept') {
-        // ✅ NO STRIPE CHECK - Accept offer immediately
-        const offer = offers.find(o => o._id === offerId);
-        if (offer) {
-          try {
-            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-            const response = await axios.put(
-              `${API_BASE_URL}/marketplace/offers/accept-offer/${offerId}`,
-              {},
-              {
-                headers: { Authorization: `Bearer ${token}` }
-              }
-            );
+      const offer = offers.find(o => o._id === offerId);
+      if (!offer) {
+        setError('Offer not found');
+        return;
+      }
 
-            if (response.data.success) {
-              setSuccessMessage('Offer accepted successfully! Buyer will now complete payment.');
-              console.log('✅ Offer accepted:', response.data);
-              
-              // Update local state
-              setOffers(prev => prev.map(o => 
-                o._id === offerId ? { ...o, status: 'accepted' } : o
-              ));
-              
-              // Add new order to orders list
-              if (response.data.order) {
-                setOrders(prev => [response.data.order, ...prev]);
-              }
-              
-              // Refresh data to get latest state
-              setTimeout(() => {
-                fetchDashboardData();
-              }, 1000);
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        return;
+      }
+
+      if (action === 'accept') {
+        try {
+          const response = await axios.put(
+            `${API_BASE_URL}/marketplace/offers/accept-offer/${offerId}`,
+            {},
+            {
+              headers: { Authorization: `Bearer ${token}` },
+              timeout: 10000
             }
-          } catch (err: any) {
-            console.error('Error accepting offer:', err);
-            setError(err.response?.data?.error || 'Failed to accept offer');
+          );
+
+          if (response.data.success) {
+            setSuccessMessage('Offer accepted successfully! Buyer will now complete payment.');
+            console.log('✅ Offer accepted:', response.data);
+            
+            // Update local state
+            setOffers(prev => prev.map(o => 
+              o._id === offerId ? { ...o, status: 'accepted' } : o
+            ));
+            
+            // Add new order to orders list if provided
+            if (response.data.order) {
+              setOrders(prev => [response.data.order, ...prev]);
+            }
+            
+            // Refresh data to get latest state
+            setTimeout(() => {
+              fetchDashboardData();
+            }, 1000);
           }
+        } catch (err: any) {
+          console.error('Error accepting offer:', err);
+          const errorMessage = err.response?.data?.error || 
+                             err.response?.data?.details || 
+                             err.message || 
+                             'Failed to accept offer';
+          setError(errorMessage);
         }
       } else {
         // Handle reject offer
-        console.log(`Rejecting offer:`, offerId);
         try {
-          const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-          await axios.put(
+          const response = await axios.put(
             `${API_BASE_URL}/marketplace/offers/reject-offer/${offerId}`,
             {},
             {
-              headers: { Authorization: `Bearer ${token}` }
+              headers: { Authorization: `Bearer ${token}` },
+              timeout: 10000
             }
           );
-          setSuccessMessage('Offer rejected successfully');
-          await fetchDashboardData();
-        } catch (err) {
+
+          if (response.data.success) {
+            setSuccessMessage('Offer rejected successfully');
+            // Update local state
+            setOffers(prev => prev.map(o => 
+              o._id === offerId ? { ...o, status: 'rejected' } : o
+            ));
+          }
+        } catch (err: any) {
           console.error('Error rejecting offer:', err);
-          setError('Failed to reject offer');
+          const errorMessage = err.response?.data?.error || 
+                             err.response?.data?.details || 
+                             err.message || 
+                             'Failed to reject offer';
+          setError(errorMessage);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating offer:', error);
-      setError('Failed to update offer');
+      setError(error.message || 'Failed to update offer');
     }
   };
 
@@ -391,6 +428,7 @@ const SellerDashboard: React.FC = () => {
   const handleStripeSetupSuccess = () => {
     console.log('✅ Stripe setup success handler called');
     setShowStripeSetup(false);
+    setSuccessMessage('Stripe account setup completed!');
     // Delay slightly to allow Stripe to process
     setTimeout(() => {
       checkStripeAccountStatus();
@@ -398,15 +436,28 @@ const SellerDashboard: React.FC = () => {
     }, 2000);
   };
 
-  // Clear success message after 5 seconds
+  // Clear messages after 5 seconds
   useEffect(() => {
+    const timers: NodeJS.Timeout[] = [];
+    
     if (successMessage) {
       const timer = setTimeout(() => {
         setSuccessMessage('');
       }, 5000);
-      return () => clearTimeout(timer);
+      timers.push(timer);
     }
-  }, [successMessage]);
+    
+    if (error) {
+      const timer = setTimeout(() => {
+        setError('');
+      }, 8000);
+      timers.push(timer);
+    }
+
+    return () => {
+      timers.forEach(timer => clearTimeout(timer));
+    };
+  }, [successMessage, error]);
 
   if (loading) {
     return (
@@ -415,6 +466,7 @@ const SellerDashboard: React.FC = () => {
           <div className="text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
             <p className="text-lg text-gray-600 font-medium">Loading dashboard...</p>
+            <p className="text-sm text-gray-500 mt-2">Getting your seller information...</p>
           </div>
         </div>
       </MarketplaceLayout>
@@ -427,12 +479,12 @@ const SellerDashboard: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="mb-8">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">Seller Dashboard</h1>
                 <p className="mt-2 text-gray-600">Manage your listings, offers, and track your sales performance</p>
               </div>
-              <div className="flex space-x-3">
+              <div className="flex flex-wrap gap-3">
                 <button
                   onClick={handleDebugStripe}
                   className="flex items-center space-x-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors"
@@ -511,7 +563,7 @@ const SellerDashboard: React.FC = () => {
 
           {/* Navigation Tabs */}
           <div className="mb-8 border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
+            <nav className="-mb-px flex space-x-8 overflow-x-auto">
               {[
                 { id: 'overview', label: 'Overview', icon: '📊' },
                 { id: 'offers', label: 'Offers', icon: '💼', badge: pendingOffers },
@@ -521,7 +573,7 @@ const SellerDashboard: React.FC = () => {
                 <button
                   key={id}
                   onClick={() => setActiveTab(id)}
-                  className={`py-3 px-1 border-b-2 font-medium text-sm flex items-center transition-all duration-200 ${
+                  className={`py-3 px-1 border-b-2 font-medium text-sm flex items-center whitespace-nowrap transition-all duration-200 ${
                     activeTab === id
                       ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -649,7 +701,7 @@ const SellerDashboard: React.FC = () => {
                                 <p className="font-semibold text-green-600">{formatCurrency(order.amount || 0)}</p>
                                 <div className="flex flex-col items-end gap-1 mt-1">
                                   <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(order.status)}`}>
-                                    {order.status || 'unknown'}
+                                    {order.status ? order.status.replace('_', ' ') : 'unknown'}
                                   </span>
                                   <PaymentStatusBadge order={order} />
                                 </div>
@@ -831,6 +883,22 @@ const SellerDashboard: React.FC = () => {
                                 </svg>
                                 <p className="text-green-800 text-sm">
                                   Offer accepted! Waiting for buyer to complete payment.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Show info for rejected offers */}
+                        {offer.status === 'rejected' && (
+                          <div className="mt-4 pt-4 border-t border-gray-200">
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                              <div className="flex items-center">
+                                <svg className="w-4 h-4 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                                <p className="text-red-800 text-sm">
+                                  Offer declined.
                                 </p>
                               </div>
                             </div>
