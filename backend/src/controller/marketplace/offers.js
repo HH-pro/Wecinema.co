@@ -90,7 +90,7 @@ const sendOrderDetailsMessage = async (order, offer, buyer, seller) => {
   }
 };
 
-// ✅ UPDATED: CONFIRM OFFER PAYMENT WITH MESSAGE NOTIFICATION
+// ✅ CONFIRM OFFER PAYMENT WITH MESSAGES
 router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) => {
   console.log("🔍 Confirm Offer Payment Request DETAILS:", {
     body: req.body,
@@ -102,7 +102,7 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     const { offerId, paymentIntentId } = req.body;
     const userId = req.user?.id || req.user?._id || req.user?.userId;
 
-    // ✅ COMPREHENSIVE VALIDATION
+    // ✅ VALIDATION
     if (!offerId || !paymentIntentId) {
       return res.status(400).json({
         success: false,
@@ -117,31 +117,17 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       });
     }
 
-    if (!mongoose.Types.ObjectId.isValid(offerId)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid offer ID format'
-      });
-    }
-
-    if (!paymentIntentId.startsWith('pi_')) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid payment intent ID format'
-      });
-    }
-
     // ✅ START TRANSACTION
     session = await mongoose.startSession();
     session.startTransaction();
 
-    // ✅ FIND OFFER WITH TRANSACTION
+    // ✅ FIND OFFER
     const offer = await Offer.findOne({
       _id: new mongoose.Types.ObjectId(offerId),
       buyerId: new mongoose.Types.ObjectId(userId)
     })
     .populate('listingId')
-    .populate('buyerId', 'username email')
+    .populate('buyerId', 'username email avatar')
     .session(session);
 
     if (!offer) {
@@ -157,8 +143,6 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       console.log("ℹ️ Offer already paid, finding existing order...");
       
       const existingOrder = await Order.findOne({ offerId: offer._id }).session(session);
-      const existingChat = await Chat.findOne({ orderId: existingOrder?._id }).session(session);
-      
       await session.abortTransaction();
       
       return res.status(200).json({
@@ -166,8 +150,7 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
         message: 'Payment already confirmed',
         data: {
           orderId: existingOrder?._id,
-          chatId: existingChat?._id,
-          redirectUrl: `/messages?chat=${existingChat?._id}`
+          redirectUrl: `/orders/${existingOrder?._id}`
         }
       });
     }
@@ -216,8 +199,8 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     console.log("✅ Offer status updated to paid:", offer._id);
 
     // ✅ GET BUYER AND SELLER DETAILS
-    const buyer = await mongoose.model('User').findById(userId).select('username email').session(session);
-    const seller = await mongoose.model('User').findById(offer.listingId.sellerId).select('username email').session(session);
+    const buyer = await mongoose.model('User').findById(userId).select('username email avatar').session(session);
+    const seller = await mongoose.model('User').findById(offer.listingId.sellerId).select('username email avatar').session(session);
 
     if (!buyer || !seller) {
       await session.abortTransaction();
@@ -227,7 +210,7 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       });
     }
 
-    // ✅ CREATE ORDER WITH CORRECT ENUM VALUES
+    // ✅ CREATE ORDER
     const orderData = {
       buyerId: userId,
       sellerId: offer.listingId.sellerId,
@@ -254,21 +237,6 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     await order.save({ session });
     console.log("✅ Order created:", order._id);
 
-    // ✅ CREATE CHAT ROOM
-    const chat = new Chat({
-      orderId: order._id,
-      participants: [
-        { userId: userId, role: 'buyer' },
-        { userId: offer.listingId.sellerId, role: 'seller' }
-      ],
-      listingId: offer.listingId._id,
-      status: 'active',
-      lastMessageAt: new Date()
-    });
-
-    await chat.save({ session });
-    console.log("✅ Chat room created:", chat._id);
-
     // ✅ UPDATE LISTING STATUS
     await MarketplaceListing.findByIdAndUpdate(
       offer.listingId._id, 
@@ -285,21 +253,13 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     await session.commitTransaction();
     console.log("🎉 Payment confirmation completed successfully");
 
-    // ✅ SEND ORDER DETAILS MESSAGES TO BOTH USERS (NON-BLOCKING, AFTER TRANSACTION)
+    // ✅ NOW SEND MESSAGES TO BOTH USERS (AFTER TRANSACTION SUCCESS)
     try {
-      await sendOrderDetailsMessage(order, offer, buyer, seller);
-      console.log("✅ Order details messages sent successfully");
+      await sendOrderConfirmationMessages(order, offer, buyer, seller);
+      console.log("✅ Order confirmation messages sent to both users");
     } catch (messageError) {
-      console.error('❌ Failed to send order details message:', messageError);
+      console.error('❌ Failed to send order messages:', messageError);
       // Don't fail the main process for message errors
-    }
-
-    // ✅ SEND EMAIL NOTIFICATIONS (NON-BLOCKING)
-    try {
-      await sendEmailNotifications(offer, order, buyer, seller);
-    } catch (emailError) {
-      console.error('❌ Email notification failed:', emailError);
-      // Don't fail the main process for email errors
     }
 
     res.status(200).json({
@@ -307,10 +267,9 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       message: 'Payment confirmed successfully! Order details sent to your messages.',
       data: {
         orderId: order._id,
-        chatId: chat._id,
-        redirectUrl: `/messages?chat=${chat._id}&order=${order._id}`,
+        redirectUrl: `/orders/${order._id}`, // Your existing order page
         offerId: offer._id,
-        messageSent: true // Confirm that message was sent
+        messageSent: true
       }
     });
 
@@ -321,26 +280,9 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       await session.abortTransaction();
     }
 
-    let errorMessage = 'Payment confirmation failed';
-    let statusCode = 500;
-
-    if (error.name === 'ValidationError') {
-      errorMessage = 'Order validation failed';
-      statusCode = 400;
-      if (error.errors) {
-        console.error('Validation errors:', Object.keys(error.errors));
-        Object.keys(error.errors).forEach(field => {
-          console.error(`- ${field}:`, error.errors[field].message);
-        });
-      }
-    } else if (error.name === 'CastError') {
-      errorMessage = 'Invalid ID format';
-      statusCode = 400;
-    }
-
-    res.status(statusCode).json({
+    res.status(500).json({
       success: false,
-      error: errorMessage,
+      error: 'Payment confirmation failed',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   } finally {
@@ -349,6 +291,53 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     }
   }
 });
+
+// ✅ FUNCTION TO SEND ORDER CONFIRMATION MESSAGES
+async function sendOrderConfirmationMessages(order, offer, buyer, seller) {
+  try {
+    const messageContent = `🎉 **Order Confirmed Successfully!**\n\n` +
+      `**Order Details:**\n` +
+      `📦 Order ID: ${order._id}\n` +
+      `💰 Amount: $${offer.amount}\n` +
+      `🛍️ Service: ${offer.listingId?.title || 'N/A'}\n` +
+      `📅 Order Date: ${new Date().toLocaleDateString('en-IN')}\n\n` +
+      `**Delivery Information:**\n` +
+      `📋 Requirements: ${offer.requirements || 'No specific requirements provided'}\n` +
+      `📅 Expected Delivery: ${offer.expectedDelivery ? new Date(offer.expectedDelivery).toLocaleDateString('en-IN') : 'Not specified'}\n\n` +
+      `💬 **You can now discuss the order details in messages.**\n\n` +
+      `🔒 Payment secured in escrow.`;
+
+    // System user ID (you can use a real system user ID or create one)
+    const systemUserId = new mongoose.Types.ObjectId('000000000000000000000000');
+
+    // ✅ MESSAGE TO SELLER
+    const messageToSeller = new Message({
+      orderId: order._id,
+      senderId: systemUserId,
+      receiverId: order.sellerId,
+      message: `🛍️ **New Order Received!**\n\n${buyer.username} has placed an order for your service "${offer.listingId.title}".\n\n${messageContent}`,
+      read: false
+    });
+    await messageToSeller.save();
+
+    // ✅ MESSAGE TO BUYER  
+    const messageToBuyer = new Message({
+      orderId: order._id,
+      senderId: systemUserId,
+      receiverId: order.buyerId,
+      message: `✅ **Order Confirmed!**\n\nYour order for "${offer.listingId.title}" has been confirmed.\n\n${messageContent}`,
+      read: false
+    });
+    await messageToBuyer.save();
+
+    console.log("✅ Order confirmation messages sent to both users' inbox");
+    return true;
+
+  } catch (error) {
+    console.error('❌ Error sending order confirmation messages:', error);
+    return false;
+  }
+}
 
 // ✅ EMAIL NOTIFICATION FUNCTION
 async function sendEmailNotifications(offer, order, buyer, seller) {
