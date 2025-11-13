@@ -259,7 +259,53 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
     });
   }
 });
+// ADD THIS to your backend routes
+router.get('/account-status', authenticateMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    
+    if (!user || !user.stripeAccountId) {
+      return res.json({
+        connected: false,
+        status: 'not_connected',
+        chargesEnabled: false,
+        payoutsEnabled: false,
+        detailsSubmitted: false
+      });
+    }
 
+    // Retrieve account from Stripe
+    const account = await stripe.accounts.retrieve(user.stripeAccountId);
+    
+    res.json({
+      connected: true,
+      stripeAccountId: user.stripeAccountId,
+      status: account.charges_enabled ? 'active' : 'pending',
+      detailsSubmitted: account.details_submitted,
+      chargesEnabled: account.charges_enabled,
+      payoutsEnabled: account.payouts_enabled,
+      requirements: account.requirements,
+      account: {
+        business_type: account.business_type,
+        country: account.country,
+        email: account.email
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error checking Stripe account status:', error);
+    
+    // If Stripe account retrieval fails, mark as not connected
+    res.json({
+      connected: false,
+      status: 'error',
+      chargesEnabled: false,
+      payoutsEnabled: false,
+      detailsSubmitted: false,
+      error: error.message
+    });
+  }
+});
 // ✅ Complete onboarding (webhook or manual check)
 router.post('/complete-onboarding', authenticateMiddleware, async (req, res) => {
   try {
