@@ -36,14 +36,14 @@ const GenrePage: React.FC = () => {
       return;
     }
 
-    // const fetchData = async () => {
-    //   try {
-    //     const result = await getRequest(`/user/${userId}`, setLoading);
-    //     setUser(result);
-    //   } catch (error) {
-    //     // console.error("Error fetching data.:", error);
-    //   }
-    // };
+    const fetchData = async () => {
+      try {
+        const result = await getRequest(`/user/${userId}`, setLoading);
+        setUser(result);
+      } catch (error) {
+        // console.error("Error fetching data.:", error);
+      }
+    };
 
     const checkUserPaymentStatus = async () => {
       try {
