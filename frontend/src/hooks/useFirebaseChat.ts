@@ -13,7 +13,7 @@ import {
   DocumentData,
   QuerySnapshot
 } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { db } from '../pages/firebase';
 
 export interface Message {
   id: string;
