@@ -59,87 +59,93 @@ router.get('/status', authenticateMiddleware, async (req, res) => {
     });
   }
 });
-// ✅ Create Stripe Connect account - SIMPLIFIED & ROBUST VERSION
+// Updated onboard-seller endpoint with detailed logging
 router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
+  console.log('=== STRIPE ONBOARDING STARTED ===');
+  
   try {
     const userId = req.user.id;
-    const user = await User.findById(userId);
+    console.log('1. User ID:', userId);
 
+    const user = await User.findById(userId);
     if (!user) {
+      console.log('❌ User not found in database');
       return res.status(404).json({
         success: false,
         error: 'User not found'
       });
     }
-
-    console.log('🔄 Starting Stripe onboarding for user:', userId);
+    console.log('2. User found:', user.email);
 
     // Check for existing Stripe account
     if (user.stripeAccountId) {
+      console.log('3. Existing Stripe account ID:', user.stripeAccountId);
       try {
+        console.log('4. Retrieving existing Stripe account...');
         const account = await stripe.accounts.retrieve(user.stripeAccountId);
+        console.log('5. Existing account status - details_submitted:', account.details_submitted);
         
         if (account.details_submitted) {
+          console.log('6. Account already completed onboarding');
           return res.status(400).json({
             success: false,
-            error: 'Stripe account already connected',
-            stripeAccountId: user.stripeAccountId
-          });
-        } else {
-          // Create new onboarding link for existing account
-          const accountLink = await stripe.accountLinks.create({
-            account: user.stripeAccountId,
-            refresh_url: `${process.env.FRONTEND_URL}/seller/dashboard?stripe=refresh`,
-            return_url: `${process.env.FRONTEND_URL}/seller/dashboard?stripe=success`,
-            type: 'account_onboarding',
-          });
-
-          return res.json({
-            success: true,
-            url: accountLink.url,
-            stripeAccountId: user.stripeAccountId
+            error: 'Stripe account already connected'
           });
         }
+        
+        // Create onboarding link for existing account
+        console.log('7. Creating account link for existing account...');
+        const accountLink = await stripe.accountLinks.create({
+          account: user.stripeAccountId,
+          refresh_url: `http://localhost:3001/seller/dashboard?stripe=refresh`,
+          return_url: `http://localhost:3001/seller/dashboard?stripe=success`,
+          type: 'account_onboarding',
+        });
+
+        console.log('8. ✅ Success - Returning account link for existing account');
+        return res.json({
+          success: true,
+          url: accountLink.url,
+          stripeAccountId: user.stripeAccountId
+        });
       } catch (stripeError) {
-        console.log('Existing Stripe account invalid, creating new one:', stripeError.message);
-        // Continue to create new account
+        console.log('9. Existing account retrieval failed:', stripeError.message);
+        console.log('10. Will create new account instead...');
       }
     }
 
-    // **SIMPLIFIED ACCOUNT CREATION** - Remove problematic fields
+    // Create new Stripe account
+    console.log('11. Creating new Stripe account...');
     const account = await stripe.accounts.create({
       type: 'express',
-      country: 'US', // Changed from IN to US for better compatibility
+      country: 'US', // Use US for better compatibility
       email: user.email,
       capabilities: {
         card_payments: { requested: true },
         transfers: { requested: true },
-      },
-      // Remove individual/business details initially - let Stripe collect them
-      business_type: 'individual',
-      business_profile: {
-        url: process.env.FRONTEND_URL || 'http://localhost:3001',
-        mcc: '5734'
       }
+      // Remove all other fields for now
     });
-
-    console.log('✅ Stripe account created:', account.id);
+    console.log('12. ✅ Stripe account created:', account.id);
 
     // Update user
+    console.log('13. Updating user with Stripe account ID...');
     user.stripeAccountId = account.id;
     user.stripeAccountStatus = 'pending';
     await user.save();
+    console.log('14. ✅ User updated successfully');
 
     // Create account link
+    console.log('15. Creating account link...');
     const accountLink = await stripe.accountLinks.create({
       account: account.id,
-      refresh_url: `${process.env.FRONTEND_URL}/seller/dashboard?stripe=refresh`,
-      return_url: `${process.env.FRONTEND_URL}/seller/dashboard?stripe=success`,
+      refresh_url: `http://localhost:3001/seller/dashboard?stripe=refresh`,
+      return_url: `http://localhost:3001/seller/dashboard?stripe=success`,
       type: 'account_onboarding',
     });
+    console.log('16. ✅ Account link created');
 
-    console.log('✅ Account link created');
-
+    console.log('17. 🎉 SUCCESS - Returning onboarding URL');
     res.json({
       success: true,
       url: accountLink.url,
@@ -147,32 +153,23 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Stripe onboarding error:', error);
+    console.error('18. ❌ CATCH BLOCK - FULL ERROR:');
+    console.error('Error message:', error.message);
+    console.error('Error type:', error.type);
+    console.error('Error code:', error.code);
+    console.error('Error stack:', error.stack);
     
-    // More specific error handling
-    let errorMessage = 'Failed to create Stripe account';
-    
-    if (error.type === 'StripeInvalidRequestError') {
-      switch (error.code) {
-        case 'parameter_unknown':
-          errorMessage = 'Invalid Stripe configuration';
-          break;
-        case 'account_invalid':
-          errorMessage = 'Stripe Connect not enabled';
-          break;
-        case 'resource_missing':
-          errorMessage = 'Stripe account not found';
-          break;
-        default:
-          errorMessage = `Stripe error: ${error.code}`;
-      }
+    // Check for specific Stripe errors
+    if (error.raw) {
+      console.error('Stripe raw error:', error.raw);
     }
-
+    
     res.status(500).json({
       success: false,
-      error: errorMessage,
-      details: error.message,
-      code: error.code
+      error: error.message,
+      type: error.type,
+      code: error.code,
+      help: 'Check backend logs for detailed error information'
     });
   }
 });
