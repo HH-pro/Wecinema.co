@@ -29,51 +29,6 @@ export const generateSlug = (text: string): string =>
 export const truncateText = (text: string, maxLength: number): string =>
   text.length <= maxLength ? text : text.slice(0, maxLength - 3) + "...";
 
-// Enhanced token decoding with multiple fallback methods
-export const decodeToken = (token: any) => {
-  if (!token) {
-    console.log("❌ No token provided");
-    return null;
-  }
-  
-  try {
-    console.log("🔐 Attempting to decode token...");
-    const decodedToken: any = jwtDecode(token) as Itoken;
-    const currentTime = Math.floor(Date.now() / 1000);
-    
-    if (decodedToken.exp && decodedToken.exp < currentTime) {
-      console.error("Token has expired");
-      localStorage.removeItem("token");
-      sessionStorage.removeItem("token");
-      localStorage.removeItem("userId");
-      return null;
-    }
-    
-    console.log("✅ Token decoded successfully:", decodedToken);
-    return decodedToken;
-  } catch (error) {
-    console.error("❌ JWT decode failed, trying manual decode:", error);
-    
-    // Manual JWT decoding as fallback
-    try {
-      const parts = token.split('.');
-      if (parts.length !== 3) {
-        throw new Error('Invalid token format');
-      }
-      
-      const payload = parts[1];
-      const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-      const paddedBase64 = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
-      const decodedPayload = JSON.parse(atob(paddedBase64));
-      
-      console.log("✅ Manual token decode successful:", decodedPayload);
-      return decodedPayload;
-    } catch (manualError) {
-      console.error("❌ Manual token decode also failed:", manualError);
-      return null;
-    }
-  }
-};
 
 // DIRECT USER ID EXTRACTION - Multiple reliable methods
 export const getCurrentUserId = (): string | null => {
