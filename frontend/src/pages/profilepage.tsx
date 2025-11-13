@@ -78,7 +78,7 @@ const GenrePage: React.FC = () => {
             setContentLoading(true);
             
             // Fetch user data
-            const result: any = await getRequest("/uer/" + id, setLoading);
+            const result: any = await getRequest("/user/" + id, setLoading);
             if (!result) {
                 throw new Error("User not found");
             }
