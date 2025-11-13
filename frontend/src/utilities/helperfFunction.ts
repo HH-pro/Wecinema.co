@@ -36,23 +36,20 @@ export const decodeToken = (token: any) => {
     return null;
   }
   
-  // try {
-  //   console.log("🔐 Attempting to decode token...");
-  //   const decodedToken: any = jwtDecode(token) as Itoken;
-  //   const currentTime = Math.floor(Date.now() / 1000);
+
+    console.log("🔐 Attempting to decode token...");
+    const decodedToken: any = jwtDecode(token) as Itoken;
+    const currentTime = Math.floor(Date.now() / 1000);
     
-  //   if (decodedToken.exp && decodedToken.exp < currentTime) {
-  //     console.error("Token has expired");
-  //     localStorage.removeItem("token");
-  //     sessionStorage.removeItem("token");
-  //     localStorage.removeItem("userId");
-  //     return null;
-  //   }
+    if (decodedToken.exp && decodedToken.exp < currentTime) {
+      console.error("Token has expired");
+      localStorage.removeItem("token");
+      sessionStorage.removeItem("token");
+      localStorage.removeItem("userId");
+      return null;
+    }
     
-  //   console.log("✅ Token decoded successfully:", decodedToken);
-  //   return decodedToken;
-  // } catch (error) {
-  //   console.error("❌ JWT decode failed, trying manual decode:", error);
+    
     
     // Manual JWT decoding as fallback
     try {
