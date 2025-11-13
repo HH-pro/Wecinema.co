@@ -12,7 +12,6 @@ const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q
 // Direct Stripe keys
 
 // Firebase Chat Service (if using Firebase)
-const FirebaseChatService = require("../../../services/chatService");
 
 // ✅ VALIDATION HELPER FUNCTIONS
 const validateObjectId = (id) => {
