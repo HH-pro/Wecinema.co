@@ -87,6 +87,7 @@ const SellerDashboard: React.FC = () => {
   const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string>('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('en-IN', {
@@ -124,7 +125,7 @@ const SellerDashboard: React.FC = () => {
 
   // Stats calculation
   const totalOrders = orders.length;
-  const pendingOrders = orders.filter(order => order.status === 'pending_payment').length;
+  const pendingOrders = orders.filter(order => order.status === 'pending_payment' || order.paymentStatus === 'pending').length;
   const completedOrders = orders.filter(order => order.status === 'completed').length;
   const totalRevenue = orders
     .filter(order => order.status === 'completed')
@@ -303,23 +304,49 @@ const SellerDashboard: React.FC = () => {
     window.location.href = `/listings/${listingId}`;
   };
 
+  // ✅ UPDATED: Accept offer without Stripe requirement
   const handleOfferAction = async (offerId: string, action: string) => {
     try {
       setError('');
+      setSuccessMessage('');
       
       if (action === 'accept') {
-        // Re-check Stripe status before accepting offer
-        await checkStripeAccountStatus();
-        
-        if (!stripeStatus?.connected || !stripeStatus?.chargesEnabled) {
-          setShowStripeSetup(true);
-          return;
-        }
-
+        // ✅ NO STRIPE CHECK - Accept offer immediately
         const offer = offers.find(o => o._id === offerId);
         if (offer) {
-          setSelectedOffer(offer);
-          setShowOrderCreation(true);
+          try {
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            const response = await axios.put(
+              `${API_BASE_URL}/marketplace/offers/accept-offer/${offerId}`,
+              {},
+              {
+                headers: { Authorization: `Bearer ${token}` }
+              }
+            );
+
+            if (response.data.success) {
+              setSuccessMessage('Offer accepted successfully! Buyer will now complete payment.');
+              console.log('✅ Offer accepted:', response.data);
+              
+              // Update local state
+              setOffers(prev => prev.map(o => 
+                o._id === offerId ? { ...o, status: 'accepted' } : o
+              ));
+              
+              // Add new order to orders list
+              if (response.data.order) {
+                setOrders(prev => [response.data.order, ...prev]);
+              }
+              
+              // Refresh data to get latest state
+              setTimeout(() => {
+                fetchDashboardData();
+              }, 1000);
+            }
+          } catch (err: any) {
+            console.error('Error accepting offer:', err);
+            setError(err.response?.data?.error || 'Failed to accept offer');
+          }
         }
       } else {
         // Handle reject offer
@@ -327,12 +354,13 @@ const SellerDashboard: React.FC = () => {
         try {
           const token = localStorage.getItem('token') || sessionStorage.getItem('token');
           await axios.put(
-            `${API_BASE_URL}/marketplace/offers/${offerId}/reject`,
+            `${API_BASE_URL}/marketplace/offers/reject-offer/${offerId}`,
             {},
             {
               headers: { Authorization: `Bearer ${token}` }
             }
           );
+          setSuccessMessage('Offer rejected successfully');
           await fetchDashboardData();
         } catch (err) {
           console.error('Error rejecting offer:', err);
@@ -369,6 +397,16 @@ const SellerDashboard: React.FC = () => {
       fetchDashboardData();
     }, 2000);
   };
+
+  // Clear success message after 5 seconds
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => {
+        setSuccessMessage('');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage]);
 
   if (loading) {
     return (
@@ -438,6 +476,18 @@ const SellerDashboard: React.FC = () => {
                 </button>
               </div>
               <pre className="text-xs text-gray-600 mt-2 whitespace-pre-wrap">{debugInfo}</pre>
+            </div>
+          )}
+
+          {/* Success Alert */}
+          {successMessage && (
+            <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <svg className="w-5 h-5 text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-green-800">{successMessage}</p>
+              </div>
             </div>
           )}
 
@@ -672,7 +722,7 @@ const SellerDashboard: React.FC = () => {
                       </li>
                       <li className="flex items-start">
                         <span className="mr-2">•</span>
-                        <span>Setup Stripe payments to accept orders</span>
+                        <span>Setup Stripe payments to receive payouts</span>
                       </li>
                     </ul>
                   </div>
@@ -768,6 +818,22 @@ const SellerDashboard: React.FC = () => {
                             >
                               Decline Offer
                             </button>
+                          </div>
+                        )}
+
+                        {/* Show info for accepted offers */}
+                        {offer.status === 'accepted' && (
+                          <div className="mt-4 pt-4 border-t border-gray-200">
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                              <div className="flex items-center">
+                                <svg className="w-4 h-4 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <p className="text-green-800 text-sm">
+                                  Offer accepted! Waiting for buyer to complete payment.
+                                </p>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
