@@ -7,7 +7,7 @@ const Order = require("../../models/marketplace/order");
 const Chat = require("../../models/marketplace/Chat");
 const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils");
 
-// Direct Stripe keys
+// Direct Stripe keys - Make sure these are correct
 const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
 
 // ✅ VALIDATION HELPER FUNCTIONS
@@ -35,8 +35,9 @@ const logRequest = (route) => (req, res, next) => {
   next();
 };
 
-// ✅ MAKE OFFER WITH IMMEDIATE PAYMENT
+// ✅ FIXED: MAKE OFFER WITH IMMEDIATE PAYMENT
 router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), async (req, res) => {
+  let session;
   try {
     console.log("=== MAKE OFFER WITH IMMEDIATE PAYMENT ===");
     
@@ -44,39 +45,43 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
     const userId = req.user.id || req.user._id || req.user.userId;
 
     // ✅ COMPREHENSIVE VALIDATION
-    const validationErrors = [];
-    
-    if (!userId) validationErrors.push('Authentication required');
-    if (!listingId) validationErrors.push('Listing ID is required');
-    if (!amount) validationErrors.push('Amount is required');
-    
-    if (validationErrors.length > 0) {
+    if (!userId) {
+      return res.status(401).json({ 
+        success: false,
+        error: 'Authentication required' 
+      });
+    }
+
+    if (!listingId || !amount) {
       return res.status(400).json({ 
         success: false,
-        error: 'Validation failed',
-        details: validationErrors
+        error: 'Listing ID and amount are required' 
       });
     }
 
     if (!validateObjectId(listingId)) {
       return res.status(400).json({ 
         success: false,
-        error: 'Invalid listing ID format'
-      });
-    }
-
-    if (!validateAmount(amount)) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'Valid amount is required (minimum $0.50)'
+        error: 'Invalid listing ID format' 
       });
     }
 
     const offerAmount = parseFloat(amount);
+    if (!validateAmount(amount)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Valid amount is required (minimum $0.50)' 
+      });
+    }
 
-    // ✅ FIND LISTING
-    const listing = await MarketplaceListing.findById(listingId);
+    // ✅ START TRANSACTION
+    session = await mongoose.startSession();
+    session.startTransaction();
+
+    // ✅ FIND LISTING WITH TRANSACTION
+    const listing = await MarketplaceListing.findById(listingId).session(session);
     if (!listing) {
+      await session.abortTransaction();
       return res.status(404).json({ 
         success: false,
         error: 'Listing not found' 
@@ -84,6 +89,7 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
     }
 
     if (listing.status !== 'active') {
+      await session.abortTransaction();
       return res.status(400).json({ 
         success: false,
         error: 'Listing is not available for offers' 
@@ -92,6 +98,7 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
 
     // Check if user is not the seller
     if (listing.sellerId.toString() === userId.toString()) {
+      await session.abortTransaction();
       return res.status(400).json({ 
         success: false,
         error: 'Cannot make offer on your own listing' 
@@ -103,9 +110,10 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
       listingId,
       buyerId: userId,
       status: { $in: ['pending', 'pending_payment', 'accepted', 'paid'] }
-    });
+    }).session(session);
 
     if (existingOffer) {
+      await session.abortTransaction();
       return res.status(400).json({ 
         success: false,
         error: 'You already have a pending offer for this listing',
@@ -113,23 +121,54 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
       });
     }
 
-    // ✅ CREATE STRIPE PAYMENT INTENT
+    // ✅ CREATE STRIPE PAYMENT INTENT (WITH ERROR HANDLING)
     console.log("💳 Creating Stripe payment intent for immediate payment...");
     
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(offerAmount * 100),
-      currency: 'usd',
-      metadata: {
-        listingId: listingId.toString(),
-        buyerId: userId.toString(),
-        sellerId: listing.sellerId.toString(),
-        type: 'offer_payment'
-      },
-      automatic_payment_methods: { enabled: true },
-      description: `Offer for: ${listing.title}`,
-    });
+    let paymentIntent;
+    try {
+      paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(offerAmount * 100), // Convert to cents
+        currency: 'usd',
+        metadata: {
+          listingId: listingId.toString(),
+          buyerId: userId.toString(),
+          sellerId: listing.sellerId.toString(),
+          type: 'offer_payment'
+        },
+        automatic_payment_methods: { 
+          enabled: true 
+        },
+        description: `Offer for: ${listing.title}`,
+      });
 
-    console.log("✅ Stripe payment intent created:", paymentIntent.id);
+      console.log("✅ Stripe payment intent created:", {
+        id: paymentIntent.id,
+        status: paymentIntent.status,
+        client_secret: paymentIntent.client_secret ? '***' : 'MISSING'
+      });
+
+    } catch (stripeError) {
+      await session.abortTransaction();
+      console.error('❌ Stripe payment intent creation failed:', stripeError);
+      
+      return res.status(400).json({ 
+        success: false,
+        error: 'Payment processing error',
+        details: stripeError.message,
+        stripe_error_type: stripeError.type
+      });
+    }
+
+    // ✅ VERIFY CLIENT SECRET IS PRESENT
+    if (!paymentIntent.client_secret) {
+      await session.abortTransaction();
+      console.error('❌ No client secret received from Stripe');
+      
+      return res.status(500).json({ 
+        success: false,
+        error: 'Payment setup failed - no client secret received'
+      });
+    }
 
     // ✅ CREATE OFFER IN DATABASE
     const offerData = {
@@ -146,9 +185,12 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
     if (expectedDelivery) offerData.expectedDelivery = new Date(expectedDelivery);
 
     const offer = new Offer(offerData);
-    await offer.save();
+    await offer.save({ session });
 
     console.log("✅ Offer saved to database:", offer._id);
+
+    // ✅ COMMIT TRANSACTION
+    await session.commitTransaction();
 
     res.status(201).json({
       success: true,
@@ -170,6 +212,11 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
   } catch (error) {
     console.error('❌ Error making offer:', error);
     
+    // ✅ ROLLBACK TRANSACTION ON ERROR
+    if (session) {
+      await session.abortTransaction();
+    }
+
     let errorMessage = 'Failed to make offer';
     let statusCode = 500;
     
@@ -186,10 +233,14 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
       error: errorMessage,
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
+  } finally {
+    if (session) {
+      session.endSession();
+    }
   }
 });
 
-// ✅ CONFIRM OFFER PAYMENT (ENHANCED VERSION)
+// ✅ FIXED: CONFIRM OFFER PAYMENT
 router.post("/confirm-offer-payment", authenticateMiddleware, logRequest("CONFIRM_OFFER_PAYMENT"), async (req, res) => {
   console.log("🔍 Confirm Offer Payment Request DETAILS:", {
     body: req.body,
@@ -202,33 +253,28 @@ router.post("/confirm-offer-payment", authenticateMiddleware, logRequest("CONFIR
     const userId = req.user?.id || req.user?._id || req.user?.userId;
 
     // ✅ COMPREHENSIVE VALIDATION
-    const validationErrors = [];
-    
-    if (!offerId) validationErrors.push('offerId is required');
-    if (!paymentIntentId) validationErrors.push('paymentIntentId is required');
-    if (!userId) validationErrors.push('user authentication required');
-    
-    if (validationErrors.length > 0) {
-      console.log("❌ Validation errors:", validationErrors);
+    if (!offerId || !paymentIntentId) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid data provided',
-        details: validationErrors
+        error: 'Offer ID and Payment Intent ID are required'
       });
     }
 
-    // Validate MongoDB ObjectId
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required'
+      });
+    }
+
     if (!validateObjectId(offerId)) {
-      console.log("❌ Invalid ObjectId:", offerId);
       return res.status(400).json({
         success: false,
         error: 'Invalid offer ID format'
       });
     }
 
-    // Validate paymentIntentId format
     if (!validatePaymentIntentId(paymentIntentId)) {
-      console.log("❌ Invalid paymentIntentId format:", paymentIntentId);
       return res.status(400).json({
         success: false,
         error: 'Invalid payment intent ID format'
@@ -239,11 +285,6 @@ router.post("/confirm-offer-payment", authenticateMiddleware, logRequest("CONFIR
     session = await mongoose.startSession();
     session.startTransaction();
 
-    console.log("🔍 Looking for offer:", { 
-      offerId: new mongoose.Types.ObjectId(offerId),
-      userId: new mongoose.Types.ObjectId(userId)
-    });
-
     // ✅ FIND OFFER WITH TRANSACTION
     const offer = await Offer.findOne({
       _id: new mongoose.Types.ObjectId(offerId),
@@ -253,18 +294,11 @@ router.post("/confirm-offer-payment", authenticateMiddleware, logRequest("CONFIR
     .populate('buyerId', 'username email')
     .session(session);
 
-    console.log("🔍 Found offer:", offer ? {
-      id: offer._id,
-      status: offer.status,
-      listingId: offer.listingId?._id
-    } : 'NOT FOUND');
-
     if (!offer) {
       await session.abortTransaction();
       return res.status(404).json({ 
         success: false,
-        error: 'Offer not found or access denied',
-        details: 'No offer found with the provided ID for this user'
+        error: 'Offer not found or access denied'
       });
     }
 
@@ -272,12 +306,8 @@ router.post("/confirm-offer-payment", authenticateMiddleware, logRequest("CONFIR
     if (offer.status === 'paid') {
       console.log("ℹ️ Offer already paid, finding existing order...");
       
-      const existingOrder = await Order.findOne({ offerId: offer._id })
-        .populate('listingId')
-        .session(session);
-        
-      const existingChat = await Chat.findOne({ orderId: existingOrder?._id })
-        .session(session);
+      const existingOrder = await Order.findOne({ offerId: offer._id }).session(session);
+      const existingChat = await Chat.findOne({ orderId: existingOrder?._id }).session(session);
       
       await session.abortTransaction();
       
@@ -407,40 +437,25 @@ router.post("/confirm-offer-payment", authenticateMiddleware, logRequest("CONFIR
   } catch (error) {
     console.error('❌ Confirm Offer Payment Error:', error);
     
-    // Enhanced error logging
-    console.error('Error details:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    });
-
     if (session) {
       await session.abortTransaction();
     }
 
     let errorMessage = 'Payment confirmation failed';
     let statusCode = 500;
-    let details = undefined;
 
     if (error.name === 'ValidationError') {
       errorMessage = 'Invalid data provided';
       statusCode = 400;
-      details = Object.values(error.errors).map(err => err.message);
     } else if (error.name === 'CastError') {
       errorMessage = 'Invalid ID format';
-      statusCode = 400;
-    } else if (error.code === 11000) {
-      errorMessage = 'Duplicate entry';
-      statusCode = 400;
-    } else if (error.name === 'StripeInvalidRequestError') {
-      errorMessage = 'Stripe API error';
       statusCode = 400;
     }
 
     res.status(statusCode).json({
       success: false,
       error: errorMessage,
-      details: process.env.NODE_ENV === 'development' ? details || error.message : undefined
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   } finally {
     if (session) {
