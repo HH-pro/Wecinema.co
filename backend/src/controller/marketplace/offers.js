@@ -7,7 +7,7 @@ const Order = require("../../models/marketplace/order");
 const Chat = require("../../models/marketplace/Chat");
 const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils");
 
-// Direct Stripe keys - Make sure these are correct
+// Direct Stripe keys
 const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
 
 // ✅ VALIDATION HELPER FUNCTIONS
@@ -35,7 +35,7 @@ const logRequest = (route) => (req, res, next) => {
   next();
 };
 
-// ✅ FIXED: MAKE OFFER WITH IMMEDIATE PAYMENT
+// ✅ MAKE OFFER WITH IMMEDIATE PAYMENT
 router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), async (req, res) => {
   let session;
   try {
@@ -121,13 +121,13 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
       });
     }
 
-    // ✅ CREATE STRIPE PAYMENT INTENT (WITH ERROR HANDLING)
+    // ✅ CREATE STRIPE PAYMENT INTENT
     console.log("💳 Creating Stripe payment intent for immediate payment...");
     
     let paymentIntent;
     try {
       paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(offerAmount * 100), // Convert to cents
+        amount: Math.round(offerAmount * 100),
         currency: 'usd',
         metadata: {
           listingId: listingId.toString(),
@@ -135,17 +135,11 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
           sellerId: listing.sellerId.toString(),
           type: 'offer_payment'
         },
-        automatic_payment_methods: { 
-          enabled: true 
-        },
+        automatic_payment_methods: { enabled: true },
         description: `Offer for: ${listing.title}`,
       });
 
-      console.log("✅ Stripe payment intent created:", {
-        id: paymentIntent.id,
-        status: paymentIntent.status,
-        client_secret: paymentIntent.client_secret ? '***' : 'MISSING'
-      });
+      console.log("✅ Stripe payment intent created:", paymentIntent.id);
 
     } catch (stripeError) {
       await session.abortTransaction();
@@ -154,19 +148,7 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
       return res.status(400).json({ 
         success: false,
         error: 'Payment processing error',
-        details: stripeError.message,
-        stripe_error_type: stripeError.type
-      });
-    }
-
-    // ✅ VERIFY CLIENT SECRET IS PRESENT
-    if (!paymentIntent.client_secret) {
-      await session.abortTransaction();
-      console.error('❌ No client secret received from Stripe');
-      
-      return res.status(500).json({ 
-        success: false,
-        error: 'Payment setup failed - no client secret received'
+        details: stripeError.message
       });
     }
 
@@ -212,25 +194,13 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
   } catch (error) {
     console.error('❌ Error making offer:', error);
     
-    // ✅ ROLLBACK TRANSACTION ON ERROR
     if (session) {
       await session.abortTransaction();
     }
 
-    let errorMessage = 'Failed to make offer';
-    let statusCode = 500;
-    
-    if (error.name === 'StripeInvalidRequestError') {
-      errorMessage = 'Payment processing error';
-      statusCode = 400;
-    } else if (error.name === 'ValidationError') {
-      errorMessage = 'Invalid offer data';
-      statusCode = 400;
-    }
-
-    res.status(statusCode).json({ 
+    res.status(500).json({ 
       success: false,
-      error: errorMessage,
+      error: 'Failed to make offer',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   } finally {
@@ -240,7 +210,7 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
   }
 });
 
-// ✅ FIXED: CONFIRM OFFER PAYMENT
+// ✅ FIXED: CONFIRM OFFER PAYMENT (with proper enum values)
 router.post("/confirm-offer-payment", authenticateMiddleware, logRequest("CONFIRM_OFFER_PAYMENT"), async (req, res) => {
   console.log("🔍 Confirm Offer Payment Request DETAILS:", {
     body: req.body,
@@ -353,9 +323,7 @@ router.post("/confirm-offer-payment", authenticateMiddleware, logRequest("CONFIR
       return res.status(400).json({
         success: false,
         error: 'Payment not completed',
-        details: `Current status: ${paymentIntent.status}`,
-        requiresAction: paymentIntent.status === 'requires_action',
-        clientSecret: paymentIntent.status === 'requires_action' ? paymentIntent.client_secret : undefined
+        details: `Current status: ${paymentIntent.status}`
       });
     }
 
@@ -367,15 +335,15 @@ router.post("/confirm-offer-payment", authenticateMiddleware, logRequest("CONFIR
 
     console.log("✅ Offer status updated to paid:", offer._id);
 
-    // ✅ CREATE ORDER
+    // ✅ CREATE ORDER WITH PROPER ENUM VALUES
     const orderData = {
       buyerId: userId,
       sellerId: offer.listingId.sellerId,
       listingId: offer.listingId._id,
       offerId: offer._id,
-      orderType: 'paid_offer',
+      orderType: 'standard', // ✅ Use existing enum value
       amount: offer.amount,
-      status: 'pending_acceptance',
+      status: 'pending_payment', // ✅ Use existing enum value
       paymentStatus: 'paid',
       stripePaymentIntentId: paymentIntentId,
       paidAt: new Date(),
@@ -387,6 +355,8 @@ router.post("/confirm-offer-payment", authenticateMiddleware, logRequest("CONFIR
     // Add optional fields
     if (offer.requirements) orderData.requirements = offer.requirements;
     if (offer.expectedDelivery) orderData.expectedDelivery = offer.expectedDelivery;
+
+    console.log("📦 Creating order with data:", orderData);
 
     const order = new Order(orderData);
     await order.save({ session });
@@ -445,8 +415,15 @@ router.post("/confirm-offer-payment", authenticateMiddleware, logRequest("CONFIR
     let statusCode = 500;
 
     if (error.name === 'ValidationError') {
-      errorMessage = 'Invalid data provided';
+      errorMessage = 'Order validation failed';
       statusCode = 400;
+      // Log specific validation errors
+      if (error.errors) {
+        console.error('Validation errors:', Object.keys(error.errors));
+        Object.keys(error.errors).forEach(field => {
+          console.error(`- ${field}:`, error.errors[field].message);
+        });
+      }
     } else if (error.name === 'CastError') {
       errorMessage = 'Invalid ID format';
       statusCode = 400;
@@ -463,7 +440,6 @@ router.post("/confirm-offer-payment", authenticateMiddleware, logRequest("CONFIR
     }
   }
 });
-
 // ✅ GET OFFERS RECEIVED (SELLER)
 router.get("/received-offers", authenticateMiddleware, logRequest("RECEIVED_OFFERS"), async (req, res) => {
   try {
