@@ -119,14 +119,24 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
     });
   }
 });
-// ✅ UPDATED: Confirm Offer Payment with Better Stripe Handling
+// ✅ DEBUGGING VERSION: Add this temporarily to find the error
 router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) => {
+  console.log("🔍 [DEBUG] Request received:", {
+    body: req.body,
+    user: req.user,
+    headers: req.headers
+  });
+
   let session;
   try {
     const { offerId, paymentIntentId } = req.body;
-    const userId = req.user.id || req.user._id || req.user.userId;
+    const userId = req.user?.id || req.user?._id || req.user?.userId;
 
+    console.log("🔍 [DEBUG] Parsed data:", { offerId, paymentIntentId, userId });
+
+    // Validate input more strictly
     if (!offerId || !paymentIntentId) {
+      console.log("❌ [DEBUG] Missing required fields");
       return res.status(400).json({ 
         success: false,
         error: 'Missing required fields',
@@ -134,13 +144,21 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       });
     }
 
-    console.log("🔍 Confirming offer payment:", { offerId, paymentIntentId, userId });
+    if (!userId) {
+      console.log("❌ [DEBUG] No user ID found");
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required'
+      });
+    }
 
-    // Start MongoDB session for transaction
+    // Start MongoDB session
+    console.log("🔍 [DEBUG] Starting MongoDB session...");
     session = await mongoose.startSession();
     session.startTransaction();
 
     // Find the offer
+    console.log("🔍 [DEBUG] Looking for offer:", offerId);
     const offer = await Offer.findOne({
       _id: offerId,
       buyerId: userId,
@@ -149,6 +167,8 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     .populate('listingId')
     .populate('buyerId', 'username email')
     .session(session);
+
+    console.log("🔍 [DEBUG] Offer found:", offer ? offer._id : 'NOT FOUND');
 
     if (!offer) {
       await session.abortTransaction();
@@ -159,110 +179,52 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       });
     }
 
-    // Check if offer is already paid
+    // Check if already paid
     if (offer.status === 'paid') {
-      // If already paid, return the existing order details
+      console.log("🔍 [DEBUG] Offer already paid");
       const existingOrder = await Order.findOne({ offerId: offer._id }).session(session);
-      const existingChat = await Chat.findOne({ orderId: existingOrder?._id }).session(session);
-      
       await session.abortTransaction();
       
       return res.status(200).json({
         success: true,
         message: 'Payment already confirmed',
-        data: {
-          offer: {
-            _id: offer._id,
-            status: offer.status,
-            amount: offer.amount,
-            paidAt: offer.paidAt
-          },
-          order: existingOrder ? {
-            _id: existingOrder._id,
-            status: existingOrder.status,
-            amount: existingOrder.amount
-          } : null,
-          chat: existingChat ? {
-            _id: existingChat._id,
-            orderId: existingChat.orderId
-          } : null,
-          redirectUrl: existingChat ? `/messages?chat=${existingChat._id}&order=${existingOrder._id}` : null
-        }
+        data: { offerId: offer._id }
       });
     }
 
-    // ✅ IMPROVED STRIPE PAYMENT VERIFICATION
-    console.log("💳 Verifying payment intent...");
+    // Verify with Stripe
+    console.log("🔍 [DEBUG] Verifying with Stripe:", paymentIntentId);
     let paymentIntent;
-    
     try {
       paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-      console.log("📊 Payment Intent Status:", paymentIntent.status);
+      console.log("🔍 [DEBUG] Stripe response:", paymentIntent.status);
     } catch (stripeError) {
+      console.error("❌ [DEBUG] Stripe error:", stripeError);
       await session.abortTransaction();
-      console.error('❌ Stripe retrieval error:', stripeError);
-      
       return res.status(400).json({
         success: false,
-        error: 'Invalid payment intent',
-        details: 'Payment information could not be verified. Please try again.',
-        code: 'STRIPE_RETRIEVAL_ERROR'
+        error: 'Payment verification failed',
+        details: stripeError.message
       });
     }
 
-    // Handle different payment intent statuses
-    switch (paymentIntent.status) {
-      case 'succeeded':
-        // Proceed with order creation
-        break;
-        
-      case 'processing':
-        await session.abortTransaction();
-        return res.status(400).json({
-          success: false,
-          error: 'Payment still processing',
-          details: 'Your payment is still being processed. Please wait a moment and try again.',
-          code: 'PAYMENT_PROCESSING'
-        });
-        
-      case 'requires_action':
-      case 'requires_payment_method':
-        await session.abortTransaction();
-        return res.status(400).json({
-          success: false,
-          error: 'Payment requires action',
-          details: 'Additional action is required to complete your payment.',
-          code: 'PAYMENT_REQUIRES_ACTION'
-        });
-        
-      case 'canceled':
-        await session.abortTransaction();
-        return res.status(400).json({
-          success: false,
-          error: 'Payment canceled',
-          details: 'This payment was canceled. Please create a new offer.',
-          code: 'PAYMENT_CANCELED'
-        });
-        
-      default:
-        await session.abortTransaction();
-        return res.status(400).json({
-          success: false,
-          error: 'Payment not completed',
-          details: `Payment status: ${paymentIntent.status}. Please try again.`,
-          code: 'PAYMENT_INCOMPLETE'
-        });
+    if (paymentIntent.status !== 'succeeded') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        error: 'Payment not completed',
+        details: `Payment status: ${paymentIntent.status}`
+      });
     }
 
-    // ✅ UPDATE OFFER STATUS
-    console.log("✅ Updating offer status to paid...");
+    // Update offer
+    console.log("🔍 [DEBUG] Updating offer status...");
     offer.status = 'paid';
     offer.paidAt = new Date();
-    offer.paymentStatus = 'completed';
     await offer.save({ session });
 
-    // ✅ CREATE ORDER
-    console.log("🛒 Creating order...");
+    // Create order
+    console.log("🔍 [DEBUG] Creating order...");
     const order = new Order({
       buyerId: userId,
       sellerId: offer.listingId.sellerId,
@@ -273,18 +235,14 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       status: 'pending_acceptance',
       paymentStatus: 'paid',
       stripePaymentIntentId: paymentIntentId,
-      paidAt: new Date(),
-      requirements: offer.requirements,
-      expectedDelivery: offer.expectedDelivery,
-      revisions: 0,
-      maxRevisions: offer.listingId.revisions || 3,
-      paymentReleased: false
+      paidAt: new Date()
     });
 
     await order.save({ session });
+    console.log("🔍 [DEBUG] Order created:", order._id);
 
-    // ✅ CREATE CHAT ROOM
-    console.log("💬 Creating chat room...");
+    // Create chat
+    console.log("🔍 [DEBUG] Creating chat...");
     const chat = new Chat({
       orderId: order._id,
       participants: [
@@ -297,7 +255,8 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
 
     await chat.save({ session });
 
-    // Update listing status
+    // Update listing
+    console.log("🔍 [DEBUG] Updating listing...");
     await MarketplaceListing.findByIdAndUpdate(
       offer.listingId._id, 
       { 
@@ -309,70 +268,33 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
 
     // Commit transaction
     await session.commitTransaction();
-    console.log("✅ Payment confirmation completed successfully");
+    console.log("✅ [DEBUG] Transaction committed successfully");
 
-    // Send notifications (non-blocking)
-    try {
-      await Promise.all([
-        // Notify seller
-        sendNotification({
-          userId: offer.listingId.sellerId,
-          title: 'New Order! 🎉',
-          message: `You received a new order for "${offer.listingId.title}"`,
-          type: 'new_order',
-          relatedId: order._id
-        }),
-        // Notify buyer
-        sendNotification({
-          userId: userId,
-          title: 'Payment Confirmed! ✅',
-          message: `Your payment for "${offer.listingId.title}" was successful`,
-          type: 'payment_success',
-          relatedId: order._id
-        })
-      ]);
-    } catch (notifError) {
-      console.warn('⚠️ Notifications failed:', notifError);
-    }
-
-    // Success response
     res.status(200).json({
       success: true,
       message: 'Payment confirmed successfully!',
       data: {
-        offer: {
-          _id: offer._id,
-          status: offer.status,
-          amount: offer.amount
-        },
-        order: {
-          _id: order._id,
-          status: order.status
-        },
-        chat: {
-          _id: chat._id
-        },
-        redirectUrl: `/messages?chat=${chat._id}&order=${order._id}`
+        orderId: order._id,
+        chatId: chat._id,
+        redirectUrl: `/messages?chat=${chat._id}`
       }
     });
 
   } catch (error) {
-    // Error handling
+    console.error('❌ [DEBUG] CATCH BLOCK ERROR:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+
     if (session) {
       await session.abortTransaction();
     }
-    
-    console.error('❌ Payment confirmation error:', {
-      message: error.message,
-      offerId: req.body?.offerId,
-      paymentIntentId: req.body?.paymentIntentId
-    });
 
     res.status(500).json({
       success: false,
-      error: 'Payment confirmation failed',
-      details: process.env.NODE_ENV === 'development' ? error.message : 'Please try again later',
-      code: 'PROCESSING_ERROR'
+      error: 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.message : 'Please try again later'
     });
   } finally {
     if (session) {
