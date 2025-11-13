@@ -183,17 +183,39 @@ export const authAPI = {
   }
 };
 
-// ✅ Individual exports for Stripe functions
-export const checkStripeStatus = (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-  getRequest<{
-    connected: boolean;
-    status: 'active' | 'pending' | 'restricted' | 'unknown';
-    stripeAccountId?: string;
-    detailsSubmitted?: boolean;
-    payoutsEnabled?: boolean;
-    requirements?: any;
-  }>("/stripe/status", setLoading);
-
+/// CORRECTED Stripe status check API
+export const checkStripeStatus = async (): Promise<{
+  connected: boolean;
+  status: string;
+  chargesEnabled?: boolean;
+  payoutsEnabled?: boolean;
+  detailsSubmitted?: boolean;
+}> => {
+  try {
+    const response = await api.get('/marketplace/stripe/account-status');
+    
+    if (response.data.success !== false) {
+      return {
+        connected: true,
+        status: response.data.chargesEnabled ? 'active' : 'pending',
+        chargesEnabled: response.data.chargesEnabled,
+        payoutsEnabled: response.data.payoutsEnabled,
+        detailsSubmitted: response.data.detailsSubmitted
+      };
+    }
+    
+    return {
+      connected: false,
+      status: 'not_connected'
+    };
+  } catch (error) {
+    console.error('Error checking Stripe status:', error);
+    return {
+      connected: false,
+      status: 'error'
+    };
+  }
+};
 export const createStripeAccount = async (): Promise<{ url: string }> => {
   const response = await api.post<{ 
     success: boolean; 
@@ -207,6 +229,7 @@ export const createStripeAccount = async (): Promise<{ url: string }> => {
     throw new Error(response.data.error || 'Failed to create Stripe account');
   }
 };
+
 export const completeOnboarding = (setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
   postRequest("/stripe/complete-onboarding", {}, setLoading, "Stripe account connected successfully");
 
