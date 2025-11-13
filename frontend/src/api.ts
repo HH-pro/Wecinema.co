@@ -183,23 +183,94 @@ export const authAPI = {
   }
 };
 
-// ✅ Individual exports for Stripe functions
-export const checkStripeStatus = (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-  getRequest<{
-    connected: boolean;
-    status: 'active' | 'pending' | 'restricted' | 'unknown';
-    stripeAccountId?: string;
-    detailsSubmitted?: boolean;
-    payoutsEnabled?: boolean;
-    requirements?: any;
-  }>("/stripe/status", setLoading);
+// Updated Stripe status check API
+export const checkStripeStatus = async (): Promise<{
+  connected: boolean;
+  status: string;
+  chargesEnabled?: boolean;
+  payoutsEnabled?: boolean;
+  detailsSubmitted?: boolean;
+  stripeAccountId?: string;
+}> => {
+  try {
+    console.log('🔄 Checking Stripe status...');
+    const response = await api.get('/marketplace/stripe/account-status');
+    console.log('✅ Stripe status API response:', response.data);
+    
+    if (response.data.connected) {
+      return {
+        connected: true,
+        status: response.data.chargesEnabled ? 'active' : 'pending',
+        chargesEnabled: response.data.chargesEnabled,
+        payoutsEnabled: response.data.payoutsEnabled,
+        detailsSubmitted: response.data.detailsSubmitted,
+        stripeAccountId: response.data.stripeAccountId
+      };
+    }
+    
+    return {
+      connected: false,
+      status: 'not_connected'
+    };
+  } catch (error: any) {
+    console.error('❌ Error checking Stripe status:', error);
+    console.log('Error details:', error.response?.data);
+    
+    return {
+      connected: false,
+      status: 'error'
+    };
+  }
+};
 
-export const createStripeAccount = (setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-  postRequest<{ url: string }>("/marketplace/stripe/onboard-seller", {}, setLoading, "Redirecting to Stripe setup");
-
+// Create Stripe account - simplified
+export const createStripeAccount = async (): Promise<{ url: string }> => {
+  try {
+    const response = await api.post('/marketplace/stripe/onboard-seller');
+    
+    if (response.data.success && response.data.url) {
+      return { url: response.data.url };
+    } else {
+      throw new Error(response.data.error || 'Failed to create Stripe account');
+    }
+  } catch (error: any) {
+    console.error('Stripe account creation error:', error);
+    throw new Error(error.response?.data?.error || 'Failed to connect Stripe account');
+  }
+};
 export const completeOnboarding = (setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
   postRequest("/stripe/complete-onboarding", {}, setLoading, "Stripe account connected successfully");
+// utils/payment.js
+export const confirmOfferPayment = async (offerId, paymentIntentId) => {
+  try {
+    const token = localStorage.getItem('token');
+    
+    console.log('🔄 Confirming payment...', { offerId, paymentIntentId });
 
+    const response = await fetch('/marketplace/offers/confirm-offer-payment', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        offerId,
+        paymentIntentId
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || data.details || 'Payment confirmation failed');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('❌ Payment confirmation error:', error);
+    throw error;
+  }
+};
 export const createPaymentIntents = (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
   postRequest<{
     clientSecret: string;
