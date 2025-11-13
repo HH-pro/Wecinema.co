@@ -2,7 +2,7 @@
 import jwtDecode from "jwt-decode";
 import moment from "moment";
 
-// Interface and Types
+// ===== Interfaces =====
 export interface Itoken {
   userId: string;
   avatar: string;
@@ -17,36 +17,38 @@ export interface Itoken {
   sub?: string;
 }
 
-// Cache for decoded token
+// ===== Cached token =====
 let cachedToken: Itoken | null = null;
 
-// Utility Functions
+// ===== Helper Functions =====
 
+// Generate slug from text
 export const generateSlug = (text: string): string =>
   text.toLowerCase().replace(/\s+/g, "-").replace(/[^\w-]+/g, "");
 
+// Truncate text
 export const truncateText = (text: string, maxLength: number): string =>
   text.length <= maxLength ? text : text.slice(0, maxLength - 3) + "...";
 
-// Decode token once and cache
+// Decode JWT token with fallback and caching
 export const decodeToken = (token: string | null): Itoken | null => {
   if (!token) return null;
   if (cachedToken) return cachedToken;
 
   try {
-    const decodedToken = jwtDecode<Itoken>(token);
-
+    const decoded: Itoken = jwtDecode<Itoken>(token);
     const currentTime = Math.floor(Date.now() / 1000);
-    if (decodedToken.exp && decodedToken.exp < currentTime) {
+
+    if (decoded.exp && decoded.exp < currentTime) {
       clearAuthData();
       return null;
     }
 
-    cachedToken = decodedToken;
-    return decodedToken;
+    cachedToken = decoded;
+    return decoded;
   } catch {
+    // Manual decode fallback
     try {
-      // Manual JWT decode fallback
       const parts = token.split(".");
       if (parts.length !== 3) return null;
 
@@ -61,13 +63,12 @@ export const decodeToken = (token: string | null): Itoken | null => {
   }
 };
 
-// Get current user ID
+// Get current user ID (from storage or token)
 export const getCurrentUserId = (): string | null => {
-  // Try cached userId
   const storedId = localStorage.getItem("userId") || sessionStorage.getItem("userId");
   if (storedId) return storedId;
 
-  // Try from user object
+  // From user object
   const userData = localStorage.getItem("user") || sessionStorage.getItem("user");
   if (userData) {
     try {
@@ -80,12 +81,13 @@ export const getCurrentUserId = (): string | null => {
     } catch {}
   }
 
-  // Try from token
+  // From token
   const token = localStorage.getItem("token") || sessionStorage.getItem("token");
   if (token) {
     const tokenData = decodeToken(token);
     if (tokenData) {
-      const userId = tokenData.userId || tokenData.id || tokenData.user?.id || tokenData.user?._id || tokenData.sub;
+      const userId =
+        tokenData.userId || tokenData.id || tokenData.user?.id || tokenData.user?._id || tokenData.sub;
       if (userId) {
         localStorage.setItem("userId", userId);
         return userId;
@@ -145,9 +147,10 @@ export const getUserInfo = (): { userId: string | null; username: string | null 
   return { userId, username };
 };
 
-// Other helpers
+// Check empty object
 export const isObjectEmpty = (obj: Record<string, any>): boolean => !Object.keys(obj).length;
 
+// Format date as "time ago"
 export const formatDateAgo = (dateTime: string): string => {
   const now = moment();
   const then = moment(dateTime);
@@ -164,19 +167,45 @@ export const formatDateAgo = (dateTime: string): string => {
   return moment(dateTime).format("MMM D, YYYY [at] h:mm A");
 };
 
+// Check if userId exists in array
 export const isUserIdInArray = (userId: string, idArray: string[]): boolean => idArray.includes(userId);
 
+// Logout
 export const logout = () => {
   clearAuthData();
   window.location.href = "/admin";
 };
 
+// Capitalization helpers
 export const capitalizeFirstLetter = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
-
 export const getCapitalizedFirstLetter = (str: string) => str?.charAt(0).toUpperCase();
 
+// Toggle item in array
 export const toggleItemInArray = <T>(array: T[], item: T): T[] =>
   array.includes(item) ? array.filter(i => i !== item) : [...array, item];
 
-// Chart options (unchanged)
-export const chartOptions = { /* keep your existing chartOptions */ };
+// Chart options (keep existing structure)
+export const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { position: "top" as const, labels: { color: "white", font: { size: 8 }, usePointStyle: true, pointStyleWidth: 0 } },
+    title: {
+      display: true,
+      text: "Rise and Fall of Different Genres/Themes/Ratings Over Time",
+      color: "white",
+      font: { size: 12, weight: "bold" },
+      padding: { top: 1, bottom: 10 },
+    },
+    tooltip: { enabled: true, bodyFont: { size: 10 }, titleFont: { size: 10 }, padding: 8 },
+  },
+  scales: {
+    y: { title: { display: true, text: "Popularity Metric (Views/Uploads)", color: "white", font: { size: 10 } }, ticks: { color: "white", font: { size: 9 } } },
+    x: {
+      reverse: true,
+      title: { display: true, text: "Time (Weeks)", color: "white", font: { size: 10 }, padding: { bottom: 20 } },
+      ticks: { color: "white", font: { size: 10 } },
+    },
+  },
+  elements: { line: { tension: 0.4, borderWidth: 1 }, point: { radius: 3, hoverRadius: 3 } },
+};
