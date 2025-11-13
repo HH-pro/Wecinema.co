@@ -3,7 +3,7 @@ const router = express.Router();
 const Offer = require("../../models/marketplace/offer");
 const MarketplaceListing = require("../../models/marketplace/listing");
 const Order = require("../../models/marketplace/order");
-const Chat = require("../../../models/Chat"); // Add Chat model
+const Chat = require("../../models/marketplace/Chat"); // Add Chat model
 const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils");
 
 // Direct Stripe keys
