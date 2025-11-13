@@ -119,46 +119,82 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
     });
   }
 });
-
 // ✅ UPDATED: Confirm Offer Payment and Create Order Immediately
 router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) => {
+  let session;
   try {
     const { offerId, paymentIntentId } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
 
-    console.log("🔍 Confirming offer payment and creating order:", { offerId, paymentIntentId });
+    if (!offerId || !paymentIntentId) {
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        details: 'Offer ID and Payment Intent ID are required'
+      });
+    }
+
+    console.log("🔍 Confirming offer payment and creating order:", { 
+      offerId, 
+      paymentIntentId,
+      userId 
+    });
+
+    // Start MongoDB session for transaction
+    session = await mongoose.startSession();
+    session.startTransaction();
 
     // Find the offer with populated listing
     const offer = await Offer.findOne({
       _id: offerId,
       buyerId: userId,
       paymentIntentId: paymentIntentId
-    }).populate('listingId').populate('buyerId', 'username email');
+    })
+    .populate('listingId')
+    .populate('buyerId', 'username email')
+    .session(session);
 
     if (!offer) {
-      return res.status(404).json({ error: 'Offer not found or access denied' });
+      await session.abortTransaction();
+      return res.status(404).json({ 
+        error: 'Offer not found or access denied',
+        details: 'Please check the offer ID and try again'
+      });
+    }
+
+    // Check if offer is already paid
+    if (offer.status === 'paid') {
+      await session.abortTransaction();
+      return res.status(400).json({ 
+        error: 'Offer already paid',
+        details: 'This offer has already been processed'
+      });
     }
 
     // Verify payment intent with Stripe
+    console.log("💳 Verifying payment intent with Stripe...");
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
     
     if (paymentIntent.status !== 'succeeded') {
+      await session.abortTransaction();
       return res.status(400).json({ 
         error: 'Payment not completed', 
-        paymentStatus: paymentIntent.status 
+        paymentStatus: paymentIntent.status,
+        details: `Payment status: ${paymentIntent.status}. Please try again.`
       });
     }
 
     // ✅ UPDATE OFFER STATUS
-    offer.status = 'paid'; // Payment completed, waiting for seller acceptance
+    console.log("✅ Updating offer status to paid...");
+    offer.status = 'paid';
     offer.paidAt = new Date();
-    await offer.save();
+    offer.paymentStatus = 'completed';
+    await offer.save({ session });
 
     console.log("✅ Offer payment confirmed:", offer._id);
 
     // ✅ CREATE ORDER IMMEDIATELY (Not waiting for seller acceptance)
     console.log("🛒 Creating order immediately after payment...");
-    const order = new Order({
+    const orderData = {
       buyerId: userId,
       sellerId: offer.listingId.sellerId,
       listingId: offer.listingId._id,
@@ -172,62 +208,158 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       requirements: offer.requirements,
       expectedDelivery: offer.expectedDelivery,
       revisions: 0,
-      maxRevisions: 3,
-      paymentReleased: false
-    });
+      maxRevisions: offer.listingId.revisions || 3,
+      paymentReleased: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
 
-    await order.save();
+    const order = new Order(orderData);
+    await order.save({ session });
     console.log("✅ Order created immediately:", order._id);
 
     // ✅ CREATE FIREBASE CHAT ROOM
-    console.log("💬 Creating Firebase chat room...");
-    const chat = new Chat({
+    console.log("💬 Creating chat room...");
+    const chatData = {
       orderId: order._id,
       participants: [
-        { userId: userId, role: 'buyer' },
-        { userId: offer.listingId.sellerId, role: 'seller' }
+        { 
+          userId: userId, 
+          role: 'buyer',
+          joinedAt: new Date()
+        },
+        { 
+          userId: offer.listingId.sellerId, 
+          role: 'seller',
+          joinedAt: new Date()
+        }
       ],
       listingId: offer.listingId._id,
-      status: 'active'
-    });
+      status: 'active',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastMessage: null,
+      unreadCount: {
+        [userId]: 0,
+        [offer.listingId.sellerId]: 0
+      }
+    };
 
-    await chat.save();
+    const chat = new Chat(chatData);
+    await chat.save({ session });
     console.log("✅ Chat room created:", chat._id);
 
     // Mark listing as reserved
-    await MarketplaceListing.findByIdAndUpdate(offer.listingId._id, { 
-      status: 'reserved',
-      reservedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-    });
+    console.log("📦 Updating listing status to reserved...");
+    await MarketplaceListing.findByIdAndUpdate(
+      offer.listingId._id, 
+      { 
+        status: 'reserved',
+        reservedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+        updatedAt: new Date()
+      },
+      { session }
+    );
 
-    res.status(200).json({
+    // Commit transaction
+    await session.commitTransaction();
+    console.log("✅ Database transaction committed successfully");
+
+    // Send notifications (outside transaction)
+    try {
+      // Notify seller about new order
+      await sendNotification({
+        userId: offer.listingId.sellerId,
+        title: 'New Order Received!',
+        message: `You have a new order for your listing "${offer.listingId.title}"`,
+        type: 'new_order',
+        relatedId: order._id
+      });
+
+      // Notify buyer about successful payment
+      await sendNotification({
+        userId: userId,
+        title: 'Payment Successful!',
+        message: `Your payment for "${offer.listingId.title}" has been confirmed`,
+        type: 'payment_success',
+        relatedId: order._id
+      });
+
+      console.log("📧 Notifications sent successfully");
+    } catch (notifError) {
+      console.warn('⚠️ Notification sending failed:', notifError);
+      // Don't fail the whole request if notifications fail
+    }
+
+    // Prepare response
+    const response = {
       success: true,
       message: 'Payment confirmed! Offer submitted to seller. You can now chat with the seller.',
-      offer: {
-        _id: offer._id,
-        status: offer.status,
-        amount: offer.amount,
-        paidAt: offer.paidAt
-      },
-      order: {
-        _id: order._id,
-        status: order.status,
-        amount: order.amount,
-        paymentStatus: order.paymentStatus
-      },
-      chat: {
-        _id: chat._id,
-        orderId: chat.orderId
-      },
-      redirectUrl: `/messages?chat=${chat._id}&order=${order._id}`
-    });
+      data: {
+        offer: {
+          _id: offer._id,
+          status: offer.status,
+          amount: offer.amount,
+          paidAt: offer.paidAt,
+          listingTitle: offer.listingId.title
+        },
+        order: {
+          _id: order._id,
+          status: order.status,
+          amount: order.amount,
+          paymentStatus: order.paymentStatus,
+          expectedDelivery: order.expectedDelivery
+        },
+        chat: {
+          _id: chat._id,
+          orderId: chat.orderId
+        },
+        redirectUrl: `/messages?chat=${chat._id}&order=${order._id}`
+      }
+    };
+
+    res.status(200).json(response);
 
   } catch (error) {
-    console.error('❌ Error confirming offer payment:', error);
-    res.status(500).json({ 
-      error: 'Failed to confirm payment',
-      details: error.message
+    // Abort transaction on error
+    if (session) {
+      await session.abortTransaction();
+    }
+    
+    console.error('❌ Error confirming offer payment:', {
+      message: error.message,
+      stack: error.stack,
+      offerId: req.body?.offerId,
+      paymentIntentId: req.body?.paymentIntentId
     });
+
+    // Handle specific error types
+    let statusCode = 500;
+    let errorMessage = 'Failed to confirm payment';
+    let errorDetails = error.message;
+
+    if (error.name === 'StripeError') {
+      statusCode = 400;
+      errorMessage = 'Payment processing error';
+    } else if (error.name === 'ValidationError') {
+      statusCode = 400;
+      errorMessage = 'Validation error';
+    } else if (error.name === 'CastError') {
+      statusCode = 400;
+      errorMessage = 'Invalid ID format';
+    }
+
+    res.status(statusCode).json({ 
+      success: false,
+      error: errorMessage,
+      details: errorDetails,
+      code: error.code || 'PROCESSING_ERROR'
+    });
+  } finally {
+    // End session
+    if (session) {
+      session.endSession();
+    }
   }
 });
 
