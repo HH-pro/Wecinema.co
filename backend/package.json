@@ -12,6 +12,7 @@
   "license": "ISC",
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
+    "@emailjs/nodejs": "^5.0.2",
     "@sentry/integrations": "^7.114.0",
     "@sentry/node": "^7.120.3",
     "@sentry/profiling-node": "^9.22.0",
