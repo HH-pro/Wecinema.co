@@ -123,7 +123,6 @@ router.post("/create-listing", async (req, res) => {
     // Get seller email from User model
     let sellerEmail = null;
     try {
-      const User = require('../models/User'); // Adjust path to your User model
       const seller = await User.findById(sellerId).select('email');
       if (seller) {
         sellerEmail = seller.email;
