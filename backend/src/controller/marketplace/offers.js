@@ -1293,23 +1293,19 @@ router.get("/test-stripe", logRequest("TEST_STRIPE"), async (req, res) => {
   }
 });
 
-// ✅ DELETE ALL OFFERS (FOR TESTING)
-router.delete("/delete-all-offers", logRequest("DELETE_ALL_OFFERS"), async (req, res) => {
+// ⚠️ Delete all offers (No Auth) — use only for testing or local cleanup
+router.delete("/delete-all-offers", async (req, res) => {
   try {
     const result = await Offer.deleteMany({});
-    console.log(`🗑️ Deleted ${result.deletedCount} offers`);
+    console.log(`🗑️ Deleted ${result.deletedCount} offers from the database.`);
 
     res.status(200).json({
       success: true,
-      message: `All offers deleted successfully (${result.deletedCount} offers removed).`,
-      data: { deletedCount: result.deletedCount }
+      message: `All offers deleted successfully (${result.deletedCount} offers removed).`
     });
   } catch (error) {
     console.error("❌ Error deleting all offers:", error);
-    res.status(500).json({ 
-      success: false,
-      error: "Failed to delete all offers" 
-    });
+    res.status(500).json({ error: "Failed to delete all offers" });
   }
 });
 
