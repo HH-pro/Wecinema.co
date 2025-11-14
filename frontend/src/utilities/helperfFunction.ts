@@ -36,7 +36,7 @@ export const decodeToken = (token: any) => {
     return null;
   }
   
-
+  try {
     console.log("🔐 Attempting to decode token...");
     const decodedToken: any = jwtDecode(token) as Itoken;
     const currentTime = Math.floor(Date.now() / 1000);
@@ -49,7 +49,10 @@ export const decodeToken = (token: any) => {
       return null;
     }
     
-    
+    console.log("✅ Token decoded successfully:", decodedToken);
+    return decodedToken;
+  } catch (error) {
+    console.error("❌ JWT decode failed, trying manual decode:", error);
     
     // Manual JWT decoding as fallback
     try {
@@ -69,7 +72,7 @@ export const decodeToken = (token: any) => {
       console.error("❌ Manual token decode also failed:", manualError);
       return null;
     }
-  
+  }
 };
 
 // DIRECT USER ID EXTRACTION - Multiple reliable methods
