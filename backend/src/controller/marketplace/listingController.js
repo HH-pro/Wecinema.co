@@ -74,7 +74,6 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
 });
 // ===================================================
 // ✅ CREATE LISTING (like your working video route)
-// ===================================================
 router.post("/create-listing", async (req, res) => {
   try {
     console.log("=== CREATE LISTING REQUEST ===");
@@ -82,49 +81,121 @@ router.post("/create-listing", async (req, res) => {
 
     const { title, description, price, type, category, tags, mediaUrls, sellerId } = req.body;
 
-    if (!title || !description || !price || !type || !category || !sellerId) {
+    // Enhanced validation with specific checks
+    if (!title || !description || !price || !type || !sellerId) {
       return res.status(400).json({ 
         error: "Missing required fields",
-        required: ["title", "description", "price", "type", "category", "sellerId"]
+        required: ["title", "description", "price", "type", "sellerId"],
+        received: {
+          title: !!title,
+          description: !!description,
+          price: !!price,
+          type: !!type,
+          sellerId: !!sellerId,
+          category: !!category
+        }
       });
     }
 
-    // Normalize tags and media URLs
-    const tagsArray = Array.isArray(tags) ? tags : [tags];
-    const mediaArray = Array.isArray(mediaUrls) ? mediaUrls : [mediaUrls];
+    // Validate price is a positive number
+    if (typeof price !== 'number' || price <= 0) {
+      return res.status(400).json({
+        error: "Price must be a positive number",
+        received: price
+      });
+    }
+
+    // Validate sellerId format
+    if (!mongoose.Types.ObjectId.isValid(sellerId)) {
+      return res.status(400).json({
+        error: "Invalid seller ID format",
+        received: sellerId
+      });
+    }
+
+    // Normalize data with defaults
+    const tagsArray = Array.isArray(tags) ? tags : (tags ? [tags] : []);
+    const mediaArray = Array.isArray(mediaUrls) ? mediaUrls : (mediaUrls ? [mediaUrls] : []);
+    const actualCategory = category || 'uncategorized'; // Default category
 
     console.log("Creating listing for seller:", sellerId);
 
-    // 🆕 Get seller email from User model
+    // Get seller email from User model
     let sellerEmail = null;
     try {
       const User = mongoose.model('User');
       const seller = await User.findById(sellerId).select('email');
-      if (seller && seller.email) {
+      if (seller) {
         sellerEmail = seller.email;
         console.log("✅ Seller email found:", sellerEmail);
+      } else {
+        return res.status(404).json({
+          error: "Seller not found",
+          sellerId: sellerId
+        });
       }
     } catch (emailError) {
       console.error("❌ Error fetching seller email:", emailError);
+      return res.status(500).json({
+        error: "Failed to verify seller",
+        details: emailError.message
+      });
     }
 
+    // Create the listing
     const listing = await MarketplaceListing.create({
       sellerId: sellerId,
-      sellerEmail: sellerEmail, // 🆕 Add seller email to listing
-      title,
-      description,
-      price,
-      type,
-      category,
-      tags: tagsArray,
+      sellerEmail: sellerEmail,
+      title: title.trim(),
+      description: description.trim(),
+      price: parseFloat(price).toFixed(2), // Ensure 2 decimal places
+      type: type,
+      category: actualCategory.trim(),
+      tags: tagsArray.map(tag => tag.trim()).filter(tag => tag), // Clean tags
       mediaUrls: mediaArray,
       status: "active",
+      createdAt: new Date(),
+      updatedAt: new Date()
     });
 
-    res.status(201).json({ message: "Listing created successfully", listing });
+    console.log("✅ Listing created successfully:", listing._id);
+
+    res.status(201).json({ 
+      message: "Listing created successfully", 
+      listing: {
+        id: listing._id,
+        title: listing.title,
+        price: listing.price,
+        type: listing.type,
+        category: listing.category,
+        status: listing.status,
+        createdAt: listing.createdAt
+      }
+    });
+
   } catch (error) {
-    console.error("Error creating listing:", error);
-    res.status(500).json({ error: "Failed to create listing", details: error.message });
+    console.error("❌ Error creating listing:", error);
+    
+    // Handle duplicate key errors
+    if (error.code === 11000) {
+      return res.status(400).json({
+        error: "Listing with similar details already exists",
+        details: error.keyValue
+      });
+    }
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: Object.values(error.errors).map(err => err.message)
+      });
+    }
+
+    res.status(500).json({ 
+      error: "Failed to create listing", 
+      details: error.message 
+    });
   }
 });
 // ===================================================
