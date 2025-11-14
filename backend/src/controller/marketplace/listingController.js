@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const MarketplaceListing = require("../../models/marketplace/listing");
 const User = require("../../models/user");
-const mongoose = require('mongoose');
+
 const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils");
 
 // ===================================================
@@ -73,7 +73,8 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
   }
 });
 // ===================================================
-
+// ✅ CREATE LISTING (like your working video route)
+// ===================================================
 router.post("/create-listing", async (req, res) => {
   try {
     console.log("=== CREATE LISTING REQUEST ===");
@@ -81,156 +82,49 @@ router.post("/create-listing", async (req, res) => {
 
     const { title, description, price, type, category, tags, mediaUrls, sellerId } = req.body;
 
-    // Enhanced validation with specific checks
-    if (!title || !description || !price || !type || !sellerId) {
+    if (!title || !description || !price || !type || !category || !sellerId) {
       return res.status(400).json({ 
         error: "Missing required fields",
-        required: ["title", "description", "price", "type", "sellerId"],
-        received: {
-          title: !!title,
-          description: !!description,
-          price: !!price,
-          type: !!type,
-          sellerId: !!sellerId,
-          category: !!category
-        }
+        required: ["title", "description", "price", "type", "category", "sellerId"]
       });
     }
 
-    // Validate price is a positive number
-    if (typeof price !== 'number' || price <= 0) {
-      return res.status(400).json({
-        error: "Price must be a positive number",
-        received: price
-      });
-    }
-
-    // Validate sellerId format
-    if (!mongoose.Types.ObjectId.isValid(sellerId)) {
-      return res.status(400).json({
-        error: "Invalid seller ID format",
-        received: sellerId
-      });
-    }
-
-    // Normalize data with defaults
-    const tagsArray = Array.isArray(tags) ? tags : (tags ? [tags] : []);
-    const mediaArray = Array.isArray(mediaUrls) ? mediaUrls : (mediaUrls ? [mediaUrls] : []);
-    const actualCategory = category || 'uncategorized';
+    // Normalize tags and media URLs
+    const tagsArray = Array.isArray(tags) ? tags : [tags];
+    const mediaArray = Array.isArray(mediaUrls) ? mediaUrls : [mediaUrls];
 
     console.log("Creating listing for seller:", sellerId);
 
-    // Get seller email from User model with timeout and connection check
+    // 🆕 Get seller email from User model
     let sellerEmail = null;
-    let sellerExists = false;
-    
     try {
-      // Check database connection first
-      const dbState = mongoose.connection.readyState;
-      if (dbState !== 1) { // 1 = connected
-        console.warn(`⚠️ Database not connected (state: ${dbState}), skipping email fetch`);
-        throw new Error('Database not connected');
-      }
-
-      // Use Promise.race to implement timeout
       const User = mongoose.model('User');
-      const emailFetchPromise = User.findById(sellerId).select('email').exec();
-      
-      // 5 second timeout for email fetch (instead of default 10s)
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Email fetch timeout')), 5000)
-      );
-
-      const seller = await Promise.race([emailFetchPromise, timeoutPromise]);
-      
-      if (seller) {
+      const seller = await User.findById(sellerId).select('email');
+      if (seller && seller.email) {
         sellerEmail = seller.email;
-        sellerExists = true;
         console.log("✅ Seller email found:", sellerEmail);
-      } else {
-        console.warn("⚠️ Seller not found in database");
-        // Don't fail here - continue without email
       }
     } catch (emailError) {
-      console.error("❌ Error fetching seller email:", emailError.message);
-      // Continue without email - don't block listing creation
-      sellerExists = true; // Assume seller exists to continue
+      console.error("❌ Error fetching seller email:", emailError);
     }
 
-    // If we couldn't verify the seller exists, fail the request
-    if (!sellerExists) {
-      return res.status(404).json({
-        error: "Seller not found",
-        sellerId: sellerId
-      });
-    }
-
-    // Create the listing (proceed even without email)
     const listing = await MarketplaceListing.create({
       sellerId: sellerId,
-      sellerEmail: sellerEmail, // Will be null if fetch failed
-      title: title.trim(),
-      description: description.trim(),
-      price: parseFloat(price).toFixed(2),
-      type: type,
-      category: actualCategory.trim(),
-      tags: tagsArray.map(tag => tag.trim()).filter(tag => tag),
+      sellerEmail: sellerEmail, // 🆕 Add seller email to listing
+      title,
+      description,
+      price,
+      type,
+      category,
+      tags: tagsArray,
       mediaUrls: mediaArray,
       status: "active",
-      createdAt: new Date(),
-      updatedAt: new Date()
     });
 
-    console.log("✅ Listing created successfully:", listing._id);
-    if (!sellerEmail) {
-      console.warn("⚠️ Listing created without seller email");
-    }
-
-    res.status(201).json({ 
-      message: "Listing created successfully", 
-      listing: {
-        id: listing._id,
-        title: listing.title,
-        price: listing.price,
-        type: listing.type,
-        category: listing.category,
-        status: listing.status,
-        createdAt: listing.createdAt,
-        hasSellerEmail: !!sellerEmail // Indicate if email was captured
-      }
-    });
-
+    res.status(201).json({ message: "Listing created successfully", listing });
   } catch (error) {
-    console.error("❌ Error creating listing:", error);
-    
-    // Handle duplicate key errors
-    if (error.code === 11000) {
-      return res.status(400).json({
-        error: "Listing with similar details already exists",
-        details: error.keyValue
-      });
-    }
-    
-    // Handle validation errors
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({
-        error: "Validation failed",
-        details: Object.values(error.errors).map(err => err.message)
-      });
-    }
-
-    // Handle database connection errors
-    if (error.name === 'MongooseError' || error.message.includes('buffering timed out')) {
-      return res.status(503).json({
-        error: "Database temporarily unavailable",
-        details: "Please try again in a moment"
-      });
-    }
-
-    res.status(500).json({ 
-      error: "Failed to create listing", 
-      details: error.message 
-    });
+    console.error("Error creating listing:", error);
+    res.status(500).json({ error: "Failed to create listing", details: error.message });
   }
 });
 // ===================================================
