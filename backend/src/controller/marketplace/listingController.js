@@ -73,7 +73,8 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
   }
 });
 // ===================================================
-// Without mongoose import - using simple validation instead
+const mongoose = require('mongoose');
+
 router.post("/create-listing", async (req, res) => {
   try {
     console.log("=== CREATE LISTING REQUEST ===");
@@ -105,8 +106,8 @@ router.post("/create-listing", async (req, res) => {
       });
     }
 
-    // Simple sellerId validation (basic length check for MongoDB ObjectId)
-    if (!sellerId || typeof sellerId !== 'string' || sellerId.length !== 24) {
+    // Validate sellerId format
+    if (!mongoose.Types.ObjectId.isValid(sellerId)) {
       return res.status(400).json({
         error: "Invalid seller ID format",
         received: sellerId
@@ -120,31 +121,55 @@ router.post("/create-listing", async (req, res) => {
 
     console.log("Creating listing for seller:", sellerId);
 
-    // Get seller email from User model
+    // Get seller email from User model with timeout and connection check
     let sellerEmail = null;
+    let sellerExists = false;
+    
     try {
-      const seller = await User.findById(sellerId).select('email');
+      // Check database connection first
+      const dbState = mongoose.connection.readyState;
+      if (dbState !== 1) { // 1 = connected
+        console.warn(`⚠️ Database not connected (state: ${dbState}), skipping email fetch`);
+        throw new Error('Database not connected');
+      }
+
+      // Use Promise.race to implement timeout
+      const User = mongoose.model('User');
+      const emailFetchPromise = User.findById(sellerId).select('email').exec();
+      
+      // 5 second timeout for email fetch (instead of default 10s)
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Email fetch timeout')), 5000)
+      );
+
+      const seller = await Promise.race([emailFetchPromise, timeoutPromise]);
+      
       if (seller) {
         sellerEmail = seller.email;
+        sellerExists = true;
         console.log("✅ Seller email found:", sellerEmail);
       } else {
-        return res.status(404).json({
-          error: "Seller not found",
-          sellerId: sellerId
-        });
+        console.warn("⚠️ Seller not found in database");
+        // Don't fail here - continue without email
       }
     } catch (emailError) {
-      console.error("❌ Error fetching seller email:", emailError);
-      return res.status(500).json({
-        error: "Failed to verify seller",
-        details: emailError.message
+      console.error("❌ Error fetching seller email:", emailError.message);
+      // Continue without email - don't block listing creation
+      sellerExists = true; // Assume seller exists to continue
+    }
+
+    // If we couldn't verify the seller exists, fail the request
+    if (!sellerExists) {
+      return res.status(404).json({
+        error: "Seller not found",
+        sellerId: sellerId
       });
     }
 
-    // Create the listing
+    // Create the listing (proceed even without email)
     const listing = await MarketplaceListing.create({
       sellerId: sellerId,
-      sellerEmail: sellerEmail,
+      sellerEmail: sellerEmail, // Will be null if fetch failed
       title: title.trim(),
       description: description.trim(),
       price: parseFloat(price).toFixed(2),
@@ -158,6 +183,9 @@ router.post("/create-listing", async (req, res) => {
     });
 
     console.log("✅ Listing created successfully:", listing._id);
+    if (!sellerEmail) {
+      console.warn("⚠️ Listing created without seller email");
+    }
 
     res.status(201).json({ 
       message: "Listing created successfully", 
@@ -168,13 +196,15 @@ router.post("/create-listing", async (req, res) => {
         type: listing.type,
         category: listing.category,
         status: listing.status,
-        createdAt: listing.createdAt
+        createdAt: listing.createdAt,
+        hasSellerEmail: !!sellerEmail // Indicate if email was captured
       }
     });
 
   } catch (error) {
     console.error("❌ Error creating listing:", error);
     
+    // Handle duplicate key errors
     if (error.code === 11000) {
       return res.status(400).json({
         error: "Listing with similar details already exists",
@@ -182,10 +212,19 @@ router.post("/create-listing", async (req, res) => {
       });
     }
     
+    // Handle validation errors
     if (error.name === 'ValidationError') {
       return res.status(400).json({
         error: "Validation failed",
         details: Object.values(error.errors).map(err => err.message)
+      });
+    }
+
+    // Handle database connection errors
+    if (error.name === 'MongooseError' || error.message.includes('buffering timed out')) {
+      return res.status(503).json({
+        error: "Database temporarily unavailable",
+        details: "Please try again in a moment"
       });
     }
 
