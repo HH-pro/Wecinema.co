@@ -5,14 +5,20 @@ const Offer = require("../../models/marketplace/offer");
 const MarketplaceListing = require("../../models/marketplace/listing");
 const Order = require("../../models/marketplace/order");
 const Chat = require("../../models/marketplace/Chat");
-const Message = require("../../models/marketplace/messages"); // Your Message model
+const Message = require("../../models/marketplace/messages");
 const { authenticateMiddleware } = require("../../utils");
 const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
 
-// Direct Stripe keys
+// EmailJS for email notifications
+const emailjs = require('@emailjs/nodejs');
 
-// Firebase Chat Service (if using Firebase)
-const FirebaseChatService = require("../../../services/chatService");
+// Initialize EmailJS with your credentials
+const EMAILJS_CONFIG = {
+  serviceId: 'YOUR_EMAILJS_SERVICE_ID', // Replace with your EmailJS service ID
+  templateId: 'YOUR_EMAILJS_TEMPLATE_ID', // Replace with your EmailJS template ID
+  publicKey: 'YOUR_EMAILJS_PUBLIC_KEY', // Replace with your EmailJS public key
+  privateKey: 'YOUR_EMAILJS_PRIVATE_KEY' // Replace with your EmailJS private key
+};
 
 // ✅ VALIDATION HELPER FUNCTIONS
 const validateObjectId = (id) => {
@@ -57,27 +63,25 @@ const sendOrderDetailsMessage = async (order, offer, buyer, seller) => {
       `🔒 Payment secured in escrow and will be released upon order completion.`;
 
     // System ke liye ek virtual system user ID (optional)
-    // Agar aapka system user hai toh uska real ID use karen, nahi toh yeh use karen
     const systemUserId = new mongoose.Types.ObjectId('000000000000000000000000');
 
     // ✅ SELLER KO MESSAGE BHEJEN (System → Seller)
     const messageToSeller = new Message({
       orderId: order._id,
-      senderId: systemUserId, // System as sender
-      receiverId: order.sellerId, // Seller ko message
+      senderId: systemUserId,
+      receiverId: order.sellerId,
       message: messageContent,
-      read: false // Initially unread
-      // attachments optional hai, agar nahi hai toh skip karen
+      read: false
     });
     await messageToSeller.save();
 
     // ✅ BUYER KO BHI MESSAGE BHEJEN (System → Buyer)
     const messageToBuyer = new Message({
       orderId: order._id,
-      senderId: systemUserId, // System as sender
-      receiverId: order.buyerId, // Buyer ko message
+      senderId: systemUserId,
+      receiverId: order.buyerId,
       message: messageContent,
-      read: false // Initially unread
+      read: false
     });
     await messageToBuyer.save();
 
@@ -90,7 +94,143 @@ const sendOrderDetailsMessage = async (order, offer, buyer, seller) => {
   }
 };
 
-// ✅ CONFIRM OFFER PAYMENT WITH MESSAGES
+// ✅ EMAIL NOTIFICATION FUNCTION USING EMAILJS
+async function sendEmailNotifications(offer, order, buyer, seller) {
+  try {
+    console.log("📧 Preparing to send email notifications...");
+
+    // Seller ko email
+    const sellerEmailParams = {
+      to_email: seller.email,
+      to_name: seller.username,
+      subject: `🎉 New Order Received - ${offer.listingId.title}`,
+      order_id: order._id.toString(),
+      buyer_name: buyer.username,
+      listing_title: offer.listingId.title,
+      order_amount: `$${offer.amount}`,
+      order_date: order.paidAt.toLocaleDateString('en-IN'),
+      requirements: offer.requirements || 'No specific requirements provided',
+      expected_delivery: offer.expectedDelivery ? new Date(offer.expectedDelivery).toLocaleDateString('en-IN') : 'Not specified',
+      chat_url: `${process.env.FRONTEND_URL || 'https://yourwebsite.com'}/messages?order=${order._id}`,
+      dashboard_url: `${process.env.FRONTEND_URL || 'https://yourwebsite.com'}/seller/dashboard`
+    };
+
+    // Buyer ko email
+    const buyerEmailParams = {
+      to_email: buyer.email,
+      to_name: buyer.username,
+      subject: `✅ Order Confirmed - ${offer.listingId.title}`,
+      order_id: order._id.toString(),
+      seller_name: seller.username,
+      listing_title: offer.listingId.title,
+      order_amount: `$${offer.amount}`,
+      order_date: order.paidAt.toLocaleDateString('en-IN'),
+      requirements: offer.requirements || 'No specific requirements provided',
+      expected_delivery: offer.expectedDelivery ? new Date(offer.expectedDelivery).toLocaleDateString('en-IN') : 'Not specified',
+      chat_url: `${process.env.FRONTEND_URL || 'https://yourwebsite.com'}/messages?order=${order._id}`,
+      support_email: 'support@yourwebsite.com'
+    };
+
+    // Send emails using EmailJS
+    const emailPromises = [];
+
+    // Send to seller
+    emailPromises.push(
+      emailjs.send(
+        EMAILJS_CONFIG.serviceId,
+        'order_received_seller', // Seller template ID
+        sellerEmailParams,
+        {
+          publicKey: EMAILJS_CONFIG.publicKey,
+          privateKey: EMAILJS_CONFIG.privateKey,
+        }
+      )
+    );
+
+    // Send to buyer
+    emailPromises.push(
+      emailjs.send(
+        EMAILJS_CONFIG.serviceId,
+        'order_confirmed_buyer', // Buyer template ID
+        buyerEmailParams,
+        {
+          publicKey: EMAILJS_CONFIG.publicKey,
+          privateKey: EMAILJS_CONFIG.privateKey,
+        }
+      )
+    );
+
+    // Wait for all emails to be sent
+    const results = await Promise.allSettled(emailPromises);
+
+    // Check results
+    results.forEach((result, index) => {
+      const emailType = index === 0 ? 'Seller' : 'Buyer';
+      if (result.status === 'fulfilled') {
+        console.log(`✅ ${emailType} email sent successfully`);
+      } else {
+        console.error(`❌ ${emailType} email failed:`, result.reason);
+      }
+    });
+
+    console.log("📧 Email notifications completed");
+    return true;
+
+  } catch (error) {
+    console.error('❌ Email notification error:', error);
+    // Don't throw error - this shouldn't break the main flow
+    return false;
+  }
+}
+
+// ✅ FUNCTION TO SEND ORDER CONFIRMATION MESSAGES
+async function sendOrderConfirmationMessages(order, offer, buyer, seller) {
+  try {
+    const messageContent = `🎉 **Order Confirmed Successfully!**\n\n` +
+      `**Order Details:**\n` +
+      `📦 Order ID: ${order._id}\n` +
+      `💰 Amount: $${offer.amount}\n` +
+      `🛍️ Service: ${offer.listingId?.title || 'N/A'}\n` +
+      `📅 Order Date: ${new Date().toLocaleDateString('en-IN')}\n\n` +
+      `**Delivery Information:**\n` +
+      `📋 Requirements: ${offer.requirements || 'No specific requirements provided'}\n` +
+      `📅 Expected Delivery: ${offer.expectedDelivery ? new Date(offer.expectedDelivery).toLocaleDateString('en-IN') : 'Not specified'}\n\n` +
+      `💬 **You can now discuss the order details in messages.**\n\n` +
+      `🔒 Payment secured in escrow.`;
+
+    // System user ID
+    const systemUserId = new mongoose.Types.ObjectId('000000000000000000000000');
+
+    // ✅ MESSAGE TO SELLER
+    const messageToSeller = new Message({
+      orderId: order._id,
+      senderId: systemUserId,
+      receiverId: order.sellerId,
+      message: `🛍️ **New Order Received!**\n\n${buyer.username} has placed an order for your service "${offer.listingId.title}".\n\n${messageContent}`,
+      read: false
+    });
+    await messageToSeller.save();
+
+    // ✅ MESSAGE TO BUYER  
+    const messageToBuyer = new Message({
+      orderId: order._id,
+      senderId: systemUserId,
+      receiverId: order.buyerId,
+      message: `✅ **Order Confirmed!**\n\nYour order for "${offer.listingId.title}" has been confirmed.\n\n${messageContent}`,
+      read: false
+    });
+    await messageToBuyer.save();
+
+    console.log("✅ Order confirmation messages sent to both users' inbox");
+    return true;
+
+  } catch (error) {
+    console.error('❌ Error sending order confirmation messages:', error);
+    return false;
+  }
+}
+
+// ✅ CONFIRM OFFER PAYMENT WITH MESSAGES & EMAILS
 router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) => {
   console.log("🔍 Confirm Offer Payment Request DETAILS:", {
     body: req.body,
@@ -253,23 +393,30 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     await session.commitTransaction();
     console.log("🎉 Payment confirmation completed successfully");
 
-    // ✅ NOW SEND MESSAGES TO BOTH USERS (AFTER TRANSACTION SUCCESS)
+    // ✅ NOW SEND MESSAGES & EMAILS TO BOTH USERS (AFTER TRANSACTION SUCCESS)
     try {
+      // Send inbox messages
       await sendOrderConfirmationMessages(order, offer, buyer, seller);
       console.log("✅ Order confirmation messages sent to both users");
+      
+      // Send email notifications
+      await sendEmailNotifications(offer, order, buyer, seller);
+      console.log("✅ Email notifications sent to both users");
+      
     } catch (messageError) {
-      console.error('❌ Failed to send order messages:', messageError);
-      // Don't fail the main process for message errors
+      console.error('❌ Failed to send notifications:', messageError);
+      // Don't fail the main process for notification errors
     }
 
     res.status(200).json({
       success: true,
-      message: 'Payment confirmed successfully! Order details sent to your messages.',
+      message: 'Payment confirmed successfully! Order details sent to your messages and email.',
       data: {
         orderId: order._id,
-        redirectUrl: `/orders/${order._id}`, // Your existing order page
+        redirectUrl: `/orders/${order._id}`,
         offerId: offer._id,
-        messageSent: true
+        messagesSent: true,
+        emailsSent: true
       }
     });
 
@@ -292,95 +439,38 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
   }
 });
 
-// ✅ FUNCTION TO SEND ORDER CONFIRMATION MESSAGES
-async function sendOrderConfirmationMessages(order, offer, buyer, seller) {
+// ✅ SIMPLE EMAIL TEMPLATE FOR TESTING (Alternative if you don't have EmailJS templates)
+async function sendSimpleEmailNotification(to, subject, htmlContent) {
   try {
-    const messageContent = `🎉 **Order Confirmed Successfully!**\n\n` +
-      `**Order Details:**\n` +
-      `📦 Order ID: ${order._id}\n` +
-      `💰 Amount: $${offer.amount}\n` +
-      `🛍️ Service: ${offer.listingId?.title || 'N/A'}\n` +
-      `📅 Order Date: ${new Date().toLocaleDateString('en-IN')}\n\n` +
-      `**Delivery Information:**\n` +
-      `📋 Requirements: ${offer.requirements || 'No specific requirements provided'}\n` +
-      `📅 Expected Delivery: ${offer.expectedDelivery ? new Date(offer.expectedDelivery).toLocaleDateString('en-IN') : 'Not specified'}\n\n` +
-      `💬 **You can now discuss the order details in messages.**\n\n` +
-      `🔒 Payment secured in escrow.`;
-
-    // System user ID (you can use a real system user ID or create one)
-    const systemUserId = new mongoose.Types.ObjectId('000000000000000000000000');
-
-    // ✅ MESSAGE TO SELLER
-    const messageToSeller = new Message({
-      orderId: order._id,
-      senderId: systemUserId,
-      receiverId: order.sellerId,
-      message: `🛍️ **New Order Received!**\n\n${buyer.username} has placed an order for your service "${offer.listingId.title}".\n\n${messageContent}`,
-      read: false
+    // This is a simple implementation using nodemailer or any other service
+    // You can replace this with your preferred email service
+    
+    const nodemailer = require('nodemailer');
+    
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
     });
-    await messageToSeller.save();
 
-    // ✅ MESSAGE TO BUYER  
-    const messageToBuyer = new Message({
-      orderId: order._id,
-      senderId: systemUserId,
-      receiverId: order.buyerId,
-      message: `✅ **Order Confirmed!**\n\nYour order for "${offer.listingId.title}" has been confirmed.\n\n${messageContent}`,
-      read: false
-    });
-    await messageToBuyer.save();
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: to,
+      subject: subject,
+      html: htmlContent
+    };
 
-    console.log("✅ Order confirmation messages sent to both users' inbox");
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Email sent to ${to}`);
     return true;
-
   } catch (error) {
-    console.error('❌ Error sending order confirmation messages:', error);
+    console.error('❌ Simple email error:', error);
     return false;
   }
 }
 
-// ✅ EMAIL NOTIFICATION FUNCTION
-async function sendEmailNotifications(offer, order, buyer, seller) {
-  try {
-    // Import your email service
-    const emailService = require('../../services/emailService');
-    
-    // Send email to seller
-    await emailService.sendTemplate('order_received', {
-      to: seller.email,
-      data: {
-        sellerName: seller.username,
-        buyerName: buyer.username,
-        listingTitle: offer.listingId.title,
-        orderAmount: `$${offer.amount}`,
-        orderId: order._id.toString(),
-        orderDate: order.paidAt.toLocaleDateString(),
-        requirements: offer.requirements || 'No specific requirements',
-        expectedDelivery: offer.expectedDelivery ? new Date(offer.expectedDelivery).toLocaleDateString() : 'Not specified'
-      }
-    });
-
-    // Send email to buyer
-    await emailService.sendTemplate('order_confirmed', {
-      to: buyer.email,
-      data: {
-        buyerName: buyer.username,
-        sellerName: seller.username,
-        listingTitle: offer.listingId.title,
-        orderAmount: `$${offer.amount}`,
-        orderId: order._id.toString(),
-        chatUrl: `${process.env.FRONTEND_URL}/messages?chat=${order._id}`
-      }
-    });
-
-    console.log("✅ Email notifications sent");
-  } catch (error) {
-    console.error('❌ Email notification error:', error);
-    // Don't throw error - this shouldn't break the main flow
-  }
-}
-
-module.exports = router;
 
 // ✅ MAKE OFFER WITH IMMEDIATE PAYMENT
 router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), async (req, res) => {
