@@ -73,7 +73,6 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
   }
 });
 // ===================================================
-const mongoose = require('mongoose');
 
 router.post("/create-listing", async (req, res) => {
   try {
