@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const MarketplaceListing = require("../../models/marketplace/listing");
 const User = require("../../models/user");
-
+const mongoose = require('mongoose');
 const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils");
 
 // ===================================================
@@ -73,7 +73,6 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
   }
 });
 // ===================================================
-// ✅ CREATE LISTING (like your working video route)
 router.post("/create-listing", async (req, res) => {
   try {
     console.log("=== CREATE LISTING REQUEST ===");
@@ -105,7 +104,7 @@ router.post("/create-listing", async (req, res) => {
       });
     }
 
-    // Validate sellerId format
+    // Validate sellerId format using mongoose
     if (!mongoose.Types.ObjectId.isValid(sellerId)) {
       return res.status(400).json({
         error: "Invalid seller ID format",
