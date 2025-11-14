@@ -15,68 +15,114 @@ export interface Itoken {
     userId?: string;
   };
   sub?: string;
+  exp?: number;
+  iat?: number;
 }
 
 type MongooseId = string;
 
-// Utility Functions
+// ===== Global Cache =====
+let cachedToken: Itoken | null = null;
+let cachedUserId: string | null = null;
 
-// Generate slug from text
+// ===== Utility Functions =====
+
+/**
+ * Generate URL-friendly slug from text
+ */
 export const generateSlug = (text: string): string =>
-  text.toLowerCase().replace(/\s+/g, "-").replace(/[^\w-]+/g, "");
+  text
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^\w-]+/g, "")
+    .replace(/--+/g, "-")
+    .trim();
 
-// Truncate text to a specific length
+/**
+ * Truncate text to specific length with ellipsis
+ */
 export const truncateText = (text: string, maxLength: number): string =>
   text.length <= maxLength ? text : text.slice(0, maxLength - 3) + "...";
 
-// Enhanced token decoding with multiple fallback methods
-export const decodeToken = (token: any) => {
+/**
+ * Enhanced token decoding with multiple fallback methods and caching
+ */
+export const decodeToken = (token: string | null): Itoken | null => {
   if (!token) {
-    console.log("❌ No token provided");
+    console.log("❌ No token provided to decodeToken");
     return null;
   }
-  
+
+  // Return cached result if available
+  if (cachedToken) {
+    console.log("✅ Using cached token data");
+    return cachedToken;
+  }
+
   try {
-    console.log("🔐 Attempting to decode token...");
-    const decodedToken: any = jwtDecode(token) as Itoken;
-    const currentTime = Math.floor(Date.now() / 1000);
+    console.log("🔐 Attempting to decode token using jwt-decode...");
     
+    // Method 1: Use jwt-decode library (primary method)
+    const decodedToken: Itoken = jwtDecode<Itoken>(token);
+    const currentTime = Math.floor(Date.now() / 1000);
+
+    // Check if token is expired
     if (decodedToken.exp && decodedToken.exp < currentTime) {
-      console.error("Token has expired");
-      localStorage.removeItem("token");
-      sessionStorage.removeItem("token");
-      localStorage.removeItem("userId");
+      console.error("❌ Token has expired");
+      clearAuthData();
+      cachedToken = null;
       return null;
     }
-    
-    console.log("✅ Token decoded successfully:", decodedToken);
+
+    console.log("✅ JWT decode successful");
+    cachedToken = decodedToken;
     return decodedToken;
+
   } catch (error) {
     console.error("❌ JWT decode failed, trying manual decode:", error);
     
-    // Manual JWT decoding as fallback
+    // Method 2: Manual JWT decoding as fallback
     try {
       const parts = token.split('.');
       if (parts.length !== 3) {
-        throw new Error('Invalid token format');
+        throw new Error('Invalid token format: expected 3 parts');
       }
       
       const payload = parts[1];
       const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
       const paddedBase64 = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
-      const decodedPayload = JSON.parse(atob(paddedBase64));
+      const decodedPayload: Itoken = JSON.parse(atob(paddedBase64));
       
-      console.log("✅ Manual token decode successful:", decodedPayload);
+      // Check expiration manually
+      const currentTime = Math.floor(Date.now() / 1000);
+      if (decodedPayload.exp && decodedPayload.exp < currentTime) {
+        console.error("❌ Token has expired (manual decode)");
+        clearAuthData();
+        cachedToken = null;
+        return null;
+      }
+      
+      console.log("✅ Manual token decode successful");
+      cachedToken = decodedPayload;
       return decodedPayload;
     } catch (manualError) {
-      console.error("❌ Manual token decode also failed:", manualError);
+      console.error("❌ Manual token decode failed:", manualError);
+      cachedToken = null;
       return null;
     }
   }
 };
 
-// DIRECT USER ID EXTRACTION - Multiple reliable methods
+/**
+ * DIRECT USER ID EXTRACTION - Multiple reliable methods with caching
+ */
 export const getCurrentUserId = (): string | null => {
+  // Return cached user ID if available
+  if (cachedUserId) {
+    console.log("✅ Using cached user ID:", cachedUserId);
+    return cachedUserId;
+  }
+
   try {
     console.log("🆔 Starting user ID extraction...");
     
@@ -84,6 +130,7 @@ export const getCurrentUserId = (): string | null => {
     const directUserId = localStorage.getItem("userId") || sessionStorage.getItem("userId");
     if (directUserId) {
       console.log("✅ User ID found directly in storage:", directUserId);
+      cachedUserId = directUserId;
       return directUserId;
     }
 
@@ -95,12 +142,12 @@ export const getCurrentUserId = (): string | null => {
         const userId = user.id || user._id || user.userId;
         if (userId) {
           console.log("✅ User ID from user object:", userId);
-          // Store for future quick access
+          cachedUserId = userId;
           localStorage.setItem("userId", userId);
           return userId;
         }
       } catch (e) {
-        console.error("Error parsing user data:", e);
+        console.error("❌ Error parsing user data:", e);
       }
     }
 
@@ -117,11 +164,11 @@ export const getCurrentUserId = (): string | null => {
         
         if (userId) {
           console.log("✅ User ID extracted from token:", userId);
-          // Store for future quick access
+          cachedUserId = userId;
           localStorage.setItem("userId", userId);
           return userId;
         } else {
-          console.warn("⚠️ Token decoded but no user ID found:", tokenData);
+          console.warn("⚠️ Token decoded but no user ID found in payload");
         }
       }
     }
@@ -134,149 +181,325 @@ export const getCurrentUserId = (): string | null => {
         const userId = authData.userId || authData.user?.id || authData.user?._id;
         if (userId) {
           console.log("✅ User ID from auth data:", userId);
+          cachedUserId = userId;
           localStorage.setItem("userId", userId);
           return userId;
         }
       } catch (e) {
-        console.error("Error parsing auth data:", e);
+        console.error("❌ Error parsing auth data:", e);
       }
     }
 
     console.log("❌ No user ID found in any storage location");
     return null;
   } catch (error) {
-    console.error("💥 Error in getCurrentUserId:", error);
+    console.error("💥 Critical error in getCurrentUserId:", error);
     return null;
   }
 };
 
-// Enhanced token validation with user ID extraction
-export const validateTokenAndGetUserId = (): { isValid: boolean; userId: string | null } => {
+/**
+ * Enhanced token validation with user ID extraction
+ */
+export const validateTokenAndGetUserId = (): { isValid: boolean; userId: string | null; tokenData?: Itoken } => {
   try {
     const token = localStorage.getItem("token") || sessionStorage.getItem("token");
     
     if (!token) {
-      console.log("❌ No token found");
+      console.log("❌ No token found in storage");
       return { isValid: false, userId: null };
     }
 
     const tokenData = decodeToken(token);
     if (!tokenData) {
-      console.log("❌ Invalid token");
+      console.log("❌ Invalid or expired token");
       return { isValid: false, userId: null };
     }
 
     const userId = getCurrentUserId();
     if (!userId) {
       console.log("❌ Could not extract user ID from token");
-      return { isValid: false, userId: null };
+      return { isValid: false, userId: null, tokenData };
     }
 
-    console.log("✅ Token valid, user ID:", userId);
-    return { isValid: true, userId };
+    console.log("✅ Token validation successful, user ID:", userId);
+    return { isValid: true, userId, tokenData };
   } catch (error) {
-    console.error("Error validating token:", error);
+    console.error("❌ Error validating token:", error);
     return { isValid: false, userId: null };
   }
 };
 
-// Store user ID for quick access
+/**
+ * Store user ID for quick access
+ */
 export const storeUserId = (userId: string): void => {
   try {
     localStorage.setItem("userId", userId);
-    console.log("💾 User ID stored:", userId);
+    cachedUserId = userId;
+    console.log("💾 User ID stored in cache and storage:", userId);
   } catch (error) {
-    console.error("Error storing user ID:", error);
+    console.error("❌ Error storing user ID:", error);
   }
 };
 
-// Clear all auth data
-export const clearAuthData = (): void => {
-  localStorage.removeItem("token");
-  sessionStorage.removeItem("token");
-  localStorage.removeItem("userId");
-  sessionStorage.removeItem("userId");
-  localStorage.removeItem("user");
-  sessionStorage.removeItem("user");
-  localStorage.removeItem("auth");
-  sessionStorage.removeItem("auth");
-  console.log("🧹 All auth data cleared");
+/**
+ * Store authentication data
+ */
+export const storeAuthData = (token: string, userId: string, userData?: any): void => {
+  try {
+    localStorage.setItem("token", token);
+    localStorage.setItem("userId", userId);
+    cachedToken = null; // Reset cache to force fresh decode
+    cachedUserId = userId;
+
+    if (userData) {
+      localStorage.setItem("user", JSON.stringify(userData));
+    }
+
+    console.log("💾 Auth data stored successfully");
+  } catch (error) {
+    console.error("❌ Error storing auth data:", error);
+  }
 };
 
-// Check if user is authenticated
+/**
+ * Clear all authentication data and cache
+ */
+export const clearAuthData = (): void => {
+  try {
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
+    localStorage.removeItem("userId");
+    sessionStorage.removeItem("userId");
+    localStorage.removeItem("user");
+    sessionStorage.removeItem("user");
+    localStorage.removeItem("auth");
+    sessionStorage.removeItem("auth");
+    
+    // Clear cache
+    cachedToken = null;
+    cachedUserId = null;
+    
+    console.log("🧹 All auth data cleared from storage and cache");
+  } catch (error) {
+    console.error("❌ Error clearing auth data:", error);
+  }
+};
+
+/**
+ * Check if user is authenticated
+ */
 export const isAuthenticated = (): boolean => {
   const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-  if (!token) return false;
+  if (!token) {
+    return false;
+  }
   
   const tokenData = decodeToken(token);
   return !!tokenData;
 };
 
-// Get user info with fallbacks
-export const getUserInfo = (): { userId: string | null; username: string | null } => {
+/**
+ * Get complete user info with fallbacks
+ */
+export const getUserInfo = (): { 
+  userId: string | null; 
+  username: string | null; 
+  email?: string;
+  avatar?: string;
+} => {
   const userId = getCurrentUserId();
   
-  // Try to get username
   let username = null;
+  let email = undefined;
+  let avatar = undefined;
+
+  // Try to get user data from storage
   const userData = localStorage.getItem("user") || sessionStorage.getItem("user");
   if (userData) {
     try {
       const user = JSON.parse(userData);
       username = user.username || user.name || null;
+      email = user.email;
+      avatar = user.avatar || user.profilePicture;
     } catch (e) {
-      console.error("Error parsing user data for username:", e);
+      console.error("❌ Error parsing user data:", e);
     }
   }
 
-  return { userId, username };
+  // If no username from user data, try token
+  if (!username) {
+    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+    if (token) {
+      const tokenData = decodeToken(token);
+      if (tokenData) {
+        username = tokenData.username || null;
+        avatar = tokenData.avatar || avatar;
+      }
+    }
+  }
+
+  return { userId, username, email, avatar };
 };
 
-// Check if an object is empty
-export const isObjectEmpty = (obj: Record<string, any>): boolean =>
-  !Object.keys(obj).length;
+/**
+ * Check if object is empty
+ */
+export const isObjectEmpty = (obj: Record<string, any>): boolean => {
+  if (!obj || typeof obj !== 'object') return true;
+  return Object.keys(obj).length === 0;
+};
 
-// Format date as "time ago"
-export const formatDateAgo = (dateTime: string): string => {
+/**
+ * Format date as human-readable "time ago"
+ */
+export const formatDateAgo = (dateTime: string | Date): string => {
+  if (!dateTime) return "Unknown time";
+  
   const now = moment();
   const then = moment(dateTime);
+  
+  if (!then.isValid()) return "Invalid date";
+
   const secondsDiff = now.diff(then, "seconds");
   const minutesDiff = now.diff(then, "minutes");
   const hoursDiff = now.diff(then, "hours");
   const daysDiff = now.diff(then, "days");
+  const weeksDiff = now.diff(then, "weeks");
+  const monthsDiff = now.diff(then, "months");
+  const yearsDiff = now.diff(then, "years");
 
   if (secondsDiff < 60) return "just now";
   if (minutesDiff < 60) return `${minutesDiff} minute${minutesDiff !== 1 ? "s" : ""} ago`;
   if (hoursDiff < 24) return `${hoursDiff} hour${hoursDiff !== 1 ? "s" : ""} ago`;
   if (daysDiff === 1) return "yesterday";
-  if (daysDiff < 365) return `${daysDiff} day${daysDiff !== 1 ? "s" : ""} ago`;
-
-  return moment(dateTime).format("MMM D, YYYY [at] h:mm A");
+  if (daysDiff < 7) return `${daysDiff} day${daysDiff !== 1 ? "s" : ""} ago`;
+  if (weeksDiff < 4) return `${weeksDiff} week${weeksDiff !== 1 ? "s" : ""} ago`;
+  if (monthsDiff < 12) return `${monthsDiff} month${monthsDiff !== 1 ? "s" : ""} ago`;
+  
+  return `${yearsDiff} year${yearsDiff !== 1 ? "s" : ""} ago`;
 };
 
-// Check if a user ID is present in an array
+/**
+ * Format date to readable string
+ */
+export const formatDateReadable = (dateTime: string | Date): string => {
+  if (!dateTime) return "Unknown date";
+  
+  const momentDate = moment(dateTime);
+  return momentDate.isValid() 
+    ? momentDate.format("MMM D, YYYY [at] h:mm A")
+    : "Invalid date";
+};
+
+/**
+ * Check if user ID is present in array
+ */
 export const isUserIdInArray = (userId: MongooseId, idArray: MongooseId[]): boolean =>
   idArray.includes(userId);
 
-// Enhanced logout function
-export const logout = () => {
-  console.log("🚪 Logging out...");
+/**
+ * Enhanced logout function with redirect
+ */
+export const logout = (redirectUrl: string = "/admin"): void => {
+  console.log("🚪 Logging out user...");
   clearAuthData();
-  window.location.href = "/admin"; // Redirect to sign-in page
+  
+  // Optional: Add delay for better UX
+  setTimeout(() => {
+    window.location.href = redirectUrl;
+  }, 100);
 };
 
-// Capitalize the first letter of a string
-export const capitalizeFirstLetter = (str: string): string =>
-  str.charAt(0).toUpperCase() + str.slice(1);
+/**
+ * Capitalize first letter of string
+ */
+export const capitalizeFirstLetter = (str: string): string => {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+};
 
-// Get only the first letter capitalized
+/**
+ * Capitalize first letter of each word
+ */
+export const capitalizeWords = (str: string): string => {
+  if (!str) return '';
+  return str.replace(/\w\S*/g, (txt) => 
+    txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
+  );
+};
+
+/**
+ * Get only the first letter capitalized
+ */
 export const getCapitalizedFirstLetter = (str: string): string =>
-  str?.charAt(0).toUpperCase();
+  str?.charAt(0).toUpperCase() || '';
 
-// Toggle an item in an array (add or remove it)
+/**
+ * Toggle item in array (add if not present, remove if present)
+ */
 export const toggleItemInArray = <T>(array: T[], item: T): T[] =>
   array.includes(item) ? array.filter(i => i !== item) : [...array, item];
 
-// Chart options generator
+/**
+ * Remove duplicates from array
+ */
+export const removeDuplicates = <T>(array: T[]): T[] => 
+  Array.from(new Set(array));
+
+/**
+ * Generate random ID
+ */
+export const generateId = (length: number = 8): string => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
+
+/**
+ * Debounce function for performance
+ */
+export const debounce = <T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): ((...args: Parameters<T>) => void) => {
+  let timeout: NodeJS.Timeout;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(null, args), wait);
+  };
+};
+
+/**
+ * Validate email format
+ */
+export const isValidEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+/**
+ * Format currency
+ */
+export const formatCurrency = (amount: number, currency: string = 'USD'): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency,
+  }).format(amount);
+};
+
+/**
+ * Format number with commas
+ */
+export const formatNumber = (num: number): string => {
+  return new Intl.NumberFormat('en-US').format(num);
+};
+
+// ===== Chart Configuration =====
 export const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
@@ -298,7 +521,7 @@ export const chartOptions = {
       color: "white",
       font: {
         size: 12,
-        weight: 'bold',
+        weight: 'bold' as const,
       },
       padding: {
         top: 1,
@@ -343,7 +566,7 @@ export const chartOptions = {
           size: 10,
         },
         padding: {
-          bottom : 20,
+          bottom: 20,
         },
       },
       ticks: {
@@ -364,4 +587,62 @@ export const chartOptions = {
       hoverRadius: 3,
     },
   },
+};
+
+/**
+ * Get chart data structure
+ */
+export const getChartData = (labels: string[], datasets: any[]) => ({
+  labels,
+  datasets: datasets.map(dataset => ({
+    ...dataset,
+    borderColor: dataset.borderColor || `hsl(${Math.random() * 360}, 70%, 50%)`,
+    backgroundColor: dataset.backgroundColor || `hsla(${Math.random() * 360}, 70%, 50%, 0.1)`,
+  }))
+});
+
+// ===== Export all utilities =====
+export default {
+  // Token & Auth
+  decodeToken,
+  getCurrentUserId,
+  validateTokenAndGetUserId,
+  storeUserId,
+  storeAuthData,
+  clearAuthData,
+  isAuthenticated,
+  getUserInfo,
+  logout,
+  
+  // String utilities
+  generateSlug,
+  truncateText,
+  capitalizeFirstLetter,
+  capitalizeWords,
+  getCapitalizedFirstLetter,
+  isValidEmail,
+  
+  // Array utilities
+  toggleItemInArray,
+  removeDuplicates,
+  isUserIdInArray,
+  
+  // Date utilities
+  formatDateAgo,
+  formatDateReadable,
+  
+  // Number utilities
+  formatCurrency,
+  formatNumber,
+  
+  // Validation utilities
+  isObjectEmpty,
+  
+  // General utilities
+  generateId,
+  debounce,
+  
+  // Chart utilities
+  chartOptions,
+  getChartData,
 };
