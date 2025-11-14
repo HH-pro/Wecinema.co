@@ -14,10 +14,10 @@ const emailjs = require('@emailjs/nodejs');
 
 // Initialize EmailJS with your credentials
 const EMAILJS_CONFIG = {
-  serviceId: 'YOUR_EMAILJS_SERVICE_ID', // Replace with your EmailJS service ID
-  templateId: 'YOUR_EMAILJS_TEMPLATE_ID', // Replace with your EmailJS template ID
-  publicKey: 'YOUR_EMAILJS_PUBLIC_KEY', // Replace with your EmailJS public key
-  privateKey: 'YOUR_EMAILJS_PRIVATE_KEY' // Replace with your EmailJS private key
+  serviceId: 'service_lrmmoyr', // Replace with your EmailJS service ID
+  templateId: 'template_p9kyheq', // Replace with your EmailJS template ID
+  publicKey: 'C8PcGH3DDuoqwOS5m', // Replace with your EmailJS public key
+  privateKey: 'eRvq637n02Lk43MW3z3sh' // Replace with your EmailJS private key
 };
 
 // ✅ VALIDATION HELPER FUNCTIONS
