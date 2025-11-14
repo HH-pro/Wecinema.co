@@ -73,6 +73,7 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
   }
 });
 // ===================================================
+// Without mongoose import - using simple validation instead
 router.post("/create-listing", async (req, res) => {
   try {
     console.log("=== CREATE LISTING REQUEST ===");
@@ -104,8 +105,8 @@ router.post("/create-listing", async (req, res) => {
       });
     }
 
-    // Validate sellerId format using mongoose
-    if (!mongoose.Types.ObjectId.isValid(sellerId)) {
+    // Simple sellerId validation (basic length check for MongoDB ObjectId)
+    if (!sellerId || typeof sellerId !== 'string' || sellerId.length !== 24) {
       return res.status(400).json({
         error: "Invalid seller ID format",
         received: sellerId
@@ -115,14 +116,14 @@ router.post("/create-listing", async (req, res) => {
     // Normalize data with defaults
     const tagsArray = Array.isArray(tags) ? tags : (tags ? [tags] : []);
     const mediaArray = Array.isArray(mediaUrls) ? mediaUrls : (mediaUrls ? [mediaUrls] : []);
-    const actualCategory = category || 'uncategorized'; // Default category
+    const actualCategory = category || 'uncategorized';
 
     console.log("Creating listing for seller:", sellerId);
 
     // Get seller email from User model
     let sellerEmail = null;
     try {
-      const User = mongoose.model('User');
+      const User = require('../models/User'); // Adjust path to your User model
       const seller = await User.findById(sellerId).select('email');
       if (seller) {
         sellerEmail = seller.email;
@@ -147,10 +148,10 @@ router.post("/create-listing", async (req, res) => {
       sellerEmail: sellerEmail,
       title: title.trim(),
       description: description.trim(),
-      price: parseFloat(price).toFixed(2), // Ensure 2 decimal places
+      price: parseFloat(price).toFixed(2),
       type: type,
       category: actualCategory.trim(),
-      tags: tagsArray.map(tag => tag.trim()).filter(tag => tag), // Clean tags
+      tags: tagsArray.map(tag => tag.trim()).filter(tag => tag),
       mediaUrls: mediaArray,
       status: "active",
       createdAt: new Date(),
@@ -175,7 +176,6 @@ router.post("/create-listing", async (req, res) => {
   } catch (error) {
     console.error("❌ Error creating listing:", error);
     
-    // Handle duplicate key errors
     if (error.code === 11000) {
       return res.status(400).json({
         error: "Listing with similar details already exists",
@@ -183,7 +183,6 @@ router.post("/create-listing", async (req, res) => {
       });
     }
     
-    // Handle validation errors
     if (error.name === 'ValidationError') {
       return res.status(400).json({
         error: "Validation failed",
