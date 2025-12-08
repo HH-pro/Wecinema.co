@@ -6,7 +6,7 @@ const morgan = require('morgan');
 const path = require('path');
 
 // Import database connection
-const connectDB = require('./config/database');
+const connectDB = require('../../backend/src/config/config');
 
 // Import routes
 const marketplaceRoutes = require('./routes/marketplace');
