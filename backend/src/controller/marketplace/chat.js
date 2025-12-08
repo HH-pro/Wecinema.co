@@ -596,7 +596,7 @@ router.get('/by-order/:orderId', authenticateMiddleware, async (req, res) => {
 });
 
 // ✅ HEALTH CHECK
-router.get('/health', (req, res) => {
+router.get('/firebase/health', (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Chat routes are healthy',
