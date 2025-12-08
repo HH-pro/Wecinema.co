@@ -9,7 +9,7 @@ const { authenticateMiddleware } = require('../../utils');
 const admin = require('firebase-admin');
 
 // ✅ GET USER'S CHATS
-router.get('/my-chats', async (req, res) => {
+router.get('/my-chats', authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user?.id || req.user?._id || req.user?.userId;
     
