@@ -127,7 +127,7 @@ const Messages: React.FC = () => {
       setChatsLoading(true);
       const token = localStorage.getItem('token');
       
-      const response = await fetch('http://localhost:3000/api/marketplace/chat/my-chats', {
+      const response = await fetch('http://localhost:3000/marketplace/chat/my-chats', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -217,7 +217,7 @@ const Messages: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:3000/api/marketplace/offers/messages/${orderId}`,
+        `http://localhost:3000/marketplace/offers/messages/${orderId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -245,7 +245,7 @@ const Messages: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       await fetch(
-        `http://localhost:3000/api/marketplace/chat/mark-read/${orderId}`,
+        `http://localhost:3000/marketplace/chat/mark-read/${orderId}`,
         {
           method: 'PUT',
           headers: {
@@ -309,7 +309,7 @@ const Messages: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:3000/api/marketplace/offers/chat-link/${orderId}`,
+        `http://localhost:3000/marketplace/offers/chat-link/${orderId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
