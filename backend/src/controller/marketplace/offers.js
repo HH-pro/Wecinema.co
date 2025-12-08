@@ -174,7 +174,7 @@ const sendOrderDetailsWithChatLink = async (order, offer, buyer, seller) => {
     const firebaseChatId = await createFirebaseChatRoom(order, buyer, seller);
     
     // Generate chat links
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     let chatLink = `${frontendUrl}/messages`;
     
     if (firebaseChatId) {
@@ -984,7 +984,7 @@ router.get("/:id", authenticateMiddleware, logRequest("GET_OFFER"), async (req, 
           status: chat.status
         } : null,
         chatLink: chat?.firebaseChatId ? 
-          `${process.env.FRONTEND_URL || 'http://localhost:3000'}/chat/${chat.firebaseChatId}` : null
+          `${process.env.FRONTEND_URL || 'http://localhost:5173'}/chat/${chat.firebaseChatId}` : null
       },
       userRole: isBuyer ? 'buyer' : 'seller'
     });
