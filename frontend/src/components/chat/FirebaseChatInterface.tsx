@@ -63,7 +63,7 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:3000/api/marketplace/offers/messages/${orderId}`,
+        `http://localhost:3000/marketplace/offers/messages/${orderId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -121,7 +121,7 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
       // Also log to your backend (optional)
       if (orderId) {
         const token = localStorage.getItem('token');
-        await fetch('http://localhost:3000/api/marketplace/chat/log-message', {
+        await fetch('http://localhost:3000/marketplace/chat/log-message', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
