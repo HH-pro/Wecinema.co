@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
-const Chat = require('../models/marketplace/Chat');
+const Chat = require('../models/marketplace/chat');
 const Order = require('../models/marketplace/order');
 const Message = require('../models/marketplace/messages');
 const { authenticateMiddleware } = require('../utils');
