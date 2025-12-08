@@ -7,7 +7,7 @@ const Order = require("../../models/marketplace/order");
 const Chat = require("../../models/marketplace/Chat");
 const Message = require("../../models/marketplace/messages");
 const { authenticateMiddleware } = require("../../utils");
-const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
+const stripe = require('stripe')('sk_test_51SUkNmLkp3Cb50hEoClRpL8Xth9SEecfF4d75v7tPawGPyp3pwx4r7VQP1P27h9QdXyXOfKwxUBZAPaYaUp8g9DL00rJAHywKV');
 
 // EmailJS for email notifications
 const emailjs = require('@emailjs/nodejs');
