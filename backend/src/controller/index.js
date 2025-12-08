@@ -8,7 +8,7 @@ const sentryRouter = require("./sentry");
 const listingRoutes = require("./marketplace/listingController");
 const orderRoutes = require("./marketplace/orders");
 const offerRoutes = require("./marketplace/offers");
-const messageRoutes = require("./marketplace/messages");
+const chatRoutes = require("./marketplace/chat");
 const paymentRoutes = require("./marketplace/payments");
 const stripeRoutes = require("./marketplace/stripe");
 
@@ -23,7 +23,7 @@ module.exports = {
   listingRoutes,
   orderRoutes, 
   offerRoutes,
-  messageRoutes,
+  chatRoutes,
   paymentRoutes,
 
   stripeRoutes,
