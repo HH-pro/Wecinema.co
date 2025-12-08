@@ -1,7 +1,7 @@
 // src/components/Chat/FirebaseChatInterface.tsx
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useFirebaseChat, Message as FirebaseMessage } from '../../hooks/useFirebaseChat';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 
 interface User {
