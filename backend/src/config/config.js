@@ -1,222 +1,87 @@
+// config/database.js or utils/dbConnection.js
 const mongoose = require("mongoose");
 const admin = require("firebase-admin");
 
 /**
- * Connect to a MongoDB database using Mongoose.
- * @param {string} databaseURL - The URL of the MongoDB database to connect to.
- * @returns {Promise<mongoose.Mongoose>} A promise that resolves with the Mongoose instance upon successful connection.
+ * Connect to MongoDB and initialize Firebase
  */
-async function connectToMongoDB(databaseURL) {
-	// Define Mongoose connection options.
-	const options = {
-		dbName: "wecinemaDB_test",
-		useNewUrlParser: true,
-		useUnifiedTopology: true,
-		// Additional options can be added here if needed.
-	};
+async function connectDB(databaseURL) { // ✅ Changed name to connectDB
+  const options = {
+    dbName: "wecinemaDB_test",
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  };
 
-	try {
-		// Attempt to connect to the MongoDB database.
-		const mongooseInstance = await mongoose.connect(databaseURL, options);
-		console.log("✅ DB CONNECTION SUCCESSFUL!");
-		console.log("📊 Database:", databaseURL);
-		
-		// Initialize Firebase after MongoDB connection
-		await initializeFirebase();
-		
-		return mongooseInstance;
-	} catch (error) {
-		// Handle connection errors.
-		console.error(
-			`❌ An error occurred while connecting to the database: ${error}`
-		);
-		throw error;
-	}
+  try {
+    console.log(`🔗 Connecting to MongoDB...`);
+    const mongooseInstance = await mongoose.connect(databaseURL, options);
+    console.log("✅ MongoDB Connected Successfully!");
+    
+    // Initialize Firebase
+    await initializeFirebase();
+    
+    return mongooseInstance;
+  } catch (error) {
+    console.error("❌ MongoDB Connection Error:", error.message);
+    throw error;
+  }
 }
 
 /**
- * Initialize Firebase Admin SDK
+ * Initialize Firebase
  */
 async function initializeFirebase() {
-	try {
-		// Check if Firebase is already initialized
-		if (admin.apps.length > 0) {
-			console.log("✅ Firebase already initialized");
-			return admin.app();
-		}
+  try {
+    if (admin.apps.length > 0) {
+      console.log("✅ Firebase already initialized");
+      return;
+    }
 
-		// Load environment variables
-		require('dotenv').config();
-		
-		// Check for required Firebase environment variables
-		const requiredVars = [
-			'FIREBASE_PROJECT_ID',
-			'FIREBASE_CLIENT_EMAIL', 
-			'FIREBASE_PRIVATE_KEY',
-			'FIREBASE_DATABASE_URL'
-		];
-		
-		const missingVars = requiredVars.filter(varName => !process.env[varName]);
-		
-		if (missingVars.length > 0) {
-			console.warn(`⚠️  Missing Firebase environment variables: ${missingVars.join(', ')}`);
-			console.warn("⚠️  Firebase features will be disabled");
-			return null;
-		}
+    // Check environment variables
+    if (!process.env.FIREBASE_PRIVATE_KEY) {
+      console.warn("⚠️  Firebase private key not found. Firebase disabled.");
+      return;
+    }
 
-		// Create service account configuration
-		const serviceAccount = {
-			type: 'service_account',
-			project_id: process.env.FIREBASE_PROJECT_ID,
-			private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID || 'f08306fa7ba1a4cb5d65693ab63953c1dfe4f458',
-			private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-			client_email: process.env.FIREBASE_CLIENT_EMAIL,
-			client_id: process.env.FIREBASE_CLIENT_ID || '111883497657450145565',
-			auth_uri: 'https://accounts.google.com/o/oauth2/auth',
-			token_uri: 'https://oauth2.googleapis.com/token',
-			auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
-			client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL || 'https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-bh6ix%40wecinema-21d00.iam.gserviceaccount.com',
-			universe_domain: 'googleapis.com'
-		};
+    const serviceAccount = {
+      project_id: process.env.FIREBASE_PROJECT_ID,
+      private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      client_email: process.env.FIREBASE_CLIENT_EMAIL,
+    };
 
-		// Initialize Firebase Admin SDK
-		const firebaseApp = admin.initializeApp({
-			credential: admin.credential.cert(serviceAccount),
-			databaseURL: process.env.FIREBASE_DATABASE_URL
-		});
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+      databaseURL: process.env.FIREBASE_DATABASE_URL
+    });
 
-		console.log("✅ Firebase Admin SDK initialized successfully!");
-		console.log("🔥 Firebase Project:", process.env.FIREBASE_PROJECT_ID);
-		console.log("🔗 Database URL:", process.env.FIREBASE_DATABASE_URL);
-		
-		// Test Firebase connections
-		await testFirebaseConnections();
-		
-		return firebaseApp;
-		
-	} catch (error) {
-		console.error("❌ Firebase initialization failed:", error.message);
-		console.log("⚠️  Firebase features will be disabled");
-		return null;
-	}
+    console.log("✅ Firebase Admin SDK Initialized!");
+    
+  } catch (error) {
+    console.error("❌ Firebase Initialization Error:", error.message);
+  }
 }
 
 /**
- * Test Firebase connections
- */
-async function testFirebaseConnections() {
-	try {
-		// Test Realtime Database
-		const rtdb = admin.database();
-		const testRef = rtdb.ref('connection_test');
-		await testRef.set({ 
-			timestamp: new Date().toISOString(),
-			status: 'connected'
-		});
-		console.log("✅ Realtime Database connected");
-		
-		// Cleanup test data
-		await testRef.remove();
-		
-		// Test Firestore
-		const firestore = admin.firestore();
-		const firestoreTest = firestore.collection('connection_tests').doc('test');
-		await firestoreTest.set({
-			timestamp: new Date().toISOString(),
-			status: 'connected'
-		});
-		console.log("✅ Firestore connected");
-		
-		// Cleanup
-		await firestoreTest.delete();
-		
-		console.log("🎉 All Firebase services connected successfully!");
-		
-	} catch (error) {
-		console.error("⚠️  Firebase connection test failed:", error.message);
-	}
-}
-
-/**
- * Get Firebase Admin instance
+ * Get Firebase services
  */
 function getFirebaseAdmin() {
-	if (admin.apps.length === 0) {
-		throw new Error('Firebase not initialized. Call initializeFirebase() first.');
-	}
-	return admin;
+  return admin.apps.length > 0 ? admin : null;
 }
 
-/**
- * Get Firestore instance
- */
 function getFirestore() {
-	if (admin.apps.length === 0) {
-		throw new Error('Firebase not initialized. Call initializeFirebase() first.');
-	}
-	return admin.firestore();
+  return admin.apps.length > 0 ? admin.firestore() : null;
 }
 
-/**
- * Get Realtime Database instance
- */
 function getDatabase() {
-	if (admin.apps.length === 0) {
-		throw new Error('Firebase not initialized. Call initializeFirebase() first.');
-	}
-	return admin.database();
+  return admin.apps.length > 0 ? admin.database() : null;
 }
 
-/**
- * Health check for Firebase services
- */
-async function checkFirebaseHealth() {
-	try {
-		if (admin.apps.length === 0) {
-			return {
-				status: 'not_initialized',
-				message: 'Firebase not initialized'
-			};
-		}
+// ✅ Export as default function (connectDB)
+module.exports = connectDB;
 
-		// Test Firestore
-		const firestore = admin.firestore();
-		const firestoreHealth = await firestore.collection('health_checks').doc('test').get();
-		
-		// Test Realtime Database
-		const rtdb = admin.database();
-		const rtdbRef = rtdb.ref('health_check');
-		await rtdbRef.set({ timestamp: new Date().toISOString() });
-		await rtdbRef.remove();
-		
-		return {
-			status: 'healthy',
-			services: {
-				firestore: 'connected',
-				realtime_database: 'connected',
-				project_id: process.env.FIREBASE_PROJECT_ID,
-				database_url: process.env.FIREBASE_DATABASE_URL
-			}
-		};
-		
-	} catch (error) {
-		return {
-			status: 'unhealthy',
-			message: error.message,
-			services: {
-				firestore: 'error',
-				realtime_database: 'error'
-			}
-		};
-	}
-}
-
-module.exports = {
-	connectToMongoDB,
-	initializeFirebase,
-	getFirebaseAdmin,
-	getFirestore,
-	getDatabase,
-	checkFirebaseHealth,
-	admin // Export admin for direct use if needed
-};
+// ✅ Also export other functions as properties
+module.exports.initializeFirebase = initializeFirebase;
+module.exports.getFirebaseAdmin = getFirebaseAdmin;
+module.exports.getFirestore = getFirestore;
+module.exports.getDatabase = getDatabase;
+module.exports.admin = admin;
