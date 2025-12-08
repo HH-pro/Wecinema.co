@@ -7,17 +7,36 @@ const Order = require("../../models/marketplace/order");
 const Chat = require("../../models/marketplace/Chat");
 const Message = require("../../models/marketplace/messages");
 const { authenticateMiddleware } = require("../../utils");
-const stripe = require('stripe')('sk_test_51SUkNmLkp3Cb50hEoClRpL8Xth9SEecfF4d75v7tPawGPyp3pwx4r7VQP1P27h9QdXyXOfKwxUBZAPaYaUp8g9DL00rJAHywKV');
+const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
 
 // EmailJS for email notifications
 const emailjs = require('@emailjs/nodejs');
 
+// Firebase Admin for real-time chat
+const admin = require('firebase-admin');
+
+// Initialize Firebase if not already initialized
+try {
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
+      }),
+      databaseURL: process.env.FIREBASE_DATABASE_URL
+    });
+  }
+} catch (error) {
+  console.log('Firebase initialization warning:', error.message);
+}
+
 // Initialize EmailJS with your credentials
 const EMAILJS_CONFIG = {
-  serviceId: 'service_lrmmoyr', // Replace with your EmailJS service ID
-  templateId: 'template_p9kyheq', // Replace with your EmailJS template ID
-  publicKey: 'C8PcGH3DDuoqwOS5m', // Replace with your EmailJS public key
-  privateKey: 'eRvq637n02Lk43MW3z3sh' // Replace with your EmailJS private key
+  serviceId: 'service_lrmmoyr',
+  templateId: 'template_p9kyheq',
+  publicKey: 'C8PcGH3DDuoqwOS5m',
+  privateKey: 'eRvq637n02Lk43MW3z3sh'
 };
 
 // ✅ VALIDATION HELPER FUNCTIONS
@@ -45,52 +64,277 @@ const logRequest = (route) => (req, res, next) => {
   next();
 };
 
-// ✅ FUNCTION TO SEND ORDER DETAILS MESSAGE USING YOUR MESSAGE MODEL
-const sendOrderDetailsMessage = async (order, offer, buyer, seller) => {
+// ✅ FIREBASE CHAT ROOM CREATION
+const createFirebaseChatRoom = async (order, buyer, seller) => {
   try {
-    // System message content create karen
-    const messageContent = `🎉 **Order Confirmed Successfully!**\n\n` +
+    console.log("🔥 Creating Firebase chat room for order:", order._id);
+    
+    if (!admin.apps.length) {
+      console.log("❌ Firebase not initialized, skipping chat room creation");
+      return null;
+    }
+    
+    const db = admin.firestore();
+    
+    // Create chat room ID
+    const chatRoomId = `order_${order._id}_${Date.now()}`;
+    
+    const chatRoomRef = db.collection('chatRooms').doc(chatRoomId);
+    
+    const chatRoomData = {
+      orderId: order._id.toString(),
+      participants: {
+        [buyer._id.toString()]: {
+          id: buyer._id.toString(),
+          name: buyer.username,
+          email: buyer.email,
+          role: 'buyer',
+          avatar: buyer.avatar || null
+        },
+        [seller._id.toString()]: {
+          id: seller._id.toString(),
+          name: seller.username,
+          email: seller.email,
+          role: 'seller',
+          avatar: seller.avatar || null
+        }
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      lastMessageAt: new Date().toISOString(),
+      status: 'active',
+      orderDetails: {
+        orderId: order._id.toString(),
+        amount: order.amount,
+        listingTitle: order.listingId?.title || 'Order',
+        listingId: order.listingId?._id?.toString(),
+        requirements: order.requirements || ''
+      }
+    };
+    
+    await chatRoomRef.set(chatRoomData);
+    
+    // Add initial system message
+    const welcomeMessage = {
+      senderId: 'system',
+      senderName: 'System',
+      senderRole: 'system',
+      message: `🎉 **Order #${order._id} has been placed!**\n\nBuyer: ${buyer.username}\nSeller: ${seller.username}\nAmount: $${order.amount}\n\nPlease discuss order details here.`,
+      timestamp: new Date().toISOString(),
+      type: 'system',
+      readBy: [],
+      metadata: {
+        orderId: order._id.toString(),
+        isSystemMessage: true
+      }
+    };
+    
+    await chatRoomRef.collection('messages').add(welcomeMessage);
+    
+    console.log("✅ Firebase chat room created:", chatRoomId);
+    
+    // Also create a local Chat record in MongoDB
+    try {
+      const localChat = new Chat({
+        firebaseChatId: chatRoomId,
+        orderId: order._id,
+        participants: [
+          { userId: buyer._id, role: 'buyer', firebaseId: buyer._id.toString() },
+          { userId: seller._id, role: 'seller', firebaseId: seller._id.toString() }
+        ],
+        listingId: order.listingId,
+        status: 'active',
+        lastMessageAt: new Date(),
+        metadata: {
+          firebaseChatId: chatRoomId,
+          createdFrom: 'offer_payment'
+        }
+      });
+      
+      await localChat.save();
+      console.log("✅ Local Chat record created");
+    } catch (localChatError) {
+      console.error("❌ Local Chat creation failed:", localChatError.message);
+    }
+    
+    return chatRoomId;
+    
+  } catch (error) {
+    console.error('❌ Firebase chat room creation error:', error);
+    return null;
+  }
+};
+
+// ✅ FUNCTION TO SEND ORDER DETAILS WITH CHAT LINK (FIVERR STYLE)
+const sendOrderDetailsWithChatLink = async (order, offer, buyer, seller) => {
+  try {
+    console.log("📨 Preparing Fiverr-style messages with chat links...");
+    
+    // Create Firebase chat room
+    const firebaseChatId = await createFirebaseChatRoom(order, buyer, seller);
+    
+    // Generate chat links
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    let chatLink = `${frontendUrl}/messages`;
+    
+    if (firebaseChatId) {
+      chatLink = `${frontendUrl}/chat/${firebaseChatId}?order=${order._id}`;
+    } else {
+      // Fallback to order-based messaging
+      chatLink = `${frontendUrl}/messages?order=${order._id}`;
+    }
+    
+    // Format dates
+    const orderDate = new Date().toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    
+    const expectedDelivery = offer.expectedDelivery ? 
+      new Date(offer.expectedDelivery).toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      }) : 'Not specified';
+    
+    // ✅ SELLER MESSAGE (Fiverr-style detailed message)
+    const sellerMessageContent = `🎉 **NEW ORDER RECEIVED!**\n\n` +
       `**Order Details:**\n` +
-      `📦 Order ID: ${order._id}\n` +
-      `👤 Buyer: ${buyer?.username || 'Customer'}\n` +
-      `💰 Amount: $${offer.amount}\n` +
-      `📅 Order Date: ${new Date().toLocaleDateString('en-IN')}\n` +
-      `🛍️ Service: ${offer.listingId?.title || 'N/A'}\n\n` +
-      `**Delivery Information:**\n` +
-      `📋 Requirements: ${offer.requirements || 'No specific requirements provided'}\n` +
-      `📅 Expected Delivery: ${offer.expectedDelivery ? new Date(offer.expectedDelivery).toLocaleDateString('en-IN') : 'Not specified'}\n\n` +
-      `💬 **You can now discuss the order details.**\n\n` +
-      `🔒 Payment secured in escrow and will be released upon order completion.`;
-
-    // System ke liye ek virtual system user ID (optional)
+      `📦 **Order ID:** ${order._id}\n` +
+      `👤 **Buyer:** ${buyer?.username || 'Customer'}\n` +
+      `💰 **Amount:** $${offer.amount}\n` +
+      `📅 **Order Date:** ${orderDate}\n` +
+      `🛍️ **Service:** ${offer.listingId?.title || 'N/A'}\n\n` +
+      `**Requirements:**\n` +
+      `${offer.requirements || 'No specific requirements provided'}\n\n` +
+      `**Expected Delivery:** ${expectedDelivery}\n\n` +
+      `**Next Steps:**\n` +
+      `1. Review the order requirements\n` +
+      `2. Contact the buyer to confirm details\n` +
+      `3. Start working on the order\n` +
+      `4. Deliver through the platform\n\n` +
+      `💬 **[OPEN CHAT WITH BUYER](${chatLink})**\n\n` +
+      `🔒 **Payment Status:** Secured in escrow\n` +
+      `💵 **Release Condition:** Upon order completion`;
+    
+    // ✅ BUYER MESSAGE
+    const buyerMessageContent = `✅ **ORDER CONFIRMED!**\n\n` +
+      `**Order Details:**\n` +
+      `📦 **Order ID:** ${order._id}\n` +
+      `👤 **Seller:** ${seller.username}\n` +
+      `💰 **Amount:** $${offer.amount}\n` +
+      `📅 **Order Date:** ${orderDate}\n` +
+      `🛍️ **Service:** ${offer.listingId?.title || 'N/A'}\n\n` +
+      `**Your Requirements:**\n` +
+      `${offer.requirements || 'No specific requirements provided'}\n\n` +
+      `**Expected Delivery:** ${expectedDelivery}\n\n` +
+      `**Next Steps:**\n` +
+      `1. Communicate requirements to seller\n` +
+      `2. Track progress in messages\n` +
+      `3. Approve delivery when complete\n` +
+      `4. Release payment after satisfaction\n\n` +
+      `💬 **[OPEN CHAT WITH SELLER](${chatLink})**\n\n` +
+      `🔒 **Payment Status:** Secured in escrow\n` +
+      `📞 **Need Help?** Contact support@yourwebsite.com`;
+    
+    // System user ID for system messages
     const systemUserId = new mongoose.Types.ObjectId('000000000000000000000000');
-
-    // ✅ SELLER KO MESSAGE BHEJEN (System → Seller)
+    
+    // ✅ SAVE SELLER MESSAGE
     const messageToSeller = new Message({
       orderId: order._id,
       senderId: systemUserId,
       receiverId: order.sellerId,
-      message: messageContent,
-      read: false
+      message: sellerMessageContent,
+      read: false,
+      messageType: 'new_order_notification',
+      metadata: {
+        orderId: order._id.toString(),
+        buyerId: buyer._id.toString(),
+        buyerName: buyer.username,
+        amount: offer.amount,
+        chatLink: chatLink,
+        firebaseChatId: firebaseChatId,
+        listingTitle: offer.listingId?.title,
+        isClickable: true,
+        isSystemMessage: true,
+        notificationType: 'new_order'
+      },
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
     });
+    
     await messageToSeller.save();
-
-    // ✅ BUYER KO BHI MESSAGE BHEJEN (System → Buyer)
+    
+    // ✅ SAVE BUYER MESSAGE
     const messageToBuyer = new Message({
       orderId: order._id,
       senderId: systemUserId,
       receiverId: order.buyerId,
-      message: messageContent,
-      read: false
+      message: buyerMessageContent,
+      read: false,
+      messageType: 'order_confirmation',
+      metadata: {
+        orderId: order._id.toString(),
+        sellerId: seller._id.toString(),
+        sellerName: seller.username,
+        amount: offer.amount,
+        chatLink: chatLink,
+        firebaseChatId: firebaseChatId,
+        listingTitle: offer.listingId?.title,
+        isClickable: true,
+        isSystemMessage: true,
+        notificationType: 'order_confirmed'
+      },
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
     });
+    
     await messageToBuyer.save();
-
-    console.log("✅ Order details messages sent to both buyer and seller");
-    return true;
-
+    
+    console.log("✅ Fiverr-style messages sent to both users with chat links");
+    
+    // Also add messages to Firebase chat for better UX
+    if (firebaseChatId && admin.apps.length) {
+      try {
+        const db = admin.firestore();
+        const chatRoomRef = db.collection('chatRooms').doc(firebaseChatId);
+        
+        // Add system notification to Firebase chat
+        const systemNotification = {
+          senderId: 'system',
+          senderName: 'System',
+          senderRole: 'system',
+          message: `💌 **Order notifications have been sent to both parties.**\n\nBuyer and seller can now communicate directly here.`,
+          timestamp: new Date().toISOString(),
+          type: 'system_info',
+          readBy: []
+        };
+        
+        await chatRoomRef.collection('messages').add(systemNotification);
+        console.log("✅ System notification added to Firebase chat");
+      } catch (firebaseError) {
+        console.error("❌ Failed to add to Firebase chat:", firebaseError.message);
+      }
+    }
+    
+    return {
+      success: true,
+      firebaseChatId: firebaseChatId,
+      chatLink: chatLink,
+      sellerMessageId: messageToSeller._id,
+      buyerMessageId: messageToBuyer._id
+    };
+    
   } catch (error) {
-    console.error('❌ Failed to send order details messages:', error);
-    return false;
+    console.error('❌ Error sending messages with chat links:', error);
+    return { 
+      success: false, 
+      error: error.message 
+    };
   }
 };
 
@@ -138,7 +382,7 @@ async function sendEmailNotifications(offer, order, buyer, seller) {
     emailPromises.push(
       emailjs.send(
         EMAILJS_CONFIG.serviceId,
-        'order_received_seller', // Seller template ID
+        'order_received_seller',
         sellerEmailParams,
         {
           publicKey: EMAILJS_CONFIG.publicKey,
@@ -151,7 +395,7 @@ async function sendEmailNotifications(offer, order, buyer, seller) {
     emailPromises.push(
       emailjs.send(
         EMAILJS_CONFIG.serviceId,
-        'order_confirmed_buyer', // Buyer template ID
+        'order_confirmed_buyer',
         buyerEmailParams,
         {
           publicKey: EMAILJS_CONFIG.publicKey,
@@ -178,59 +422,11 @@ async function sendEmailNotifications(offer, order, buyer, seller) {
 
   } catch (error) {
     console.error('❌ Email notification error:', error);
-    // Don't throw error - this shouldn't break the main flow
     return false;
   }
 }
 
-// ✅ FUNCTION TO SEND ORDER CONFIRMATION MESSAGES
-async function sendOrderConfirmationMessages(order, offer, buyer, seller) {
-  try {
-    const messageContent = `🎉 **Order Confirmed Successfully!**\n\n` +
-      `**Order Details:**\n` +
-      `📦 Order ID: ${order._id}\n` +
-      `💰 Amount: $${offer.amount}\n` +
-      `🛍️ Service: ${offer.listingId?.title || 'N/A'}\n` +
-      `📅 Order Date: ${new Date().toLocaleDateString('en-IN')}\n\n` +
-      `**Delivery Information:**\n` +
-      `📋 Requirements: ${offer.requirements || 'No specific requirements provided'}\n` +
-      `📅 Expected Delivery: ${offer.expectedDelivery ? new Date(offer.expectedDelivery).toLocaleDateString('en-IN') : 'Not specified'}\n\n` +
-      `💬 **You can now discuss the order details in messages.**\n\n` +
-      `🔒 Payment secured in escrow.`;
-
-    // System user ID
-    const systemUserId = new mongoose.Types.ObjectId('000000000000000000000000');
-
-    // ✅ MESSAGE TO SELLER
-    const messageToSeller = new Message({
-      orderId: order._id,
-      senderId: systemUserId,
-      receiverId: order.sellerId,
-      message: `🛍️ **New Order Received!**\n\n${buyer.username} has placed an order for your service "${offer.listingId.title}".\n\n${messageContent}`,
-      read: false
-    });
-    await messageToSeller.save();
-
-    // ✅ MESSAGE TO BUYER  
-    const messageToBuyer = new Message({
-      orderId: order._id,
-      senderId: systemUserId,
-      receiverId: order.buyerId,
-      message: `✅ **Order Confirmed!**\n\nYour order for "${offer.listingId.title}" has been confirmed.\n\n${messageContent}`,
-      read: false
-    });
-    await messageToBuyer.save();
-
-    console.log("✅ Order confirmation messages sent to both users' inbox");
-    return true;
-
-  } catch (error) {
-    console.error('❌ Error sending order confirmation messages:', error);
-    return false;
-  }
-}
-
-// ✅ CONFIRM OFFER PAYMENT WITH MESSAGES & EMAILS
+// ✅ CONFIRM OFFER PAYMENT WITH MESSAGES & CHAT LINKS (MAIN FUNCTION)
 router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) => {
   console.log("🔍 Confirm Offer Payment Request DETAILS:", {
     body: req.body,
@@ -257,9 +453,18 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       });
     }
 
+    if (!validateObjectId(offerId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid Offer ID format'
+      });
+    }
+
     // ✅ START TRANSACTION
     session = await mongoose.startSession();
     session.startTransaction();
+
+    console.log("🔍 Searching for offer:", offerId, "for user:", userId);
 
     // ✅ FIND OFFER
     const offer = await Offer.findOne({
@@ -272,11 +477,14 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
 
     if (!offer) {
       await session.abortTransaction();
+      console.log("❌ Offer not found or access denied");
       return res.status(404).json({ 
         success: false,
         error: 'Offer not found or access denied'
       });
     }
+
+    console.log("✅ Offer found:", offer._id, "Status:", offer.status);
 
     // ✅ CHECK IF ALREADY PROCESSED
     if (offer.status === 'paid') {
@@ -350,6 +558,8 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       });
     }
 
+    console.log("✅ Buyer:", buyer.username, "Seller:", seller.username);
+
     // ✅ CREATE ORDER
     const orderData = {
       buyerId: userId,
@@ -364,12 +574,18 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       revisions: 0,
       maxRevisions: 3,
       paymentReleased: false,
-      orderDate: new Date()
+      orderDate: new Date(),
+      metadata: {
+        paymentMethod: paymentIntent.payment_method_types?.[0] || 'card',
+        offerAmount: offer.amount,
+        buyerNote: offer.message || ''
+      }
     };
 
     // Add optional fields
     if (offer.requirements) orderData.requirements = offer.requirements;
     if (offer.expectedDelivery) orderData.expectedDelivery = offer.expectedDelivery;
+    if (offer.message) orderData.buyerNote = offer.message;
 
     console.log("📦 Creating order with data:", orderData);
 
@@ -382,7 +598,9 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       offer.listingId._id, 
       { 
         status: 'reserved',
-        reservedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+        reservedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+        lastOrderAt: new Date(),
+        $inc: { totalOrders: 1 }
       },
       { session }
     );
@@ -391,32 +609,51 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
 
     // ✅ COMMIT TRANSACTION FIRST
     await session.commitTransaction();
-    console.log("🎉 Payment confirmation completed successfully");
+    console.log("🎉 Database transaction completed successfully");
 
-    // ✅ NOW SEND MESSAGES & EMAILS TO BOTH USERS (AFTER TRANSACTION SUCCESS)
+    // ✅ NOW SEND FIVERR-STYLE MESSAGES WITH CHAT LINKS
+    let notificationResults = {};
     try {
-      // Send inbox messages
-      await sendOrderConfirmationMessages(order, offer, buyer, seller);
-      console.log("✅ Order confirmation messages sent to both users");
+      // Send Fiverr-style messages with chat links
+      const messageResult = await sendOrderDetailsWithChatLink(order, offer, buyer, seller);
+      notificationResults.messages = messageResult;
       
-      // Send email notifications
-      await sendEmailNotifications(offer, order, buyer, seller);
-      console.log("✅ Email notifications sent to both users");
+      console.log("✅ Order notification messages sent");
       
-    } catch (messageError) {
-      console.error('❌ Failed to send notifications:', messageError);
-      // Don't fail the main process for notification errors
+      // Send email notifications (optional, can be done in background)
+      if (process.env.SEND_EMAILS === 'true') {
+        const emailResult = await sendEmailNotifications(offer, order, buyer, seller);
+        notificationResults.emails = emailResult;
+        console.log("✅ Email notifications sent");
+      }
+      
+    } catch (notificationError) {
+      console.error('❌ Notification sending failed:', notificationError);
+      notificationResults.error = notificationError.message;
     }
 
+    // ✅ SUCCESS RESPONSE WITH ALL DETAILS
     res.status(200).json({
       success: true,
-      message: 'Payment confirmed successfully! Order details sent to your messages and email.',
+      message: 'Payment confirmed successfully! Order details sent to your inbox.',
       data: {
         orderId: order._id,
         redirectUrl: `/orders/${order._id}`,
+        chatUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/messages?order=${order._id}`,
         offerId: offer._id,
-        messagesSent: true,
-        emailsSent: true
+        notifications: {
+          messagesSent: notificationResults.messages?.success || false,
+          firebaseChatId: notificationResults.messages?.firebaseChatId,
+          chatLink: notificationResults.messages?.chatLink,
+          emailsSent: notificationResults.emails || false
+        },
+        orderDetails: {
+          amount: order.amount,
+          sellerName: seller.username,
+          listingTitle: offer.listingId?.title,
+          orderDate: order.orderDate,
+          requirements: order.requirements || 'None specified'
+        }
       }
     });
 
@@ -430,7 +667,8 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     res.status(500).json({
       success: false,
       error: 'Payment confirmation failed',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      code: error.code || 'INTERNAL_ERROR'
     });
   } finally {
     if (session) {
@@ -438,39 +676,6 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     }
   }
 });
-
-// ✅ SIMPLE EMAIL TEMPLATE FOR TESTING (Alternative if you don't have EmailJS templates)
-async function sendSimpleEmailNotification(to, subject, htmlContent) {
-  try {
-    // This is a simple implementation using nodemailer or any other service
-    // You can replace this with your preferred email service
-    
-    const nodemailer = require('nodemailer');
-    
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      }
-    });
-
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: to,
-      subject: subject,
-      html: htmlContent
-    };
-
-    await transporter.sendMail(mailOptions);
-    console.log(`✅ Email sent to ${to}`);
-    return true;
-  } catch (error) {
-    console.error('❌ Simple email error:', error);
-    return false;
-  }
-}
-
 
 // ✅ MAKE OFFER WITH IMMEDIATE PAYMENT
 router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), async (req, res) => {
@@ -596,12 +801,10 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
       amount: offerAmount,
       message: message || '',
       paymentIntentId: paymentIntent.id,
-      status: 'pending_payment'
+      status: 'pending_payment',
+      requirements: requirements || '',
+      expectedDelivery: expectedDelivery ? new Date(expectedDelivery) : null
     };
-
-    // Add optional fields
-    if (requirements) offerData.requirements = requirements;
-    if (expectedDelivery) offerData.expectedDelivery = new Date(expectedDelivery);
 
     const offer = new Offer(offerData);
     await offer.save({ session });
@@ -620,11 +823,14 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
           amount: offer.amount,
           status: offer.status,
           paymentIntentId: offer.paymentIntentId,
-          createdAt: offer.createdAt
+          createdAt: offer.createdAt,
+          requirements: offer.requirements,
+          expectedDelivery: offer.expectedDelivery
         },
         clientSecret: paymentIntent.client_secret,
         paymentIntentId: paymentIntent.id,
-        amount: offerAmount
+        amount: offerAmount,
+        nextSteps: 'Complete payment to submit your offer. Once paid, the seller will be notified automatically.'
       }
     });
 
@@ -647,7 +853,6 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
   }
 });
 
-
 // ✅ GET OFFERS RECEIVED (SELLER)
 router.get("/received-offers", authenticateMiddleware, logRequest("RECEIVED_OFFERS"), async (req, res) => {
   try {
@@ -664,7 +869,7 @@ router.get("/received-offers", authenticateMiddleware, logRequest("RECEIVED_OFFE
     const listingIds = myListings.map(listing => listing._id);
     
     const offers = await Offer.find({ listingId: { $in: listingIds } })
-      .populate('buyerId', 'username avatar email')
+      .populate('buyerId', 'username avatar email rating')
       .populate('listingId', 'title price mediaUrls status')
       .sort({ createdAt: -1 });
     
@@ -696,7 +901,7 @@ router.get("/my-offers", authenticateMiddleware, logRequest("MY_OFFERS"), async 
 
     const offers = await Offer.find({ buyerId: userId })
       .populate('listingId', 'title price mediaUrls status sellerId')
-      .populate('listingId.sellerId', 'username avatar')
+      .populate('listingId.sellerId', 'username avatar rating')
       .sort({ createdAt: -1 });
     
     res.status(200).json({
@@ -734,9 +939,9 @@ router.get("/:id", authenticateMiddleware, logRequest("GET_OFFER"), async (req, 
     }
 
     const offer = await Offer.findById(offerId)
-      .populate('buyerId', 'username avatar email')
-      .populate('listingId', 'title price mediaUrls status sellerId')
-      .populate('listingId.sellerId', 'username avatar');
+      .populate('buyerId', 'username avatar email rating')
+      .populate('listingId', 'title price mediaUrls status sellerId description')
+      .populate('listingId.sellerId', 'username avatar rating');
 
     if (!offer) {
       return res.status(404).json({ 
@@ -756,9 +961,31 @@ router.get("/:id", authenticateMiddleware, logRequest("GET_OFFER"), async (req, 
       });
     }
 
+    // Check if there's an associated order
+    const order = await Order.findOne({ offerId: offer._id })
+      .select('status paidAt acceptedAt completedAt');
+    
+    // Check if there's a chat room
+    const chat = await Chat.findOne({ 
+      $or: [
+        { orderId: order?._id },
+        { firebaseChatId: { $regex: `order_${order?._id}` } }
+      ]
+    });
+
     res.status(200).json({
       success: true,
-      data: offer,
+      data: {
+        ...offer.toObject(),
+        associatedOrder: order,
+        chatRoom: chat ? {
+          _id: chat._id,
+          firebaseChatId: chat.firebaseChatId,
+          status: chat.status
+        } : null,
+        chatLink: chat?.firebaseChatId ? 
+          `${process.env.FRONTEND_URL || 'http://localhost:3000'}/chat/${chat.firebaseChatId}` : null
+      },
       userRole: isBuyer ? 'buyer' : 'seller'
     });
 
@@ -836,9 +1063,22 @@ router.put("/accept-offer/:id", authenticateMiddleware, logRequest("ACCEPT_OFFER
     // ✅ FIND AND UPDATE ORDER
     const order = await Order.findOne({ offerId: offer._id }).session(session);
     if (order) {
-      order.status = 'in_progress'; // ✅ CORRECT: Move to 'in_progress' status
+      order.status = 'in_progress';
       order.acceptedAt = new Date();
       await order.save({ session });
+      
+      // Send acceptance notification to buyer
+      const systemUserId = new mongoose.Types.ObjectId('000000000000000000000000');
+      const acceptanceMessage = new Message({
+        orderId: order._id,
+        senderId: systemUserId,
+        receiverId: order.buyerId,
+        message: `✅ **Offer Accepted!**\n\n${offer.listingId.sellerId.username} has accepted your offer for "${offer.listingId.title}".\n\n**Order Status:** In Progress\n**Amount:** $${offer.amount}\n\nYou can now discuss the project details in the chat.`,
+        read: false,
+        messageType: 'offer_accepted'
+      });
+      
+      await acceptanceMessage.save();
     }
 
     // ✅ MARK LISTING AS SOLD
@@ -846,6 +1086,7 @@ router.put("/accept-offer/:id", authenticateMiddleware, logRequest("ACCEPT_OFFER
       offer.listingId._id, 
       { 
         status: 'sold',
+        soldAt: new Date(),
         reservedUntil: null
       },
       { session }
@@ -934,6 +1175,7 @@ router.put("/reject-offer/:id", authenticateMiddleware, logRequest("REJECT_OFFER
 
     const offer = await Offer.findById(offerId)
       .populate('listingId')
+      .populate('buyerId', 'username email')
       .session(session);
     
     if (!offer) {
@@ -968,11 +1210,24 @@ router.put("/reject-offer/:id", authenticateMiddleware, logRequest("REJECT_OFFER
     offer.rejectionReason = req.body.rejectionReason || 'Seller rejected the offer';
     await offer.save({ session });
 
+    // ✅ NOTIFY BUYER
+    const systemUserId = new mongoose.Types.ObjectId('000000000000000000000000');
+    const rejectionMessage = new Message({
+      orderId: offer._id,
+      senderId: systemUserId,
+      receiverId: offer.buyerId._id,
+      message: `❌ **Offer Rejected**\n\nYour offer for "${offer.listingId.title}" has been rejected by the seller.\n\n**Reason:** ${offer.rejectionReason}\n**Amount:** $${offer.amount}\n\nYou can make another offer or browse other listings.`,
+      read: false,
+      messageType: 'offer_rejected'
+    });
+    
+    await rejectionMessage.save();
+
     // ✅ UPDATE ORDER STATUS IF EXISTS
     if (offer.status === 'paid') {
       await Order.findOneAndUpdate(
         { offerId: offer._id },
-        { status: 'cancelled' }, // ✅ CORRECT: Use 'cancelled' status
+        { status: 'cancelled' },
         { session }
       );
 
@@ -985,7 +1240,6 @@ router.put("/reject-offer/:id", authenticateMiddleware, logRequest("REJECT_OFFER
           console.log("✅ Payment refunded for rejected offer:", offer._id, refund.id);
         } catch (refundError) {
           console.error('Refund error:', refundError);
-          // Continue even if refund fails - can be handled manually
         }
       }
     }
@@ -1006,7 +1260,10 @@ router.put("/reject-offer/:id", authenticateMiddleware, logRequest("REJECT_OFFER
     res.status(200).json({ 
       success: true,
       message: 'Offer rejected successfully',
-      data: { offer }
+      data: { 
+        offer,
+        buyerNotified: true 
+      }
     });
   } catch (error) {
     console.error('Error rejecting offer:', error);
@@ -1051,7 +1308,10 @@ router.put("/cancel-offer/:id", authenticateMiddleware, logRequest("CANCEL_OFFER
     session = await mongoose.startSession();
     session.startTransaction();
 
-    const offer = await Offer.findById(offerId).session(session);
+    const offer = await Offer.findById(offerId)
+      .populate('listingId')
+      .populate('buyerId', 'username email')
+      .session(session);
     
     if (!offer) {
       await session.abortTransaction();
@@ -1084,6 +1344,19 @@ router.put("/cancel-offer/:id", authenticateMiddleware, logRequest("CANCEL_OFFER
     offer.cancelledAt = new Date();
     await offer.save({ session });
 
+    // ✅ NOTIFY SELLER
+    const systemUserId = new mongoose.Types.ObjectId('000000000000000000000000');
+    const cancellationMessage = new Message({
+      orderId: offer._id,
+      senderId: systemUserId,
+      receiverId: offer.listingId.sellerId,
+      message: `❌ **Offer Cancelled**\n\n${offer.buyerId.username} has cancelled their offer for "${offer.listingId.title}".\n\n**Amount:** $${offer.amount}\n**Reason:** Buyer cancelled the offer`,
+      read: false,
+      messageType: 'offer_cancelled'
+    });
+    
+    await cancellationMessage.save();
+
     // ✅ IF PAYMENT WAS STARTED BUT NOT COMPLETED, CANCEL PAYMENT INTENT
     if (offer.paymentIntentId && offer.status === 'pending_payment') {
       try {
@@ -1091,9 +1364,18 @@ router.put("/cancel-offer/:id", authenticateMiddleware, logRequest("CANCEL_OFFER
         console.log("✅ Payment intent cancelled for offer:", offer._id);
       } catch (stripeError) {
         console.error('Payment cancellation error:', stripeError);
-        // Continue even if cancellation fails
       }
     }
+
+    // ✅ MAKE LISTING ACTIVE AGAIN
+    await MarketplaceListing.findByIdAndUpdate(
+      offer.listingId._id, 
+      { 
+        status: 'active',
+        reservedUntil: null
+      },
+      { session }
+    );
 
     // ✅ COMMIT TRANSACTION
     await session.commitTransaction();
@@ -1101,7 +1383,10 @@ router.put("/cancel-offer/:id", authenticateMiddleware, logRequest("CANCEL_OFFER
     res.status(200).json({ 
       success: true,
       message: 'Offer cancelled successfully', 
-      data: { offer }
+      data: { 
+        offer,
+        sellerNotified: true 
+      }
     });
   } catch (error) {
     console.error('Error cancelling offer:', error);
@@ -1125,7 +1410,7 @@ router.put("/cancel-offer/:id", authenticateMiddleware, logRequest("CANCEL_OFFER
 router.post("/create-direct-payment", authenticateMiddleware, logRequest("DIRECT_PURCHASE"), async (req, res) => {
   let session;
   try {
-    const { listingId } = req.body;
+    const { listingId, requirements } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
 
     if (!listingId) {
@@ -1191,14 +1476,15 @@ router.post("/create-direct-payment", authenticateMiddleware, logRequest("DIRECT
       buyerId: userId,
       sellerId: listing.sellerId,
       listingId: listingId,
-      orderType: 'direct_purchase', // ✅ CORRECT: Use 'direct_purchase' from your enum
+      orderType: 'direct_purchase',
       amount: listing.price,
-      status: 'pending_payment', // ✅ CORRECT: Use 'pending_payment' from your enum
+      status: 'pending_payment',
       stripePaymentIntentId: paymentIntent.id,
       revisions: 0,
       maxRevisions: 3,
       paymentReleased: false,
-      orderDate: new Date()
+      orderDate: new Date(),
+      requirements: requirements || ''
     });
 
     await order.save({ session });
@@ -1265,6 +1551,71 @@ router.post("/create-direct-payment", authenticateMiddleware, logRequest("DIRECT
   }
 });
 
+// ✅ GET CHAT LINK FOR ORDER
+router.get("/chat-link/:orderId", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+    const { orderId } = req.params;
+    
+    if (!validateObjectId(orderId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid order ID format' 
+      });
+    }
+    
+    const order = await Order.findById(orderId)
+      .select('buyerId sellerId listingId');
+    
+    if (!order) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Order not found' 
+      });
+    }
+    
+    // Check if user is part of this order
+    if (order.buyerId.toString() !== userId.toString() && 
+        order.sellerId.toString() !== userId.toString()) {
+      return res.status(403).json({ 
+        success: false,
+        error: 'Not authorized to access this chat' 
+      });
+    }
+    
+    // Find chat
+    const chat = await Chat.findOne({ 
+      orderId: order._id 
+    }).select('firebaseChatId status');
+    
+    if (!chat) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Chat not found for this order' 
+      });
+    }
+    
+    const chatLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/chat/${chat.firebaseChatId}?order=${orderId}`;
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        chatLink: chatLink,
+        firebaseChatId: chat.firebaseChatId,
+        orderId: order._id,
+        directLink: `/chat/${chat.firebaseChatId}`
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error getting chat link:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to get chat link' 
+    });
+  }
+});
+
 // ✅ TEST STRIPE CONNECTION
 router.get("/test-stripe", logRequest("TEST_STRIPE"), async (req, res) => {
   try {
@@ -1290,22 +1641,6 @@ router.get("/test-stripe", logRequest("TEST_STRIPE"), async (req, res) => {
       error: 'Stripe test failed',
       details: error.message
     });
-  }
-});
-
-// ⚠️ Delete all offers (No Auth) — use only for testing or local cleanup
-router.delete("/delete-all-offers", async (req, res) => {
-  try {
-    const result = await Offer.deleteMany({});
-    console.log(`🗑️ Deleted ${result.deletedCount} offers from the database.`);
-
-    res.status(200).json({
-      success: true,
-      message: `All offers deleted successfully (${result.deletedCount} offers removed).`
-    });
-  } catch (error) {
-    console.error("❌ Error deleting all offers:", error);
-    res.status(500).json({ error: "Failed to delete all offers" });
   }
 });
 
@@ -1358,6 +1693,96 @@ router.get("/stats/overview", authenticateMiddleware, logRequest("OFFER_STATS"),
       error: 'Failed to fetch offer statistics' 
     });
   }
+});
+
+// ✅ GET MESSAGES FOR ORDER
+router.get("/messages/:orderId", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+    const { orderId } = req.params;
+    
+    if (!validateObjectId(orderId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid order ID format' 
+      });
+    }
+    
+    // Check if user has access to this order
+    const order = await Order.findById(orderId)
+      .select('buyerId sellerId');
+    
+    if (!order) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Order not found' 
+      });
+    }
+    
+    if (order.buyerId.toString() !== userId.toString() && 
+        order.sellerId.toString() !== userId.toString()) {
+      return res.status(403).json({ 
+        success: false,
+        error: 'Not authorized to view these messages' 
+      });
+    }
+    
+    // Get messages for this order
+    const messages = await Message.find({
+      orderId: orderId,
+      $or: [
+        { receiverId: userId },
+        { senderId: userId }
+      ]
+    })
+    .sort({ createdAt: -1 })
+    .limit(50);
+    
+    res.status(200).json({
+      success: true,
+      data: messages,
+      count: messages.length,
+      orderId: orderId
+    });
+    
+  } catch (error) {
+    console.error('Error fetching order messages:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch messages' 
+    });
+  }
+});
+
+// ✅ DELETE ALL OFFERS (TESTING ONLY)
+router.delete("/delete-all-offers", async (req, res) => {
+  try {
+    const result = await Offer.deleteMany({});
+    console.log(`🗑️ Deleted ${result.deletedCount} offers from the database.`);
+
+    res.status(200).json({
+      success: true,
+      message: `All offers deleted successfully (${result.deletedCount} offers removed).`
+    });
+  } catch (error) {
+    console.error("❌ Error deleting all offers:", error);
+    res.status(500).json({ error: "Failed to delete all offers" });
+  }
+});
+
+// ✅ HEALTH CHECK ENDPOINT
+router.get("/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Offer routes are healthy",
+    timestamp: new Date().toISOString(),
+    services: {
+      database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+      stripe: "configured",
+      firebase: admin.apps.length > 0 ? "initialized" : "not_initialized",
+      emailjs: EMAILJS_CONFIG.serviceId ? "configured" : "not_configured"
+    }
+  });
 });
 
 module.exports = router;
