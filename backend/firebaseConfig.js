@@ -3,7 +3,7 @@ import { initializeApp } from 'firebase/app';
 import { getDatabase } from 'firebase/database';
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 const firebaseConfig = {
-  apiKey: "AIzaSyDbtw87NpBAema-2eA58hpDuS85dxCBn50",
+  apiKey: "f08306fa7ba1a4cb5d65693ab63953c1dfe4f458",
   authDomain: "wecinema-21d00.firebaseapp.com",
   projectId: "wecinema-21d00",
   storageBucket: "wecinema-21d00.appspot.com",
