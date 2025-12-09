@@ -21,8 +21,6 @@ const firestore = getFirestore(app); // Firestore (for chat)
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
-googleProvider.addScope('https://www.googleapis.com/auth/user.birthday.read');
-googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
-googleProvider.addScope('https://www.googleapis.com/auth/userinfo.profile');
+
 
 export { auth, googleProvider, app, database, firestore };
