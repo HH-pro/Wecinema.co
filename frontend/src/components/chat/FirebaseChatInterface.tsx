@@ -71,7 +71,7 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
   const [initializationError, setInitializationError] = useState<string | null>(null);
   const [chatExists, setChatExists] = useState(false);
   
-  const { messages, loading, error, sendMessage, sendTypingStatus, markAsRead } = useFirebaseChat(chatId);
+  const { messages, loading, error, sendMessage, markAllAsRead, sendTypingStatus } = useFirebaseChat(chatId);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const { user: authUser } = useAuth();
@@ -81,16 +81,13 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
     if (!chatId || chatInitialized) return;
 
     try {
-      console.log('Checking if chat exists:', chatId);
       const chatRef = doc(firestore, 'chats', chatId);
       const chatSnap = await getDoc(chatRef);
       
       if (chatSnap.exists()) {
-        console.log('Chat exists in Firebase');
         setChatExists(true);
         setChatInitialized(true);
       } else {
-        console.log('Chat does not exist in Firebase');
         setChatExists(false);
       }
     } catch (error: any) {
@@ -106,13 +103,6 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
     }
 
     try {
-      console.log('Initializing chat:', {
-        chatId,
-        currentUserId: currentUser.id,
-        otherUserId: otherUser.id,
-        orderId
-      });
-
       const chatRef = doc(firestore, 'chats', chatId);
       
       // Create chat document structure
@@ -148,11 +138,8 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
         },
         isActive: true
       };
-
-      console.log('Creating chat with data:', chatData);
       
       await setDoc(chatRef, chatData);
-      console.log('Chat created successfully in Firebase');
       
       // Create welcome message
       try {
@@ -174,7 +161,6 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
         };
         
         await setDoc(doc(messagesRef), welcomeMessage);
-        console.log('Welcome message added');
       } catch (messageError) {
         console.warn('Could not add welcome message:', messageError);
       }
@@ -259,21 +245,14 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
     setIsSending(true);
 
     try {
-      console.log('Sending message to Firebase:', {
-        chatId,
-        message: messageContent,
-        senderId: currentUser.id
-      });
-
-      // Send to Firebase using your hook
       const messageSent = await sendMessage({
         senderId: currentUser.id,
-        senderName: currentUser.username,
-        senderAvatar: currentUser.avatar,
+        senderName: currentUser.username || 'User',
+        senderAvatar: currentUser.avatar || '',
         content: messageContent,
         messageType: 'text',
         metadata: {
-          orderId,
+          orderId: orderId || '',
           isUserMessage: true,
           timestamp: new Date().toISOString()
         }
@@ -282,8 +261,6 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
       if (!messageSent) {
         throw new Error('Failed to send message to Firebase');
       }
-      
-      console.log('Message sent successfully to Firebase');
       
       // Update chat document with last message
       try {
@@ -294,7 +271,6 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
           updatedAt: serverTimestamp(),
           [`unreadCount.${otherUser?.id}`]: increment(1)
         });
-        console.log('Chat document updated with last message');
       } catch (updateError) {
         console.warn('Failed to update chat document:', updateError);
       }
@@ -329,16 +305,7 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
       
     } catch (err: any) {
       console.error('Failed to send message:', err);
-      
-      if (err.code === 'permission-denied') {
-        toast.error('Permission denied. Check Firebase security rules.');
-      } else if (err.code === 'not-found') {
-        toast.error('Chat not found. Please refresh the page.');
-      } else {
-        toast.error('Failed to send message. Please try again.');
-      }
-      
-      // Restore message if failed
+      toast.error('Failed to send message. Please try again.');
       setNewMessage(messageContent);
     } finally {
       setIsSending(false);
@@ -351,11 +318,11 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
     }
 
     setIsTyping(true);
-    sendTypingStatus?.(true);
+    sendTypingStatus?.(true, currentUser!.id);
 
     const timeout = setTimeout(() => {
       setIsTyping(false);
-      sendTypingStatus?.(false);
+      sendTypingStatus?.(false, currentUser!.id);
     }, 1000);
 
     setTypingTimeout(timeout);
@@ -382,19 +349,9 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
   // Mark messages as read
   useEffect(() => {
     if (chatId && allMessages.length > 0 && chatExists && currentUser) {
-      const unreadMessages = allMessages.filter(msg => 
-        msg.messageType !== 'system' && 
-        'senderId' in msg &&
-        msg.senderId !== currentUser.id &&
-        'read' in msg &&
-        !msg.read
-      );
-      
-      if (unreadMessages.length > 0) {
-        markAsRead?.();
-      }
+      markAllAsRead?.(currentUser.id);
     }
-  }, [chatId, allMessages, currentUser, markAsRead, chatExists]);
+  }, [chatId, allMessages, currentUser, markAllAsRead, chatExists]);
 
   // Fetch system messages
   useEffect(() => {
@@ -402,39 +359,6 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
       fetchSystemMessages();
     }
   }, [orderId, fetchSystemMessages]);
-
-  const formatMessageTime = (timestamp: Date): string => {
-    try {
-      const date = new Date(timestamp);
-      if (isNaN(date.getTime())) return 'Just now';
-      
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffMins = Math.floor(diffMs / 60000);
-      const diffHours = Math.floor(diffMs / 3600000);
-      const diffDays = Math.floor(diffMs / 86400000);
-
-      if (diffMins < 1) {
-        return 'Just now';
-      } else if (diffMins < 60) {
-        return `${diffMins}m ago`;
-      } else if (diffHours < 24) {
-        return `${diffHours}h ago`;
-      } else if (diffDays === 1) {
-        return 'Yesterday';
-      } else if (diffDays < 7) {
-        return `${diffDays}d ago`;
-      } else {
-        return date.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: diffDays > 365 ? 'numeric' : undefined
-        });
-      }
-    } catch (error) {
-      return 'Just now';
-    }
-  };
 
   const renderMessageContent = (message: FirebaseMessage | SystemMessage) => {
     if (message.messageType === 'system') {
@@ -504,16 +428,6 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
               }`}
           >
             {renderMessageContent(message)}
-            
-            {/* Message time */}
-            <div className={`text-xs mt-1 ${isCurrentUser ? 'text-blue-100' : 'text-gray-500'} ${isSystem ? 'text-yellow-600' : ''}`}>
-              {formatMessageTime(message.timestamp)}
-              {!isSystem && message.messageType !== 'system' && 'read' in message && isCurrentUser && (
-                <span className="ml-1">
-                  {message.read ? '✓✓' : '✓'}
-                </span>
-              )}
-            </div>
           </div>
         </div>
       </div>
