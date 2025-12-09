@@ -19,6 +19,7 @@ const morgan = require("morgan");
 const cors = require("cors");
 const cron = require("node-cron");
 const axios = require("axios");
+require("../services/expirationService");
 
 const app = express();
 
