@@ -7,7 +7,6 @@ const Order = require('../../models/marketplace/order');
 const Message = require('../../models/marketplace/messages');
 const { authenticateMiddleware } = require('../../utils');
 const admin = require('firebase-admin');
-const { app } = require('../../config/config'); // Adjust path
 
 // ✅ GET USER'S CHATS
 router.get('/my-chats', authenticateMiddleware, async (req, res) => {
@@ -598,16 +597,15 @@ router.get('/by-order/:orderId', authenticateMiddleware, async (req, res) => {
 
 // ✅ HEALTH CHECK
 router.get('/firebase/health', (req, res) => {
-  // Import your Firebase config
-  
   res.status(200).json({
     success: true,
     message: 'Chat routes are healthy',
     timestamp: new Date().toISOString(),
     services: {
       database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-      firebase: app ? 'initialized' : 'not_initialized' // Check app instead of admin
+      firebase: admin.apps.length > 0 ? 'initialized' : 'not_initialized'
     }
   });
 });
+
 module.exports = router;
