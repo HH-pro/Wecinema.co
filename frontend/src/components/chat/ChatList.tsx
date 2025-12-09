@@ -3,17 +3,18 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useFirebaseChat, Message as FirebaseMessage } from '../../hooks/useFirebaseChat';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
-import { db } from '../../firebase/config';
+// Correct import path for your firebase config
+import { firestore as db } from '../../firebase/config'; // Import as 'db'
 import { 
   doc, 
   setDoc, 
   getDoc, 
   serverTimestamp,
   collection,
-  query,
-  where,
-  getDocs
+  updateDoc,
+  increment
 } from 'firebase/firestore';
+// Rest of the code remains the same...
 
 interface User {
   id: string;
