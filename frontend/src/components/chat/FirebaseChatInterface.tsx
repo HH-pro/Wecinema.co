@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useFirebaseChat, Message as FirebaseMessage } from '../../hooks/useFirebaseChat';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
-import { firestore } from '../../firebaseConfig';
+import { firestore } from '../../firebase/config';
 import { 
   doc, 
   setDoc, 
