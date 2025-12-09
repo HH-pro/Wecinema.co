@@ -1,16 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { HypemodeGallery} from "../components";
-import { MdForwardToInbox } from "react-icons/md";
+import { useNavigate } from "react-router-dom";
+import { HypemodeGallery } from "../components";
 import { Layout } from "../components";
 import { getRequest } from "../api";
 import { decodeToken } from "../utilities/helperfFunction";
 import Modal from 'react-modal';
 import axios from 'axios';
-import { getDatabase, ref, push, serverTimestamp } from 'firebase/database'
-import { appp } from "./firebase";
-
-const database = getDatabase(appp);
 
 const GenrePage: React.FC = () => {
   const [setLoading] = useState<any>({});
@@ -80,28 +75,14 @@ const GenrePage: React.FC = () => {
     setShowPaidUsersModal(true);
   };
 
-  const startChat = (chatUserId: string) => {
-    if (!userId || !chatUserId) {
-      // console.error('User ID or Chat User ID is not defined.');
-      return;
-    }
-
-    const chatId = userId > chatUserId ? `${userId}_${chatUserId}` : `${chatUserId}_${userId}`;
-    const chatRef = ref(database, `chats/${chatId}`);
-    push(chatRef, {
-      sender: username,
-      message: "Hello!",
-      timestamp: serverTimestamp()
-    });
-    navigate(`/chat/${chatId}`);
-  };
+  // Removed startChat function
 
   return (
     <Layout expand={false} hasHeader={false}>
       <div style={{ position: 'fixed', top: '100px', right: '20px', zIndex: 999 }}>
         <button onClick={handleOpenPaidUsersModal} style={{
           padding: '5px 12px',
-          background: '#f1c40f	',
+          background: '#f1c40f',
           color: '#fff',
           border: 'none',
           borderRadius: '',
@@ -109,7 +90,8 @@ const GenrePage: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
         }}>
-          <MdForwardToInbox size="40"  />
+          {/* Removed MdForwardToInbox icon since we're removing chat functionality */}
+          <span style={{ fontSize: '14px', fontWeight: 'bold' }}>Premium Users</span>
         </button>
       </div>
 
@@ -139,22 +121,18 @@ const GenrePage: React.FC = () => {
           },
         }}
       >
+        <h2 style={{ marginBottom: '20px', color: '#000' }}>Premium Users</h2>
         <ul style={{ listStyleType: 'none', padding: 0 }}>
           {paidUsers.map((paidUser) => (
-            <li key={paidUser._id} style={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
-              <Link to={`/user/${paidUser._id}`}>
-                <img src={paidUser.avatar} alt={`${paidUser.username}'s avatar`} style={{ width: '30px', height: '30px', borderRadius: '50%', marginRight: '10px' }} />
-              </Link>
-              <span style={{ fontWeight: 'bold' }}>{paidUser.username}</span>
-              <button onClick={() => startChat(paidUser._id)} style={{
-                marginLeft: '10px',
-                padding: '5px 10px',
-                background: '#f1c40f',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-              }}>Start Chat</button>
+            <li key={paidUser._id} style={{ display: 'flex', alignItems: 'center', marginBottom: '10px', padding: '10px', backgroundColor: '#fff', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+              <img src={paidUser.avatar} alt={`${paidUser.username}'s avatar`} style={{ width: '40px', height: '40px', borderRadius: '50%', marginRight: '10px' }} />
+              <div style={{ flex: 1 }}>
+                <span style={{ fontWeight: 'bold', fontSize: '16px' }}>{paidUser.username}</span>
+                {paidUser.bio && (
+                  <p style={{ margin: '5px 0 0 0', fontSize: '14px', color: '#666' }}>{paidUser.bio}</p>
+                )}
+              </div>
+              {/* Removed Start Chat button */}
             </li>
           ))}
         </ul>
@@ -187,22 +165,21 @@ const GenrePage: React.FC = () => {
             },
           }}
         >
-          <h2 style={{ marginBottom: '20px' }}>Subscribe to Access This Profile</h2>
-          <p>You need to subscribe to access this profile.</p>
+          <h2 style={{ marginBottom: '20px' }}>Subscribe to Access Premium Features</h2>
+          <p>You need to subscribe to view premium users and access all features.</p>
           <button onClick={handleCloseModal} style={{ marginTop: '20px', padding: '10px 20px', background: '#fff', color: '#000', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
             Close
           </button>
         </Modal>
       )}
       <HypemodeGallery title="Action" category="Action" length={5} isFirst />
-			<HypemodeGallery title="Comedy" length={5} category="Comedy" />
-			<HypemodeGallery title="Horror" length={5} category="Horror" />
-			<HypemodeGallery title="Drama" length={5} category="Drama" />
-			<HypemodeGallery title="Romance" length={5} category="Romance" />
-			<HypemodeGallery title="Mystery" length={5} category="Mystery" />
-			<HypemodeGallery title="Adventure" length={5} category="Adventure" />
-			<HypemodeGallery title="Thriller " length={5} category="Thriller" />
-
+      <HypemodeGallery title="Comedy" length={5} category="Comedy" />
+      <HypemodeGallery title="Horror" length={5} category="Horror" />
+      <HypemodeGallery title="Drama" length={5} category="Drama" />
+      <HypemodeGallery title="Romance" length={5} category="Romance" />
+      <HypemodeGallery title="Mystery" length={5} category="Mystery" />
+      <HypemodeGallery title="Adventure" length={5} category="Adventure" />
+      <HypemodeGallery title="Thriller " length={5} category="Thriller" />
     </Layout>
   );
 };
