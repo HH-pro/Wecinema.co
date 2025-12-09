@@ -7,6 +7,7 @@ const Order = require('../../models/marketplace/order');
 const Message = require('../../models/marketplace/messages');
 const { authenticateMiddleware } = require('../../utils');
 const admin = require('firebase-admin');
+const { app } = require('../../config/config'); // Adjust path
 
 // ✅ GET USER'S CHATS
 router.get('/my-chats', authenticateMiddleware, async (req, res) => {
@@ -598,7 +599,6 @@ router.get('/by-order/:orderId', authenticateMiddleware, async (req, res) => {
 // ✅ HEALTH CHECK
 router.get('/firebase/health', (req, res) => {
   // Import your Firebase config
-  const { app } = require('../config/firebaseConfig'); // Adjust path
   
   res.status(200).json({
     success: true,
