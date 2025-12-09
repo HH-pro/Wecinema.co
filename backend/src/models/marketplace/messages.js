@@ -1,15 +1,57 @@
-// models/marketplace/Message.js
+// backend/models/marketplace/Message.js
 const mongoose = require('mongoose');
 
 const messageSchema = new mongoose.Schema({
-  orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: true },
-  chatId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chat' }, // ✅ New field
-  senderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  receiverId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  message: String,
-  attachments: [String],
-  read: { type: Boolean, default: false },
-  messageType: { type: String, default: 'text' } // 'text', 'system', 'order'
-}, { timestamps: true });
+  chatId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Chat',
+    required: true,
+    index: true
+  },
+  firebaseChatId: {
+    type: String,
+    required: true,
+    index: true
+  },
+  senderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  receiverId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  message: {
+    type: String,
+    required: true
+  },
+  messageType: {
+    type: String,
+    enum: ['text', 'image', 'file', 'system'],
+    default: 'text'
+  },
+  read: {
+    type: Boolean,
+    default: false
+  },
+  readAt: {
+    type: Date
+  },
+  metadata: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
+  }
+}, {
+  timestamps: true
+});
 
-module.exports = mongoose.model('Message', messageSchema);
+// Index for faster queries
+messageSchema.index({ chatId: 1, createdAt: -1 });
+messageSchema.index({ firebaseChatId: 1, createdAt: -1 });
+messageSchema.index({ receiverId: 1, read: 1 });
+
+const Message = mongoose.model('Message', messageSchema);
+
+module.exports = Message;
