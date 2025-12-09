@@ -158,7 +158,186 @@ router.get('/my-chats', authenticateMiddleware, async (req, res) => {
     });
   }
 });
+router.get('/by-firebase-id/:firebaseChatId', auth, async (req, res) => {
+  try {
+    const { firebaseChatId } = req.params;
+    const userId = req.user.id;
+    
+    console.log(`Fetching chat by Firebase ID: ${firebaseChatId} for user: ${userId}`);
+    
+    // Find chat by Firebase chat ID
+    const chat = await Chat.findOne({ firebaseChatId })
+      .populate({
+        path: 'buyerId',
+        select: 'username avatar email'
+      })
+      .populate({
+        path: 'sellerId',
+        select: 'username avatar email'
+      })
+      .populate({
+        path: 'listingId',
+        select: 'title price mediaUrls'
+      })
+      .populate({
+        path: 'orderId',
+        select: 'amount status listingTitle createdAt'
+      });
+    
+    if (!chat) {
+      console.log(`Chat not found for Firebase ID: ${firebaseChatId}`);
+      return res.status(404).json({
+        success: false,
+        message: 'Chat not found'
+      });
+    }
+    
+    // Check if user is part of this chat
+    const isParticipant = chat.buyerId._id.toString() === userId || chat.sellerId._id.toString() === userId;
+    
+    if (!isParticipant) {
+      console.log(`User ${userId} is not a participant in chat ${firebaseChatId}`);
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. You are not a participant in this chat.'
+      });
+    }
+    
+    // Determine the other user
+    let otherUser;
+    if (chat.buyerId._id.toString() === userId) {
+      otherUser = chat.sellerId;
+    } else {
+      otherUser = chat.buyerId;
+    }
+    
+    // Get unread message count
+    const unreadCount = await Message.countDocuments({
+      chatId: chat._id,
+      receiverId: userId,
+      read: false
+    });
+    
+    // Get last message
+    const lastMessage = await Message.findOne({ chatId: chat._id })
+      .sort({ createdAt: -1 })
+      .select('message senderId createdAt read')
+      .lean();
+    
+    // Format the response
+    const responseData = {
+      _id: chat._id,
+      firebaseChatId: chat.firebaseChatId,
+      otherUser: {
+        _id: otherUser._id,
+        username: otherUser.username,
+        avatar: otherUser.avatar,
+        email: otherUser.email
+      },
+      otherUserId: otherUser._id,
+      listing: chat.listingId ? {
+        _id: chat.listingId._id,
+        title: chat.listingId.title,
+        price: chat.listingId.price,
+        mediaUrls: chat.listingId.mediaUrls
+      } : null,
+      listingId: chat.listingId?._id,
+      order: chat.orderId ? {
+        _id: chat.orderId._id,
+        amount: chat.orderId.amount,
+        status: chat.orderId.status,
+        listingTitle: chat.orderId.listingTitle,
+        createdAt: chat.orderId.createdAt
+      } : null,
+      orderId: chat.orderId?._id,
+      lastMessage: lastMessage ? {
+        message: lastMessage.message,
+        senderId: lastMessage.senderId,
+        createdAt: lastMessage.createdAt,
+        read: lastMessage.read
+      } : null,
+      unreadCount,
+      updatedAt: chat.updatedAt || lastMessage?.createdAt || chat.createdAt,
+      createdAt: chat.createdAt
+    };
+    
+    console.log(`Successfully fetched chat ${firebaseChatId} for user ${userId}`);
+    
+    res.json({
+      success: true,
+      data: responseData
+    });
+  } catch (error) {
+    console.error('Error fetching chat by Firebase ID:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching chat',
+      error: error.message
+    });
+  }
+});
 
+// Mark messages as read by Firebase chat ID
+router.put('/mark-read-by-firebase/:firebaseChatId', auth, async (req, res) => {
+  try {
+    const { firebaseChatId } = req.params;
+    const userId = req.user.id;
+    
+    console.log(`Marking messages as read for Firebase chat: ${firebaseChatId} for user: ${userId}`);
+    
+    // Find the chat
+    const chat = await Chat.findOne({ firebaseChatId });
+    
+    if (!chat) {
+      console.log(`Chat not found: ${firebaseChatId}`);
+      return res.status(404).json({
+        success: false,
+        message: 'Chat not found'
+      });
+    }
+    
+    // Check if user is part of this chat
+    const isParticipant = chat.buyerId.toString() === userId || chat.sellerId.toString() === userId;
+    
+    if (!isParticipant) {
+      console.log(`User ${userId} is not a participant in chat ${firebaseChatId}`);
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+    
+    // Mark all unread messages as read
+    const result = await Message.updateMany(
+      {
+        chatId: chat._id,
+        receiverId: userId,
+        read: false
+      },
+      {
+        $set: { 
+          read: true, 
+          readAt: new Date() 
+        }
+      }
+    );
+    
+    console.log(`Marked ${result.nModified} messages as read for chat ${firebaseChatId}`);
+    
+    res.json({
+      success: true,
+      message: `Marked ${result.nModified} messages as read`,
+      count: result.nModified
+    });
+  } catch (error) {
+    console.error('Error marking messages as read:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while marking messages as read',
+      error: error.message
+    });
+  }
+});
 // ✅ CREATE OR GET CHAT FOR ORDER
 router.post('/create/:orderId', authenticateMiddleware, async (req, res) => {
   try {
