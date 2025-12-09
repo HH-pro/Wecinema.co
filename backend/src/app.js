@@ -2,11 +2,12 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const morgan = require('morgan');
 const path = require('path');
 
 // Import database connection
-const connectDB = require('../../backend/src/config/config');
+const connectDB = require('./config/database');
 
 // Import routes
 const marketplaceRoutes = require('./routes/marketplace');
