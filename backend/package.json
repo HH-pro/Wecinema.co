@@ -2,11 +2,13 @@
   "name": "backend",
   "version": "1.0.0",
   "main": "index.js",
+  
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node ./src/app.js",
-    "dev": "nodemon ./src/app.js"
+    "start": "node backend/src/app.js",
+    "dev": "nodemon backend/src/app.js",
+    "backend": "cd backend && node src/app.js"
   },
+
   "keywords": [],
   "author": "",
   "license": "ISC",
