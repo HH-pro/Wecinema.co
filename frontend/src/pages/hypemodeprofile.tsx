@@ -8,9 +8,9 @@ import { decodeToken } from "../utilities/helperfFunction";
 import Modal from 'react-modal';
 import axios from 'axios';
 import { getDatabase, ref, push, serverTimestamp } from 'firebase/database'
-import { appp } from "./firebase";
 
-const database = getDatabase(appp);
+
+
 
 const GenrePage: React.FC = () => {
   const [setLoading] = useState<any>({});
@@ -26,8 +26,7 @@ const GenrePage: React.FC = () => {
 
   if (token) {
     const tokenData = decodeToken(token);
-    userId = tokenData.userId;
-    username = tokenData.username;
+ 
   }
 
   useEffect(() => {
@@ -80,21 +79,7 @@ const GenrePage: React.FC = () => {
     setShowPaidUsersModal(true);
   };
 
-  const startChat = (chatUserId: string) => {
-    if (!userId || !chatUserId) {
-      // console.error('User ID or Chat User ID is not defined.');
-      return;
-    }
-
-    const chatId = userId > chatUserId ? `${userId}_${chatUserId}` : `${chatUserId}_${userId}`;
-    const chatRef = ref(database, `chats/${chatId}`);
-    push(chatRef, {
-      sender: username,
-      message: "Hello!",
-      timestamp: serverTimestamp()
-    });
-    navigate(`/chat/${chatId}`);
-  };
+ 
 
   return (
     <Layout expand={false} hasHeader={false}>
@@ -146,15 +131,8 @@ const GenrePage: React.FC = () => {
                 <img src={paidUser.avatar} alt={`${paidUser.username}'s avatar`} style={{ width: '30px', height: '30px', borderRadius: '50%', marginRight: '10px' }} />
               </Link>
               <span style={{ fontWeight: 'bold' }}>{paidUser.username}</span>
-              <button onClick={() => startChat(paidUser._id)} style={{
-                marginLeft: '10px',
-                padding: '5px 10px',
-                background: '#f1c40f',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-              }}>Start Chat</button>
+             
+              
             </li>
           ))}
         </ul>
