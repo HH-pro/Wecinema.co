@@ -1,6 +1,5 @@
 // firebaseConfig.js
 const admin = require('firebase-admin');
-require('dotenv').config(); // ✅ IMPORTANT: .env load karein
 
 let adminApp = null;
 
