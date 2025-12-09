@@ -40,9 +40,17 @@ interface Message {
   };
 }
 
+interface ChatMetadata {
+  orderId?: string;
+  listingId?: string;
+  buyerId?: string;
+  sellerId?: string;
+  createdAt?: string;
+}
+
 const Messages: React.FC = () => {
   const { chatId: urlChatId } = useParams<{ chatId?: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
   
@@ -53,6 +61,7 @@ const Messages: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [isFetchingChatFromUrl, setIsFetchingChatFromUrl] = useState(false);
   
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialMount = useRef(true);
@@ -79,20 +88,7 @@ const Messages: React.FC = () => {
           return;
         }
 
-        // Fallback: parse token
-        try {
-          const payload = JSON.parse(atob(token.split('.')[1]));
-          setCurrentUser({
-            id: payload.userId || payload.id,
-            username: payload.username || 'User',
-            email: payload.email || '',
-            role: payload.role
-          });
-        } catch (parseError) {
-          console.error('Error parsing token:', parseError);
-        }
-
-        // Or fetch from API
+        // Fallback: fetch from API
         const response = await fetch('http://localhost:3000/api/auth/me', {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -109,6 +105,19 @@ const Messages: React.FC = () => {
             avatar: userData.avatar,
             role: userData.role
           });
+        } else {
+          // Try parsing token as fallback
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            setCurrentUser({
+              id: payload.userId || payload.id,
+              username: payload.username || 'User',
+              email: payload.email || '',
+              role: payload.role
+            });
+          } catch (parseError) {
+            console.error('Error parsing token:', parseError);
+          }
         }
       } catch (error) {
         console.error('Error fetching user:', error);
@@ -210,6 +219,93 @@ const Messages: React.FC = () => {
     };
   }, [currentUser?.id, fetchChats]);
 
+  // Fetch chat by Firebase ID from backend
+  const fetchChatByFirebaseId = useCallback(async (firebaseChatId: string) => {
+    if (!firebaseChatId || !currentUser?.id) return null;
+
+    try {
+      setIsFetchingChatFromUrl(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        `http://localhost:3000/marketplace/chat/by-firebase-id/${firebaseChatId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data) {
+          const chatData = data.data;
+          
+          // Transform the chat data
+          const transformedChat: Chat = {
+            firebaseChatId: chatData.firebaseChatId || chatData._id,
+            otherUser: {
+              id: chatData.otherUser?._id || chatData.otherUserId,
+              username: chatData.otherUser?.username || 'Unknown User',
+              avatar: chatData.otherUser?.avatar || '/default-avatar.png',
+              email: chatData.otherUser?.email || ''
+            },
+            listing: {
+              id: chatData.listing?._id || chatData.listingId,
+              title: chatData.listing?.title || 'Unknown Listing',
+              price: chatData.listing?.price || 0,
+              mediaUrls: chatData.listing?.mediaUrls || []
+            },
+            order: chatData.order ? {
+              _id: chatData.order._id,
+              amount: chatData.order.amount,
+              status: chatData.order.status,
+              listingTitle: chatData.order.listingTitle,
+              createdAt: chatData.order.createdAt
+            } : undefined,
+            lastMessage: chatData.lastMessage,
+            unreadCount: chatData.unreadCount || 0,
+            updatedAt: chatData.updatedAt || chatData.lastMessageAt
+          };
+          
+          return transformedChat;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching chat by Firebase ID:', error);
+      return null;
+    } finally {
+      setIsFetchingChatFromUrl(false);
+    }
+  }, [currentUser?.id]);
+
+  // Fetch chat link for order
+  const fetchChatLink = async (orderId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        `http://localhost:3000/marketplace/offers/chat-link/${orderId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data.chatLink) {
+          // Navigate to the chat
+          window.location.href = data.data.chatLink;
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching chat link:', error);
+    }
+  };
+
   // Fetch messages for selected chat
   const fetchChatMessages = useCallback(async (orderId: string) => {
     if (!orderId || !currentUser?.id) return;
@@ -270,67 +366,111 @@ const Messages: React.FC = () => {
 
   // Handle URL parameters and auto-select chat
   useEffect(() => {
-    if (!chats.length) return;
-
-    // Check for chatId in URL params
-    const urlChatId = searchParams.get('chat');
-    const orderId = searchParams.get('order');
-    
-    let chatToSelect: Chat | null = null;
-
-    if (urlChatId) {
-      // Find by Firebase chat ID
-      chatToSelect = chats.find(c => c.firebaseChatId === urlChatId) || null;
-    } else if (orderId) {
-      // Find by order ID
-      chatToSelect = chats.find(c => c.order?._id === orderId) || null;
+    const handleUrlChat = async () => {
+      // Get chat ID from URL
+      const urlChatId = searchParams.get('chat');
+      const orderId = searchParams.get('order');
       
-      // If not found, try to get chat link from API
-      if (!chatToSelect) {
-        fetchChatLink(orderId);
-      }
-    }
-
-    if (chatToSelect) {
-      setSelectedChat(chatToSelect);
+      console.log('URL Parameters:', { urlChatId, orderId });
       
-      // Fetch messages for this chat
-      if (chatToSelect.order?._id) {
-        fetchChatMessages(chatToSelect.order._id);
-      }
+      if (!urlChatId && !orderId) return;
       
-      // Update URL
-      navigate(`/messages?chat=${chatToSelect.firebaseChatId}`, { replace: true });
-    }
-  }, [chats, searchParams, navigate, fetchChatMessages]);
-
-  // Fetch chat link for order
-  const fetchChatLink = async (orderId: string) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(
-        `http://localhost:3000/marketplace/offers/chat-link/${orderId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+      // If we have URL chat ID, try to find or fetch the chat
+      if (urlChatId) {
+        // First, check in existing chats
+        let foundChat = chats.find(c => c.firebaseChatId === urlChatId);
+        
+        if (foundChat) {
+          // Chat found in existing chats
+          console.log('Chat found in existing chats:', foundChat);
+          setSelectedChat(foundChat);
+          
+          // Fetch messages for this chat
+          if (foundChat.order?._id) {
+            fetchChatMessages(foundChat.order._id);
+          }
+          
+          // Mark as read
+          await markMessagesAsRead(foundChat.order?._id || foundChat.firebaseChatId);
+          
+          // Update URL
+          setSearchParams({ chat: urlChatId });
+        } else {
+          // Chat not found in existing chats, try to fetch from backend
+          console.log('Chat not found in existing chats, fetching from backend...');
+          const fetchedChat = await fetchChatByFirebaseId(urlChatId);
+          
+          if (fetchedChat) {
+            // Chat fetched successfully
+            setSelectedChat(fetchedChat);
+            
+            // Add to chats list if not already present
+            setChats(prev => {
+              if (!prev.find(c => c.firebaseChatId === fetchedChat.firebaseChatId)) {
+                return [...prev, fetchedChat];
+              }
+              return prev;
+            });
+            
+            // Fetch messages
+            if (fetchedChat.order?._id) {
+              fetchChatMessages(fetchedChat.order._id);
+            }
+            
+            // Update URL
+            setSearchParams({ chat: urlChatId });
+          } else {
+            // Chat not found anywhere, create a temporary chat object
+            console.log('Chat not found in backend, creating temporary chat');
+            const tempChat: Chat = {
+              firebaseChatId: urlChatId,
+              otherUser: {
+                id: 'loading',
+                username: 'User',
+                avatar: '/default-avatar.png',
+                email: ''
+              },
+              listing: {
+                id: 'unknown',
+                title: 'Conversation',
+                price: 0,
+                mediaUrls: []
+              },
+              order: undefined,
+              lastMessage: null,
+              unreadCount: 0,
+              updatedAt: new Date().toISOString()
+            };
+            
+            setSelectedChat(tempChat);
+            
+            // Update URL
+            setSearchParams({ chat: urlChatId });
           }
         }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.data.chatLink) {
-          // Navigate to the chat
-          window.location.href = data.data.chatLink;
+      } else if (orderId) {
+        // Handle order ID from URL
+        const foundChat = chats.find(c => c.order?._id === orderId);
+        
+        if (foundChat) {
+          setSelectedChat(foundChat);
+          fetchChatMessages(foundChat.order._id);
+          setSearchParams({ chat: foundChat.firebaseChatId });
+        } else {
+          // Try to fetch chat link
+          fetchChatLink(orderId);
         }
       }
-    } catch (error) {
-      console.error('Error fetching chat link:', error);
-    }
-  };
+    };
 
-  const handleChatSelect = (chat: Chat) => {
+    // Only run when we have chats or when explicitly triggered
+    if (chats.length > 0 || searchParams.get('chat')) {
+      handleUrlChat();
+    }
+  }, [chats, searchParams, setSearchParams, fetchChatMessages, fetchChatByFirebaseId]);
+
+  // Handle chat selection
+  const handleChatSelect = async (chat: Chat) => {
     setSelectedChat(chat);
     
     // Fetch messages for selected chat
@@ -339,12 +479,10 @@ const Messages: React.FC = () => {
     }
     
     // Update URL
-    navigate(`/messages?chat=${chat.firebaseChatId}`, { replace: true });
+    setSearchParams({ chat: chat.firebaseChatId });
     
     // Mark as read
-    if (chat.order?._id) {
-      markMessagesAsRead(chat.order._id);
-    }
+    await markMessagesAsRead(chat.order?._id || chat.firebaseChatId);
   };
 
   const handleSendMessage = async (message: string) => {
@@ -430,6 +568,7 @@ const Messages: React.FC = () => {
         setChats(prev => prev.filter(chat => chat.firebaseChatId !== chatId));
         if (selectedChat?.firebaseChatId === chatId) {
           setSelectedChat(null);
+          setSearchParams({});
         }
       }
     } catch (error) {
@@ -441,6 +580,16 @@ const Messages: React.FC = () => {
   const handleRefreshChats = () => {
     fetchChats();
     toast.success('Refreshing conversations...');
+  };
+
+  // Function to extract order ID from Firebase chat ID
+  const extractOrderIdFromChatId = (chatId: string): string | null => {
+    // Handle format like "order_6937fd43b3db97de743f95f2_1765276996399"
+    const parts = chatId.split('_');
+    if (parts.length >= 2 && parts[0] === 'order') {
+      return parts[1]; // Return the order ID part
+    }
+    return null;
   };
 
   const renderEmptyState = () => (
@@ -472,6 +621,7 @@ const Messages: React.FC = () => {
     </div>
   );
 
+  // Render loading state
   if (loading && isInitialMount.current) {
     return (
       <MarketplaceLayout>
@@ -598,12 +748,14 @@ const Messages: React.FC = () => {
                       </div>
                       
                       <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => selectedChat.order?._id && navigate(`/orders/${selectedChat.order._id}`)}
-                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                        >
-                          View Order
-                        </button>
+                        {selectedChat.order?._id && (
+                          <button
+                            onClick={() => navigate(`/orders/${selectedChat.order!._id}`)}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                          >
+                            View Order
+                          </button>
+                        )}
                         <button
                           onClick={() => handleArchiveChat(selectedChat.firebaseChatId)}
                           className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
@@ -620,48 +772,62 @@ const Messages: React.FC = () => {
                   {/* Chat Messages Area */}
                   <div className="flex-1 relative">
                     <div className="absolute inset-0">
-                      <FirebaseChatInterface
-                        chatId={selectedChat.firebaseChatId}
-                        currentUser={currentUser}
-                        onSendMessage={handleSendMessage}
-                        className="h-full"
-                        orderId={selectedChat.order?._id}
-                        otherUser={selectedChat.otherUser}
-                      />
+                      {isFetchingChatFromUrl ? (
+                        <div className="flex items-center justify-center h-full">
+                          <div className="text-center">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600 mx-auto"></div>
+                            <p className="mt-4 text-gray-600">Loading conversation...</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <FirebaseChatInterface
+                          chatId={selectedChat.firebaseChatId}
+                          currentUser={currentUser}
+                          onSendMessage={handleSendMessage}
+                          className="h-full"
+                          orderId={selectedChat.order?._id}
+                          otherUser={selectedChat.otherUser}
+                        />
+                      )}
                     </div>
                   </div>
                 </>
-              ) : chats.length === 0 ? (
-                renderEmptyState()
               ) : (
+                // No chat selected view
                 <div className="flex-1 flex flex-col items-center justify-center p-8">
-                  <div className="w-48 h-48 mx-auto mb-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-full flex items-center justify-center">
-                    <svg className="w-24 h-24 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-3">Select a conversation</h3>
-                  <p className="text-gray-600 max-w-md text-center mb-8">
-                    Choose a conversation from the list to start messaging.
-                    All your order-related chats are listed on the left.
-                  </p>
-                  <div className="flex items-center space-x-4">
-                    <button
-                      onClick={() => navigate('/marketplace')}
-                      className="px-6 py-3 bg-yellow-600 text-white font-semibold rounded-lg hover:bg-yellow-700 transition-colors flex items-center"
-                    >
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                      Browse Listings
-                    </button>
-                    <button
-                      onClick={handleRefreshChats}
-                      className="px-6 py-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      Refresh List
-                    </button>
-                  </div>
+                  {chats.length === 0 ? (
+                    renderEmptyState()
+                  ) : (
+                    <>
+                      <div className="w-48 h-48 mx-auto mb-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-full flex items-center justify-center">
+                        <svg className="w-24 h-24 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-2xl font-bold text-gray-900 mb-3">Select a conversation</h3>
+                      <p className="text-gray-600 max-w-md text-center mb-8">
+                        Choose a conversation from the list to start messaging.
+                        All your order-related chats are listed on the left.
+                      </p>
+                      <div className="flex items-center space-x-4">
+                        <button
+                          onClick={() => navigate('/marketplace')}
+                          className="px-6 py-3 bg-yellow-600 text-white font-semibold rounded-lg hover:bg-yellow-700 transition-colors flex items-center"
+                        >
+                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                          Browse Listings
+                        </button>
+                        <button
+                          onClick={handleRefreshChats}
+                          className="px-6 py-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                          Refresh List
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
