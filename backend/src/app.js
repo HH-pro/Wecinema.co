@@ -1,6 +1,5 @@
 const express = require("express");
 const Sentry = require("@sentry/node");
-
 const Tracing = require("@sentry/tracing");
 const {
   VideoController,
@@ -14,7 +13,7 @@ const {
   paymentRoutes,
   stripeRoutes
 } = require("./controller");
-const rootDir = path.join(__dirname, '..'); // Backend se project root tak
+
 const connectDB = require("./config/config");
 const morgan = require("morgan");
 const cors = require("cors");
