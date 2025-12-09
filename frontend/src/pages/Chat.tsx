@@ -5,7 +5,7 @@ import { Layout } from "../components";
 import { decodeToken } from '../utilities/helperfFunction';
 import Modal from 'react-modal';
 import '../App.css'; // Import CSS file
-import { appp } from "./firebase";
+import { appp } from "../firebase/config";
 
 interface Order {
   description: string;
