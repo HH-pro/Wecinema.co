@@ -9,9 +9,8 @@ const {
   listingRoutes,
   orderRoutes, 
   offerRoutes,
-  chatRoutes,  // ✅ This is what you imported
-  paymentRoutes,
-  stripeRoutes
+  messageRoutes,
+  paymentRoutes
 } = require("./controller");
 
 const connectDB = require("./config/config");
@@ -74,7 +73,6 @@ const corsOptions = {
       callback(new Error("Not allowed by CORS"));
     }
   },
-  credentials: true, // ✅ Allow credentials/cookies
 };
 
 app.use(cors(corsOptions));
@@ -114,13 +112,12 @@ app.use("/user", UserController);
 app.use("/domain", domainController);
 app.use("/sentry", sentryRouter);
 
-// ✅ Marketplace Routes - Fixed the variable name
+// ✅ Marketplace Routes
 app.use("/marketplace/listings", listingRoutes);        // 🆕 API prefix add karein
 app.use("/marketplace/orders", orderRoutes);           // 🆕 API prefix add karein  
 app.use("/marketplace/offers", offerRoutes);           // 🆕 API prefix add karein
-app.use("/marketplace/chat", chatRoutes);             // ✅ FIXED: Changed messageRoutes to chatRoutes
-app.use("/marketplace/payments", paymentRoutes);      
-app.use("/marketplace/stripe", stripeRoutes);         // 🆕 API prefix add karein
+app.use("/marketplace/messages", messageRoutes);       // 🆕 API prefix add karein
+app.use("/marketplace/payments", paymentRoutes);       // 🆕 API prefix add karein
 
 // 🆕 STRIPE WEBHOOK ROUTE (Raw body parser ke baath)
 app.use("/webhook/stripe", paymentRoutes); // 🆕 Stripe webhook ke liye alag route
