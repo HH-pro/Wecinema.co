@@ -7,7 +7,7 @@ const cron = require("node-cron");
 const axios = require("axios");
 
 // Import database connection
-const connectDB = require("./config/config"); // ✅ Updated path
+const connectDB = require("./config/database"); // ✅ Updated path
 
 // Import controllers
 const {
