@@ -16,11 +16,9 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const database = getDatabase(app); // Realtime Database
-const firestore = getFirestore(app); // Firestore (for chat)
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
 
 
-export { auth, googleProvider, app, database, firestore };
+export { auth, googleProvider, app };
