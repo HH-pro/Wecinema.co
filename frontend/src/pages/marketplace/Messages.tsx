@@ -40,16 +40,7 @@ interface Message {
   };
 }
 
-interface ChatMetadata {
-  orderId?: string;
-  listingId?: string;
-  buyerId?: string;
-  sellerId?: string;
-  createdAt?: string;
-}
-
 const Messages: React.FC = () => {
-  const { chatId: urlChatId } = useParams<{ chatId?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
@@ -65,6 +56,7 @@ const Messages: React.FC = () => {
   
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialMount = useRef(true);
+  const hasProcessedUrlChat = useRef(false);
 
   // Fetch current user
   useEffect(() => {
@@ -153,7 +145,7 @@ const Messages: React.FC = () => {
           otherUser: {
             id: chat.otherUser?._id || chat.otherUserId,
             username: chat.otherUser?.username || 'Unknown User',
-            avatar: chat.otherUser?.avatar || '/default-avatar.png',
+            avatar: chat.otherUser?.avatar || '',
             email: chat.otherUser?.email || ''
           },
           listing: {
@@ -227,7 +219,7 @@ const Messages: React.FC = () => {
       setIsFetchingChatFromUrl(true);
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `http://localhost:3000/marketplace/chat/by-firebase-id/${firebaseChatId}`,
+        `http://localhost:3000/api/marketplace/chat/by-firebase-id/${firebaseChatId}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -247,7 +239,7 @@ const Messages: React.FC = () => {
             otherUser: {
               id: chatData.otherUser?._id || chatData.otherUserId,
               username: chatData.otherUser?.username || 'Unknown User',
-              avatar: chatData.otherUser?.avatar || '/default-avatar.png',
+              avatar: chatData.otherUser?.avatar || '',
               email: chatData.otherUser?.email || ''
             },
             listing: {
@@ -279,32 +271,6 @@ const Messages: React.FC = () => {
       setIsFetchingChatFromUrl(false);
     }
   }, [currentUser?.id]);
-
-  // Fetch chat link for order
-  const fetchChatLink = async (orderId: string) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(
-        `http://localhost:3000/marketplace/offers/chat-link/${orderId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.data.chatLink) {
-          // Navigate to the chat
-          window.location.href = data.data.chatLink;
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching chat link:', error);
-    }
-  };
 
   // Fetch messages for selected chat
   const fetchChatMessages = useCallback(async (orderId: string) => {
@@ -364,16 +330,24 @@ const Messages: React.FC = () => {
     }
   };
 
-  // Handle URL parameters and auto-select chat
+  // Handle URL parameters and auto-select chat (ONLY ONCE)
   useEffect(() => {
     const handleUrlChat = async () => {
-      // Get chat ID from URL
+      // Only process once when chats are loaded
+      if (hasProcessedUrlChat.current) return;
+      
       const urlChatId = searchParams.get('chat');
       const orderId = searchParams.get('order');
       
-      console.log('URL Parameters:', { urlChatId, orderId });
+      console.log('Processing URL chat:', { urlChatId, orderId, hasProcessed: hasProcessedUrlChat.current });
       
-      if (!urlChatId && !orderId) return;
+      if (!urlChatId && !orderId) {
+        hasProcessedUrlChat.current = true;
+        return;
+      }
+      
+      // Mark as processed
+      hasProcessedUrlChat.current = true;
       
       // If we have URL chat ID, try to find or fetch the chat
       if (urlChatId) {
@@ -382,7 +356,7 @@ const Messages: React.FC = () => {
         
         if (foundChat) {
           // Chat found in existing chats
-          console.log('Chat found in existing chats:', foundChat);
+          console.log('Chat found in existing chats:', foundChat.firebaseChatId);
           setSelectedChat(foundChat);
           
           // Fetch messages for this chat
@@ -392,9 +366,6 @@ const Messages: React.FC = () => {
           
           // Mark as read
           await markMessagesAsRead(foundChat.order?._id || foundChat.firebaseChatId);
-          
-          // Update URL
-          setSearchParams({ chat: urlChatId });
         } else {
           // Chat not found in existing chats, try to fetch from backend
           console.log('Chat not found in existing chats, fetching from backend...');
@@ -416,36 +387,9 @@ const Messages: React.FC = () => {
             if (fetchedChat.order?._id) {
               fetchChatMessages(fetchedChat.order._id);
             }
-            
-            // Update URL
-            setSearchParams({ chat: urlChatId });
           } else {
-            // Chat not found anywhere, create a temporary chat object
-            console.log('Chat not found in backend, creating temporary chat');
-            const tempChat: Chat = {
-              firebaseChatId: urlChatId,
-              otherUser: {
-                id: 'loading',
-                username: 'User',
-                avatar: '/default-avatar.png',
-                email: ''
-              },
-              listing: {
-                id: 'unknown',
-                title: 'Conversation',
-                price: 0,
-                mediaUrls: []
-              },
-              order: undefined,
-              lastMessage: null,
-              unreadCount: 0,
-              updatedAt: new Date().toISOString()
-            };
-            
-            setSelectedChat(tempChat);
-            
-            // Update URL
-            setSearchParams({ chat: urlChatId });
+            // Chat not found anywhere
+            console.log('Chat not found in backend');
           }
         }
       } else if (orderId) {
@@ -455,22 +399,28 @@ const Messages: React.FC = () => {
         if (foundChat) {
           setSelectedChat(foundChat);
           fetchChatMessages(foundChat.order._id);
-          setSearchParams({ chat: foundChat.firebaseChatId });
-        } else {
-          // Try to fetch chat link
-          fetchChatLink(orderId);
         }
       }
     };
 
-    // Only run when we have chats or when explicitly triggered
-    if (chats.length > 0 || searchParams.get('chat')) {
+    // Only run when we have chats loaded
+    if (!chatsLoading && chats.length >= 0) {
       handleUrlChat();
     }
-  }, [chats, searchParams, setSearchParams, fetchChatMessages, fetchChatByFirebaseId]);
+  }, [chats, chatsLoading, searchParams, fetchChatMessages, fetchChatByFirebaseId]);
+
+  // Reset URL processing flag when leaving page
+  useEffect(() => {
+    return () => {
+      hasProcessedUrlChat.current = false;
+    };
+  }, []);
 
   // Handle chat selection
   const handleChatSelect = async (chat: Chat) => {
+    // Reset the URL processing flag
+    hasProcessedUrlChat.current = true;
+    
     setSelectedChat(chat);
     
     // Fetch messages for selected chat
@@ -482,18 +432,15 @@ const Messages: React.FC = () => {
     setSearchParams({ chat: chat.firebaseChatId });
     
     // Mark as read
-    await markMessagesAsRead(chat.order?._id || chat.firebaseChatId);
+    if (chat.order?._id) {
+      await markMessagesAsRead(chat.order._id);
+    }
   };
 
   const handleSendMessage = async (message: string) => {
     if (!selectedChat || !currentUser) return;
     
     try {
-      // You can add additional logic here like:
-      // 1. Send notification to the other user
-      // 2. Update order status if needed
-      // 3. Log message for analytics
-      
       console.log('Message sent to chat:', selectedChat.firebaseChatId, 'Message:', message);
       
       // Optional: Send a copy to your backend
@@ -569,6 +516,7 @@ const Messages: React.FC = () => {
         if (selectedChat?.firebaseChatId === chatId) {
           setSelectedChat(null);
           setSearchParams({});
+          hasProcessedUrlChat.current = false;
         }
       }
     } catch (error) {
@@ -578,18 +526,70 @@ const Messages: React.FC = () => {
   };
 
   const handleRefreshChats = () => {
+    // Reset the flag when manually refreshing
+    hasProcessedUrlChat.current = false;
     fetchChats();
     toast.success('Refreshing conversations...');
   };
 
-  // Function to extract order ID from Firebase chat ID
-  const extractOrderIdFromChatId = (chatId: string): string | null => {
-    // Handle format like "order_6937fd43b3db97de743f95f2_1765276996399"
-    const parts = chatId.split('_');
-    if (parts.length >= 2 && parts[0] === 'order') {
-      return parts[1]; // Return the order ID part
+  // Get first letter of name for avatar
+  const getAvatarFallback = (username: string): string => {
+    if (!username || username.trim().length === 0) return 'U';
+    return username.charAt(0).toUpperCase();
+  };
+
+  // Get avatar color based on user ID
+  const getAvatarColor = (userId: string): string => {
+    const colors = [
+      'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500',
+      'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'
+    ];
+    
+    if (!userId) return colors[0];
+    
+    // Simple hash function to get consistent color for same user
+    let hash = 0;
+    for (let i = 0; i < userId.length; i++) {
+      hash = userId.charCodeAt(i) + ((hash << 5) - hash);
     }
-    return null;
+    
+    const index = Math.abs(hash) % colors.length;
+    return colors[index];
+  };
+
+  // Render avatar with fallback
+  const renderAvatar = (chat: Chat) => {
+    const { otherUser } = chat;
+    const avatarColor = getAvatarColor(otherUser.id);
+    
+    if (otherUser.avatar) {
+      return (
+        <img
+          src={otherUser.avatar}
+          alt={otherUser.username}
+          className="w-12 h-12 rounded-full border-2 border-white shadow-sm object-cover"
+          onError={(e) => {
+            // If image fails to load, show fallback
+            e.currentTarget.style.display = 'none';
+            const parent = e.currentTarget.parentElement;
+            if (parent) {
+              const fallback = parent.querySelector('.avatar-fallback');
+              if (fallback) {
+                (fallback as HTMLElement).style.display = 'flex';
+              }
+            }
+          }}
+        />
+      );
+    }
+    
+    return (
+      <div 
+        className={`${avatarColor} w-12 h-12 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-white font-bold text-lg avatar-fallback`}
+      >
+        {getAvatarFallback(otherUser.username)}
+      </div>
+    );
   };
 
   const renderEmptyState = () => (
@@ -696,6 +696,7 @@ const Messages: React.FC = () => {
                     onChatSelect={handleChatSelect}
                     loading={chatsLoading}
                     onArchiveChat={handleArchiveChat}
+                    renderAvatar={renderAvatar}
                   />
                 )}
               </div>
@@ -709,11 +710,7 @@ const Messages: React.FC = () => {
                   <div className="border-b border-gray-200 p-4 bg-gradient-to-r from-gray-50 to-white">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4">
-                        <img
-                          src={selectedChat.otherUser.avatar || '/default-avatar.png'}
-                          alt={selectedChat.otherUser.username}
-                          className="w-12 h-12 rounded-full border-2 border-white shadow-sm"
-                        />
+                        {renderAvatar(selectedChat)}
                         <div>
                           <div className="flex items-center space-x-2">
                             <h3 className="font-bold text-gray-900 text-lg">
