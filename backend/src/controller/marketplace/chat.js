@@ -596,16 +596,32 @@ router.get('/by-order/:orderId', authenticateMiddleware, async (req, res) => {
 });
 
 // ✅ HEALTH CHECK
+// chatRoutes.js mein health check
 router.get('/firebase/health', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Chat routes are healthy',
-    timestamp: new Date().toISOString(),
-    services: {
-      database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-      firebase: admin.apps.length > 0 ? 'initialized' : 'not_initialized'
-    }
-  });
+  try {
+    const { isInitialized } = require('../../../firebaseConfig');
+    
+    // Always return success, firebase optional hai
+    res.status(200).json({
+      success: true,
+      message: 'Chat service is operational',
+      timestamp: new Date().toISOString(),
+      services: {
+        mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+        firebase: isInitialized ? 'connected' : 'optional_not_required'
+      },
+      note: 'Firebase is optional for chat functionality'
+    });
+  } catch (error) {
+    res.status(200).json({
+      success: true,
+      message: 'Chat service running without Firebase',
+      timestamp: new Date().toISOString(),
+      services: {
+        mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+      }
+    });
+  }
 });
 
 module.exports = router;
