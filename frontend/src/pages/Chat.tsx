@@ -22,7 +22,7 @@ interface FormErrors {
 }
 
 
-const database = getDatabase(appp);
+const database = getDatabase(app);
 
 const Chat = () => {
   const { chatId } = useParams();
