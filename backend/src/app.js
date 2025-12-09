@@ -1,6 +1,16 @@
 const express = require("express");
 const Sentry = require("@sentry/node");
 const Tracing = require("@sentry/tracing");
+const morgan = require("morgan");
+const cors = require("cors");
+const cron = require("node-cron");
+const axios = require("axios");
+require('dotenv').config();
+
+// Import database connection
+const connectDB = require("./config/config");
+
+// Import controllers
 const {
   VideoController,
   UserController,
@@ -9,16 +19,11 @@ const {
   listingRoutes,
   orderRoutes, 
   offerRoutes,
-  chatRoutes,  // ✅ This is what you imported
   paymentRoutes,
   stripeRoutes
 } = require("./controller");
 
-const connectDB = require("./config/config");
-const morgan = require("morgan");
-const cors = require("cors");
-const cron = require("node-cron");
-const axios = require("axios");
+// Import expiration service
 require("../services/expirationService");
 
 const app = express();
@@ -30,7 +35,7 @@ Sentry.init({
     new Sentry.Integrations.Http({ tracing: true }),
     new Tracing.Integrations.Express({ app }),
   ],
-  tracesSampleRate: 1.0, // Adjust in production
+  tracesSampleRate: 1.0,
 });
 
 // ✅ Request handler must be the first middleware
@@ -46,23 +51,16 @@ app.use((req, res, next) => {
 
 app.use(morgan("dev"));
 
-// 🆕 STRIPE WEBHOOK KE LIYE IMPORTANT: Raw body parser pehle use karein
-app.use("/webhook/stripe", express.raw({type: 'application/json'})); // 🆕 Stripe webhook ke liye
-
-// Baaki sab routes ke liye JSON parser
-app.use(express.json());
-
 // ✅ CORS configuration
 const allowedOrigins = [
   "http://www.wecinema.co",
   "https://www.wecinema.co",
-  "https://www.wecinema.co/api",
   "http://wecinema.co",
-  "http://wecinema.co/api",
   "https://wecinema.co",
   "http://localhost:3000",
+  "http://localhost:5173",
   "https://wecinema-admin.onrender.com",
-  "https://wecinema-main.vercel.app/",
+  "https://wecinema-main.vercel.app",
   "https://wecinema-21d00.firebaseapp.com",
 ];
 
@@ -74,72 +72,152 @@ const corsOptions = {
       callback(new Error("Not allowed by CORS"));
     }
   },
-  credentials: true, // ✅ Allow credentials/cookies
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 };
 
 app.use(cors(corsOptions));
 
-// ✅ Default cookie middleware
+// ✅ IMPORTANT: Stripe webhook requires raw body parsing first
+app.use("/webhook/stripe", express.raw({ type: 'application/json' }));
+
+// ✅ Regular JSON parsing for all other routes
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ✅ Default cookie middleware (optional)
 app.use((req, res, next) => {
   res.cookie("token", "your-token-value", {
     httpOnly: true,
-    secure: true,
-    sameSite: "None",
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
   });
   next();
 });
 
-// Debug logger
-app.use((req, res, next) => {
-  console.log("Received request: ", req.method, req.url);
-  console.log("Request body: ", req.body);
-  next();
-});
+// ✅ Debug logger (development only)
+if (process.env.NODE_ENV === 'development') {
+  app.use((req, res, next) => {
+    console.log("📥 Request:", req.method, req.url);
+    console.log("📦 Request body:", req.body);
+    next();
+  });
+}
 
 // ✅ Scheduled job: daily at 9 AM
 cron.schedule("0 9 * * *", async () => {
   try {
-    console.log("Running daily domain/hosting expiration check...");
+    console.log("⏰ Running daily domain/hosting expiration check...");
     await axios.get("https://wecinema.co/api/check-expirations");
-    console.log("Expiration check completed");
+    console.log("✅ Expiration check completed");
   } catch (error) {
-    console.error("Error in scheduled expiration check:", error);
+    console.error("❌ Error in scheduled expiration check:", error);
     Sentry.captureException(error);
   }
 });
 
-// ✅ Routes
-app.use("/video", VideoController);
-app.use("/user", UserController);
-app.use("/domain", domainController);
-app.use("/sentry", sentryRouter);
+// ✅ API Routes with proper prefixes
+app.use("/api/video", VideoController);
+app.use("/api/user", UserController);
+app.use("/api/domain", domainController);
+app.use("/api/sentry", sentryRouter);
 
-// ✅ Marketplace Routes - Fixed the variable name
-app.use("/marketplace/listings", listingRoutes);        // 🆕 API prefix add karein
-app.use("/marketplace/orders", orderRoutes);           // 🆕 API prefix add karein  
-app.use("/marketplace/offers", offerRoutes);           // 🆕 API prefix add karein
-app.use("/marketplace/chat", chatRoutes);             // ✅ FIXED: Changed messageRoutes to chatRoutes
-app.use("/marketplace/payments", paymentRoutes);      
-app.use("/marketplace/stripe", stripeRoutes);         // 🆕 API prefix add karein
+// ✅ Marketplace Routes with consistent API prefix
+app.use("/api/marketplace/listings", listingRoutes);        // ✅ Correct prefix
+app.use("/api/marketplace/orders", orderRoutes);           // ✅ Correct prefix  
+app.use("/api/marketplace/offers", offerRoutes);           // ✅ Correct prefix
+app.use("/api/marketplace/payments", paymentRoutes);       // ✅ Correct prefix
+app.use("/api/marketplace/stripe", stripeRoutes);          // ✅ Correct prefix
 
-// 🆕 STRIPE WEBHOOK ROUTE (Raw body parser ke baath)
-app.use("/webhook/stripe", paymentRoutes); // 🆕 Stripe webhook ke liye alag route
+// ✅ Stripe Webhook Route (separate from API routes)
+app.use("/webhook/stripe", stripeRoutes);  // ✅ Stripe webhook specific route
+
+// ✅ Health check endpoint
+app.get("/api/health", async (req, res) => {
+  try {
+    res.status(200).json({
+      success: true,
+      message: 'Server is running',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || 'development',
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Health check failed',
+      error: error.message
+    });
+  }
+});
+
+// ✅ Test endpoint
+app.get("/api/test", (req, res) => {
+  res.json({
+    success: true,
+    message: 'API is working',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: '/api/health',
+      marketplace: '/api/marketplace',
+      listings: '/api/marketplace/listings',
+      offers: '/api/marketplace/offers',
+      orders: '/api/marketplace/orders',
+      payments: '/api/marketplace/payments',
+      user: '/api/user',
+      video: '/api/video',
+      domain: '/api/domain'
+    }
+  });
+});
+
+// ✅ 404 handler
+app.use("*", (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Route ${req.originalUrl} not found`,
+    availableRoutes: [
+      '/api/health',
+      '/api/test',
+      '/api/user',
+      '/api/video',
+      '/api/domain',
+      '/api/marketplace/listings',
+      '/api/marketplace/offers',
+      '/api/marketplace/orders',
+      '/api/marketplace/payments'
+    ]
+  });
+});
 
 // ✅ Error handler (Sentry first, then fallback)
 app.use(Sentry.Handlers.errorHandler());
 app.use((err, req, res, next) => {
-  console.error("Custom Error Handler:", err);
-  res.status(500).json({ error: "Internal Server Error" });
+  console.error("❌ Custom Error Handler:", err);
+  
+  const statusCode = err.status || 500;
+  const message = process.env.NODE_ENV === 'production' 
+    ? 'Something went wrong' 
+    : err.message;
+  
+  res.status(statusCode).json({
+    success: false,
+    message: message,
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
 });
 
-// ✅ MongoDB connection
-connectDB(
-  "mongodb+srv://hamzamanzoor046:9Jf9tuRZv2bEvKES@wecinema.15sml.mongodb.net/database_name?retryWrites=true&w=majority"
-);
-console.log("connected db");
+// ✅ MongoDB connection using environment variable
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://hamzamanzoor046:9Jf9tuRZv2bEvKES@wecinema.15sml.mongodb.net/database_name?retryWrites=true&w=majority";
+connectDB(MONGODB_URI);
+console.log("✅ Connected to MongoDB");
 
+// ✅ Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
-  console.log(`🏪 Marketplace API: http://localhost:${PORT}/api/marketplace`); // 🆕 Marketplace info
+  console.log(`🏪 Marketplace API: http://localhost:${PORT}/api/marketplace`);
+  console.log(`🏥 Health Check: http://localhost:${PORT}/api/health`);
+  console.log(`🔄 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
