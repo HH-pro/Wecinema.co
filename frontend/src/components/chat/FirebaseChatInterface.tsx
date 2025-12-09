@@ -4,7 +4,7 @@ import { useFirebaseChat, Message as FirebaseMessage } from '../../hooks/useFire
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 // Correct import path for your firebase config
-import { firestore as db } from '../../firebaseConfig'; // Import as 'db'
+import { firestore as db } from '../../firebase/config'; // Import as 'db'
 import { 
   doc, 
   setDoc, 
