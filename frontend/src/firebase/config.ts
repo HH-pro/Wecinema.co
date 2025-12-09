@@ -5,7 +5,7 @@ import { getFirestore } from 'firebase/firestore'; // Add Firestore
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "f08306fa7ba1a4cb5d65693ab63953c1dfe4f458",
+  apiKey: "AIzaSyDbtw87NpBAema-2eA58hpDuS85dxCBn50",
   authDomain: "wecinema-21d00.firebaseapp.com",
   databaseURL: "https://wecinema-21d00-default-rtdb.firebaseio.com", // ✅ ADD THIS
   projectId: "wecinema-21d00",
