@@ -124,7 +124,53 @@ app.use("/api/video", VideoController);
 app.use("/api/user", UserController);
 app.use("/api/domain", domainController);
 app.use("/api/sentry", sentryRouter);
+// Temporary fix in server.js (remove after testing)
+const admin = require('firebase-admin');
 
+// Hardcoded Firebase config (temporary)
+const firebaseConfig = {
+  projectId: 'wecinema-21d00',
+  clientEmail: 'firebase-adminsdk-bh6ix@wecinema-21d00.iam.gserviceaccount.com',
+  privateKey: `-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCtknDuMWNQ+IZ3
+o9F3VP6paTIgxy/HMP85khRBoSzmxGOjZq6jlJNohzsDaESThK3NojaOKkQzT0cG
+DFqI3XtoFDGS1NwsuJaw7JyUgXnyoYKnfp2c4PNYkmPXLJ73yiSBn9JFiNrpcDFG
+nz3x/m+4ggRq0ibe3ALEQracfXAybiCpob9mcMlPA3olAkhUzFCx2LtLtVAP4BcU
+QYQHaLhHVi/zWI9IcskrYxVEVHNPpIbU8EiuRDZa4BpIA3tvkBlkR3UNz3YMTUZ4
+ZCWwjr/a6EyU5ssHaPm0f9AMpwDVJ6MDSefICCBML2uEfBR6BFbBR8+mK2gcz+xi
+JUtkFYJtAgMBAAECggEADEhACILjKcAkV8P2VxDjIl7IxswBhAFiFhNRrqE2ma/M
+8yuZcQba9XsYQHH45E1vtQzk+mNgRxc1ieaG44d0q5U+OssoN1vqgeOEYvfUhshK
+BAswIQFEBwD44qmMKDGcKrYB/ZylDP685efvzLd59V7x7BMp3/xGj9e+r00rCs5l
+PTQgectetb4jpM3Mf0cfyDnzyPCfp7+q1+qDk6O9krmVrMoBOh2BrU17ZND5hSAz
+rzPd6wjWZwqP4dvAYmq1/3CJYhuXFDa9avdnYTm0HtsbnxYi9laEOikqgHZiATdW
+JemFndDCtOUFHoh1lrNB2CsNbZQjrdQGLx0ymmPFoQKBgQDlmUr5h8WIWuIkjguX
+pP3p/iU7tO4D10ZW5iZcgGXPO0XR14CN2I6hP/BMYzAshgQ5ap/20ocO3oiMfXoD
+kH1O20TkxfUbkk1BsmTmZ582IhlYTBCrHQT9YWwbwSJiw4xG3JzHzelgQP49CUMM
+Y81W1+UDVNIoQ+Q4qBWViRkzEQKBgQDBh+L5/CfKH/EC2EVdPpR2lLE09ixB2aKT
+9WTLYvJkpYt5VJToEKeVQhRSrNhMvm98kC36M+kEDXhuVJAGHjgq7/zcJeezuL9Q
+f9hPgdgyKwJSM0QHi5UAZlIhAjA3FWyxrE+xlOnrpRVNwBxY6+kwk5RyeBG4hWN9
+dJiSd0whnQKBgQCmHyXKKdxYbjmVbVkh3XUCKqpR6vUTvlzcXyV+ZEBFkoNP8vbG
+qtt3/EUnX9TpQgYobOdUtLqXnZd63wa7MX4Y4jmUtU5FJrPTRvoOYwclKcLgyhh9
+Vj/X/Pc1laYFg6spUlH1lxy2UhAhpWPnwQY/QXIn2OU90PF9tM/5I/shoQKBgFVh
+Tti8zw0UNG7t3QQ7JKKADQHxjSrsCha+j15PY+LVSggYMa2EE3r88RxcVvzckzDg
+JviYSDfafYQnWHbqhBslT2gMbQFUA0tPa63/+dKAOQDszxmJEg5gFeGsJntWv2JP
+Q8VzjhPA+/oWRCtSwMkGgtpRcHf4mSDy/JC5guPdAoGBAMk/ngMX5wvzrvayb1Zf
+PmnGo4k39+XDeZAbvJRpVGRKRtn4XTsW487MLBx6QqGNpAhKOhMO4Y2q+VjQlMg9
+THGD6GkCMoV0/iXVFM6Ih08j5dPVqSOYbozxeXtPIKlai8LCq24PbFJ0fJrWM7yn
+j1drKjpC/KARZjW2uc0lOVRa
+-----END PRIVATE KEY-----`,
+  databaseURL: 'https://wecinema-21d00-default-rtdb.firebaseio.com'
+};
+
+try {
+  admin.initializeApp({
+    credential: admin.credential.cert(firebaseConfig),
+    databaseURL: firebaseConfig.databaseURL
+  });
+  console.log('✅ Firebase initialized with hardcoded config');
+} catch (error) {
+  console.error('❌ Hardcoded Firebase init failed:', error.message);
+}
 // ✅ Marketplace Routes with consistent API prefix
 app.use("/api/marketplace/listings", listingRoutes);        // ✅ Correct prefix
 app.use("/api/marketplace/orders", orderRoutes);           // ✅ Correct prefix  
