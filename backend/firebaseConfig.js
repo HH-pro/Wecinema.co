@@ -8,7 +8,7 @@ let adminApp = null;
 try {
   if (!admin.apps.length) {
     // Try multiple methods
-    const serviceAccountPath = path.join(__dirname, 'serviceAccountKey.json');
+    const serviceAccountPath = require("../backend/src/serviceAccountKey.json");
     
     if (fs.existsSync(serviceAccountPath)) {
       // Method 1: File se
