@@ -53,7 +53,6 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({
   children,
   hideSidebar = false,
-  expand,
 }) => {
   const [screenWidth, setScreenWidth] = useState(window.innerWidth);
   const [token, _] = useState<string | null>(
