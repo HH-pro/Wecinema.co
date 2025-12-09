@@ -9,7 +9,7 @@ const {
   listingRoutes,
   orderRoutes, 
   offerRoutes,
-  messageRoutes,
+  chatRoutes,
   paymentRoutes,
   stripeRoutes
 } = require("./controller");
@@ -117,7 +117,7 @@ app.use("/sentry", sentryRouter);
 app.use("/marketplace/listings", listingRoutes);        // 🆕 API prefix add karein
 app.use("/marketplace/orders", orderRoutes);           // 🆕 API prefix add karein  
 app.use("/marketplace/offers", offerRoutes);           // 🆕 API prefix add karein
-app.use("/marketplace/messages", messageRoutes);       // 🆕 API prefix add karein
+app.use("/marketplace/chat", messageRoutes);       // 🆕 API prefix add karein
 app.use("/marketplace/payments", paymentRoutes);      
 app.use("/marketplace/stripe", stripeRoutes);       // 🆕 API prefix add karein
  // 🆕 API prefix add karein
