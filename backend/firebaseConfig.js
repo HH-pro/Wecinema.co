@@ -1,22 +1,23 @@
 // firebaseConfig.js
-import { initializeApp } from 'firebase/app';
-import { getDatabase } from 'firebase/database';
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
-const firebaseConfig = {
-  apiKey: "AIzaSyDbtw87NpBAema-2eA58hpDuS85dxCBn50",
-  authDomain: "wecinema-21d00.firebaseapp.com",
-  projectId: "wecinema-21d00",
-  storageBucket: "wecinema-21d00.firebasestorage.app",
-  messagingSenderId: "257754899711",
-  appId: "1:257754899711:web:affc6a0e53f9c9806c18ca",
-  measurementId: "G-1TR2CEXH5M"
-  };
-const app = initializeApp(firebaseConfig);
-const database = getDatabase(app);
-const auth = getAuth(app);
-const googleProvider = new GoogleAuthProvider();
-googleProvider.addScope('https://www.googleapis.com/auth/user.birthday.read');
-googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
-googleProvider.addScope('https://www.googleapis.com/auth/userinfo.profile');
+const admin = require('firebase-admin');
 
-export { auth, googleProvider, app, database };
+// Initialize Firebase Admin SDK
+const serviceAccount = require('../backend/src/serviceAccount.json'); // You need to download this from Firebase Console
+
+try {
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+      databaseURL: "https://wecinema-21d00.firebaseio.com", // Add your database URL
+      projectId: "wecinema-21d00"
+    });
+  }
+  
+  const database = admin.database();
+  const auth = admin.auth();
+  
+  module.exports = { admin, database, auth };
+} catch (error) {
+  console.error("Firebase Admin initialization error:", error);
+  module.exports = { admin: null, database: null, auth: null };
+}
