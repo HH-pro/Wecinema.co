@@ -37,7 +37,6 @@ interface ChatListProps {
   currentChatId: string | null;
   onChatSelect: (chat: Chat) => void;
   loading: boolean;
-  onArchiveChat?: (chatId: string) => void;
   renderAvatar?: (chat: Chat) => React.ReactNode;
 }
 
@@ -46,35 +45,8 @@ const ChatList: React.FC<ChatListProps> = ({
   currentChatId,
   onChatSelect,
   loading,
-  onArchiveChat,
   renderAvatar
 }) => {
-  // Format time ago
-  const formatTimeAgo = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return 'Recently';
-      
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffMins = Math.floor(diffMs / 60000);
-      const diffHours = Math.floor(diffMs / 3600000);
-      const diffDays = Math.floor(diffMs / 86400000);
-
-      if (diffMins < 1) return 'just now';
-      if (diffMins < 60) return `${diffMins}m ago`;
-      if (diffHours < 24) return `${diffHours}h ago`;
-      if (diffDays < 7) return `${diffDays}d ago`;
-      
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric'
-      });
-    } catch (error) {
-      return 'Recently';
-    }
-  };
-
   // Get first letter of name for avatar
   const getAvatarFallback = (username: string): string => {
     if (!username || username.trim().length === 0) return 'U';
@@ -112,16 +84,12 @@ const ChatList: React.FC<ChatListProps> = ({
             alt={otherUser.username || 'User'}
             className="w-12 h-12 rounded-full border-2 border-white shadow-sm object-cover"
             onError={(e) => {
-              const target = e.currentTarget;
-              target.style.display = 'none';
-              const parent = target.parentElement;
+              e.currentTarget.style.display = 'none';
+              const parent = e.currentTarget.parentElement;
               if (parent) {
-                const existingFallback = parent.querySelector('.avatar-fallback');
-                if (!existingFallback) {
-                  const fallback = document.createElement('div');
-                  fallback.className = `${avatarColor} w-12 h-12 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-white font-bold text-lg avatar-fallback`;
-                  fallback.textContent = getAvatarFallback(otherUser.username);
-                  parent.appendChild(fallback);
+                const fallback = parent.querySelector('.avatar-fallback');
+                if (fallback) {
+                  (fallback as HTMLElement).style.display = 'flex';
                 }
               }
             }}
@@ -201,9 +169,6 @@ const ChatList: React.FC<ChatListProps> = ({
                   <h4 className="text-sm font-semibold text-gray-900 truncate">
                     {chat.otherUser.username || 'Unknown User'}
                   </h4>
-                  <span className="text-xs text-gray-500 whitespace-nowrap">
-                    {formatTimeAgo(chat.updatedAt)}
-                  </span>
                 </div>
                 
                 <p className="text-sm text-gray-600 truncate mt-1">
@@ -227,22 +192,6 @@ const ChatList: React.FC<ChatListProps> = ({
                   </div>
                 )}
               </div>
-              
-              {/* Archive Button */}
-              {onArchiveChat && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onArchiveChat(chat.firebaseChatId);
-                  }}
-                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-                  title="Archive conversation"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                  </svg>
-                </button>
-              )}
             </div>
             
             {/* Order Status Badge */}
