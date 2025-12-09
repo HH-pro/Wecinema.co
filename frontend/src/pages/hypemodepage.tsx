@@ -3,7 +3,7 @@ import axios from 'axios';
 import { Layout } from "../components";
 import { useNavigate } from 'react-router-dom';
 import { getAuth, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
-import { googleProvider } from "./firebase";
+import { googleProvider } from "../firebase/config";
 import { motion } from "framer-motion";
 import Confetti from "react-confetti";
 import "../css/HypeModeProfile.css";
