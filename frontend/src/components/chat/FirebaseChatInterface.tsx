@@ -1,10 +1,9 @@
-// src/components/Chat/FirebaseChatInterface.tsx
+// src/components/chat/FirebaseChatInterface.tsx
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useFirebaseChat, Message as FirebaseMessage } from '../../hooks/useFirebaseChat';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
-// Correct import path for your firebase config
-import { firestore as db } from '../../firebase/config'; // Import as 'db'
+import { firestore } from '../../firebaseConfig';
 import { 
   doc, 
   setDoc, 
@@ -25,7 +24,7 @@ interface User {
 
 interface FirebaseChatInterfaceProps {
   chatId: string;
-  currentUser: User;
+  currentUser: User | null;
   onSendMessage?: (message: string) => void;
   className?: string;
   orderId?: string;
@@ -53,8 +52,15 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
   onSendMessage,
   className = '',
   orderId,
-  otherUser
+  otherUser: propOtherUser
 }) => {
+  // Create a safe otherUser object
+  const otherUser = propOtherUser || {
+    id: 'unknown',
+    username: 'User',
+    avatar: ''
+  };
+
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
@@ -76,7 +82,7 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
 
     try {
       console.log('Checking if chat exists:', chatId);
-      const chatRef = doc(db, 'chats', chatId);
+      const chatRef = doc(firestore, 'chats', chatId);
       const chatSnap = await getDoc(chatRef);
       
       if (chatSnap.exists()) {
@@ -107,7 +113,7 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
         orderId
       });
 
-      const chatRef = doc(db, 'chats', chatId);
+      const chatRef = doc(firestore, 'chats', chatId);
       
       // Create chat document structure
       const chatData = {
@@ -150,7 +156,7 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
       
       // Create welcome message
       try {
-        const messagesRef = collection(db, 'chats', chatId, 'messages');
+        const messagesRef = collection(firestore, 'chats', chatId, 'messages');
         const welcomeMessage = {
           text: `🎉 Chat started for ${orderId ? `order #${orderId.slice(-8)}` : 'this conversation'}. You can now discuss details here.`,
           senderId: 'system',
@@ -198,7 +204,7 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
 
   // Fetch system messages from your backend
   const fetchSystemMessages = useCallback(async () => {
-    if (!orderId || !currentUser.id) return;
+    if (!orderId || !currentUser?.id) return;
 
     try {
       const token = localStorage.getItem('token');
@@ -229,7 +235,7 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
     } catch (error) {
       console.error('Error fetching system messages:', error);
     }
-  }, [orderId, currentUser.id]);
+  }, [orderId, currentUser?.id]);
 
   // Combine Firebase messages with system messages
   const allMessages = [...systemMessages, ...messages].sort(
@@ -239,7 +245,7 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newMessage.trim() || !chatId || isSending) {
+    if (!newMessage.trim() || !chatId || isSending || !currentUser) {
       toast.error('Cannot send empty message');
       return;
     }
@@ -281,7 +287,7 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
       
       // Update chat document with last message
       try {
-        const chatRef = doc(db, 'chats', chatId);
+        const chatRef = doc(firestore, 'chats', chatId);
         await updateDoc(chatRef, {
           lastMessage: messageContent,
           lastMessageAt: serverTimestamp(),
@@ -375,7 +381,7 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
 
   // Mark messages as read
   useEffect(() => {
-    if (chatId && allMessages.length > 0 && chatExists) {
+    if (chatId && allMessages.length > 0 && chatExists && currentUser) {
       const unreadMessages = allMessages.filter(msg => 
         msg.messageType !== 'system' && 
         'senderId' in msg &&
@@ -388,7 +394,7 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
         markAsRead?.();
       }
     }
-  }, [chatId, allMessages, currentUser.id, markAsRead, chatExists]);
+  }, [chatId, allMessages, currentUser, markAsRead, chatExists]);
 
   // Fetch system messages
   useEffect(() => {
@@ -398,29 +404,35 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
   }, [orderId, fetchSystemMessages]);
 
   const formatMessageTime = (timestamp: Date): string => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+    try {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) return 'Just now';
+      
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) {
+      if (diffMins < 1) {
+        return 'Just now';
+      } else if (diffMins < 60) {
+        return `${diffMins}m ago`;
+      } else if (diffHours < 24) {
+        return `${diffHours}h ago`;
+      } else if (diffDays === 1) {
+        return 'Yesterday';
+      } else if (diffDays < 7) {
+        return `${diffDays}d ago`;
+      } else {
+        return date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: diffDays > 365 ? 'numeric' : undefined
+        });
+      }
+    } catch (error) {
       return 'Just now';
-    } else if (diffMins < 60) {
-      return `${diffMins}m ago`;
-    } else if (diffHours < 24) {
-      return `${diffHours}h ago`;
-    } else if (diffDays === 1) {
-      return 'Yesterday';
-    } else if (diffDays < 7) {
-      return `${diffDays}d ago`;
-    } else {
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: diffDays > 365 ? 'numeric' : undefined
-      });
     }
   };
 
@@ -452,13 +464,13 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
     );
   };
 
-  const renderMessage = (message: FirebaseMessage | SystemMessage) => {
-    const isCurrentUser = message.messageType !== 'system' && 'senderId' in message && message.senderId === currentUser.id;
+  const renderMessage = (message: FirebaseMessage | SystemMessage, index: number) => {
+    const isCurrentUser = message.messageType !== 'system' && 'senderId' in message && message.senderId === currentUser?.id;
     const isSystem = message.messageType === 'system';
 
     return (
       <div
-        key={message.id}
+        key={message.id || index}
         className={`flex mb-4 ${isCurrentUser ? 'justify-end' : 'justify-start'} ${isSystem ? 'justify-center' : ''}`}
       >
         <div className={`max-w-xs lg:max-w-md ${isSystem ? 'w-full' : ''}`}>
@@ -468,16 +480,16 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
               {otherUser?.avatar ? (
                 <img
                   src={otherUser.avatar}
-                  alt={otherUser.username}
+                  alt={otherUser.username || 'User'}
                   className="w-5 h-5 rounded-full"
                 />
               ) : (
                 <div className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold">
-                  {otherUser?.username?.charAt(0).toUpperCase() || 'U'}
+                  {(otherUser?.username || 'U').charAt(0).toUpperCase()}
                 </div>
               )}
               <span className="text-xs font-medium text-gray-700">
-                {message.senderName || otherUser?.username}
+                {message.senderName || otherUser?.username || 'User'}
               </span>
             </div>
           )}
@@ -507,6 +519,23 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
       </div>
     );
   };
+
+  // Validate currentUser
+  if (!currentUser) {
+    return (
+      <div className={`flex flex-col items-center justify-center h-full ${className}`}>
+        <div className="text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h3 className="font-semibold text-gray-900 mb-2">Authentication Required</h3>
+          <p className="text-sm text-gray-600 mb-4">Please login to access chat</p>
+        </div>
+      </div>
+    );
+  }
 
   // Loading state
   if (loading && !chatExists) {
@@ -567,44 +596,42 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
   return (
     <div className={`flex flex-col h-full bg-white rounded-lg border border-gray-200 ${className}`}>
       {/* Header */}
-      {otherUser && (
-        <div className="border-b border-gray-200 p-3 bg-gray-50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="relative">
-                {otherUser.avatar ? (
-                  <img
-                    src={otherUser.avatar}
-                    alt={otherUser.username}
-                    className="w-8 h-8 rounded-full border-2 border-white"
-                  />
-                ) : (
-                  <div className="w-8 h-8 rounded-full border-2 border-white bg-blue-500 text-white flex items-center justify-center font-bold text-sm">
-                    {otherUser.username?.charAt(0).toUpperCase() || 'U'}
-                  </div>
-                )}
-                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-400 border-2 border-white rounded-full"></div>
-              </div>
-              <div>
-                <h3 className="font-bold text-gray-900 text-sm">{otherUser.username}</h3>
-                <p className="text-xs text-gray-600">
-                  {isTyping ? 'Typing...' : 'Online'}
-                </p>
-              </div>
+      <div className="border-b border-gray-200 p-3 bg-gray-50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="relative">
+              {otherUser?.avatar ? (
+                <img
+                  src={otherUser.avatar}
+                  alt={otherUser.username || 'User'}
+                  className="w-8 h-8 rounded-full border-2 border-white"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full border-2 border-white bg-blue-500 text-white flex items-center justify-center font-bold text-sm">
+                  {(otherUser?.username || 'U').charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-400 border-2 border-white rounded-full"></div>
             </div>
-            {orderId && (
-              <a
-                href={`/orders/${orderId}`}
-                className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors font-medium"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Order
-              </a>
-            )}
+            <div>
+              <h3 className="font-bold text-gray-900 text-sm">{otherUser?.username || 'User'}</h3>
+              <p className="text-xs text-gray-600">
+                {isTyping ? 'Typing...' : 'Online'}
+              </p>
+            </div>
           </div>
+          {orderId && (
+            <a
+              href={`/orders/${orderId}`}
+              className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors font-medium"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Order
+            </a>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Messages Container */}
       <div
@@ -638,7 +665,7 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
         ) : (
           <>
             {/* Messages */}
-            {allMessages.map(renderMessage)}
+            {allMessages.map((message, index) => renderMessage(message, index))}
             <div ref={messagesEndRef} />
           </>
         )}
