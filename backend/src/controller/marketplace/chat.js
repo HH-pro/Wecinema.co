@@ -158,7 +158,7 @@ router.get('/my-chats', authenticateMiddleware, async (req, res) => {
     });
   }
 });
-router.get('/by-firebase-id/:firebaseChatId', auth, async (req, res) => {
+router.get('/by-firebase-id/:firebaseChatId', authenticateMiddleware, async (req, res) => {
   try {
     const { firebaseChatId } = req.params;
     const userId = req.user.id;
@@ -278,7 +278,7 @@ router.get('/by-firebase-id/:firebaseChatId', auth, async (req, res) => {
 });
 
 // Mark messages as read by Firebase chat ID
-router.put('/mark-read-by-firebase/:firebaseChatId', auth, async (req, res) => {
+router.put('/mark-read-by-firebase/:firebaseChatId', authenticateMiddleware, async (req, res) => {
   try {
     const { firebaseChatId } = req.params;
     const userId = req.user.id;
