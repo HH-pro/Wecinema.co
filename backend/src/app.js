@@ -1,202 +1,64 @@
-const express = require("express");
-const Sentry = require("@sentry/node");
-const Tracing = require("@sentry/tracing");
-const morgan = require("morgan");
-const cors = require("cors");
-const cron = require("node-cron");
-const axios = require("axios");
+// server.js or app.js
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const morgan = require('morgan');
+const path = require('path');
 
 // Import database connection
-const connectDB = require("./config/config"); // ✅ Updated path
+const connectDB = require('../../backend/src/config/config');
 
-// Import controllers
-const {
-  VideoController,
-  UserController,
-  domainController,
-  sentryRouter,
-  listingRoutes,
-  orderRoutes, 
-  offerRoutes,
-  chatRoutes,
-  paymentRoutes,
-  stripeRoutes
-} = require("./controller");
+// Import routes
+const marketplaceRoutes = require('./routes/marketplace');
+const offerRoutes = require('./routes/offers');
+const chatRoutes = require('./routes/chat');
 
-// Import expiration service
-require("../services/expirationService");
-
+// Create Express app
 const app = express();
 
-// ✅ Initialize Sentry
-Sentry.init({
-  dsn: "https://ffba1b70eb56e50557f3a75a5899e7ab@o4509361947148288.ingest.us.sentry.io/4509361953177600",
-  integrations: [
-    new Sentry.Integrations.Http({ tracing: true }),
-    new Tracing.Integrations.Express({ app }),
-  ],
-  tracesSampleRate: 1.0,
-});
+// Middleware
+app.use(helmet({
+  contentSecurityPolicy: false, // Adjust as needed
+  crossOriginEmbedderPolicy: false
+}));
 
-// ✅ Request handler must be the first middleware
-app.use(Sentry.Handlers.requestHandler());
-app.use(Sentry.Handlers.tracingHandler());
-
-// Security headers
-app.use((req, res, next) => {
-  res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
-  res.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
-  next();
-});
-
-app.use(morgan("dev"));
-
-// ✅ CORS configuration
-const allowedOrigins = [
-  "http://www.wecinema.co",
-  "https://www.wecinema.co",
-  "https://www.wecinema.co/api",
-  "http://wecinema.co",
-  "http://wecinema.co/api",
-  "https://wecinema.co",
-  "http://localhost:3000",
-  "http://localhost:5173", // ✅ Added for frontend
-  "https://wecinema-admin.onrender.com",
-  "https://wecinema-main.vercel.app",
-  "https://wecinema-21d00.firebaseapp.com",
-];
-
-const corsOptions = {
-  origin: function (origin, callback) {
-    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGINS 
+    ? process.env.ALLOWED_ORIGINS.split(',')
+    : ['http://localhost:5173', 'http://localhost:3000'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-};
+}));
 
-app.use(cors(corsOptions));
-
-// ✅ IMPORTANT: Stripe webhook requires raw body parsing first
-app.use("/webhook/stripe", express.raw({ type: 'application/json' }));
-
-// ✅ Regular JSON parsing for all other routes
+app.use(morgan('dev'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ✅ Default cookie middleware (optional)
-app.use((req, res, next) => {
-  res.cookie("token", "your-token-value", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'None' : 'Lax',
-  });
-  next();
-});
+// Static files (if needed)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ✅ Debug logger (development only)
-if (process.env.NODE_ENV === 'development') {
-  app.use((req, res, next) => {
-    console.log("📥 Request:", req.method, req.url);
-    console.log("📦 Request body:", req.body);
-    next();
-  });
-}
+// Routes
+app.use('/api/marketplace', marketplaceRoutes);
+app.use('/api/marketplace/offers', offerRoutes);
+app.use('/api/marketplace/chat', chatRoutes);
 
-// ✅ Scheduled job: daily at 9 AM
-cron.schedule("0 9 * * *", async () => {
+// Health endpoint
+app.get('/api/health', async (req, res) => {
   try {
-    console.log("⏰ Running daily domain/hosting expiration check...");
-    await axios.get("https://wecinema.co/api/check-expirations");
-    console.log("✅ Expiration check completed");
-  } catch (error) {
-    console.error("❌ Error in scheduled expiration check:", error);
-    Sentry.captureException(error);
-  }
-});
-
-// ✅ API Routes with proper prefixes
-app.use("/api/video", VideoController);
-app.use("/api/user", UserController);
-app.use("/api/domain", domainController);
-app.use("/api/sentry", sentryRouter);
-// Temporary fix in server.js (remove after testing)
-const admin = require('firebase-admin');
-
-// Hardcoded Firebase config (temporary)
-const firebaseConfig = {
-  projectId: 'wecinema-21d00',
-  clientEmail: 'firebase-adminsdk-bh6ix@wecinema-21d00.iam.gserviceaccount.com',
-  privateKey: `-----BEGIN PRIVATE KEY-----
-MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCtknDuMWNQ+IZ3
-o9F3VP6paTIgxy/HMP85khRBoSzmxGOjZq6jlJNohzsDaESThK3NojaOKkQzT0cG
-DFqI3XtoFDGS1NwsuJaw7JyUgXnyoYKnfp2c4PNYkmPXLJ73yiSBn9JFiNrpcDFG
-nz3x/m+4ggRq0ibe3ALEQracfXAybiCpob9mcMlPA3olAkhUzFCx2LtLtVAP4BcU
-QYQHaLhHVi/zWI9IcskrYxVEVHNPpIbU8EiuRDZa4BpIA3tvkBlkR3UNz3YMTUZ4
-ZCWwjr/a6EyU5ssHaPm0f9AMpwDVJ6MDSefICCBML2uEfBR6BFbBR8+mK2gcz+xi
-JUtkFYJtAgMBAAECggEADEhACILjKcAkV8P2VxDjIl7IxswBhAFiFhNRrqE2ma/M
-8yuZcQba9XsYQHH45E1vtQzk+mNgRxc1ieaG44d0q5U+OssoN1vqgeOEYvfUhshK
-BAswIQFEBwD44qmMKDGcKrYB/ZylDP685efvzLd59V7x7BMp3/xGj9e+r00rCs5l
-PTQgectetb4jpM3Mf0cfyDnzyPCfp7+q1+qDk6O9krmVrMoBOh2BrU17ZND5hSAz
-rzPd6wjWZwqP4dvAYmq1/3CJYhuXFDa9avdnYTm0HtsbnxYi9laEOikqgHZiATdW
-JemFndDCtOUFHoh1lrNB2CsNbZQjrdQGLx0ymmPFoQKBgQDlmUr5h8WIWuIkjguX
-pP3p/iU7tO4D10ZW5iZcgGXPO0XR14CN2I6hP/BMYzAshgQ5ap/20ocO3oiMfXoD
-kH1O20TkxfUbkk1BsmTmZ582IhlYTBCrHQT9YWwbwSJiw4xG3JzHzelgQP49CUMM
-Y81W1+UDVNIoQ+Q4qBWViRkzEQKBgQDBh+L5/CfKH/EC2EVdPpR2lLE09ixB2aKT
-9WTLYvJkpYt5VJToEKeVQhRSrNhMvm98kC36M+kEDXhuVJAGHjgq7/zcJeezuL9Q
-f9hPgdgyKwJSM0QHi5UAZlIhAjA3FWyxrE+xlOnrpRVNwBxY6+kwk5RyeBG4hWN9
-dJiSd0whnQKBgQCmHyXKKdxYbjmVbVkh3XUCKqpR6vUTvlzcXyV+ZEBFkoNP8vbG
-qtt3/EUnX9TpQgYobOdUtLqXnZd63wa7MX4Y4jmUtU5FJrPTRvoOYwclKcLgyhh9
-Vj/X/Pc1laYFg6spUlH1lxy2UhAhpWPnwQY/QXIn2OU90PF9tM/5I/shoQKBgFVh
-Tti8zw0UNG7t3QQ7JKKADQHxjSrsCha+j15PY+LVSggYMa2EE3r88RxcVvzckzDg
-JviYSDfafYQnWHbqhBslT2gMbQFUA0tPa63/+dKAOQDszxmJEg5gFeGsJntWv2JP
-Q8VzjhPA+/oWRCtSwMkGgtpRcHf4mSDy/JC5guPdAoGBAMk/ngMX5wvzrvayb1Zf
-PmnGo4k39+XDeZAbvJRpVGRKRtn4XTsW487MLBx6QqGNpAhKOhMO4Y2q+VjQlMg9
-THGD6GkCMoV0/iXVFM6Ih08j5dPVqSOYbozxeXtPIKlai8LCq24PbFJ0fJrWM7yn
-j1drKjpC/KARZjW2uc0lOVRa
------END PRIVATE KEY-----`,
-  databaseURL: 'https://wecinema-21d00-default-rtdb.firebaseio.com'
-};
-
-try {
-  admin.initializeApp({
-    credential: admin.credential.cert(firebaseConfig),
-    databaseURL: firebaseConfig.databaseURL
-  });
-  console.log('✅ Firebase initialized with hardcoded config');
-} catch (error) {
-  console.error('❌ Hardcoded Firebase init failed:', error.message);
-}
-// ✅ Marketplace Routes with consistent API prefix
-app.use("/api/marketplace/listings", listingRoutes);        // ✅ Correct prefix
-app.use("/api/marketplace/orders", orderRoutes);           // ✅ Correct prefix  
-app.use("/api/marketplace/offers", offerRoutes);           // ✅ Correct prefix
-app.use("/api/marketplace/chat", chatRoutes);              // ✅ Correct prefix (singular chat)
-app.use("/api/marketplace/payments", paymentRoutes);       // ✅ Correct prefix
-app.use("/api/marketplace/stripe", stripeRoutes);          // ✅ Correct prefix
-
-// ✅ Stripe Webhook Route (separate from API routes)
-app.use("/webhook/stripe", stripeRoutes);  // ✅ Stripe webhook specific route
-
-// ✅ Health check endpoint
-app.get("/api/health", async (req, res) => {
-  try {
-    const { checkHealth } = require("./config/database");
+    const { checkHealth } = require('./config/database');
     const health = await checkHealth();
     
     res.status(200).json({
       success: true,
       message: 'Server is running',
-      timestamp: new Date().toISOString(),
+      timestamp: health.timestamp,
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development',
       services: {
         mongodb: health.mongodb.status,
-        firebase: health.firebase.initialized ? 'initialized' : 'not_initialized'
+        firebase: health.firebase.initialized ? 'initialized' : 'not_initialized',
+        firebase_services: health.firebase.services
       }
     });
     
@@ -209,45 +71,26 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
-// ✅ Test endpoint
-app.get("/api/test", (req, res) => {
+// Test endpoint
+app.get('/api/test', (req, res) => {
   res.json({
     success: true,
     message: 'API is working',
-    timestamp: new Date().toISOString(),
-    endpoints: {
-      marketplace: '/api/marketplace',
-      health: '/api/health',
-      listings: '/api/marketplace/listings',
-      offers: '/api/marketplace/offers',
-      chat: '/api/marketplace/chat'
-    }
+    timestamp: new Date().toISOString()
   });
 });
 
-// ✅ 404 handler
-app.use("*", (req, res) => {
+// 404 handler
+app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
-    message: `Route ${req.originalUrl} not found`,
-    availableRoutes: [
-      '/api/health',
-      '/api/test',
-      '/api/marketplace',
-      '/api/marketplace/listings',
-      '/api/marketplace/offers',
-      '/api/marketplace/chat',
-      '/api/marketplace/orders',
-      '/api/user',
-      '/api/video'
-    ]
+    message: `Route ${req.originalUrl} not found`
   });
 });
 
-// ✅ Error handler (Sentry first, then fallback)
-app.use(Sentry.Handlers.errorHandler());
+// Global error handler
 app.use((err, req, res, next) => {
-  console.error("❌ Custom Error Handler:", err);
+  console.error('❌ Server error:', err);
   
   const statusCode = err.status || 500;
   const message = process.env.NODE_ENV === 'production' 
@@ -261,41 +104,43 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ✅ Start server function
+// Start server
 async function startServer() {
   try {
-    console.log('🚀 Starting WeCinema Server...');
+    console.log('🚀 Starting WeCinema Marketplace Server...');
     console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🔗 MongoDB URI: ${process.env.MONGODB_URI ? 'Configured' : 'Not configured'}`);
+    console.log(`🔥 Firebase: ${process.env.FIREBASE_PROJECT_ID ? 'Configured' : 'Not configured'}`);
     
-    // Connect to database using environment variable
+    // Connect to database
     await connectDB(process.env.MONGODB_URI);
     
     const PORT = process.env.PORT || 3000;
     
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`✅ Server running on port ${PORT}`);
       console.log(`📡 API Base URL: http://localhost:${PORT}/api`);
       console.log(`🏥 Health Check: http://localhost:${PORT}/api/health`);
-      console.log(`💬 Chat API: http://localhost:${PORT}/api/marketplace/chat`);
-      console.log(`🛒 Marketplace: http://localhost:${PORT}/api/marketplace`);
       console.log(`🔄 Ready to process requests...`);
     });
     
-    // ✅ Graceful shutdown
+    // Graceful shutdown
     process.on('SIGTERM', () => {
       console.log('SIGTERM received. Shutting down gracefully...');
-      const { closeConnections } = require("./config/database");
-      closeConnections().then(() => {
-        console.log('✅ All connections closed');
+      server.close(async () => {
+        const { closeConnections } = require('./config/database');
+        await closeConnections();
+        console.log('Server closed');
         process.exit(0);
       });
     });
     
     process.on('SIGINT', () => {
       console.log('SIGINT received. Shutting down gracefully...');
-      const { closeConnections } = require("./config/database");
-      closeConnections().then(() => {
-        console.log('✅ All connections closed');
+      server.close(async () => {
+        const { closeConnections } = require('./config/database');
+        await closeConnections();
+        console.log('Server closed');
         process.exit(0);
       });
     });
@@ -306,8 +151,7 @@ async function startServer() {
   }
 }
 
-// ✅ Load environment variables and start server
-require('dotenv').config();
+// Start the server
 startServer();
 
 module.exports = app; // For testing
