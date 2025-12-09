@@ -1,5 +1,6 @@
 const express = require("express");
 const Sentry = require("@sentry/node");
+const path = require('path');
 const Tracing = require("@sentry/tracing");
 const {
   VideoController,
