@@ -1,17 +1,16 @@
-// routes/offerRoutes.js
 const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
-const Offer = require("../models/marketplace/offer");
-const MarketplaceListing = require("../models/marketplace/listing");
-const Order = require("../models/marketplace/order");
-const Chat = require("../models/marketplace/Chat");
-const Message = require("../models/marketplace/messages");
-const { authenticateMiddleware } = require("../utils");
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-
+const Offer = require("../../models/marketplace/offer");
+const MarketplaceListing = require("../../models/marketplace/listing");
+const Order = require("../../models/marketplace/order");
+const Chat = require("../../models/marketplace/Chat");
+const Message = require("../../models/marketplace/messages");
+const { authenticateMiddleware } = require("../../utils");
+const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
+// routes/offerRoutes.js
 // Email service using Gmail
-const emailService = require('../services/emailService');
+const emailService = require('../../../services/emailService');
 
 // Firebase Admin for real-time chat
 const admin = require('firebase-admin');
