@@ -363,7 +363,6 @@ async function sendProfessionalEmailNotifications(order, offer, buyer, seller, c
 // ============================
 // ROUTES START HERE
 // ============================
-
 // ✅ CONFIRM OFFER PAYMENT WITH PROFESSIONAL EMAILS
 router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) => {
   console.log("🔍 Confirm Offer Payment Request DETAILS:", {
@@ -565,14 +564,36 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       console.log("✅ Order notification messages sent");
       
       // ✅ SEND PROFESSIONAL GMAIL EMAILS IN BACKGROUND (NON-BLOCKING)
-      setTimeout(async () => {
-        try {
-          await sendProfessionalEmailNotifications(order, offer, buyer, seller, chatLink);
-          console.log("✅ Professional email notifications sent successfully");
-        } catch (emailError) {
-          console.error("❌ Background email sending failed:", emailError.message);
-        }
-      }, 1000); // 1 second delay to not block response
+      // ✅ IMPORTANT: यहां buyer और seller दोनों को email भेजा जा रहा है
+      try {
+        console.log("📧 Starting professional email notifications...");
+        
+        // Seller को professional email भेजें
+        console.log(`📧 Sending email to seller: ${seller.email}`);
+        await emailService.sendOrderConfirmationToSeller(order, buyer, seller, chatLink);
+        console.log("✅ Professional email sent to seller:", seller.email);
+        
+        // Buyer को professional email भेजें
+        console.log(`📧 Sending email to buyer: ${buyer.email}`);
+        await emailService.sendOrderConfirmationToBuyer(order, buyer, seller, chatLink);
+        console.log("✅ Professional email sent to buyer:", buyer.email);
+        
+        console.log("✅ Professional email notifications sent successfully to BOTH parties");
+        notificationResults.emails = {
+          seller: true,
+          buyer: true,
+          status: 'sent'
+        };
+        
+      } catch (emailError) {
+        console.error("❌ Email sending failed:", emailError.message);
+        notificationResults.emails = {
+          seller: false,
+          buyer: false,
+          status: 'failed',
+          error: emailError.message
+        };
+      }
       
     } catch (notificationError) {
       console.error('❌ Notification sending failed:', notificationError);
@@ -592,11 +613,17 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
           messagesSent: notificationResults.messages?.success || false,
           firebaseChatId: notificationResults.messages?.firebaseChatId,
           chatLink: chatLink,
-          emailStatus: 'Professional emails are being sent to both parties'
+          emailsSent: notificationResults.emails?.status === 'sent',
+          buyerEmail: buyer.email,
+          sellerEmail: seller.email,
+          emailStatus: notificationResults.emails?.status === 'sent' ? 
+            'Professional emails sent to both buyer and seller' : 
+            'Email sending failed - check logs'
         },
         orderDetails: {
           amount: order.amount,
           sellerName: seller.username,
+          buyerName: buyer.username,
           listingTitle: offer.listingId?.title,
           orderDate: order.orderDate,
           requirements: order.requirements || 'None specified'
@@ -623,7 +650,6 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     }
   }
 });
-
 // ✅ MAKE OFFER WITH IMMEDIATE PAYMENT
 router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), async (req, res) => {
   let session;
