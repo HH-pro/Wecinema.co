@@ -1,16 +1,17 @@
+// routes/offerRoutes.js
 const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
-const Offer = require("../../models/marketplace/offer");
-const MarketplaceListing = require("../../models/marketplace/listing");
-const Order = require("../../models/marketplace/order");
-const Chat = require("../../models/marketplace/Chat");
-const Message = require("../../models/marketplace/messages");
-const { authenticateMiddleware } = require("../../utils");
-const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
+const Offer = require("../models/marketplace/offer");
+const MarketplaceListing = require("../models/marketplace/listing");
+const Order = require("../models/marketplace/order");
+const Chat = require("../models/marketplace/Chat");
+const Message = require("../models/marketplace/messages");
+const { authenticateMiddleware } = require("../utils");
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-// EmailJS for email notifications
-const emailjs = require('@emailjs/nodejs');
+// Email service using Gmail
+const emailService = require('../services/emailService');
 
 // Firebase Admin for real-time chat
 const admin = require('firebase-admin');
@@ -30,14 +31,6 @@ try {
 } catch (error) {
   console.log('Firebase initialization warning:', error.message);
 }
-
-// Initialize EmailJS with your credentials
-const EMAILJS_CONFIG = {
-  serviceId: 'service_lrmmoyr',
-  templateId: 'template_p9kyheq',
-  publicKey: 'C8PcGH3DDuoqwOS5m',
-  privateKey: 'eRvq637n02Lk43MW3z3sh'
-};
 
 // ✅ VALIDATION HELPER FUNCTIONS
 const validateObjectId = (id) => {
@@ -119,7 +112,7 @@ const createFirebaseChatRoom = async (order, buyer, seller) => {
       senderId: 'system',
       senderName: 'System',
       senderRole: 'system',
-      message: `🎉 **Order #${order._id} has been placed!**\n\nBuyer: ${buyer.username}\nSeller: ${seller.username}\nAmount: $${order.amount}\n\nPlease discuss order details here.`,
+      message: `🎉 **Order #${order._id.toString().slice(-8).toUpperCase()} has been placed!**\n\nBuyer: ${buyer.username}\nSeller: ${seller.username}\nAmount: $${order.amount}\n\nPlease discuss order details here.`,
       timestamp: new Date().toISOString(),
       type: 'system',
       readBy: [],
@@ -165,10 +158,10 @@ const createFirebaseChatRoom = async (order, buyer, seller) => {
   }
 };
 
-// ✅ FUNCTION TO SEND ORDER DETAILS WITH CHAT LINK (FIVERR STYLE)
+// ✅ FUNCTION TO SEND ORDER DETAILS WITH CHAT LINK
 const sendOrderDetailsWithChatLink = async (order, offer, buyer, seller) => {
   try {
-    console.log("📨 Preparing Fiverr-style messages with chat links...");
+    console.log("📨 Preparing professional messages with chat links...");
     
     // Create Firebase chat room
     const firebaseChatId = await createFirebaseChatRoom(order, buyer, seller);
@@ -200,10 +193,10 @@ const sendOrderDetailsWithChatLink = async (order, offer, buyer, seller) => {
         year: 'numeric'
       }) : 'Not specified';
     
-    // ✅ SELLER MESSAGE (Fiverr-style detailed message)
+    // ✅ SELLER MESSAGE
     const sellerMessageContent = `🎉 **NEW ORDER RECEIVED!**\n\n` +
       `**Order Details:**\n` +
-      `📦 **Order ID:** ${order._id}\n` +
+      `📦 **Order ID:** ${order._id.toString().slice(-8).toUpperCase()}\n` +
       `👤 **Buyer:** ${buyer?.username || 'Customer'}\n` +
       `💰 **Amount:** $${offer.amount}\n` +
       `📅 **Order Date:** ${orderDate}\n` +
@@ -223,7 +216,7 @@ const sendOrderDetailsWithChatLink = async (order, offer, buyer, seller) => {
     // ✅ BUYER MESSAGE
     const buyerMessageContent = `✅ **ORDER CONFIRMED!**\n\n` +
       `**Order Details:**\n` +
-      `📦 **Order ID:** ${order._id}\n` +
+      `📦 **Order ID:** ${order._id.toString().slice(-8).toUpperCase()}\n` +
       `👤 **Seller:** ${seller.username}\n` +
       `💰 **Amount:** $${offer.amount}\n` +
       `📅 **Order Date:** ${orderDate}\n` +
@@ -238,7 +231,7 @@ const sendOrderDetailsWithChatLink = async (order, offer, buyer, seller) => {
       `4. Release payment after satisfaction\n\n` +
       `💬 **[OPEN CHAT WITH SELLER](${chatLink})**\n\n` +
       `🔒 **Payment Status:** Secured in escrow\n` +
-      `📞 **Need Help?** Contact support@yourwebsite.com`;
+      `📞 **Need Help?** Contact ${process.env.SUPPORT_EMAIL || 'support@yourwebsite.com'}`;
     
     // System user ID for system messages
     const systemUserId = new mongoose.Types.ObjectId('000000000000000000000000');
@@ -295,7 +288,7 @@ const sendOrderDetailsWithChatLink = async (order, offer, buyer, seller) => {
     
     await messageToBuyer.save();
     
-    console.log("✅ Fiverr-style messages sent to both users with chat links");
+    console.log("✅ Professional messages sent to both users with chat links");
     
     // Also add messages to Firebase chat for better UX
     if (firebaseChatId && admin.apps.length) {
@@ -308,7 +301,7 @@ const sendOrderDetailsWithChatLink = async (order, offer, buyer, seller) => {
           senderId: 'system',
           senderName: 'System',
           senderRole: 'system',
-          message: `💌 **Order notifications have been sent to both parties.**\n\nBuyer and seller can now communicate directly here.`,
+          message: `💌 **Professional emails have been sent to both parties.**\n\nCheck your email for detailed order confirmation.`,
           timestamp: new Date().toISOString(),
           type: 'system_info',
           readBy: []
@@ -338,95 +331,41 @@ const sendOrderDetailsWithChatLink = async (order, offer, buyer, seller) => {
   }
 };
 
-// ✅ EMAIL NOTIFICATION FUNCTION USING EMAILJS
-async function sendEmailNotifications(offer, order, buyer, seller) {
+// ✅ PROFESSIONAL EMAIL NOTIFICATION FUNCTION USING GMAIL
+async function sendProfessionalEmailNotifications(order, offer, buyer, seller, chatLink) {
   try {
-    console.log("📧 Preparing to send email notifications...");
+    console.log("📧 Preparing professional email notifications via Gmail...");
 
-    // Seller ko email
-    const sellerEmailParams = {
-      to_email: seller.email,
-      to_name: seller.username,
-      subject: `🎉 New Order Received - ${offer.listingId.title}`,
-      order_id: order._id.toString(),
-      buyer_name: buyer.username,
-      listing_title: offer.listingId.title,
-      order_amount: `$${offer.amount}`,
-      order_date: order.paidAt.toLocaleDateString('en-IN'),
-      requirements: offer.requirements || 'No specific requirements provided',
-      expected_delivery: offer.expectedDelivery ? new Date(offer.expectedDelivery).toLocaleDateString('en-IN') : 'Not specified',
-      chat_url: `${process.env.FRONTEND_URL || 'https://yourwebsite.com'}/messages?order=${order._id}`,
-      dashboard_url: `${process.env.FRONTEND_URL || 'https://yourwebsite.com'}/seller/dashboard`
-    };
+    // Seller ko professional email bhejen
+    try {
+      await emailService.sendOrderConfirmationToSeller(order, buyer, seller, chatLink);
+      console.log("✅ Professional email sent to seller:", seller.email);
+    } catch (sellerEmailError) {
+      console.error("❌ Failed to send email to seller:", sellerEmailError.message);
+    }
 
-    // Buyer ko email
-    const buyerEmailParams = {
-      to_email: buyer.email,
-      to_name: buyer.username,
-      subject: `✅ Order Confirmed - ${offer.listingId.title}`,
-      order_id: order._id.toString(),
-      seller_name: seller.username,
-      listing_title: offer.listingId.title,
-      order_amount: `$${offer.amount}`,
-      order_date: order.paidAt.toLocaleDateString('en-IN'),
-      requirements: offer.requirements || 'No specific requirements provided',
-      expected_delivery: offer.expectedDelivery ? new Date(offer.expectedDelivery).toLocaleDateString('en-IN') : 'Not specified',
-      chat_url: `${process.env.FRONTEND_URL || 'https://yourwebsite.com'}/messages?order=${order._id}`,
-      support_email: 'support@yourwebsite.com'
-    };
+    // Buyer ko professional email bhejen
+    try {
+      await emailService.sendOrderConfirmationToBuyer(order, buyer, seller, chatLink);
+      console.log("✅ Professional email sent to buyer:", buyer.email);
+    } catch (buyerEmailError) {
+      console.error("❌ Failed to send email to buyer:", buyerEmailError.message);
+    }
 
-    // Send emails using EmailJS
-    const emailPromises = [];
-
-    // Send to seller
-    emailPromises.push(
-      emailjs.send(
-        EMAILJS_CONFIG.serviceId,
-        'order_received_seller',
-        sellerEmailParams,
-        {
-          publicKey: EMAILJS_CONFIG.publicKey,
-          privateKey: EMAILJS_CONFIG.privateKey,
-        }
-      )
-    );
-
-    // Send to buyer
-    emailPromises.push(
-      emailjs.send(
-        EMAILJS_CONFIG.serviceId,
-        'order_confirmed_buyer',
-        buyerEmailParams,
-        {
-          publicKey: EMAILJS_CONFIG.publicKey,
-          privateKey: EMAILJS_CONFIG.privateKey,
-        }
-      )
-    );
-
-    // Wait for all emails to be sent
-    const results = await Promise.allSettled(emailPromises);
-
-    // Check results
-    results.forEach((result, index) => {
-      const emailType = index === 0 ? 'Seller' : 'Buyer';
-      if (result.status === 'fulfilled') {
-        console.log(`✅ ${emailType} email sent successfully`);
-      } else {
-        console.error(`❌ ${emailType} email failed:`, result.reason);
-      }
-    });
-
-    console.log("📧 Email notifications completed");
+    console.log("📧 Professional email notifications completed");
     return true;
 
   } catch (error) {
-    console.error('❌ Email notification error:', error);
+    console.error('❌ Professional email notification error:', error);
     return false;
   }
 }
 
-// ✅ CONFIRM OFFER PAYMENT WITH MESSAGES & CHAT LINKS (MAIN FUNCTION)
+// ============================
+// ROUTES START HERE
+// ============================
+
+// ✅ CONFIRM OFFER PAYMENT WITH PROFESSIONAL EMAILS
 router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) => {
   console.log("🔍 Confirm Offer Payment Request DETAILS:", {
     body: req.body,
@@ -611,21 +550,30 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     await session.commitTransaction();
     console.log("🎉 Database transaction completed successfully");
 
-    // ✅ NOW SEND FIVERR-STYLE MESSAGES WITH CHAT LINKS
+    // ✅ NOW SEND PROFESSIONAL MESSAGES WITH CHAT LINKS
     let notificationResults = {};
+    let chatLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/messages?order=${order._id}`;
+    
     try {
-      // Send Fiverr-style messages with chat links
+      // Send professional messages with chat links
       const messageResult = await sendOrderDetailsWithChatLink(order, offer, buyer, seller);
       notificationResults.messages = messageResult;
       
+      if (messageResult.chatLink) {
+        chatLink = messageResult.chatLink;
+      }
+      
       console.log("✅ Order notification messages sent");
       
-      // Send email notifications (optional, can be done in background)
-      if (process.env.SEND_EMAILS === 'true') {
-        const emailResult = await sendEmailNotifications(offer, order, buyer, seller);
-        notificationResults.emails = emailResult;
-        console.log("✅ Email notifications sent");
-      }
+      // ✅ SEND PROFESSIONAL GMAIL EMAILS IN BACKGROUND (NON-BLOCKING)
+      setTimeout(async () => {
+        try {
+          await sendProfessionalEmailNotifications(order, offer, buyer, seller, chatLink);
+          console.log("✅ Professional email notifications sent successfully");
+        } catch (emailError) {
+          console.error("❌ Background email sending failed:", emailError.message);
+        }
+      }, 1000); // 1 second delay to not block response
       
     } catch (notificationError) {
       console.error('❌ Notification sending failed:', notificationError);
@@ -635,17 +583,17 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     // ✅ SUCCESS RESPONSE WITH ALL DETAILS
     res.status(200).json({
       success: true,
-      message: 'Payment confirmed successfully! Order details sent to your inbox.',
+      message: 'Payment confirmed successfully! Check your email for professional order details.',
       data: {
         orderId: order._id,
         redirectUrl: `/orders/${order._id}`,
-        chatUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/messages?order=${order._id}`,
+        chatUrl: chatLink,
         offerId: offer._id,
         notifications: {
           messagesSent: notificationResults.messages?.success || false,
           firebaseChatId: notificationResults.messages?.firebaseChatId,
-          chatLink: notificationResults.messages?.chatLink,
-          emailsSent: notificationResults.emails || false
+          chatLink: chatLink,
+          emailStatus: 'Professional emails are being sent to both parties'
         },
         orderDetails: {
           amount: order.amount,
@@ -1780,7 +1728,7 @@ router.get("/health", (req, res) => {
       database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
       stripe: "configured",
       firebase: admin.apps.length > 0 ? "initialized" : "not_initialized",
-      emailjs: EMAILJS_CONFIG.serviceId ? "configured" : "not_configured"
+      emailService: process.env.GMAIL_USER ? "configured" : "not_configured"
     }
   });
 });
