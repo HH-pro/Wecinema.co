@@ -547,7 +547,7 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
         </div>
       </div>
 
-      {/* Messages Container */}
+      {/* Messages Container - REMOVED WELCOME MESSAGE DIV */}
       <div
         ref={messagesContainerRef}
         onScroll={handleScroll}
@@ -578,7 +578,7 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
           </div>
         ) : (
           <>
-            {/* Messages */}
+            {/* Messages without date separators */}
             {allMessages.map((message, index) => renderMessage(message, index))}
             <div ref={messagesEndRef} />
           </>
