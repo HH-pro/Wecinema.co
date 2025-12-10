@@ -165,25 +165,69 @@ const SellerDashboard: React.FC = () => {
         return;
       }
 
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      
       const [ordersResponse, offersResponse, listingsResponse] = await Promise.allSettled([
-        getSellerOrders().catch(err => {
-          console.error('Error fetching orders:', err);
-          return [];
-        }),
-        getReceivedOffers().catch(err => {
-          console.error('Error fetching offers:', err);
-          return [];
-        }),
+        // ✅ FIXED: Direct API call with correct endpoint
         (async () => {
           try {
-            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            console.log('📦 Fetching seller orders from /marketplace/my-sales');
+            const response = await axios.get(
+              `${API_BASE_URL}/marketplace/my-sales`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+                timeout: 10000
+              }
+            );
             
+            console.log('✅ Orders API Response:', {
+              success: response.data.success,
+              salesCount: response.data.sales?.length,
+              data: response.data
+            });
+            
+            // Backend returns { success: true, sales: [...] }
+            if (response.data.success && response.data.sales) {
+              return response.data.sales;
+            }
+            
+            // If response structure is different, try to extract
+            return response.data.data || response.data.orders || [];
+          } catch (err: any) {
+            console.error('❌ Error fetching orders:', err.response?.data || err.message);
+            
+            // Fallback to old API function
+            try {
+              console.log('🔄 Trying fallback API function getSellerOrders()');
+              const fallback = await getSellerOrders();
+              console.log('Fallback response:', fallback);
+              return Array.isArray(fallback) ? fallback : (fallback?.data || fallback?.sales || []);
+            } catch (fallbackErr) {
+              console.error('Fallback also failed:', fallbackErr);
+              return [];
+            }
+          }
+        })(),
+        
+        // Offers - use existing function
+        (async () => {
+          try {
+            const offers = await getReceivedOffers();
+            return Array.isArray(offers) ? offers : (offers?.data || []);
+          } catch (err) {
+            console.error('Error fetching offers:', err);
+            return [];
+          }
+        })(),
+        
+        // Listings
+        (async () => {
+          try {
             const response = await axios.get(
               `${API_BASE_URL}/marketplace/listings/user/${currentUserId}/listings`,
               {
                 params: { page: 1, limit: 1000 },
-                headers,
+                headers: { Authorization: `Bearer ${token}` },
                 timeout: 10000
               }
             );
@@ -197,22 +241,32 @@ const SellerDashboard: React.FC = () => {
       ]);
 
       // Process orders response
-      const ordersData = ordersResponse.status === 'fulfilled' 
-        ? (Array.isArray(ordersResponse.value) ? ordersResponse.value : (ordersResponse.value?.data || []))
-        : [];
+      let ordersData = [];
+      if (ordersResponse.status === 'fulfilled') {
+        const result = ordersResponse.value;
+        ordersData = Array.isArray(result) ? result : [];
+        console.log('📊 Processed Orders Data:', {
+          count: ordersData.length,
+          firstFew: ordersData.slice(0, 3)
+        });
+      } else {
+        console.error('Orders promise rejected:', ordersResponse.reason);
+      }
 
       // Process offers response
-      const offersData = offersResponse.status === 'fulfilled'
-        ? (Array.isArray(offersResponse.value) ? offersResponse.value : (offersResponse.value?.data || []))
-        : [];
+      let offersData = [];
+      if (offersResponse.status === 'fulfilled') {
+        const result = offersResponse.value;
+        offersData = Array.isArray(result) ? result : [];
+      }
 
       // Process listings response
       if (listingsResponse.status === 'fulfilled' && listingsResponse.value?.success) {
         setListingsData(listingsResponse.value);
       }
 
-      setOrders(Array.isArray(ordersData) ? ordersData : []);
-      setOffers(Array.isArray(offersData) ? offersData : []);
+      setOrders(ordersData);
+      setOffers(offersData);
       
       console.log('✅ Dashboard data loaded:', {
         orders: ordersData.length,
@@ -228,6 +282,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
+  // Rest of the functions remain same...
   const checkStripeAccountStatus = async () => {
     try {
       console.log('🔄 Checking Stripe account status...');
