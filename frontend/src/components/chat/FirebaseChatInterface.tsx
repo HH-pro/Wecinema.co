@@ -275,28 +275,38 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
         console.warn('Failed to update chat document:', updateError);
       }
       
-      // Log to backend (optional)
-      if (orderId) {
-        try {
-          const token = localStorage.getItem('token');
-          await fetch('http://localhost:3000/marketplace/chat/log-message', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              orderId,
-              message: messageContent,
-              firebaseChatId: chatId,
-              senderId: currentUser.id,
-              senderName: currentUser.username,
-              isFirebaseMessage: true
-            })
-          });
-        } catch (backendError) {
-          console.warn('Failed to log message to backend:', backendError);
+      // Log to backend with all required fields
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('http://localhost:3000/marketplace/chat/log-message', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            orderId: orderId || '',
+            message: messageContent,
+            firebaseChatId: chatId,
+            chatId: chatId, // Same as firebaseChatId
+            senderId: currentUser.id,
+            senderName: currentUser.username || 'User',
+            isFirebaseMessage: true,
+            metadata: {
+              orderId: orderId || '',
+              timestamp: new Date().toISOString(),
+              platform: 'marketplace',
+              messageType: 'text'
+            }
+          })
+        });
+
+        if (!response.ok) {
+          console.warn('Failed to log message to backend, but Firebase message sent');
         }
+      } catch (backendError) {
+        console.warn('Failed to log message to backend:', backendError);
+        // Continue even if backend logging fails
       }
       
       setNewMessage('');
@@ -578,7 +588,7 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
           </div>
         ) : (
           <>
-            {/* Messages */}
+            {/* Messages without date separators */}
             {allMessages.map((message, index) => renderMessage(message, index))}
             <div ref={messagesEndRef} />
           </>
