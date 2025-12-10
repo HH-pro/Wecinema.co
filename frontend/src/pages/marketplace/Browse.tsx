@@ -1010,164 +1010,153 @@ const PaymentForm = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showBillingForm, setShowBillingForm] = useState(false);
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    
-    if (!stripe || !elements) {
-      setError('Payment system not ready. Please refresh the page and try again.');
+ // PaymentForm component में handleSubmit function को update करें:
+const handleSubmit = async (event: React.FormEvent) => {
+  event.preventDefault();
+  
+  if (!stripe || !elements) {
+    setError('Payment system not ready. Please refresh the page and try again.');
+    return;
+  }
+
+  setIsSubmitting(true);
+  setPaymentStatus('processing');
+  setError('');
+
+  try {
+    console.log('🔄 Confirming payment...');
+    console.log('📦 Offer Data for confirmation:', offerData);
+
+    // Get user info
+    const userInfo = {
+      name: currentUser?.username || billingDetails.name || 'Customer',
+      email: currentUser?.email || billingDetails.email || '',
+      phone: billingDetails.phone || ''
+    };
+
+    // Prepare billing details for confirmPayment
+    const billingDetailsForStripe = {
+      name: userInfo.name,
+      email: userInfo.email || undefined,
+      phone: userInfo.phone || undefined,
+      address: {
+        line1: billingDetails.address.line1 || 'N/A',
+        line2: billingDetails.address.line2 || undefined,
+        city: billingDetails.address.city || 'N/A',
+        state: billingDetails.address.state || 'N/A',
+        postal_code: billingDetails.address.postal_code || '00000',
+        country: billingDetails.address.country || 'US'
+      }
+    };
+
+    console.log('📋 Billing details for Stripe:', billingDetailsForStripe);
+
+    // DIRECT CONFIRMATION WITHOUT submit()
+    const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: `${window.location.origin}/marketplace/payment/success`,
+        payment_method_data: {
+          billing_details: billingDetailsForStripe
+        }
+      },
+      redirect: 'if_required'
+    });
+
+    if (stripeError) {
+      console.error('❌ Stripe payment error:', stripeError);
+      setError(stripeError.message || 'Payment failed. Please try again.');
+      setPaymentStatus('failed');
+      setIsSubmitting(false);
       return;
     }
 
-    setIsSubmitting(true);
-    setPaymentStatus('processing');
-    setError('');
+    console.log('✅ Stripe payment successful:', {
+      paymentIntentId: paymentIntent?.id,
+      status: paymentIntent?.status
+    });
 
-    try {
-      console.log('🔄 Confirming payment...');
-      console.log('📦 Offer Data for confirmation:', offerData);
+    // Prepare confirmation data with proper validation
+    let confirmationPayload;
+    let confirmationEndpoint;
 
-      // Get payment element
-      const paymentElement = elements.getElement(PaymentElement);
-      if (!paymentElement) {
-        throw new Error('Payment element not found');
-      }
-
-      // Get user info
-      const userInfo = {
-        name: currentUser?.username || billingDetails.name || 'Customer',
-        email: currentUser?.email || billingDetails.email || '',
-        phone: billingDetails.phone || ''
-      };
-
-      // Submit payment element first
-      const { error: submitError } = await paymentElement.submit();
-      if (submitError) {
-        throw submitError;
-      }
-
-      // Prepare billing details for confirmPayment
-      const billingDetailsForStripe = {
-        name: userInfo.name,
-        email: userInfo.email || undefined,
-        phone: userInfo.phone || undefined,
-        address: {
-          line1: billingDetails.address.line1 || 'N/A',
-          line2: billingDetails.address.line2 || undefined,
-          city: billingDetails.address.city || 'N/A',
-          state: billingDetails.address.state || 'N/A',
-          postal_code: billingDetails.address.postal_code || '00000',
-          country: billingDetails.address.country || 'US'
-        }
-      };
-
-      console.log('📋 Billing details for Stripe:', billingDetailsForStripe);
-
-      const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        confirmParams: {
-          return_url: `${window.location.origin}/marketplace/payment/success`,
-          payment_method_data: {
-            billing_details: billingDetailsForStripe
-          }
-        },
-        redirect: 'if_required'
-      });
-
-      if (stripeError) {
-        console.error('❌ Stripe payment error:', stripeError);
-        setError(stripeError.message || 'Payment failed. Please try again.');
-        setPaymentStatus('failed');
-        setIsSubmitting(false);
-        return;
-      }
-
-      console.log('✅ Stripe payment successful:', {
+    if (offerData?.type === 'direct_purchase') {
+      confirmationEndpoint = '/marketplace/payments/confirm-payment';
+      confirmationPayload = {
+        orderId: offerData.order?._id,
         paymentIntentId: paymentIntent?.id,
-        status: paymentIntent?.status
-      });
-
-      // Prepare confirmation data with proper validation
-      let confirmationPayload;
-      let confirmationEndpoint;
-
-      if (offerData?.type === 'direct_purchase') {
-        confirmationEndpoint = '/marketplace/payments/confirm-payment';
-        confirmationPayload = {
-          orderId: offerData.order?._id,
-          paymentIntentId: paymentIntent?.id,
-          billingDetails: billingDetailsForStripe
-        };
-      } else {
-        confirmationEndpoint = '/marketplace/offers/confirm-offer-payment';
-        confirmationPayload = {
-          offerId: offerData?.offer?._id || offerData?.offerId,
-          paymentIntentId: paymentIntent?.id,
-          billingDetails: billingDetailsForStripe
-        };
-      }
-
-      console.log('📤 Sending confirmation to server:', {
-        endpoint: confirmationEndpoint,
-        payload: confirmationPayload
-      });
-
-      // Validate required fields
-      if (!confirmationPayload.offerId && !confirmationPayload.orderId) {
-        throw new Error('Missing offerId or orderId for confirmation');
-      }
-
-      if (!confirmationPayload.paymentIntentId) {
-        throw new Error('Missing paymentIntentId for confirmation');
-      }
-
-      // Send confirmation to server
-      const response = await axios.post(
-        `http://localhost:3000${confirmationEndpoint}`,
-        confirmationPayload,
-        { 
-          headers: { 
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          } 
-        }
-      );
-
-      console.log('✅ Server confirmation successful:', response.data);
-      setPaymentStatus('success');
-      
-      // Wait a moment before redirecting to show success state
-      setTimeout(() => {
-        onSuccess();
-      }, 1500);
-
-    } catch (err: any) {
-      console.error('❌ Payment processing error:', {
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status,
-        config: err.config
-      });
-      
-      // Enhanced error message
-      let errorMessage = 'Payment failed. Please try again.';
-      
-      if (err.response?.data?.error) {
-        errorMessage = err.response.data.error;
-      } else if (err.response?.data?.details) {
-        errorMessage = Array.isArray(err.response.data.details) 
-          ? err.response.data.details.join(', ')
-          : err.response.data.details;
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-
-      setError(errorMessage);
-      setPaymentStatus('failed');
-    } finally {
-      setIsSubmitting(false);
+        billingDetails: billingDetailsForStripe
+      };
+    } else {
+      confirmationEndpoint = '/marketplace/offers/confirm-offer-payment';
+      confirmationPayload = {
+        offerId: offerData?.offer?._id || offerData?.offerId,
+        paymentIntentId: paymentIntent?.id,
+        billingDetails: billingDetailsForStripe
+      };
     }
-  };
 
+    console.log('📤 Sending confirmation to server:', {
+      endpoint: confirmationEndpoint,
+      payload: confirmationPayload
+    });
+
+    // Validate required fields
+    if (!confirmationPayload.offerId && !confirmationPayload.orderId) {
+      throw new Error('Missing offerId or orderId for confirmation');
+    }
+
+    if (!confirmationPayload.paymentIntentId) {
+      throw new Error('Missing paymentIntentId for confirmation');
+    }
+
+    // Send confirmation to server
+    const response = await axios.post(
+      `http://localhost:3000${confirmationEndpoint}`,
+      confirmationPayload,
+      { 
+        headers: { 
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        } 
+      }
+    );
+
+    console.log('✅ Server confirmation successful:', response.data);
+    setPaymentStatus('success');
+    
+    // Wait a moment before redirecting to show success state
+    setTimeout(() => {
+      onSuccess();
+    }, 1500);
+
+  } catch (err: any) {
+    console.error('❌ Payment processing error:', {
+      message: err.message,
+      response: err.response?.data,
+      status: err.response?.status,
+      config: err.config
+    });
+    
+    // Enhanced error message
+    let errorMessage = 'Payment failed. Please try again.';
+    
+    if (err.response?.data?.error) {
+      errorMessage = err.response.data.error;
+    } else if (err.response?.data?.details) {
+      errorMessage = Array.isArray(err.response.data.details) 
+        ? err.response.data.details.join(', ')
+        : err.response.data.details;
+    } else if (err.message) {
+      errorMessage = err.message;
+    }
+
+    setError(errorMessage);
+    setPaymentStatus('failed');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
   const handleAddressChange = (event: any) => {
     if (event.complete) {
       const address = event.value.address;
