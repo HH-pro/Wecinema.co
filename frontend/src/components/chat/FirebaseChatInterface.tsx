@@ -63,15 +63,13 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
 
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
-  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [systemMessages, setSystemMessages] = useState<SystemMessage[]>([]);
   const [chatInitialized, setChatInitialized] = useState(false);
   const [initializationError, setInitializationError] = useState<string | null>(null);
   const [chatExists, setChatExists] = useState(false);
   
-  const { messages, loading, error, sendMessage, markAllAsRead, sendTypingStatus } = useFirebaseChat(chatId);
+  const { messages, loading, error, sendMessage, markAllAsRead } = useFirebaseChat(chatId);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const { user: authUser } = useAuth();
@@ -288,22 +286,6 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
     }
   };
 
-  const handleTyping = () => {
-    if (typingTimeout) {
-      clearTimeout(typingTimeout);
-    }
-
-    setIsTyping(true);
-    sendTypingStatus?.(true, currentUser!.id);
-
-    const timeout = setTimeout(() => {
-      setIsTyping(false);
-      sendTypingStatus?.(false, currentUser!.id);
-    }, 1000);
-
-    setTypingTimeout(timeout);
-  };
-
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior });
   };
@@ -335,6 +317,20 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
       fetchSystemMessages();
     }
   }, [orderId, fetchSystemMessages]);
+
+  // Handle View Order button click
+  const handleViewOrder = () => {
+    if (!orderId) {
+      toast.error('Order ID not available');
+      return;
+    }
+
+    // Check if we have a valid orderId
+    console.log('View Order clicked, Order ID:', orderId);
+    
+    // Open order in new tab
+    window.open(`/orders/${orderId}`, '_blank');
+  };
 
   const renderMessageContent = (message: FirebaseMessage | SystemMessage) => {
     if (message.messageType === 'system') {
@@ -397,7 +393,7 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
           {/* Message bubble */}
           <div
             className={`px-3 py-2 rounded-lg ${isSystem
-                ? 'bg-transparent text-gray-400 text-center text-xs shadow-none border-none'
+                ? 'bg-yellow-50 text-yellow-800 border border-yellow-200 text-center text-xs'
                 : isCurrentUser
                 ? 'bg-blue-500 text-white rounded-br-sm'
                 : 'bg-gray-100 text-gray-900 rounded-bl-sm'
@@ -505,20 +501,20 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-gray-900 text-sm">{otherUser?.username || 'User'}</h3>
-              <p className="text-xs text-gray-600">
-                {isTyping ? 'Typing...' : 'Online'}
-              </p>
+              <p className="text-xs text-gray-600">Online</p>
             </div>
           </div>
-          {orderId && (
-            <a
-              href={`/orders/${orderId}`}
+          {orderId ? (
+            <button
+              onClick={handleViewOrder}
               className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors font-medium"
-              target="_blank"
-              rel="noopener noreferrer"
             >
-              Order
-            </a>
+              View Order
+            </button>
+          ) : (
+            <span className="px-2 py-1 text-xs bg-gray-300 text-gray-700 rounded font-medium cursor-not-allowed">
+              No Order
+            </span>
           )}
         </div>
       </div>
@@ -551,6 +547,12 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
             <p className="text-gray-600 text-sm max-w-sm mb-4">
               Say hello to {otherUser?.username || 'your partner'} and discuss your order details.
             </p>
+            {orderId && (
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm text-blue-800 font-medium">Order #{orderId.slice(-6)}</p>
+                <p className="text-xs text-blue-600 mt-1">Click "View Order" button above to see order details</p>
+              </div>
+            )}
           </div>
         ) : (
           <>
@@ -579,10 +581,7 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
           <input
             type="text"
             value={newMessage}
-            onChange={(e) => {
-              setNewMessage(e.target.value);
-              handleTyping();
-            }}
+            onChange={(e) => setNewMessage(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
