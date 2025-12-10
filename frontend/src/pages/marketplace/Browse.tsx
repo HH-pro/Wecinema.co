@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import ListingCard from '../../components/marketplae/ListingCard';
 import MarketplaceLayout from '../../components/Layout';
 import { Listing } from '../../types/marketplace';
-import { FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiCheck, FiMail, FiAlertCircle, FiLoader } from 'react-icons/fi';
+import { FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiCheck, FiMail, FiAlertCircle, FiLoader, FiUser, FiCalendar } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { loadStripe } from '@stripe/stripe-js';
-import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { Elements, PaymentElement, useStripe, useElements, AddressElement } from '@stripe/react-stripe-js';
 import emailjs from '@emailjs/browser';
 
 // Initialize EmailJS with your credentials
@@ -31,6 +31,19 @@ const Browse: React.FC = () => {
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string>('');
+  const [billingDetails, setBillingDetails] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: {
+      line1: '',
+      line2: '',
+      city: '',
+      state: '',
+      postal_code: '',
+      country: 'US'
+    }
+  });
   const navigate = useNavigate();
 
   const [filters, setFilters] = useState({
@@ -96,11 +109,25 @@ const Browse: React.FC = () => {
       if (token) {
         // Get user info from token
         const payload = JSON.parse(atob(token.split('.')[1]));
-        setCurrentUser({
+        const userData = {
           id: payload.userId || payload.id,
           username: payload.username || 'Buyer',
-          email: payload.email
-        });
+          email: payload.email,
+          phone: payload.phone || ''
+        };
+        
+        setCurrentUser(userData);
+        
+        // Set billing details from user data
+        setBillingDetails(prev => ({
+          ...prev,
+          name: payload.username || 'Customer',
+          email: payload.email || '',
+          phone: payload.phone || ''
+        }));
+        
+        // Store in localStorage for payment form
+        localStorage.setItem('currentUser', JSON.stringify(userData));
       }
     } catch (error) {
       console.error('Error fetching current user:', error);
@@ -453,46 +480,12 @@ const Browse: React.FC = () => {
     (listing.tags && listing.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())))
   );
 
-  // Debug component to see payment data
-  const DebugInfo = () => {
-    if (!showPaymentModal) return null;
-    
-    return (
-      <div className="fixed bottom-4 right-4 bg-gray-800 text-white p-4 rounded-lg text-xs max-w-md z-50">
-        <h4 className="font-bold mb-2">Debug Info:</h4>
-        <pre>{JSON.stringify({
-          hasClientSecret: !!clientSecret,
-          offerType: offerData?.type,
-          hasOfferId: !!offerData?.offer?._id,
-          hasOrderId: !!offerData?.order?._id,
-          offerId: offerData?.offer?._id,
-          orderId: offerData?.order?._id,
-          amount: offerData?.amount
-        }, null, 2)}</pre>
-      </div>
-    );
-  };
-
-  // Render error banner if there's an error
-  const renderErrorBanner = () => {
-    if (!error) return null;
-
-    return (
-      <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-        <div className="flex items-center gap-3">
-          <FiAlertCircle className="text-red-500 flex-shrink-0" size={20} />
-          <div className="flex-1">
-            <p className="text-red-800 text-sm font-medium">{error}</p>
-          </div>
-          <button
-            onClick={() => setError('')}
-            className="text-red-500 hover:text-red-700 p-1"
-          >
-            <FiX size={16} />
-          </button>
-        </div>
-      </div>
-    );
+  // Handle billing details change
+  const handleBillingDetailsChange = (details: any) => {
+    setBillingDetails(prev => ({
+      ...prev,
+      ...details
+    }));
   };
 
   if (loading) {
@@ -513,7 +506,22 @@ const Browse: React.FC = () => {
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Error Banner */}
-          {renderErrorBanner()}
+          {error && (
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <FiAlertCircle className="text-red-500 flex-shrink-0" size={20} />
+                <div className="flex-1">
+                  <p className="text-red-800 text-sm font-medium">{error}</p>
+                </div>
+                <button
+                  onClick={() => setError('')}
+                  className="text-red-500 hover:text-red-700 p-1"
+                >
+                  <FiX size={16} />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Header Section */}
           <div className="mb-8">
@@ -866,7 +874,7 @@ const Browse: React.FC = () => {
       {/* Payment Modal - FIXED VERSION */}
       {showPaymentModal && clientSecret && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-2 sm:p-4 overflow-y-auto">
-          <div className="w-full max-w-md sm:max-w-lg">
+          <div className="w-full max-w-md sm:max-w-lg mx-4">
             <div className="bg-white rounded-lg shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
               {/* Header */}
               <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between">
@@ -954,6 +962,9 @@ const Browse: React.FC = () => {
                         onClose={handlePaymentClose}
                         paymentStatus={paymentStatus}
                         setPaymentStatus={setPaymentStatus}
+                        billingDetails={billingDetails}
+                        onBillingDetailsChange={handleBillingDetailsChange}
+                        currentUser={currentUser}
                       />
                     </Elements>
                   </div>
@@ -978,19 +989,26 @@ const Browse: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Debug Info */}
-      <DebugInfo />
     </MarketplaceLayout>
   );
 };
 
-// Payment Form Component with enhanced debugging and error handling
-const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentStatus }: any) => {
+// Payment Form Component with proper billing details handling
+const PaymentForm = ({ 
+  offerData, 
+  onSuccess, 
+  onClose, 
+  paymentStatus, 
+  setPaymentStatus,
+  billingDetails,
+  onBillingDetailsChange,
+  currentUser
+}: any) => {
   const stripe = useStripe();
   const elements = useElements();
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showBillingForm, setShowBillingForm] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -1007,11 +1025,50 @@ const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentS
     try {
       console.log('🔄 Confirming payment...');
       console.log('📦 Offer Data for confirmation:', offerData);
-      
+
+      // Get payment element
+      const paymentElement = elements.getElement(PaymentElement);
+      if (!paymentElement) {
+        throw new Error('Payment element not found');
+      }
+
+      // Get user info
+      const userInfo = {
+        name: currentUser?.username || billingDetails.name || 'Customer',
+        email: currentUser?.email || billingDetails.email || '',
+        phone: billingDetails.phone || ''
+      };
+
+      // Submit payment element first
+      const { error: submitError } = await paymentElement.submit();
+      if (submitError) {
+        throw submitError;
+      }
+
+      // Prepare billing details for confirmPayment
+      const billingDetailsForStripe = {
+        name: userInfo.name,
+        email: userInfo.email || undefined,
+        phone: userInfo.phone || undefined,
+        address: {
+          line1: billingDetails.address.line1 || 'N/A',
+          line2: billingDetails.address.line2 || undefined,
+          city: billingDetails.address.city || 'N/A',
+          state: billingDetails.address.state || 'N/A',
+          postal_code: billingDetails.address.postal_code || '00000',
+          country: billingDetails.address.country || 'US'
+        }
+      };
+
+      console.log('📋 Billing details for Stripe:', billingDetailsForStripe);
+
       const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
           return_url: `${window.location.origin}/marketplace/payment/success`,
+          payment_method_data: {
+            billing_details: billingDetailsForStripe
+          }
         },
         redirect: 'if_required'
       });
@@ -1037,13 +1094,15 @@ const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentS
         confirmationEndpoint = '/marketplace/payments/confirm-payment';
         confirmationPayload = {
           orderId: offerData.order?._id,
-          paymentIntentId: paymentIntent?.id
+          paymentIntentId: paymentIntent?.id,
+          billingDetails: billingDetailsForStripe
         };
       } else {
         confirmationEndpoint = '/marketplace/offers/confirm-offer-payment';
         confirmationPayload = {
           offerId: offerData?.offer?._id || offerData?.offerId,
-          paymentIntentId: paymentIntent?.id
+          paymentIntentId: paymentIntent?.id,
+          billingDetails: billingDetailsForStripe
         };
       }
 
@@ -1109,14 +1168,145 @@ const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentS
     }
   };
 
+  const handleAddressChange = (event: any) => {
+    if (event.complete) {
+      const address = event.value.address;
+      onBillingDetailsChange({
+        address: {
+          line1: address.line1 || '',
+          line2: address.line2 || '',
+          city: address.city || '',
+          state: address.state || '',
+          postal_code: address.postal_code || '',
+          country: address.country || 'US'
+        }
+      });
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Payment Element - Made more compact */}
+      {/* User Information */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <div className="mb-3">
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-semibold text-gray-800">Payment Details</label>
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+            <FiUser size={14} />
+            Billing Information
+          </h4>
+          <button
+            type="button"
+            onClick={() => setShowBillingForm(!showBillingForm)}
+            className="text-xs text-yellow-600 hover:text-yellow-500"
+          >
+            {showBillingForm ? 'Hide' : 'Edit'}
+          </button>
+        </div>
+        
+        {showBillingForm ? (
+          <div className="space-y-4">
+            {/* Name Input */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Full Name
+              </label>
+              <input
+                type="text"
+                value={billingDetails.name || currentUser?.username || ''}
+                onChange={(e) => onBillingDetailsChange({ name: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                placeholder="Enter your full name"
+                required
+              />
+            </div>
+
+            {/* Email Input */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Email Address
+              </label>
+              <input
+                type="email"
+                value={billingDetails.email || currentUser?.email || ''}
+                onChange={(e) => onBillingDetailsChange({ email: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                placeholder="Enter your email"
+                required
+              />
+            </div>
+
+            {/* Phone Input (Optional) */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Phone Number (Optional)
+              </label>
+              <input
+                type="tel"
+                value={billingDetails.phone || ''}
+                onChange={(e) => onBillingDetailsChange({ phone: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                placeholder="Enter your phone number"
+              />
+            </div>
+
+            {/* Address Element */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Billing Address
+              </label>
+              <div className="border border-gray-300 rounded-md overflow-hidden">
+                <AddressElement 
+                  options={{
+                    mode: 'billing',
+                    allowedCountries: ['US', 'CA', 'GB', 'AU', 'IN'],
+                    fields: {
+                      phone: 'always'
+                    },
+                    validation: {
+                      phone: {
+                        required: 'never'
+                      }
+                    },
+                    defaultValues: {
+                      name: billingDetails.name || currentUser?.username || '',
+                      phone: billingDetails.phone || '',
+                      address: {
+                        line1: billingDetails.address.line1 || '',
+                        line2: billingDetails.address.line2 || '',
+                        city: billingDetails.address.city || '',
+                        state: billingDetails.address.state || '',
+                        postal_code: billingDetails.address.postal_code || '',
+                        country: billingDetails.address.country || 'US'
+                      }
+                    }
+                  }}
+                  onChange={handleAddressChange}
+                />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-sm text-gray-600">
+            <div className="flex items-center gap-2 mb-2">
+              <FiUser size={14} />
+              <span>{billingDetails.name || currentUser?.username || 'Not provided'}</span>
+            </div>
             <div className="flex items-center gap-2">
+              <FiMail size={14} />
+              <span>{billingDetails.email || currentUser?.email || 'Not provided'}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Payment Element */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <label className="block text-sm font-semibold text-gray-800 flex items-center gap-2">
+              <FiCreditCard size={14} />
+              Payment Details
+            </label>
+            <div className="flex items-center gap-1">
               <div className="w-6 h-4 bg-blue-500 rounded-sm"></div>
               <div className="w-6 h-4 bg-red-500 rounded-sm"></div>
               <div className="w-6 h-4 bg-yellow-500 rounded-sm"></div>
@@ -1127,17 +1317,17 @@ const PaymentForm = ({ offerData, onSuccess, onClose, paymentStatus, setPaymentS
               options={{
                 layout: 'tabs',
                 wallets: {
-                  applePay: 'never',
-                  googlePay: 'never'
+                  applePay: 'auto',
+                  googlePay: 'auto'
                 },
                 fields: {
                   billingDetails: {
-                    name: 'never',
-                    email: 'never',
-                    phone: 'never',
+                    name: 'auto',
+                    email: 'auto',
+                    phone: 'auto',
                     address: {
-                      country: 'never',
-                      postalCode: 'never'
+                      country: 'auto',
+                      postalCode: 'auto'
                     }
                   }
                 }
