@@ -1,5 +1,6 @@
-// utils/emailService.js
 const nodemailer = require('nodemailer');
+require('dotenv').config(); // Add this line to load .env variables
+
 
 class EmailService {
   constructor() {
