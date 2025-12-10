@@ -1,3 +1,4 @@
+// src/pages/seller/SellerDashboard.tsx
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import { getSellerOrders, getReceivedOffers, checkStripeStatus, createStripeAccount } from '../../api';
@@ -10,6 +11,7 @@ import StripeAccountStatus from '../../components/marketplae/seller/StripeAccoun
 import StatCard from '../../components/marketplae/seller/StatCard';
 import UserListings from '../../components/marketplae/seller/UserListings';
 import OrderReceivedPage from '../../components/marketplae/seller/OrderReceivedPage';
+import OrderDetailsModal from '../../components/marketplae/seller/OrderDetailsModal';
 
 const API_BASE_URL = 'http://localhost:3000';
 
@@ -88,6 +90,8 @@ const SellerDashboard: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [showOrderModal, setShowOrderModal] = useState(false);
 
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('en-IN', {
@@ -282,7 +286,6 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // Rest of the functions remain same...
   const checkStripeAccountStatus = async () => {
     try {
       console.log('🔄 Checking Stripe account status...');
@@ -373,6 +376,23 @@ const SellerDashboard: React.FC = () => {
 
   const handleViewListingDetails = (listingId: string) => {
     window.location.href = `/listings/${listingId}`;
+  };
+
+  // Function to handle order view
+  const handleViewOrderDetails = (orderId: string) => {
+    setSelectedOrderId(orderId);
+    setShowOrderModal(true);
+  };
+
+  // Function to handle order update from modal
+  const handleOrderUpdateFromModal = (orderId: string, newStatus: string) => {
+    // Update local orders state
+    setOrders(prev => prev.map(order => 
+      order._id === orderId ? { ...order, status: newStatus } : order
+    ));
+    
+    // Call existing update function
+    handleOrderUpdate(orderId, newStatus);
   };
 
   // ✅ IMPROVED: Accept offer with better error handling
@@ -666,6 +686,19 @@ const SellerDashboard: React.FC = () => {
             />
           )}
 
+          {/* Order Details Modal */}
+          {selectedOrderId && (
+            <OrderDetailsModal
+              orderId={selectedOrderId}
+              isOpen={showOrderModal}
+              onClose={() => {
+                setShowOrderModal(false);
+                setSelectedOrderId(null);
+              }}
+              onOrderUpdate={handleOrderUpdateFromModal}
+            />
+          )}
+
           {/* Tab Content */}
           {activeTab === 'overview' && (
             <div className="space-y-6">
@@ -738,7 +771,11 @@ const SellerDashboard: React.FC = () => {
                       ) : (
                         <div className="space-y-4">
                           {orders.slice(0, 5).map(order => (
-                            <div key={order._id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
+                            <div 
+                              key={order._id} 
+                              className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-300 hover:bg-blue-50 transition-colors cursor-pointer"
+                              onClick={() => handleViewOrderDetails(order._id)}
+                            >
                               <div className="flex items-center space-x-4">
                                 <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center border border-blue-200">
                                   <span className="text-sm font-medium text-blue-600">
@@ -975,6 +1012,7 @@ const SellerDashboard: React.FC = () => {
             <OrderReceivedPage 
               orders={orders}
               onOrderUpdate={handleOrderUpdate}
+              onViewOrderDetails={handleViewOrderDetails}
             />
           )}
         </div>
