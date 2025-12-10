@@ -1,8 +1,9 @@
 // src/components/marketplae/seller/OrderDetailsModal.tsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { api } from '../../../api';
-const API_BASE_URL = api.API_BASE_URL;
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api';
+
 interface OrderDetails {
   _id: string;
   status: string;
