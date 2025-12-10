@@ -24,22 +24,6 @@ interface Order {
   createdAt: string;
 }
 
-interface Message {
-  _id: string;
-  senderId: string;
-  receiverId: string;
-  message: string;
-  read: boolean;
-  createdAt: string;
-  metadata?: {
-    orderId?: string;
-    chatLink?: string;
-    firebaseChatId?: string;
-    isSystemMessage?: boolean;
-    notificationType?: string;
-  };
-}
-
 const Messages: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -56,6 +40,7 @@ const Messages: React.FC = () => {
   const isInitialMount = useRef(true);
   const hasProcessedUrlChat = useRef(false);
   const lastChatIdRef = useRef<string | null>(null);
+  const lastChatsLengthRef = useRef<number>(0);
 
   // Fetch current user
   useEffect(() => {
@@ -116,8 +101,8 @@ const Messages: React.FC = () => {
     fetchCurrentUser();
   }, [authUser, navigate]);
 
-  // Fetch user chats
-  const fetchChats = useCallback(async () => {
+  // Fetch user chats - WITHOUT AUTO-RELOADING SELECTED CHAT
+  const fetchChats = useCallback(async (showToast = false) => {
     if (!currentUser?.id) return;
 
     try {
@@ -161,7 +146,22 @@ const Messages: React.FC = () => {
           updatedAt: chat.updatedAt || chat.lastMessageAt || new Date().toISOString()
         }));
         
-        setChats(transformedChats);
+        // Only update if chats actually changed
+        const chatsChanged = JSON.stringify(transformedChats) !== JSON.stringify(chats);
+        if (chatsChanged) {
+          setChats(transformedChats);
+          lastChatsLengthRef.current = transformedChats.length;
+          
+          // Don't auto-select chat when chats update
+          // Only select chat if it's a new chat and user hasn't manually selected one
+          if (selectedChat && transformedChats.length > lastChatsLengthRef.current) {
+            // Check if our selected chat still exists
+            const chatStillExists = transformedChats.some(c => c.firebaseChatId === selectedChat.firebaseChatId);
+            if (!chatStillExists) {
+              setSelectedChat(null);
+            }
+          }
+        }
         
         const totalUnread = transformedChats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0);
         setUnreadCount(totalUnread);
@@ -171,11 +171,16 @@ const Messages: React.FC = () => {
         } else {
           document.title = 'Messages - Marketplace';
         }
-      } else {
-        console.error('Failed to fetch chats');
+
+        if (showToast) {
+          toast.success('Conversations updated');
+        }
       }
     } catch (error) {
       console.error('Error fetching chats:', error);
+      if (showToast) {
+        toast.error('Failed to refresh conversations');
+      }
     } finally {
       setChatsLoading(false);
       if (isInitialMount.current) {
@@ -183,24 +188,24 @@ const Messages: React.FC = () => {
         isInitialMount.current = false;
       }
     }
-  }, [currentUser?.id]);
+  }, [currentUser?.id, chats, selectedChat]);
 
-  // Poll for new chats - ONLY REFRESH CHAT LIST, NOT RESELECT CHAT
+  // Initial fetch only - NO POLLING
   useEffect(() => {
     if (!currentUser?.id) return;
 
-    // Initial fetch
-    fetchChats();
+    // Initial fetch only
+    fetchChats(false);
 
-    // Set up polling for real-time updates
-    pollIntervalRef.current = setInterval(fetchChats, 30000);
+    // NO POLLING - Chat list won't auto-refresh
+    // pollIntervalRef.current = setInterval(() => fetchChats(false), 30000);
 
     return () => {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
       }
     };
-  }, [currentUser?.id, fetchChats]);
+  }, [currentUser?.id]);
 
   // Handle URL parameters and auto-select chat (ONLY ONCE)
   useEffect(() => {
@@ -265,34 +270,13 @@ const Messages: React.FC = () => {
   }, [selectedChat, setSearchParams]);
 
   const handleSendMessage = async (message: string) => {
-    if (!selectedChat || !currentUser) return;
-    
-    try {
-      if (selectedChat.order?._id) {
-        const token = localStorage.getItem('token');
-        await fetch('http://localhost:3000/marketplace/chat/log-message', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            orderId: selectedChat.order._id,
-            message: message,
-            firebaseChatId: selectedChat.firebaseChatId
-          })
-        });
-      }
-      
-      toast.success('Message sent!');
-    } catch (error) {
-      console.error('Error logging message:', error);
-    }
+    // REMOVED BACKEND LOGGING - Only Firebase will be used
+    toast.success('Message sent!');
   };
 
   const handleRefreshChats = () => {
-    fetchChats();
-    toast.success('Conversations refreshed');
+    // Manual refresh only
+    fetchChats(true);
   };
 
   // Get first letter of name for avatar
