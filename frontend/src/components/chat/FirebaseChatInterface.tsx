@@ -397,10 +397,8 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
           {/* Message bubble */}
           <div
             className={`px-3 py-2 rounded-lg ${isSystem
-                ? 'bg-transparent text-gray-400 text-center text-xs shadow-none border-none'
-                : isCurrentUser
-                ? 'bg-blue-500 text-white rounded-br-sm'
-                : 'bg-gray-100 text-gray-900 rounded-bl-sm'
+               
+                
               }`}
           >
             {renderMessageContent(message)}
