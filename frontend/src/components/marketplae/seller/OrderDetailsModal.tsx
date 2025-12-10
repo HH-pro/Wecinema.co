@@ -212,7 +212,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[55vh] overflow-hidden">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[55vh] overflow-hidden">
         {/* Modal Header */}
         <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
           <div className="flex items-center space-x-3">
