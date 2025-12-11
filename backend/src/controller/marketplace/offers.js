@@ -1,3 +1,4 @@
+// routes/offerRoutes.js - Updated Version
 const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
@@ -8,11 +9,7 @@ const Chat = require("../../models/marketplace/Chat");
 const Message = require("../../models/marketplace/messages");
 const { authenticateMiddleware } = require("../../utils");
 const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
-// routes/offerRoutes.js
-// Email service using Gmail
 const emailService = require('../../../services/emailService');
-
-// Firebase Admin for real-time chat
 const admin = require('firebase-admin');
 
 // Initialize Firebase if not already initialized
@@ -330,39 +327,10 @@ const sendOrderDetailsWithChatLink = async (order, offer, buyer, seller) => {
   }
 };
 
-// ✅ PROFESSIONAL EMAIL NOTIFICATION FUNCTION USING GMAIL
-async function sendProfessionalEmailNotifications(order, offer, buyer, seller, chatLink) {
-  try {
-    console.log("📧 Preparing professional email notifications via Gmail...");
-
-    // Seller ko professional email bhejen
-    try {
-      await emailService.sendOrderConfirmationToSeller(order, buyer, seller, chatLink);
-      console.log("✅ Professional email sent to seller:", seller.email);
-    } catch (sellerEmailError) {
-      console.error("❌ Failed to send email to seller:", sellerEmailError.message);
-    }
-
-    // Buyer ko professional email bhejen
-    try {
-      await emailService.sendOrderConfirmationToBuyer(order, buyer, seller, chatLink);
-      console.log("✅ Professional email sent to buyer:", buyer.email);
-    } catch (buyerEmailError) {
-      console.error("❌ Failed to send email to buyer:", buyerEmailError.message);
-    }
-
-    console.log("📧 Professional email notifications completed");
-    return true;
-
-  } catch (error) {
-    console.error('❌ Professional email notification error:', error);
-    return false;
-  }
-}
-
 // ============================
 // ROUTES START HERE
 // ============================
+
 // ✅ CONFIRM OFFER PAYMENT WITH PROFESSIONAL EMAILS
 router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) => {
   console.log("🔍 Confirm Offer Payment Request DETAILS:", {
@@ -530,19 +498,19 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     await order.save({ session });
     console.log("✅ Order created:", order._id);
 
-    // ✅ UPDATE LISTING STATUS
+    // ✅ UPDATE LISTING - KEEP ACTIVE, ONLY UPDATE ORDER COUNT
     await MarketplaceListing.findByIdAndUpdate(
       offer.listingId._id, 
       { 
-        status: 'reserved',
-        reservedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+        // DO NOT change status - keep it active
         lastOrderAt: new Date(),
         $inc: { totalOrders: 1 }
+        // Do NOT set reservedUntil or change status
       },
       { session }
     );
 
-    console.log("✅ Listing status updated to reserved");
+    console.log("✅ Listing order count updated, listing remains active");
 
     // ✅ COMMIT TRANSACTION FIRST
     await session.commitTransaction();
@@ -563,17 +531,16 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       
       console.log("✅ Order notification messages sent");
       
-      // ✅ SEND PROFESSIONAL GMAIL EMAILS IN BACKGROUND (NON-BLOCKING)
-      // ✅ IMPORTANT: यहां buyer और seller दोनों को email भेजा जा रहा है
+      // ✅ SEND PROFESSIONAL GMAIL EMAILS
       try {
         console.log("📧 Starting professional email notifications...");
         
-        // Seller को professional email भेजें
+        // Send email to seller
         console.log(`📧 Sending email to seller: ${seller.email}`);
         await emailService.sendOrderConfirmationToSeller(order, buyer, seller, chatLink);
         console.log("✅ Professional email sent to seller:", seller.email);
         
-        // Buyer को professional email भेजें
+        // Send email to buyer
         console.log(`📧 Sending email to buyer: ${buyer.email}`);
         await emailService.sendOrderConfirmationToBuyer(order, buyer, seller, chatLink);
         console.log("✅ Professional email sent to buyer:", buyer.email);
@@ -650,6 +617,7 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     }
   }
 });
+
 // ✅ MAKE OFFER WITH IMMEDIATE PAYMENT
 router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), async (req, res) => {
   let session;
@@ -783,6 +751,9 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
     await offer.save({ session });
 
     console.log("✅ Offer saved to database:", offer._id);
+
+    // ✅ DO NOT RESERVE LISTING - KEEP IT ACTIVE
+    // Listing remains active so other users can see it
 
     // ✅ COMMIT TRANSACTION
     await session.commitTransaction();
@@ -1054,13 +1025,13 @@ router.put("/accept-offer/:id", authenticateMiddleware, logRequest("ACCEPT_OFFER
       await acceptanceMessage.save();
     }
 
-    // ✅ MARK LISTING AS SOLD
+    // ✅ MARK LISTING AS RESERVED WHEN SELLER ACCEPTS
     await MarketplaceListing.findByIdAndUpdate(
       offer.listingId._id, 
       { 
-        status: 'sold',
-        soldAt: new Date(),
-        reservedUntil: null
+        status: 'reserved',  // Only reserve when seller accepts
+        reservedUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        soldAt: new Date()
       },
       { session }
     );
@@ -1217,7 +1188,7 @@ router.put("/reject-offer/:id", authenticateMiddleware, logRequest("REJECT_OFFER
       }
     }
 
-    // ✅ MAKE LISTING ACTIVE AGAIN
+    // ✅ MAKE LISTING ACTIVE AGAIN IF IT WAS RESERVED
     await MarketplaceListing.findByIdAndUpdate(
       offer.listingId._id, 
       { 
@@ -1340,7 +1311,7 @@ router.put("/cancel-offer/:id", authenticateMiddleware, logRequest("CANCEL_OFFER
       }
     }
 
-    // ✅ MAKE LISTING ACTIVE AGAIN
+    // ✅ MAKE LISTING ACTIVE AGAIN IF IT WAS RESERVED
     await MarketplaceListing.findByIdAndUpdate(
       offer.listingId._id, 
       { 
@@ -1476,12 +1447,16 @@ router.post("/create-direct-payment", authenticateMiddleware, logRequest("DIRECT
 
     await chat.save({ session });
 
-    // Reserve listing
+    // ✅ DO NOT RESERVE LISTING - KEEP IT ACTIVE
+    // Listing remains active even after direct purchase initiation
+    // Only update order count
     await MarketplaceListing.findByIdAndUpdate(
       listingId,
       { 
-        status: 'reserved',
-        reservedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000)
+        // status: 'active' remains unchanged
+        lastOrderAt: new Date(),
+        $inc: { totalOrders: 1 }
+        // Do NOT set reservedUntil
       },
       { session }
     );
