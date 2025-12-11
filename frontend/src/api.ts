@@ -1753,7 +1753,6 @@ export const requestRevision = orderAPI.requestRevision;
 export const completeOrder = orderAPI.completeOrder;
 export const getOrderTimeline = orderAPI.getOrderTimeline;
 export const cancelOrder = orderAPI.cancelOrder;
-export const getOrderMessages = orderAPI.getOrderMessages;
 export const sendOrderMessage = orderAPI.sendOrderMessage;
 export const getOrderStats = orderAPI.getOrderStats;
 export const downloadInvoice = orderAPI.downloadInvoice;
@@ -1783,7 +1782,6 @@ export const getBuyerStats = dashboardAPI.getBuyerStats;
 export const getSellerDashboard = dashboardAPI.getSellerDashboard;
 export const getBuyerDashboard = dashboardAPI.getBuyerDashboard;
 export const getRevenueAnalytics = dashboardAPI.getRevenueAnalytics;
-export const getPerformanceMetrics = dashboardAPI.getPerformanceMetrics;
 
 // Monitoring exports
 export const logError = monitoringAPI.logError;
