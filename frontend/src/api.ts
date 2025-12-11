@@ -14,7 +14,7 @@ const api = axios.create({
     "Content-Type": "application/json",
   },
 });
-  
+
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
@@ -46,10 +46,11 @@ api.interceptors.response.use(
 // ========================
 
 // Interface for API response
-interface ApiResponse {
+interface ApiResponse<T = any> {
   message?: string;
   error?: string;
-  data?: any;
+  data?: T;
+  success?: boolean;
 }
 
 // Handle successful API responses
@@ -111,14 +112,15 @@ export const getRequest = async <T>(
 ): Promise<T> => {
   try {
     setLoading?.(true);
-    const response = await api.get<T>(url);
-    return response.data;
+    const response = await api.get<ApiResponse<T>>(url);
+    return response.data.data || response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      throw new Error(
-        `API Error: ${error.response?.status} - ${error.response?.data?.error || 'Unknown error'}`
-      );
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Unknown error';
+      toast.error(errorMessage);
+      throw new Error(`API Error: ${error.response?.status} - ${errorMessage}`);
     }
+    toast.error('Network error occurred');
     throw new Error('Network error occurred');
   } finally {
     setLoading?.(false);
@@ -197,7 +199,7 @@ export const checkStripeStatus = async (): Promise<{
     const response = await api.get('/marketplace/stripe/account-status');
     console.log('✅ Stripe status API response:', response.data);
     
-    if (response.data.connected) {
+    if (response.data.success && response.data.connected) {
       return {
         connected: true,
         status: response.data.chargesEnabled ? 'active' : 'pending',
@@ -214,7 +216,14 @@ export const checkStripeStatus = async (): Promise<{
     };
   } catch (error: any) {
     console.error('❌ Error checking Stripe status:', error);
-    console.log('Error details:', error.response?.data);
+    
+    // Specific error handling
+    if (error.response?.status === 404) {
+      return {
+        connected: false,
+        status: 'not_connected'
+      };
+    }
     
     return {
       connected: false,
@@ -851,7 +860,7 @@ export const orderAPI = {
     putRequest(`/marketplace/orders/${orderId}/cancel`, { reason }, setLoading, "Order cancelled"),
 
   // Get order messages/chat
-  getOrderMessages: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+  getOrderMessagesForOrder: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
     getRequest(`/marketplace/orders/${orderId}/messages`, setLoading),
 
   // Send message in order chat
@@ -1087,7 +1096,7 @@ export const marketplaceAPI = {
     complete: orderAPI.completeOrder,
     getTimeline: orderAPI.getOrderTimeline,
     cancel: orderAPI.cancelOrder,
-    getMessages: orderAPI.getOrderMessages,
+    getMessages: orderAPI.getOrderMessagesForOrder,
     sendMessage: orderAPI.sendOrderMessage,
     getStats: orderAPI.getOrderStats,
     downloadInvoice: orderAPI.downloadInvoice
@@ -1165,7 +1174,7 @@ export const monitoringAPI = {
     setLoading: React.Dispatch<React.SetStateAction<boolean>>
   ) => getRequest(`/api/monitoring/errors?${new URLSearchParams(params as any)}`, setLoading),
 
-  getPerformanceMetrics: (
+  getPerformanceData: (
     timeRange: string = "24h",
     setLoading: React.Dispatch<React.SetStateAction<boolean>>
   ) => getRequest(`/api/monitoring/performance?range=${timeRange}`, setLoading),
@@ -1753,6 +1762,7 @@ export const requestRevision = orderAPI.requestRevision;
 export const completeOrder = orderAPI.completeOrder;
 export const getOrderTimeline = orderAPI.getOrderTimeline;
 export const cancelOrder = orderAPI.cancelOrder;
+export const getOrderMessagesForOrder = orderAPI.getOrderMessagesForOrder;
 export const sendOrderMessage = orderAPI.sendOrderMessage;
 export const getOrderStats = orderAPI.getOrderStats;
 export const downloadInvoice = orderAPI.downloadInvoice;
@@ -1782,11 +1792,12 @@ export const getBuyerStats = dashboardAPI.getBuyerStats;
 export const getSellerDashboard = dashboardAPI.getSellerDashboard;
 export const getBuyerDashboard = dashboardAPI.getBuyerDashboard;
 export const getRevenueAnalytics = dashboardAPI.getRevenueAnalytics;
+export const getPerformanceMetrics = dashboardAPI.getPerformanceMetrics;
 
 // Monitoring exports
 export const logError = monitoringAPI.logError;
 export const getErrorLogs = monitoringAPI.getErrorLogs;
-export const getPerformanceMetrics = monitoringAPI.getPerformanceMetrics;
+export const getPerformanceData = monitoringAPI.getPerformanceData;
 export const getServerStatus = monitoringAPI.getServerStatus;
 export const getUptimeStats = monitoringAPI.getUptimeStats;
 
@@ -1808,6 +1819,6 @@ export const removeBookmark = bookmarkAPI.removeBookmark;
 export const getBookmarks = bookmarkAPI.getBookmarks;
 export const getVideoHistory = bookmarkAPI.getVideoHistory;
 
-// Stripe exports
+
 
 export default api;
