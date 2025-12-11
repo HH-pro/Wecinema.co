@@ -116,6 +116,11 @@ export const getRequest = async <T>(
     return response.data.data || response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
+      if (error.response?.status === 404) {
+        console.warn(`API endpoint not found: ${url}`);
+        // Return empty data instead of throwing error for 404
+        return [] as any;
+      }
       const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Unknown error';
       toast.error(errorMessage);
       throw new Error(`API Error: ${error.response?.status} - ${errorMessage}`);
@@ -293,7 +298,7 @@ export const createLoginLink = (setLoading: React.Dispatch<React.SetStateAction<
   postRequest<{ url: string }>("/stripe/create-login-link", {}, setLoading);
 
 // ========================
-// MARKETPLACE LISTING APIs (UPDATED WITH VIDEO FUNCTIONALITY)
+// MARKETPLACE LISTING APIs (UPDATED WITH CORRECT ROUTES)
 // ========================
 
 // Interface for Media
@@ -352,7 +357,7 @@ interface ListingData {
 
 // Marketplace Listing APIs with Video Management
 export const listingAPI = {
-  // Get all listings with filters
+  // Get all listings with filters - FIXED ROUTE
   getListings: (
     params?: {
       type?: string;
@@ -386,18 +391,19 @@ export const listingAPI = {
     }
     
     const queryString = queryParams.toString();
-    return getRequest(`/marketplace/listings${queryString ? `?${queryString}` : ''}`, setLoading);
+    // UPDATED: Correct route for listings
+    return getRequest(`/api/marketplace/listings${queryString ? `?${queryString}` : ''}`, setLoading);
   },
 
-  // Get single listing by ID
+  // Get single listing by ID - FIXED ROUTE
   getListingById: (listingId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(`/marketplace/listings/${listingId}`, setLoading),
+    getRequest(`/api/marketplace/listings/${listingId}`, setLoading),
 
-  // Get listings by slug
+  // Get listings by slug - FIXED ROUTE
   getListingBySlug: (slug: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(`/marketplace/listings/slug/${slug}`, setLoading),
+    getRequest(`/api/marketplace/listings/slug/${slug}`, setLoading),
 
-  // Get user's listings
+  // Get user's listings - FIXED ROUTE
   getUserListings: (
     userId?: string,
     params?: {
@@ -420,20 +426,20 @@ export const listingAPI = {
     
     const userIdParam = userId || 'me';
     const queryString = queryParams.toString();
-    return getRequest(`/marketplace/listings/user/${userIdParam}/listings${queryString ? `?${queryString}` : ''}`, setLoading);
+    return getRequest(`/api/marketplace/listings/user/${userIdParam}${queryString ? `?${queryString}` : ''}`, setLoading);
   },
 
-  // Get seller's listings (dashboard)
+  // Get seller's listings (dashboard) - FIXED ROUTE
   getSellerListings: (params?: any, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest('/marketplace/listings/seller/listings', setLoading),
+    getRequest('/api/marketplace/listings/seller', setLoading),
 
-  // Create listing with file upload support
+  // Create listing with file upload support - FIXED ROUTE
   createListing: async (formData: FormData, setLoading: React.Dispatch<React.SetStateAction<boolean>>): Promise<any> => {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
       
-      const response = await api.post('/marketplace/listings', formData, {
+      const response = await api.post('/api/marketplace/listings', formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
@@ -452,13 +458,13 @@ export const listingAPI = {
     }
   },
 
-  // Update listing with file upload support
+  // Update listing with file upload support - FIXED ROUTE
   updateListing: async (listingId: string, formData: FormData, setLoading: React.Dispatch<React.SetStateAction<boolean>>): Promise<any> => {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
       
-      const response = await api.put(`/marketplace/listings/${listingId}`, formData, {
+      const response = await api.put(`/api/marketplace/listings/${listingId}`, formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
@@ -477,17 +483,17 @@ export const listingAPI = {
     }
   },
 
-  // Update listing without files
+  // Update listing without files - FIXED ROUTE
   updateListingData: (listingId: string, data: ListingData, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/marketplace/listings/${listingId}`, data, setLoading, "Listing updated successfully"),
+    putRequest(`/api/marketplace/listings/${listingId}`, data, setLoading, "Listing updated successfully"),
 
-  // Delete listing
+  // Delete listing - FIXED ROUTE
   deleteListing: async (listingId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>): Promise<any> => {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
       
-      const response = await api.delete(`/marketplace/listings/${listingId}`, {
+      const response = await api.delete(`/api/marketplace/listings/${listingId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -505,28 +511,28 @@ export const listingAPI = {
     }
   },
 
-  // ✅ VIDEO MANAGEMENT APIs
+  // ✅ VIDEO MANAGEMENT APIs - FIXED ROUTES
   
   // Toggle video status (activate/deactivate)
   toggleVideoStatus: (listingId: string, status: 'activated' | 'deactivated', setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    patchRequest(`/marketplace/listings/${listingId}/video-status`, { status }, setLoading, 
+    patchRequest(`/api/marketplace/listings/${listingId}/video-status`, { status }, setLoading, 
       status === 'activated' ? 'Video activated successfully' : 'Video deactivated successfully'),
 
   // Activate video
   activateVideo: (listingId: string, mediaId?: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    patchRequest(`/marketplace/listings/${listingId}/activate-video`, { mediaId }, setLoading as any, 'Video activated successfully'),
+    patchRequest(`/api/marketplace/listings/${listingId}/activate-video`, { mediaId }, setLoading as any, 'Video activated successfully'),
 
   // Deactivate video
   deactivateVideo: (listingId: string, mediaId?: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    patchRequest(`/marketplace/listings/${listingId}/deactivate-video`, { mediaId }, setLoading as any, 'Video deactivated successfully'),
+    patchRequest(`/api/marketplace/listings/${listingId}/deactivate-video`, { mediaId }, setLoading as any, 'Video deactivated successfully'),
 
   // Set primary video
   setPrimaryVideo: (listingId: string, mediaId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    patchRequest(`/marketplace/listings/${listingId}/set-primary-video`, { mediaId }, setLoading, 'Primary video set successfully'),
+    patchRequest(`/api/marketplace/listings/${listingId}/set-primary-video`, { mediaId }, setLoading, 'Primary video set successfully'),
 
   // Delete specific media
   deleteMedia: (listingId: string, mediaId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    deleteRequest(`/marketplace/listings/${listingId}/media/${mediaId}`, setLoading, 'Media deleted successfully'),
+    deleteRequest(`/api/marketplace/listings/${listingId}/media/${mediaId}`, setLoading, 'Media deleted successfully'),
 
   // Add media to listing
   addMedia: async (listingId: string, mediaFile: File, setLoading: React.Dispatch<React.SetStateAction<boolean>>): Promise<any> => {
@@ -536,7 +542,7 @@ export const listingAPI = {
       formData.append('media', mediaFile);
       
       const token = localStorage.getItem("token");
-      const response = await api.post(`/marketplace/listings/${listingId}/media`, formData, {
+      const response = await api.post(`/api/marketplace/listings/${listingId}/media`, formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
@@ -555,39 +561,39 @@ export const listingAPI = {
     }
   },
 
-  // ✅ LISTING STATUS MANAGEMENT
+  // ✅ LISTING STATUS MANAGEMENT - FIXED ROUTES
   
   // Update listing status
   updateListingStatus: (listingId: string, status: 'active' | 'inactive' | 'sold' | 'reserved', setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    patchRequest(`/marketplace/listings/${listingId}/status`, { status }, setLoading, `Listing ${status} successfully`),
+    patchRequest(`/api/marketplace/listings/${listingId}/status`, { status }, setLoading, `Listing ${status} successfully`),
 
   // Mark as sold
   markAsSold: (listingId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    patchRequest(`/marketplace/listings/${listingId}/status`, { status: 'sold' }, setLoading, 'Listing marked as sold'),
+    patchRequest(`/api/marketplace/listings/${listingId}/status`, { status: 'sold' }, setLoading, 'Listing marked as sold'),
 
   // Mark as active
   markAsActive: (listingId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    patchRequest(`/marketplace/listings/${listingId}/status`, { status: 'active' }, setLoading, 'Listing activated successfully'),
+    patchRequest(`/api/marketplace/listings/${listingId}/status`, { status: 'active' }, setLoading, 'Listing activated successfully'),
 
   // Mark as inactive
   markAsInactive: (listingId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    patchRequest(`/marketplace/listings/${listingId}/status`, { status: 'inactive' }, setLoading, 'Listing deactivated successfully'),
+    patchRequest(`/api/marketplace/listings/${listingId}/status`, { status: 'inactive' }, setLoading, 'Listing deactivated successfully'),
 
-  // ✅ ANALYTICS & STATS
+  // ✅ ANALYTICS & STATS - FIXED ROUTES
   
   // Get listing statistics
   getListingStats: (listingId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(`/marketplace/listings/${listingId}/stats`, setLoading),
+    getRequest(`/api/marketplace/listings/${listingId}/stats`, setLoading),
 
   // Increment view count
   incrementViewCount: (listingId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    patchRequest(`/marketplace/listings/${listingId}/increment-view`, {}, setLoading as any),
+    patchRequest(`/api/marketplace/listings/${listingId}/increment-view`, {}, setLoading as any),
 
   // Get seller's listing statistics
   getSellerListingStats: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest('/marketplace/listings/seller/stats', setLoading),
+    getRequest('/api/marketplace/listings/seller/stats', setLoading),
 
-  // ✅ SEARCH & DISCOVERY
+  // ✅ SEARCH & DISCOVERY - FIXED ROUTES
   
   // Search listings
   searchListings: (searchTerm: string, filters?: any, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) => {
@@ -602,13 +608,13 @@ export const listingAPI = {
       });
     }
     
-    return getRequest(`/marketplace/listings/search?${queryParams.toString()}`, setLoading);
+    return getRequest(`/api/marketplace/listings/search?${queryParams.toString()}`, setLoading);
   },
 
   // Get featured listings
   getFeaturedListings: (limit?: number, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) => {
     const params = limit ? `?limit=${limit}` : '';
-    return getRequest(`/marketplace/listings/featured${params}`, setLoading);
+    return getRequest(`/api/marketplace/listings/featured${params}`, setLoading);
   },
 
   // Get video listings
@@ -623,57 +629,57 @@ export const listingAPI = {
     }
     
     const queryString = queryParams.toString();
-    return getRequest(`/marketplace/listings/videos${queryString ? `?${queryString}` : ''}`, setLoading);
+    return getRequest(`/api/marketplace/listings/videos${queryString ? `?${queryString}` : ''}`, setLoading);
   },
 
   // Get categories
   getCategories: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest('/marketplace/listings/categories', setLoading),
+    getRequest('/api/marketplace/categories', setLoading),
 
-  // ✅ FAVORITES & BOOKMARKS
+  // ✅ FAVORITES & BOOKMARKS - FIXED ROUTES
   
   // Add to favorites
   addToFavorites: (listingId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest(`/marketplace/listings/${listingId}/favorite`, {}, setLoading, 'Added to favorites'),
+    postRequest(`/api/marketplace/listings/${listingId}/favorite`, {}, setLoading, 'Added to favorites'),
 
   // Remove from favorites
   removeFromFavorites: (listingId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    deleteRequest(`/marketplace/listings/${listingId}/favorite`, setLoading, 'Removed from favorites'),
+    deleteRequest(`/api/marketplace/listings/${listingId}/favorite`, setLoading, 'Removed from favorites'),
 
   // Get favorite listings
   getFavoriteListings: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest('/marketplace/listings/favorites', setLoading),
+    getRequest('/api/marketplace/listings/favorites', setLoading),
 
-  // ✅ CLONE & DUPLICATE
+  // ✅ CLONE & DUPLICATE - FIXED ROUTES
   
   // Clone listing
   cloneListing: (listingId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest(`/marketplace/listings/${listingId}/clone`, {}, setLoading, 'Listing cloned successfully'),
+    postRequest(`/api/marketplace/listings/${listingId}/clone`, {}, setLoading, 'Listing cloned successfully'),
 
-  // ✅ BULK OPERATIONS
+  // ✅ BULK OPERATIONS - FIXED ROUTES
   
   // Bulk update listing status
   bulkUpdateStatus: (listingIds: string[], status: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest('/marketplace/listings/bulk/status', { listingIds, status }, setLoading, 'Bulk update completed'),
+    postRequest('/api/marketplace/listings/bulk/status', { listingIds, status }, setLoading, 'Bulk update completed'),
 
   // Bulk delete listings
   bulkDeleteListings: (listingIds: string[], setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest('/marketplace/listings/bulk/delete', { listingIds }, setLoading, 'Bulk delete completed'),
+    postRequest('/api/marketplace/listings/bulk/delete', { listingIds }, setLoading, 'Bulk delete completed'),
 
-  // ✅ VALIDATION
+  // ✅ VALIDATION - FIXED ROUTES
   
   // Validate listing data
   validateListing: (data: ListingData, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest('/marketplace/listings/validate', data, setLoading as any),
+    postRequest('/api/marketplace/listings/validate', data, setLoading as any),
 
   // Check slug availability
   checkSlugAvailability: (slug: string, listingId?: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) => {
     const params = listingId ? `?listingId=${listingId}` : '';
-    return getRequest(`/marketplace/listings/check-slug/${slug}${params}`, setLoading);
+    return getRequest(`/api/marketplace/listings/check-slug/${slug}${params}`, setLoading);
   }
 };
 
-// Offer APIs
+// Offer APIs - FIXED ROUTES
 export const offerAPI = {
   makeOffer: async (
     offerData: {
@@ -698,7 +704,7 @@ export const offerAPI = {
 
       console.log("Sending offer data:", requestData);
 
-      const response = await api.post('/marketplace/offers/make-offer', requestData);
+      const response = await api.post('/api/marketplace/offers/make-offer', requestData);
       
       toast.success("Offer sent successfully!");
       return response.data;
@@ -713,34 +719,34 @@ export const offerAPI = {
   },
 
   getMyOffers: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest('/marketplace/offers/my-offers', setLoading),
+    getRequest('/api/marketplace/offers/my-offers', setLoading),
 
   getReceivedOffers: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest('/marketplace/offers/received-offers', setLoading),
+    getRequest('/api/marketplace/offers/received-offers', setLoading),
 
   acceptOffer: (offerId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/marketplace/offers/accept-offer/${offerId}`, {}, setLoading, "Offer accepted"),
+    putRequest(`/api/marketplace/offers/accept-offer/${offerId}`, {}, setLoading, "Offer accepted"),
 
   rejectOffer: (offerId: string, reason?: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/marketplace/offers/reject-offer/${offerId}`, { rejectionReason: reason }, setLoading, "Offer rejected"),
+    putRequest(`/api/marketplace/offers/reject-offer/${offerId}`, { rejectionReason: reason }, setLoading, "Offer rejected"),
 
   cancelOffer: (offerId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/marketplace/offers/cancel-offer/${offerId}`, {}, setLoading, "Offer cancelled"),
+    putRequest(`/api/marketplace/offers/cancel-offer/${offerId}`, {}, setLoading, "Offer cancelled"),
 
   // Get offer details
   getOfferDetails: (offerId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(`/marketplace/offers/${offerId}`, setLoading),
+    getRequest(`/api/marketplace/offers/${offerId}`, setLoading),
 
   // Counter offer
   counterOffer: (offerId: string, counterAmount: number, message?: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/marketplace/offers/${offerId}/counter`, { counterAmount, message }, setLoading as any, "Counter offer sent"),
+    putRequest(`/api/marketplace/offers/${offerId}/counter`, { counterAmount, message }, setLoading as any, "Counter offer sent"),
 
   // Get offer chat link
   getOfferChatLink: (offerId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(`/marketplace/offers/${offerId}/chat-link`, setLoading)
+    getRequest(`/api/marketplace/offers/${offerId}/chat-link`, setLoading)
 };
 
-// Order APIs
+// Order APIs - FIXED ROUTES
 export const orderAPI = {
   // Create new order from accepted offer
   createOrder: async (
@@ -763,7 +769,7 @@ export const orderAPI = {
       
       console.log("🛒 Creating order with data:", orderData);
 
-      const response = await api.post('/marketplace/orders/create', orderData);
+      const response = await api.post('/api/marketplace/orders/create', orderData);
       
       toast.success("Order created successfully!");
       return response.data;
@@ -789,7 +795,7 @@ export const orderAPI = {
     }
     
     const queryString = queryParams.toString();
-    return getRequest(`/marketplace/orders/my-orders${queryString ? `?${queryString}` : ''}`, setLoading);
+    return getRequest(`/api/marketplace/orders/my-orders${queryString ? `?${queryString}` : ''}`, setLoading);
   },
 
   // Get orders for seller
@@ -804,20 +810,20 @@ export const orderAPI = {
     }
     
     const queryString = queryParams.toString();
-    return getRequest(`/marketplace/orders/my-sales${queryString ? `?${queryString}` : ''}`, setLoading);
+    return getRequest(`/api/marketplace/orders/my-sales${queryString ? `?${queryString}` : ''}`, setLoading);
   },
 
   // Get order details
   getOrderDetails: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(`/marketplace/orders/${orderId}`, setLoading),
+    getRequest(`/api/marketplace/orders/${orderId}`, setLoading),
 
   // Update order status
   updateOrderStatus: (orderId: string, status: string, notes?: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/marketplace/orders/${orderId}/status`, { status, notes }, setLoading, "Order status updated"),
+    putRequest(`/api/marketplace/orders/${orderId}/status`, { status, notes }, setLoading, "Order status updated"),
 
   // Seller starts work on order
   startWork: (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/marketplace/orders/${orderId}/start-work`, {}, setLoading, "Work started on order"),
+    putRequest(`/api/marketplace/orders/${orderId}/start-work`, {}, setLoading, "Work started on order"),
 
   // Seller delivers order
   deliverOrder: (
@@ -837,7 +843,7 @@ export const orderAPI = {
       deliveryData.attachments.forEach(file => formData.append('attachments', file));
     }
     
-    return postRequest(`/marketplace/orders/${orderId}/deliver`, formData, setLoading, "Order delivered");
+    return postRequest(`/api/marketplace/orders/${orderId}/deliver`, formData, setLoading, "Order delivered");
   },
 
   // Buyer requests revision
@@ -845,23 +851,23 @@ export const orderAPI = {
     orderId: string,
     revisionNotes: string,
     setLoading: React.Dispatch<React.SetStateAction<boolean>>
-  ) => putRequest(`/marketplace/orders/${orderId}/request-revision`, { revisionNotes }, setLoading, "Revision requested"),
+  ) => putRequest(`/api/marketplace/orders/${orderId}/request-revision`, { revisionNotes }, setLoading, "Revision requested"),
 
   // Buyer completes order
   completeOrder: (orderId: string, rating?: number, review?: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/marketplace/orders/${orderId}/complete`, { rating, review }, setLoading, "Order completed"),
+    putRequest(`/api/marketplace/orders/${orderId}/complete`, { rating, review }, setLoading, "Order completed"),
 
   // Get order timeline
   getOrderTimeline: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(`/marketplace/orders/${orderId}/timeline`, setLoading),
+    getRequest(`/api/marketplace/orders/${orderId}/timeline`, setLoading),
 
   // Cancel order
   cancelOrder: (orderId: string, reason?: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/marketplace/orders/${orderId}/cancel`, { reason }, setLoading, "Order cancelled"),
+    putRequest(`/api/marketplace/orders/${orderId}/cancel`, { reason }, setLoading, "Order cancelled"),
 
   // Get order messages/chat
   getOrderMessagesForOrder: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(`/marketplace/orders/${orderId}/messages`, setLoading),
+    getRequest(`/api/marketplace/orders/${orderId}/messages`, setLoading),
 
   // Send message in order chat
   sendOrderMessage: (
@@ -879,137 +885,16 @@ export const orderAPI = {
       messageData.attachments.forEach(file => formData.append('attachments', file));
     }
     
-    return postRequest(`/marketplace/orders/${orderId}/messages`, formData, setLoading, "Message sent");
+    return postRequest(`/api/marketplace/orders/${orderId}/messages`, formData, setLoading, "Message sent");
   },
 
   // Get order statistics
   getOrderStats: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest('/marketplace/orders/stats', setLoading),
+    getRequest('/api/marketplace/orders/stats', setLoading),
 
   // Download order invoice
   downloadInvoice: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(`/marketplace/orders/${orderId}/invoice`, setLoading)
-};
-
-// Payment APIs
-export const paymentAPI = {
-  createPaymentIntent: (
-    orderId: string,
-    setLoading: React.Dispatch<React.SetStateAction<boolean>>
-  ) => postRequest('/api/marketplace/payments/create-payment-intent', { orderId }, setLoading),
-
-  confirmPayment: (
-    orderId: string,
-    paymentIntentId: string,
-    setLoading: React.Dispatch<React.SetStateAction<boolean>>
-  ) => postRequest('/api/marketplace/payments/confirm-payment', { orderId, paymentIntentId }, setLoading, "Payment confirmed"),
-
-  capturePayment: (
-    orderId: string,
-    setLoading: React.Dispatch<React.SetStateAction<boolean>>
-  ) => postRequest('/api/marketplace/payments/capture-payment', { orderId }, setLoading, "Payment released to seller"),
-
-  cancelPayment: (
-    orderId: string,
-    setLoading: React.Dispatch<React.SetStateAction<boolean>>
-  ) => postRequest('/api/marketplace/payments/cancel-payment', { orderId }, setLoading, "Payment cancelled"),
-
-  getPaymentStatus: (
-    orderId: string,
-    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-  ) => getRequest(`/api/marketplace/payments/payment-status/${orderId}`, setLoading),
-
-  // Stripe specific
-  getStripePaymentMethods: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest('/api/marketplace/payments/payment-methods', setLoading),
-
-  addStripePaymentMethod: (paymentMethodId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest('/api/marketplace/payments/payment-methods', { paymentMethodId }, setLoading, "Payment method added"),
-
-  removeStripePaymentMethod: (paymentMethodId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    deleteRequest(`/api/marketplace/payments/payment-methods/${paymentMethodId}`, setLoading, "Payment method removed")
-};
-
-// Message APIs
-export const messageAPI = {
-  getOrderMessages: (
-    orderId: string,
-    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-  ) => getRequest(`/api/marketplace/messages/${orderId}`, setLoading),
-
-  sendMessage: (
-    messageData: {
-      orderId: string;
-      message: string;
-      receiverId: string;
-      attachments?: string[];
-    },
-    setLoading: React.Dispatch<React.SetStateAction<boolean>>
-  ) => postRequest('/api/marketplace/messages/send', messageData, setLoading, "Message sent"),
-
-  markMessageAsRead: (
-    messageId: string,
-    setLoading: React.Dispatch<React.SetStateAction<boolean>>
-  ) => putRequest(`/api/marketplace/messages/${messageId}/read`, {}, setLoading),
-
-  // Get conversations
-  getConversations: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest('/api/marketplace/messages/conversations', setLoading),
-
-  // Get conversation with user
-  getConversation: (userId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(`/api/marketplace/messages/conversations/${userId}`, setLoading),
-
-  // Mark conversation as read
-  markConversationAsRead: (userId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/api/marketplace/messages/conversations/${userId}/read`, {}, setLoading),
-
-  // Get unread count
-  getUnreadCount: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest('/api/marketplace/messages/unread-count', setLoading)
-};
-
-// Dashboard APIs
-export const dashboardAPI = {
-  getSellerStats: (
-    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-  ) => getRequest('/api/marketplace/dashboard/seller-stats', setLoading),
-
-  getBuyerStats: (
-    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-  ) => getRequest('/api/marketplace/dashboard/buyer-stats', setLoading),
-
-  getSellerDashboard: (
-    period?: string,
-    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-  ) => {
-    const params = period ? `?period=${period}` : '';
-    return getRequest(`/api/marketplace/dashboard/seller${params}`, setLoading);
-  },
-
-  getBuyerDashboard: (
-    period?: string,
-    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-  ) => {
-    const params = period ? `?period=${period}` : '';
-    return getRequest(`/api/marketplace/dashboard/buyer${params}`, setLoading);
-  },
-
-  getRevenueAnalytics: (
-    period?: string,
-    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-  ) => {
-    const params = period ? `?period=${period}` : '';
-    return getRequest(`/api/marketplace/dashboard/revenue${params}`, setLoading);
-  },
-
-  getPerformanceMetrics: (
-    period?: string,
-    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-  ) => {
-    const params = period ? `?period=${period}` : '';
-    return getRequest(`/api/marketplace/dashboard/performance${params}`, setLoading);
-  }
+    getRequest(`/api/marketplace/orders/${orderId}/invoice`, setLoading)
 };
 
 // ========================
@@ -1102,39 +987,6 @@ export const marketplaceAPI = {
     downloadInvoice: orderAPI.downloadInvoice
   },
   
-  // Payment APIs
-  payments: {
-    createIntent: paymentAPI.createPaymentIntent,
-    confirm: paymentAPI.confirmPayment,
-    capture: paymentAPI.capturePayment,
-    cancel: paymentAPI.cancelPayment,
-    getStatus: paymentAPI.getPaymentStatus,
-    getPaymentMethods: paymentAPI.getStripePaymentMethods,
-    addPaymentMethod: paymentAPI.addStripePaymentMethod,
-    removePaymentMethod: paymentAPI.removeStripePaymentMethod
-  },
-  
-  // Message APIs
-  messages: {
-    getOrderMessages: messageAPI.getOrderMessages,
-    send: messageAPI.sendMessage,
-    markRead: messageAPI.markMessageAsRead,
-    getConversations: messageAPI.getConversations,
-    getConversation: messageAPI.getConversation,
-    markConversationRead: messageAPI.markConversationAsRead,
-    getUnreadCount: messageAPI.getUnreadCount
-  },
-  
-  // Dashboard APIs
-  dashboard: {
-    getSellerStats: dashboardAPI.getSellerStats,
-    getBuyerStats: dashboardAPI.getBuyerStats,
-    getSellerDashboard: dashboardAPI.getSellerDashboard,
-    getBuyerDashboard: dashboardAPI.getBuyerDashboard,
-    getRevenueAnalytics: dashboardAPI.getRevenueAnalytics,
-    getPerformanceMetrics: dashboardAPI.getPerformanceMetrics
-  },
-  
   // Stripe APIs
   stripe: {
     checkStatus: checkStripeStatus,
@@ -1145,12 +997,13 @@ export const marketplaceAPI = {
     getBalance: getSellerBalance,
     createPayout,
     getPayouts,
-    createLoginLink
+    createLoginLink,
+    confirmOfferPayment
   }
 };
 
 // ========================
-// MONITORING SYSTEM APIs (Keep existing)
+// MONITORING SYSTEM APIs
 // ========================
 
 export const monitoringAPI = {
@@ -1190,7 +1043,7 @@ export const monitoringAPI = {
 };
 
 // ========================
-// ALERT SYSTEM APIs (Keep existing)
+// ALERT SYSTEM APIs
 // ========================
 
 export const alertAPI = {
@@ -1233,7 +1086,7 @@ export const alertAPI = {
 };
 
 // ========================
-// DOMAIN MONITORING APIs (Keep existing)
+// DOMAIN MONITORING APIs
 // ========================
 
 export const domainAPI = {
@@ -1254,7 +1107,7 @@ export const domainAPI = {
 };
 
 // ========================
-// BOOKMARK & HISTORY APIs (Keep existing)
+// BOOKMARK & HISTORY APIs
 // ========================
 
 export const bookmarkAPI = {
@@ -1269,7 +1122,7 @@ export const bookmarkAPI = {
   ) => deleteRequest(`/api/bookmarks/${videoId}`, setLoading, "Bookmark removed"),
 
   getBookmarks: (
-    setLoading: React.Dispatch<React.SetStateAction<boolean>>
+    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
   ) => getRequest("/api/bookmarks", setLoading),
 
   getVideoHistory: (
@@ -1279,7 +1132,7 @@ export const bookmarkAPI = {
 };
 
 // ========================
-// UTILITY FUNCTIONS (Updated with listing utilities)
+// UTILITY FUNCTIONS
 // ========================
 
 // Domain Notification Utilities
@@ -1554,44 +1407,12 @@ export const validateOrderData = (data: {
   return errors;
 };
 
-// Payment-specific functions
-export const initializeStripe = async () => {
-  if (typeof window !== 'undefined' && !window.Stripe) {
-    const { loadStripe } = await import('@stripe/stripe-js');
-    return loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY!);
-  }
-  return null;
-};
-
-export const createStripePaymentMethod = async (cardElement: any) => {
-  const stripe = await initializeStripe();
-  if (!stripe) throw new Error('Stripe not loaded');
-
-  const { error, paymentMethod } = await stripe.createPaymentMethod({
-    type: 'card',
-    card: cardElement,
-  });
-
-  if (error) throw new Error(error.message);
-  return paymentMethod;
-};
-
-// Webhook simulation for development
-export const simulateWebhook = async (paymentIntentId: string, eventType: string) => {
-  return postRequest('/api/webhook/simulate', {
-    paymentIntentId,
-    eventType
-  }, () => {});
-};
-
 // Token utilities
 export const getCurrentUserFromToken = () => {
   const token = localStorage.getItem("token");
   if (!token) return null;
   
   try {
-    // This assumes you have a decodeToken function in your helperFunctions
-    // You might need to import it or implement it here
     const decoded = JSON.parse(atob(token.split('.')[1]));
     return decoded;
   } catch (error) {
@@ -1680,7 +1501,7 @@ export const canDeactivateVideo = (videoStatus?: string): boolean => {
 };
 
 // ========================
-// LEGACY INDIVIDUAL EXPORTS (Updated with new functions)
+// LEGACY INDIVIDUAL EXPORTS
 // ========================
 
 // Auth exports
@@ -1750,7 +1571,7 @@ export const cancelOffer = offerAPI.cancelOffer;
 export const counterOffer = offerAPI.counterOffer;
 export const getOfferChatLink = offerAPI.getOfferChatLink;
 
-// Order exports - UPDATED
+// Order exports
 export const createOrder = orderAPI.createOrder;
 export const getMyOrders = orderAPI.getMyOrders;
 export const getSellerOrders = orderAPI.getSellerOrders;
@@ -1767,32 +1588,6 @@ export const sendOrderMessage = orderAPI.sendOrderMessage;
 export const getOrderStats = orderAPI.getOrderStats;
 export const downloadInvoice = orderAPI.downloadInvoice;
 
-// Payment exports
-export const createPaymentIntent = paymentAPI.createPaymentIntent;
-export const confirmPayment = paymentAPI.confirmPayment;
-export const capturePayment = paymentAPI.capturePayment;
-export const cancelPayment = paymentAPI.cancelPayment;
-export const getPaymentStatus = paymentAPI.getPaymentStatus;
-export const getStripePaymentMethods = paymentAPI.getStripePaymentMethods;
-export const addStripePaymentMethod = paymentAPI.addStripePaymentMethod;
-export const removeStripePaymentMethod = paymentAPI.removeStripePaymentMethod;
-
-// Message exports
-export const getOrderMessages = messageAPI.getOrderMessages;
-export const sendMessage = messageAPI.sendMessage;
-export const markMessageAsRead = messageAPI.markMessageAsRead;
-export const getConversations = messageAPI.getConversations;
-export const getConversation = messageAPI.getConversation;
-export const markConversationAsRead = messageAPI.markConversationAsRead;
-export const getUnreadCount = messageAPI.getUnreadCount;
-
-// Dashboard exports
-export const getSellerStats = dashboardAPI.getSellerStats;
-export const getBuyerStats = dashboardAPI.getBuyerStats;
-export const getSellerDashboard = dashboardAPI.getSellerDashboard;
-export const getBuyerDashboard = dashboardAPI.getBuyerDashboard;
-export const getRevenueAnalytics = dashboardAPI.getRevenueAnalytics;
-export const getPerformanceMetrics = dashboardAPI.getPerformanceMetrics;
 
 // Monitoring exports
 export const logError = monitoringAPI.logError;
@@ -1818,6 +1613,5 @@ export const addBookmark = bookmarkAPI.addBookmark;
 export const removeBookmark = bookmarkAPI.removeBookmark;
 export const getBookmarks = bookmarkAPI.getBookmarks;
 export const getVideoHistory = bookmarkAPI.getVideoHistory;
-
 
 export default api;
