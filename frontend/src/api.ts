@@ -487,7 +487,7 @@ export const listingAPI = {
       setLoading(true);
       const token = localStorage.getItem("token");
       
-      const response = await api.delete(`/marketplace/listings/${listingId}`, {
+      const response = await api.delete(`/api/marketplace/listings/${listingId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
