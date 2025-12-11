@@ -1567,7 +1567,7 @@ const SellerDashboard: React.FC = () => {
                       {refreshing ? 'Refreshing...' : 'Refresh'}
                     </button>
                     <button
-                      onClick={() => window.location.href = '/create-listing'}
+                      onClick={() => window.location.href = '/marketplace/create'}
                       className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition duration-200 flex items-center"
                     >
                       <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
