@@ -1,7 +1,7 @@
 // src/components/marketplae/seller/VideoManagementModal.tsx
 import React, { useState } from 'react';
 import { toast } from 'react-toastify';
-import {  formatBytes } from '../../../api';
+import { getVideoDurationFormatted, formatBytes } from '../../../api';
 
 interface MediaItem {
   _id: string;
@@ -247,6 +247,7 @@ const VideoManagementModal: React.FC<VideoManagementModalProps> = ({
                           </div>
                           
                           <div className="mt-1 flex items-center text-xs text-gray-500">
+                            <span className="mr-3">{getVideoDurationFormatted(video.duration || 0)}</span>
                             {video.fileSize && (
                               <span>{formatBytes(video.fileSize)}</span>
                             )}
@@ -360,6 +361,7 @@ const VideoManagementModal: React.FC<VideoManagementModalProps> = ({
                           Duration
                         </label>
                         <p className="text-sm text-gray-900">
+                          {getVideoDurationFormatted(selectedVideo.duration || 0)}
                         </p>
                       </div>
                       
