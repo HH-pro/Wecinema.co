@@ -21,12 +21,11 @@ router.get("/listings", async (req, res) => {
 
 /// ===================================================
 // ✅ GET USER'S LISTINGS (My Listings)
-// ===================================================
 router.get("/my-listings", authenticateMiddleware, async (req, res) => {
   try {
     const sellerId = req.user._id;
     
-    const { status, page = 1, limit = 20 } = req.query;
+    const { status, page = 1, limit = 10 } = req.query;
     
     const filter = { sellerId };
     if (status) filter.status = status;
@@ -35,44 +34,44 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
     
     console.log("📝 Fetching my listings for seller:", sellerId);
 
+    // Get listings with pagination
     const listings = await MarketplaceListing.find(filter)
-      .select("title price status mediaUrls description category tags createdAt updatedAt")
+      .select("title price status mediaUrls description category tags createdAt updatedAt views sellerId")
+      .populate("sellerId", "username avatar sellerRating")
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
 
     const total = await MarketplaceListing.countDocuments(filter);
 
-    // Cache headers
-    const lastModified = listings[0]?.updatedAt || new Date();
-    const etag = `"${lastModified.getTime()}"`;
+    // ✅ REMOVE or modify cache headers to prevent 304
+    // Option 1: Remove cache headers entirely
+    // Option 2: Add cache-busting headers
     
-    res.setHeader('Cache-Control', 'private, max-age=60');
-    res.setHeader('Last-Modified', lastModified.toUTCString());
-    res.setHeader('ETag', etag);
-    
-    // Conditional request check
-    const ifNoneMatch = req.headers['if-none-match'];
-    if (ifNoneMatch === etag) {
-      return res.status(304).send();
-    }
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     
     res.status(200).json({
+      success: true,
       listings,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
         pages: Math.ceil(total / parseInt(limit))
-      }
+      },
+      timestamp: new Date().getTime() // Add timestamp to prevent caching
     });
     
   } catch (error) {
     console.error("❌ Error fetching my listings:", error);
-    res.status(500).json({ error: "Failed to fetch my listings" });
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to fetch my listings" 
+    });
   }
 });
-
 // ===================================================
 // ✅ CREATE LISTING
 router.post("/create-listing", authenticateMiddleware, async (req, res) => {
