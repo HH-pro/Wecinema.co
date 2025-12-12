@@ -176,6 +176,37 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
+  // Check if a URL is a video
+  const isVideoUrl = (url: string): boolean => {
+    if (!url) return false;
+    const videoExtensions = ['.mp4', '.mov', '.avi', '.wmv', '.flv', '.mkv', '.webm'];
+    const urlLower = url.toLowerCase();
+    return videoExtensions.some(ext => urlLower.endsWith(ext));
+  };
+
+  // Check if a URL is an image
+  const isImageUrl = (url: string): boolean => {
+    if (!url) return false;
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'];
+    const urlLower = url.toLowerCase();
+    return imageExtensions.some(ext => urlLower.endsWith(ext));
+  };
+
+  // Get first media URL (image or video)
+  const getFirstMediaUrl = (mediaUrls: string[]): string | null => {
+    if (!mediaUrls || mediaUrls.length === 0) return null;
+    
+    // Try to find an image first
+    for (const url of mediaUrls) {
+      if (isImageUrl(url)) {
+        return url;
+      }
+    }
+    
+    // If no image found, return first video or first URL
+    return mediaUrls[0];
+  };
+
   // Stats calculation
   const totalOrders = orders.length;
   const pendingOrders = orders.filter(order => 
@@ -225,7 +256,6 @@ const SellerDashboard: React.FC = () => {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       
       const [ordersResponse, offersResponse] = await Promise.allSettled([
-        // ✅ FIXED: Direct API call with correct endpoint
         (async () => {
           try {
             console.log('📦 Fetching seller orders from /marketplace/my-sales');
@@ -243,17 +273,14 @@ const SellerDashboard: React.FC = () => {
               data: response.data
             });
             
-            // Backend returns { success: true, sales: [...] }
             if (response.data.success && response.data.sales) {
               return response.data.sales;
             }
             
-            // If response structure is different, try to extract
             return response.data.data || response.data.orders || [];
           } catch (err: any) {
             console.error('❌ Error fetching orders:', err.response?.data || err.message);
             
-            // Fallback to old API function
             try {
               console.log('🔄 Trying fallback API function getSellerOrders()');
               const fallback = await getSellerOrders();
@@ -266,7 +293,6 @@ const SellerDashboard: React.FC = () => {
           }
         })(),
         
-        // Offers - use existing function
         (async () => {
           try {
             const offers = await getReceivedOffers();
@@ -315,93 +341,133 @@ const SellerDashboard: React.FC = () => {
   };
 
   const fetchListings = async () => {
-  try {
-    const currentUserId = getCurrentUserId();
-    if (!currentUserId) {
-      setError('User not authenticated. Please log in again.');
-      return;
-    }
-
-    console.log('📝 Fetching listings for user:', currentUserId);
-    
-    const params: any = {
-      page: listingsPage,
-      limit: listingsLimit,
-      _t: new Date().getTime() // Cache busting parameter
-    };
-    
-    if (listingsStatusFilter) {
-      params.status = listingsStatusFilter;
-    }
-    
-    // Force fresh fetch by disabling cache
-    const response = await axios.get(
-      `${API_BASE_URL}/marketplace/listings/my-listings`,
-      {
-        params,
-        headers: { 
-          Authorization: `Bearer ${localStorage.getItem('token') || sessionStorage.getItem('token')}`,
-          'Cache-Control': 'no-cache'
-        }
+    try {
+      const currentUserId = getCurrentUserId();
+      if (!currentUserId) {
+        setError('User not authenticated. Please log in again.');
+        return;
       }
-    );
-    
-    if (response.data.success) {
-      setListingsData(response.data);
-      console.log('✅ Listings fetched successfully:', {
-        count: response.data.listings?.length || 0,
-        pagination: response.data.pagination
-      });
-    } else {
-      setError(response.data.error || 'Failed to fetch listings');
-    }
-  } catch (error: any) {
-    console.error('Error fetching listings:', error);
-    
-    // If it's a 304 error, try without cache
-    if (error.response?.status === 304) {
-      console.log('🔄 Got 304, retrying without cache...');
-      // Retry without cache
-      await fetchListingsWithoutCache();
-    } else {
-      setError('Failed to load listings. Please try again.');
-    }
-  }
-};
 
-// Helper function to fetch without cache
-const fetchListingsWithoutCache = async () => {
-  try {
-    const currentUserId = getCurrentUserId();
-    if (!currentUserId) return;
-    
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    
-    // Create a unique URL to bypass cache
-    const timestamp = new Date().getTime();
-    const url = `${API_BASE_URL}/marketplace/listings/my-listings?_nocache=${timestamp}`;
-    
-    const response = await axios.get(url, {
-      params: {
+      console.log('📝 Fetching listings for user:', currentUserId);
+      
+      const params: any = {
         page: listingsPage,
         limit: listingsLimit,
-        status: listingsStatusFilter || undefined
-      },
-      headers: { 
-        Authorization: `Bearer ${token}`,
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
+        _t: new Date().getTime() // Cache busting parameter
+      };
+      
+      if (listingsStatusFilter) {
+        params.status = listingsStatusFilter;
       }
-    });
-    
-    if (response.data.success) {
-      setListingsData(response.data);
-      console.log('✅ Listings fetched without cache:', response.data.listings?.length);
+      
+      // Force fresh fetch by disabling cache
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/listings/my-listings`,
+        {
+          params,
+          headers: { 
+            Authorization: `Bearer ${localStorage.getItem('token') || sessionStorage.getItem('token')}`,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          }
+        }
+      );
+      
+      if (response.data.success) {
+        setListingsData(response.data);
+        console.log('✅ Listings fetched successfully:', {
+          count: response.data.listings?.length || 0,
+          pagination: response.data.pagination
+        });
+      } else {
+        setError(response.data.error || 'Failed to fetch listings');
+      }
+    } catch (error: any) {
+      console.error('Error fetching listings:', error);
+      
+      // If it's a 304 error, try without cache
+      if (error.response?.status === 304) {
+        console.log('🔄 Got 304, retrying without cache...');
+        await fetchListingsWithoutCache();
+      } else {
+        setError('Failed to load listings. Please try again.');
+      }
     }
-  } catch (error) {
-    console.error('Error fetching listings without cache:', error);
-  }
-};
+  };
+
+  // Helper function to fetch without cache
+  const fetchListingsWithoutCache = async () => {
+    try {
+      const currentUserId = getCurrentUserId();
+      if (!currentUserId) return;
+      
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      
+      // Create a unique URL to bypass cache
+      const timestamp = new Date().getTime();
+      const url = `${API_BASE_URL}/marketplace/listings/my-listings?_nocache=${timestamp}`;
+      
+      const response = await axios.get(url, {
+        params: {
+          page: listingsPage,
+          limit: listingsLimit,
+          status: listingsStatusFilter || undefined
+        },
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      if (response.data.success) {
+        setListingsData(response.data);
+        console.log('✅ Listings fetched without cache:', response.data.listings?.length);
+      }
+    } catch (error) {
+      console.error('Error fetching listings without cache:', error);
+    }
+  };
+
+  // ✅ FIXED: Force refresh listings after any action
+  const forceRefreshListings = async () => {
+    console.log('🔄 Force refreshing listings...');
+    
+    // Reset to page 1 to see updated listings
+    setListingsPage(1);
+    
+    // Force fetch with cache busting
+    const timestamp = new Date().getTime();
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/listings/my-listings?_force=${timestamp}`,
+        {
+          params: {
+            page: 1,
+            limit: listingsLimit,
+            status: listingsStatusFilter || undefined
+          },
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        }
+      );
+      
+      if (response.data.success) {
+        setListingsData(response.data);
+        console.log('✅ Listings force refreshed:', response.data.listings?.length || 0);
+      }
+    } catch (error) {
+      console.error('Error force refreshing listings:', error);
+      // Fallback to regular fetch
+      await fetchListings();
+    }
+  };
 
   const checkStripeAccountStatus = async () => {
     try {
@@ -412,10 +478,8 @@ const fetchListingsWithoutCache = async () => {
       console.log('✅ Stripe status response:', response);
       setStripeStatus(response);
       
-      // Update debug info
       setDebugInfo(`Stripe Status: ${response.connected ? 'Connected' : 'Not Connected'}, Charges Enabled: ${response.chargesEnabled}`);
       
-      // If Stripe is connected and active, don't show setup modal
       if (response.connected && response.chargesEnabled) {
         setShowStripeSetup(false);
         console.log('🎉 Stripe is connected and active - hiding setup modal');
@@ -434,7 +498,6 @@ const fetchListingsWithoutCache = async () => {
   };
 
   const handleStripeReturn = () => {
-    // Check if user just returned from Stripe onboarding
     const urlParams = new URLSearchParams(window.location.search);
     const stripeStatus = urlParams.get('stripe');
     const accountId = urlParams.get('account_id');
@@ -449,12 +512,10 @@ const fetchListingsWithoutCache = async () => {
       console.log('🎉 Returned from Stripe onboarding - refreshing status');
       setSuccessMessage('Stripe account setup completed successfully!');
       
-      // Refresh status after a delay to allow webhook processing
       setTimeout(() => {
         checkStripeAccountStatus();
         fetchDashboardData();
         
-        // Clean URL
         const newUrl = window.location.pathname;
         window.history.replaceState({}, '', newUrl);
         console.log('🧹 Cleaned URL after Stripe return');
@@ -471,7 +532,7 @@ const fetchListingsWithoutCache = async () => {
     ]);
     
     if (activeTab === 'listings') {
-      fetchListings();
+      await forceRefreshListings();
     }
     
     setRefreshing(false);
@@ -500,27 +561,24 @@ const fetchListingsWithoutCache = async () => {
     window.location.href = `/listings/${listingId}`;
   };
 
-  // Function to handle order view
   const handleViewOrderDetails = (orderId: string) => {
     setSelectedOrderId(orderId);
     setShowOrderModal(true);
   };
 
-  // Function to handle order update from modal
   const handleOrderUpdateFromModal = (orderId: string, newStatus: string) => {
-    // Update local orders state
     setOrders(prev => prev.map(order => 
       order._id === orderId ? { ...order, status: newStatus } : order
     ));
   };
 
-  // ✅ NEW: Handle listing edit
+  // ✅ FIXED: Handle listing edit with forced refresh
   const handleEditListing = (listing: Listing) => {
     setEditingListing(listing);
     setShowEditModal(true);
   };
 
-  // ✅ NEW: Handle listing update
+  // ✅ FIXED: Handle listing update with forced refresh
   const handleUpdateListing = async (updatedData: any) => {
     if (!editingListing) return;
     
@@ -537,21 +595,14 @@ const fetchListingsWithoutCache = async () => {
       if (response.success) {
         setSuccessMessage('Listing updated successfully!');
         
-        // Update local state
-        if (listingsData) {
-          setListingsData(prev => ({
-            ...prev!,
-            listings: prev!.listings.map(listing => 
-              listing._id === editingListing._id 
-                ? { ...listing, ...response.listing, updatedAt: new Date().toISOString() }
-                : listing
-            )
-          }));
-        }
+        // Force refresh listings to get updated data
+        await forceRefreshListings();
         
         setShowEditModal(false);
         setEditingListing(null);
-        fetchListings(); // Refresh listings
+        
+        // Also refresh dashboard stats
+        fetchDashboardData();
       } else {
         setError(response.error || 'Failed to update listing');
       }
@@ -563,13 +614,13 @@ const fetchListingsWithoutCache = async () => {
     }
   };
 
-  // ✅ NEW: Handle listing delete
+  // ✅ FIXED: Handle listing delete with forced refresh
   const handleDeleteListing = (listing: Listing) => {
     setDeletingListing(listing);
     setShowDeleteModal(true);
   };
 
-  // ✅ NEW: Confirm listing deletion
+  // ✅ FIXED: Confirm listing deletion with forced refresh
   const handleConfirmDeleteListing = async () => {
     if (!deletingListing) return;
     
@@ -585,16 +636,14 @@ const fetchListingsWithoutCache = async () => {
       if (response.success) {
         setSuccessMessage('Listing deleted successfully!');
         
-        // Update local state
-        if (listingsData) {
-          setListingsData(prev => ({
-            ...prev!,
-            listings: prev!.listings.filter(listing => listing._id !== deletingListing._id)
-          }));
-        }
+        // Force refresh listings to reflect deletion
+        await forceRefreshListings();
         
         setShowDeleteModal(false);
         setDeletingListing(null);
+        
+        // Also refresh dashboard stats
+        fetchDashboardData();
       } else {
         setError(response.error || 'Failed to delete listing');
       }
@@ -606,7 +655,7 @@ const fetchListingsWithoutCache = async () => {
     }
   };
 
-  // ✅ NEW: Handle listing status toggle
+  // ✅ FIXED: Handle listing status toggle with forced refresh
   const handleToggleListingStatus = async (listing: Listing) => {
     try {
       setListingActionLoading(`toggling-${listing._id}`);
@@ -620,19 +669,11 @@ const fetchListingsWithoutCache = async () => {
       if (response.success) {
         setSuccessMessage(`Listing ${response.newStatus === 'active' ? 'activated' : 'deactivated'} successfully!`);
         
-        // Update local state
-        if (listingsData) {
-          setListingsData(prev => ({
-            ...prev!,
-            listings: prev!.listings.map(l => 
-              l._id === listing._id 
-                ? { ...l, status: response.newStatus, updatedAt: new Date().toISOString() }
-                : l
-            )
-          }));
-        }
+        // Force refresh listings to get updated status
+        await forceRefreshListings();
         
-        fetchListings(); // Refresh listings
+        // Also refresh dashboard stats
+        fetchDashboardData();
       } else {
         setError(response.error || 'Failed to toggle listing status');
       }
@@ -644,7 +685,7 @@ const fetchListingsWithoutCache = async () => {
     }
   };
 
-  // ✅ IMPROVED: Accept offer with better error handling
+  // Handle offer actions
   const handleOfferAction = async (offerId: string, action: string) => {
     try {
       setError('');
@@ -677,17 +718,14 @@ const fetchListingsWithoutCache = async () => {
             setSuccessMessage('Offer accepted successfully! Buyer will now complete payment.');
             console.log('✅ Offer accepted:', response.data);
             
-            // Update local state
             setOffers(prev => prev.map(o => 
               o._id === offerId ? { ...o, status: 'accepted' } : o
             ));
             
-            // Add new order to orders list if provided
             if (response.data.order) {
               setOrders(prev => [response.data.order, ...prev]);
             }
             
-            // Refresh data to get latest state
             setTimeout(() => {
               fetchDashboardData();
             }, 1000);
@@ -701,7 +739,6 @@ const fetchListingsWithoutCache = async () => {
           setError(errorMessage);
         }
       } else {
-        // Handle reject offer
         try {
           const response = await axios.put(
             `${API_BASE_URL}/marketplace/offers/reject-offer/${offerId}`,
@@ -714,7 +751,6 @@ const fetchListingsWithoutCache = async () => {
 
           if (response.data.success) {
             setSuccessMessage('Offer rejected successfully');
-            // Update local state
             setOffers(prev => prev.map(o => 
               o._id === offerId ? { ...o, status: 'rejected' } : o
             ));
@@ -753,7 +789,6 @@ const fetchListingsWithoutCache = async () => {
     console.log('✅ Stripe setup success handler called');
     setShowStripeSetup(false);
     setSuccessMessage('Stripe account setup completed!');
-    // Delay slightly to allow Stripe to process
     setTimeout(() => {
       checkStripeAccountStatus();
       fetchDashboardData();
@@ -1295,7 +1330,7 @@ const fetchListingsWithoutCache = async () => {
                     value={listingsStatusFilter}
                     onChange={(e) => {
                       setListingsStatusFilter(e.target.value);
-                      setListingsPage(1); // Reset to first page when filter changes
+                      setListingsPage(1);
                     }}
                     className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
@@ -1317,14 +1352,14 @@ const fetchListingsWithoutCache = async () => {
                   </button>
                   
                   <button
-                    onClick={fetchListings}
-                    disabled={loading}
+                    onClick={() => forceRefreshListings()}
+                    disabled={listingActionLoading !== null}
                     className="text-sm text-gray-500 hover:text-gray-700 flex items-center bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg transition-colors disabled:opacity-50"
                   >
-                    <svg className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className={`w-4 h-4 mr-1 ${listingActionLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
-                    {loading ? 'Loading...' : 'Refresh'}
+                    {listingActionLoading ? 'Processing...' : 'Refresh'}
                   </button>
                 </div>
               </div>
@@ -1350,140 +1385,214 @@ const fetchListingsWithoutCache = async () => {
                   <>
                     {/* Listings Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                      {listingsData.listings.map(listing => (
-                        <div key={listing._id} className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow duration-200">
-                          {/* Listing Image */}
-                          <div 
-                            className="h-48 bg-gray-100 flex items-center justify-center cursor-pointer"
-                            onClick={() => handleViewListingDetails(listing._id)}
-                          >
-                            {listing.mediaUrls && listing.mediaUrls.length > 0 ? (
-                              <img
-                                src={listing.mediaUrls[0]}
-                                alt={listing.title}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="text-gray-400">
-                                <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                <p className="text-sm mt-2">No Image</p>
-                              </div>
-                            )}
-                            <div className="absolute top-3 right-3">
-                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(listing.status)}`}>
-                                {listing.status}
-                              </span>
-                            </div>
-                          </div>
-                          
-                          {/* Listing Info */}
-                          <div className="p-5">
-                            <h3 
-                              className="font-medium text-gray-900 mb-2 cursor-pointer hover:text-blue-600 transition-colors truncate"
-                              onClick={() => handleViewListingDetails(listing._id)}
-                              title={listing.title}
-                            >
-                              {listing.title}
-                            </h3>
-                            
-                            <p className="text-sm text-gray-600 mb-3 line-clamp-2" title={listing.description}>
-                              {listing.description}
-                            </p>
-                            
-                            <div className="flex items-center justify-between mb-4">
-                              <div>
-                                <p className="text-2xl font-bold text-green-600">{formatCurrency(listing.price)}</p>
-                                <p className="text-xs text-gray-500">{listing.category}</p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-sm text-gray-500">Views</p>
-                                <p className="font-medium">{listing.views || 0}</p>
-                              </div>
-                            </div>
-                            
-                            {/* Tags */}
-                            {listing.tags && listing.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mb-4">
-                                {listing.tags.slice(0, 3).map((tag, index) => (
-                                  <span key={index} className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">
-                                    {tag}
-                                  </span>
-                                ))}
-                                {listing.tags.length > 3 && (
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-200 text-gray-600">
-                                    +{listing.tags.length - 3}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                            
-                            {/* Action Buttons */}
-                            <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-100">
-                              <button
-                                onClick={() => handleViewListingDetails(listing._id)}
-                                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center"
-                              >
-                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                </svg>
-                                View
-                              </button>
-                              
-                              <button
-                                onClick={() => handleEditListing(listing)}
-                                disabled={listingActionLoading === `toggling-${listing._id}`}
-                                className="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50"
-                              >
-                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                                Edit
-                              </button>
-                              
-                              <button
-                                onClick={() => handleToggleListingStatus(listing)}
-                                disabled={listingActionLoading === `toggling-${listing._id}`}
-                                className="flex-1 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 text-sm font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50"
-                              >
-                                {listing.status === 'active' ? (
-                                  <>
-                                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    Deactivate
-                                  </>
+                      {listingsData.listings.map(listing => {
+                        const firstMediaUrl = getFirstMediaUrl(listing.mediaUrls);
+                        const isVideo = firstMediaUrl ? isVideoUrl(firstMediaUrl) : false;
+                        const isImage = firstMediaUrl ? isImageUrl(firstMediaUrl) : false;
+                        
+                        return (
+                          <div key={listing._id} className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow duration-200">
+                            {/* Listing Media Thumbnail - Shows video or image */}
+                            <div className="h-48 bg-gray-100 relative overflow-hidden">
+                              {firstMediaUrl ? (
+                                isVideo ? (
+                                  // Video thumbnail with play button
+                                  <div className="relative w-full h-full group">
+                                    <video 
+                                      className="w-full h-full object-cover"
+                                      preload="metadata"
+                                      poster={listing.mediaUrls.find(url => isImageUrl(url)) || ''}
+                                    >
+                                      <source src={firstMediaUrl} type="video/mp4" />
+                                      Your browser does not support the video tag.
+                                    </video>
+                                    <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <div className="w-12 h-12 bg-white bg-opacity-80 rounded-full flex items-center justify-center">
+                                        <svg className="w-6 h-6 text-gray-800" fill="currentColor" viewBox="0 0 24 24">
+                                          <path d="M8 5v14l11-7z" />
+                                        </svg>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : isImage ? (
+                                  // Image
+                                  <img
+                                    src={firstMediaUrl}
+                                    alt={listing.title}
+                                    className="w-full h-full object-cover"
+                                    loading="lazy"
+                                  />
                                 ) : (
-                                  <>
-                                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  // Generic media (could be PDF, etc.)
+                                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100">
+                                    <div className="text-center">
+                                      <svg className="w-12 h-12 text-blue-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                      </svg>
+                                      <p className="text-sm text-blue-600 mt-2">Media File</p>
+                                    </div>
+                                  </div>
+                                )
+                              ) : (
+                                // No media
+                                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+                                  <div className="text-center">
+                                    <svg className="w-12 h-12 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                     </svg>
-                                    Activate
-                                  </>
-                                )}
-                              </button>
-                              
-                              <button
-                                onClick={() => handleDeleteListing(listing)}
-                                disabled={listingActionLoading === `toggling-${listing._id}`}
-                                className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 text-sm font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50"
-                              >
-                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                                Delete
-                              </button>
+                                    <p className="text-sm text-gray-500 mt-2">No Media</p>
+                                  </div>
+                                </div>
+                              )}
+                              <div className="absolute top-3 right-3">
+                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(listing.status)}`}>
+                                  {listing.status}
+                                </span>
+                              </div>
+                              {isVideo && (
+                                <div className="absolute top-3 left-3">
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                                    <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                                      <path d="M8 5v14l11-7z" />
+                                    </svg>
+                                    Video
+                                  </span>
+                                </div>
+                              )}
                             </div>
                             
-                            {/* Last Updated */}
-                            <div className="text-xs text-gray-500 mt-3">
-                              Updated {formatDate(listing.updatedAt)}
+                            {/* Listing Info */}
+                            <div className="p-5">
+                              <h3 className="font-medium text-gray-900 mb-2 truncate" title={listing.title}>
+                                {listing.title}
+                              </h3>
+                              
+                              <p className="text-sm text-gray-600 mb-3 line-clamp-2" title={listing.description}>
+                                {listing.description}
+                              </p>
+                              
+                              <div className="flex items-center justify-between mb-4">
+                                <div>
+                                  <p className="text-2xl font-bold text-green-600">{formatCurrency(listing.price)}</p>
+                                  <p className="text-xs text-gray-500 capitalize">{listing.category}</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-sm text-gray-500">Views</p>
+                                  <p className="font-medium">{listing.views || 0}</p>
+                                </div>
+                              </div>
+                              
+                              {/* Tags */}
+                              {listing.tags && listing.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mb-4">
+                                  {listing.tags.slice(0, 3).map((tag, index) => (
+                                    <span key={index} className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">
+                                      {tag}
+                                    </span>
+                                  ))}
+                                  {listing.tags.length > 3 && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-200 text-gray-600">
+                                      +{listing.tags.length - 3}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {/* Action Buttons - REMOVED View button as requested */}
+                              <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-100">
+                                <button
+                                  onClick={() => handleEditListing(listing)}
+                                  disabled={listingActionLoading === `toggling-${listing._id}` || listingActionLoading === 'updating' || listingActionLoading === 'deleting'}
+                                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {listingActionLoading === 'updating' && listing._id === editingListing?._id ? (
+                                    <>
+                                      <svg className="w-4 h-4 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                      </svg>
+                                      Editing...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                      </svg>
+                                      Edit
+                                    </>
+                                  )}
+                                </button>
+                                
+                                <button
+                                  onClick={() => handleToggleListingStatus(listing)}
+                                  disabled={listingActionLoading === `toggling-${listing._id}` || listingActionLoading === 'updating' || listingActionLoading === 'deleting'}
+                                  className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {listingActionLoading === `toggling-${listing._id}` ? (
+                                    <>
+                                      <svg className="w-4 h-4 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                      </svg>
+                                      Processing...
+                                    </>
+                                  ) : listing.status === 'active' ? (
+                                    <>
+                                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      </svg>
+                                      Deactivate
+                                    </>
+                                  ) : (
+                                    <>
+                                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      </svg>
+                                      Activate
+                                    </>
+                                  )}
+                                </button>
+                                
+                                <button
+                                  onClick={() => handleDeleteListing(listing)}
+                                  disabled={listingActionLoading === `toggling-${listing._id}` || listingActionLoading === 'updating' || listingActionLoading === 'deleting'}
+                                  className="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {listingActionLoading === 'deleting' && listing._id === deletingListing?._id ? (
+                                    <>
+                                      <svg className="w-4 h-4 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                      </svg>
+                                      Deleting...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                      Delete
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                              
+                              {/* Last Updated & Media Count */}
+                              <div className="flex justify-between items-center text-xs text-gray-500 mt-3">
+                                <span>Updated {formatDate(listing.updatedAt)}</span>
+                                {listing.mediaUrls && listing.mediaUrls.length > 0 && (
+                                  <span className="flex items-center">
+                                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                    {listing.mediaUrls.length} {listing.mediaUrls.length === 1 ? 'media' : 'media'}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                     
                     {/* Pagination */}
@@ -1491,7 +1600,7 @@ const fetchListingsWithoutCache = async () => {
                       <div className="flex justify-center items-center space-x-2">
                         <button
                           onClick={() => setListingsPage(prev => Math.max(1, prev - 1))}
-                          disabled={listingsPage === 1 || loading}
+                          disabled={listingsPage === 1 || listingActionLoading !== null}
                           className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Previous
@@ -1503,7 +1612,7 @@ const fetchListingsWithoutCache = async () => {
                         
                         <button
                           onClick={() => setListingsPage(prev => Math.min(listingsData.pagination!.pages, prev + 1))}
-                          disabled={listingsPage === listingsData.pagination.pages || loading}
+                          disabled={listingsPage === listingsData.pagination.pages || listingActionLoading !== null}
                           className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Next
