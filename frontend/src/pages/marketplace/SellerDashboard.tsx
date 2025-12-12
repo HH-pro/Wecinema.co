@@ -12,13 +12,13 @@ import {
 } from '../../api/marketplace';
 import axios from 'axios';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
-import StripeSetupModal from '../../components/marketplace/seller/StripeSetupModal';
-import OrderCreation from '../../components/marketplace/seller/order/OrderCreation';
-import PaymentStatusBadge from '../../components/marketplace/seller/PaymentStatusBadge';
-import StripeAccountStatus from '../../components/marketplace/seller/StripeAccountStatus';
-import StatCard from '../../components/marketplace/seller/StatCard';
-import OrderReceivedPage from '../../components/marketplace/seller/OrderReceivedPage';
-import OrderDetailsModal from '../../components/marketplace/seller/OrderDetailsModal';
+import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
+import OrderCreation from '../../components/marketplae/seller/OrderCreation';
+import PaymentStatusBadge from '../../components/marketplae/seller/PaymentStatusBadge';
+import StripeAccountStatus from '../../components/marketplae/seller/StripeAccountStatus';
+import StatCard from '../../components/marketplae/seller/StatCard';
+import OrderReceivedPage from '../../components/marketplae/seller/OrderReceivedPage';
+import OrderDetailsModal from '../../components/marketplae/seller/OrderDetailsModal';
 
 const API_BASE_URL = 'http://localhost:3000';
 
