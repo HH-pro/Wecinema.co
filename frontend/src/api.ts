@@ -547,7 +547,7 @@ export const orderAPI = {
         requestData.notes = options.notes;
       }
       
-      const response = await api.put(`/api/marketplace/orders/${orderId}/status`, requestData);
+      const response = await api.put(`/marketplace/orders/${orderId}/status`, requestData);
       
       const statusInfo = getOrderStatusInfo(status);
       toast.success(`Order status updated to ${statusInfo.text}`);
