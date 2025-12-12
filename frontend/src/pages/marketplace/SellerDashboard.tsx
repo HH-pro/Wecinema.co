@@ -10,9 +10,7 @@ import {
   getOrderActions,
   formatCurrency,
   formatOrderStatus,
-  getStatusColor,
-  getValidStatusTransitions,
-  getValidStatuses
+  getStatusColor
 } from '../../api';
 import axios from 'axios';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
@@ -27,7 +25,9 @@ import OffersTab from '../../components/marketplae/seller/OffersTab';
 import ListingsTab from '../../components/marketplae/seller/ListingsTab';
 import OrdersTab from '../../components/marketplae/seller/OrdersTab';
 import SellerOrderActions from '../../components/marketplae/seller/SellerOrderActions';
-import StatusUpdateModal from '../../components/marketplae/seller/StatusUpdateModal';
+import OrderWorkflowGuide from '../../components/marketplae/seller/OrderWorkflowGuide';
+import QuickActionCard from '../../components/marketplae/seller/QuickActionCard';
+import OrderStatusTracker from '../../components/marketplae/seller/OrderStatusTracker';
 
 const API_BASE_URL = 'http://localhost:3000';
 
@@ -226,10 +226,15 @@ const SellerDashboard: React.FC = () => {
   const [showOrderActionModal, setShowOrderActionModal] = useState(false);
   const [orderActionType, setOrderActionType] = useState<string>('');
   
-  // Status update modal
-  const [showStatusUpdateModal, setShowStatusUpdateModal] = useState(false);
-  const [statusUpdateOrder, setStatusUpdateOrder] = useState<Order | null>(null);
-  const [availableStatuses, setAvailableStatuses] = useState<string[]>([]);
+  // New: Current order being processed
+  const [processingOrder, setProcessingOrder] = useState<Order | null>(null);
+  const [showProcessingModal, setShowProcessingModal] = useState(false);
+  
+  // New: Delivery modal state
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  
+  // New: Cancellation modal state
+  const [showCancellationModal, setShowCancellationModal] = useState(false);
 
   const formatDate = (dateString: string): string => {
     if (!dateString) return 'N/A';
@@ -582,10 +587,10 @@ const SellerDashboard: React.FC = () => {
     setShowOrderModal(true);
   };
 
-  // ORDER MANAGEMENT FUNCTIONS - UPDATED VERSION
-  const handleStartProcessing = async (orderId: string) => {
+  // SIMPLIFIED ORDER MANAGEMENT FUNCTIONS
+  const handleSimpleStartProcessing = async (order: Order) => {
     try {
-      setOrderActionLoading(orderId);
+      setOrderActionLoading(order._id);
       setError('');
       
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -595,13 +600,17 @@ const SellerDashboard: React.FC = () => {
         return;
       }
 
-      console.log('🔄 Starting processing for order:', orderId);
+      console.log('🔄 Starting processing for order:', order._id);
       
-      // Try the specific endpoint first
+      // Show processing modal with steps
+      setProcessingOrder(order);
+      setShowProcessingModal(true);
+      
+      // First, try to update status to "processing"
       try {
         const response = await axios.put(
-          `${API_BASE_URL}/marketplace/orders/${orderId}/start-processing`,
-          {},
+          `${API_BASE_URL}/api/marketplace/orders/${order._id}/status`,
+          { status: 'processing' },
           {
             headers: { 
               Authorization: `Bearer ${token}`,
@@ -612,39 +621,34 @@ const SellerDashboard: React.FC = () => {
         );
 
         if (response.data.success) {
-          setSuccessMessage('Order processing started successfully!');
-          updateOrderInState(orderId, 'processing', {
-            processingAt: new Date().toISOString(),
-            permissions: {
-              canStartProcessing: false,
-              canStartWork: true,
-              canDeliver: false,
-              canCancelBySeller: true
-            }
+          setSuccessMessage('✅ Order processing started! You can now begin working on this order.');
+          
+          // Update order in state
+          updateOrderInState(order._id, 'processing', {
+            processingAt: new Date().toISOString()
           });
-        } else {
-          setError(response.data.error || 'Failed to start processing order');
+          
+          // Auto-close modal after 2 seconds
+          setTimeout(() => {
+            setShowProcessingModal(false);
+            setProcessingOrder(null);
+          }, 2000);
         }
-      } catch (axiosError: any) {
-        // If specific endpoint fails, try generic status update
-        if (axiosError.response?.status === 404 || axiosError.response?.status === 500) {
-          console.log('⚠️ Specific endpoint not found, trying generic status update...');
-          await updateOrderStatusGeneric(orderId, 'processing');
-        } else {
-          throw axiosError;
-        }
+      } catch (error: any) {
+        console.error('Error starting processing:', error);
+        setError('Failed to start processing. Please try again.');
       }
     } catch (error: any) {
-      console.error('❌ Error starting order processing:', error);
-      setError(error.response?.data?.error || 'Failed to start processing order. Please try again.');
+      console.error('❌ Error in start processing:', error);
+      setError(error.response?.data?.error || 'Failed to start processing. Please try again.');
     } finally {
       setOrderActionLoading(null);
     }
   };
 
-  const handleStartWork = async (orderId: string) => {
+  const handleSimpleStartWork = async (order: Order) => {
     try {
-      setOrderActionLoading(orderId);
+      setOrderActionLoading(order._id);
       setError('');
       
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -654,13 +658,12 @@ const SellerDashboard: React.FC = () => {
         return;
       }
 
-      console.log('👨‍💻 Starting work on order:', orderId);
+      console.log('👨‍💻 Starting work on order:', order._id);
       
-      // Try the specific endpoint first
       try {
         const response = await axios.put(
-          `${API_BASE_URL}/marketplace/orders/${orderId}/start-work`,
-          {},
+          `${API_BASE_URL}/api/marketplace/orders/${order._id}/status`,
+          { status: 'in_progress' },
           {
             headers: { 
               Authorization: `Bearer ${token}`,
@@ -671,44 +674,69 @@ const SellerDashboard: React.FC = () => {
         );
 
         if (response.data.success) {
-          setSuccessMessage('Work started on order successfully!');
-          updateOrderInState(orderId, 'in_progress', {
-            startedAt: new Date().toISOString(),
-            permissions: {
-              canStartProcessing: false,
-              canStartWork: false,
-              canDeliver: true,
-              canCancelBySeller: true
-            }
+          setSuccessMessage('✅ Work started! You are now working on this order.');
+          updateOrderInState(order._id, 'in_progress', {
+            startedAt: new Date().toISOString()
           });
-        } else {
-          setError(response.data.error || 'Failed to start work on order');
         }
-      } catch (axiosError: any) {
-        // If specific endpoint fails, try generic status update
-        if (axiosError.response?.status === 404 || axiosError.response?.status === 500) {
-          console.log('⚠️ Specific endpoint not found, trying generic status update...');
-          await updateOrderStatusGeneric(orderId, 'in_progress');
-        } else {
-          throw axiosError;
-        }
+      } catch (error: any) {
+        console.error('Error starting work:', error);
+        setError('Failed to start work. Please try again.');
       }
     } catch (error: any) {
-      console.error('❌ Error starting work on order:', error);
+      console.error('❌ Error starting work:', error);
       setError(error.response?.data?.error || 'Failed to start work. Please try again.');
     } finally {
       setOrderActionLoading(null);
     }
   };
 
-  // Generic order status update (using the new endpoint)
-  const updateOrderStatusGeneric = async (orderId: string, status: string, options?: any) => {
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  const handleSimpleDeliver = async (order: Order, deliveryData?: any) => {
+    try {
+      setOrderActionLoading(order._id);
+      setError('');
+      
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        setOrderActionLoading(null);
+        return;
+      }
+
+      console.log('📤 Delivering order:', order._id);
+      
+      // Show delivery modal
+      setSelectedOrder(order);
+      setShowDeliveryModal(true);
+    } catch (error: any) {
+      console.error('❌ Error in deliver:', error);
+      setError('Failed to deliver. Please try again.');
+    }
+  };
+
+  const handleSubmitDelivery = async (deliveryData: any) => {
+    if (!selectedOrder) return;
     
     try {
+      setOrderActionLoading(selectedOrder._id);
+      setError('');
+      
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        setOrderActionLoading(null);
+        return;
+      }
+
+      const requestData = {
+        status: 'delivered',
+        deliveryMessage: deliveryData.deliveryMessage,
+        deliveryFiles: deliveryData.deliveryFiles
+      };
+
       const response = await axios.put(
-        `${API_BASE_URL}/api/marketplace/orders/${orderId}/status`,
-        { status, ...options },
+        `${API_BASE_URL}/api/marketplace/orders/${selectedOrder._id}/status`,
+        requestData,
         {
           headers: { 
             Authorization: `Bearer ${token}`,
@@ -719,26 +747,122 @@ const SellerDashboard: React.FC = () => {
       );
 
       if (response.data.success) {
-        const statusInfo = getOrderStatusInfo(status);
-        setSuccessMessage(`Order status updated to ${statusInfo.text} successfully!`);
-        
-        // Update order in state
-        updateOrderInState(orderId, status, response.data.order);
-        return true;
+        setSuccessMessage('✅ Order delivered successfully! The buyer will review your work.');
+        updateOrderInState(selectedOrder._id, 'delivered', {
+          deliveredAt: new Date().toISOString(),
+          deliveryMessage: deliveryData.deliveryMessage,
+          deliveryFiles: deliveryData.deliveryFiles
+        });
+        setShowDeliveryModal(false);
+        setSelectedOrder(null);
       } else {
-        setError(response.data.error || `Failed to update order status to ${status}`);
-        return false;
+        setError(response.data.error || 'Failed to deliver order');
       }
     } catch (error: any) {
-      console.error(`❌ Error updating order status to ${status}:`, error);
+      console.error('❌ Error delivering order:', error);
+      setError(error.response?.data?.error || 'Failed to deliver. Please try again.');
+    } finally {
+      setOrderActionLoading(null);
+    }
+  };
+
+  const handleSimpleCancel = async (order: Order) => {
+    try {
+      // Show cancellation modal
+      setSelectedOrder(order);
+      setShowCancellationModal(true);
+    } catch (error: any) {
+      console.error('❌ Error in cancel:', error);
+      setError('Failed to cancel. Please try again.');
+    }
+  };
+
+  const handleSubmitCancellation = async (cancelReason: string) => {
+    if (!selectedOrder) return;
+    
+    try {
+      setOrderActionLoading(selectedOrder._id);
+      setError('');
       
-      // Check if it's a validation error for status transitions
-      if (error.response?.data?.allowedTransitions) {
-        setError(`${error.response.data.error}. Allowed transitions: ${error.response.data.allowedTransitions.join(', ')}`);
-      } else {
-        setError(error.response?.data?.error || `Failed to update order status. Please try again.`);
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        setOrderActionLoading(null);
+        return;
       }
-      return false;
+
+      const response = await axios.put(
+        `${API_BASE_URL}/api/marketplace/orders/${selectedOrder._id}/status`,
+        { 
+          status: 'cancelled',
+          cancelReason: cancelReason || 'Seller cancelled the order'
+        },
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
+
+      if (response.data.success) {
+        setSuccessMessage('✅ Order cancelled successfully. Refund has been initiated.');
+        updateOrderInState(selectedOrder._id, 'cancelled', {
+          cancelledAt: new Date().toISOString()
+        });
+        setShowCancellationModal(false);
+        setSelectedOrder(null);
+      } else {
+        setError(response.data.error || 'Failed to cancel order');
+      }
+    } catch (error: any) {
+      console.error('❌ Error cancelling order:', error);
+      setError(error.response?.data?.error || 'Failed to cancel. Please try again.');
+    } finally {
+      setOrderActionLoading(null);
+    }
+  };
+
+  const handleSimpleCompleteRevision = async (order: Order) => {
+    try {
+      setOrderActionLoading(order._id);
+      setError('');
+      
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        setOrderActionLoading(null);
+        return;
+      }
+
+      console.log('🔄 Completing revision for order:', order._id);
+      
+      const response = await axios.put(
+        `${API_BASE_URL}/api/marketplace/orders/${order._id}/status`,
+        { status: 'delivered' },
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
+
+      if (response.data.success) {
+        setSuccessMessage('✅ Revision completed! Work sent back to buyer for review.');
+        updateOrderInState(order._id, 'delivered', {
+          deliveredAt: new Date().toISOString()
+        });
+      } else {
+        setError(response.data.error || 'Failed to complete revision');
+      }
+    } catch (error: any) {
+      console.error('❌ Error completing revision:', error);
+      setError(error.response?.data?.error || 'Failed to complete revision. Please try again.');
+    } finally {
+      setOrderActionLoading(null);
     }
   };
 
@@ -752,18 +876,13 @@ const SellerDashboard: React.FC = () => {
           ...updates
         };
         
-        // Set appropriate timestamps based on status
-        if (newStatus === 'processing' && !updatedOrder.processingAt) {
-          updatedOrder.processingAt = new Date().toISOString();
-        } else if (newStatus === 'in_progress' && !updatedOrder.startedAt) {
-          updatedOrder.startedAt = new Date().toISOString();
-        } else if (newStatus === 'delivered' && !updatedOrder.deliveredAt) {
-          updatedOrder.deliveredAt = new Date().toISOString();
-        } else if (newStatus === 'completed' && !updatedOrder.completedAt) {
-          updatedOrder.completedAt = new Date().toISOString();
-        } else if (newStatus === 'cancelled' && !updatedOrder.cancelledAt) {
-          updatedOrder.cancelledAt = new Date().toISOString();
-        }
+        // Update permissions based on new status
+        updatedOrder.permissions = {
+          canStartProcessing: newStatus === 'paid',
+          canStartWork: ['processing', 'paid'].includes(newStatus),
+          canDeliver: newStatus === 'in_progress',
+          canCancelBySeller: ['paid', 'processing'].includes(newStatus)
+        };
         
         return updatedOrder;
       }
@@ -775,263 +894,6 @@ const SellerDashboard: React.FC = () => {
       orders.map(order => order._id === orderId ? { ...order, status: newStatus } : order)
     );
     setOrderStats(updatedStats);
-  };
-
-  const handleDeliverOrder = async (orderId: string, deliveryData: { deliveryMessage?: string; deliveryFiles?: string[] }) => {
-    try {
-      setOrderActionLoading(orderId);
-      setError('');
-      
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      if (!token) {
-        setError('Authentication required. Please log in again.');
-        setOrderActionLoading(null);
-        return;
-      }
-
-      console.log('📤 Delivering order:', orderId);
-      
-      // Try the specific endpoint first
-      try {
-        const response = await axios.put(
-          `${API_BASE_URL}/marketplace/orders/${orderId}/deliver`,
-          deliveryData,
-          {
-            headers: { 
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            timeout: 10000
-          }
-        );
-
-        if (response.data.success) {
-          setSuccessMessage('Order delivered successfully!');
-          updateOrderInState(orderId, 'delivered', {
-            deliveredAt: new Date().toISOString(),
-            deliveryMessage: deliveryData.deliveryMessage,
-            deliveryFiles: deliveryData.deliveryFiles,
-            permissions: {
-              canStartProcessing: false,
-              canStartWork: false,
-              canDeliver: false,
-              canCancelBySeller: false
-            }
-          });
-        } else {
-          setError(response.data.error || 'Failed to deliver order');
-        }
-      } catch (axiosError: any) {
-        // If specific endpoint fails, try generic status update
-        if (axiosError.response?.status === 404 || axiosError.response?.status === 500) {
-          console.log('⚠️ Specific endpoint not found, trying generic status update...');
-          await updateOrderStatusGeneric(orderId, 'delivered', deliveryData);
-        } else {
-          throw axiosError;
-        }
-      }
-    } catch (error: any) {
-      console.error('❌ Error delivering order:', error);
-      setError(error.response?.data?.error || 'Failed to deliver order. Please try again.');
-    } finally {
-      setOrderActionLoading(null);
-    }
-  };
-
-  const handleCancelOrderBySeller = async (orderId: string, cancelReason?: string) => {
-    try {
-      setOrderActionLoading(orderId);
-      setError('');
-      
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      if (!token) {
-        setError('Authentication required. Please log in again.');
-        setOrderActionLoading(null);
-        return;
-      }
-
-      console.log('❌ Seller cancelling order:', orderId);
-      
-      // Try the specific endpoint first
-      try {
-        const response = await axios.put(
-          `${API_BASE_URL}/marketplace/orders/${orderId}/cancel-by-seller`,
-          { cancelReason },
-          {
-            headers: { 
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            timeout: 10000
-          }
-        );
-
-        if (response.data.success) {
-          setSuccessMessage('Order cancelled successfully!');
-          updateOrderInState(orderId, 'cancelled', {
-            cancelledAt: new Date().toISOString(),
-            permissions: {
-              canStartProcessing: false,
-              canStartWork: false,
-              canDeliver: false,
-              canCancelBySeller: false
-            }
-          });
-        } else {
-          setError(response.data.error || 'Failed to cancel order');
-        }
-      } catch (axiosError: any) {
-        // If specific endpoint fails, try generic status update
-        if (axiosError.response?.status === 404 || axiosError.response?.status === 500) {
-          console.log('⚠️ Specific endpoint not found, trying generic status update...');
-          await updateOrderStatusGeneric(orderId, 'cancelled', { cancelReason });
-        } else {
-          throw axiosError;
-        }
-      }
-    } catch (error: any) {
-      console.error('❌ Error cancelling order:', error);
-      setError(error.response?.data?.error || 'Failed to cancel order. Please try again.');
-    } finally {
-      setOrderActionLoading(null);
-    }
-  };
-
-  const handleCompleteRevision = async (orderId: string, revisionId: string, files?: string[]) => {
-    try {
-      setOrderActionLoading(orderId);
-      setError('');
-      
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      if (!token) {
-        setError('Authentication required. Please log in again.');
-        setOrderActionLoading(null);
-        return;
-      }
-
-      console.log('🔄 Completing revision for order:', orderId);
-      
-      try {
-        const response = await axios.put(
-          `${API_BASE_URL}/marketplace/orders/${orderId}/complete-revision/${revisionId}`,
-          { files },
-          {
-            headers: { 
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            timeout: 10000
-          }
-        );
-
-        if (response.data.success) {
-          setSuccessMessage('Revision completed and sent back to buyer!');
-          updateOrderInState(orderId, 'delivered', {
-            permissions: {
-              canStartProcessing: false,
-              canStartWork: false,
-              canDeliver: false,
-              canCancelBySeller: false
-            }
-          });
-        } else {
-          setError(response.data.error || 'Failed to complete revision');
-        }
-      } catch (axiosError: any) {
-        // If revision endpoint fails, try to mark as delivered
-        if (axiosError.response?.status === 404 || axiosError.response?.status === 500) {
-          console.log('⚠️ Revision endpoint not found, marking as delivered...');
-          await updateOrderStatusGeneric(orderId, 'delivered');
-        } else {
-          throw axiosError;
-        }
-      }
-    } catch (error: any) {
-      console.error('❌ Error completing revision:', error);
-      setError(error.response?.data?.error || 'Failed to complete revision. Please try again.');
-    } finally {
-      setOrderActionLoading(null);
-    }
-  };
-
-  // Manual status update (using the new generic endpoint)
-  const handleManualStatusUpdate = async (order: Order, newStatus: string, options?: any) => {
-    try {
-      setOrderActionLoading(order._id);
-      setError('');
-      
-      const result = await updateOrderStatusGeneric(order._id, newStatus, options);
-      
-      if (result) {
-        setShowStatusUpdateModal(false);
-        setStatusUpdateOrder(null);
-      }
-    } catch (error: any) {
-      console.error('❌ Error in manual status update:', error);
-      setError(error.message || 'Failed to update status');
-    } finally {
-      setOrderActionLoading(null);
-    }
-  };
-
-  // Open manual status update modal
-  const openStatusUpdateModal = (order: Order) => {
-    setStatusUpdateOrder(order);
-    
-    // Get available status transitions for seller
-    const transitions = getValidStatusTransitions(order.status, 'seller');
-    const allStatuses = getValidStatuses();
-    
-    // Filter statuses that are valid for seller role
-    const available = allStatuses.filter(status => 
-      transitions.includes(status) || 
-      // Allow moving to cancelled from paid/processing
-      (status === 'cancelled' && ['paid', 'processing'].includes(order.status))
-    );
-    
-    setAvailableStatuses(available);
-    setShowStatusUpdateModal(true);
-  };
-
-  // Open order action modal
-  const handleOpenOrderAction = (order: Order, action: string) => {
-    setSelectedOrder(order);
-    setOrderActionType(action);
-    setShowOrderActionModal(true);
-  };
-
-  // Handle order action submission
-  const handleOrderActionSubmit = async (data: any) => {
-    if (!selectedOrder) return;
-    
-    try {
-      switch (orderActionType) {
-        case 'deliver':
-          await handleDeliverOrder(selectedOrder._id, data);
-          break;
-        case 'cancel':
-          await handleCancelOrderBySeller(selectedOrder._id, data.cancelReason);
-          break;
-        case 'complete_revision':
-          if (selectedOrder.revisionNotes?.[0]?._id) {
-            await handleCompleteRevision(
-              selectedOrder._id, 
-              selectedOrder.revisionNotes[0]._id, 
-              data.files
-            );
-          } else {
-            // If no revision ID, just mark as delivered
-            await handleDeliverOrder(selectedOrder._id, data);
-          }
-          break;
-        default:
-          break;
-      }
-    } finally {
-      setShowOrderActionModal(false);
-      setSelectedOrder(null);
-      setOrderActionType('');
-    }
   };
 
   // Order update handler from modal
@@ -1164,7 +1026,7 @@ const SellerDashboard: React.FC = () => {
           );
 
           if (response.data.success) {
-            setSuccessMessage('Offer accepted successfully! Buyer will now complete payment.');
+            setSuccessMessage('✅ Offer accepted! Buyer will now complete payment.');
             
             setOffers(prev => prev.map(o => 
               o._id === offerId ? { ...o, status: 'accepted' } : o
@@ -1276,7 +1138,7 @@ const SellerDashboard: React.FC = () => {
                   Seller Dashboard
                 </h1>
                 <p className="mt-2 text-gray-600 max-w-2xl">
-                  Welcome back! Manage your listings, track sales, and grow your business in one place.
+                  Welcome back! Manage your orders, listings, and grow your business easily.
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -1342,7 +1204,7 @@ const SellerDashboard: React.FC = () => {
                   { id: 'overview', label: 'Overview', icon: '📊' },
                   { id: 'offers', label: 'Offers', icon: '💼', badge: pendingOffers },
                   { id: 'listings', label: 'My Listings', icon: '🏠', badge: totalListings },
-                  { id: 'orders', label: 'Orders', icon: '📦', badge: orderStats.activeOrders }
+                  { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders }
                 ].map(({ id, label, icon, badge }) => (
                   <button
                     key={id}
@@ -1425,22 +1287,17 @@ const SellerDashboard: React.FC = () => {
             />
           )}
 
-          {/* Order Action Modal */}
-          {showOrderActionModal && selectedOrder && (
+          {/* Processing Modal */}
+          {showProcessingModal && processingOrder && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
                 <div className="p-6">
                   <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-bold text-gray-900">
-                      {orderActionType === 'deliver' && 'Deliver Order'}
-                      {orderActionType === 'cancel' && 'Cancel Order'}
-                      {orderActionType === 'complete_revision' && 'Complete Revision'}
-                    </h3>
+                    <h3 className="text-xl font-bold text-gray-900">Start Processing Order</h3>
                     <button
                       onClick={() => {
-                        setShowOrderActionModal(false);
-                        setSelectedOrder(null);
-                        setOrderActionType('');
+                        setShowProcessingModal(false);
+                        setProcessingOrder(null);
                       }}
                       className="text-gray-400 hover:text-gray-600"
                     >
@@ -1448,114 +1305,63 @@ const SellerDashboard: React.FC = () => {
                     </button>
                   </div>
                   
-                  {orderActionType === 'deliver' && (
-                    <div>
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Delivery Message (Optional)
-                        </label>
-                        <textarea
-                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          rows={4}
-                          placeholder="Add any notes for the buyer..."
-                          id="deliveryMessage"
-                        />
+                  <div className="mb-6">
+                    <div className="bg-blue-50 p-4 rounded-lg mb-4">
+                      <h4 className="font-semibold text-blue-800 mb-2">What happens next?</h4>
+                      <ol className="text-sm text-blue-700 space-y-2">
+                        <li className="flex items-start">
+                          <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-100 text-blue-600 rounded-full text-xs mr-2">1</span>
+                          <span>Order status changes to "Processing"</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-100 text-blue-600 rounded-full text-xs mr-2">2</span>
+                          <span>You can begin preparing the order</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-100 text-blue-600 rounded-full text-xs mr-2">3</span>
+                          <span>When ready, click "Start Work"</span>
+                        </li>
+                      </ol>
+                    </div>
+                    
+                    <div className="flex items-center p-3 bg-gray-50 rounded-lg">
+                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                        <span className="text-blue-600 font-semibold">{processingOrder.orderNumber?.slice(-3) || '#'}</span>
                       </div>
-                      <div className="mb-6">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Delivery Files (Optional)
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="Enter file URLs separated by commas"
-                          id="deliveryFiles"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">Add comma-separated URLs of delivered files</p>
+                      <div>
+                        <p className="font-medium">{processingOrder.listingId?.title || 'Order'}</p>
+                        <p className="text-sm text-gray-500">From: {processingOrder.buyerId?.username || 'Buyer'}</p>
                       </div>
                     </div>
-                  )}
-                  
-                  {orderActionType === 'cancel' && (
-                    <div className="mb-6">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Reason for Cancellation (Optional)
-                      </label>
-                      <textarea
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        rows={3}
-                        placeholder="Why are you cancelling this order?"
-                        id="cancelReason"
-                      />
-                    </div>
-                  )}
-                  
-                  {orderActionType === 'complete_revision' && (
-                    <div className="mb-6">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Updated Files (Optional)
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Enter updated file URLs separated by commas"
-                        id="revisionFiles"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Add comma-separated URLs of revised files</p>
-                    </div>
-                  )}
+                  </div>
                   
                   <div className="flex justify-end gap-3">
                     <button
                       onClick={() => {
-                        setShowOrderActionModal(false);
-                        setSelectedOrder(null);
-                        setOrderActionType('');
+                        setShowProcessingModal(false);
+                        setProcessingOrder(null);
                       }}
                       className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
                     >
                       Cancel
                     </button>
                     <button
-                      onClick={() => {
-                        const formData: any = {};
-                        
-                        if (orderActionType === 'deliver') {
-                          const messageEl = document.getElementById('deliveryMessage') as HTMLTextAreaElement;
-                          const filesEl = document.getElementById('deliveryFiles') as HTMLInputElement;
-                          formData.deliveryMessage = messageEl?.value || '';
-                          formData.deliveryFiles = filesEl?.value ? filesEl.value.split(',').map(f => f.trim()) : [];
-                        } else if (orderActionType === 'cancel') {
-                          const reasonEl = document.getElementById('cancelReason') as HTMLTextAreaElement;
-                          formData.cancelReason = reasonEl?.value || '';
-                        } else if (orderActionType === 'complete_revision') {
-                          const filesEl = document.getElementById('revisionFiles') as HTMLInputElement;
-                          formData.files = filesEl?.value ? filesEl.value.split(',').map(f => f.trim()) : [];
-                        }
-                        
-                        handleOrderActionSubmit(formData);
+                      onClick={async () => {
+                        await handleSimpleStartProcessing(processingOrder);
                       }}
-                      disabled={orderActionLoading === selectedOrder._id}
-                      className={`px-4 py-2.5 text-sm font-medium text-white rounded-xl transition-colors ${
-                        orderActionType === 'cancel' 
-                          ? 'bg-red-600 hover:bg-red-700' 
-                          : 'bg-blue-600 hover:bg-blue-700'
-                      } disabled:opacity-50`}
+                      disabled={orderActionLoading === processingOrder._id}
+                      className="px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors disabled:opacity-50"
                     >
-                      {orderActionLoading === selectedOrder._id ? (
+                      {orderActionLoading === processingOrder._id ? (
                         <span className="flex items-center">
                           <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
-                          Processing...
+                          Starting...
                         </span>
                       ) : (
-                        <>
-                          {orderActionType === 'deliver' && 'Deliver Order'}
-                          {orderActionType === 'cancel' && 'Cancel Order'}
-                          {orderActionType === 'complete_revision' && 'Complete Revision'}
-                        </>
+                        'Start Processing'
                       )}
                     </button>
                   </div>
@@ -1564,250 +1370,423 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* Status Update Modal */}
-          {showStatusUpdateModal && statusUpdateOrder && (
-            <StatusUpdateModal
-              order={statusUpdateOrder}
-              availableStatuses={availableStatuses}
-              isOpen={showStatusUpdateModal}
-              onClose={() => {
-                setShowStatusUpdateModal(false);
-                setStatusUpdateOrder(null);
-              }}
-              onSubmit={handleManualStatusUpdate}
-              loading={orderActionLoading === statusUpdateOrder._id}
-            />
+          {/* Delivery Modal */}
+          {showDeliveryModal && selectedOrder && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+                <div className="p-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-gray-900">Deliver Order</h3>
+                    <button
+                      onClick={() => {
+                        setShowDeliveryModal(false);
+                        setSelectedOrder(null);
+                      }}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  
+                  <div className="mb-6">
+                    <div className="bg-green-50 p-4 rounded-lg mb-4">
+                      <h4 className="font-semibold text-green-800 mb-2">Ready to deliver?</h4>
+                      <p className="text-sm text-green-700">
+                        Once delivered, the buyer will have time to review your work and mark it as complete.
+                      </p>
+                    </div>
+                    
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Delivery Message (Optional)
+                      </label>
+                      <textarea
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        rows={3}
+                        placeholder="Add any notes for the buyer..."
+                        id="deliveryMessage"
+                        defaultValue="Your order is ready! Please review and let me know if you need any changes."
+                      />
+                    </div>
+                    
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Delivery Files (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        placeholder="https://example.com/file1.zip, https://example.com/file2.pdf"
+                        id="deliveryFiles"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Add comma-separated URLs of your delivered files</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end gap-3">
+                    <button
+                      onClick={() => {
+                        setShowDeliveryModal(false);
+                        setSelectedOrder(null);
+                      }}
+                      className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        const messageEl = document.getElementById('deliveryMessage') as HTMLTextAreaElement;
+                        const filesEl = document.getElementById('deliveryFiles') as HTMLInputElement;
+                        const deliveryData = {
+                          deliveryMessage: messageEl?.value || '',
+                          deliveryFiles: filesEl?.value ? filesEl.value.split(',').map(f => f.trim()) : []
+                        };
+                        handleSubmitDelivery(deliveryData);
+                      }}
+                      disabled={orderActionLoading === selectedOrder._id}
+                      className="px-4 py-2.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-xl transition-colors disabled:opacity-50"
+                    >
+                      {orderActionLoading === selectedOrder._id ? (
+                        <span className="flex items-center">
+                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Delivering...
+                        </span>
+                      ) : (
+                        'Deliver Order'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Cancellation Modal */}
+          {showCancellationModal && selectedOrder && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+                <div className="p-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-gray-900">Cancel Order</h3>
+                    <button
+                      onClick={() => {
+                        setShowCancellationModal(false);
+                        setSelectedOrder(null);
+                      }}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  
+                  <div className="mb-6">
+                    <div className="bg-red-50 p-4 rounded-lg mb-4">
+                      <div className="flex items-start">
+                        <svg className="w-5 h-5 text-red-400 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.998-.833-2.732 0L4.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                        <div>
+                          <h4 className="font-semibold text-red-800">Important</h4>
+                          <p className="text-sm text-red-700 mt-1">
+                            Cancelling an order will initiate a refund to the buyer. This action cannot be undone.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Reason for Cancellation (Optional)
+                      </label>
+                      <textarea
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                        rows={3}
+                        placeholder="Why are you cancelling this order?"
+                        id="cancelReason"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">This will be shared with the buyer</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end gap-3">
+                    <button
+                      onClick={() => {
+                        setShowCancellationModal(false);
+                        setSelectedOrder(null);
+                      }}
+                      className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+                    >
+                      Go Back
+                    </button>
+                    <button
+                      onClick={() => {
+                        const reasonEl = document.getElementById('cancelReason') as HTMLTextAreaElement;
+                        handleSubmitCancellation(reasonEl?.value || '');
+                      }}
+                      disabled={orderActionLoading === selectedOrder._id}
+                      className="px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors disabled:opacity-50"
+                    >
+                      {orderActionLoading === selectedOrder._id ? (
+                        <span className="flex items-center">
+                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Cancelling...
+                        </span>
+                      ) : (
+                        'Cancel Order'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Tab Content */}
           {activeTab === 'overview' && (
             <div className="space-y-8">
-              {/* Stats Overview */}
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">Business Overview</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  <StatCard
-                    title="Total Revenue"
-                    value={formatCurrency(orderStats.totalRevenue)}
-                    icon="💰"
-                    color="green"
-                    description="Total earnings from completed orders"
-                  />
-                  <StatCard
-                    title="Active Orders"
-                    value={orderStats.activeOrders}
-                    icon="📦"
-                    color="blue"
-                    description="Orders currently in progress"
-                    onClick={() => setActiveTab('orders')}
-                  />
-                  <StatCard
-                    title="Pending Payment"
-                    value={orderStats.pendingPayment}
-                    icon="⏳"
-                    color="yellow"
-                    description="Orders awaiting payment"
-                    onClick={() => setActiveTab('orders')}
-                  />
-                  <StatCard
-                    title="Active Listings"
-                    value={activeListings}
-                    icon="✅"
-                    color="purple"
-                    description="Listings currently available"
-                    onClick={() => setActiveTab('listings')}
-                  />
-                </div>
-                
-                {/* Second Row Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
-                  <StatCard
-                    title="Processing"
-                    value={orderStats.processing}
-                    icon="⚙️"
-                    color="indigo"
-                    description="Orders being prepared"
-                    size="sm"
-                  />
-                  <StatCard
-                    title="In Progress"
-                    value={orderStats.inProgress}
-                    icon="👨‍💻"
-                    color="teal"
-                    description="Orders being worked on"
-                    size="sm"
-                  />
-                  <StatCard
-                    title="Delivered"
-                    value={orderStats.delivered}
-                    icon="🚚"
-                    color="cyan"
-                    description="Orders delivered to buyers"
-                    size="sm"
-                  />
-                  <StatCard
-                    title="Completed"
-                    value={orderStats.completed}
-                    icon="✅"
-                    color="green"
-                    description="Successfully completed orders"
-                    size="sm"
-                  />
+              {/* Welcome Card with Quick Actions */}
+              <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                  <div>
+                    <h2 className="text-2xl font-bold mb-2">Ready to grow your business?</h2>
+                    <p className="opacity-90">Manage orders, track earnings, and connect with buyers easily.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      onClick={() => window.open('/create-listing', '_blank')}
+                      className="px-4 py-2.5 bg-white text-blue-600 font-semibold rounded-xl hover:bg-blue-50 transition-colors"
+                    >
+                      + New Listing
+                    </button>
+                    {!(stripeStatus?.connected && stripeStatus?.chargesEnabled) && (
+                      <button
+                        onClick={() => setShowStripeSetup(true)}
+                        className="px-4 py-2.5 bg-green-500 text-white font-semibold rounded-xl hover:bg-green-600 transition-colors"
+                      >
+                        💰 Setup Payments
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Quick Stats Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Recent Activity */}
-                <div className="lg:col-span-2">
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h2 className="text-lg font-semibold text-gray-900">Recent Orders</h2>
-                          <p className="text-sm text-gray-600 mt-1">Latest orders and updates</p>
-                        </div>
-                        <button 
-                          onClick={() => setActiveTab('orders')}
-                          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                        >
-                          View All
-                        </button>
-                      </div>
+              {/* Quick Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <StatCard
+                  title="Total Earnings"
+                  value={formatCurrency(orderStats.totalRevenue)}
+                  icon="💰"
+                  color="green"
+                  description="All-time completed orders"
+                />
+                <StatCard
+                  title="Active Orders"
+                  value={orderStats.activeOrders}
+                  icon="📦"
+                  color="blue"
+                  description="Orders in progress"
+                  onClick={() => setActiveTab('orders')}
+                />
+                <StatCard
+                  title="Pending Offers"
+                  value={pendingOffers}
+                  icon="💼"
+                  color="yellow"
+                  description="Offers waiting review"
+                  onClick={() => setActiveTab('offers')}
+                />
+                <StatCard
+                  title="Active Listings"
+                  value={activeListings}
+                  icon="✅"
+                  color="purple"
+                  description="Items for sale"
+                  onClick={() => setActiveTab('listings')}
+                />
+              </div>
+
+              {/* Order Workflow Guide */}
+              <OrderWorkflowGuide />
+
+              {/* Recent Orders with Quick Actions */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900">Recent Orders</h2>
+                      <p className="text-sm text-gray-600 mt-1">Quick actions for your latest orders</p>
                     </div>
-                    <div className="p-6">
-                      {orders.length === 0 ? (
-                        <div className="text-center py-10">
-                          <div className="text-5xl mb-4 text-gray-300">📦</div>
-                          <h3 className="text-lg font-medium text-gray-900">No recent orders</h3>
-                          <p className="mt-2 text-gray-500">When you receive orders, they'll appear here.</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          {orders.slice(0, 5).map(order => {
-                            const statusInfo = getOrderStatusInfo(order.status);
-                            return (
-                              <div 
-                                key={order._id} 
-                                className="flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:border-blue-200 hover:bg-blue-50 transition-all duration-200 cursor-pointer group"
-                                onClick={() => handleViewOrderDetails(order._id)}
-                              >
-                                <div className="flex items-center space-x-4">
-                                  <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center border border-blue-200 group-hover:border-blue-300">
-                                    <span className="text-lg font-semibold text-blue-600">
-                                      {order.buyerId?.username?.charAt(0).toUpperCase() || 'U'}
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <p className="font-medium text-gray-900 group-hover:text-blue-600">
-                                      {order.listingId?.title || 'Unknown Listing'}
-                                    </p>
-                                    <p className="text-sm text-gray-500">{order.buyerId?.username || 'Unknown Buyer'}</p>
-                                    <div className="flex items-center mt-1">
-                                      <span 
-                                        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                                        style={{ backgroundColor: `${statusInfo.color}15`, color: statusInfo.color }}
-                                      >
-                                        <span className="mr-1">{statusInfo.icon}</span>
-                                        {statusInfo.text}
-                                      </span>
-                                      <span className="text-xs text-gray-400 ml-2">
-                                        {formatDate(order.createdAt)}
-                                      </span>
-                                    </div>
-                                  </div>
+                    <button 
+                      onClick={() => setActiveTab('orders')}
+                      className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    >
+                      View All →
+                    </button>
+                  </div>
+                </div>
+                <div className="p-6">
+                  {orders.length === 0 ? (
+                    <div className="text-center py-10">
+                      <div className="text-5xl mb-4 text-gray-300">📦</div>
+                      <h3 className="text-lg font-medium text-gray-900">No orders yet</h3>
+                      <p className="mt-2 text-gray-500">When you receive orders, they'll appear here.</p>
+                      <button
+                        onClick={() => setActiveTab('listings')}
+                        className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        Create Your First Listing
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {orders.slice(0, 5).map(order => {
+                        const statusInfo = getOrderStatusInfo(order.status);
+                        return (
+                          <div 
+                            key={order._id} 
+                            className="p-4 border border-gray-200 rounded-xl hover:border-blue-200 hover:bg-blue-50 transition-all duration-200"
+                          >
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                              <div className="flex items-center space-x-4">
+                                <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center border border-blue-200">
+                                  <span className="text-lg font-semibold text-blue-600">
+                                    {order.buyerId?.username?.charAt(0).toUpperCase() || 'B'}
+                                  </span>
                                 </div>
-                                <div className="text-right">
-                                  <p className="font-semibold text-green-600 text-lg">{formatCurrency(order.amount || 0)}</p>
-                                  <div className="mt-1">
-                                    <SellerOrderActions
-                                      order={order}
-                                      loading={orderActionLoading === order._id}
-                                      onStartProcessing={() => handleStartProcessing(order._id)}
-                                      onStartWork={() => handleStartWork(order._id)}
-                                      onDeliver={() => handleOpenOrderAction(order, 'deliver')}
-                                      onCancel={() => handleOpenOrderAction(order, 'cancel')}
-                                      onCompleteRevision={() => handleOpenOrderAction(order, 'complete_revision')}
-                                      onViewDetails={() => handleViewOrderDetails(order._id)}
-                                      onManualStatusUpdate={() => openStatusUpdateModal(order)}
-                                    />
+                                <div>
+                                  <p className="font-medium text-gray-900">{order.listingId?.title || 'Order'}</p>
+                                  <p className="text-sm text-gray-500">{order.buyerId?.username || 'Buyer'}</p>
+                                  <div className="flex items-center mt-1">
+                                    <span 
+                                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                      style={{ backgroundColor: `${statusInfo.color}15`, color: statusInfo.color }}
+                                    >
+                                      <span className="mr-1">{statusInfo.icon}</span>
+                                      {statusInfo.text}
+                                    </span>
+                                    <span className="text-xs text-gray-400 ml-2">
+                                      {formatDate(order.createdAt)}
+                                    </span>
                                   </div>
                                 </div>
                               </div>
-                            );
-                          })}
-                        </div>
-                      )}
+                              
+                              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                                <div className="text-right">
+                                  <p className="font-semibold text-green-600 text-lg">{formatCurrency(order.amount || 0)}</p>
+                                  <p className="text-xs text-gray-500">Order #{order.orderNumber || order._id.slice(-6)}</p>
+                                </div>
+                                
+                                <div className="flex flex-wrap gap-2">
+                                  {/* Quick Action Buttons Based on Status */}
+                                  {order.status === 'paid' && (
+                                    <button
+                                      onClick={() => handleSimpleStartProcessing(order)}
+                                      disabled={orderActionLoading === order._id}
+                                      className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                                    >
+                                      {orderActionLoading === order._id ? '...' : 'Start Processing'}
+                                    </button>
+                                  )}
+                                  
+                                  {order.status === 'processing' && (
+                                    <button
+                                      onClick={() => handleSimpleStartWork(order)}
+                                      disabled={orderActionLoading === order._id}
+                                      className="px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                                    >
+                                      {orderActionLoading === order._id ? '...' : 'Start Work'}
+                                    </button>
+                                  )}
+                                  
+                                  {order.status === 'in_progress' && (
+                                    <button
+                                      onClick={() => handleSimpleDeliver(order)}
+                                      disabled={orderActionLoading === order._id}
+                                      className="px-3 py-1.5 text-xs font-medium bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                                    >
+                                      Deliver
+                                    </button>
+                                  )}
+                                  
+                                  {order.status === 'in_revision' && (
+                                    <button
+                                      onClick={() => handleSimpleCompleteRevision(order)}
+                                      disabled={orderActionLoading === order._id}
+                                      className="px-3 py-1.5 text-xs font-medium bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50"
+                                    >
+                                      Complete Revision
+                                    </button>
+                                  )}
+                                  
+                                  {/* Cancel Button for Paid/Processing orders */}
+                                  {['paid', 'processing'].includes(order.status) && (
+                                    <button
+                                      onClick={() => handleSimpleCancel(order)}
+                                      disabled={orderActionLoading === order._id}
+                                      className="px-3 py-1.5 text-xs font-medium bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50"
+                                    >
+                                      Cancel
+                                    </button>
+                                  )}
+                                  
+                                  <button
+                                    onClick={() => handleViewOrderDetails(order._id)}
+                                    className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                                  >
+                                    Details
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Status Tracker */}
+                            <div className="mt-4 pt-4 border-t border-gray-100">
+                              <OrderStatusTracker 
+                                currentStatus={order.status}
+                                orderId={order._id}
+                                createdAt={order.createdAt}
+                                deliveredAt={order.deliveredAt}
+                                completedAt={order.completedAt}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  </div>
+                  )}
                 </div>
+              </div>
 
-                {/* Quick Actions & Tips */}
-                <div className="space-y-6">
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="px-6 py-5 border-b border-gray-200">
-                      <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
-                    </div>
-                    <div className="p-6 space-y-4">
-                      <button
-                        onClick={() => window.open('/create-listing', '_blank')}
-                        className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium py-3 px-4 rounded-xl transition-all duration-200 flex items-center justify-center shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-                      >
-                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                        Create New Listing
-                      </button>
-                      {!(stripeStatus?.connected && stripeStatus?.chargesEnabled) && (
-                        <button
-                          onClick={() => setShowStripeSetup(true)}
-                          className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-medium py-3 px-4 rounded-xl transition-all duration-200 flex items-center justify-center shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-                        >
-                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                          </svg>
-                          Setup Payments
-                        </button>
-                      )}
-                      <button
-                        onClick={() => setActiveTab('orders')}
-                        className="w-full bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 font-medium py-3 px-4 rounded-xl transition-all duration-200 flex items-center justify-center hover:shadow-sm"
-                      >
-                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                        </svg>
-                        Manage Orders
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-200 p-6">
-                    <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center">
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Order Management Tips
-                    </h3>
-                    <ul className="text-sm text-blue-800 space-y-2">
-                      <li className="flex items-start">
-                        <span className="inline-flex items-center justify-center w-5 h-5 bg-blue-100 text-blue-600 rounded-full text-xs mr-2 mt-0.5">✓</span>
-                        <span>Start processing orders within 24 hours of payment</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="inline-flex items-center justify-center w-5 h-5 bg-blue-100 text-blue-600 rounded-full text-xs mr-2 mt-0.5">✓</span>
-                        <span>Keep buyers updated on order progress</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="inline-flex items-center justify-center w-5 h-5 bg-blue-100 text-blue-600 rounded-full text-xs mr-2 mt-0.5">✓</span>
-                        <span>Deliver work before the expected delivery date</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="inline-flex items-center justify-center w-5 h-5 bg-blue-100 text-blue-600 rounded-full text-xs mr-2 mt-0.5">✓</span>
-                        <span>Communicate clearly during revision requests</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
+              {/* Quick Action Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <QuickActionCard
+                  title="Need Help with an Order?"
+                  description="Learn how to manage orders step by step"
+                  icon="❓"
+                  color="blue"
+                  actions={[
+                    { label: 'View Tutorial', onClick: () => window.open('/help/orders', '_blank') },
+                    { label: 'Contact Support', onClick: () => window.open('/help/support', '_blank') }
+                  ]}
+                />
+                
+                <QuickActionCard
+                  title="Boost Your Sales"
+                  description="Tips to get more orders"
+                  icon="🚀"
+                  color="green"
+                  actions={[
+                    { label: 'Optimize Listings', onClick: () => window.open('/help/optimize', '_blank') },
+                    { label: 'View Analytics', onClick: () => setActiveTab('listings') }
+                  ]}
+                />
               </div>
             </div>
           )}
@@ -1849,12 +1828,17 @@ const SellerDashboard: React.FC = () => {
               onViewOrderDetails={handleViewOrderDetails}
               onPlayVideo={handlePlayVideo}
               onRefresh={handleRefresh}
-              onStartProcessing={handleStartProcessing}
-              onStartWork={handleStartWork}
-              onDeliver={handleOpenOrderAction}
-              onCancel={handleOpenOrderAction}
-              onCompleteRevision={handleOpenOrderAction}
-              onManualStatusUpdate={openStatusUpdateModal}
+              onStartProcessing={(orderId) => {
+                const order = orders.find(o => o._id === orderId);
+                if (order) handleSimpleStartProcessing(order);
+              }}
+              onStartWork={(orderId) => {
+                const order = orders.find(o => o._id === orderId);
+                if (order) handleSimpleStartWork(order);
+              }}
+              onDeliver={(order) => handleSimpleDeliver(order)}
+              onCancel={(order) => handleSimpleCancel(order)}
+              onCompleteRevision={(order) => handleSimpleCompleteRevision(order)}
               actionLoading={orderActionLoading}
             />
           )}
