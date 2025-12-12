@@ -1190,10 +1190,10 @@ const SellerDashboard: React.FC = () => {
 
           {/* Stripe Status Banner - UPDATED TEXT */}
           <div className="mb-8">
-            <StripeAccountStatus 
+            {/* <StripeAccountStatus 
               stripeStatus={stripeStatus}
               onSetupClick={() => setShowStripeSetup(true)}
-            />
+            /> */}
           </div>
 
           {/* Navigation Tabs */}
