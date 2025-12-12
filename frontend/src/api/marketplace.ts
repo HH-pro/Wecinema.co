@@ -84,8 +84,8 @@ export interface UserListingsResponse extends MyListingsResponse {
   };
 }
 
-// API Base URL - FIXED: Hardcoded URL use karein
-const API_BASE_URL = 'http://localhost:3000/';
+// API Base Configuration
+const API_BASE_URL = 'http://localhost:3000';
 
 // Get auth token from localStorage or context
 const getAuthToken = (): string | null => {
@@ -114,7 +114,7 @@ const apiCall = async <T = any>(
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> => {
   try {
-    const url = `${API_BASE_URL}/marketplace${endpoint}`;
+    const url = `${API_BASE_URL}${endpoint}`;
     console.log(`🌐 API Call: ${options.method || 'GET'} ${url}`);
     
     const response = await fetch(url, {
@@ -161,70 +161,21 @@ const apiCall = async <T = any>(
 };
 
 // ===================================================
-// PUBLIC LISTINGS APIs (No authentication required)
+// NEW MARKETPLACE APIs (using /api/marketplace)
 // ===================================================
 
 /**
- * Get all active listings (Public)
- * @param params - Query parameters
- * @returns Promise with listings data
- */
-export const getListings = async (params: ListingFilters = {}): Promise<ApiResponse<Listing[]>> => {
-  const queryParams = new URLSearchParams(params as Record<string, string>).toString();
-  return await apiCall<Listing[]>(`/listings${queryParams ? `?${queryParams}` : ''}`);
-};
-
-/**
- * Get single listing details by ID (Public)
- * @param id - Listing ID
- * @returns Promise with listing data
- */
-export const getListingById = async (id: string): Promise<ApiResponse<{ listing: Listing }>> => {
-  if (!id) {
-    return {
-      success: false,
-      error: 'Listing ID is required'
-    };
-  }
-  return await apiCall<{ listing: Listing }>(`/listing/${id}`);
-};
-
-/**
- * Get listings by specific user ID (Public)
- * @param userId - User ID
- * @param params - Query parameters
- * @returns Promise with user's listings
- */
-export const getUserListings = async (
-  userId: string, 
-  params: Omit<ListingFilters, 'status'> = {}
-): Promise<ApiResponse<UserListingsResponse>> => {
-  if (!userId) {
-    return {
-      success: false,
-      error: 'User ID is required'
-    };
-  }
-  const queryParams = new URLSearchParams(params as Record<string, string>).toString();
-  return await apiCall<UserListingsResponse>(`/user/${userId}/listings${queryParams ? `?${queryParams}` : ''}`);
-};
-
-// ===================================================
-// AUTHENTICATED LISTING APIs (Require authentication)
-// ===================================================
-
-/**
- * Get current user's listings
+ * Get current user's listings (NEW API)
  * @param params - Query parameters
  * @returns Promise with user's listings
  */
 export const getMyListings = async (params: Omit<ListingFilters, 'search' | 'minPrice' | 'maxPrice'> = {}): Promise<ApiResponse<MyListingsResponse>> => {
   const queryParams = new URLSearchParams(params as Record<string, string>).toString();
-  return await apiCall<MyListingsResponse>(`/my-listings${queryParams ? `?${queryParams}` : ''}`);
+  return await apiCall<MyListingsResponse>(`/api/marketplace/my-listings${queryParams ? `?${queryParams}` : ''}`);
 };
 
 /**
- * Create a new listing
+ * Create a new listing (NEW API)
  * @param listingData - Listing data
  * @returns Promise with created listing
  */
@@ -249,14 +200,14 @@ export const createListing = async (listingData: CreateListingRequest): Promise<
     };
   }
   
-  return await apiCall('/create-listing', {
+  return await apiCall('/api/marketplace/create-listing', {
     method: 'POST',
     body: JSON.stringify(listingData)
   });
 };
 
 /**
- * Edit/Update an existing listing
+ * Edit/Update an existing listing (NEW API)
  * @param id - Listing ID
  * @param updateData - Fields to update
  * @returns Promise with updated listing
@@ -275,14 +226,14 @@ export const editListing = async (
     };
   }
   
-  return await apiCall<{ message: string; listing: Listing }>(`/listing/${id}`, {
+  return await apiCall<{ message: string; listing: Listing }>(`/api/marketplace/listing/${id}`, {
     method: 'PUT',
     body: JSON.stringify(updateData)
   });
 };
 
 /**
- * Toggle listing status between active and inactive
+ * Toggle listing status between active and inactive (NEW API)
  * @param id - Listing ID
  * @returns Promise with status change response
  */
@@ -299,13 +250,13 @@ export const toggleListingStatus = async (id: string): Promise<ApiResponse<{
     };
   }
   
-  return await apiCall(`/listing/${id}/toggle-status`, {
+  return await apiCall(`/api/marketplace/listing/${id}/toggle-status`, {
     method: 'PATCH'
   });
 };
 
 /**
- * Delete a listing
+ * Delete a listing (NEW API)
  * @param id - Listing ID
  * @returns Promise with deletion response
  */
@@ -324,69 +275,110 @@ export const deleteListing = async (id: string): Promise<ApiResponse<{
     };
   }
   
-  return await apiCall(`/listing/${id}`, {
+  return await apiCall(`/api/marketplace/listing/${id}`, {
     method: 'DELETE'
   });
 };
 
-// ===================================================
-// ADVANCED LISTING APIs
-// ===================================================
-
 /**
- * Search listings with filters
- * @param filters - Search filters
- * @returns Promise with search results
+ * Get single listing details by ID (NEW API)
+ * @param id - Listing ID
+ * @returns Promise with listing data
  */
-export const searchListings = async (filters: ListingFilters = {}): Promise<ApiResponse<Listing[]>> => {
-  const queryParams = new URLSearchParams(filters as Record<string, string>).toString();
-  return await apiCall<Listing[]>(`/listings/search${queryParams ? `?${queryParams}` : ''}`);
-};
-
-/**
- * Upload listing images
- * @param listingId - Listing ID
- * @param files - Array of image files
- * @returns Promise with upload response
- */
-export const uploadListingImages = async (
-  listingId: string, 
-  files: File[]
-): Promise<ApiResponse<{ urls: string[] }>> => {
-  if (!listingId || !files || files.length === 0) {
-    return {
-      success: false,
-      error: 'Listing ID and files are required'
-    };
-  }
-  
-  const formData = new FormData();
-  files.forEach((file, index) => {
-    formData.append('images', file);
-  });
-  
-  return await apiCall<{ urls: string[] }>(`/listing/${listingId}/upload-images`, {
-    method: 'POST',
-    body: formData
-  });
-};
-
-/**
- * Update listing views count
- * @param listingId - Listing ID
- * @returns Promise with view count response
- */
-export const incrementListingViews = async (listingId: string): Promise<ApiResponse<{ views: number }>> => {
-  if (!listingId) {
+export const getListingById = async (id: string): Promise<ApiResponse<{ listing: Listing }>> => {
+  if (!id) {
     return {
       success: false,
       error: 'Listing ID is required'
     };
   }
-  
-  return await apiCall<{ views: number }>(`/listing/${listingId}/view`, {
-    method: 'POST'
-  });
+  return await apiCall<{ listing: Listing }>(`/api/marketplace/listing/${id}`);
+};
+
+// ===================================================
+// EXISTING APIs (using /marketplace)
+// ===================================================
+
+/**
+ * Get all active listings (EXISTING API)
+ * @param params - Query parameters
+ * @returns Promise with listings data
+ */
+export const getAllListings = async (params: ListingFilters = {}): Promise<ApiResponse<Listing[]>> => {
+  const queryParams = new URLSearchParams(params as Record<string, string>).toString();
+  return await apiCall<Listing[]>(`/marketplace/listings${queryParams ? `?${queryParams}` : ''}`);
+};
+
+/**
+ * Get listings by specific user ID (EXISTING API)
+ * @param userId - User ID
+ * @param params - Query parameters
+ * @returns Promise with user's listings
+ */
+export const getUserListings = async (
+  userId: string, 
+  params: Omit<ListingFilters, 'status'> = {}
+): Promise<ApiResponse<UserListingsResponse>> => {
+  if (!userId) {
+    return {
+      success: false,
+      error: 'User ID is required'
+    };
+  }
+  const queryParams = new URLSearchParams(params as Record<string, string>).toString();
+  return await apiCall<UserListingsResponse>(`/marketplace/user/${userId}/listings${queryParams ? `?${queryParams}` : ''}`);
+};
+
+/**
+ * Search listings with filters (EXISTING API)
+ * @param filters - Search filters
+ * @returns Promise with search results
+ */
+export const searchListings = async (filters: ListingFilters = {}): Promise<ApiResponse<Listing[]>> => {
+  const queryParams = new URLSearchParams(filters as Record<string, string>).toString();
+  return await apiCall<Listing[]>(`/marketplace/listings/search${queryParams ? `?${queryParams}` : ''}`);
+};
+
+// ===================================================
+// HYBRID FUNCTIONS (Works with both old and new endpoints)
+// ===================================================
+
+/**
+ * Get user listings - tries new API first, falls back to old API
+ */
+export const getUserListingsHybrid = async (userId: string, params: any = {}): Promise<ApiResponse<any>> => {
+  try {
+    // Try new API first
+    const newResponse = await getUserListings(userId, params);
+    if (newResponse.success) {
+      return newResponse;
+    }
+    
+    // Fallback to old API method
+    const token = getAuthToken();
+    const queryParams = new URLSearchParams(params).toString();
+    const response = await fetch(
+      `${API_BASE_URL}/marketplace/listings/user/${userId}/listings${queryParams ? `?${queryParams}` : ''}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    
+    const data = await response.json();
+    return {
+      success: response.ok,
+      data,
+      error: response.ok ? undefined : data.error
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
 };
 
 // ===================================================
@@ -435,10 +427,21 @@ export type StatusType = 'active' | 'inactive' | 'pending' | 'sold' | 'deleted';
  * @param price - Price to format
  * @returns Formatted price string
  */
-export const formatPrice = (price: number): string => {
+export const formatPrice = (price: number, currency: string = 'USD'): string => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'USD',
+    currency: currency,
+    minimumFractionDigits: 2
+  }).format(price);
+};
+
+/**
+ * Format price in INR (for Indian Rupees)
+ */
+export const formatPriceINR = (price: number): string => {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
     minimumFractionDigits: 2
   }).format(price);
 };
@@ -458,6 +461,28 @@ export const getStatusColor = (status: StatusType): string => {
   };
   
   return colors[status] || 'secondary';
+};
+
+/**
+ * Get status color class for any status string
+ */
+export const getStatusColorClass = (status: string): string => {
+  const statusLower = status.toLowerCase();
+  
+  if (statusLower.includes('active') || statusLower.includes('completed') || statusLower.includes('paid')) {
+    return 'bg-green-100 text-green-800 border-green-200';
+  }
+  if (statusLower.includes('pending') || statusLower.includes('waiting')) {
+    return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+  }
+  if (statusLower.includes('inactive') || statusLower.includes('cancelled') || statusLower.includes('rejected')) {
+    return 'bg-red-100 text-red-800 border-red-200';
+  }
+  if (statusLower.includes('sold') || statusLower.includes('shipped') || statusLower.includes('delivered')) {
+    return 'bg-blue-100 text-blue-800 border-blue-200';
+  }
+  
+  return 'bg-gray-100 text-gray-800 border-gray-200';
 };
 
 /**
@@ -493,34 +518,67 @@ export const prepareListingData = (formData: any): CreateListingRequest => {
   };
 };
 
+/**
+ * Format date for display
+ */
+export const formatDate = (dateString: string | Date): string => {
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date);
+};
+
+/**
+ * Get relative time (e.g., "2 days ago")
+ */
+export const getRelativeTime = (dateString: string | Date): string => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  if (diffInSeconds < 60) return 'just now';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+  
+  return formatDate(date);
+};
+
 // ===================================================
 // EXPORT ALL FUNCTIONS
 // ===================================================
 
 const marketplaceAPI = {
-  // Public APIs
-  getListings,
-  getListingById,
-  getUserListings,
-  
-  // Authenticated APIs
+  // New Marketplace APIs
   getMyListings,
   createListing,
   editListing,
   toggleListingStatus,
   deleteListing,
+  getListingById,
   
-  // Advanced APIs
+  // Existing APIs
+  getAllListings,
+  getUserListings,
   searchListings,
-  uploadListingImages,
-  incrementListingViews,
+  
+  // Hybrid Functions
+  getUserListingsHybrid,
   
   // Utility functions
   validateListingData,
   formatPrice,
+  formatPriceINR,
   getStatusColor,
+  getStatusColorClass,
   parseTags,
-  prepareListingData
+  prepareListingData,
+  formatDate,
+  getRelativeTime
 };
 
 export default marketplaceAPI;
