@@ -75,18 +75,33 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
 
 // ===================================================
 // ✅ CREATE LISTING
-// ===================================================
 router.post("/create-listing", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== CREATE LISTING REQUEST ===");
-    console.log("Body received:", req.body);
+    console.log("Full request object:", {
+      user: req.user,
+      body: req.body,
+      headers: req.headers
+    });
+
+    // Debug: Check if user is properly authenticated
+    if (!req.user || !req.user._id) {
+      console.error("❌ User not authenticated. req.user:", req.user);
+      return res.status(401).json({
+        success: false,
+        error: "User not authenticated. Please log in again."
+      });
+    }
 
     const { title, description, price, type, category, tags, mediaUrls } = req.body;
     const sellerId = req.user._id;
 
-    // Enhanced validation with specific checks
+    console.log("✅ Authenticated user ID:", sellerId);
+
+    // Enhanced validation
     if (!title || !description || !price || !type) {
       return res.status(400).json({ 
+        success: false,
         error: "Missing required fields",
         required: ["title", "description", "price", "type"],
         received: {
@@ -99,36 +114,60 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    // Validate price is a positive number
-    if (typeof price !== 'number' || price <= 0) {
+    // Validate price
+    if (isNaN(price) || price <= 0) {
       return res.status(400).json({
+        success: false,
         error: "Price must be a positive number",
         received: price
       });
     }
 
-    // Normalize data with defaults
+    // Normalize data
     const tagsArray = Array.isArray(tags) ? tags : (tags ? [tags] : []);
     const mediaArray = Array.isArray(mediaUrls) ? mediaUrls : (mediaUrls ? [mediaUrls] : []);
     const actualCategory = category || 'uncategorized';
 
-    console.log("Creating listing for seller:", sellerId);
-
-    // Get seller email from User model
+    // Get seller email with better error handling
     let sellerEmail = null;
+    let seller = null;
+    
     try {
-      const seller = await User.findById(sellerId).select('email').exec();
+      seller = await User.findById(sellerId).select('email username').exec();
       if (seller) {
         sellerEmail = seller.email;
-        console.log("✅ Seller email found:", sellerEmail);
+        console.log("✅ Seller found:", {
+          id: seller._id,
+          email: seller.email,
+          username: seller.username
+        });
+      } else {
+        console.error("❌ Seller not found in database for ID:", sellerId);
+        return res.status(404).json({
+          success: false,
+          error: "User account not found. Please contact support."
+        });
       }
     } catch (emailError) {
-      console.error("❌ Error fetching seller email:", emailError.message);
-      // Continue without email
+      console.error("❌ Error fetching seller:", emailError.message);
+      return res.status(500).json({
+        success: false,
+        error: "Could not retrieve user information",
+        details: emailError.message
+      });
     }
 
-    // Create the listing
-    const listing = await MarketplaceListing.create({
+    // Validate email format
+    if (sellerEmail && !isValidEmail(sellerEmail)) {
+      console.error("❌ Invalid seller email format:", sellerEmail);
+      return res.status(400).json({
+        success: false,
+        error: "Invalid email format in user account"
+      });
+    }
+
+    // Create listing data
+    const listingData = {
       sellerId: sellerId,
       sellerEmail: sellerEmail,
       title: title.trim(),
@@ -141,11 +180,22 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
       status: "active",
       createdAt: new Date(),
       updatedAt: new Date()
+    };
+
+    console.log("📝 Creating listing with data:", listingData);
+
+    // Create the listing
+    const listing = await MarketplaceListing.create(listingData);
+
+    console.log("✅ Listing created successfully:", {
+      id: listing._id,
+      title: listing.title,
+      sellerId: listing.sellerId,
+      sellerEmail: listing.sellerEmail
     });
 
-    console.log("✅ Listing created successfully:", listing._id);
-
     res.status(201).json({ 
+      success: true,
       message: "Listing created successfully", 
       listing: {
         id: listing._id,
@@ -155,7 +205,11 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
         category: listing.category,
         status: listing.status,
         createdAt: listing.createdAt,
-        hasSellerEmail: !!sellerEmail
+        seller: {
+          id: seller._id,
+          username: seller.username,
+          email: sellerEmail ? 'email_provided' : 'no_email'
+        }
       }
     });
 
@@ -165,6 +219,7 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
     // Handle duplicate key errors
     if (error.code === 11000) {
       return res.status(400).json({
+        success: false,
         error: "Listing with similar details already exists",
         details: error.keyValue
       });
@@ -172,26 +227,40 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
     
     // Handle validation errors
     if (error.name === 'ValidationError') {
+      const errors = {};
+      Object.keys(error.errors).forEach(key => {
+        errors[key] = error.errors[key].message;
+      });
+      
       return res.status(400).json({
+        success: false,
         error: "Validation failed",
-        details: Object.values(error.errors).map(err => err.message)
+        details: errors
       });
     }
 
     // Handle database connection errors
     if (error.name === 'MongooseError' || error.message.includes('buffering timed out')) {
       return res.status(503).json({
+        success: false,
         error: "Database temporarily unavailable",
         details: "Please try again in a moment"
       });
     }
 
     res.status(500).json({ 
+      success: false,
       error: "Failed to create listing", 
       details: error.message 
     });
   }
 });
+
+// Email validation helper function
+function isValidEmail(email) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
 
 // ===================================================
 // ✅ EDIT/UPDATE LISTING
