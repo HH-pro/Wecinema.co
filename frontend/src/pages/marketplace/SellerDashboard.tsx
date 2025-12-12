@@ -1115,10 +1115,10 @@ const SellerDashboard: React.FC = () => {
   if (loading && activeTab !== 'listings' && activeTab !== 'orders') {
     return (
       <MarketplaceLayout>
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-yellow-50 to-amber-50">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-600 mx-auto mb-4"></div>
-            <p className="text-lg text-gray-700 font-medium">Loading your dashboard...</p>
+            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+            <p className="text-lg text-gray-800 font-medium">Loading your dashboard...</p>
             <p className="text-sm text-gray-500 mt-2">Getting everything ready for you</p>
           </div>
         </div>
@@ -1128,24 +1128,34 @@ const SellerDashboard: React.FC = () => {
 
   return (
     <MarketplaceLayout>
-      <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-white to-amber-50 py-8">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="mb-10">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
               <div>
-                <h1 className="text-3xl md:text-4xl font-bold text-gray-900 bg-gradient-to-r from-yellow-600 to-amber-800 bg-clip-text text-transparent">
-                  Seller Dashboard
-                </h1>
-                <p className="mt-2 text-gray-600 max-w-2xl">
-                  Welcome back! Manage orders, track earnings, and grow your business easily.
-                </p>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-md">
+                    <span className="text-white text-2xl">📊</span>
+                  </div>
+                  <div>
+                    <h1 className="text-3xl md:text-4xl font-bold text-gray-900">
+                      Seller Dashboard
+                    </h1>
+                    <p className="mt-1 text-gray-600">
+                      Manage orders, track earnings, and grow your business
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                <div className="text-sm text-gray-500 bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm">
+                  <span className="font-medium">{formatCurrency(orderStats.totalRevenue)}</span> total earnings
+                </div>
                 <button
                   onClick={handleRefresh}
                   disabled={refreshing}
-                  className="inline-flex items-center px-4 py-2.5 bg-white border border-yellow-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-yellow-50 hover:shadow-sm transition-all duration-200 disabled:opacity-50"
+                  className="inline-flex items-center px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:shadow-sm transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow"
                 >
                   <svg 
                     className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} 
@@ -1155,53 +1165,55 @@ const SellerDashboard: React.FC = () => {
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  {refreshing ? 'Refreshing...' : 'Refresh Data'}
+                  {refreshing ? 'Refreshing...' : 'Refresh'}
                 </button>
               </div>
             </div>
           </div>
 
           {/* Alerts */}
-          {successMessage && (
-            <div className="mb-6 animate-fade-in">
-              <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded-r-lg">
-                <div className="flex items-center">
-                  <svg className="w-5 h-5 text-green-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <p className="text-green-800">{successMessage}</p>
+          <div className="mb-8 space-y-4">
+            {successMessage && (
+              <div className="animate-fade-in">
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-500 p-4 rounded-lg shadow-sm">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-green-800">{successMessage}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {error && (
-            <div className="mb-6 animate-fade-in">
-              <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-r-lg">
-                <div className="flex items-center">
-                  <svg className="w-5 h-5 text-red-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <p className="text-red-800">{error}</p>
+            {error && (
+              <div className="animate-fade-in">
+                <div className="bg-gradient-to-r from-red-50 to-rose-50 border-l-4 border-red-500 p-4 rounded-lg shadow-sm">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-red-800">{error}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-
-          {/* Stripe Status Banner - UPDATED TEXT */}
-          <div className="mb-8">
-            {/* <StripeAccountStatus 
-              stripeStatus={stripeStatus}
-              onSetupClick={() => setShowStripeSetup(true)}
-            /> */}
+            )}
           </div>
 
           {/* Navigation Tabs */}
           <div className="mb-8">
-            <div className="border-b border-yellow-200">
-              <nav className="-mb-px flex space-x-8 overflow-x-auto">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-1">
+              <nav className="flex space-x-1" aria-label="Tabs">
                 {[
-                  { id: 'overview', label: 'Overview', icon: '📊' },
+                  { id: 'overview', label: 'Overview', icon: '📊', badge: null },
                   { id: 'offers', label: 'Offers', icon: '💼', badge: pendingOffers },
                   { id: 'listings', label: 'My Listings', icon: '🏠', badge: totalListings },
                   { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders }
@@ -1209,21 +1221,27 @@ const SellerDashboard: React.FC = () => {
                   <button
                     key={id}
                     onClick={() => setActiveTab(id)}
-                    className={`py-4 px-1 font-medium text-sm flex items-center whitespace-nowrap transition-all duration-200 relative ${
-                      activeTab === id
-                        ? 'text-yellow-600'
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
+                    className={`
+                      relative flex-1 py-3 px-4 font-medium text-sm rounded-lg
+                      transition-all duration-200 flex items-center justify-center
+                      ${activeTab === id
+                        ? 'bg-gradient-to-r from-yellow-50 to-yellow-100 text-yellow-700 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                      }
+                    `}
                   >
                     <span className="mr-2 text-lg">{icon}</span>
                     {label}
                     {badge !== undefined && badge > 0 && (
-                      <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                      <span className={`
+                        ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                        ${activeTab === id 
+                          ? 'bg-yellow-100 text-yellow-800' 
+                          : 'bg-gray-100 text-gray-800'
+                        }
+                      `}>
                         {badge}
                       </span>
-                    )}
-                    {activeTab === id && (
-                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-yellow-500 to-amber-600 rounded-full"></div>
                     )}
                   </button>
                 ))}
@@ -1306,7 +1324,7 @@ const SellerDashboard: React.FC = () => {
                   </div>
                   
                   <div className="mb-6">
-                    <div className="bg-yellow-50 p-4 rounded-lg mb-4 border border-yellow-200">
+                    <div className="bg-gradient-to-r from-yellow-50 to-amber-50 p-4 rounded-lg mb-4 border border-yellow-200">
                       <h4 className="font-semibold text-yellow-800 mb-2">What happens next?</h4>
                       <ol className="text-sm text-yellow-700 space-y-2">
                         <li className="flex items-start">
@@ -1324,12 +1342,12 @@ const SellerDashboard: React.FC = () => {
                       </ol>
                     </div>
                     
-                    <div className="flex items-center p-3 bg-gray-50 rounded-lg">
-                      <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center mr-3 border border-yellow-200">
+                    <div className="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="w-10 h-10 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-lg flex items-center justify-center mr-3 border border-yellow-200">
                         <span className="text-yellow-600 font-semibold">{processingOrder.orderNumber?.slice(-3) || '#'}</span>
                       </div>
                       <div>
-                        <p className="font-medium">{processingOrder.listingId?.title || 'Order'}</p>
+                        <p className="font-medium text-gray-900">{processingOrder.listingId?.title || 'Order'}</p>
                         <p className="text-sm text-gray-500">From: {processingOrder.buyerId?.username || 'Buyer'}</p>
                       </div>
                     </div>
@@ -1341,7 +1359,7 @@ const SellerDashboard: React.FC = () => {
                         setShowProcessingModal(false);
                         setProcessingOrder(null);
                       }}
-                      className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+                      className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors shadow-sm"
                     >
                       Cancel
                     </button>
@@ -1350,7 +1368,7 @@ const SellerDashboard: React.FC = () => {
                         await handleSimpleStartProcessing(processingOrder);
                       }}
                       disabled={orderActionLoading === processingOrder._id}
-                      className="px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-600 hover:to-amber-700 rounded-xl transition-colors disabled:opacity-50 shadow-md"
+                      className="px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 rounded-xl transition-all duration-200 disabled:opacity-50 shadow-md hover:shadow"
                     >
                       {orderActionLoading === processingOrder._id ? (
                         <span className="flex items-center">
@@ -1389,7 +1407,7 @@ const SellerDashboard: React.FC = () => {
                   </div>
                   
                   <div className="mb-6">
-                    <div className="bg-green-50 p-4 rounded-lg mb-4 border border-green-200">
+                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg mb-4 border border-green-200">
                       <h4 className="font-semibold text-green-800 mb-2">Ready to deliver?</h4>
                       <p className="text-sm text-green-700">
                         Once delivered, the buyer will have time to review your work and mark it as complete.
@@ -1401,7 +1419,7 @@ const SellerDashboard: React.FC = () => {
                         Delivery Message (Optional)
                       </label>
                       <textarea
-                        className="w-full p-3 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 shadow-sm"
                         rows={3}
                         placeholder="Add any notes for the buyer..."
                         id="deliveryMessage"
@@ -1415,7 +1433,7 @@ const SellerDashboard: React.FC = () => {
                       </label>
                       <input
                         type="text"
-                        className="w-full p-3 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 shadow-sm"
                         placeholder="https://example.com/file1.zip, https://example.com/file2.pdf"
                         id="deliveryFiles"
                       />
@@ -1429,7 +1447,7 @@ const SellerDashboard: React.FC = () => {
                         setShowDeliveryModal(false);
                         setSelectedOrder(null);
                       }}
-                      className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+                      className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors shadow-sm"
                     >
                       Cancel
                     </button>
@@ -1444,7 +1462,7 @@ const SellerDashboard: React.FC = () => {
                         handleSubmitDelivery(deliveryData);
                       }}
                       disabled={orderActionLoading === selectedOrder._id}
-                      className="px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 rounded-xl transition-colors disabled:opacity-50 shadow-md"
+                      className="px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-xl transition-all duration-200 disabled:opacity-50 shadow-md hover:shadow"
                     >
                       {orderActionLoading === selectedOrder._id ? (
                         <span className="flex items-center">
@@ -1483,10 +1501,10 @@ const SellerDashboard: React.FC = () => {
                   </div>
                   
                   <div className="mb-6">
-                    <div className="bg-red-50 p-4 rounded-lg mb-4 border border-red-200">
+                    <div className="bg-gradient-to-r from-red-50 to-rose-50 p-4 rounded-lg mb-4 border border-red-200">
                       <div className="flex items-start">
-                        <svg className="w-5 h-5 text-red-400 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.998-.833-2.732 0L4.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        <svg className="w-5 h-5 text-red-500 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <div>
                           <h4 className="font-semibold text-red-800">Important</h4>
@@ -1502,7 +1520,7 @@ const SellerDashboard: React.FC = () => {
                         Reason for Cancellation (Optional)
                       </label>
                       <textarea
-                        className="w-full p-3 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 shadow-sm"
                         rows={3}
                         placeholder="Why are you cancelling this order?"
                         id="cancelReason"
@@ -1517,7 +1535,7 @@ const SellerDashboard: React.FC = () => {
                         setShowCancellationModal(false);
                         setSelectedOrder(null);
                       }}
-                      className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+                      className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors shadow-sm"
                     >
                       Go Back
                     </button>
@@ -1527,7 +1545,7 @@ const SellerDashboard: React.FC = () => {
                         handleSubmitCancellation(reasonEl?.value || '');
                       }}
                       disabled={orderActionLoading === selectedOrder._id}
-                      className="px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 rounded-xl transition-colors disabled:opacity-50 shadow-md"
+                      className="px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded-xl transition-all duration-200 disabled:opacity-50 shadow-md hover:shadow"
                     >
                       {orderActionLoading === selectedOrder._id ? (
                         <span className="flex items-center">
@@ -1551,72 +1569,95 @@ const SellerDashboard: React.FC = () => {
           {activeTab === 'overview' && (
             <div className="space-y-8">
               {/* Welcome Card with Quick Actions */}
-              <div className="bg-gradient-to-r from-yellow-500 to-amber-600 rounded-2xl p-6 text-white shadow-lg">
+              <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-2xl p-6 text-white shadow-xl">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                   <div>
-                    <h2 className="text-2xl font-bold mb-2">Ready to grow your business?</h2>
-                    <p className="opacity-90">Manage orders, track earnings, and connect with buyers easily.</p>
+                    <h2 className="text-2xl font-bold mb-2">Welcome back, Seller! 👋</h2>
+                    <p className="text-gray-300">Manage your business efficiently with real-time insights and quick actions.</p>
                   </div>
                   <div className="flex flex-wrap gap-3">
                     <button
                       onClick={() => window.open('/create-listing', '_blank')}
-                      className="px-4 py-2.5 bg-white text-yellow-600 font-semibold rounded-xl hover:bg-yellow-50 transition-colors shadow-md"
+                      className="px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-semibold rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 shadow-md hover:shadow-lg"
                     >
-                      + New Listing
+                      + Create New Listing
                     </button>
                     {!(stripeStatus?.connected && stripeStatus?.chargesEnabled) && (
                       <button
                         onClick={() => setShowStripeSetup(true)}
-                        className="px-4 py-2.5 bg-emerald-500 text-white font-semibold rounded-xl hover:bg-emerald-600 transition-colors shadow-md"
+                        className="px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-semibold rounded-xl hover:from-emerald-600 hover:to-emerald-700 transition-all duration-200 shadow-md hover:shadow-lg"
                       >
-                        💰 Accept Orders
+                        💰 Setup Payments
                       </button>
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* Quick Stats */}
+              {/* Stats Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard
-                  title="Total Earnings"
-                  value={formatCurrency(orderStats.totalRevenue)}
-                  icon="💰"
-                  color="green"
-                  description="All-time completed orders"
-                />
-                <StatCard
-                  title="Active Orders"
-                  value={orderStats.activeOrders}
-                  icon="📦"
-                  color="yellow"
-                  description="Orders in progress"
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl">
+                      <span className="text-2xl">💰</span>
+                    </div>
+                    <span className="text-sm font-medium text-green-600 bg-green-50 px-2 py-1 rounded-lg">+12%</span>
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-1">{formatCurrency(orderStats.totalRevenue)}</h3>
+                  <p className="text-gray-500 text-sm">Total Earnings</p>
+                </div>
+
+                <div 
                   onClick={() => setActiveTab('orders')}
-                />
-                <StatCard
-                  title="Pending Offers"
-                  value={pendingOffers}
-                  icon="💼"
-                  color="amber"
-                  description="Offers waiting review"
+                  className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200 cursor-pointer hover:border-yellow-300"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl">
+                      <span className="text-2xl">📦</span>
+                    </div>
+                    <span className="text-sm font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">{orderStats.activeOrders} Active</span>
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-1">{orderStats.totalOrders}</h3>
+                  <p className="text-gray-500 text-sm">Total Orders</p>
+                </div>
+
+                <div 
                   onClick={() => setActiveTab('offers')}
-                />
-                <StatCard
-                  title="Active Listings"
-                  value={activeListings}
-                  icon="✅"
-                  color="purple"
-                  description="Items for sale"
+                  className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200 cursor-pointer hover:border-amber-300"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl">
+                      <span className="text-2xl">💼</span>
+                    </div>
+                    {pendingOffers > 0 && (
+                      <span className="text-sm font-medium text-red-600 bg-red-50 px-2 py-1 rounded-lg">{pendingOffers} Pending</span>
+                    )}
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-1">{offers.length}</h3>
+                  <p className="text-gray-500 text-sm">Total Offers</p>
+                </div>
+
+                <div 
                   onClick={() => setActiveTab('listings')}
-                />
+                  className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200 cursor-pointer hover:border-purple-300"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-3 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl">
+                      <span className="text-2xl">🏠</span>
+                    </div>
+                    <span className="text-sm font-medium text-purple-600 bg-purple-50 px-2 py-1 rounded-lg">{activeListings} Active</span>
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-1">{totalListings}</h3>
+                  <p className="text-gray-500 text-sm">Total Listings</p>
+                </div>
               </div>
 
               {/* Order Workflow Guide */}
               <OrderWorkflowGuide />
 
-              {/* Recent Orders with Quick Actions */}
-              <div className="bg-white rounded-2xl shadow-sm border border-yellow-200 overflow-hidden">
-                <div className="px-6 py-5 border-b border-yellow-200 bg-gradient-to-r from-yellow-50 to-amber-50">
+              {/* Recent Orders */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="px-6 py-5 border-b border-gray-200">
                   <div className="flex justify-between items-center">
                     <div>
                       <h2 className="text-lg font-semibold text-gray-900">Recent Orders</h2>
@@ -1624,7 +1665,7 @@ const SellerDashboard: React.FC = () => {
                     </div>
                     <button 
                       onClick={() => setActiveTab('orders')}
-                      className="text-sm text-yellow-600 hover:text-yellow-700 font-medium"
+                      className="text-sm font-medium text-yellow-600 hover:text-yellow-700 bg-yellow-50 hover:bg-yellow-100 px-3 py-1.5 rounded-lg transition-colors"
                     >
                       View All →
                     </button>
@@ -1638,7 +1679,7 @@ const SellerDashboard: React.FC = () => {
                       <p className="mt-2 text-gray-500">When you receive orders, they'll appear here.</p>
                       <button
                         onClick={() => setActiveTab('listings')}
-                        className="mt-4 px-4 py-2 bg-gradient-to-r from-yellow-500 to-amber-600 text-white rounded-lg hover:from-yellow-600 hover:to-amber-700 transition-colors shadow-md"
+                        className="mt-4 px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 shadow-md hover:shadow"
                       >
                         Create Your First Listing
                       </button>
@@ -1650,12 +1691,12 @@ const SellerDashboard: React.FC = () => {
                         return (
                           <div 
                             key={order._id} 
-                            className="p-4 border border-yellow-200 rounded-xl hover:border-yellow-300 hover:bg-yellow-50 transition-all duration-200"
+                            className="p-4 border border-gray-200 rounded-xl hover:border-yellow-300 hover:shadow-sm transition-all duration-200"
                           >
                             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                               <div className="flex items-center space-x-4">
-                                <div className="w-12 h-12 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-xl flex items-center justify-center border border-yellow-200">
-                                  <span className="text-lg font-semibold text-yellow-600">
+                                <div className="w-12 h-12 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center border border-gray-300">
+                                  <span className="text-lg font-semibold text-gray-600">
                                     {order.buyerId?.username?.charAt(0).toUpperCase() || 'B'}
                                   </span>
                                 </div>
@@ -1689,7 +1730,7 @@ const SellerDashboard: React.FC = () => {
                                     <button
                                       onClick={() => handleSimpleStartProcessing(order)}
                                       disabled={orderActionLoading === order._id}
-                                      className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-yellow-500 to-amber-600 text-white rounded-lg hover:from-yellow-600 hover:to-amber-700 transition-colors disabled:opacity-50 shadow-sm"
+                                      className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow"
                                     >
                                       {orderActionLoading === order._id ? '...' : 'Start Processing'}
                                     </button>
@@ -1699,7 +1740,7 @@ const SellerDashboard: React.FC = () => {
                                     <button
                                       onClick={() => handleSimpleStartWork(order)}
                                       disabled={orderActionLoading === order._id}
-                                      className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-colors disabled:opacity-50 shadow-sm"
+                                      className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow"
                                     >
                                       {orderActionLoading === order._id ? '...' : 'Start Work'}
                                     </button>
@@ -1709,7 +1750,7 @@ const SellerDashboard: React.FC = () => {
                                     <button
                                       onClick={() => handleSimpleDeliver(order)}
                                       disabled={orderActionLoading === order._id}
-                                      className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-purple-500 to-violet-600 text-white rounded-lg hover:from-purple-600 hover:to-violet-700 transition-colors disabled:opacity-50 shadow-sm"
+                                      className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow"
                                     >
                                       Deliver
                                     </button>
@@ -1719,7 +1760,7 @@ const SellerDashboard: React.FC = () => {
                                     <button
                                       onClick={() => handleSimpleCompleteRevision(order)}
                                       disabled={orderActionLoading === order._id}
-                                      className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-lg hover:from-amber-600 hover:to-orange-700 transition-colors disabled:opacity-50 shadow-sm"
+                                      className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-lg hover:from-amber-600 hover:to-amber-700 transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow"
                                     >
                                       Complete Revision
                                     </button>
@@ -1730,7 +1771,7 @@ const SellerDashboard: React.FC = () => {
                                     <button
                                       onClick={() => handleSimpleCancel(order)}
                                       disabled={orderActionLoading === order._id}
-                                      className="px-3 py-1.5 text-xs font-medium bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50"
+                                      className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-red-50 to-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50 border border-red-200"
                                     >
                                       Cancel
                                     </button>
@@ -1738,7 +1779,7 @@ const SellerDashboard: React.FC = () => {
                                   
                                   <button
                                     onClick={() => handleViewOrderDetails(order._id)}
-                                    className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                                    className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors border border-gray-300"
                                   >
                                     Details
                                   </button>
@@ -1747,7 +1788,7 @@ const SellerDashboard: React.FC = () => {
                             </div>
                             
                             {/* Status Tracker */}
-                            <div className="mt-4 pt-4 border-t border-yellow-100">
+                            <div className="mt-4 pt-4 border-t border-gray-100">
                               <OrderStatusTracker 
                                 currentStatus={order.status}
                                 orderId={order._id}
@@ -1766,27 +1807,57 @@ const SellerDashboard: React.FC = () => {
 
               {/* Quick Action Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <QuickActionCard
-                  title="Need Help with an Order?"
-                  description="Learn how to manage orders step by step"
-                  icon="❓"
-                  color="yellow"
-                  actions={[
-                    { label: 'View Tutorial', onClick: () => window.open('/help/orders', '_blank') },
-                    { label: 'Contact Support', onClick: () => window.open('/help/support', '_blank') }
-                  ]}
-                />
+                <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-2xl p-6 border border-yellow-200">
+                  <div className="flex items-start gap-4 mb-4">
+                    <div className="p-3 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl">
+                      <span className="text-2xl text-white">❓</span>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">Need Help with an Order?</h3>
+                      <p className="text-gray-600 text-sm mt-1">Learn how to manage orders step by step</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => window.open('/help/orders', '_blank')}
+                      className="flex-1 px-4 py-2.5 bg-white text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors border border-gray-300 shadow-sm"
+                    >
+                      View Tutorial
+                    </button>
+                    <button
+                      onClick={() => window.open('/help/support', '_blank')}
+                      className="flex-1 px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 shadow-sm hover:shadow"
+                    >
+                      Contact Support
+                    </button>
+                  </div>
+                </div>
                 
-                <QuickActionCard
-                  title="Boost Your Sales"
-                  description="Tips to get more orders"
-                  icon="🚀"
-                  color="green"
-                  actions={[
-                    { label: 'Optimize Listings', onClick: () => window.open('/help/optimize', '_blank') },
-                    { label: 'View Analytics', onClick: () => setActiveTab('listings') }
-                  ]}
-                />
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 border border-green-200">
+                  <div className="flex items-start gap-4 mb-4">
+                    <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-xl">
+                      <span className="text-2xl text-white">🚀</span>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">Boost Your Sales</h3>
+                      <p className="text-gray-600 text-sm mt-1">Tips to get more orders and grow your business</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => window.open('/help/optimize', '_blank')}
+                      className="flex-1 px-4 py-2.5 bg-white text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors border border-gray-300 shadow-sm"
+                    >
+                      Optimize Listings
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('listings')}
+                      className="flex-1 px-4 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white font-medium rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 shadow-sm hover:shadow"
+                    >
+                      View Analytics
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
