@@ -1,5 +1,5 @@
-// API Response Types
-interface ApiResponse<T = any> {
+// Marketplace API Types
+export interface ApiResponse<T = any> {
   success: boolean;
   status?: number;
   data?: T;
@@ -10,7 +10,7 @@ interface ApiResponse<T = any> {
 }
 
 // Listing Types
-interface Listing {
+export interface Listing {
   _id: string;
   sellerId: string | User;
   sellerEmail?: string;
@@ -27,7 +27,7 @@ interface Listing {
   updatedAt: string | Date;
 }
 
-interface User {
+export interface User {
   _id: string;
   username: string;
   avatar?: string;
@@ -37,7 +37,7 @@ interface User {
 }
 
 // Request Types
-interface CreateListingRequest {
+export interface CreateListingRequest {
   title: string;
   description: string;
   price: number;
@@ -47,9 +47,9 @@ interface CreateListingRequest {
   mediaUrls?: string[];
 }
 
-interface EditListingRequest extends Partial<CreateListingRequest> {}
+export interface EditListingRequest extends Partial<CreateListingRequest> {}
 
-interface ListingFilters {
+export interface ListingFilters {
   status?: 'active' | 'inactive' | 'pending' | 'sold';
   category?: string;
   type?: 'product' | 'service' | 'digital' | 'rental';
@@ -63,19 +63,19 @@ interface ListingFilters {
   order?: 'asc' | 'desc';
 }
 
-interface PaginationInfo {
+export interface PaginationInfo {
   page: number;
   limit: number;
   total: number;
   pages: number;
 }
 
-interface MyListingsResponse {
+export interface MyListingsResponse {
   listings: Listing[];
   pagination: PaginationInfo;
 }
 
-interface UserListingsResponse extends MyListingsResponse {
+export interface UserListingsResponse extends MyListingsResponse {
   user: {
     id: string;
     username: string;
@@ -84,8 +84,8 @@ interface UserListingsResponse extends MyListingsResponse {
   };
 }
 
-// API Base URL
-const API_BASE_URL: string = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
+// API Base URL - FIXED: Hardcoded URL use karein
+const API_BASE_URL = 'http://localhost:3000/api';
 
 // Get auth token from localStorage or context
 const getAuthToken = (): string | null => {
@@ -390,85 +390,10 @@ export const incrementListingViews = async (listingId: string): Promise<ApiRespo
 };
 
 // ===================================================
-// ADMIN APIs (Require admin privileges)
-// ===================================================
-
-interface AdminListingsResponse {
-  listings: Listing[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
-/**
- * Admin: Get all listings (including inactive)
- * @param params - Query parameters
- * @returns Promise with all listings
- */
-export const adminGetAllListings = async (params: ListingFilters = {}): Promise<ApiResponse<AdminListingsResponse>> => {
-  const queryParams = new URLSearchParams(params as Record<string, string>).toString();
-  return await apiCall<AdminListingsResponse>(`/admin/listings${queryParams ? `?${queryParams}` : ''}`);
-};
-
-/**
- * Admin: Update any listing
- * @param id - Listing ID
- * @param updateData - Update data
- * @returns Promise with update response
- */
-export const adminUpdateListing = async (
-  id: string, 
-  updateData: EditListingRequest
-): Promise<ApiResponse<{ listing: Listing }>> => {
-  return await apiCall<{ listing: Listing }>(`/admin/listing/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(updateData)
-  });
-};
-
-/**
- * Admin: Delete any listing
- * @param id - Listing ID
- * @returns Promise with deletion response
- */
-export const adminDeleteListing = async (id: string): Promise<ApiResponse<{ message: string }>> => {
-  return await apiCall<{ message: string }>(`/admin/listing/${id}`, {
-    method: 'DELETE'
-  });
-};
-
-/**
- * Admin: Delete ALL listings (⚠️ Dangerous!)
- * @returns Promise with deletion response
- */
-export const adminDeleteAllListings = async (): Promise<ApiResponse<{
-  success: boolean;
-  message: string;
-  deletedCount: number;
-  beforeCount: number;
-  warning: string;
-}>> => {
-  const confirm = window.confirm(
-    '⚠️ WARNING: This will delete ALL listings permanently!\n\nAre you sure you want to continue?'
-  );
-  
-  if (!confirm) {
-    return {
-      success: false,
-      error: 'Operation cancelled by user'
-    };
-  }
-  
-  return await apiCall('/admin/delete-all-listings', {
-    method: 'DELETE'
-  });
-};
-
-// ===================================================
 // UTILITY FUNCTIONS
 // ===================================================
 
-interface ValidationResult {
+export interface ValidationResult {
   isValid: boolean;
   errors: string[];
 }
@@ -503,7 +428,7 @@ export const validateListingData = (data: Partial<CreateListingRequest>): Valida
   };
 };
 
-type StatusType = 'active' | 'inactive' | 'pending' | 'sold' | 'deleted';
+export type StatusType = 'active' | 'inactive' | 'pending' | 'sold' | 'deleted';
 
 /**
  * Format price for display
@@ -590,29 +515,12 @@ const marketplaceAPI = {
   uploadListingImages,
   incrementListingViews,
   
-  // Admin APIs
-  adminGetAllListings,
-  adminUpdateListing,
-  adminDeleteListing,
-  adminDeleteAllListings,
-  
   // Utility functions
   validateListingData,
   formatPrice,
   getStatusColor,
   parseTags,
   prepareListingData
-};
-
-export type {
-  Listing,
-  User,
-  CreateListingRequest,
-  EditListingRequest,
-  ListingFilters,
-  ApiResponse,
-  ValidationResult,
-  StatusType
 };
 
 export default marketplaceAPI;
