@@ -609,7 +609,7 @@ const SellerDashboard: React.FC = () => {
       // First, try to update status to "processing"
       try {
         const response = await axios.put(
-          `${API_BASE_URL}/marketplace/orders/${order._id}/status`,
+          `${API_BASE_URL}/api/marketplace/orders/${order._id}/status`,
           { status: 'processing' },
           {
             headers: { 
@@ -662,7 +662,7 @@ const SellerDashboard: React.FC = () => {
       
       try {
         const response = await axios.put(
-          `${API_BASE_URL}/marketplace/orders/${order._id}/status`,
+          `${API_BASE_URL}/api/marketplace/orders/${order._id}/status`,
           { status: 'in_progress' },
           {
             headers: { 
@@ -735,7 +735,7 @@ const SellerDashboard: React.FC = () => {
       };
 
       const response = await axios.put(
-        `${API_BASE_URL}/marketplace/orders/${selectedOrder._id}/status`,
+        `${API_BASE_URL}/api/marketplace/orders/${selectedOrder._id}/status`,
         requestData,
         {
           headers: { 
@@ -792,7 +792,7 @@ const SellerDashboard: React.FC = () => {
       }
 
       const response = await axios.put(
-        `${API_BASE_URL}/marketplace/orders/${selectedOrder._id}/status`,
+        `${API_BASE_URL}/api/marketplace/orders/${selectedOrder._id}/status`,
         { 
           status: 'cancelled',
           cancelReason: cancelReason || 'Seller cancelled the order'
@@ -839,7 +839,7 @@ const SellerDashboard: React.FC = () => {
       console.log('🔄 Completing revision for order:', order._id);
       
       const response = await axios.put(
-        `${API_BASE_URL}/marketplace/orders/${order._id}/status`,
+        `${API_BASE_URL}/api/marketplace/orders/${order._id}/status`,
         { status: 'delivered' },
         {
           headers: { 
@@ -1082,7 +1082,7 @@ const SellerDashboard: React.FC = () => {
 
   const handleStripeSetupSuccess = () => {
     setShowStripeSetup(false);
-    setSuccessMessage('Stripe account setup completed!');
+    setSuccessMessage('Stripe account connected successfully! You can now accept orders.');
     setTimeout(() => {
       checkStripeAccountStatus();
       fetchDashboardData();
@@ -1115,9 +1115,9 @@ const SellerDashboard: React.FC = () => {
   if (loading && activeTab !== 'listings' && activeTab !== 'orders') {
     return (
       <MarketplaceLayout>
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-gray-50">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-yellow-50 to-amber-50">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-600 mx-auto mb-4"></div>
             <p className="text-lg text-gray-700 font-medium">Loading your dashboard...</p>
             <p className="text-sm text-gray-500 mt-2">Getting everything ready for you</p>
           </div>
@@ -1128,24 +1128,24 @@ const SellerDashboard: React.FC = () => {
 
   return (
     <MarketplaceLayout>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-gray-50 py-8">
+      <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-white to-amber-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="mb-10">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
-                <h1 className="text-3xl md:text-4xl font-bold text-gray-900 bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+                <h1 className="text-3xl md:text-4xl font-bold text-gray-900 bg-gradient-to-r from-yellow-600 to-amber-800 bg-clip-text text-transparent">
                   Seller Dashboard
                 </h1>
                 <p className="mt-2 text-gray-600 max-w-2xl">
-                  Welcome back! Manage your orders, listings, and grow your business easily.
+                  Welcome back! Manage orders, track earnings, and grow your business easily.
                 </p>
               </div>
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleRefresh}
                   disabled={refreshing}
-                  className="inline-flex items-center px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 hover:shadow-sm transition-all duration-200 disabled:opacity-50"
+                  className="inline-flex items-center px-4 py-2.5 bg-white border border-yellow-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-yellow-50 hover:shadow-sm transition-all duration-200 disabled:opacity-50"
                 >
                   <svg 
                     className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} 
@@ -1188,7 +1188,7 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* Stripe Status Banner */}
+          {/* Stripe Status Banner - UPDATED TEXT */}
           <div className="mb-8">
             <StripeAccountStatus 
               stripeStatus={stripeStatus}
@@ -1198,7 +1198,7 @@ const SellerDashboard: React.FC = () => {
 
           {/* Navigation Tabs */}
           <div className="mb-8">
-            <div className="border-b border-gray-200">
+            <div className="border-b border-yellow-200">
               <nav className="-mb-px flex space-x-8 overflow-x-auto">
                 {[
                   { id: 'overview', label: 'Overview', icon: '📊' },
@@ -1211,7 +1211,7 @@ const SellerDashboard: React.FC = () => {
                     onClick={() => setActiveTab(id)}
                     className={`py-4 px-1 font-medium text-sm flex items-center whitespace-nowrap transition-all duration-200 relative ${
                       activeTab === id
-                        ? 'text-blue-600'
+                        ? 'text-yellow-600'
                         : 'text-gray-500 hover:text-gray-700'
                     }`}
                   >
@@ -1223,7 +1223,7 @@ const SellerDashboard: React.FC = () => {
                       </span>
                     )}
                     {activeTab === id && (
-                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full"></div>
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-yellow-500 to-amber-600 rounded-full"></div>
                     )}
                   </button>
                 ))}
@@ -1306,27 +1306,27 @@ const SellerDashboard: React.FC = () => {
                   </div>
                   
                   <div className="mb-6">
-                    <div className="bg-blue-50 p-4 rounded-lg mb-4">
-                      <h4 className="font-semibold text-blue-800 mb-2">What happens next?</h4>
-                      <ol className="text-sm text-blue-700 space-y-2">
+                    <div className="bg-yellow-50 p-4 rounded-lg mb-4 border border-yellow-200">
+                      <h4 className="font-semibold text-yellow-800 mb-2">What happens next?</h4>
+                      <ol className="text-sm text-yellow-700 space-y-2">
                         <li className="flex items-start">
-                          <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-100 text-blue-600 rounded-full text-xs mr-2">1</span>
+                          <span className="inline-flex items-center justify-center w-6 h-6 bg-yellow-100 text-yellow-600 rounded-full text-xs mr-2">1</span>
                           <span>Order status changes to "Processing"</span>
                         </li>
                         <li className="flex items-start">
-                          <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-100 text-blue-600 rounded-full text-xs mr-2">2</span>
+                          <span className="inline-flex items-center justify-center w-6 h-6 bg-yellow-100 text-yellow-600 rounded-full text-xs mr-2">2</span>
                           <span>You can begin preparing the order</span>
                         </li>
                         <li className="flex items-start">
-                          <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-100 text-blue-600 rounded-full text-xs mr-2">3</span>
+                          <span className="inline-flex items-center justify-center w-6 h-6 bg-yellow-100 text-yellow-600 rounded-full text-xs mr-2">3</span>
                           <span>When ready, click "Start Work"</span>
                         </li>
                       </ol>
                     </div>
                     
                     <div className="flex items-center p-3 bg-gray-50 rounded-lg">
-                      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                        <span className="text-blue-600 font-semibold">{processingOrder.orderNumber?.slice(-3) || '#'}</span>
+                      <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center mr-3 border border-yellow-200">
+                        <span className="text-yellow-600 font-semibold">{processingOrder.orderNumber?.slice(-3) || '#'}</span>
                       </div>
                       <div>
                         <p className="font-medium">{processingOrder.listingId?.title || 'Order'}</p>
@@ -1350,7 +1350,7 @@ const SellerDashboard: React.FC = () => {
                         await handleSimpleStartProcessing(processingOrder);
                       }}
                       disabled={orderActionLoading === processingOrder._id}
-                      className="px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors disabled:opacity-50"
+                      className="px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-600 hover:to-amber-700 rounded-xl transition-colors disabled:opacity-50 shadow-md"
                     >
                       {orderActionLoading === processingOrder._id ? (
                         <span className="flex items-center">
@@ -1389,7 +1389,7 @@ const SellerDashboard: React.FC = () => {
                   </div>
                   
                   <div className="mb-6">
-                    <div className="bg-green-50 p-4 rounded-lg mb-4">
+                    <div className="bg-green-50 p-4 rounded-lg mb-4 border border-green-200">
                       <h4 className="font-semibold text-green-800 mb-2">Ready to deliver?</h4>
                       <p className="text-sm text-green-700">
                         Once delivered, the buyer will have time to review your work and mark it as complete.
@@ -1401,7 +1401,7 @@ const SellerDashboard: React.FC = () => {
                         Delivery Message (Optional)
                       </label>
                       <textarea
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        className="w-full p-3 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
                         rows={3}
                         placeholder="Add any notes for the buyer..."
                         id="deliveryMessage"
@@ -1415,7 +1415,7 @@ const SellerDashboard: React.FC = () => {
                       </label>
                       <input
                         type="text"
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        className="w-full p-3 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
                         placeholder="https://example.com/file1.zip, https://example.com/file2.pdf"
                         id="deliveryFiles"
                       />
@@ -1444,7 +1444,7 @@ const SellerDashboard: React.FC = () => {
                         handleSubmitDelivery(deliveryData);
                       }}
                       disabled={orderActionLoading === selectedOrder._id}
-                      className="px-4 py-2.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-xl transition-colors disabled:opacity-50"
+                      className="px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 rounded-xl transition-colors disabled:opacity-50 shadow-md"
                     >
                       {orderActionLoading === selectedOrder._id ? (
                         <span className="flex items-center">
@@ -1483,7 +1483,7 @@ const SellerDashboard: React.FC = () => {
                   </div>
                   
                   <div className="mb-6">
-                    <div className="bg-red-50 p-4 rounded-lg mb-4">
+                    <div className="bg-red-50 p-4 rounded-lg mb-4 border border-red-200">
                       <div className="flex items-start">
                         <svg className="w-5 h-5 text-red-400 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.998-.833-2.732 0L4.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
@@ -1502,7 +1502,7 @@ const SellerDashboard: React.FC = () => {
                         Reason for Cancellation (Optional)
                       </label>
                       <textarea
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                        className="w-full p-3 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                         rows={3}
                         placeholder="Why are you cancelling this order?"
                         id="cancelReason"
@@ -1527,7 +1527,7 @@ const SellerDashboard: React.FC = () => {
                         handleSubmitCancellation(reasonEl?.value || '');
                       }}
                       disabled={orderActionLoading === selectedOrder._id}
-                      className="px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors disabled:opacity-50"
+                      className="px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 rounded-xl transition-colors disabled:opacity-50 shadow-md"
                     >
                       {orderActionLoading === selectedOrder._id ? (
                         <span className="flex items-center">
@@ -1551,7 +1551,7 @@ const SellerDashboard: React.FC = () => {
           {activeTab === 'overview' && (
             <div className="space-y-8">
               {/* Welcome Card with Quick Actions */}
-              <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white shadow-lg">
+              <div className="bg-gradient-to-r from-yellow-500 to-amber-600 rounded-2xl p-6 text-white shadow-lg">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                   <div>
                     <h2 className="text-2xl font-bold mb-2">Ready to grow your business?</h2>
@@ -1560,16 +1560,16 @@ const SellerDashboard: React.FC = () => {
                   <div className="flex flex-wrap gap-3">
                     <button
                       onClick={() => window.open('/create-listing', '_blank')}
-                      className="px-4 py-2.5 bg-white text-blue-600 font-semibold rounded-xl hover:bg-blue-50 transition-colors"
+                      className="px-4 py-2.5 bg-white text-yellow-600 font-semibold rounded-xl hover:bg-yellow-50 transition-colors shadow-md"
                     >
                       + New Listing
                     </button>
                     {!(stripeStatus?.connected && stripeStatus?.chargesEnabled) && (
                       <button
                         onClick={() => setShowStripeSetup(true)}
-                        className="px-4 py-2.5 bg-green-500 text-white font-semibold rounded-xl hover:bg-green-600 transition-colors"
+                        className="px-4 py-2.5 bg-emerald-500 text-white font-semibold rounded-xl hover:bg-emerald-600 transition-colors shadow-md"
                       >
-                        💰 Setup Payments
+                        💰 Accept Orders
                       </button>
                     )}
                   </div>
@@ -1589,7 +1589,7 @@ const SellerDashboard: React.FC = () => {
                   title="Active Orders"
                   value={orderStats.activeOrders}
                   icon="📦"
-                  color="blue"
+                  color="yellow"
                   description="Orders in progress"
                   onClick={() => setActiveTab('orders')}
                 />
@@ -1597,7 +1597,7 @@ const SellerDashboard: React.FC = () => {
                   title="Pending Offers"
                   value={pendingOffers}
                   icon="💼"
-                  color="yellow"
+                  color="amber"
                   description="Offers waiting review"
                   onClick={() => setActiveTab('offers')}
                 />
@@ -1615,8 +1615,8 @@ const SellerDashboard: React.FC = () => {
               <OrderWorkflowGuide />
 
               {/* Recent Orders with Quick Actions */}
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white">
+              <div className="bg-white rounded-2xl shadow-sm border border-yellow-200 overflow-hidden">
+                <div className="px-6 py-5 border-b border-yellow-200 bg-gradient-to-r from-yellow-50 to-amber-50">
                   <div className="flex justify-between items-center">
                     <div>
                       <h2 className="text-lg font-semibold text-gray-900">Recent Orders</h2>
@@ -1624,7 +1624,7 @@ const SellerDashboard: React.FC = () => {
                     </div>
                     <button 
                       onClick={() => setActiveTab('orders')}
-                      className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                      className="text-sm text-yellow-600 hover:text-yellow-700 font-medium"
                     >
                       View All →
                     </button>
@@ -1638,7 +1638,7 @@ const SellerDashboard: React.FC = () => {
                       <p className="mt-2 text-gray-500">When you receive orders, they'll appear here.</p>
                       <button
                         onClick={() => setActiveTab('listings')}
-                        className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        className="mt-4 px-4 py-2 bg-gradient-to-r from-yellow-500 to-amber-600 text-white rounded-lg hover:from-yellow-600 hover:to-amber-700 transition-colors shadow-md"
                       >
                         Create Your First Listing
                       </button>
@@ -1650,12 +1650,12 @@ const SellerDashboard: React.FC = () => {
                         return (
                           <div 
                             key={order._id} 
-                            className="p-4 border border-gray-200 rounded-xl hover:border-blue-200 hover:bg-blue-50 transition-all duration-200"
+                            className="p-4 border border-yellow-200 rounded-xl hover:border-yellow-300 hover:bg-yellow-50 transition-all duration-200"
                           >
                             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                               <div className="flex items-center space-x-4">
-                                <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center border border-blue-200">
-                                  <span className="text-lg font-semibold text-blue-600">
+                                <div className="w-12 h-12 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-xl flex items-center justify-center border border-yellow-200">
+                                  <span className="text-lg font-semibold text-yellow-600">
                                     {order.buyerId?.username?.charAt(0).toUpperCase() || 'B'}
                                   </span>
                                 </div>
@@ -1689,7 +1689,7 @@ const SellerDashboard: React.FC = () => {
                                     <button
                                       onClick={() => handleSimpleStartProcessing(order)}
                                       disabled={orderActionLoading === order._id}
-                                      className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                                      className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-yellow-500 to-amber-600 text-white rounded-lg hover:from-yellow-600 hover:to-amber-700 transition-colors disabled:opacity-50 shadow-sm"
                                     >
                                       {orderActionLoading === order._id ? '...' : 'Start Processing'}
                                     </button>
@@ -1699,7 +1699,7 @@ const SellerDashboard: React.FC = () => {
                                     <button
                                       onClick={() => handleSimpleStartWork(order)}
                                       disabled={orderActionLoading === order._id}
-                                      className="px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                                      className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-colors disabled:opacity-50 shadow-sm"
                                     >
                                       {orderActionLoading === order._id ? '...' : 'Start Work'}
                                     </button>
@@ -1709,7 +1709,7 @@ const SellerDashboard: React.FC = () => {
                                     <button
                                       onClick={() => handleSimpleDeliver(order)}
                                       disabled={orderActionLoading === order._id}
-                                      className="px-3 py-1.5 text-xs font-medium bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+                                      className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-purple-500 to-violet-600 text-white rounded-lg hover:from-purple-600 hover:to-violet-700 transition-colors disabled:opacity-50 shadow-sm"
                                     >
                                       Deliver
                                     </button>
@@ -1719,7 +1719,7 @@ const SellerDashboard: React.FC = () => {
                                     <button
                                       onClick={() => handleSimpleCompleteRevision(order)}
                                       disabled={orderActionLoading === order._id}
-                                      className="px-3 py-1.5 text-xs font-medium bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50"
+                                      className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-lg hover:from-amber-600 hover:to-orange-700 transition-colors disabled:opacity-50 shadow-sm"
                                     >
                                       Complete Revision
                                     </button>
@@ -1747,7 +1747,7 @@ const SellerDashboard: React.FC = () => {
                             </div>
                             
                             {/* Status Tracker */}
-                            <div className="mt-4 pt-4 border-t border-gray-100">
+                            <div className="mt-4 pt-4 border-t border-yellow-100">
                               <OrderStatusTracker 
                                 currentStatus={order.status}
                                 orderId={order._id}
@@ -1770,7 +1770,7 @@ const SellerDashboard: React.FC = () => {
                   title="Need Help with an Order?"
                   description="Learn how to manage orders step by step"
                   icon="❓"
-                  color="blue"
+                  color="yellow"
                   actions={[
                     { label: 'View Tutorial', onClick: () => window.open('/help/orders', '_blank') },
                     { label: 'Contact Support', onClick: () => window.open('/help/support', '_blank') }
