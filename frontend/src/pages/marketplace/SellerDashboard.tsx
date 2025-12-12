@@ -10,7 +10,9 @@ import {
   getOrderActions,
   formatCurrency,
   formatOrderStatus,
-  getStatusColor
+  getStatusColor,
+  getValidStatusTransitions,
+  getValidStatuses
 } from '../../api';
 import axios from 'axios';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
@@ -25,6 +27,7 @@ import OffersTab from '../../components/marketplae/seller/OffersTab';
 import ListingsTab from '../../components/marketplae/seller/ListingsTab';
 import OrdersTab from '../../components/marketplae/seller/OrdersTab';
 import SellerOrderActions from '../../components/marketplae/seller/SellerOrderActions';
+import StatusUpdateModal from '../../components/marketplae/seller/StatusUpdateModal';
 
 const API_BASE_URL = 'http://localhost:3000';
 
@@ -222,6 +225,11 @@ const SellerDashboard: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showOrderActionModal, setShowOrderActionModal] = useState(false);
   const [orderActionType, setOrderActionType] = useState<string>('');
+  
+  // Status update modal
+  const [showStatusUpdateModal, setShowStatusUpdateModal] = useState(false);
+  const [statusUpdateOrder, setStatusUpdateOrder] = useState<Order | null>(null);
+  const [availableStatuses, setAvailableStatuses] = useState<string[]>([]);
 
   const formatDate = (dateString: string): string => {
     if (!dateString) return 'N/A';
@@ -574,7 +582,7 @@ const SellerDashboard: React.FC = () => {
     setShowOrderModal(true);
   };
 
-  // ORDER MANAGEMENT FUNCTIONS - FIXED VERSION
+  // ORDER MANAGEMENT FUNCTIONS - UPDATED VERSION
   const handleStartProcessing = async (orderId: string) => {
     try {
       setOrderActionLoading(orderId);
@@ -605,35 +613,23 @@ const SellerDashboard: React.FC = () => {
 
         if (response.data.success) {
           setSuccessMessage('Order processing started successfully!');
-          
-          // Update order in state
-          setOrders(prev => prev.map(order => 
-            order._id === orderId ? { 
-              ...order, 
-              status: 'processing',
-              processingAt: new Date().toISOString(),
-              permissions: {
-                ...order.permissions,
-                canStartProcessing: false,
-                canStartWork: true
-              }
-            } : order
-          ));
-          
-          // Update stats
-          const updatedOrders = orders.map(order => 
-            order._id === orderId ? { ...order, status: 'processing' } : order
-          );
-          const updatedStats = calculateOrderStats(updatedOrders);
-          setOrderStats(updatedStats);
+          updateOrderInState(orderId, 'processing', {
+            processingAt: new Date().toISOString(),
+            permissions: {
+              canStartProcessing: false,
+              canStartWork: true,
+              canDeliver: false,
+              canCancelBySeller: true
+            }
+          });
         } else {
           setError(response.data.error || 'Failed to start processing order');
         }
       } catch (axiosError: any) {
         // If specific endpoint fails, try generic status update
-        if (axiosError.response?.status === 404) {
+        if (axiosError.response?.status === 404 || axiosError.response?.status === 500) {
           console.log('⚠️ Specific endpoint not found, trying generic status update...');
-          await updateOrderStatus(orderId, 'processing');
+          await updateOrderStatusGeneric(orderId, 'processing');
         } else {
           throw axiosError;
         }
@@ -676,35 +672,23 @@ const SellerDashboard: React.FC = () => {
 
         if (response.data.success) {
           setSuccessMessage('Work started on order successfully!');
-          
-          // Update order in state
-          setOrders(prev => prev.map(order => 
-            order._id === orderId ? { 
-              ...order, 
-              status: 'in_progress',
-              startedAt: new Date().toISOString(),
-              permissions: {
-                ...order.permissions,
-                canStartWork: false,
-                canDeliver: true
-              }
-            } : order
-          ));
-          
-          // Update stats
-          const updatedOrders = orders.map(order => 
-            order._id === orderId ? { ...order, status: 'in_progress' } : order
-          );
-          const updatedStats = calculateOrderStats(updatedOrders);
-          setOrderStats(updatedStats);
+          updateOrderInState(orderId, 'in_progress', {
+            startedAt: new Date().toISOString(),
+            permissions: {
+              canStartProcessing: false,
+              canStartWork: false,
+              canDeliver: true,
+              canCancelBySeller: true
+            }
+          });
         } else {
           setError(response.data.error || 'Failed to start work on order');
         }
       } catch (axiosError: any) {
         // If specific endpoint fails, try generic status update
-        if (axiosError.response?.status === 404) {
+        if (axiosError.response?.status === 404 || axiosError.response?.status === 500) {
           console.log('⚠️ Specific endpoint not found, trying generic status update...');
-          await updateOrderStatus(orderId, 'in_progress');
+          await updateOrderStatusGeneric(orderId, 'in_progress');
         } else {
           throw axiosError;
         }
@@ -717,14 +701,14 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // Generic order status update (fallback)
-  const updateOrderStatus = async (orderId: string, status: string) => {
+  // Generic order status update (using the new endpoint)
+  const updateOrderStatusGeneric = async (orderId: string, status: string, options?: any) => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     
     try {
       const response = await axios.put(
-        `${API_BASE_URL}/marketplace/orders/${orderId}/status`,
-        { status },
+        `${API_BASE_URL}/api/marketplace/orders/${orderId}/status`,
+        { status, ...options },
         {
           headers: { 
             Authorization: `Bearer ${token}`,
@@ -735,50 +719,11 @@ const SellerDashboard: React.FC = () => {
       );
 
       if (response.data.success) {
-        setSuccessMessage(`Order status updated to ${status} successfully!`);
+        const statusInfo = getOrderStatusInfo(status);
+        setSuccessMessage(`Order status updated to ${statusInfo.text} successfully!`);
         
         // Update order in state
-        setOrders(prev => prev.map(order => {
-          if (order._id === orderId) {
-            const updatedOrder = { ...order, status };
-            
-            // Set appropriate timestamps
-            if (status === 'processing') {
-              updatedOrder.processingAt = new Date().toISOString();
-              updatedOrder.permissions = {
-                ...order.permissions,
-                canStartProcessing: false,
-                canStartWork: true
-              };
-            } else if (status === 'in_progress') {
-              updatedOrder.startedAt = new Date().toISOString();
-              updatedOrder.permissions = {
-                ...order.permissions,
-                canStartWork: false,
-                canDeliver: true
-              };
-            } else if (status === 'delivered') {
-              updatedOrder.deliveredAt = new Date().toISOString();
-              updatedOrder.permissions = {
-                ...order.permissions,
-                canDeliver: false
-              };
-            } else if (status === 'cancelled') {
-              updatedOrder.cancelledAt = new Date().toISOString();
-            }
-            
-            return updatedOrder;
-          }
-          return order;
-        }));
-        
-        // Update stats
-        const updatedOrders = orders.map(order => 
-          order._id === orderId ? { ...order, status } : order
-        );
-        const updatedStats = calculateOrderStats(updatedOrders);
-        setOrderStats(updatedStats);
-        
+        updateOrderInState(orderId, status, response.data.order);
         return true;
       } else {
         setError(response.data.error || `Failed to update order status to ${status}`);
@@ -786,9 +731,50 @@ const SellerDashboard: React.FC = () => {
       }
     } catch (error: any) {
       console.error(`❌ Error updating order status to ${status}:`, error);
-      setError(error.response?.data?.error || `Failed to update order status. Please try again.`);
+      
+      // Check if it's a validation error for status transitions
+      if (error.response?.data?.allowedTransitions) {
+        setError(`${error.response.data.error}. Allowed transitions: ${error.response.data.allowedTransitions.join(', ')}`);
+      } else {
+        setError(error.response?.data?.error || `Failed to update order status. Please try again.`);
+      }
       return false;
     }
+  };
+
+  // Update order in state
+  const updateOrderInState = (orderId: string, newStatus: string, updates?: any) => {
+    setOrders(prev => prev.map(order => {
+      if (order._id === orderId) {
+        const updatedOrder = { 
+          ...order, 
+          status: newStatus,
+          ...updates
+        };
+        
+        // Set appropriate timestamps based on status
+        if (newStatus === 'processing' && !updatedOrder.processingAt) {
+          updatedOrder.processingAt = new Date().toISOString();
+        } else if (newStatus === 'in_progress' && !updatedOrder.startedAt) {
+          updatedOrder.startedAt = new Date().toISOString();
+        } else if (newStatus === 'delivered' && !updatedOrder.deliveredAt) {
+          updatedOrder.deliveredAt = new Date().toISOString();
+        } else if (newStatus === 'completed' && !updatedOrder.completedAt) {
+          updatedOrder.completedAt = new Date().toISOString();
+        } else if (newStatus === 'cancelled' && !updatedOrder.cancelledAt) {
+          updatedOrder.cancelledAt = new Date().toISOString();
+        }
+        
+        return updatedOrder;
+      }
+      return order;
+    }));
+    
+    // Update stats
+    const updatedStats = calculateOrderStats(
+      orders.map(order => order._id === orderId ? { ...order, status: newStatus } : order)
+    );
+    setOrderStats(updatedStats);
   };
 
   const handleDeliverOrder = async (orderId: string, deliveryData: { deliveryMessage?: string; deliveryFiles?: string[] }) => {
@@ -821,36 +807,25 @@ const SellerDashboard: React.FC = () => {
 
         if (response.data.success) {
           setSuccessMessage('Order delivered successfully!');
-          
-          // Update order in state
-          setOrders(prev => prev.map(order => 
-            order._id === orderId ? { 
-              ...order, 
-              status: 'delivered',
-              deliveredAt: new Date().toISOString(),
-              deliveryMessage: deliveryData.deliveryMessage,
-              deliveryFiles: deliveryData.deliveryFiles,
-              permissions: {
-                ...order.permissions,
-                canDeliver: false
-              }
-            } : order
-          ));
-          
-          // Update stats
-          const updatedOrders = orders.map(order => 
-            order._id === orderId ? { ...order, status: 'delivered' } : order
-          );
-          const updatedStats = calculateOrderStats(updatedOrders);
-          setOrderStats(updatedStats);
+          updateOrderInState(orderId, 'delivered', {
+            deliveredAt: new Date().toISOString(),
+            deliveryMessage: deliveryData.deliveryMessage,
+            deliveryFiles: deliveryData.deliveryFiles,
+            permissions: {
+              canStartProcessing: false,
+              canStartWork: false,
+              canDeliver: false,
+              canCancelBySeller: false
+            }
+          });
         } else {
           setError(response.data.error || 'Failed to deliver order');
         }
       } catch (axiosError: any) {
         // If specific endpoint fails, try generic status update
-        if (axiosError.response?.status === 404) {
+        if (axiosError.response?.status === 404 || axiosError.response?.status === 500) {
           console.log('⚠️ Specific endpoint not found, trying generic status update...');
-          await updateOrderStatus(orderId, 'delivered');
+          await updateOrderStatusGeneric(orderId, 'delivered', deliveryData);
         } else {
           throw axiosError;
         }
@@ -893,30 +868,23 @@ const SellerDashboard: React.FC = () => {
 
         if (response.data.success) {
           setSuccessMessage('Order cancelled successfully!');
-          
-          // Update order in state
-          setOrders(prev => prev.map(order => 
-            order._id === orderId ? { 
-              ...order, 
-              status: 'cancelled',
-              cancelledAt: new Date().toISOString()
-            } : order
-          ));
-          
-          // Update stats
-          const updatedOrders = orders.map(order => 
-            order._id === orderId ? { ...order, status: 'cancelled' } : order
-          );
-          const updatedStats = calculateOrderStats(updatedOrders);
-          setOrderStats(updatedStats);
+          updateOrderInState(orderId, 'cancelled', {
+            cancelledAt: new Date().toISOString(),
+            permissions: {
+              canStartProcessing: false,
+              canStartWork: false,
+              canDeliver: false,
+              canCancelBySeller: false
+            }
+          });
         } else {
           setError(response.data.error || 'Failed to cancel order');
         }
       } catch (axiosError: any) {
         // If specific endpoint fails, try generic status update
-        if (axiosError.response?.status === 404) {
+        if (axiosError.response?.status === 404 || axiosError.response?.status === 500) {
           console.log('⚠️ Specific endpoint not found, trying generic status update...');
-          await updateOrderStatus(orderId, 'cancelled');
+          await updateOrderStatusGeneric(orderId, 'cancelled', { cancelReason });
         } else {
           throw axiosError;
         }
@@ -958,33 +926,22 @@ const SellerDashboard: React.FC = () => {
 
         if (response.data.success) {
           setSuccessMessage('Revision completed and sent back to buyer!');
-          
-          // Update order in state
-          setOrders(prev => prev.map(order => 
-            order._id === orderId ? { 
-              ...order, 
-              status: 'delivered',
-              permissions: {
-                ...order.permissions,
-                canDeliver: false
-              }
-            } : order
-          ));
-          
-          // Update stats
-          const updatedOrders = orders.map(order => 
-            order._id === orderId ? { ...order, status: 'delivered' } : order
-          );
-          const updatedStats = calculateOrderStats(updatedOrders);
-          setOrderStats(updatedStats);
+          updateOrderInState(orderId, 'delivered', {
+            permissions: {
+              canStartProcessing: false,
+              canStartWork: false,
+              canDeliver: false,
+              canCancelBySeller: false
+            }
+          });
         } else {
           setError(response.data.error || 'Failed to complete revision');
         }
       } catch (axiosError: any) {
         // If revision endpoint fails, try to mark as delivered
-        if (axiosError.response?.status === 404) {
+        if (axiosError.response?.status === 404 || axiosError.response?.status === 500) {
           console.log('⚠️ Revision endpoint not found, marking as delivered...');
-          await updateOrderStatus(orderId, 'delivered');
+          await updateOrderStatusGeneric(orderId, 'delivered');
         } else {
           throw axiosError;
         }
@@ -995,6 +952,45 @@ const SellerDashboard: React.FC = () => {
     } finally {
       setOrderActionLoading(null);
     }
+  };
+
+  // Manual status update (using the new generic endpoint)
+  const handleManualStatusUpdate = async (order: Order, newStatus: string, options?: any) => {
+    try {
+      setOrderActionLoading(order._id);
+      setError('');
+      
+      const result = await updateOrderStatusGeneric(order._id, newStatus, options);
+      
+      if (result) {
+        setShowStatusUpdateModal(false);
+        setStatusUpdateOrder(null);
+      }
+    } catch (error: any) {
+      console.error('❌ Error in manual status update:', error);
+      setError(error.message || 'Failed to update status');
+    } finally {
+      setOrderActionLoading(null);
+    }
+  };
+
+  // Open manual status update modal
+  const openStatusUpdateModal = (order: Order) => {
+    setStatusUpdateOrder(order);
+    
+    // Get available status transitions for seller
+    const transitions = getValidStatusTransitions(order.status, 'seller');
+    const allStatuses = getValidStatuses();
+    
+    // Filter statuses that are valid for seller role
+    const available = allStatuses.filter(status => 
+      transitions.includes(status) || 
+      // Allow moving to cancelled from paid/processing
+      (status === 'cancelled' && ['paid', 'processing'].includes(order.status))
+    );
+    
+    setAvailableStatuses(available);
+    setShowStatusUpdateModal(true);
   };
 
   // Open order action modal
@@ -1040,18 +1036,7 @@ const SellerDashboard: React.FC = () => {
 
   // Order update handler from modal
   const handleOrderUpdateFromModal = (orderId: string, newStatus: string) => {
-    setOrders(prev => prev.map(order => 
-      order._id === orderId ? { ...order, status: newStatus } : order
-    ));
-    
-    // Update stats
-    const updatedStats = calculateOrderStats(
-      orders.map(order => order._id === orderId ? { 
-        ...order, 
-        status: newStatus 
-      } : order)
-    );
-    setOrderStats(updatedStats);
+    updateOrderInState(orderId, newStatus);
   };
 
   // Listing Management Functions (existing)
@@ -1579,6 +1564,21 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
+          {/* Status Update Modal */}
+          {showStatusUpdateModal && statusUpdateOrder && (
+            <StatusUpdateModal
+              order={statusUpdateOrder}
+              availableStatuses={availableStatuses}
+              isOpen={showStatusUpdateModal}
+              onClose={() => {
+                setShowStatusUpdateModal(false);
+                setStatusUpdateOrder(null);
+              }}
+              onSubmit={handleManualStatusUpdate}
+              loading={orderActionLoading === statusUpdateOrder._id}
+            />
+          )}
+
           {/* Tab Content */}
           {activeTab === 'overview' && (
             <div className="space-y-8">
@@ -1729,6 +1729,7 @@ const SellerDashboard: React.FC = () => {
                                       onCancel={() => handleOpenOrderAction(order, 'cancel')}
                                       onCompleteRevision={() => handleOpenOrderAction(order, 'complete_revision')}
                                       onViewDetails={() => handleViewOrderDetails(order._id)}
+                                      onManualStatusUpdate={() => openStatusUpdateModal(order)}
                                     />
                                   </div>
                                 </div>
@@ -1853,6 +1854,7 @@ const SellerDashboard: React.FC = () => {
               onDeliver={handleOpenOrderAction}
               onCancel={handleOpenOrderAction}
               onCompleteRevision={handleOpenOrderAction}
+              onManualStatusUpdate={openStatusUpdateModal}
               actionLoading={orderActionLoading}
             />
           )}
