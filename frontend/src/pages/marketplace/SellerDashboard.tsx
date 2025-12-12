@@ -621,52 +621,55 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  const handleStartWork = async (orderId: string) => {
-    try {
-      setOrderActionLoading(orderId);
-      setError('');
+// In the handleStartWork function, change it to:
+const handleStartWork = async (orderId: string) => {
+  try {
+    setOrderActionLoading(orderId);
+    setError('');
+    
+    // Use the correct API method
+    const response = await marketplaceAPI.orders.startWork(
+      orderId,
+      () => {} // loading callback
+    );
+    
+    // OR use axios directly if API method not working
+    // const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    // const response = await axios.put(
+    //   `${API_BASE_URL}/marketplace/orders/${orderId}/start-work`,
+    //   {},
+    //   {
+    //     headers: { Authorization: `Bearer ${token}` }
+    //   }
+    // );
+    
+    if (response.success) {
+      setSuccessMessage('Work started on order!');
       
-      const response = await marketplaceAPI.orders.startWork(
-        orderId,
-        () => {}
-      );
-      
-      if (response.success) {
-        setSuccessMessage('Work started on order!');
-        
-        // Update order in state
-        setOrders(prev => prev.map(order => 
-          order._id === orderId ? { 
-            ...order, 
-            status: 'in_progress',
-            startedAt: new Date().toISOString(),
-            permissions: {
-              ...order.permissions,
-              canStartWork: false,
-              canDeliver: true
-            }
-          } : order
-        ));
-        
-        // Update stats
-        const updatedStats = calculateOrderStats(
-          orders.map(order => order._id === orderId ? { 
-            ...order, 
-            status: 'in_progress' 
-          } : order)
-        );
-        setOrderStats(updatedStats);
-      } else {
-        setError(response.error || 'Failed to start work on order');
-      }
-    } catch (error: any) {
-      console.error('Error starting work on order:', error);
-      setError('Failed to start work. Please try again.');
-    } finally {
-      setOrderActionLoading(null);
+      // Update local state
+      setOrders(prev => prev.map(order => 
+        order._id === orderId ? { 
+          ...order, 
+          status: 'in_progress',
+          startedAt: new Date().toISOString()
+        } : order
+      ));
+    } else {
+      setError(response.error || 'Failed to start work on order');
     }
-  };
-
+  } catch (error: any) {
+    console.error('Error starting work on order:', error);
+    
+    // Check the specific error
+    if (error.response?.status === 404) {
+      setError('Order not found or invalid status. Please refresh and try again.');
+    } else {
+      setError(error.response?.data?.error || 'Failed to start work. Please try again.');
+    }
+  } finally {
+    setOrderActionLoading(null);
+  }
+};
   const handleDeliverOrder = async (orderId: string, deliveryData: { deliveryMessage?: string; deliveryFiles?: string[] }) => {
     try {
       setOrderActionLoading(orderId);
