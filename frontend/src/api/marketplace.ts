@@ -171,7 +171,7 @@ const apiCall = async <T = any>(
  */
 export const getMyListings = async (params: Omit<ListingFilters, 'search' | 'minPrice' | 'maxPrice'> = {}): Promise<ApiResponse<MyListingsResponse>> => {
   const queryParams = new URLSearchParams(params as Record<string, string>).toString();
-  return await apiCall<MyListingsResponse>(`/marketplace/my-listings${queryParams ? `?${queryParams}` : ''}`);
+  return await apiCall<MyListingsResponse>(`/api/marketplace/my-listings${queryParams ? `?${queryParams}` : ''}`);
 };
 
 /**
