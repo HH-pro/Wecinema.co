@@ -277,7 +277,221 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
     });
   }
 });
+// Add this route for generic status updates (if specific endpoints fail)
+router.put("/:orderId/status", authenticateMiddleware, async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { status } = req.body;
+    const userId = req.user.id || req.user._id || req.user.userId;
 
+    console.log("🔄 Updating order status via /status endpoint:", { 
+      orderId, 
+      status, 
+      userId 
+    });
+
+    // Find the order
+    const order = await Order.findById(orderId);
+    
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: 'Order not found'
+      });
+    }
+
+    // Check if user is authorized (must be seller or buyer of this order)
+    const isSeller = order.sellerId.toString() === userId.toString();
+    const isBuyer = order.buyerId.toString() === userId.toString();
+    
+    if (!isSeller && !isBuyer) {
+      return res.status(403).json({
+        success: false,
+        error: 'You are not authorized to update this order'
+      });
+    }
+
+    // Validate status transitions based on user role
+    const validStatuses = [
+      'pending_payment',
+      'paid', 
+      'processing',
+      'in_progress',
+      'delivered',
+      'in_revision',
+      'completed',
+      'cancelled',
+      'disputed'
+    ];
+
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid status: ${status}`,
+        validStatuses
+      });
+    }
+
+    // For sellers: Validate transitions
+    if (isSeller) {
+      const sellerValidTransitions = {
+        'paid': ['processing', 'cancelled'],
+        'processing': ['in_progress', 'cancelled'],
+        'in_progress': ['delivered', 'cancelled'],
+        'delivered': ['in_revision'], // Only if buyer requests revision
+        'in_revision': ['delivered'], // After completing revision
+        'completed': [] // No further changes
+      };
+
+      const allowedTransitions = sellerValidTransitions[order.status] || [];
+      
+      if (!allowedTransitions.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid status transition from ${order.status} to ${status} for seller`,
+          currentStatus: order.status,
+          allowedTransitions
+        });
+      }
+    }
+
+    // For buyers: Validate transitions
+    if (isBuyer) {
+      const buyerValidTransitions = {
+        'pending_payment': ['cancelled'],
+        'paid': ['cancelled'],
+        'delivered': ['completed', 'in_revision'],
+        'in_revision': [] // Buyer can only request revision, not complete it
+      };
+
+      const allowedTransitions = buyerValidTransitions[order.status] || [];
+      
+      if (!allowedTransitions.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid status transition from ${order.status} to ${status} for buyer`,
+          currentStatus: order.status,
+          allowedTransitions
+        });
+      }
+    }
+
+    // Update order status
+    const previousStatus = order.status;
+    order.status = status;
+    
+    // Set timestamps based on status change
+    const now = new Date();
+    
+    if (status === 'paid' && !order.paidAt) {
+      order.paidAt = now;
+    } else if (status === 'processing' && !order.processingAt) {
+      order.processingAt = now;
+    } else if (status === 'in_progress' && !order.startedAt) {
+      order.startedAt = now;
+    } else if (status === 'delivered' && !order.deliveredAt) {
+      order.deliveredAt = now;
+    } else if (status === 'completed' && !order.completedAt) {
+      order.completedAt = now;
+      
+      // Release payment to seller if not already released
+      if (order.stripePaymentIntentId && !order.paymentReleased) {
+        try {
+          // Capture the payment
+          await stripe.paymentIntents.capture(order.stripePaymentIntentId);
+          
+          // Calculate platform fee and seller amount
+          const platformFeePercent = 0.15;
+          const platformFee = order.amount * platformFeePercent;
+          const sellerAmount = order.amount - platformFee;
+
+          order.platformFee = platformFee;
+          order.sellerAmount = sellerAmount;
+          order.paymentReleased = true;
+          order.releaseDate = now;
+          
+          console.log("💰 Payment released to seller:", sellerAmount);
+        } catch (stripeError) {
+          console.error('❌ Stripe capture error:', stripeError);
+        }
+      }
+    } else if (status === 'cancelled' && !order.cancelledAt) {
+      order.cancelledAt = now;
+      
+      // If payment was made, process refund
+      if (order.stripePaymentIntentId && previousStatus === 'paid') {
+        try {
+          await stripe.refunds.create({
+            payment_intent: order.stripePaymentIntentId,
+          });
+          console.log("💰 Refund processed for cancelled order");
+        } catch (stripeError) {
+          console.error('❌ Stripe refund error:', stripeError);
+        }
+      }
+    }
+
+    // Update permissions based on new status
+    order.permissions = {
+      canStartProcessing: isSeller && status === 'paid',
+      canStartWork: isSeller && (status === 'processing' || status === 'paid'),
+      canDeliver: isSeller && status === 'in_progress',
+      canRequestRevision: isBuyer && status === 'delivered' && order.revisions < order.maxRevisions,
+      canComplete: isBuyer && status === 'delivered',
+      canCancelByBuyer: isBuyer && ['pending_payment', 'paid'].includes(status),
+      canCancelBySeller: isSeller && ['paid', 'processing'].includes(status)
+    };
+
+    await order.save();
+
+    console.log(`✅ Order ${orderId} status updated: ${previousStatus} → ${status}`);
+
+    // Populate the order for response
+    const populatedOrder = await Order.findById(orderId)
+      .populate({
+        path: 'buyerId',
+        select: 'username avatar email',
+        model: 'User'
+      })
+      .populate({
+        path: 'sellerId',
+        select: 'username avatar sellerRating email',
+        model: 'User'
+      })
+      .populate({
+        path: 'listingId',
+        select: 'title mediaUrls price category type',
+        model: 'MarketplaceListing'
+      })
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      message: `Order status updated to ${status}`,
+      order: populatedOrder,
+      previousStatus,
+      newStatus: status,
+      updatedAt: now
+    });
+
+  } catch (error) {
+    console.error('❌ Error updating order status:', error);
+    
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: Object.values(error.errors).map(err => err.message)
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update order status',
+      details: error.message
+    });
+  }
+});
 // ========== SELLER ORDER MANAGEMENT ========== //
 
 // 1. Start processing order (paid → processing)
