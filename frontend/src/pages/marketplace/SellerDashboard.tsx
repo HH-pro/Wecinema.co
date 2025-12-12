@@ -11,9 +11,9 @@ import {
   type MyListingsResponse 
 } from '../../api/marketplace';
 import axios from 'axios';
-import { getCurrentUserId } from '../../utilities/helperFunction';
+import { getCurrentUserId } from '../../utilities/helperfFunction';
 import StripeSetupModal from '../../components/marketplace/seller/StripeSetupModal';
-import OrderCreation from '../../components/marketplace/seller/OrderCreation';
+import OrderCreation from '../../components/marketplace/seller/order/OrderCreation';
 import PaymentStatusBadge from '../../components/marketplace/seller/PaymentStatusBadge';
 import StripeAccountStatus from '../../components/marketplace/seller/StripeAccountStatus';
 import StatCard from '../../components/marketplace/seller/StatCard';
