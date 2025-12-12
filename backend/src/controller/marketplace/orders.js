@@ -3,7 +3,7 @@ const router = express.Router();
 const Order = require("../../models/marketplace/order");
 const MarketplaceListing = require("../../models/marketplace/listing");
 const Offer = require("../../models/marketplace/offer");
-const User = require("../../models/User"); // Add this import
+const User = require("../../../models/User"); // Add this import
 const { authenticateMiddleware } = require("../../utils");
 const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
 
