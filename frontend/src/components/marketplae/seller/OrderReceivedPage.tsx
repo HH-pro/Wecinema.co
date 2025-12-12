@@ -61,27 +61,27 @@ const getStatusColor = (status: string): string => {
     case 'active':
     case 'paid':
     case 'delivered':
-      return 'bg-green-100 text-green-800 border-green-200';
+      return 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-800 border-green-200';
     case 'pending':
     case 'pending_payment':
     case 'pending_acceptance':
-      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      return 'bg-gradient-to-r from-yellow-50 to-amber-50 text-yellow-800 border-yellow-200';
     case 'shipped':
     case 'sold':
     case 'in_progress':
     case 'in_transit':
     case 'in_revision':
-      return 'bg-blue-100 text-blue-800 border-blue-200';
+      return 'bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-800 border-blue-200';
     case 'cancelled':
     case 'rejected':
     case 'inactive':
     case 'failed':
     case 'declined':
-      return 'bg-red-100 text-red-800 border-red-200';
+      return 'bg-gradient-to-r from-red-50 to-rose-50 text-red-800 border-red-200';
     case 'draft':
-      return 'bg-gray-100 text-gray-800 border-gray-200';
+      return 'bg-gradient-to-r from-gray-50 to-gray-100 text-gray-800 border-gray-200';
     default:
-      return 'bg-gray-100 text-gray-800 border-gray-200';
+      return 'bg-gradient-to-r from-gray-50 to-gray-100 text-gray-800 border-gray-200';
   }
 };
 
@@ -138,13 +138,13 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
       case 'confirmed':
       case 'paid':
         options.push(
-          { value: 'in_progress', label: 'Start Processing', color: 'blue' },
+          { value: 'in_progress', label: 'Start Processing', color: 'yellow' },
           { value: 'cancelled', label: 'Cancel Order', color: 'red' }
         );
         break;
       case 'in_progress':
         options.push(
-          { value: 'shipped', label: 'Mark as Shipped', color: 'blue' },
+          { value: 'shipped', label: 'Mark as Shipped', color: 'purple' },
           { value: 'completed', label: 'Complete Order', color: 'green' },
           { value: 'cancelled', label: 'Cancel Order', color: 'red' }
         );
@@ -172,7 +172,7 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
     return (
       <div 
         key={order._id} 
-        className="border border-gray-200 rounded-xl p-6 hover:border-gray-300 hover:shadow-sm transition-all duration-200 cursor-pointer"
+        className="bg-white border border-yellow-200 rounded-2xl p-6 hover:border-yellow-300 hover:shadow-md transition-all duration-200 cursor-pointer shadow-sm"
         onClick={() => onViewOrderDetails(order._id)}
       >
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
@@ -184,58 +184,58 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
                   <img
                     src={order.buyerId.avatar}
                     alt={order.buyerId.username}
-                    className="w-12 h-12 rounded-full border-2 border-white shadow-sm"
+                    className="w-14 h-14 rounded-xl border-4 border-white shadow-md"
                   />
                 ) : (
-                  <div className="w-12 h-12 rounded-full border-2 border-white bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center font-bold text-lg text-blue-600 shadow-sm">
+                  <div className="w-14 h-14 rounded-xl border-4 border-white bg-gradient-to-br from-yellow-100 to-amber-100 flex items-center justify-center font-bold text-xl text-yellow-600 shadow-md">
                     {order.buyerId?.username?.charAt(0).toUpperCase() || 'B'}
                   </div>
                 )}
                 <div>
                   <div className="flex items-center space-x-2">
-                    <h3 className="text-lg font-bold text-gray-900">
+                    <h3 className="text-xl font-bold text-gray-900">
                       Order #{order._id.slice(-8).toUpperCase()}
                     </h3>
                     <PaymentStatusBadge order={order} />
                   </div>
-                  <p className="text-gray-600">
-                    Buyer: <span className="font-medium">{order.buyerId?.username || 'Unknown Buyer'}</span>
+                  <p className="text-gray-600 mt-1">
+                    Buyer: <span className="font-medium text-gray-800">{order.buyerId?.username || 'Unknown Buyer'}</span>
                   </p>
                 </div>
               </div>
               
               <div className="flex flex-col items-end gap-2">
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(order.status)}`}>
+                <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium border ${getStatusColor(order.status)}`}>
                   {order.status ? order.status.replace('_', ' ') : 'Unknown'}
                 </span>
-                <p className="font-bold text-green-600 text-lg">{formatCurrency(order.amount)}</p>
+                <p className="font-bold text-green-600 text-xl">{formatCurrency(order.amount)}</p>
               </div>
             </div>
 
             {/* Product Info */}
             {order.listingId && (
-              <div className="flex items-start space-x-4 mb-4 p-4 bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg border border-gray-200">
+              <div className="flex items-start space-x-4 mb-6 p-4 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl border border-yellow-200">
                 {order.listingId.mediaUrls?.[0] ? (
                   <img
                     src={order.listingId.mediaUrls[0]}
                     alt={order.listingId.title}
-                    className="w-20 h-20 object-cover rounded-lg border border-gray-300 shadow-sm"
+                    className="w-24 h-24 object-cover rounded-xl border-2 border-yellow-300 shadow-sm"
                   />
                 ) : (
-                  <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-pink-100 rounded-lg border border-purple-200 flex items-center justify-center">
+                  <div className="w-24 h-24 bg-gradient-to-br from-purple-100 to-pink-100 rounded-xl border-2 border-purple-200 flex items-center justify-center shadow-sm">
                     <div className="text-center">
-                      <div className="text-2xl mb-1">📦</div>
+                      <div className="text-3xl mb-1">📦</div>
                     </div>
                   </div>
                 )}
                 <div className="flex-1">
-                  <h4 className="font-bold text-gray-900 mb-1">{order.listingId.title}</h4>
+                  <h4 className="font-bold text-gray-900 mb-2">{order.listingId.title}</h4>
                   {order.listingId.price && (
                     <div className="flex items-center space-x-4">
                       <p className="text-sm text-gray-600">
                         Original: <span className="line-through">{formatCurrency(order.listingId.price)}</span>
                       </p>
-                      <p className="text-sm font-medium text-green-600">
+                      <p className="text-sm font-medium text-green-600 bg-green-50 px-2 py-1 rounded-lg">
                         Sold for: {formatCurrency(order.amount)}
                       </p>
                     </div>
@@ -245,23 +245,23 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
             )}
 
             {/* Order Details Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-              <div className="bg-white border border-gray-200 rounded-lg p-3">
-                <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Order Date</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div className="bg-white border border-yellow-200 rounded-xl p-4 shadow-sm">
+                <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Order Date</p>
                 <p className="font-medium text-gray-900 text-sm">{formatDate(order.createdAt)}</p>
               </div>
-              <div className="bg-white border border-gray-200 rounded-lg p-3">
-                <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Payment Method</p>
+              <div className="bg-white border border-yellow-200 rounded-xl p-4 shadow-sm">
+                <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Payment Method</p>
                 <p className="font-medium text-gray-900 text-sm capitalize">{order.paymentMethod || 'Not specified'}</p>
               </div>
-              <div className="bg-white border border-gray-200 rounded-lg p-3">
-                <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Shipping Address</p>
+              <div className="bg-white border border-yellow-200 rounded-xl p-4 shadow-sm">
+                <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Shipping Address</p>
                 <p className="font-medium text-gray-900 text-sm line-clamp-1">
                   {order.shippingAddress || 'Not provided'}
                 </p>
               </div>
-              <div className="bg-white border border-gray-200 rounded-lg p-3">
-                <p className="text-xs text-gray-500 uppercase font-semibold mb-1">Order ID</p>
+              <div className="bg-white border border-yellow-200 rounded-xl p-4 shadow-sm">
+                <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Order ID</p>
                 <p className="font-medium text-gray-900 text-sm font-mono">#{order._id.slice(-8)}</p>
               </div>
             </div>
@@ -269,14 +269,14 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
             {/* Notes */}
             {order.notes && (
               <div className="mt-3">
-                <p className="text-sm font-medium text-gray-700 mb-1 flex items-center">
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <p className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                  <svg className="w-4 h-4 mr-2 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                   </svg>
                   Seller Notes
                 </p>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-blue-800 text-sm whitespace-pre-line">
+                <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-4">
+                  <p className="text-yellow-800 text-sm whitespace-pre-line">
                     {order.notes}
                   </p>
                 </div>
@@ -285,13 +285,13 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-col gap-3 lg:w-64">
+          <div className="flex flex-col gap-3 lg:w-72">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onViewOrderDetails(order._id);
               }}
-              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium py-3 px-4 rounded-lg transition duration-200 shadow-md hover:shadow-lg flex items-center justify-center"
+              className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-medium py-3 px-4 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center"
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -311,13 +311,13 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
                       e.stopPropagation();
                       handleQuickStatusUpdate(order._id, option.value);
                     }}
-                    className={`w-full py-2 px-4 rounded-lg font-medium transition-colors text-sm ${
+                    className={`w-full py-2.5 px-4 rounded-xl font-medium transition-all duration-200 text-sm shadow-sm hover:shadow-md ${
                       option.color === 'green'
-                        ? 'bg-green-600 hover:bg-green-700 text-white'
+                        ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
                         : option.color === 'red'
-                        ? 'bg-red-600 hover:bg-red-700 text-white'
-                        : 'bg-blue-600 hover:bg-blue-700 text-white'
-                    } shadow-sm hover:shadow-md`}
+                        ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white'
+                        : 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white'
+                    }`}
                   >
                     {option.label}
                   </button>
@@ -326,16 +326,16 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
             )}
 
             {/* Order Info Summary */}
-            <div className="mt-2 pt-3 border-t border-gray-200">
-              <div className="text-xs text-gray-500 space-y-1">
+            <div className="mt-2 pt-4 border-t border-yellow-200">
+              <div className="text-xs text-gray-500 space-y-2">
                 <div className="flex justify-between">
                   <span>Created:</span>
-                  <span className="font-medium">{new Date(order.createdAt).toLocaleDateString()}</span>
+                  <span className="font-medium text-gray-700">{new Date(order.createdAt).toLocaleDateString()}</span>
                 </div>
                 {order.stripePaymentIntentId && (
                   <div className="flex justify-between">
                     <span>Stripe ID:</span>
-                    <span className="font-mono text-xs">{order.stripePaymentIntentId.slice(-8)}</span>
+                    <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{order.stripePaymentIntentId.slice(-8)}</span>
                   </div>
                 )}
               </div>
@@ -350,7 +350,7 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
     return (
       <div 
         key={order._id} 
-        className="bg-white border border-gray-200 rounded-xl p-6 hover:border-gray-300 hover:shadow-md transition-all duration-200 cursor-pointer"
+        className="bg-white border border-yellow-200 rounded-2xl p-6 hover:border-yellow-300 hover:shadow-lg transition-all duration-200 cursor-pointer shadow-sm"
         onClick={() => onViewOrderDetails(order._id)}
       >
         {/* Order Header */}
@@ -363,7 +363,7 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
               {formatDate(order.createdAt)}
             </p>
           </div>
-          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(order.status)}`}>
+          <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium border ${getStatusColor(order.status)}`}>
             {order.status ? order.status.replace('_', ' ') : 'Unknown'}
           </span>
         </div>
@@ -374,10 +374,10 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
             <img
               src={order.buyerId.avatar}
               alt={order.buyerId.username}
-              className="w-10 h-10 rounded-full border-2 border-white shadow-sm"
+              className="w-12 h-12 rounded-xl border-2 border-white shadow-sm"
             />
           ) : (
-            <div className="w-10 h-10 rounded-full border-2 border-white bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center font-bold text-md text-blue-600 shadow-sm">
+            <div className="w-12 h-12 rounded-xl border-2 border-white bg-gradient-to-br from-yellow-100 to-amber-100 flex items-center justify-center font-bold text-md text-yellow-600 shadow-sm">
               {order.buyerId?.username?.charAt(0).toUpperCase() || 'B'}
             </div>
           )}
@@ -395,11 +395,11 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
                 <img
                   src={order.listingId.mediaUrls[0]}
                   alt={order.listingId.title}
-                  className="w-16 h-16 object-cover rounded-lg border border-gray-300 shadow-sm"
+                  className="w-20 h-20 object-cover rounded-xl border-2 border-yellow-300 shadow-sm"
                 />
               ) : (
-                <div className="w-16 h-16 bg-gradient-to-br from-purple-100 to-pink-100 rounded-lg border border-purple-200 flex items-center justify-center">
-                  <div className="text-2xl">📦</div>
+                <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-pink-100 rounded-xl border-2 border-purple-200 flex items-center justify-center shadow-sm">
+                  <div className="text-3xl">📦</div>
                 </div>
               )}
               <div className="flex-1">
@@ -415,14 +415,14 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
         <div className="mb-4">
           <div className="flex justify-between items-center">
             <p className="text-sm text-gray-600">Order Amount</p>
-            <p className="font-bold text-green-600 text-lg">{formatCurrency(order.amount)}</p>
+            <p className="font-bold text-green-600 text-xl">{formatCurrency(order.amount)}</p>
           </div>
         </div>
 
         {/* Shipping Address */}
         <div className="mb-4">
           <p className="text-xs text-gray-500 mb-1">Shipping to:</p>
-          <p className="text-sm text-gray-800 line-clamp-2 bg-gray-50 p-2 rounded border border-gray-200">
+          <p className="text-sm text-gray-800 line-clamp-2 bg-gradient-to-r from-gray-50 to-gray-100 p-3 rounded-xl border border-yellow-200">
             {order.shippingAddress || 'Not provided'}
           </p>
         </div>
@@ -434,7 +434,7 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
               e.stopPropagation();
               onViewOrderDetails(order._id);
             }}
-            className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium py-2 px-4 rounded-lg transition duration-200 text-sm shadow-sm hover:shadow-md"
+            className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-medium py-2.5 px-4 rounded-xl transition-all duration-200 text-sm shadow-md hover:shadow-lg"
           >
             View Details
           </button>
@@ -449,13 +449,13 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
                     e.stopPropagation();
                     handleQuickStatusUpdate(order._id, option.value);
                   }}
-                  className={`py-2 px-3 rounded-lg font-medium transition-colors text-xs ${
+                  className={`py-2 px-3 rounded-xl font-medium transition-all duration-200 text-xs shadow-sm hover:shadow-md ${
                     option.color === 'green'
-                      ? 'bg-green-600 hover:bg-green-700 text-white'
+                      ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
                       : option.color === 'red'
-                      ? 'bg-red-600 hover:bg-red-700 text-white'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white'
-                  } shadow-sm hover:shadow-md`}
+                      ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white'
+                      : 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white'
+                  }`}
                 >
                   {option.label}
                 </button>
@@ -468,12 +468,12 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+    <div className="bg-white rounded-2xl shadow-sm border border-yellow-200">
       {/* Header with Controls */}
-      <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+      <div className="px-6 py-5 border-b border-yellow-200 bg-gradient-to-r from-yellow-50 to-amber-50">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Orders Received</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Orders Received</h2>
             <p className="text-sm text-gray-600 mt-1">
               {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''} found
             </p>
@@ -488,9 +488,9 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
                 placeholder="Search orders..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm w-48"
+                className="pl-10 pr-4 py-2.5 border border-yellow-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 text-sm w-48 shadow-sm"
               />
-              <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-yellow-500 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
@@ -499,7 +499,7 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="border border-yellow-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 shadow-sm"
             >
               <option value="all">All Status</option>
               <option value="pending_payment">Pending Payment</option>
@@ -516,17 +516,17 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'date' | 'amount')}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="border border-yellow-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 shadow-sm"
             >
               <option value="date">Sort by Date</option>
               <option value="amount">Sort by Amount</option>
             </select>
             
             {/* View Toggle */}
-            <div className="flex border border-gray-300 rounded-lg overflow-hidden">
+            <div className="flex border border-yellow-300 rounded-xl overflow-hidden shadow-sm">
               <button
                 onClick={() => setActiveView('list')}
-                className={`px-3 py-2 text-sm font-medium ${activeView === 'list' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                className={`px-3 py-2.5 text-sm font-medium ${activeView === 'list' ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white' : 'bg-white text-gray-700 hover:bg-yellow-50'}`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
@@ -534,7 +534,7 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
               </button>
               <button
                 onClick={() => setActiveView('grid')}
-                className={`px-3 py-2 text-sm font-medium ${activeView === 'grid' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                className={`px-3 py-2.5 text-sm font-medium ${activeView === 'grid' ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-white' : 'bg-white text-gray-700 hover:bg-yellow-50'}`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
@@ -549,7 +549,7 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
       <div className="p-6">
         {filteredOrders.length === 0 ? (
           <div className="text-center py-16">
-            <div className="text-7xl mb-6">📦</div>
+            <div className="text-7xl mb-6 text-yellow-300">📦</div>
             <h3 className="text-2xl font-bold text-gray-900 mb-3">No orders found</h3>
             <p className="text-gray-600 max-w-md mx-auto mb-8">
               {searchQuery || statusFilter !== 'all' 
@@ -563,14 +563,14 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
                     setSearchQuery('');
                     setStatusFilter('all');
                   }}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 font-medium shadow-md hover:shadow-lg"
                 >
                   Clear Filters
                 </button>
               )}
               <button
                 onClick={() => window.location.href = '/create-listing'}
-                className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-colors font-medium"
+                className="px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl hover:from-green-600 hover:to-green-700 transition-all duration-200 font-medium shadow-md hover:shadow-lg"
               >
                 Create New Listing
               </button>
@@ -590,23 +590,23 @@ const OrderReceivedPage: React.FC<OrderReceivedPageProps> = ({
       
       {/* Footer Stats */}
       {filteredOrders.length > 0 && (
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div className="px-6 py-5 border-t border-yellow-200 bg-gradient-to-r from-yellow-50 to-amber-50">
           <div className="flex flex-wrap gap-6 text-sm text-gray-600">
             <div className="flex items-center">
-              <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-              <span>Completed: {filteredOrders.filter(o => o.status === 'completed').length}</span>
+              <div className="w-3 h-3 bg-gradient-to-r from-green-500 to-green-600 rounded-full mr-2"></div>
+              <span className="font-medium">Completed: {filteredOrders.filter(o => o.status === 'completed').length}</span>
             </div>
             <div className="flex items-center">
-              <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
-              <span>In Progress: {filteredOrders.filter(o => ['in_progress', 'shipped'].includes(o.status)).length}</span>
+              <div className="w-3 h-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full mr-2"></div>
+              <span className="font-medium">In Progress: {filteredOrders.filter(o => ['in_progress', 'shipped'].includes(o.status)).length}</span>
             </div>
             <div className="flex items-center">
-              <div className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
-              <span>Pending: {filteredOrders.filter(o => ['pending_payment', 'pending_acceptance'].includes(o.status)).length}</span>
+              <div className="w-3 h-3 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-full mr-2"></div>
+              <span className="font-medium">Pending: {filteredOrders.filter(o => ['pending_payment', 'pending_acceptance'].includes(o.status)).length}</span>
             </div>
             <div className="flex items-center">
-              <div className="w-3 h-3 bg-purple-500 rounded-full mr-2"></div>
-              <span>Total Revenue: {formatCurrency(filteredOrders.reduce((sum, order) => sum + order.amount, 0))}</span>
+              <div className="w-3 h-3 bg-gradient-to-r from-purple-500 to-purple-600 rounded-full mr-2"></div>
+              <span className="font-medium">Total Revenue: {formatCurrency(filteredOrders.reduce((sum, order) => sum + order.amount, 0))}</span>
             </div>
           </div>
         </div>
