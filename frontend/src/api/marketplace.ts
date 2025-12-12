@@ -85,7 +85,7 @@ export interface UserListingsResponse extends MyListingsResponse {
 }
 
 // API Base URL - FIXED: Hardcoded URL use karein
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = 'http://localhost:3000/';
 
 // Get auth token from localStorage or context
 const getAuthToken = (): string | null => {
