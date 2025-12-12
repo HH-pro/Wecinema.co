@@ -847,13 +847,13 @@ const SellerDashboard: React.FC = () => {
           )}
 
           {/* Modals */}
-          {showStripeSetup && (
+          {/* {showStripeSetup && (
             <StripeSetupModal
               show={showStripeSetup}
               onClose={() => setShowStripeSetup(false)}
               onSuccess={handleStripeSetupSuccess}
             />
-          )}
+          )} */}
 
           {selectedOrderId && (
             <OrderDetailsModal
