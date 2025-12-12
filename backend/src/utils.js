@@ -3,84 +3,85 @@ const Mongoose = require("mongoose");
 const Listing = require("../../backend/src/models/marketplace/listing");
 const User = require("../../backend/src/models/user"); // 🆕 ADD THIS
 
-// Updated authenticateMiddleware - make sure this is what you're using
-const authenticateMiddleware = (req, res, next) => {
-  let token = req.headers.authorization;
-  
-  console.log("🔐 Auth Middleware - Raw authorization header:", req.headers.authorization);
-  
-  token = token?.split(" ")[1];
-
-  if (!token) {
-    console.log("❌ No token provided in headers");
-    return res.status(401).json({ error: "Unauthorized: No token provided" });
-  }
-
-  const SECRET_KEY = process.env.JWT_SECRET || "weloremcium.secret_key";
-
-  // Verify the token
-  jwt.verify(token, SECRET_KEY, (err, decoded) => {
-    if (err) {
-      console.log("❌ JWT verification error:", err);
-      return res.status(401).json({ error: "Unauthorized: Invalid token" });
-    }
-
-    // Check if the token has expired
-    const currentTimestamp = Math.floor(Date.now() / 1000);
-    if (decoded.exp < currentTimestamp) {
-      console.log("❌ Token expired");
-      return res.status(401).json({ error: "Unauthorized: Token has expired" });
-    }
-
-    console.log("✅ JWT decoded successfully. Full payload:", decoded);
-
-    // Extract user information from decoded token - try multiple field names
-    const userId = decoded.id || decoded._id || decoded.userId || decoded.sub;
-    const userEmail = decoded.email;
-    const userRole = decoded.role;
-
-    console.log("🔍 Extracted from token - userId:", userId, "email:", userEmail, "role:", userRole);
-
-    if (!userId) {
-      console.log("❌ No user ID found in token payload. Available fields:", Object.keys(decoded));
-      return res.status(401).json({ 
-        error: "Unauthorized: Invalid token payload",
-        details: "User ID not found in token" 
+const authenticateMiddleware = async (req, res, next) => {
+  try {
+    console.log("🔐 Authentication middleware triggered");
+    console.log("Headers:", req.headers);
+    
+    // Get token from Authorization header
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log("❌ No token found in Authorization header");
+      return res.status(401).json({
+        success: false,
+        error: 'No token provided'
       });
     }
-
-    // Attach the user information to the request object
-    req.user = { 
-      id: userId.toString(), // Ensure it's a string
-      email: userEmail, 
-      role: userRole,
-      // Include the full decoded payload for debugging
-      _fullPayload: decoded
+    
+    const token = authHeader.split(' ')[1];
+    
+    if (!token) {
+      console.log("❌ Token is empty");
+      return res.status(401).json({
+        success: false,
+        error: 'No token provided'
+      });
+    }
+    
+    console.log("✅ Token found, verifying...");
+    
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    console.log("✅ Token verified. User ID:", decoded.userId);
+    
+    // Find user
+    const user = await User.findById(decoded.userId).select('-password');
+    
+    if (!user) {
+      console.log("❌ User not found for ID:", decoded.userId);
+      return res.status(401).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+    
+    console.log("✅ User found:", user._id, user.email);
+    
+    // Attach user to request
+    req.user = {
+      _id: user._id,
+      id: user._id, // Add both _id and id for compatibility
+      email: user.email,
+      username: user.username,
+      isAdmin: user.isAdmin,
+      // Add any other user fields you need
     };
-
-    console.log("✅ Setting req.user:", req.user);
-
-    // Continue to the next middleware or route handler
+    
     next();
-  });
+  } catch (error) {
+    console.error("❌ Authentication error:", error.message);
+    
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid token'
+      });
+    }
+    
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        error: 'Token expired'
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Authentication failed'
+    });
+  }
 };
-// ✅ Alternative Protect Middleware (simpler version)
-const protect = (req, res, next) => {
-	const auth = req.headers.authorization;
-	if (!auth || !auth.startsWith("Bearer ")) {
-		return res.status(401).json({ message: "No token" });
-	}
-
-	const token = auth.split(" ")[1];
-	try {
-		const payload = jwt.verify(token, process.env.JWT_SECRET || "weloremcium.secret_key");
-		req.user = { id: payload.id, email: payload.email, role: payload.role };
-		return next();
-	} catch (err) {
-		return res.status(401).json({ message: "Token invalid" });
-	}
-};
-
 // 🆕 HYPEMODE USER MIDDLEWARE
 const isHypeModeUser = async (req, res, next) => {
   try {
