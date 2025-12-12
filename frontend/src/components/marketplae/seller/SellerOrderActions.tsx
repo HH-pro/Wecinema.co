@@ -199,7 +199,7 @@ const SellerOrderActions: React.FC<SellerOrderActionsProps> = ({
       console.log(`🔄 Updating order ${order._id} status to ${newStatus}`);
       
       const response = await axios.put(
-        `${API_BASE_URL}/api/marketplace/orders/${order._id}/status`,
+        `${API_BASE_URL}/marketplace/orders/${order._id}/status`,
         { status: newStatus, ...options },
         {
           headers: { 
