@@ -14,17 +14,17 @@ import {
 } from '../../api';
 import axios from 'axios';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
-import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
-import StripeAccountStatus from '../../components/marketplae/seller/StripeAccountStatus';
-import StatCard from '../../components/marketplae/seller/StatCard';
-import OrderDetailsModal from '../../components/marketplae/seller/OrderDetailsModal';
-import EditListingModal from '../../components/marketplae/seller/EditListingModal';
-import DeleteListingModal from '../../components/marketplae/seller/DeleteListingModal';
-import VideoPlayerModal from '../../components/marketplae/seller/VideoPlayerModal';
-import OffersTab from '../../components/marketplae/seller/OffersTab';
-import ListingsTab from '../../components/marketplae/seller/ListingsTab';
-import OrdersTab from '../../components/marketplae/seller/OrdersTab';
-import SellerOrderActions from '../../components/marketplae/seller/SellerOrderActions';
+import StripeSetupModal from '../../components/marketplace/seller/StripeSetupModal';
+import StripeAccountStatus from '../../components/marketplace/seller/StripeAccountStatus';
+import StatCard from '../../components/marketplace/seller/StatCard';
+import OrderDetailsModal from '../../components/marketplace/seller/OrderDetailsModal';
+import EditListingModal from '../../components/marketplace/seller/EditListingModal';
+import DeleteListingModal from '../../components/marketplace/seller/DeleteListingModal';
+import VideoPlayerModal from '../../components/marketplace/seller/VideoPlayerModal';
+import OffersTab from '../../components/marketplace/seller/OffersTab';
+import ListingsTab from '../../components/marketplace/seller/ListingsTab';
+import OrdersTab from '../../components/marketplace/seller/OrdersTab';
+import SellerOrderActions from '../../components/marketplace/seller/SellerOrderActions';
 
 const API_BASE_URL = 'http://localhost:3000';
 
@@ -574,145 +574,290 @@ const SellerDashboard: React.FC = () => {
     setShowOrderModal(true);
   };
 
-  // ORDER MANAGEMENT FUNCTIONS
+  // ORDER MANAGEMENT FUNCTIONS - FIXED VERSION
   const handleStartProcessing = async (orderId: string) => {
     try {
       setOrderActionLoading(orderId);
       setError('');
       
-      const response = await marketplaceAPI.orders.startProcessing(
-        orderId,
-        () => {}
-      );
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        setOrderActionLoading(null);
+        return;
+      }
+
+      console.log('🔄 Starting processing for order:', orderId);
       
-      if (response.success) {
-        setSuccessMessage('Order marked as processing!');
-        
-        // Update order in state
-        setOrders(prev => prev.map(order => 
-          order._id === orderId ? { 
-            ...order, 
-            status: 'processing',
-            processingAt: new Date().toISOString(),
-            permissions: {
-              ...order.permissions,
-              canStartProcessing: false,
-              canStartWork: true
-            }
-          } : order
-        ));
-        
-        // Update stats
-        const updatedStats = calculateOrderStats(
-          orders.map(order => order._id === orderId ? { 
-            ...order, 
-            status: 'processing' 
-          } : order)
+      // Try the specific endpoint first
+      try {
+        const response = await axios.put(
+          `${API_BASE_URL}/marketplace/orders/${orderId}/start-processing`,
+          {},
+          {
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 10000
+          }
         );
-        setOrderStats(updatedStats);
-      } else {
-        setError(response.error || 'Failed to start processing order');
+
+        if (response.data.success) {
+          setSuccessMessage('Order processing started successfully!');
+          
+          // Update order in state
+          setOrders(prev => prev.map(order => 
+            order._id === orderId ? { 
+              ...order, 
+              status: 'processing',
+              processingAt: new Date().toISOString(),
+              permissions: {
+                ...order.permissions,
+                canStartProcessing: false,
+                canStartWork: true
+              }
+            } : order
+          ));
+          
+          // Update stats
+          const updatedOrders = orders.map(order => 
+            order._id === orderId ? { ...order, status: 'processing' } : order
+          );
+          const updatedStats = calculateOrderStats(updatedOrders);
+          setOrderStats(updatedStats);
+        } else {
+          setError(response.data.error || 'Failed to start processing order');
+        }
+      } catch (axiosError: any) {
+        // If specific endpoint fails, try generic status update
+        if (axiosError.response?.status === 404) {
+          console.log('⚠️ Specific endpoint not found, trying generic status update...');
+          await updateOrderStatus(orderId, 'processing');
+        } else {
+          throw axiosError;
+        }
       }
     } catch (error: any) {
-      console.error('Error starting order processing:', error);
-      setError('Failed to start processing order. Please try again.');
+      console.error('❌ Error starting order processing:', error);
+      setError(error.response?.data?.error || 'Failed to start processing order. Please try again.');
     } finally {
       setOrderActionLoading(null);
     }
   };
 
-// In the handleStartWork function, change it to:
-const handleStartWork = async (orderId: string) => {
-  try {
-    setOrderActionLoading(orderId);
-    setError('');
-    
-    // Use the correct API method
-    const response = await marketplaceAPI.orders.startWork(
-      orderId,
-      () => {} // loading callback
-    );
-    
-    // OR use axios directly if API method not working
-    // const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    // const response = await axios.put(
-    //   `${API_BASE_URL}/marketplace/orders/${orderId}/start-work`,
-    //   {},
-    //   {
-    //     headers: { Authorization: `Bearer ${token}` }
-    //   }
-    // );
-    
-    if (response.success) {
-      setSuccessMessage('Work started on order!');
+  const handleStartWork = async (orderId: string) => {
+    try {
+      setOrderActionLoading(orderId);
+      setError('');
       
-      // Update local state
-      setOrders(prev => prev.map(order => 
-        order._id === orderId ? { 
-          ...order, 
-          status: 'in_progress',
-          startedAt: new Date().toISOString()
-        } : order
-      ));
-    } else {
-      setError(response.error || 'Failed to start work on order');
-    }
-  } catch (error: any) {
-    console.error('Error starting work on order:', error);
-    
-    // Check the specific error
-    if (error.response?.status === 404) {
-      setError('Order not found or invalid status. Please refresh and try again.');
-    } else {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        setOrderActionLoading(null);
+        return;
+      }
+
+      console.log('👨‍💻 Starting work on order:', orderId);
+      
+      // Try the specific endpoint first
+      try {
+        const response = await axios.put(
+          `${API_BASE_URL}/marketplace/orders/${orderId}/start-work`,
+          {},
+          {
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 10000
+          }
+        );
+
+        if (response.data.success) {
+          setSuccessMessage('Work started on order successfully!');
+          
+          // Update order in state
+          setOrders(prev => prev.map(order => 
+            order._id === orderId ? { 
+              ...order, 
+              status: 'in_progress',
+              startedAt: new Date().toISOString(),
+              permissions: {
+                ...order.permissions,
+                canStartWork: false,
+                canDeliver: true
+              }
+            } : order
+          ));
+          
+          // Update stats
+          const updatedOrders = orders.map(order => 
+            order._id === orderId ? { ...order, status: 'in_progress' } : order
+          );
+          const updatedStats = calculateOrderStats(updatedOrders);
+          setOrderStats(updatedStats);
+        } else {
+          setError(response.data.error || 'Failed to start work on order');
+        }
+      } catch (axiosError: any) {
+        // If specific endpoint fails, try generic status update
+        if (axiosError.response?.status === 404) {
+          console.log('⚠️ Specific endpoint not found, trying generic status update...');
+          await updateOrderStatus(orderId, 'in_progress');
+        } else {
+          throw axiosError;
+        }
+      }
+    } catch (error: any) {
+      console.error('❌ Error starting work on order:', error);
       setError(error.response?.data?.error || 'Failed to start work. Please try again.');
+    } finally {
+      setOrderActionLoading(null);
     }
-  } finally {
-    setOrderActionLoading(null);
-  }
-};
+  };
+
+  // Generic order status update (fallback)
+  const updateOrderStatus = async (orderId: string, status: string) => {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/status`,
+        { status },
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
+
+      if (response.data.success) {
+        setSuccessMessage(`Order status updated to ${status} successfully!`);
+        
+        // Update order in state
+        setOrders(prev => prev.map(order => {
+          if (order._id === orderId) {
+            const updatedOrder = { ...order, status };
+            
+            // Set appropriate timestamps
+            if (status === 'processing') {
+              updatedOrder.processingAt = new Date().toISOString();
+              updatedOrder.permissions = {
+                ...order.permissions,
+                canStartProcessing: false,
+                canStartWork: true
+              };
+            } else if (status === 'in_progress') {
+              updatedOrder.startedAt = new Date().toISOString();
+              updatedOrder.permissions = {
+                ...order.permissions,
+                canStartWork: false,
+                canDeliver: true
+              };
+            } else if (status === 'delivered') {
+              updatedOrder.deliveredAt = new Date().toISOString();
+              updatedOrder.permissions = {
+                ...order.permissions,
+                canDeliver: false
+              };
+            } else if (status === 'cancelled') {
+              updatedOrder.cancelledAt = new Date().toISOString();
+            }
+            
+            return updatedOrder;
+          }
+          return order;
+        }));
+        
+        // Update stats
+        const updatedOrders = orders.map(order => 
+          order._id === orderId ? { ...order, status } : order
+        );
+        const updatedStats = calculateOrderStats(updatedOrders);
+        setOrderStats(updatedStats);
+        
+        return true;
+      } else {
+        setError(response.data.error || `Failed to update order status to ${status}`);
+        return false;
+      }
+    } catch (error: any) {
+      console.error(`❌ Error updating order status to ${status}:`, error);
+      setError(error.response?.data?.error || `Failed to update order status. Please try again.`);
+      return false;
+    }
+  };
+
   const handleDeliverOrder = async (orderId: string, deliveryData: { deliveryMessage?: string; deliveryFiles?: string[] }) => {
     try {
       setOrderActionLoading(orderId);
       setError('');
       
-      const response = await marketplaceAPI.orders.deliver(
-        orderId,
-        deliveryData,
-        () => {}
-      );
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        setOrderActionLoading(null);
+        return;
+      }
+
+      console.log('📤 Delivering order:', orderId);
       
-      if (response.success) {
-        setSuccessMessage('Order delivered successfully!');
-        
-        // Update order in state
-        setOrders(prev => prev.map(order => 
-          order._id === orderId ? { 
-            ...order, 
-            status: 'delivered',
-            deliveredAt: new Date().toISOString(),
-            deliveryMessage: deliveryData.deliveryMessage,
-            deliveryFiles: deliveryData.deliveryFiles,
-            permissions: {
-              ...order.permissions,
-              canDeliver: false
-            }
-          } : order
-        ));
-        
-        // Update stats
-        const updatedStats = calculateOrderStats(
-          orders.map(order => order._id === orderId ? { 
-            ...order, 
-            status: 'delivered' 
-          } : order)
+      // Try the specific endpoint first
+      try {
+        const response = await axios.put(
+          `${API_BASE_URL}/marketplace/orders/${orderId}/deliver`,
+          deliveryData,
+          {
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 10000
+          }
         );
-        setOrderStats(updatedStats);
-      } else {
-        setError(response.error || 'Failed to deliver order');
+
+        if (response.data.success) {
+          setSuccessMessage('Order delivered successfully!');
+          
+          // Update order in state
+          setOrders(prev => prev.map(order => 
+            order._id === orderId ? { 
+              ...order, 
+              status: 'delivered',
+              deliveredAt: new Date().toISOString(),
+              deliveryMessage: deliveryData.deliveryMessage,
+              deliveryFiles: deliveryData.deliveryFiles,
+              permissions: {
+                ...order.permissions,
+                canDeliver: false
+              }
+            } : order
+          ));
+          
+          // Update stats
+          const updatedOrders = orders.map(order => 
+            order._id === orderId ? { ...order, status: 'delivered' } : order
+          );
+          const updatedStats = calculateOrderStats(updatedOrders);
+          setOrderStats(updatedStats);
+        } else {
+          setError(response.data.error || 'Failed to deliver order');
+        }
+      } catch (axiosError: any) {
+        // If specific endpoint fails, try generic status update
+        if (axiosError.response?.status === 404) {
+          console.log('⚠️ Specific endpoint not found, trying generic status update...');
+          await updateOrderStatus(orderId, 'delivered');
+        } else {
+          throw axiosError;
+        }
       }
     } catch (error: any) {
-      console.error('Error delivering order:', error);
-      setError('Failed to deliver order. Please try again.');
+      console.error('❌ Error delivering order:', error);
+      setError(error.response?.data?.error || 'Failed to deliver order. Please try again.');
     } finally {
       setOrderActionLoading(null);
     }
@@ -723,38 +868,62 @@ const handleStartWork = async (orderId: string) => {
       setOrderActionLoading(orderId);
       setError('');
       
-      const response = await marketplaceAPI.orders.cancelBySeller(
-        orderId,
-        cancelReason,
-        () => {}
-      );
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        setOrderActionLoading(null);
+        return;
+      }
+
+      console.log('❌ Seller cancelling order:', orderId);
       
-      if (response.success) {
-        setSuccessMessage('Order cancelled successfully!');
-        
-        // Update order in state
-        setOrders(prev => prev.map(order => 
-          order._id === orderId ? { 
-            ...order, 
-            status: 'cancelled',
-            cancelledAt: new Date().toISOString()
-          } : order
-        ));
-        
-        // Update stats
-        const updatedStats = calculateOrderStats(
-          orders.map(order => order._id === orderId ? { 
-            ...order, 
-            status: 'cancelled' 
-          } : order)
+      // Try the specific endpoint first
+      try {
+        const response = await axios.put(
+          `${API_BASE_URL}/marketplace/orders/${orderId}/cancel-by-seller`,
+          { cancelReason },
+          {
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 10000
+          }
         );
-        setOrderStats(updatedStats);
-      } else {
-        setError(response.error || 'Failed to cancel order');
+
+        if (response.data.success) {
+          setSuccessMessage('Order cancelled successfully!');
+          
+          // Update order in state
+          setOrders(prev => prev.map(order => 
+            order._id === orderId ? { 
+              ...order, 
+              status: 'cancelled',
+              cancelledAt: new Date().toISOString()
+            } : order
+          ));
+          
+          // Update stats
+          const updatedOrders = orders.map(order => 
+            order._id === orderId ? { ...order, status: 'cancelled' } : order
+          );
+          const updatedStats = calculateOrderStats(updatedOrders);
+          setOrderStats(updatedStats);
+        } else {
+          setError(response.data.error || 'Failed to cancel order');
+        }
+      } catch (axiosError: any) {
+        // If specific endpoint fails, try generic status update
+        if (axiosError.response?.status === 404) {
+          console.log('⚠️ Specific endpoint not found, trying generic status update...');
+          await updateOrderStatus(orderId, 'cancelled');
+        } else {
+          throw axiosError;
+        }
       }
     } catch (error: any) {
-      console.error('Error cancelling order:', error);
-      setError('Failed to cancel order. Please try again.');
+      console.error('❌ Error cancelling order:', error);
+      setError(error.response?.data?.error || 'Failed to cancel order. Please try again.');
     } finally {
       setOrderActionLoading(null);
     }
@@ -765,42 +934,64 @@ const handleStartWork = async (orderId: string) => {
       setOrderActionLoading(orderId);
       setError('');
       
-      const response = await marketplaceAPI.orders.completeRevision(
-        orderId,
-        revisionId,
-        files,
-        () => {}
-      );
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        setOrderActionLoading(null);
+        return;
+      }
+
+      console.log('🔄 Completing revision for order:', orderId);
       
-      if (response.success) {
-        setSuccessMessage('Revision completed and sent back to buyer!');
-        
-        // Update order in state
-        setOrders(prev => prev.map(order => 
-          order._id === orderId ? { 
-            ...order, 
-            status: 'delivered',
-            permissions: {
-              ...order.permissions,
-              canDeliver: false
-            }
-          } : order
-        ));
-        
-        // Update stats
-        const updatedStats = calculateOrderStats(
-          orders.map(order => order._id === orderId ? { 
-            ...order, 
-            status: 'delivered' 
-          } : order)
+      try {
+        const response = await axios.put(
+          `${API_BASE_URL}/marketplace/orders/${orderId}/complete-revision/${revisionId}`,
+          { files },
+          {
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 10000
+          }
         );
-        setOrderStats(updatedStats);
-      } else {
-        setError(response.error || 'Failed to complete revision');
+
+        if (response.data.success) {
+          setSuccessMessage('Revision completed and sent back to buyer!');
+          
+          // Update order in state
+          setOrders(prev => prev.map(order => 
+            order._id === orderId ? { 
+              ...order, 
+              status: 'delivered',
+              permissions: {
+                ...order.permissions,
+                canDeliver: false
+              }
+            } : order
+          ));
+          
+          // Update stats
+          const updatedOrders = orders.map(order => 
+            order._id === orderId ? { ...order, status: 'delivered' } : order
+          );
+          const updatedStats = calculateOrderStats(updatedOrders);
+          setOrderStats(updatedStats);
+        } else {
+          setError(response.data.error || 'Failed to complete revision');
+        }
+      } catch (axiosError: any) {
+        // If revision endpoint fails, try to mark as delivered
+        if (axiosError.response?.status === 404) {
+          console.log('⚠️ Revision endpoint not found, marking as delivered...');
+          await updateOrderStatus(orderId, 'delivered');
+        } else {
+          throw axiosError;
+        }
       }
     } catch (error: any) {
-      console.error('Error completing revision:', error);
-      setError('Failed to complete revision. Please try again.');
+      console.error('❌ Error completing revision:', error);
+      setError(error.response?.data?.error || 'Failed to complete revision. Please try again.');
     } finally {
       setOrderActionLoading(null);
     }
@@ -817,29 +1008,34 @@ const handleStartWork = async (orderId: string) => {
   const handleOrderActionSubmit = async (data: any) => {
     if (!selectedOrder) return;
     
-    switch (orderActionType) {
-      case 'deliver':
-        await handleDeliverOrder(selectedOrder._id, data);
-        break;
-      case 'cancel':
-        await handleCancelOrderBySeller(selectedOrder._id, data.cancelReason);
-        break;
-      case 'complete_revision':
-        if (selectedOrder.revisionNotes?.[0]?._id) {
-          await handleCompleteRevision(
-            selectedOrder._id, 
-            selectedOrder.revisionNotes[0]._id, 
-            data.files
-          );
-        }
-        break;
-      default:
-        break;
+    try {
+      switch (orderActionType) {
+        case 'deliver':
+          await handleDeliverOrder(selectedOrder._id, data);
+          break;
+        case 'cancel':
+          await handleCancelOrderBySeller(selectedOrder._id, data.cancelReason);
+          break;
+        case 'complete_revision':
+          if (selectedOrder.revisionNotes?.[0]?._id) {
+            await handleCompleteRevision(
+              selectedOrder._id, 
+              selectedOrder.revisionNotes[0]._id, 
+              data.files
+            );
+          } else {
+            // If no revision ID, just mark as delivered
+            await handleDeliverOrder(selectedOrder._id, data);
+          }
+          break;
+        default:
+          break;
+      }
+    } finally {
+      setShowOrderActionModal(false);
+      setSelectedOrder(null);
+      setOrderActionType('');
     }
-    
-    setShowOrderActionModal(false);
-    setSelectedOrder(null);
-    setOrderActionType('');
   };
 
   // Order update handler from modal
@@ -1524,23 +1720,16 @@ const handleStartWork = async (orderId: string) => {
                                 <div className="text-right">
                                   <p className="font-semibold text-green-600 text-lg">{formatCurrency(order.amount || 0)}</p>
                                   <div className="mt-1">
-                                   // In SellerDashboard.tsx, update the SellerOrderActions usage:
-<SellerOrderActions
-  order={order}
-  loading={orderActionLoading === order._id}
-  onStartProcessing={handleStartProcessing}
-  onStartWork={handleStartWork}
-  onDeliver={handleOpenOrderAction}
-  onCancel={handleOpenOrderAction}
-  onCompleteRevision={handleOpenOrderAction}
-  onViewDetails={() => handleViewOrderDetails(order._id)}
-  onOrderUpdate={(orderId, newStatus) => {
-    // Update local state
-    setOrders(prev => prev.map(o => 
-      o._id === orderId ? { ...o, status: newStatus } : o
-    ));
-  }}
-/>
+                                    <SellerOrderActions
+                                      order={order}
+                                      loading={orderActionLoading === order._id}
+                                      onStartProcessing={() => handleStartProcessing(order._id)}
+                                      onStartWork={() => handleStartWork(order._id)}
+                                      onDeliver={() => handleOpenOrderAction(order, 'deliver')}
+                                      onCancel={() => handleOpenOrderAction(order, 'cancel')}
+                                      onCompleteRevision={() => handleOpenOrderAction(order, 'complete_revision')}
+                                      onViewDetails={() => handleViewOrderDetails(order._id)}
+                                    />
                                   </div>
                                 </div>
                               </div>
