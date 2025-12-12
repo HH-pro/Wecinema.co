@@ -468,7 +468,7 @@ export const offerAPI = {
 };
 
 // ========================
-// ORDER APIs
+// ORDER APIs - UPDATED
 // ========================
 
 export const orderAPI = {
@@ -479,10 +479,10 @@ export const orderAPI = {
       buyerId: string;
       sellerId: string;
       amount: number;
-      shippingAddress?: string;
+      shippingAddress?: any;
       paymentMethod?: string;
       notes?: string;
-      status?: string;
+      expectedDeliveryDays?: number;
     },
     setLoading?: React.Dispatch<React.SetStateAction<boolean>>
   ) => {
@@ -511,8 +511,9 @@ export const orderAPI = {
   getOrderDetails: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
     getRequest(`/marketplace/orders/${orderId}`, setLoading),
 
-  updateOrderStatus: (orderId: string, status: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/marketplace/orders/${orderId}/status`, { status }, setLoading, "Order status updated"),
+  // Seller Order Management
+  startProcessing: (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    putRequest(`/marketplace/orders/${orderId}/start-processing`, {}, setLoading, "Order processing started"),
 
   startWork: (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
     putRequest(`/marketplace/orders/${orderId}/start-work`, {}, setLoading, "Work started on order"),
@@ -520,12 +521,13 @@ export const orderAPI = {
   deliverOrder: (
     orderId: string,
     deliveryData: {
-      deliveryMessage: string;
-      deliveryFiles: string[];
+      deliveryMessage?: string;
+      deliveryFiles?: string[];
     },
     setLoading: React.Dispatch<React.SetStateAction<boolean>>
-  ) => putRequest(`/marketplace/orders/${orderId}/deliver`, deliveryData, setLoading, "Order delivered"),
+  ) => putRequest(`/marketplace/orders/${orderId}/deliver`, deliveryData, setLoading, "Order delivered successfully"),
 
+  // Buyer Order Management
   requestRevision: (
     orderId: string,
     revisionNotes: string,
@@ -533,13 +535,92 @@ export const orderAPI = {
   ) => putRequest(`/marketplace/orders/${orderId}/request-revision`, { revisionNotes }, setLoading, "Revision requested"),
 
   completeOrder: (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/marketplace/orders/${orderId}/complete`, {}, setLoading, "Order completed"),
+    putRequest(`/marketplace/orders/${orderId}/complete`, {}, setLoading, "Order completed successfully"),
 
+  // Order Cancellation (Separate for buyer and seller)
+  cancelByBuyer: (
+    orderId: string,
+    cancelReason?: string,
+    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+  ) => {
+    return new Promise((resolve, reject) => {
+      setLoading?.(true);
+      api.put(`/marketplace/orders/${orderId}/cancel-by-buyer`, { cancelReason })
+        .then(response => {
+          toast.success("Order cancelled successfully!");
+          resolve(response.data);
+        })
+        .catch(error => {
+          const errorMessage = error.response?.data?.error || 'Failed to cancel order';
+          toast.error(errorMessage);
+          reject(new Error(errorMessage));
+        })
+        .finally(() => setLoading?.(false));
+    });
+  },
+
+  cancelBySeller: (
+    orderId: string,
+    cancelReason?: string,
+    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+  ) => {
+    return new Promise((resolve, reject) => {
+      setLoading?.(true);
+      api.put(`/marketplace/orders/${orderId}/cancel-by-seller`, { cancelReason })
+        .then(response => {
+          toast.success("Order cancelled successfully!");
+          resolve(response.data);
+        })
+        .catch(error => {
+          const errorMessage = error.response?.data?.error || 'Failed to cancel order';
+          toast.error(errorMessage);
+          reject(new Error(errorMessage));
+        })
+        .finally(() => setLoading?.(false));
+    });
+  },
+
+  // Order Timeline
   getOrderTimeline: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
     getRequest(`/marketplace/orders/${orderId}/timeline`, setLoading),
 
-  cancelOrder: (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/marketplace/orders/${orderId}/cancel`, {}, setLoading, "Order cancelled")
+  // Seller Statistics
+  getSellerStats: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest('/marketplace/orders/stats/seller', setLoading),
+
+  // Work File Management
+  uploadWorkFile: (
+    orderId: string,
+    fileData: {
+      name: string;
+      url: string;
+      type: string;
+    },
+    setLoading: React.Dispatch<React.SetStateAction<boolean>>
+  ) => postRequest(`/marketplace/orders/${orderId}/upload-work-file`, fileData, setLoading, "File uploaded successfully"),
+
+  // Revision Management
+  completeRevision: (
+    orderId: string,
+    revisionId: string,
+    files?: string[],
+    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+  ) => {
+    return new Promise((resolve, reject) => {
+      setLoading?.(true);
+      api.put(`/marketplace/orders/${orderId}/complete-revision/${revisionId}`, { files })
+        .then(response => {
+          toast.success("Revision completed successfully!");
+          resolve(response.data);
+        })
+        .catch(error => {
+          const errorMessage = error.response?.data?.error || 'Failed to complete revision';
+          toast.error(errorMessage);
+          reject(new Error(errorMessage));
+        })
+        .finally(() => setLoading?.(false));
+    });
+  }
 };
 
 // ========================
@@ -571,7 +652,19 @@ export const paymentAPI = {
   getPaymentStatus: (
     orderId: string,
     setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-  ) => getRequest(`/marketplace/payments/payment-status/${orderId}`, setLoading)
+  ) => getRequest(`/marketplace/payments/payment-status/${orderId}`, setLoading),
+
+  // Order Payment
+  createOrderPayment: (
+    orderId: string,
+    setLoading: React.Dispatch<React.SetStateAction<boolean>>
+  ) => postRequest(`/marketplace/payments/create-order-payment/${orderId}`, {}, setLoading),
+
+  confirmOrderPayment: (
+    orderId: string,
+    paymentIntentId: string,
+    setLoading: React.Dispatch<React.SetStateAction<boolean>>
+  ) => postRequest(`/marketplace/payments/confirm-order-payment/${orderId}`, { paymentIntentId }, setLoading, "Order payment confirmed")
 };
 
 // ========================
@@ -597,7 +690,35 @@ export const messageAPI = {
   markMessageAsRead: (
     messageId: string,
     setLoading: React.Dispatch<React.SetStateAction<boolean>>
-  ) => putRequest(`/marketplace/messages/${messageId}/read`, {}, setLoading)
+  ) => putRequest(`/marketplace/messages/${messageId}/read`, {}, setLoading),
+
+  // Order-specific messages
+  getOrderConversation: (
+    orderId: string,
+    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+  ) => getRequest(`/marketplace/messages/order/${orderId}`, setLoading),
+
+  sendOrderMessage: (
+    orderId: string,
+    message: string,
+    attachments?: string[],
+    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+  ) => {
+    return new Promise((resolve, reject) => {
+      setLoading?.(true);
+      api.post(`/marketplace/messages/order/${orderId}/send`, { message, attachments })
+        .then(response => {
+          toast.success("Message sent!");
+          resolve(response.data);
+        })
+        .catch(error => {
+          const errorMessage = error.response?.data?.error || 'Failed to send message';
+          toast.error(errorMessage);
+          reject(new Error(errorMessage));
+        })
+        .finally(() => setLoading?.(false));
+    });
+  }
 };
 
 // ========================
@@ -611,7 +732,82 @@ export const dashboardAPI = {
 
   getBuyerStats: (
     setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-  ) => getRequest('/marketplace/dashboard/buyer-stats', setLoading)
+  ) => getRequest('/marketplace/dashboard/buyer-stats', setLoading),
+
+  // Order statistics
+  getOrderStats: (
+    timeframe?: 'daily' | 'weekly' | 'monthly' | 'yearly',
+    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+  ) => {
+    const url = timeframe 
+      ? `/marketplace/dashboard/order-stats?timeframe=${timeframe}`
+      : '/marketplace/dashboard/order-stats';
+    return getRequest(url, setLoading);
+  },
+
+  // Revenue statistics
+  getRevenueStats: (
+    timeframe?: 'daily' | 'weekly' | 'monthly' | 'yearly',
+    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+  ) => {
+    const url = timeframe 
+      ? `/marketplace/dashboard/revenue-stats?timeframe=${timeframe}`
+      : '/marketplace/dashboard/revenue-stats';
+    return getRequest(url, setLoading);
+  }
+};
+
+// ========================
+// REVIEW & RATING APIs
+// ========================
+
+export const reviewAPI = {
+  createReview: (
+    reviewData: {
+      orderId: string;
+      rating: number;
+      comment?: string;
+      type: 'buyer' | 'seller';
+    },
+    setLoading: React.Dispatch<React.SetStateAction<boolean>>
+  ) => postRequest('/marketplace/reviews/create', reviewData, setLoading, "Review submitted successfully"),
+
+  getOrderReviews: (
+    orderId: string,
+    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+  ) => getRequest(`/marketplace/reviews/order/${orderId}`, setLoading),
+
+  getUserReviews: (
+    userId: string,
+    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+  ) => getRequest(`/marketplace/reviews/user/${userId}`, setLoading),
+
+  getMyReviews: (
+    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+  ) => getRequest('/marketplace/reviews/my-reviews', setLoading)
+};
+
+// ========================
+// NOTIFICATION APIs
+// ========================
+
+export const notificationAPI = {
+  getNotifications: (
+    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+  ) => getRequest('/marketplace/notifications', setLoading),
+
+  markAsRead: (
+    notificationId: string,
+    setLoading: React.Dispatch<React.SetStateAction<boolean>>
+  ) => putRequest(`/marketplace/notifications/${notificationId}/read`, {}, setLoading),
+
+  markAllAsRead: (
+    setLoading: React.Dispatch<React.SetStateAction<boolean>>
+  ) => putRequest('/marketplace/notifications/mark-all-read', {}, setLoading, "All notifications marked as read"),
+
+  getUnreadCount: (
+    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+  ) => getRequest('/marketplace/notifications/unread-count', setLoading)
 };
 
 // ========================
@@ -639,33 +835,66 @@ export const marketplaceAPI = {
     cancel: offerAPI.cancelOffer
   },
   orders: {
+    // Order Creation & Retrieval
     create: orderAPI.createOrder,
     getMy: orderAPI.getMyOrders,
     getSeller: orderAPI.getSellerOrders,
     getDetails: orderAPI.getOrderDetails,
-    updateStatus: orderAPI.updateOrderStatus,
+    
+    // Seller Order Management
+    startProcessing: orderAPI.startProcessing,
     startWork: orderAPI.startWork,
     deliver: orderAPI.deliverOrder,
+    
+    // Buyer Order Management
     requestRevision: orderAPI.requestRevision,
     complete: orderAPI.completeOrder,
+    
+    // Order Cancellation
+    cancelByBuyer: orderAPI.cancelByBuyer,
+    cancelBySeller: orderAPI.cancelBySeller,
+    
+    // Order Timeline & Stats
     getTimeline: orderAPI.getOrderTimeline,
-    cancel: orderAPI.cancelOrder
+    getSellerStats: orderAPI.getSellerStats,
+    
+    // Work Management
+    uploadWorkFile: orderAPI.uploadWorkFile,
+    completeRevision: orderAPI.completeRevision
   },
   payments: {
     createIntent: paymentAPI.createPaymentIntent,
     confirm: paymentAPI.confirmPayment,
     capture: paymentAPI.capturePayment,
     cancel: paymentAPI.cancelPayment,
-    getStatus: paymentAPI.getPaymentStatus
+    getStatus: paymentAPI.getPaymentStatus,
+    createOrderPayment: paymentAPI.createOrderPayment,
+    confirmOrderPayment: paymentAPI.confirmOrderPayment
   },
   messages: {
     get: messageAPI.getOrderMessages,
     send: messageAPI.sendMessage,
-    markRead: messageAPI.markMessageAsRead
+    markRead: messageAPI.markMessageAsRead,
+    getOrderConversation: messageAPI.getOrderConversation,
+    sendOrderMessage: messageAPI.sendOrderMessage
   },
   dashboard: {
     getSellerStats: dashboardAPI.getSellerStats,
-    getBuyerStats: dashboardAPI.getBuyerStats
+    getBuyerStats: dashboardAPI.getBuyerStats,
+    getOrderStats: dashboardAPI.getOrderStats,
+    getRevenueStats: dashboardAPI.getRevenueStats
+  },
+  reviews: {
+    create: reviewAPI.createReview,
+    getOrderReviews: reviewAPI.getOrderReviews,
+    getUserReviews: reviewAPI.getUserReviews,
+    getMyReviews: reviewAPI.getMyReviews
+  },
+  notifications: {
+    get: notificationAPI.getNotifications,
+    markAsRead: notificationAPI.markAsRead,
+    markAllAsRead: notificationAPI.markAllAsRead,
+    getUnreadCount: notificationAPI.getUnreadCount
   },
   stripe: {
     checkStatus: checkStripeStatus,
@@ -684,6 +913,103 @@ export const marketplaceAPI = {
 // UTILITY FUNCTIONS
 // ========================
 
+// Order Status Utilities
+export const getOrderStatusInfo = (status: string) => {
+  const statusInfo: { [key: string]: { text: string; color: string; icon: string; description: string } } = {
+    pending_payment: {
+      text: 'Payment Pending',
+      color: '#f59e0b',
+      icon: '⏳',
+      description: 'Waiting for buyer to complete payment'
+    },
+    paid: {
+      text: 'Paid',
+      color: '#3b82f6',
+      icon: '💳',
+      description: 'Payment received, waiting for seller to start'
+    },
+    processing: {
+      text: 'Processing',
+      color: '#8b5cf6',
+      icon: '📦',
+      description: 'Seller is preparing your order'
+    },
+    in_progress: {
+      text: 'In Progress',
+      color: '#10b981',
+      icon: '👨‍💻',
+      description: 'Seller is working on your order'
+    },
+    delivered: {
+      text: 'Delivered',
+      color: '#06b6d4',
+      icon: '🚚',
+      description: 'Order has been delivered, review and accept'
+    },
+    in_revision: {
+      text: 'Revision Requested',
+      color: '#f59e0b',
+      icon: '🔄',
+      description: 'Buyer requested revisions'
+    },
+    completed: {
+      text: 'Completed',
+      color: '#10b981',
+      icon: '✅',
+      description: 'Order successfully completed'
+    },
+    cancelled: {
+      text: 'Cancelled',
+      color: '#ef4444',
+      icon: '❌',
+      description: 'Order has been cancelled'
+    },
+    disputed: {
+      text: 'Disputed',
+      color: '#dc2626',
+      icon: '⚠️',
+      description: 'Order has a dispute'
+    }
+  };
+
+  return statusInfo[status] || {
+    text: status,
+    color: '#6b7280',
+    icon: '❓',
+    description: 'Unknown status'
+  };
+};
+
+export const getOrderActions = (status: string, userRole: 'buyer' | 'seller') => {
+  const buyerActions: { [key: string]: string[] } = {
+    pending_payment: ['cancel'],
+    paid: ['cancel', 'contact_seller'],
+    processing: ['contact_seller'],
+    in_progress: ['contact_seller'],
+    delivered: ['request_revision', 'complete', 'contact_seller'],
+    in_revision: ['contact_seller'],
+    completed: ['leave_review', 'contact_seller'],
+    cancelled: [],
+    disputed: ['contact_support']
+  };
+
+  const sellerActions: { [key: string]: string[] } = {
+    pending_payment: ['contact_buyer'],
+    paid: ['start_processing', 'contact_buyer'],
+    processing: ['start_work', 'contact_buyer'],
+    in_progress: ['deliver', 'contact_buyer'],
+    delivered: ['contact_buyer'],
+    in_revision: ['complete_revision', 'contact_buyer'],
+    completed: ['contact_buyer'],
+    cancelled: [],
+    disputed: ['contact_support']
+  };
+
+  return userRole === 'buyer' 
+    ? buyerActions[status] || []
+    : sellerActions[status] || [];
+};
+
 // Marketplace Utilities
 export const calculatePlatformFee = (amount: number, feePercent: number = 0.15) => {
   const platformFee = amount * feePercent;
@@ -700,13 +1026,13 @@ export const formatOrderStatus = (status: string) => {
   const statusMap: { [key: string]: string } = {
     pending_payment: 'Payment Pending',
     paid: 'Paid',
+    processing: 'Processing',
     in_progress: 'In Progress',
     delivered: 'Delivered',
     in_revision: 'Revision Requested',
     completed: 'Completed',
     cancelled: 'Cancelled',
-    disputed: 'Disputed',
-    confirmed: 'Confirmed'
+    disputed: 'Disputed'
   };
   return statusMap[status] || status;
 };
@@ -715,13 +1041,13 @@ export const getStatusColor = (status: string) => {
   const statusColors: { [key: string]: string } = {
     pending_payment: 'var(--warning)',
     paid: 'var(--info)',
+    processing: 'var(--primary)',
     in_progress: 'var(--primary)',
     delivered: 'var(--success)',
     in_revision: 'var(--warning)',
     completed: 'var(--success)',
     cancelled: 'var(--danger)',
-    disputed: 'var(--danger)',
-    confirmed: 'var(--info)'
+    disputed: 'var(--danger)'
   };
   return statusColors[status] || 'var(--secondary)';
 };
@@ -748,6 +1074,19 @@ export const validateListingData = (data: {
   return errors;
 };
 
+export const formatCurrency = (amount: number, currency: string = 'USD') => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency
+  }).format(amount);
+};
+
+export const calculateEstimatedDelivery = (orderDate: Date, expectedDays: number) => {
+  const date = new Date(orderDate);
+  date.setDate(date.getDate() + expectedDays);
+  return date;
+};
+
 // Token utilities
 export const getCurrentUserFromToken = () => {
   const token = localStorage.getItem("token");
@@ -764,6 +1103,40 @@ export const getCurrentUserFromToken = () => {
 
 export const isAuthenticated = () => {
   return !!localStorage.getItem("token");
+};
+
+export const getUserRole = () => {
+  const user = getCurrentUserFromToken();
+  return user?.role || 'buyer';
+};
+
+// Order validation
+export const validateOrderData = (data: {
+  offerId?: string;
+  listingId?: string;
+  buyerId?: string;
+  sellerId?: string;
+  amount?: number;
+}) => {
+  const errors: string[] = [];
+
+  if (!data.offerId && !data.listingId) {
+    errors.push('Either offerId or listingId is required');
+  }
+
+  if (!data.buyerId) {
+    errors.push('Buyer ID is required');
+  }
+
+  if (!data.sellerId) {
+    errors.push('Seller ID is required');
+  }
+
+  if (!data.amount || data.amount <= 0) {
+    errors.push('Amount must be greater than 0');
+  }
+
+  return errors;
 };
 
 // ========================
@@ -791,18 +1164,20 @@ export const acceptOffer = offerAPI.acceptOffer;
 export const rejectOffer = offerAPI.rejectOffer;
 export const cancelOffer = offerAPI.cancelOffer;
 
-// Order exports
+// Order exports - UPDATED
 export const createOrder = orderAPI.createOrder;
 export const getMyOrders = orderAPI.getMyOrders;
 export const getSellerOrders = orderAPI.getSellerOrders;
 export const getOrderDetails = orderAPI.getOrderDetails;
-export const updateOrderStatus = orderAPI.updateOrderStatus;
+export const startProcessing = orderAPI.startProcessing;
 export const startWorkOnOrder = orderAPI.startWork;
 export const deliverOrder = orderAPI.deliverOrder;
 export const requestRevision = orderAPI.requestRevision;
 export const completeOrder = orderAPI.completeOrder;
+export const cancelOrderByBuyer = orderAPI.cancelByBuyer;
+export const cancelOrderBySeller = orderAPI.cancelBySeller;
 export const getOrderTimeline = orderAPI.getOrderTimeline;
-export const cancelOrder = orderAPI.cancelOrder;
+export const getSellerOrderStats = orderAPI.getSellerStats;
 
 // Payment exports
 export const createPaymentIntent = paymentAPI.createPaymentIntent;
@@ -810,14 +1185,32 @@ export const confirmPayment = paymentAPI.confirmPayment;
 export const capturePayment = paymentAPI.capturePayment;
 export const cancelPayment = paymentAPI.cancelPayment;
 export const getPaymentStatus = paymentAPI.getPaymentStatus;
+export const createOrderPayment = paymentAPI.createOrderPayment;
+export const confirmOrderPayment = paymentAPI.confirmOrderPayment;
 
 // Message exports
 export const getOrderMessages = messageAPI.getOrderMessages;
 export const sendMessage = messageAPI.sendMessage;
 export const markMessageAsRead = messageAPI.markMessageAsRead;
+export const getOrderConversation = messageAPI.getOrderConversation;
+export const sendOrderMessage = messageAPI.sendOrderMessage;
 
 // Dashboard exports
 export const getSellerStats = dashboardAPI.getSellerStats;
 export const getBuyerStats = dashboardAPI.getBuyerStats;
+export const getOrderStats = dashboardAPI.getOrderStats;
+export const getRevenueStats = dashboardAPI.getRevenueStats;
+
+// Review exports
+export const createReview = reviewAPI.createReview;
+export const getOrderReviews = reviewAPI.getOrderReviews;
+export const getUserReviews = reviewAPI.getUserReviews;
+export const getMyReviews = reviewAPI.getMyReviews;
+
+// Notification exports
+export const getNotifications = notificationAPI.getNotifications;
+export const markNotificationAsRead = notificationAPI.markAsRead;
+export const markAllNotificationsAsRead = notificationAPI.markAllAsRead;
+export const getUnreadNotificationCount = notificationAPI.getUnreadCount;
 
 export default api;
