@@ -609,7 +609,7 @@ const SellerDashboard: React.FC = () => {
       // First, try to update status to "processing"
       try {
         const response = await axios.put(
-          `${API_BASE_URL}/api/marketplace/orders/${order._id}/status`,
+          `${API_BASE_URL}/marketplace/orders/${order._id}/status`,
           { status: 'processing' },
           {
             headers: { 
@@ -662,7 +662,7 @@ const SellerDashboard: React.FC = () => {
       
       try {
         const response = await axios.put(
-          `${API_BASE_URL}/api/marketplace/orders/${order._id}/status`,
+          `${API_BASE_URL}/marketplace/orders/${order._id}/status`,
           { status: 'in_progress' },
           {
             headers: { 
@@ -735,7 +735,7 @@ const SellerDashboard: React.FC = () => {
       };
 
       const response = await axios.put(
-        `${API_BASE_URL}/api/marketplace/orders/${selectedOrder._id}/status`,
+        `${API_BASE_URL}/marketplace/orders/${selectedOrder._id}/status`,
         requestData,
         {
           headers: { 
@@ -792,7 +792,7 @@ const SellerDashboard: React.FC = () => {
       }
 
       const response = await axios.put(
-        `${API_BASE_URL}/api/marketplace/orders/${selectedOrder._id}/status`,
+        `${API_BASE_URL}/marketplace/orders/${selectedOrder._id}/status`,
         { 
           status: 'cancelled',
           cancelReason: cancelReason || 'Seller cancelled the order'
@@ -839,7 +839,7 @@ const SellerDashboard: React.FC = () => {
       console.log('🔄 Completing revision for order:', order._id);
       
       const response = await axios.put(
-        `${API_BASE_URL}/api/marketplace/orders/${order._id}/status`,
+        `${API_BASE_URL}/marketplace/orders/${order._id}/status`,
         { status: 'delivered' },
         {
           headers: { 
