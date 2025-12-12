@@ -315,37 +315,93 @@ const SellerDashboard: React.FC = () => {
   };
 
   const fetchListings = async () => {
-    try {
-      const currentUserId = getCurrentUserId();
-      if (!currentUserId) {
-        setError('User not authenticated. Please log in again.');
-        return;
-      }
+  try {
+    const currentUserId = getCurrentUserId();
+    if (!currentUserId) {
+      setError('User not authenticated. Please log in again.');
+      return;
+    }
 
-      console.log('📝 Fetching listings for user:', currentUserId);
-      
-      const params: any = {
-        page: listingsPage,
-        limit: listingsLimit
-      };
-      
-      if (listingsStatusFilter) {
-        params.status = listingsStatusFilter;
+    console.log('📝 Fetching listings for user:', currentUserId);
+    
+    const params: any = {
+      page: listingsPage,
+      limit: listingsLimit,
+      _t: new Date().getTime() // Cache busting parameter
+    };
+    
+    if (listingsStatusFilter) {
+      params.status = listingsStatusFilter;
+    }
+    
+    // Force fresh fetch by disabling cache
+    const response = await axios.get(
+      `${API_BASE_URL}/marketplace/listings/my-listings`,
+      {
+        params,
+        headers: { 
+          Authorization: `Bearer ${localStorage.getItem('token') || sessionStorage.getItem('token')}`,
+          'Cache-Control': 'no-cache'
+        }
       }
-      
-      const response = await marketplaceAPI.listings.getMy(params, setLoading);
-      
-      if (response.success) {
-        setListingsData(response);
-        console.log('✅ Listings fetched successfully:', response.listings?.length || 0);
-      } else {
-        setError(response.error || 'Failed to fetch listings');
-      }
-    } catch (error: any) {
-      console.error('Error fetching listings:', error);
+    );
+    
+    if (response.data.success) {
+      setListingsData(response.data);
+      console.log('✅ Listings fetched successfully:', {
+        count: response.data.listings?.length || 0,
+        pagination: response.data.pagination
+      });
+    } else {
+      setError(response.data.error || 'Failed to fetch listings');
+    }
+  } catch (error: any) {
+    console.error('Error fetching listings:', error);
+    
+    // If it's a 304 error, try without cache
+    if (error.response?.status === 304) {
+      console.log('🔄 Got 304, retrying without cache...');
+      // Retry without cache
+      await fetchListingsWithoutCache();
+    } else {
       setError('Failed to load listings. Please try again.');
     }
-  };
+  }
+};
+
+// Helper function to fetch without cache
+const fetchListingsWithoutCache = async () => {
+  try {
+    const currentUserId = getCurrentUserId();
+    if (!currentUserId) return;
+    
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    
+    // Create a unique URL to bypass cache
+    const timestamp = new Date().getTime();
+    const url = `${API_BASE_URL}/marketplace/listings/my-listings?_nocache=${timestamp}`;
+    
+    const response = await axios.get(url, {
+      params: {
+        page: listingsPage,
+        limit: listingsLimit,
+        status: listingsStatusFilter || undefined
+      },
+      headers: { 
+        Authorization: `Bearer ${token}`,
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
+    
+    if (response.data.success) {
+      setListingsData(response.data);
+      console.log('✅ Listings fetched without cache:', response.data.listings?.length);
+    }
+  } catch (error) {
+    console.error('Error fetching listings without cache:', error);
+  }
+};
 
   const checkStripeAccountStatus = async () => {
     try {
