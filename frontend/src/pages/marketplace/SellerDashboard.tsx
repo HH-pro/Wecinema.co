@@ -27,7 +27,7 @@ import OrdersTab from '../../components/marketplae/seller/OrdersTab';
 import SellerOrderActions from '../../components/marketplae/seller/SellerOrderActions';
 import OrderWorkflowGuide from '../../components/marketplae/seller/OrderWorkflowGuide';
 import QuickActionCard from '../../components/marketplae/seller/QuickActionCard';
-import OrderStatusTracker from '../../components/marketplae/seller/OrderStatusTracker';
+import OrderStatusTracker from '../../components/marketplace/seller/OrderStatusTracker';
 
 const API_BASE_URL = 'http://localhost:3000';
 
