@@ -14,17 +14,17 @@ import {
 } from '../../api';
 import axios from 'axios';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
-import StripeSetupModal from '../../components/marketplace/seller/StripeSetupModal';
-import StripeAccountStatus from '../../components/marketplace/seller/StripeAccountStatus';
-import StatCard from '../../components/marketplace/seller/StatCard';
-import OrderDetailsModal from '../../components/marketplace/seller/OrderDetailsModal';
-import EditListingModal from '../../components/marketplace/seller/EditListingModal';
-import DeleteListingModal from '../../components/marketplace/seller/DeleteListingModal';
-import VideoPlayerModal from '../../components/marketplace/seller/VideoPlayerModal';
-import OffersTab from '../../components/marketplace/seller/OffersTab';
-import ListingsTab from '../../components/marketplace/seller/ListingsTab';
-import OrdersTab from '../../components/marketplace/seller/OrdersTab';
-import SellerOrderActions from '../../components/marketplace/seller/SellerOrderActions';
+import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
+import StripeAccountStatus from '../../components/marketplae/seller/StripeAccountStatus';
+import StatCard from '../../components/marketplae/seller/StatCard';
+import OrderDetailsModal from '../../components/marketplae/seller/OrderDetailsModal';
+import EditListingModal from '../../components/marketplae/seller/EditListingModal';
+import DeleteListingModal from '../../components/marketplae/seller/DeleteListingModal';
+import VideoPlayerModal from '../../components/marketplae/seller/VideoPlayerModal';
+import OffersTab from '../../components/marketplae/seller/OffersTab';
+import ListingsTab from '../../components/marketplae/seller/ListingsTab';
+import OrdersTab from '../../components/marketplae/seller/OrdersTab';
+import SellerOrderActions from '../../components/marketplae/seller/SellerOrderActions';
 
 const API_BASE_URL = 'http://localhost:3000';
 
