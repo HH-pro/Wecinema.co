@@ -468,7 +468,7 @@ export const offerAPI = {
 };
 
 // ========================
-// ORDER APIs - UPDATED
+// ORDER APIs - UPDATED WITH NEW STATUS ENDPOINT
 // ========================
 
 export const orderAPI = {
@@ -510,6 +510,62 @@ export const orderAPI = {
 
   getOrderDetails: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
     getRequest(`/marketplace/orders/${orderId}`, setLoading),
+
+  // Generic Order Status Update (for when specific endpoints fail)
+  updateOrderStatus: async (
+    orderId: string,
+    status: string,
+    options?: {
+      cancelReason?: string;
+      revisionNotes?: string;
+      deliveryMessage?: string;
+      deliveryFiles?: string[];
+      notes?: string;
+    },
+    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+  ) => {
+    try {
+      setLoading?.(true);
+      
+      const requestData: any = { status };
+      
+      // Add optional data based on status
+      if (status === 'cancelled' && options?.cancelReason) {
+        requestData.cancelReason = options.cancelReason;
+      }
+      
+      if (status === 'in_revision' && options?.revisionNotes) {
+        requestData.revisionNotes = options.revisionNotes;
+      }
+      
+      if (status === 'delivered' && (options?.deliveryMessage || options?.deliveryFiles)) {
+        requestData.deliveryMessage = options.deliveryMessage;
+        requestData.deliveryFiles = options.deliveryFiles;
+      }
+      
+      if (options?.notes) {
+        requestData.notes = options.notes;
+      }
+      
+      const response = await api.put(`/api/marketplace/orders/${orderId}/status`, requestData);
+      
+      const statusInfo = getOrderStatusInfo(status);
+      toast.success(`Order status updated to ${statusInfo.text}`);
+      return response.data;
+    } catch (error: any) {
+      let errorMessage = error.response?.data?.error || 'Failed to update order status';
+      
+      // Show allowed transitions if available
+      if (error.response?.data?.allowedTransitions) {
+        errorMessage += `. Allowed transitions: ${error.response.data.allowedTransitions.join(', ')}`;
+      }
+      
+      toast.error(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setLoading?.(false);
+    }
+  },
 
   // Seller Order Management
   startProcessing: (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
@@ -841,6 +897,9 @@ export const marketplaceAPI = {
     getSeller: orderAPI.getSellerOrders,
     getDetails: orderAPI.getOrderDetails,
     
+    // Generic Status Update (fallback endpoint)
+    updateStatus: orderAPI.updateOrderStatus,
+    
     // Seller Order Management
     startProcessing: orderAPI.startProcessing,
     startWork: orderAPI.startWork,
@@ -1169,6 +1228,7 @@ export const createOrder = orderAPI.createOrder;
 export const getMyOrders = orderAPI.getMyOrders;
 export const getSellerOrders = orderAPI.getSellerOrders;
 export const getOrderDetails = orderAPI.getOrderDetails;
+export const updateOrderStatus = orderAPI.updateOrderStatus; // NEW
 export const startProcessing = orderAPI.startProcessing;
 export const startWorkOnOrder = orderAPI.startWork;
 export const deliverOrder = orderAPI.deliverOrder;
@@ -1212,5 +1272,40 @@ export const getNotifications = notificationAPI.getNotifications;
 export const markNotificationAsRead = notificationAPI.markAsRead;
 export const markAllNotificationsAsRead = notificationAPI.markAllAsRead;
 export const getUnreadNotificationCount = notificationAPI.getUnreadCount;
+
+// Additional Status Utilities for the new endpoint
+export const getValidStatusTransitions = (currentStatus: string, userRole: 'buyer' | 'seller') => {
+  const sellerTransitions: { [key: string]: string[] } = {
+    'paid': ['processing', 'cancelled'],
+    'processing': ['in_progress', 'cancelled'],
+    'in_progress': ['delivered', 'cancelled'],
+    'delivered': ['in_revision'],
+    'in_revision': ['delivered'],
+    'completed': []
+  };
+
+  const buyerTransitions: { [key: string]: string[] } = {
+    'pending_payment': ['cancelled'],
+    'paid': ['cancelled'],
+    'delivered': ['completed', 'in_revision'],
+    'in_revision': []
+  };
+
+  return userRole === 'buyer' 
+    ? buyerTransitions[currentStatus] || []
+    : sellerTransitions[currentStatus] || [];
+};
+
+export const getValidStatuses = () => [
+  'pending_payment',
+  'paid', 
+  'processing',
+  'in_progress',
+  'delivered',
+  'in_revision',
+  'completed',
+  'cancelled',
+  'disputed'
+];
 
 export default api;
