@@ -316,4 +316,113 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
                             </span>
                           ))}
                           {listing.tags.length > 3 && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-200 text-gray-600">
+                              +{listing.tags.length - 3}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Action Buttons */}
+                      <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t border-gray-100">
+                        <button
+                          onClick={() => onEditListing(listing)}
+                          disabled={isProcessing}
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2.5 px-3 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Edit
+                        </button>
+                        
+                        <button
+                          onClick={() => onToggleStatus(listing)}
+                          disabled={isProcessing}
+                          className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium py-2.5 px-3 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {listing.status === 'active' ? (
+                            <>
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              Deactivate
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              Activate
+                            </>
+                          )}
+                        </button>
+                        
+                        <button
+                          onClick={() => onDeleteListing(listing)}
+                          disabled={isProcessing}
+                          className="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-medium py-2.5 px-3 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Delete
+                        </button>
+                      </div>
+                      
+                      {/* Last Updated & Media Info */}
+                      <div className="flex justify-between items-center text-xs text-gray-500 mt-3">
+                        <span>Updated {formatDate(listing.updatedAt)}</span>
+                        {listing.mediaUrls && listing.mediaUrls.length > 0 && (
+                          <span className="flex items-center">
+                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            {listing.mediaUrls.length} {listing.mediaUrls.length === 1 ? 'media' : 'media'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            {/* Pagination */}
+            {pagination && pagination.pages > 1 && (
+              <div className="flex justify-center items-center space-x-4">
+                <button
+                  onClick={() => onPageChange(currentPage - 1)}
+                  disabled={currentPage === 1 || loading || actionLoading !== null}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Previous
+                </button>
+                
+                <span className="text-sm text-gray-700">
+                  Page <span className="font-semibold">{currentPage}</span> of <span className="font-semibold">{pagination.pages}</span>
+                </span>
+                
+                <button
+                  onClick={() => onPageChange(currentPage + 1)}
+                  disabled={currentPage === pagination.pages || loading || actionLoading !== null}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                  <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ListingsTab;
