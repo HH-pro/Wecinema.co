@@ -494,7 +494,7 @@ const SellerDashboard: React.FC = () => {
       }
 
       const response = await axios.put(
-        `${API_BASE_URL}/api/marketplace/orders/${order._id}/status`,
+        `${API_BASE_URL}/marketplace/orders/${order._id}/status`,
         { status: 'processing' },
         {
           headers: { 
@@ -532,7 +532,7 @@ const SellerDashboard: React.FC = () => {
       }
 
       const response = await axios.put(
-        `${API_BASE_URL}/api/marketplace/orders/${order._id}/status`,
+        `${API_BASE_URL}/marketplace/orders/${order._id}/status`,
         { status: 'in_progress' },
         {
           headers: { 
@@ -592,7 +592,7 @@ const SellerDashboard: React.FC = () => {
       }
 
       const response = await axios.put(
-        `${API_BASE_URL}/api/marketplace/orders/${order._id}/status`,
+        `${API_BASE_URL}/marketplace/orders/${order._id}/status`,
         { status: 'delivered' },
         {
           headers: { 
