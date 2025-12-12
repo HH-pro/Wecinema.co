@@ -1,15 +1,7 @@
+// src/pages/seller/SellerDashboard.tsx
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import { getSellerOrders, getReceivedOffers, checkStripeStatus, createStripeAccount } from '../../api';
-import { 
-  getMyListings, 
-  toggleListingStatus, 
-  deleteListing,
-  formatPriceINR,
-  getStatusColorClass,
-  type Listing as MarketplaceListing,
-  type MyListingsResponse 
-} from '../../api/marketplace';
 import axios from 'axios';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
 import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
@@ -17,6 +9,7 @@ import OrderCreation from '../../components/marketplae/seller/OrderCreation';
 import PaymentStatusBadge from '../../components/marketplae/seller/PaymentStatusBadge';
 import StripeAccountStatus from '../../components/marketplae/seller/StripeAccountStatus';
 import StatCard from '../../components/marketplae/seller/StatCard';
+import UserListings from '../../components/marketplae/seller/UserListings';
 import OrderReceivedPage from '../../components/marketplae/seller/OrderReceivedPage';
 import OrderDetailsModal from '../../components/marketplae/seller/OrderDetailsModal';
 
@@ -86,7 +79,6 @@ interface ListingsData {
 const SellerDashboard: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
-  const [marketplaceListings, setMarketplaceListings] = useState<MarketplaceListing[]>([]);
   const [listingsData, setListingsData] = useState<ListingsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
@@ -102,11 +94,40 @@ const SellerDashboard: React.FC = () => {
   const [showOrderModal, setShowOrderModal] = useState(false);
 
   const formatCurrency = (amount: number): string => {
-    return formatPriceINR(amount || 0);
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+    }).format(amount || 0);
   };
 
   const getStatusColor = (status: string): string => {
-    return getStatusColorClass(status);
+    switch (status?.toLowerCase()) {
+      case 'confirmed':
+      case 'completed':
+      case 'accepted':
+      case 'active':
+      case 'paid':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'pending':
+      case 'pending_payment':
+      case 'pending_acceptance':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'shipped':
+      case 'sold':
+      case 'in_progress':
+      case 'in_transit':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'cancelled':
+      case 'rejected':
+      case 'inactive':
+      case 'failed':
+      case 'declined':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'draft':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
   };
 
   // Stats calculation
@@ -123,9 +144,9 @@ const SellerDashboard: React.FC = () => {
   const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
   
   // Listings stats
-  const totalListings = marketplaceListings?.length || 0;
-  const activeListings = marketplaceListings?.filter((listing) => listing.status === 'active').length || 0;
-  const soldListings = marketplaceListings?.filter((listing) => listing.status === 'sold').length || 0;
+  const totalListings = listingsData?.listings?.length || 0;
+  const activeListings = listingsData?.listings?.filter((listing) => listing.status === 'active').length || 0;
+  const soldListings = listingsData?.listings?.filter((listing) => listing.status === 'sold').length || 0;
 
   useEffect(() => {
     console.log('🎯 SellerDashboard mounted');
@@ -133,78 +154,6 @@ const SellerDashboard: React.FC = () => {
     checkStripeAccountStatus();
     handleStripeReturn();
   }, []);
-
-  const fetchMarketplaceListings = async () => {
-    try {
-      console.log('📝 Fetching marketplace listings via new API...');
-      const response = await getMyListings({ page: 1, limit: 1000 });
-      
-      if (response.success && response.data) {
-        const listingsData = response.data;
-        console.log('✅ Marketplace listings fetched successfully:', listingsData.listings.length);
-        setMarketplaceListings(listingsData.listings);
-        
-        // Old format for compatibility
-        const oldFormatListings: Listing[] = listingsData.listings.map(listing => ({
-          _id: listing._id,
-          status: listing.status,
-          price: listing.price
-        }));
-        
-        setListingsData({
-          listings: oldFormatListings,
-          user: {
-            _id: getCurrentUserId() || '',
-            username: 'Current User'
-          }
-        });
-      } else {
-        console.error('❌ Failed to fetch marketplace listings:', response.error);
-        await fetchOldListings();
-      }
-    } catch (error) {
-      console.error('❌ Error fetching marketplace listings:', error);
-      await fetchOldListings();
-    }
-  };
-
-  const fetchOldListings = async () => {
-    try {
-      const currentUserId = getCurrentUserId();
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/listings/user/${currentUserId}/listings`,
-        {
-          params: { page: 1, limit: 1000 },
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 10000
-        }
-      );
-      
-      if (response.data.success) {
-        const oldListings = response.data.listings || [];
-        const convertedListings: MarketplaceListing[] = oldListings.map((oldListing: any) => ({
-          _id: oldListing._id,
-          sellerId: oldListing.sellerId || currentUserId,
-          title: oldListing.title || '',
-          description: oldListing.description || '',
-          price: oldListing.price || 0,
-          type: oldListing.type || 'product',
-          category: oldListing.category || '',
-          tags: Array.isArray(oldListing.tags) ? oldListing.tags : [],
-          mediaUrls: Array.isArray(oldListing.mediaUrls) ? oldListing.mediaUrls : [],
-          status: oldListing.status || 'active',
-          createdAt: oldListing.createdAt || new Date(),
-          updatedAt: oldListing.updatedAt || new Date()
-        }));
-        
-        setMarketplaceListings(convertedListings);
-      }
-    } catch (error) {
-      console.error('❌ Fallback listings fetch failed:', error);
-    }
-  };
 
   const fetchDashboardData = async () => {
     try {
@@ -222,7 +171,8 @@ const SellerDashboard: React.FC = () => {
 
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       
-      const [ordersResponse, offersResponse] = await Promise.allSettled([
+      const [ordersResponse, offersResponse, listingsResponse] = await Promise.allSettled([
+        // ✅ FIXED: Direct API call with correct endpoint
         (async () => {
           try {
             console.log('📦 Fetching seller orders from /marketplace/my-sales');
@@ -240,14 +190,17 @@ const SellerDashboard: React.FC = () => {
               data: response.data
             });
             
+            // Backend returns { success: true, sales: [...] }
             if (response.data.success && response.data.sales) {
               return response.data.sales;
             }
             
+            // If response structure is different, try to extract
             return response.data.data || response.data.orders || [];
           } catch (err: any) {
             console.error('❌ Error fetching orders:', err.response?.data || err.message);
             
+            // Fallback to old API function
             try {
               console.log('🔄 Trying fallback API function getSellerOrders()');
               const fallback = await getSellerOrders();
@@ -260,6 +213,7 @@ const SellerDashboard: React.FC = () => {
           }
         })(),
         
+        // Offers - use existing function
         (async () => {
           try {
             const offers = await getReceivedOffers();
@@ -269,10 +223,28 @@ const SellerDashboard: React.FC = () => {
             return [];
           }
         })(),
+        
+        // Listings
+        (async () => {
+          try {
+            const response = await axios.get(
+              `${API_BASE_URL}/marketplace/listings/user/${currentUserId}/listings`,
+              {
+                params: { page: 1, limit: 1000 },
+                headers: { Authorization: `Bearer ${token}` },
+                timeout: 10000
+              }
+            );
+            console.log('📝 Listings fetched successfully');
+            return response.data;
+          } catch (err) {
+            console.log('Listings fetch failed, continuing without listings data');
+            return null;
+          }
+        })()
       ]);
 
-      await fetchMarketplaceListings();
-
+      // Process orders response
       let ordersData = [];
       if (ordersResponse.status === 'fulfilled') {
         const result = ordersResponse.value;
@@ -285,10 +257,16 @@ const SellerDashboard: React.FC = () => {
         console.error('Orders promise rejected:', ordersResponse.reason);
       }
 
+      // Process offers response
       let offersData = [];
       if (offersResponse.status === 'fulfilled') {
         const result = offersResponse.value;
         offersData = Array.isArray(result) ? result : [];
+      }
+
+      // Process listings response
+      if (listingsResponse.status === 'fulfilled' && listingsResponse.value?.success) {
+        setListingsData(listingsResponse.value);
       }
 
       setOrders(ordersData);
@@ -297,7 +275,7 @@ const SellerDashboard: React.FC = () => {
       console.log('✅ Dashboard data loaded:', {
         orders: ordersData.length,
         offers: offersData.length,
-        marketplaceListings: marketplaceListings.length
+        listings: listingsData?.listings?.length || 0
       });
 
     } catch (error) {
@@ -317,8 +295,10 @@ const SellerDashboard: React.FC = () => {
       console.log('✅ Stripe status response:', response);
       setStripeStatus(response);
       
+      // Update debug info
       setDebugInfo(`Stripe Status: ${response.connected ? 'Connected' : 'Not Connected'}, Charges Enabled: ${response.chargesEnabled}`);
       
+      // If Stripe is connected and active, don't show setup modal
       if (response.connected && response.chargesEnabled) {
         setShowStripeSetup(false);
         console.log('🎉 Stripe is connected and active - hiding setup modal');
@@ -337,6 +317,7 @@ const SellerDashboard: React.FC = () => {
   };
 
   const handleStripeReturn = () => {
+    // Check if user just returned from Stripe onboarding
     const urlParams = new URLSearchParams(window.location.search);
     const stripeStatus = urlParams.get('stripe');
     const accountId = urlParams.get('account_id');
@@ -351,10 +332,12 @@ const SellerDashboard: React.FC = () => {
       console.log('🎉 Returned from Stripe onboarding - refreshing status');
       setSuccessMessage('Stripe account setup completed successfully!');
       
+      // Refresh status after a delay to allow webhook processing
       setTimeout(() => {
         checkStripeAccountStatus();
         fetchDashboardData();
         
+        // Clean URL
         const newUrl = window.location.pathname;
         window.history.replaceState({}, '', newUrl);
         console.log('🧹 Cleaned URL after Stripe return');
@@ -395,68 +378,24 @@ const SellerDashboard: React.FC = () => {
     window.location.href = `/listings/${listingId}`;
   };
 
+  // Function to handle order view
   const handleViewOrderDetails = (orderId: string) => {
     setSelectedOrderId(orderId);
     setShowOrderModal(true);
   };
 
+  // Function to handle order update from modal
   const handleOrderUpdateFromModal = (orderId: string, newStatus: string) => {
+    // Update local orders state
     setOrders(prev => prev.map(order => 
       order._id === orderId ? { ...order, status: newStatus } : order
     ));
     
+    // Call existing update function
     handleOrderUpdate(orderId, newStatus);
   };
 
-  const handleToggleListingStatus = async (listingId: string) => {
-    try {
-      const response = await toggleListingStatus(listingId);
-      if (response.success && response.data) {
-        const message = response.data.newStatus === 'active' ? 'Listing activated!' : 'Listing deactivated!';
-        setSuccessMessage(message);
-        
-        setMarketplaceListings(prev => prev.map(listing => 
-          listing._id === listingId 
-            ? { ...listing, status: response.data!.newStatus } 
-            : listing
-        ));
-        
-        await fetchMarketplaceListings();
-      } else {
-        setError(response.error || 'Failed to update listing status');
-      }
-    } catch (error: any) {
-      console.error('Error toggling listing status:', error);
-      setError(error.message || 'Failed to update listing status');
-    }
-  };
-
-  const handleDeleteListing = async (listingId: string) => {
-    if (!window.confirm('Are you sure you want to delete this listing?')) {
-      return;
-    }
-
-    try {
-      const response = await deleteListing(listingId);
-      if (response.success) {
-        setSuccessMessage('Listing deleted successfully!');
-        
-        setMarketplaceListings(prev => prev.filter(listing => listing._id !== listingId));
-        
-        await fetchMarketplaceListings();
-      } else {
-        setError(response.error || 'Failed to delete listing');
-      }
-    } catch (error: any) {
-      console.error('Error deleting listing:', error);
-      setError(error.message || 'Failed to delete listing');
-    }
-  };
-
-  const handleEditListing = (listingId: string) => {
-    window.location.href = `/edit-listing/${listingId}`;
-  };
-
+  // ✅ IMPROVED: Accept offer with better error handling
   const handleOfferAction = async (offerId: string, action: string) => {
     try {
       setError('');
@@ -489,14 +428,17 @@ const SellerDashboard: React.FC = () => {
             setSuccessMessage('Offer accepted successfully! Buyer will now complete payment.');
             console.log('✅ Offer accepted:', response.data);
             
+            // Update local state
             setOffers(prev => prev.map(o => 
               o._id === offerId ? { ...o, status: 'accepted' } : o
             ));
             
+            // Add new order to orders list if provided
             if (response.data.order) {
               setOrders(prev => [response.data.order, ...prev]);
             }
             
+            // Refresh data to get latest state
             setTimeout(() => {
               fetchDashboardData();
             }, 1000);
@@ -510,6 +452,7 @@ const SellerDashboard: React.FC = () => {
           setError(errorMessage);
         }
       } else {
+        // Handle reject offer
         try {
           const response = await axios.put(
             `${API_BASE_URL}/marketplace/offers/reject-offer/${offerId}`,
@@ -522,6 +465,7 @@ const SellerDashboard: React.FC = () => {
 
           if (response.data.success) {
             setSuccessMessage('Offer rejected successfully');
+            // Update local state
             setOffers(prev => prev.map(o => 
               o._id === offerId ? { ...o, status: 'rejected' } : o
             ));
@@ -560,12 +504,14 @@ const SellerDashboard: React.FC = () => {
     console.log('✅ Stripe setup success handler called');
     setShowStripeSetup(false);
     setSuccessMessage('Stripe account setup completed!');
+    // Delay slightly to allow Stripe to process
     setTimeout(() => {
       checkStripeAccountStatus();
       fetchDashboardData();
     }, 2000);
   };
 
+  // Clear messages after 5 seconds
   useEffect(() => {
     const timers: NodeJS.Timeout[] = [];
     
@@ -1059,126 +1005,7 @@ const SellerDashboard: React.FC = () => {
           )}
 
           {activeTab === 'listings' && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">My Listings</h2>
-                  <p className="text-sm text-gray-600 mt-1">Manage your product listings</p>
-                </div>
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleRefresh}
-                    disabled={refreshing}
-                    className="text-sm text-gray-500 hover:text-gray-700 flex items-center bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    <svg className={`w-4 h-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    {refreshing ? 'Refreshing...' : 'Refresh'}
-                  </button>
-                  <button
-                    onClick={() => window.location.href = '/create-listing'}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 shadow-md hover:shadow-lg flex items-center"
-                  >
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Create New Listing
-                  </button>
-                </div>
-              </div>
-              <div className="p-6">
-                {marketplaceListings.length === 0 ? (
-                  <div className="text-center py-12">
-                    <div className="text-6xl mb-4">🏠</div>
-                    <h3 className="text-lg font-medium text-gray-900">No listings yet</h3>
-                    <p className="mt-2 text-gray-500">Create your first listing to start selling</p>
-                    <button
-                      onClick={() => window.location.href = '/create-listing'}
-                      className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition duration-200 shadow-md hover:shadow-lg"
-                    >
-                      Create Your First Listing
-                    </button>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {marketplaceListings.map(listing => (
-                      <div key={listing._id} className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
-                        {/* Listing Image */}
-                        {listing.mediaUrls && listing.mediaUrls[0] && (
-                          <div className="h-48 overflow-hidden">
-                            <img 
-                              src={listing.mediaUrls[0]} 
-                              alt={listing.title}
-                              className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                            />
-                          </div>
-                        )}
-                        
-                        {/* Listing Details */}
-                        <div className="p-4">
-                          <div className="flex items-start justify-between mb-2">
-                            <h3 
-                              className="font-semibold text-gray-900 hover:text-blue-600 cursor-pointer truncate"
-                              onClick={() => handleViewListingDetails(listing._id)}
-                              title={listing.title}
-                            >
-                              {listing.title}
-                            </h3>
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(listing.status)}`}>
-                              {listing.status}
-                            </span>
-                          </div>
-                          
-                          <p className="text-gray-600 text-sm mb-3 line-clamp-2">{listing.description}</p>
-                          
-                          <div className="flex items-center justify-between mb-4">
-                            <div>
-                              <p className="font-bold text-gray-900">{formatCurrency(listing.price)}</p>
-                              <p className="text-xs text-gray-500">{listing.category}</p>
-                            </div>
-                            {listing.views && (
-                              <div className="text-xs text-gray-500">
-                                👁️ {listing.views} views
-                              </div>
-                            )}
-                          </div>
-                          
-                          {/* Action Buttons */}
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleViewListingDetails(listing._id)}
-                              className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-1.5 rounded text-sm transition-colors"
-                            >
-                              View
-                            </button>
-                            <button
-                              onClick={() => handleEditListing(listing._id)}
-                              className="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-700 font-medium py-1.5 rounded text-sm transition-colors"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => handleToggleListingStatus(listing._id)}
-                              className="flex-1 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 font-medium py-1.5 rounded text-sm transition-colors"
-                              title={listing.status === 'active' ? 'Deactivate' : 'Activate'}
-                            >
-                              {listing.status === 'active' ? 'Deactivate' : 'Activate'}
-                            </button>
-                            <button
-                              onClick={() => handleDeleteListing(listing._id)}
-                              className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 font-medium py-1.5 rounded text-sm transition-colors"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <UserListings show={true} />
           )}
 
           {activeTab === 'orders' && (
