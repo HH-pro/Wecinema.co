@@ -6,10 +6,10 @@ import {
   getMyListings, 
   toggleListingStatus, 
   deleteListing,
-  formatPrice as formatListingPrice,
+  formatPrice as formatListingPrice, // rename conflict سے بچنے کے لیے
   type Listing as MarketplaceListing,
   type MyListingsResponse 
-} from '../../api/marketplace'; // بس یہ شامل کریں
+} from '../../api/marketplace';
 import axios from 'axios';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
 import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
