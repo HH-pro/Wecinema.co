@@ -1524,16 +1524,23 @@ const handleStartWork = async (orderId: string) => {
                                 <div className="text-right">
                                   <p className="font-semibold text-green-600 text-lg">{formatCurrency(order.amount || 0)}</p>
                                   <div className="mt-1">
-                                    <SellerOrderActions
-                                      order={order}
-                                      loading={orderActionLoading === order._id}
-                                      onStartProcessing={() => handleStartProcessing(order._id)}
-                                      onStartWork={() => handleStartWork(order._id)}
-                                      onDeliver={() => handleOpenOrderAction(order, 'deliver')}
-                                      onCancel={() => handleOpenOrderAction(order, 'cancel')}
-                                      onCompleteRevision={() => handleOpenOrderAction(order, 'complete_revision')}
-                                      onViewDetails={() => handleViewOrderDetails(order._id)}
-                                    />
+                                   // In SellerDashboard.tsx, update the SellerOrderActions usage:
+<SellerOrderActions
+  order={order}
+  loading={orderActionLoading === order._id}
+  onStartProcessing={handleStartProcessing}
+  onStartWork={handleStartWork}
+  onDeliver={handleOpenOrderAction}
+  onCancel={handleOpenOrderAction}
+  onCompleteRevision={handleOpenOrderAction}
+  onViewDetails={() => handleViewOrderDetails(order._id)}
+  onOrderUpdate={(orderId, newStatus) => {
+    // Update local state
+    setOrders(prev => prev.map(o => 
+      o._id === orderId ? { ...o, status: newStatus } : o
+    ));
+  }}
+/>
                                   </div>
                                 </div>
                               </div>
