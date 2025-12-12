@@ -14,7 +14,7 @@ import {
   type Listing,
   type Order,
   type Offer
-} from '../../api/marketplace';
+} from '../../../src/api/marketplace';
 import axios from 'axios';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
 import StripeSetupModal from '../../components/marketplace/seller/StripeSetupModal';
