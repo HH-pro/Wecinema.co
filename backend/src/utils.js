@@ -218,7 +218,7 @@ const sendWhatsAppAlert = async (message) => {
 
 module.exports = {
 	authenticateMiddleware,
-	protect,
+	
 	ensureOwner,
 	isValidObjectId,
 	isValidObject,
