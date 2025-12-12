@@ -1,7 +1,13 @@
 // src/pages/seller/SellerDashboard.tsx
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
-import { getSellerOrders, getReceivedOffers, checkStripeStatus, createStripeAccount } from '../../api';
+import { 
+  getSellerOrders, 
+  getReceivedOffers, 
+  checkStripeStatus, 
+  createStripeAccount,
+  marketplaceAPI 
+} from '../../api';
 import axios from 'axios';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
 import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
@@ -12,6 +18,8 @@ import StatCard from '../../components/marketplae/seller/StatCard';
 import UserListings from '../../components/marketplae/seller/UserListings';
 import OrderReceivedPage from '../../components/marketplae/seller/OrderReceivedPage';
 import OrderDetailsModal from '../../components/marketplae/seller/OrderDetailsModal';
+import EditListingModal from '../../components/marketplae/seller/EditListingModal';
+import DeleteListingModal from '../../components/marketplae/seller/DeleteListingModal';
 
 const API_BASE_URL = 'http://localhost:3000';
 
@@ -64,8 +72,21 @@ interface Offer {
 
 interface Listing {
   _id: string;
-  status: string;
+  title: string;
+  description: string;
   price: number;
+  type: string;
+  category: string;
+  tags: string[];
+  mediaUrls: string[];
+  status: string;
+  views?: number;
+  sellerId: {
+    _id: string;
+    username: string;
+  };
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface ListingsData {
@@ -73,6 +94,12 @@ interface ListingsData {
   user: {
     _id: string;
     username: string;
+  };
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
   };
 }
 
@@ -92,12 +119,31 @@ const SellerDashboard: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
+  
+  // New states for listing management
+  const [editingListing, setEditingListing] = useState<Listing | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [deletingListing, setDeletingListing] = useState<Listing | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [listingActionLoading, setListingActionLoading] = useState<string | null>(null);
+  const [listingsPage, setListingsPage] = useState(1);
+  const [listingsLimit] = useState(10);
+  const [listingsStatusFilter, setListingsStatusFilter] = useState<string>('');
 
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
     }).format(amount || 0);
+  };
+
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
   };
 
   const getStatusColor = (status: string): string => {
@@ -155,6 +201,13 @@ const SellerDashboard: React.FC = () => {
     handleStripeReturn();
   }, []);
 
+  // Fetch listings when tab changes or page/filter changes
+  useEffect(() => {
+    if (activeTab === 'listings') {
+      fetchListings();
+    }
+  }, [activeTab, listingsPage, listingsStatusFilter]);
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -171,7 +224,7 @@ const SellerDashboard: React.FC = () => {
 
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       
-      const [ordersResponse, offersResponse, listingsResponse] = await Promise.allSettled([
+      const [ordersResponse, offersResponse] = await Promise.allSettled([
         // ✅ FIXED: Direct API call with correct endpoint
         (async () => {
           try {
@@ -223,25 +276,6 @@ const SellerDashboard: React.FC = () => {
             return [];
           }
         })(),
-        
-        // Listings
-        (async () => {
-          try {
-            const response = await axios.get(
-              `${API_BASE_URL}/marketplace/listings/user/${currentUserId}/listings`,
-              {
-                params: { page: 1, limit: 1000 },
-                headers: { Authorization: `Bearer ${token}` },
-                timeout: 10000
-              }
-            );
-            console.log('📝 Listings fetched successfully');
-            return response.data;
-          } catch (err) {
-            console.log('Listings fetch failed, continuing without listings data');
-            return null;
-          }
-        })()
       ]);
 
       // Process orders response
@@ -264,18 +298,12 @@ const SellerDashboard: React.FC = () => {
         offersData = Array.isArray(result) ? result : [];
       }
 
-      // Process listings response
-      if (listingsResponse.status === 'fulfilled' && listingsResponse.value?.success) {
-        setListingsData(listingsResponse.value);
-      }
-
       setOrders(ordersData);
       setOffers(offersData);
       
       console.log('✅ Dashboard data loaded:', {
         orders: ordersData.length,
-        offers: offersData.length,
-        listings: listingsData?.listings?.length || 0
+        offers: offersData.length
       });
 
     } catch (error) {
@@ -283,6 +311,39 @@ const SellerDashboard: React.FC = () => {
       setError('Failed to load dashboard data. Please try refreshing the page.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchListings = async () => {
+    try {
+      const currentUserId = getCurrentUserId();
+      if (!currentUserId) {
+        setError('User not authenticated. Please log in again.');
+        return;
+      }
+
+      console.log('📝 Fetching listings for user:', currentUserId);
+      
+      const params: any = {
+        page: listingsPage,
+        limit: listingsLimit
+      };
+      
+      if (listingsStatusFilter) {
+        params.status = listingsStatusFilter;
+      }
+      
+      const response = await marketplaceAPI.listings.getMy(params, setLoading);
+      
+      if (response.success) {
+        setListingsData(response);
+        console.log('✅ Listings fetched successfully:', response.listings?.length || 0);
+      } else {
+        setError(response.error || 'Failed to fetch listings');
+      }
+    } catch (error: any) {
+      console.error('Error fetching listings:', error);
+      setError('Failed to load listings. Please try again.');
     }
   };
 
@@ -352,6 +413,11 @@ const SellerDashboard: React.FC = () => {
       fetchDashboardData(),
       checkStripeAccountStatus()
     ]);
+    
+    if (activeTab === 'listings') {
+      fetchListings();
+    }
+    
     setRefreshing(false);
     setDebugInfo('Dashboard refreshed');
   };
@@ -390,9 +456,136 @@ const SellerDashboard: React.FC = () => {
     setOrders(prev => prev.map(order => 
       order._id === orderId ? { ...order, status: newStatus } : order
     ));
+  };
+
+  // ✅ NEW: Handle listing edit
+  const handleEditListing = (listing: Listing) => {
+    setEditingListing(listing);
+    setShowEditModal(true);
+  };
+
+  // ✅ NEW: Handle listing update
+  const handleUpdateListing = async (updatedData: any) => {
+    if (!editingListing) return;
     
-    // Call existing update function
-    handleOrderUpdate(orderId, newStatus);
+    try {
+      setListingActionLoading('updating');
+      setError('');
+      
+      const response = await marketplaceAPI.listings.update(
+        editingListing._id, 
+        updatedData,
+        () => {}
+      );
+      
+      if (response.success) {
+        setSuccessMessage('Listing updated successfully!');
+        
+        // Update local state
+        if (listingsData) {
+          setListingsData(prev => ({
+            ...prev!,
+            listings: prev!.listings.map(listing => 
+              listing._id === editingListing._id 
+                ? { ...listing, ...response.listing, updatedAt: new Date().toISOString() }
+                : listing
+            )
+          }));
+        }
+        
+        setShowEditModal(false);
+        setEditingListing(null);
+        fetchListings(); // Refresh listings
+      } else {
+        setError(response.error || 'Failed to update listing');
+      }
+    } catch (error: any) {
+      console.error('Error updating listing:', error);
+      setError('Failed to update listing. Please try again.');
+    } finally {
+      setListingActionLoading(null);
+    }
+  };
+
+  // ✅ NEW: Handle listing delete
+  const handleDeleteListing = (listing: Listing) => {
+    setDeletingListing(listing);
+    setShowDeleteModal(true);
+  };
+
+  // ✅ NEW: Confirm listing deletion
+  const handleConfirmDeleteListing = async () => {
+    if (!deletingListing) return;
+    
+    try {
+      setListingActionLoading('deleting');
+      setError('');
+      
+      const response = await marketplaceAPI.listings.delete(
+        deletingListing._id,
+        () => {}
+      );
+      
+      if (response.success) {
+        setSuccessMessage('Listing deleted successfully!');
+        
+        // Update local state
+        if (listingsData) {
+          setListingsData(prev => ({
+            ...prev!,
+            listings: prev!.listings.filter(listing => listing._id !== deletingListing._id)
+          }));
+        }
+        
+        setShowDeleteModal(false);
+        setDeletingListing(null);
+      } else {
+        setError(response.error || 'Failed to delete listing');
+      }
+    } catch (error: any) {
+      console.error('Error deleting listing:', error);
+      setError('Failed to delete listing. Please try again.');
+    } finally {
+      setListingActionLoading(null);
+    }
+  };
+
+  // ✅ NEW: Handle listing status toggle
+  const handleToggleListingStatus = async (listing: Listing) => {
+    try {
+      setListingActionLoading(`toggling-${listing._id}`);
+      setError('');
+      
+      const response = await marketplaceAPI.listings.toggleStatus(
+        listing._id,
+        () => {}
+      );
+      
+      if (response.success) {
+        setSuccessMessage(`Listing ${response.newStatus === 'active' ? 'activated' : 'deactivated'} successfully!`);
+        
+        // Update local state
+        if (listingsData) {
+          setListingsData(prev => ({
+            ...prev!,
+            listings: prev!.listings.map(l => 
+              l._id === listing._id 
+                ? { ...l, status: response.newStatus, updatedAt: new Date().toISOString() }
+                : l
+            )
+          }));
+        }
+        
+        fetchListings(); // Refresh listings
+      } else {
+        setError(response.error || 'Failed to toggle listing status');
+      }
+    } catch (error: any) {
+      console.error('Error toggling listing status:', error);
+      setError('Failed to toggle listing status. Please try again.');
+    } finally {
+      setListingActionLoading(null);
+    }
   };
 
   // ✅ IMPROVED: Accept offer with better error handling
@@ -534,7 +727,7 @@ const SellerDashboard: React.FC = () => {
     };
   }, [successMessage, error]);
 
-  if (loading) {
+  if (loading && activeTab !== 'listings') {
     return (
       <MarketplaceLayout>
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -696,6 +889,34 @@ const SellerDashboard: React.FC = () => {
                 setSelectedOrderId(null);
               }}
               onOrderUpdate={handleOrderUpdateFromModal}
+            />
+          )}
+
+          {/* Edit Listing Modal */}
+          {showEditModal && editingListing && (
+            <EditListingModal
+              listing={editingListing}
+              isOpen={showEditModal}
+              onClose={() => {
+                setShowEditModal(false);
+                setEditingListing(null);
+              }}
+              onUpdate={handleUpdateListing}
+              loading={listingActionLoading === 'updating'}
+            />
+          )}
+
+          {/* Delete Listing Modal */}
+          {showDeleteModal && deletingListing && (
+            <DeleteListingModal
+              listing={deletingListing}
+              isOpen={showDeleteModal}
+              onClose={() => {
+                setShowDeleteModal(false);
+                setDeletingListing(null);
+              }}
+              onConfirm={handleConfirmDeleteListing}
+              loading={listingActionLoading === 'deleting'}
             />
           )}
 
@@ -1005,7 +1226,238 @@ const SellerDashboard: React.FC = () => {
           )}
 
           {activeTab === 'listings' && (
-            <UserListings show={true} />
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">My Listings</h2>
+                  <p className="text-sm text-gray-600 mt-1">Manage your listings - edit, delete, or change status</p>
+                </div>
+                
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Status Filter */}
+                  <select
+                    value={listingsStatusFilter}
+                    onChange={(e) => {
+                      setListingsStatusFilter(e.target.value);
+                      setListingsPage(1); // Reset to first page when filter changes
+                    }}
+                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="sold">Sold</option>
+                    <option value="draft">Draft</option>
+                  </select>
+                  
+                  <button
+                    onClick={() => window.location.href = '/create-listing'}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 flex items-center shadow-md hover:shadow-lg text-sm"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Create New Listing
+                  </button>
+                  
+                  <button
+                    onClick={fetchListings}
+                    disabled={loading}
+                    className="text-sm text-gray-500 hover:text-gray-700 flex items-center bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <svg className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    {loading ? 'Loading...' : 'Refresh'}
+                  </button>
+                </div>
+              </div>
+              
+              <div className="p-6">
+                {!listingsData?.listings || listingsData.listings.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="text-6xl mb-4">🏠</div>
+                    <h3 className="text-lg font-medium text-gray-900">No listings found</h3>
+                    <p className="mt-2 text-gray-500">
+                      {listingsStatusFilter 
+                        ? `You don't have any ${listingsStatusFilter} listings.`
+                        : "You haven't created any listings yet."}
+                    </p>
+                    <button
+                      onClick={() => window.location.href = '/create-listing'}
+                      className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition duration-200"
+                    >
+                      Create Your First Listing
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Listings Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                      {listingsData.listings.map(listing => (
+                        <div key={listing._id} className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow duration-200">
+                          {/* Listing Image */}
+                          <div 
+                            className="h-48 bg-gray-100 flex items-center justify-center cursor-pointer"
+                            onClick={() => handleViewListingDetails(listing._id)}
+                          >
+                            {listing.mediaUrls && listing.mediaUrls.length > 0 ? (
+                              <img
+                                src={listing.mediaUrls[0]}
+                                alt={listing.title}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="text-gray-400">
+                                <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <p className="text-sm mt-2">No Image</p>
+                              </div>
+                            )}
+                            <div className="absolute top-3 right-3">
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(listing.status)}`}>
+                                {listing.status}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {/* Listing Info */}
+                          <div className="p-5">
+                            <h3 
+                              className="font-medium text-gray-900 mb-2 cursor-pointer hover:text-blue-600 transition-colors truncate"
+                              onClick={() => handleViewListingDetails(listing._id)}
+                              title={listing.title}
+                            >
+                              {listing.title}
+                            </h3>
+                            
+                            <p className="text-sm text-gray-600 mb-3 line-clamp-2" title={listing.description}>
+                              {listing.description}
+                            </p>
+                            
+                            <div className="flex items-center justify-between mb-4">
+                              <div>
+                                <p className="text-2xl font-bold text-green-600">{formatCurrency(listing.price)}</p>
+                                <p className="text-xs text-gray-500">{listing.category}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm text-gray-500">Views</p>
+                                <p className="font-medium">{listing.views || 0}</p>
+                              </div>
+                            </div>
+                            
+                            {/* Tags */}
+                            {listing.tags && listing.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mb-4">
+                                {listing.tags.slice(0, 3).map((tag, index) => (
+                                  <span key={index} className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">
+                                    {tag}
+                                  </span>
+                                ))}
+                                {listing.tags.length > 3 && (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-200 text-gray-600">
+                                    +{listing.tags.length - 3}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            
+                            {/* Action Buttons */}
+                            <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-100">
+                              <button
+                                onClick={() => handleViewListingDetails(listing._id)}
+                                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center"
+                              >
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                View
+                              </button>
+                              
+                              <button
+                                onClick={() => handleEditListing(listing)}
+                                disabled={listingActionLoading === `toggling-${listing._id}`}
+                                className="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50"
+                              >
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                Edit
+                              </button>
+                              
+                              <button
+                                onClick={() => handleToggleListingStatus(listing)}
+                                disabled={listingActionLoading === `toggling-${listing._id}`}
+                                className="flex-1 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 text-sm font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50"
+                              >
+                                {listing.status === 'active' ? (
+                                  <>
+                                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Deactivate
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Activate
+                                  </>
+                                )}
+                              </button>
+                              
+                              <button
+                                onClick={() => handleDeleteListing(listing)}
+                                disabled={listingActionLoading === `toggling-${listing._id}`}
+                                className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 text-sm font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50"
+                              >
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Delete
+                              </button>
+                            </div>
+                            
+                            {/* Last Updated */}
+                            <div className="text-xs text-gray-500 mt-3">
+                              Updated {formatDate(listing.updatedAt)}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* Pagination */}
+                    {listingsData.pagination && listingsData.pagination.pages > 1 && (
+                      <div className="flex justify-center items-center space-x-2">
+                        <button
+                          onClick={() => setListingsPage(prev => Math.max(1, prev - 1))}
+                          disabled={listingsPage === 1 || loading}
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Previous
+                        </button>
+                        
+                        <span className="text-sm text-gray-700">
+                          Page {listingsPage} of {listingsData.pagination.pages}
+                        </span>
+                        
+                        <button
+                          onClick={() => setListingsPage(prev => Math.min(listingsData.pagination!.pages, prev + 1))}
+                          disabled={listingsPage === listingsData.pagination.pages || loading}
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
           )}
 
           {activeTab === 'orders' && (
