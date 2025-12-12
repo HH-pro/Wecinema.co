@@ -1,4 +1,3 @@
-// src/pages/seller/SellerDashboard.tsx
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import { getSellerOrders, getReceivedOffers, checkStripeStatus, createStripeAccount } from '../../api';
@@ -6,20 +5,20 @@ import {
   getMyListings, 
   toggleListingStatus, 
   deleteListing,
-  formatPrice as formatListingPrice, // rename conflict سے بچنے کے لیے
+  formatPriceINR,
+  getStatusColorClass,
   type Listing as MarketplaceListing,
   type MyListingsResponse 
 } from '../../api/marketplace';
 import axios from 'axios';
-import { getCurrentUserId } from '../../utilities/helperfFunction';
-import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
-import OrderCreation from '../../components/marketplae/seller/OrderCreation';
-import PaymentStatusBadge from '../../components/marketplae/seller/PaymentStatusBadge';
-import StripeAccountStatus from '../../components/marketplae/seller/StripeAccountStatus';
-import StatCard from '../../components/marketplae/seller/StatCard';
-import UserListings from '../../components/marketplae/seller/UserListings';
-import OrderReceivedPage from '../../components/marketplae/seller/OrderReceivedPage';
-import OrderDetailsModal from '../../components/marketplae/seller/OrderDetailsModal';
+import { getCurrentUserId } from '../../utilities/helperFunction';
+import StripeSetupModal from '../../components/marketplace/seller/StripeSetupModal';
+import OrderCreation from '../../components/marketplace/seller/OrderCreation';
+import PaymentStatusBadge from '../../components/marketplace/seller/PaymentStatusBadge';
+import StripeAccountStatus from '../../components/marketplace/seller/StripeAccountStatus';
+import StatCard from '../../components/marketplace/seller/StatCard';
+import OrderReceivedPage from '../../components/marketplace/seller/OrderReceivedPage';
+import OrderDetailsModal from '../../components/marketplace/seller/OrderDetailsModal';
 
 const API_BASE_URL = 'http://localhost:3000';
 
@@ -70,14 +69,12 @@ interface Offer {
   };
 }
 
-// Old Listing Interface (existing)
 interface Listing {
   _id: string;
   status: string;
   price: number;
 }
 
-// Old ListingsData Interface (existing)
 interface ListingsData {
   listings: Listing[];
   user: {
@@ -89,7 +86,6 @@ interface ListingsData {
 const SellerDashboard: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
-  // نیا state marketplace listings کے لیے
   const [marketplaceListings, setMarketplaceListings] = useState<MarketplaceListing[]>([]);
   const [listingsData, setListingsData] = useState<ListingsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -106,40 +102,11 @@ const SellerDashboard: React.FC = () => {
   const [showOrderModal, setShowOrderModal] = useState(false);
 
   const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-    }).format(amount || 0);
+    return formatPriceINR(amount || 0);
   };
 
   const getStatusColor = (status: string): string => {
-    switch (status?.toLowerCase()) {
-      case 'confirmed':
-      case 'completed':
-      case 'accepted':
-      case 'active':
-      case 'paid':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'pending':
-      case 'pending_payment':
-      case 'pending_acceptance':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'shipped':
-      case 'sold':
-      case 'in_progress':
-      case 'in_transit':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'cancelled':
-      case 'rejected':
-      case 'inactive':
-      case 'failed':
-      case 'declined':
-        return 'bg-red-100 text-red-800 border-red-200';
-      case 'draft':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
+    return getStatusColorClass(status);
   };
 
   // Stats calculation
@@ -155,7 +122,7 @@ const SellerDashboard: React.FC = () => {
     .reduce((sum, order) => sum + order.amount, 0);
   const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
   
-  // Listings stats - اب marketplace listings استعمال کریں
+  // Listings stats
   const totalListings = marketplaceListings?.length || 0;
   const activeListings = marketplaceListings?.filter((listing) => listing.status === 'active').length || 0;
   const soldListings = marketplaceListings?.filter((listing) => listing.status === 'sold').length || 0;
@@ -167,7 +134,6 @@ const SellerDashboard: React.FC = () => {
     handleStripeReturn();
   }, []);
 
-  // Marketplace listings fetch کرنے کا الگ function
   const fetchMarketplaceListings = async () => {
     try {
       console.log('📝 Fetching marketplace listings via new API...');
@@ -178,7 +144,7 @@ const SellerDashboard: React.FC = () => {
         console.log('✅ Marketplace listings fetched successfully:', listingsData.listings.length);
         setMarketplaceListings(listingsData.listings);
         
-        // پرانے format میں بھی save کریں compatibility کے لیے
+        // Old format for compatibility
         const oldFormatListings: Listing[] = listingsData.listings.map(listing => ({
           _id: listing._id,
           status: listing.status,
@@ -194,9 +160,49 @@ const SellerDashboard: React.FC = () => {
         });
       } else {
         console.error('❌ Failed to fetch marketplace listings:', response.error);
+        await fetchOldListings();
       }
     } catch (error) {
       console.error('❌ Error fetching marketplace listings:', error);
+      await fetchOldListings();
+    }
+  };
+
+  const fetchOldListings = async () => {
+    try {
+      const currentUserId = getCurrentUserId();
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/listings/user/${currentUserId}/listings`,
+        {
+          params: { page: 1, limit: 1000 },
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 10000
+        }
+      );
+      
+      if (response.data.success) {
+        const oldListings = response.data.listings || [];
+        const convertedListings: MarketplaceListing[] = oldListings.map((oldListing: any) => ({
+          _id: oldListing._id,
+          sellerId: oldListing.sellerId || currentUserId,
+          title: oldListing.title || '',
+          description: oldListing.description || '',
+          price: oldListing.price || 0,
+          type: oldListing.type || 'product',
+          category: oldListing.category || '',
+          tags: Array.isArray(oldListing.tags) ? oldListing.tags : [],
+          mediaUrls: Array.isArray(oldListing.mediaUrls) ? oldListing.mediaUrls : [],
+          status: oldListing.status || 'active',
+          createdAt: oldListing.createdAt || new Date(),
+          updatedAt: oldListing.updatedAt || new Date()
+        }));
+        
+        setMarketplaceListings(convertedListings);
+      }
+    } catch (error) {
+      console.error('❌ Fallback listings fetch failed:', error);
     }
   };
 
@@ -217,7 +223,6 @@ const SellerDashboard: React.FC = () => {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       
       const [ordersResponse, offersResponse] = await Promise.allSettled([
-        // ✅ Orders - existing API
         (async () => {
           try {
             console.log('📦 Fetching seller orders from /marketplace/my-sales');
@@ -235,17 +240,14 @@ const SellerDashboard: React.FC = () => {
               data: response.data
             });
             
-            // Backend returns { success: true, sales: [...] }
             if (response.data.success && response.data.sales) {
               return response.data.sales;
             }
             
-            // If response structure is different, try to extract
             return response.data.data || response.data.orders || [];
           } catch (err: any) {
             console.error('❌ Error fetching orders:', err.response?.data || err.message);
             
-            // Fallback to old API function
             try {
               console.log('🔄 Trying fallback API function getSellerOrders()');
               const fallback = await getSellerOrders();
@@ -258,7 +260,6 @@ const SellerDashboard: React.FC = () => {
           }
         })(),
         
-        // ✅ Offers - existing API function
         (async () => {
           try {
             const offers = await getReceivedOffers();
@@ -270,10 +271,8 @@ const SellerDashboard: React.FC = () => {
         })(),
       ]);
 
-      // ✅ Marketplace listings الگ سے fetch کریں
       await fetchMarketplaceListings();
 
-      // Process orders response
       let ordersData = [];
       if (ordersResponse.status === 'fulfilled') {
         const result = ordersResponse.value;
@@ -286,7 +285,6 @@ const SellerDashboard: React.FC = () => {
         console.error('Orders promise rejected:', ordersResponse.reason);
       }
 
-      // Process offers response
       let offersData = [];
       if (offersResponse.status === 'fulfilled') {
         const result = offersResponse.value;
@@ -319,10 +317,8 @@ const SellerDashboard: React.FC = () => {
       console.log('✅ Stripe status response:', response);
       setStripeStatus(response);
       
-      // Update debug info
       setDebugInfo(`Stripe Status: ${response.connected ? 'Connected' : 'Not Connected'}, Charges Enabled: ${response.chargesEnabled}`);
       
-      // If Stripe is connected and active, don't show setup modal
       if (response.connected && response.chargesEnabled) {
         setShowStripeSetup(false);
         console.log('🎉 Stripe is connected and active - hiding setup modal');
@@ -341,7 +337,6 @@ const SellerDashboard: React.FC = () => {
   };
 
   const handleStripeReturn = () => {
-    // Check if user just returned from Stripe onboarding
     const urlParams = new URLSearchParams(window.location.search);
     const stripeStatus = urlParams.get('stripe');
     const accountId = urlParams.get('account_id');
@@ -356,12 +351,10 @@ const SellerDashboard: React.FC = () => {
       console.log('🎉 Returned from Stripe onboarding - refreshing status');
       setSuccessMessage('Stripe account setup completed successfully!');
       
-      // Refresh status after a delay to allow webhook processing
       setTimeout(() => {
         checkStripeAccountStatus();
         fetchDashboardData();
         
-        // Clean URL
         const newUrl = window.location.pathname;
         window.history.replaceState({}, '', newUrl);
         console.log('🧹 Cleaned URL after Stripe return');
@@ -402,24 +395,19 @@ const SellerDashboard: React.FC = () => {
     window.location.href = `/listings/${listingId}`;
   };
 
-  // Function to handle order view
   const handleViewOrderDetails = (orderId: string) => {
     setSelectedOrderId(orderId);
     setShowOrderModal(true);
   };
 
-  // Function to handle order update from modal
   const handleOrderUpdateFromModal = (orderId: string, newStatus: string) => {
-    // Update local orders state
     setOrders(prev => prev.map(order => 
       order._id === orderId ? { ...order, status: newStatus } : order
     ));
     
-    // Call existing update function
     handleOrderUpdate(orderId, newStatus);
   };
 
-  // ✅ NEW: Handle listing status toggle using marketplace API
   const handleToggleListingStatus = async (listingId: string) => {
     try {
       const response = await toggleListingStatus(listingId);
@@ -427,14 +415,12 @@ const SellerDashboard: React.FC = () => {
         const message = response.data.newStatus === 'active' ? 'Listing activated!' : 'Listing deactivated!';
         setSuccessMessage(message);
         
-        // Update local state
         setMarketplaceListings(prev => prev.map(listing => 
           listing._id === listingId 
             ? { ...listing, status: response.data!.newStatus } 
             : listing
         ));
         
-        // Refresh listings
         await fetchMarketplaceListings();
       } else {
         setError(response.error || 'Failed to update listing status');
@@ -445,7 +431,6 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ NEW: Handle listing delete using marketplace API
   const handleDeleteListing = async (listingId: string) => {
     if (!window.confirm('Are you sure you want to delete this listing?')) {
       return;
@@ -456,10 +441,8 @@ const SellerDashboard: React.FC = () => {
       if (response.success) {
         setSuccessMessage('Listing deleted successfully!');
         
-        // Update local state
         setMarketplaceListings(prev => prev.filter(listing => listing._id !== listingId));
         
-        // Refresh listings
         await fetchMarketplaceListings();
       } else {
         setError(response.error || 'Failed to delete listing');
@@ -470,12 +453,10 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ NEW: Handle edit listing - redirect to edit page
   const handleEditListing = (listingId: string) => {
     window.location.href = `/edit-listing/${listingId}`;
   };
 
-  // ✅ IMPROVED: Accept offer with better error handling
   const handleOfferAction = async (offerId: string, action: string) => {
     try {
       setError('');
@@ -508,17 +489,14 @@ const SellerDashboard: React.FC = () => {
             setSuccessMessage('Offer accepted successfully! Buyer will now complete payment.');
             console.log('✅ Offer accepted:', response.data);
             
-            // Update local state
             setOffers(prev => prev.map(o => 
               o._id === offerId ? { ...o, status: 'accepted' } : o
             ));
             
-            // Add new order to orders list if provided
             if (response.data.order) {
               setOrders(prev => [response.data.order, ...prev]);
             }
             
-            // Refresh data to get latest state
             setTimeout(() => {
               fetchDashboardData();
             }, 1000);
@@ -532,7 +510,6 @@ const SellerDashboard: React.FC = () => {
           setError(errorMessage);
         }
       } else {
-        // Handle reject offer
         try {
           const response = await axios.put(
             `${API_BASE_URL}/marketplace/offers/reject-offer/${offerId}`,
@@ -545,7 +522,6 @@ const SellerDashboard: React.FC = () => {
 
           if (response.data.success) {
             setSuccessMessage('Offer rejected successfully');
-            // Update local state
             setOffers(prev => prev.map(o => 
               o._id === offerId ? { ...o, status: 'rejected' } : o
             ));
@@ -584,14 +560,12 @@ const SellerDashboard: React.FC = () => {
     console.log('✅ Stripe setup success handler called');
     setShowStripeSetup(false);
     setSuccessMessage('Stripe account setup completed!');
-    // Delay slightly to allow Stripe to process
     setTimeout(() => {
       checkStripeAccountStatus();
       fetchDashboardData();
     }, 2000);
   };
 
-  // Clear messages after 5 seconds
   useEffect(() => {
     const timers: NodeJS.Timeout[] = [];
     
@@ -1160,7 +1134,7 @@ const SellerDashboard: React.FC = () => {
                           
                           <div className="flex items-center justify-between mb-4">
                             <div>
-                              <p className="font-bold text-gray-900">{formatListingPrice(listing.price)}</p>
+                              <p className="font-bold text-gray-900">{formatCurrency(listing.price)}</p>
                               <p className="text-xs text-gray-500">{listing.category}</p>
                             </div>
                             {listing.views && (
