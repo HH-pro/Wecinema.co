@@ -314,72 +314,38 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
- // Or update the fetchListings to use marketplaceAPI with cache busting:
-const fetchListings = async () => {
-  try {
-    const currentUserId = getCurrentUserId();
-    if (!currentUserId) {
-      setError('User not authenticated. Please log in again.');
-      return;
-    }
-
-    console.log('📝 Fetching listings for user:', currentUserId);
-    
-    const params: any = {
-      page: listingsPage,
-      limit: listingsLimit,
-      _t: new Date().getTime() // Cache busting
-    };
-    
-    if (listingsStatusFilter) {
-      params.status = listingsStatusFilter;
-    }
-    
-    // Using marketplaceAPI with cache busting
-    const response = await marketplaceAPI.listings.getMy(params, setLoading);
-    
-    if (response.success) {
-      setListingsData(response);
-      console.log('✅ Listings fetched successfully:', response.listings?.length || 0);
-    } else {
-      setError(response.error || 'Failed to fetch listings');
-    }
-  } catch (error: any) {
-    console.error('Error fetching listings:', error);
-    
-    // If it's a caching issue, show a message
-    if (error.message?.includes('304')) {
-      console.log('🔄 Caching issue detected, trying alternative method...');
-      
-      // Try direct fetch as fallback
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      const timestamp = new Date().getTime();
-      
-      const directResponse = await axios.get(
-        `${API_BASE_URL}/marketplace/listings/my-listings?_=${timestamp}`,
-        {
-          params: {
-            page: listingsPage,
-            limit: listingsLimit,
-            status: listingsStatusFilter || undefined
-          },
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Cache-Control': 'no-cache'
-          }
-        }
-      );
-      
-      if (directResponse.data.success) {
-        setListingsData(directResponse.data);
-      } else {
-        setError('Failed to load listings. Please refresh the page.');
+  const fetchListings = async () => {
+    try {
+      const currentUserId = getCurrentUserId();
+      if (!currentUserId) {
+        setError('User not authenticated. Please log in again.');
+        return;
       }
-    } else {
+
+      console.log('📝 Fetching listings for user:', currentUserId);
+      
+      const params: any = {
+        page: listingsPage,
+        limit: listingsLimit
+      };
+      
+      if (listingsStatusFilter) {
+        params.status = listingsStatusFilter;
+      }
+      
+      const response = await marketplaceAPI.listings.getMy(params, setLoading);
+      
+      if (response.success) {
+        setListingsData(response);
+        console.log('✅ Listings fetched successfully:', response.listings?.length || 0);
+      } else {
+        setError(response.error || 'Failed to fetch listings');
+      }
+    } catch (error: any) {
+      console.error('Error fetching listings:', error);
       setError('Failed to load listings. Please try again.');
     }
-  }
-};
+  };
 
   const checkStripeAccountStatus = async () => {
     try {
