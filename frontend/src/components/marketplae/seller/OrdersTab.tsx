@@ -81,17 +81,17 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
   const getPriorityColor = (status: string) => {
     switch (status) {
       case 'in_revision':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'bg-red-50 border-red-200';
       case 'delivered':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        return 'bg-yellow-50 border-yellow-200';
       case 'in_progress':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
+        return 'bg-green-50 border-green-200';
       case 'processing':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
+        return 'bg-purple-50 border-purple-200';
       case 'paid':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-amber-50 border-amber-200';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-gray-50 border-gray-200';
     }
   };
 
@@ -100,7 +100,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
       case 'paid':
         return {
           text: 'Start Processing',
-          color: 'blue',
+          color: 'yellow',
           onClick: () => onStartProcessing?.(order._id),
           description: 'Begin preparing this order'
         };
@@ -121,7 +121,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
       case 'in_revision':
         return {
           text: 'Complete Revision',
-          color: 'yellow',
+          color: 'amber',
           onClick: () => onCompleteRevision?.(order),
           description: 'Send revised work back'
         };
@@ -154,7 +154,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
   return (
     <div className="space-y-6">
       {/* Header with Stats */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-2xl shadow-sm border border-yellow-200 p-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">My Orders</h2>
@@ -164,7 +164,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
             <button
               onClick={onRefresh}
               disabled={loading}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              className="px-4 py-2.5 bg-white border border-yellow-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-yellow-50 hover:shadow-sm transition-all duration-200 disabled:opacity-50 shadow-sm"
             >
               {loading ? 'Refreshing...' : 'Refresh'}
             </button>
@@ -173,29 +173,29 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
 
         {/* Quick Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
-            <div className="text-sm text-blue-700 font-medium">To Start</div>
-            <div className="text-2xl font-bold text-blue-800">
+          <div className="bg-gradient-to-br from-yellow-50 to-amber-50 p-4 rounded-xl border border-yellow-200">
+            <div className="text-sm font-medium text-yellow-700">To Start</div>
+            <div className="text-2xl font-bold text-yellow-800">
               {orders.filter(o => o.status === 'paid').length}
             </div>
-            <div className="text-xs text-blue-600">Awaiting action</div>
+            <div className="text-xs text-yellow-600">Awaiting action</div>
           </div>
-          <div className="bg-purple-50 p-4 rounded-xl border border-purple-200">
-            <div className="text-sm text-purple-700 font-medium">In Progress</div>
+          <div className="bg-gradient-to-br from-purple-50 to-violet-50 p-4 rounded-xl border border-purple-200">
+            <div className="text-sm font-medium text-purple-700">In Progress</div>
             <div className="text-2xl font-bold text-purple-800">
               {orders.filter(o => ['processing', 'in_progress'].includes(o.status)).length}
             </div>
             <div className="text-xs text-purple-600">Being worked on</div>
           </div>
-          <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200">
-            <div className="text-sm text-yellow-700 font-medium">For Review</div>
-            <div className="text-2xl font-bold text-yellow-800">
+          <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-4 rounded-xl border border-amber-200">
+            <div className="text-sm font-medium text-amber-700">For Review</div>
+            <div className="text-2xl font-bold text-amber-800">
               {orders.filter(o => ['delivered', 'in_revision'].includes(o.status)).length}
             </div>
-            <div className="text-xs text-yellow-600">Awaiting buyer</div>
+            <div className="text-xs text-amber-600">Awaiting buyer</div>
           </div>
-          <div className="bg-green-50 p-4 rounded-xl border border-green-200">
-            <div className="text-sm text-green-700 font-medium">Completed</div>
+          <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200">
+            <div className="text-sm font-medium text-green-700">Completed</div>
             <div className="text-2xl font-bold text-green-800">
               {orders.filter(o => o.status === 'completed').length}
             </div>
@@ -204,7 +204,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
         </div>
 
         {/* Status Filter Tabs */}
-        <div className="border-b border-gray-200">
+        <div className="border-b border-yellow-200">
           <nav className="-mb-px flex space-x-8 overflow-x-auto">
             {statusFilters.map(({ value, label, count }) => (
               <button
@@ -212,20 +212,20 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                 onClick={() => onFilterChange(value)}
                 className={`py-3 px-1 font-medium text-sm flex items-center whitespace-nowrap transition-all duration-200 relative ${
                   filter === value
-                    ? 'text-blue-600'
+                    ? 'text-yellow-600'
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
                 {label}
                 {count > 0 && (
                   <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                    filter === value ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                    filter === value ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
                   }`}>
                     {count}
                   </span>
                 )}
                 {filter === value && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full"></div>
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-full"></div>
                 )}
               </button>
             ))}
@@ -237,10 +237,10 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
       <OrderActionGuide currentFilter={filter} />
 
       {/* Orders List */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-yellow-200 overflow-hidden">
         {loading ? (
           <div className="p-12 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
             <p className="text-gray-700">Loading orders...</p>
           </div>
         ) : filteredOrders.length === 0 ? (
@@ -256,32 +256,32 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
             {filter !== 'all' && (
               <button
                 onClick={() => onFilterChange('all')}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="mt-4 px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 shadow-md hover:shadow"
               >
                 View All Orders
               </button>
             )}
           </div>
         ) : (
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-yellow-100">
             {filteredOrders.map(order => {
               const statusInfo = getOrderStatusInfo(order.status);
               const action = getStatusAction(order);
-              const deliveryDate = calculateDeliveryDate(order.createdAt, 7); // Assuming 7 days default
+              const deliveryDate = calculateDeliveryDate(order.createdAt, 7);
               const daysRemaining = deliveryDate ? getDaysRemaining(deliveryDate) : null;
               const isExpanded = expandedOrderId === order._id;
 
               return (
                 <div 
                   key={order._id} 
-                  className={`p-6 hover:bg-gray-50 transition-colors ${getPriorityColor(order.status)}`}
+                  className={`p-6 hover:bg-yellow-50 transition-colors ${getPriorityColor(order.status)}`}
                 >
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     {/* Order Info */}
                     <div className="flex-1">
                       <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center border border-blue-200 flex-shrink-0">
-                          <span className="text-lg font-semibold text-blue-600">
+                        <div className="w-12 h-12 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-xl flex items-center justify-center border border-yellow-200 flex-shrink-0">
+                          <span className="text-lg font-semibold text-yellow-600">
                             {order.orderNumber?.slice(-3) || '#'}
                           </span>
                         </div>
@@ -294,7 +294,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                               order.status === 'in_revision' ? 'bg-red-100 text-red-800' :
                               order.status === 'delivered' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-blue-100 text-blue-800'
+                              'bg-yellow-100 text-yellow-800'
                             }`}>
                               <span className="mr-1">{statusInfo.icon}</span>
                               {statusInfo.text}
@@ -313,7 +313,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                             {daysRemaining !== null && daysRemaining > 0 && (
                               <div className="flex items-center">
                                 <span className="mr-1">⏳</span>
-                                <span className={daysRemaining <= 2 ? 'text-red-600 font-medium' : 'text-gray-600'}>
+                                <span className={daysRemaining <= 2 ? 'text-red-600 font-medium' : 'text-amber-600'}>
                                   {daysRemaining} day{daysRemaining !== 1 ? 's' : ''} remaining
                                 </span>
                               </div>
@@ -332,7 +332,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                               <div className="w-full bg-gray-200 rounded-full h-2">
                                 <div 
                                   className={`h-2 rounded-full ${
-                                    order.status === 'processing' ? 'bg-blue-500 w-1/4' : 'bg-green-500 w-3/4'
+                                    order.status === 'processing' ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 w-1/4' : 'bg-gradient-to-r from-green-500 to-green-600 w-3/4'
                                   }`}
                                 ></div>
                               </div>
@@ -358,12 +358,12 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                           <button
                             onClick={action.onClick}
                             disabled={actionLoading === order._id}
-                            className={`px-4 py-2 text-sm font-medium text-white rounded-xl transition-colors disabled:opacity-50 ${
-                              action.color === 'blue' ? 'bg-blue-600 hover:bg-blue-700' :
-                              action.color === 'green' ? 'bg-green-600 hover:bg-green-700' :
-                              action.color === 'purple' ? 'bg-purple-600 hover:bg-purple-700' :
-                              action.color === 'yellow' ? 'bg-yellow-600 hover:bg-yellow-700' :
-                              'bg-gray-600 hover:bg-gray-700'
+                            className={`px-4 py-2.5 text-sm font-medium text-white rounded-xl transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow ${
+                              action.color === 'yellow' ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700' :
+                              action.color === 'green' ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700' :
+                              action.color === 'purple' ? 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700' :
+                              action.color === 'amber' ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700' :
+                              'bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700'
                             }`}
                           >
                             {actionLoading === order._id ? (
@@ -384,7 +384,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                           <button
                             onClick={() => onCancel(order)}
                             disabled={actionLoading === order._id}
-                            className="px-4 py-2 text-sm font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-xl transition-colors disabled:opacity-50"
+                            className="px-4 py-2.5 text-sm font-medium text-red-700 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 rounded-xl transition-all duration-200 disabled:opacity-50 border border-red-200"
                           >
                             Cancel
                           </button>
@@ -392,14 +392,14 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
 
                         <button
                           onClick={() => toggleExpandOrder(order._id)}
-                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+                          className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 rounded-xl transition-all duration-200 border border-gray-300"
                         >
                           {isExpanded ? 'Show Less' : 'More Info'}
                         </button>
 
                         <button
                           onClick={() => onViewOrderDetails(order._id)}
-                          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-xl transition-colors"
+                          className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-yellow-300 hover:bg-yellow-50 rounded-xl transition-all duration-200 shadow-sm"
                         >
                           Details
                         </button>
@@ -409,7 +409,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
 
                   {/* Expanded View */}
                   {isExpanded && (
-                    <div className="mt-6 pt-6 border-t border-gray-200">
+                    <div className="mt-6 pt-6 border-t border-yellow-200">
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Left Column: Status Tracker */}
                         <div>
@@ -423,14 +423,14 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                           />
                           
                           {action && (
-                            <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                              <p className="font-medium text-blue-800">Next Step: {action.text}</p>
-                              <p className="text-sm text-blue-700 mt-1">{action.description}</p>
+                            <div className="mt-6 p-4 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl border border-yellow-200">
+                              <p className="font-medium text-yellow-800">Next Step: {action.text}</p>
+                              <p className="text-sm text-yellow-700 mt-1">{action.description}</p>
                               {action.onClick && (
                                 <button
                                   onClick={action.onClick}
                                   disabled={actionLoading === order._id}
-                                  className="mt-3 w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                                  className="mt-3 w-full px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 disabled:opacity-50 shadow-md"
                                 >
                                   Take Action
                                 </button>
@@ -465,7 +465,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                             )}
                             
                             {order.notes && (
-                              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                              <div className="mt-4 p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200">
                                 <p className="text-sm text-gray-700">
                                   <span className="font-medium">Notes: </span>
                                   {order.notes}
@@ -474,25 +474,25 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                             )}
 
                             {/* Quick Links */}
-                            <div className="mt-6 pt-4 border-t border-gray-200">
+                            <div className="mt-6 pt-4 border-t border-yellow-200">
                               <p className="text-sm font-medium text-gray-900 mb-2">Quick Actions</p>
                               <div className="flex flex-wrap gap-2">
                                 <button
                                   onClick={() => onViewOrderDetails(order._id)}
-                                  className="px-3 py-1.5 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                                  className="px-3 py-1.5 text-xs bg-gradient-to-r from-yellow-50 to-yellow-100 text-yellow-700 rounded-lg hover:from-yellow-100 hover:to-yellow-200 transition-all duration-200 border border-yellow-200"
                                 >
                                   📋 View Full Details
                                 </button>
                                 <button
                                   onClick={() => window.open(`/messages?order=${order._id}`, '_blank')}
-                                  className="px-3 py-1.5 text-xs bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+                                  className="px-3 py-1.5 text-xs bg-gradient-to-r from-green-50 to-green-100 text-green-700 rounded-lg hover:from-green-100 hover:to-green-200 transition-all duration-200 border border-green-200"
                                 >
                                   💬 Message Buyer
                                 </button>
                                 {order.listingId?.mediaUrls?.[0] && onPlayVideo && (
                                   <button
                                     onClick={() => onPlayVideo(order.listingId.mediaUrls[0], order.listingId.title)}
-                                    className="px-3 py-1.5 text-xs bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
+                                    className="px-3 py-1.5 text-xs bg-gradient-to-r from-purple-50 to-purple-100 text-purple-700 rounded-lg hover:from-purple-100 hover:to-purple-200 transition-all duration-200 border border-purple-200"
                                   >
                                     ▶️ View Media
                                   </button>
@@ -513,16 +513,16 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
 
       {/* Bulk Actions */}
       {filteredOrders.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-yellow-200 p-6">
           <h3 className="font-medium text-gray-900 mb-4">Bulk Actions</h3>
           <div className="flex flex-wrap gap-3">
-            <button className="px-4 py-2 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors">
+            <button className="px-4 py-2.5 text-sm bg-gradient-to-r from-yellow-50 to-yellow-100 text-yellow-700 rounded-lg hover:from-yellow-100 hover:to-yellow-200 transition-all duration-200 border border-yellow-300">
               Export Orders (CSV)
             </button>
-            <button className="px-4 py-2 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors">
+            <button className="px-4 py-2.5 text-sm bg-gradient-to-r from-green-50 to-green-100 text-green-700 rounded-lg hover:from-green-100 hover:to-green-200 transition-all duration-200 border border-green-300">
               Send Bulk Message
             </button>
-            <button className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+            <button className="px-4 py-2.5 text-sm bg-gradient-to-r from-gray-50 to-gray-100 text-gray-700 rounded-lg hover:from-gray-100 hover:to-gray-200 transition-all duration-200 border border-gray-300">
               Print Order Summaries
             </button>
           </div>
