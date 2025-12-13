@@ -1,9 +1,10 @@
 // src/components/marketplace/seller/OrdersTab.tsx
-import React, { useState } from 'react';
-import { getOrderStatusInfo, formatCurrency, formatDate } from '../../../api';
+import React, { useState, useEffect } from 'react';
+import { marketplaceAPI, getOrderStatusInfo, formatCurrency, formatDate } from '../../../api';
 import OrderStatusTracker from './OrderStatusTracker';
 import OrderActionGuide from './OrderActionGuide';
 import DeliveryModal from './DeliveryModal';
+import { toast } from 'react-toastify';
 
 interface Order {
   _id: string;
@@ -13,10 +14,17 @@ interface Order {
   buyerId: {
     username: string;
     avatar?: string;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
   };
   listingId: {
     title: string;
     mediaUrls?: string[];
+  };
+  sellerId?: {
+    username: string;
+    email?: string;
   };
   createdAt: string;
   deliveredAt?: string;
@@ -26,6 +34,9 @@ interface Order {
   revisions?: number;
   maxRevisions?: number;
   expectedDays?: number;
+  deliveryMessage?: string;
+  deliveryFiles?: string[];
+  payments?: any[];
 }
 
 interface OrdersTabProps {
@@ -71,6 +82,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState<Order | null>(null);
   const [isSubmittingDelivery, setIsSubmittingDelivery] = useState(false);
+  const [deliveryHistory, setDeliveryHistory] = useState<Record<string, any[]>>({});
 
   const statusFilters = [
     { value: 'all', label: 'All Orders', count: orders.length },
@@ -87,8 +99,28 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     ? orders 
     : orders.filter(order => order.status === filter);
 
-  const toggleExpandOrder = (orderId: string) => {
-    setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
+  const toggleExpandOrder = async (orderId: string) => {
+    if (expandedOrderId === orderId) {
+      setExpandedOrderId(null);
+    } else {
+      setExpandedOrderId(orderId);
+      // Load delivery history when expanding
+      await loadDeliveryHistory(orderId);
+    }
+  };
+
+  const loadDeliveryHistory = async (orderId: string) => {
+    try {
+      const response = await marketplaceAPI.orders.getDeliveryHistory(orderId);
+      if (response.success) {
+        setDeliveryHistory(prev => ({
+          ...prev,
+          [orderId]: response.deliveries
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading delivery history:', error);
+    }
   };
 
   const handleDeliverClick = (order: Order) => {
@@ -107,78 +139,133 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
       setIsSubmittingDelivery(true);
 
       // Upload files first if there are attachments
-      let uploadedAttachments = [];
+      let uploadedAttachments: Array<{
+        filename: string;
+        originalName: string;
+        mimeType: string;
+        size: number;
+        url: string;
+        path?: string;
+      }> = [];
+
       if (deliveryData.attachments && deliveryData.attachments.length > 0) {
-        uploadedAttachments = await Promise.all(
-          deliveryData.attachments.map(async (file) => {
-            const formData = new FormData();
-            formData.append('files', file);
-            
-            const uploadResponse = await fetch('/upload/delivery', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${localStorage.getItem('token')}`
-              },
-              body: formData
-            });
-            
-            const uploadData = await uploadResponse.json();
-            
-            if (!uploadData.success) {
-              throw new Error(uploadData.error || 'File upload failed');
-            }
-            
-            return uploadData.files[0]; // Get the first uploaded file
-          })
+        try {
+          uploadedAttachments = await marketplaceAPI.upload.files(
+            deliveryData.attachments,
+            setIsSubmittingDelivery
+          );
+        } catch (uploadError: any) {
+          throw new Error(`File upload failed: ${uploadError.message}`);
+        }
+      }
+
+      // Determine if this is a revision or initial delivery
+      const isRevision = selectedOrderForDelivery?.status === 'in_revision';
+      
+      if (isRevision) {
+        // Complete revision
+        await marketplaceAPI.orders.completeRevision(
+          deliveryData.orderId,
+          {
+            deliveryMessage: deliveryData.message,
+            attachments: uploadedAttachments,
+            isFinalDelivery: deliveryData.isFinal
+          },
+          setIsSubmittingDelivery
         );
+        toast.success('Revision completed successfully!');
+      } else {
+        // Initial delivery with email
+        await marketplaceAPI.orders.deliverWithEmail(
+          deliveryData.orderId,
+          {
+            deliveryMessage: deliveryData.message,
+            attachments: uploadedAttachments,
+            isFinalDelivery: deliveryData.isFinal
+          },
+          setIsSubmittingDelivery
+        );
+        toast.success('Order delivered successfully! Buyer has been notified via email.');
       }
 
-      // Send delivery request with email notification
-      const response = await fetch(`/orders/${deliveryData.orderId}/deliver-with-email`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          deliveryMessage: deliveryData.message,
-          attachments: uploadedAttachments,
-          isFinalDelivery: deliveryData.isFinal,
-          revisionsLeft: deliveryData.revisionsLeft
-        })
-      });
-
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Delivery failed');
-      }
-
-      // Show success message
-      alert('✅ Delivery submitted successfully! Buyer has been notified via email.');
-      
       // Close modal and refresh
       setDeliveryModalOpen(false);
       setSelectedOrderForDelivery(null);
       onRefresh();
       
+      // Reload delivery history
+      if (expandedOrderId === deliveryData.orderId) {
+        await loadDeliveryHistory(deliveryData.orderId);
+      }
+      
     } catch (error: any) {
       console.error('Delivery error:', error);
-      alert(`❌ Delivery failed: ${error.message || 'Something went wrong'}`);
+      toast.error(`Delivery failed: ${error.message || 'Something went wrong'}`);
     } finally {
       setIsSubmittingDelivery(false);
     }
   };
 
-  // For revision completion:
+  const handleStartProcessing = async (orderId: string) => {
+    if (onStartProcessing) {
+      onStartProcessing(orderId);
+    } else {
+      try {
+        await marketplaceAPI.orders.startProcessing(orderId, setIsSubmittingDelivery);
+        onRefresh();
+      } catch (error) {
+        console.error('Error starting processing:', error);
+      }
+    }
+  };
+
+  const handleStartWork = async (orderId: string) => {
+    if (onStartWork) {
+      onStartWork(orderId);
+    } else {
+      try {
+        await marketplaceAPI.orders.startWork(orderId, setIsSubmittingDelivery);
+        onRefresh();
+      } catch (error) {
+        console.error('Error starting work:', error);
+      }
+    }
+  };
+
   const handleCompleteRevision = async (order: Order) => {
+    setSelectedOrderForDelivery(order);
+    setDeliveryModalOpen(true);
+  };
+
+  const handleCancelOrder = async (order: Order) => {
+    if (confirm(`Are you sure you want to cancel order #${order.orderNumber}? This action cannot be undone.`)) {
+      try {
+        await marketplaceAPI.orders.cancelBySeller(order._id, "Cancelled by seller", setIsSubmittingDelivery);
+        onRefresh();
+      } catch (error: any) {
+        toast.error(error.message || 'Failed to cancel order');
+      }
+    }
+  };
+
+  const handleCompleteOrder = async (orderId: string) => {
     try {
-      // Show delivery modal for revision completion
-      setSelectedOrderForDelivery(order);
-      setDeliveryModalOpen(true);
+      await marketplaceAPI.orders.complete(orderId, setIsSubmittingDelivery);
+      onRefresh();
     } catch (error: any) {
-      console.error('Revision error:', error);
-      alert(`❌ Revision failed: ${error.message || 'Something went wrong'}`);
+      toast.error(error.message || 'Failed to complete order');
+    }
+  };
+
+  const handleRequestRevision = async (orderId: string) => {
+    const revisionNotes = prompt('Please provide details about what needs to be revised:');
+    if (revisionNotes) {
+      try {
+        await marketplaceAPI.orders.requestRevision(orderId, revisionNotes, setIsSubmittingDelivery);
+        onRefresh();
+      } catch (error: any) {
+        toast.error(error.message || 'Failed to request revision');
+      }
     }
   };
 
@@ -205,7 +292,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
         return {
           text: 'Start Processing',
           color: 'yellow',
-          onClick: () => onStartProcessing?.(order._id),
+          onClick: () => handleStartProcessing(order._id),
           description: 'Begin preparing this order',
           icon: '⚙️'
         };
@@ -213,7 +300,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
         return {
           text: 'Start Work',
           color: 'green',
-          onClick: () => onStartWork?.(order._id),
+          onClick: () => handleStartWork(order._id),
           description: 'Begin working on deliverables',
           icon: '🛠️'
         };
@@ -288,6 +375,15 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     return null;
   };
 
+  const getOrderDeliveries = (orderId: string) => {
+    return deliveryHistory[orderId] || [];
+  };
+
+  const getLatestDelivery = (orderId: string) => {
+    const deliveries = getOrderDeliveries(orderId);
+    return deliveries.length > 0 ? deliveries[deliveries.length - 1] : null;
+  };
+
   return (
     <div className="space-y-6">
       {/* Header with Stats */}
@@ -303,7 +399,15 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
               disabled={loading}
               className="px-4 py-2.5 bg-white border border-yellow-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-yellow-50 hover:shadow-sm transition-all duration-200 disabled:opacity-50 shadow-sm"
             >
-              {loading ? 'Refreshing...' : 'Refresh'}
+              {loading ? (
+                <>
+                  <svg className="animate-spin h-4 w-4 inline mr-2" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Refreshing...
+                </>
+              ) : 'Refresh'}
             </button>
           </div>
         </div>
@@ -408,6 +512,8 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
               const daysRemaining = deliveryDate ? getDaysRemaining(deliveryDate) : null;
               const isExpanded = expandedOrderId === order._id;
               const priorityBadge = getPriorityBadge(order);
+              const deliveries = getOrderDeliveries(order._id);
+              const latestDelivery = getLatestDelivery(order._id);
 
               return (
                 <div 
@@ -480,6 +586,14 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                                 </span>
                               </div>
                             )}
+                            {deliveries.length > 0 && (
+                              <div className="flex items-center">
+                                <span className="mr-1">📤</span>
+                                <span className="text-gray-600">
+                                  {deliveries.length} deliver{deliveries.length !== 1 ? 'ies' : 'y'}
+                                </span>
+                              </div>
+                            )}
                           </div>
 
                           {/* Progress Bar for In Progress Orders */}
@@ -500,6 +614,21 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                                   }`}
                                 ></div>
                               </div>
+                            </div>
+                          )}
+
+                          {/* Latest delivery preview */}
+                          {latestDelivery && isExpanded && (
+                            <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+                              <p className="text-sm text-blue-800">
+                                <span className="font-medium">Latest Delivery: </span>
+                                {latestDelivery.message?.substring(0, 100)}...
+                              </p>
+                              {latestDelivery.attachments && latestDelivery.attachments.length > 0 && (
+                                <p className="text-xs text-blue-600 mt-1">
+                                  📎 {latestDelivery.attachments.length} file{latestDelivery.attachments.length !== 1 ? 's' : ''} attached
+                                </p>
+                              )}
                             </div>
                           )}
                         </div>
@@ -547,9 +676,9 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                           </button>
                         )}
 
-                        {['paid', 'processing', 'in_progress'].includes(order.status) && onCancel && (
+                        {['paid', 'processing', 'in_progress'].includes(order.status) && (
                           <button
-                            onClick={() => onCancel(order)}
+                            onClick={() => handleCancelOrder(order)}
                             disabled={actionLoading === order._id || isSubmittingDelivery}
                             className="px-4 py-2.5 text-sm font-medium text-red-700 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 rounded-xl transition-all duration-200 disabled:opacity-50 border border-red-200 flex items-center gap-2"
                           >
@@ -583,7 +712,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                   {isExpanded && (
                     <div className="mt-6 pt-6 border-t border-yellow-200">
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Left Column: Status Tracker */}
+                        {/* Left Column: Status Tracker & Deliveries */}
                         <div>
                           <h4 className="font-medium text-gray-900 mb-4">Order Progress</h4>
                           <OrderStatusTracker
@@ -611,6 +740,51 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                                   Take Action
                                 </button>
                               )}
+                            </div>
+                          )}
+
+                          {/* Delivery History */}
+                          {deliveries.length > 0 && (
+                            <div className="mt-6">
+                              <h5 className="font-medium text-gray-900 mb-3">Delivery History</h5>
+                              <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+                                {deliveries.map((delivery, index) => (
+                                  <div key={delivery._id} className="p-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+                                    <div className="flex justify-between items-start mb-2">
+                                      <span className="text-sm font-medium text-blue-800">
+                                        Delivery #{delivery.revisionNumber || index + 1}
+                                      </span>
+                                      <span className="text-xs text-blue-600">
+                                        {formatDate(delivery.createdAt)}
+                                      </span>
+                                    </div>
+                                    <p className="text-sm text-blue-700 mb-2">
+                                      {delivery.message?.substring(0, 150)}...
+                                    </p>
+                                    {delivery.attachments && delivery.attachments.length > 0 && (
+                                      <div className="flex flex-wrap gap-1">
+                                        {delivery.attachments.map((file: any, fileIndex: number) => (
+                                          <a
+                                            key={fileIndex}
+                                            href={file.url || marketplaceAPI.upload.getFile(file.filename)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center px-2 py-1 text-xs bg-white text-blue-700 rounded border border-blue-300 hover:bg-blue-50 transition-colors"
+                                          >
+                                            <span className="mr-1">📎</span>
+                                            {file.originalName || file.filename}
+                                          </a>
+                                        ))}
+                                      </div>
+                                    )}
+                                    <div className="mt-2 pt-2 border-t border-blue-200">
+                                      <span className="text-xs text-blue-600">
+                                        Status: <span className="font-medium">{delivery.status || 'Delivered'}</span>
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </div>
