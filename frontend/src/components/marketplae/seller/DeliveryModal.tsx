@@ -1,5 +1,6 @@
 // src/components/marketplace/seller/DeliveryModal.tsx
 import React, { useState, useRef } from 'react';
+import toast from 'react-hot-toast';
 
 interface DeliveryModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ interface DeliveryModalProps {
     revisionsLeft?: number;
   }) => Promise<void>;
   isLoading?: boolean;
+  validateFile?: (file: File) => string | null;
 }
 
 const DeliveryModal: React.FC<DeliveryModalProps> = ({
@@ -32,7 +34,8 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({
   onClose,
   order,
   onDeliver,
-  isLoading = false
+  isLoading = false,
+  validateFile
 }) => {
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -46,45 +49,65 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({
   if (!isOpen) return null;
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    
-    // Validate file types and sizes
-    const validFiles = files.filter(file => {
-      const validTypes = [
-        'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-        'video/mp4', 'video/quicktime', 'video/x-msvideo',
-        'application/pdf', 'application/zip', 'application/x-rar-compressed',
-        'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'audio/mpeg', 'audio/wav', 'audio/ogg'
-      ];
+    if (e.target.files) {
+      const files = Array.from(e.target.files);
       
-      const maxSize = 100 * 1024 * 1024; // 100MB
+      // ✅ Validate each file before adding
+      const validFiles: File[] = [];
+      const validationErrors: string[] = [];
       
-      if (!validTypes.includes(file.type)) {
-        setErrors(prev => ({
-          ...prev,
-          attachments: `File type not supported: ${file.name}`
-        }));
-        return false;
+      files.forEach(file => {
+        // Use custom validation function if provided
+        if (validateFile) {
+          const error = validateFile(file);
+          if (error) {
+            validationErrors.push(error);
+          } else {
+            validFiles.push(file);
+          }
+        } else {
+          // Fallback to default validation
+          const validTypes = [
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+            'video/mp4', 'video/quicktime', 'video/x-msvideo',
+            'application/pdf', 'application/zip', 'application/x-rar-compressed',
+            'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'audio/mpeg', 'audio/wav', 'audio/ogg'
+          ];
+          
+          const maxSize = 100 * 1024 * 1024; // 100MB
+          
+          if (!validTypes.includes(file.type)) {
+            validationErrors.push(`File type not supported: ${file.name}`);
+            return;
+          }
+          
+          if (file.size > maxSize) {
+            validationErrors.push(`File too large (max 100MB): ${file.name}`);
+            return;
+          }
+          
+          validFiles.push(file);
+        }
+      });
+      
+      // Show validation errors
+      if (validationErrors.length > 0) {
+        toast.error(`❌ ${validationErrors.join(', ')}`);
       }
       
-      if (file.size > maxSize) {
-        setErrors(prev => ({
-          ...prev,
-          attachments: `File too large (max 100MB): ${file.name}`
-        }));
-        return false;
+      // Add valid files
+      if (validFiles.length > 0) {
+        setAttachments(prev => [...prev, ...validFiles]);
+        setErrors(prev => ({ ...prev, attachments: undefined }));
+        toast.success(`✅ Added ${validFiles.length} file(s)`);
       }
-      
-      return true;
-    });
-    
-    setAttachments(prev => [...prev, ...validFiles]);
-    setErrors(prev => ({ ...prev, attachments: undefined }));
+    }
   };
 
   const removeAttachment = (index: number) => {
     setAttachments(prev => prev.filter((_, i) => i !== index));
+    toast.success('File removed');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -103,6 +126,7 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({
     
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
+      toast.error('Please fix the errors before delivering');
       return;
     }
     
@@ -122,9 +146,11 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({
       setAttachments([]);
       setIsFinalDelivery(true);
       setErrors({});
+      toast.success('Work delivered successfully!');
     } catch (error) {
       // Error handling is done in parent component
       console.error('Delivery failed:', error);
+      toast.error('Failed to deliver work. Please try again.');
     }
   };
 
