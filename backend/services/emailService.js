@@ -734,6 +734,258 @@ class EmailService {
     }
   }
 
+  // Add this method to your EmailService class
+  async sendOrderDeliveryNotification(buyerEmail, sellerEmail, deliveryData) {
+    try {
+      console.log(`📧 Preparing delivery email to buyer: ${buyerEmail}`);
+      
+      if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+        throw new Error('Email credentials not configured');
+      }
+
+      const siteName = process.env.SITE_NAME || 'WeCinema';
+      const siteUrl = process.env.SITE_URL || 'http://localhost:5173';
+      const supportEmail = process.env.SUPPORT_EMAIL || 'support@wecinema.co';
+      
+      const orderLink = deliveryData.orderLink;
+      const reviewPeriod = '3 days'; // Buyer has 3 days to review
+
+      // Helper function for file icons
+      const getFileIcon = (mimeType) => {
+        if (mimeType.startsWith('image/')) return '🖼️';
+        if (mimeType.startsWith('video/')) return '🎥';
+        if (mimeType.startsWith('audio/')) return '🎵';
+        if (mimeType.includes('pdf')) return '📄';
+        if (mimeType.includes('word') || mimeType.includes('document')) return '📝';
+        if (mimeType.includes('zip') || mimeType.includes('rar')) return '📦';
+        if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return '📊';
+        return '📎';
+      };
+
+      // Helper function for file size formatting
+      const formatFileSize = (bytes) => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+      };
+
+      // Prepare attachments list HTML
+      let attachmentsHTML = '';
+      if (deliveryData.attachmentsCount > 0) {
+        attachmentsHTML = `
+          <div style="background: #f8fafc; border-radius: 10px; padding: 20px; margin: 20px 0;">
+            <h4 style="font-size: 15px; color: #1f2937; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+              📎 Attached Files (${deliveryData.attachmentsCount})
+            </h4>
+            <div style="display: grid; gap: 8px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 6px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span style="font-size: 18px;">📎</span>
+                  <div>
+                    <div style="font-size: 13px; font-weight: 500; color: #1f2937;">${deliveryData.attachmentsCount} file(s) delivered</div>
+                    <div style="font-size: 11px; color: #6b7280;">Click below to download</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      const revisionsLeft = deliveryData.maxRevisions - deliveryData.revisionsUsed;
+      const isFinal = deliveryData.isFinalDelivery && revisionsLeft <= 0;
+
+      const content = `
+        <div class="header" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+            <div class="logo">${siteName}</div>
+            <h1 class="title">${deliveryData.isRevision ? '🔄 Revision Delivered!' : '📦 Your Order Has Been Delivered!'}</h1>
+            <p class="subtitle">${deliveryData.sellerName} has ${deliveryData.isRevision ? 'completed the revision' : 'delivered your work'}</p>
+        </div>
+        
+        <div class="content">
+            <div class="order-card">
+                <div class="order-amount">$${deliveryData.orderAmount}</div>
+                <p class="order-message">
+                    Your order ${deliveryData.isRevision ? 'revision' : ''} from <strong>${deliveryData.sellerName}</strong> is ready for review
+                </p>
+                <div class="order-badge" style="background: ${isFinal ? '#059669' : '#d97706'};">
+                    ${isFinal ? 'FINAL DELIVERY' : (deliveryData.isRevision ? 'REVISION #' + deliveryData.revisionNumber : 'DELIVERY #' + deliveryData.revisionNumber)}
+                </div>
+            </div>
+            
+            <div class="info-grid">
+                <div class="info-card">
+                    <span class="info-icon">👨‍💼</span>
+                    <div class="info-label">Seller</div>
+                    <div class="info-value">${deliveryData.sellerName}</div>
+                </div>
+                
+                <div class="info-card">
+                    <span class="info-icon">💰</span>
+                    <div class="info-label">Order Amount</div>
+                    <div class="info-value" style="color: #059669;">$${deliveryData.orderAmount}</div>
+                </div>
+                
+                <div class="info-card">
+                    <span class="info-icon">🔄</span>
+                    <div class="info-label">Revisions Used</div>
+                    <div class="info-value">${deliveryData.revisionsUsed} of ${deliveryData.maxRevisions}</div>
+                </div>
+                
+                <div class="info-card">
+                    <span class="info-icon">📅</span>
+                    <div class="info-label">Review Period</div>
+                    <div class="info-value">${reviewPeriod}</div>
+                </div>
+            </div>
+            
+            ${deliveryData.deliveryMessage ? `
+            <div class="requirements-box">
+                <h4 style="font-size: 15px; color: #92400e; margin-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                    💬 Message from ${deliveryData.sellerName}
+                </h4>
+                <p style="color: #92400e; font-size: 14px; line-height: 1.5; white-space: pre-wrap;">${deliveryData.deliveryMessage}</p>
+            </div>
+            ` : ''}
+            
+            ${attachmentsHTML}
+            
+            <div class="steps-container">
+                <h3 style="font-size: 18px; color: #1f2937; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;">
+                    ⏳ What Should You Do Next?
+                </h3>
+                
+                <div class="step-item">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h4>Review the Work</h4>
+                        <p>Carefully check all delivered files and ensure they meet your requirements</p>
+                    </div>
+                </div>
+                
+                <div class="step-item">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h4>Make a Decision</h4>
+                        ${revisionsLeft > 0 ? 
+                          `<p>You have <strong>${revisionsLeft} revision${revisionsLeft === 1 ? '' : 's'}</strong> left if needed</p>` :
+                          `<p><strong>No revisions left</strong> - this is your final delivery</p>`
+                        }
+                    </div>
+                </div>
+                
+                <div class="step-item">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h4>Complete or Request Changes</h4>
+                        <p>Accept the work or request modifications within ${reviewPeriod}</p>
+                    </div>
+                </div>
+            </div>
+            
+            ${revisionsLeft > 0 ? `
+            <div style="background: #fffbeb; border: 2px solid #f59e0b; border-radius: 10px; padding: 16px; margin: 20px 0;">
+                <div style="display: flex; align-items: flex-start; gap: 12px;">
+                    <span style="font-size: 20px; color: #d97706;">🔄</span>
+                    <div>
+                        <h4 style="font-size: 15px; color: #92400e; margin-bottom: 4px;">Revision Rights</h4>
+                        <p style="font-size: 13px; color: #92400e;">
+                            You have <strong>${revisionsLeft} revision${revisionsLeft === 1 ? '' : 's'}</strong> available. 
+                            Please review carefully before requesting changes.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            ` : ''}
+            
+            <div style="background: #ecfdf5; border: 2px solid #10b981; border-radius: 10px; padding: 16px; margin: 20px 0;">
+                <div style="display: flex; align-items: flex-start; gap: 12px;">
+                    <span style="font-size: 20px; color: #059669;">💰</span>
+                    <div>
+                        <h4 style="font-size: 15px; color: #065f46; margin-bottom: 4px;">Payment Status</h4>
+                        <p style="font-size: 13px; color: #065f46;">
+                            Your payment of <strong>$${deliveryData.orderAmount}</strong> is securely held in escrow. 
+                            It will be released to the seller once you approve the work.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="btn-container">
+                <a href="${orderLink}" class="btn">
+                    👁️ Review Delivery
+                </a>
+            </div>
+            
+            <div style="text-align: center; margin-top: 24px;">
+                <p style="font-size: 12px; color: #6b7280;">
+                    <strong>Important:</strong> You have <strong>${reviewPeriod}</strong> to review the work before it's automatically approved.
+                </p>
+            </div>
+            
+            <div class="divider"></div>
+        </div>
+        
+        <div class="footer">
+            <div class="footer-links">
+                <a href="${siteUrl}/help">Help Center</a>
+                <a href="${siteUrl}/contact">Contact Us</a>
+                <a href="${siteUrl}/terms">Terms</a>
+                <a href="${siteUrl}/privacy">Privacy</a>
+            </div>
+            
+            <div class="copyright">
+                <p>This is an automated message from ${siteName}. Please do not reply to this email.</p>
+                <p>Need help? <a href="mailto:${supportEmail}" style="color: #f59e0b; text-decoration: none;">${supportEmail}</a></p>
+                <p>© ${new Date().getFullYear()} ${siteName}. All rights reserved.</p>
+            </div>
+        </div>`;
+
+      const emailTemplate = this.getEmailTemplate({
+        title: `${deliveryData.isRevision ? 'Revision Delivered' : 'Delivery Notification'} - ${siteName}`,
+        headerColor: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+        content: content,
+        isBuyer: true
+      });
+
+      const mailOptions = {
+        from: `"${process.env.GMAIL_SENDER_NAME || siteName}" <${process.env.GMAIL_USER}>`,
+        to: buyerEmail,
+        subject: `${deliveryData.isRevision ? '🔄 Revision Completed' : '📦 Delivery Ready'}: Order #${deliveryData.orderNumber} from ${deliveryData.sellerName}`,
+        html: emailTemplate,
+        text: `${deliveryData.isRevision ? 'Revision Completed' : 'Delivery Notification'}!\n\nOrder #${deliveryData.orderNumber}\nSeller: ${deliveryData.sellerName}\nAmount: $${deliveryData.orderAmount}\n\nMessage: ${deliveryData.deliveryMessage}\n\nAttachments: ${deliveryData.attachmentsCount} files\n\nReview Link: ${orderLink}\n\nThank you for using ${siteName}!`
+      };
+
+      console.log('📤 Sending delivery email...');
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log('✅ Delivery email sent successfully:', info.messageId);
+      
+      // Also send a simpler confirmation to seller
+      await this.transporter.sendMail({
+        from: `"${siteName}" <${process.env.GMAIL_USER}>`,
+        to: sellerEmail,
+        subject: `✅ ${deliveryData.isRevision ? 'Revision Submitted' : 'Delivery Submitted'} - Order #${deliveryData.orderNumber}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #059669;">✅ ${deliveryData.isRevision ? 'Revision Submitted Successfully' : 'Delivery Submitted Successfully'}</h2>
+            <p>Your ${deliveryData.isRevision ? 'revision' : 'delivery'} for order <strong>#${deliveryData.orderNumber}</strong> has been sent to the buyer.</p>
+            <p>The buyer has ${reviewPeriod} to review and respond.</p>
+            <p>You will be notified when they take action.</p>
+          </div>
+        `,
+        text: `${deliveryData.isRevision ? 'Revision' : 'Delivery'} submitted successfully for order #${deliveryData.orderNumber}. Buyer notified.`
+      });
+
+      return info;
+
+    } catch (error) {
+      console.error('❌ Delivery email error:', error);
+      throw error;
+    }
+  }
+
   // Compact welcome email
   async sendWelcomeEmail(user) {
     try {
