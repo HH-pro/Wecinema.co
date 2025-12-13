@@ -1,5 +1,5 @@
 // src/components/marketplace/seller/OrdersTab.tsx
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { getOrderStatusInfo, formatCurrency, formatDate } from '../../../api';
 import OrderStatusTracker from './OrderStatusTracker';
 import OrderActionGuide from './OrderActionGuide';
@@ -58,6 +58,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
   actionLoading
 }) => {
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [localLoading, setLocalLoading] = useState<string | null>(null);
 
   const statusFilters = [
     { value: 'all', label: 'All Orders', count: orders.length },
@@ -74,11 +75,11 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     ? orders 
     : orders.filter(order => order.status === filter);
 
-  const toggleExpandOrder = (orderId: string) => {
-    setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
-  };
+  const toggleExpandOrder = useCallback((orderId: string) => {
+    setExpandedOrderId(prev => prev === orderId ? null : orderId);
+  }, []);
 
-  const getPriorityColor = (status: string) => {
+  const getPriorityColor = useCallback((status: string) => {
     switch (status) {
       case 'in_revision':
         return 'bg-red-50 border-red-200';
@@ -93,62 +94,137 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
       default:
         return 'bg-gray-50 border-gray-200';
     }
-  };
+  }, []);
 
-  const getStatusAction = (order: Order) => {
+  const handleAction = useCallback(async (
+    orderId: string, 
+    actionFunction?: (orderId: string | Order) => void,
+    order?: Order
+  ) => {
+    if (!actionFunction) return;
+    
+    setLocalLoading(orderId);
+    try {
+      if (order && (actionFunction === onDeliver || actionFunction === onCancel || actionFunction === onCompleteRevision)) {
+        await actionFunction(order);
+      } else if (actionFunction === onStartProcessing || actionFunction === onStartWork) {
+        await actionFunction(orderId);
+      }
+    } catch (error) {
+      console.error('Action failed:', error);
+      // You might want to show a toast notification here
+    } finally {
+      setLocalLoading(null);
+    }
+  }, [onDeliver, onCancel, onCompleteRevision, onStartProcessing, onStartWork]);
+
+  const getStatusAction = useCallback((order: Order) => {
     switch (order.status) {
       case 'paid':
         return {
           text: 'Start Processing',
           color: 'yellow',
-          onClick: () => onStartProcessing?.(order._id),
-          description: 'Begin preparing this order'
+          onClick: () => handleAction(order._id, onStartProcessing, order),
+          description: 'Begin preparing this order',
+          requiresConfirmation: false
         };
       case 'processing':
         return {
           text: 'Start Work',
           color: 'green',
-          onClick: () => onStartWork?.(order._id),
-          description: 'Begin working on deliverables'
+          onClick: () => handleAction(order._id, onStartWork, order),
+          description: 'Begin working on deliverables',
+          requiresConfirmation: false
         };
       case 'in_progress':
         return {
           text: 'Deliver Work',
           color: 'yellow',
-          onClick: () => onDeliver?.(order),
-          description: 'Send completed work to buyer'
+          onClick: () => handleAction(order._id, onDeliver, order),
+          description: 'Send completed work to buyer',
+          requiresConfirmation: true
         };
       case 'in_revision':
         return {
           text: 'Complete Revision',
           color: 'amber',
-          onClick: () => onCompleteRevision?.(order),
-          description: 'Send revised work back'
+          onClick: () => handleAction(order._id, onCompleteRevision, order),
+          description: 'Send revised work back',
+          requiresConfirmation: false
         };
       case 'delivered':
         return {
           text: 'Awaiting Buyer',
           color: 'gray',
           onClick: null,
-          description: 'Waiting for buyer review'
+          description: 'Waiting for buyer review',
+          requiresConfirmation: false
         };
       default:
         return null;
     }
-  };
+  }, [handleAction, onStartProcessing, onStartWork, onDeliver, onCompleteRevision]);
 
-  const calculateDeliveryDate = (createdAt: string, expectedDays?: number) => {
+  const calculateDeliveryDate = useCallback((createdAt: string, expectedDays?: number) => {
     if (!expectedDays) return null;
     const date = new Date(createdAt);
     date.setDate(date.getDate() + expectedDays);
     return date;
-  };
+  }, []);
 
-  const getDaysRemaining = (deliveryDate: Date) => {
+  const getDaysRemaining = useCallback((deliveryDate: Date) => {
     const today = new Date();
     const diffTime = deliveryDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
+  }, []);
+
+  const isOrderActionLoading = useCallback((orderId: string) => {
+    return actionLoading === orderId || localLoading === orderId;
+  }, [actionLoading, localLoading]);
+
+  const renderActionButton = (order: Order, action: any) => {
+    const isLoading = isOrderActionLoading(order._id);
+    
+    if (!action || !action.onClick) return null;
+
+    const handleClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (action.requiresConfirmation) {
+        const confirmed = window.confirm(`Are you sure you want to ${action.text.toLowerCase()} for order #${order.orderNumber}?`);
+        if (confirmed) {
+          action.onClick();
+        }
+      } else {
+        action.onClick();
+      }
+    };
+
+    return (
+      <button
+        onClick={handleClick}
+        disabled={isLoading}
+        className={`px-4 py-2.5 text-sm font-medium text-white rounded-xl transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow min-w-[120px] ${
+          action.color === 'yellow' ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700' :
+          action.color === 'green' ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700' :
+          action.color === 'purple' ? 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700' :
+          action.color === 'amber' ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700' :
+          'bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700'
+        }`}
+      >
+        {isLoading ? (
+          <span className="flex items-center justify-center">
+            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Processing...
+          </span>
+        ) : (
+          action.text
+        )}
+      </button>
+    );
   };
 
   return (
@@ -270,11 +346,12 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
               const deliveryDate = calculateDeliveryDate(order.createdAt, 7);
               const daysRemaining = deliveryDate ? getDaysRemaining(deliveryDate) : null;
               const isExpanded = expandedOrderId === order._id;
+              const isLoading = isOrderActionLoading(order._id);
 
               return (
                 <div 
                   key={order._id} 
-                  className={`p-6 hover:bg-yellow-50 transition-colors ${getPriorityColor(order.status)}`}
+                  className={`p-6 hover:bg-yellow-50 transition-colors ${getPriorityColor(order.status)} ${isLoading ? 'opacity-70' : ''}`}
                 >
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     {/* Order Info */}
@@ -354,52 +431,42 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                       </div>
                       
                       <div className="flex flex-wrap gap-2">
-                        {action && action.onClick && (
-                          <button
-                            onClick={action.onClick}
-                            disabled={actionLoading === order._id}
-                            className={`px-4 py-2.5 text-sm font-medium text-white rounded-xl transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow ${
-                              action.color === 'yellow' ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700' :
-                              action.color === 'green' ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700' :
-                              action.color === 'purple' ? 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700' :
-                              action.color === 'amber' ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700' :
-                              'bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700'
-                            }`}
-                          >
-                            {actionLoading === order._id ? (
-                              <span className="flex items-center">
-                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Processing...
-                              </span>
-                            ) : (
-                              action.text
-                            )}
-                          </button>
-                        )}
+                        {renderActionButton(order, action)}
 
                         {['paid', 'processing'].includes(order.status) && onCancel && (
                           <button
-                            onClick={() => onCancel(order)}
-                            disabled={actionLoading === order._id}
-                            className="px-4 py-2.5 text-sm font-medium text-red-700 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 rounded-xl transition-all duration-200 disabled:opacity-50 border border-red-200"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const confirmed = window.confirm(`Are you sure you want to cancel order #${order.orderNumber}?`);
+                              if (confirmed) {
+                                handleAction(order._id, onCancel, order);
+                              }
+                            }}
+                            disabled={isLoading}
+                            className="px-4 py-2.5 text-sm font-medium text-red-700 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 rounded-xl transition-all duration-200 disabled:opacity-50 border border-red-200 min-w-[80px]"
                           >
                             Cancel
                           </button>
                         )}
 
                         <button
-                          onClick={() => toggleExpandOrder(order._id)}
-                          className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 rounded-xl transition-all duration-200 border border-gray-300"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleExpandOrder(order._id);
+                          }}
+                          disabled={isLoading}
+                          className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 rounded-xl transition-all duration-200 border border-gray-300 disabled:opacity-50 min-w-[100px]"
                         >
                           {isExpanded ? 'Show Less' : 'More Info'}
                         </button>
 
                         <button
-                          onClick={() => onViewOrderDetails(order._id)}
-                          className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-yellow-300 hover:bg-yellow-50 rounded-xl transition-all duration-200 shadow-sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onViewOrderDetails(order._id);
+                          }}
+                          disabled={isLoading}
+                          className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-yellow-300 hover:bg-yellow-50 rounded-xl transition-all duration-200 shadow-sm disabled:opacity-50 min-w-[80px]"
                         >
                           Details
                         </button>
@@ -428,8 +495,18 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                               <p className="text-sm text-yellow-700 mt-1">{action.description}</p>
                               {action.onClick && (
                                 <button
-                                  onClick={action.onClick}
-                                  disabled={actionLoading === order._id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (action.requiresConfirmation) {
+                                      const confirmed = window.confirm(`Are you sure you want to ${action.text.toLowerCase()} for order #${order.orderNumber}?`);
+                                      if (confirmed) {
+                                        action.onClick();
+                                      }
+                                    } else {
+                                      action.onClick();
+                                    }
+                                  }}
+                                  disabled={isLoading}
                                   className="mt-3 w-full px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 disabled:opacity-50 shadow-md"
                                 >
                                   Take Action
