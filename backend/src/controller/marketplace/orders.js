@@ -157,7 +157,7 @@ const validateUserAccess = (order, userId) => {
   const isBuyer = order.buyerId.toString() === userId.toString();
   const isSeller = order.sellerId.toString() === userId.toString();
   
-  if (!isSeller) {
+  if (!isBuyer && !isSeller) {
     throw new Error('Access denied to this order');
   }
   
@@ -1273,7 +1273,7 @@ router.get("/:orderId", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    const { isSeller } = validateUserAccess(order, userId);
+    const { isBuyer, isSeller } = validateUserAccess(order, userId);
 
     const deliveries = await Delivery.find({ orderId: order._id })
       .populate('sellerId', 'username avatar')
