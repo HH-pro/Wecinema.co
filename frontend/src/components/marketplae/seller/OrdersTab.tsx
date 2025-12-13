@@ -341,7 +341,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
       case 'in_progress':
         return {
           text: 'Deliver Work',
-          color: 'purple',
+          color: 'yellow',
           onClick: () => handleDeliverClick(order),
           description: 'Send completed work to buyer',
           icon: '📤'
