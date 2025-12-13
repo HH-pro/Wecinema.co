@@ -159,7 +159,7 @@ export const deleteRequest = <T>(
 // ========================
 // FILE UPLOAD FUNCTIONS
 // ========================
-
+// In api.ts - Update the uploadFiles function
 export const uploadFiles = async (
   files: File[],
   setLoading: React.Dispatch<React.SetStateAction<boolean>>
@@ -175,15 +175,17 @@ export const uploadFiles = async (
     setLoading(true);
     const formData = new FormData();
     
-    files.forEach((file, index) => {
+    files.forEach((file) => {
       formData.append('files', file);
     });
 
     const token = localStorage.getItem("token");
+    
     const response = await fetch('http://localhost:3000/marketplace/orders/upload/delivery', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
+        // Don't set Content-Type for FormData, browser will set it with boundary
       },
       body: formData,
     });
@@ -202,13 +204,13 @@ export const uploadFiles = async (
       throw new Error(data.error || 'Upload failed');
     }
   } catch (error: any) {
+    console.error('Upload error:', error);
     toast.error(error.message || 'File upload failed');
     throw error;
   } finally {
     setLoading(false);
   }
 };
-
 export const getUploadedFile = (filename: string): string => {
   return `http://localhost:3000/marketplace/orders/upload/delivery/${filename}`;
 };
