@@ -152,18 +152,32 @@ const upload = multer({
 // ========== HELPER FUNCTIONS ========== //
 const calculatePlatformFee = (amount) => parseFloat((amount * 0.10).toFixed(2));
 const calculateSellerPayout = (amount) => parseFloat((amount - calculatePlatformFee(amount)).toFixed(2));
+const validateUserAccess = (order, userId, userRole) => {
+  console.log('Validating access:', {
+    orderId: order._id,
+    userId,
+    userRole,
+    buyerId: order.buyerId?._id?.toString(),
+    sellerId: order.sellerId?._id?.toString()
+  });
 
-const validateUserAccess = (order, userId) => {
-  const isBuyer = order.buyerId.toString() === userId.toString();
-  const isSeller = order.sellerId.toString() === userId.toString();
-  
+  // Allow admin access
+  if (userRole === 'admin') {
+    return true;
+  }
+
+  // Check if user is either buyer or seller
+  const isBuyer = order.buyerId?._id?.toString() === userId.toString();
+  const isSeller = order.sellerId?._id?.toString() === userId.toString();
+
+  console.log('Access check:', { isBuyer, isSeller });
+
   if (!isBuyer && !isSeller) {
     throw new Error('Access denied to this order');
   }
-  
-  return { isBuyer, isSeller };
-};
 
+  return true;
+};
 const populateOrder = (orderId) => Order.findById(orderId)
   .populate('buyerId', 'username avatar email firstName lastName')
   .populate('sellerId', 'username avatar sellerRating email firstName lastName stripeAccountId')
