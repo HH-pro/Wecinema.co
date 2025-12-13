@@ -1,4 +1,4 @@
-// routes/order.js
+// routes/order.js - COMPLETE FIXED VERSION WITH ZIP FILE SUPPORT
 const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
@@ -21,31 +21,131 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
+  destination: (req, file, cb) => {
+    console.log('📂 Setting destination to:', uploadsDir);
+    cb(null, uploadsDir);
+  },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+    const safeName = path.parse(file.originalname).name.replace(/[^a-zA-Z0-9]/g, '_');
+    const ext = path.extname(file.originalname).toLowerCase();
+    const filename = `${uniqueSuffix}_${safeName}${ext}`;
+    console.log('📝 Generated filename:', filename);
+    cb(null, filename);
   }
 });
 
+// ✅ FIXED: Added ALL ZIP file MIME types and extensions
 const allowedMimeTypes = [
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-  'video/mp4', 'video/quicktime', 'video/x-msvideo',
-  'application/pdf', 'application/zip', 'application/x-rar-compressed',
-  'text/plain', 'application/msword',
+  // Images
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+  
+  // Videos
+  'video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm', 'video/avi',
+  
+  // Documents
+  'application/pdf', 
+  'text/plain', 'text/csv',
+  'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'audio/mpeg', 'audio/wav', 'audio/ogg',
   'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  
+  // Audio
+  'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/x-wav',
+  
+  // ✅ ZIP and Archive Files - ALL POSSIBLE MIME TYPES
+  'application/zip',
+  'application/x-zip',
+  'application/x-zip-compressed',
+  'application/x-compressed',
+  'multipart/x-zip',
+  'application/octet-stream', // Generic binary (often used for ZIP)
+  
+  // Other archive formats
+  'application/x-rar-compressed',
+  'application/x-rar',
+  'application/x-7z-compressed',
+  'application/x-tar',
+  'application/gzip',
+  'application/x-bzip2',
+  'application/x-tar-gz',
+  'application/x-gtar'
+];
+
+const allowedExtensions = [
+  // Images
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg',
+  
+  // Videos
+  '.mp4', '.mov', '.avi', '.webm', '.mkv',
+  
+  // Documents
+  '.pdf', '.txt', '.csv',
+  '.doc', '.docx',
+  '.xls', '.xlsx',
+  '.ppt', '.pptx',
+  
+  // Audio
+  '.mp3', '.wav', '.ogg', '.m4a',
+  
+  // ✅ ZIP and Archive Files - ALL POSSIBLE EXTENSIONS
+  '.zip',
+  '.rar',
+  '.7z',
+  '.tar',
+  '.gz',
+  '.tgz',
+  '.bz2',
+  '.tar.gz',
+  '.tar.bz2'
 ];
 
 const upload = multer({
   storage,
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+  limits: { 
+    fileSize: 100 * 1024 * 1024, // 100MB
+    files: 10 // Max 10 files
+  },
   fileFilter: (req, file, cb) => {
-    allowedMimeTypes.includes(file.mimetype) 
-      ? cb(null, true)
-      : cb(new Error(`File type ${file.mimetype} not supported`), false);
+    console.log('🔍 File filter checking:', {
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      extension: path.extname(file.originalname).toLowerCase()
+    });
+
+    const fileExt = path.extname(file.originalname).toLowerCase();
+    
+    // First check by MIME type
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      console.log(`✅ Accepted by MIME type: ${file.mimetype}`);
+      cb(null, true);
+      return;
+    }
+    
+    // Then check by file extension (for safety)
+    if (allowedExtensions.includes(fileExt)) {
+      console.log(`✅ Accepted by extension: ${fileExt}`);
+      cb(null, true);
+      return;
+    }
+    
+    // Special case for ZIP files that might have weird MIME types
+    if (fileExt === '.zip') {
+      console.log(`✅ Accepted as ZIP file (extension: ${fileExt})`);
+      cb(null, true);
+      return;
+    }
+    
+    // Reject if not allowed
+    console.log(`❌ Rejected file: ${file.originalname} (MIME: ${file.mimetype}, Ext: ${fileExt})`);
+    cb(new Error(
+      `File type not supported. Allowed: Images (JPG, PNG, GIF), Videos (MP4, MOV), ` +
+      `Documents (PDF, DOC, DOCX, XLS, XLSX), Audio (MP3, WAV), Archives (ZIP, RAR, 7Z). ` +
+      `Your file: ${file.originalname} (${file.mimetype})`
+    ), false);
   }
 });
 
@@ -103,6 +203,149 @@ const sendDeliveryEmail = async (order, deliveryData, isRevision = false) => {
     return false;
   }
 };
+
+// ========== FILE UPLOAD ROUTES ========== //
+router.post("/upload/delivery", authenticateMiddleware, upload.array('files', 10), async (req, res) => {
+  try {
+    const files = req.files;
+    const userId = req.user.id || req.user._id || req.user.userId;
+    
+    console.log('📤 File upload request received:', {
+      userId,
+      fileCount: files ? files.length : 0,
+      fileNames: files ? files.map(f => f.originalname) : []
+    });
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No files uploaded'
+      });
+    }
+
+    // Log details of each file
+    files.forEach(file => {
+      console.log('📁 File details:', {
+        filename: file.filename,
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+        size: formatBytes(file.size),
+        path: file.path,
+        extension: path.extname(file.originalname)
+      });
+    });
+
+    const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
+    const uploadedFiles = files.map(file => ({
+      filename: file.filename,
+      originalName: file.originalname,
+      mimeType: file.mimetype,
+      size: file.size,
+      url: `${siteUrl}/marketplace/orders/upload/delivery/${file.filename}`,
+      path: file.path,
+      extension: path.extname(file.originalname).toLowerCase()
+    }));
+
+    console.log(`✅ Successfully uploaded ${uploadedFiles.length} files for user ${userId}`);
+
+    res.status(200).json({
+      success: true,
+      message: `Uploaded ${uploadedFiles.length} file(s) successfully`,
+      files: uploadedFiles,
+      count: uploadedFiles.length
+    });
+
+  } catch (error) {
+    console.error('❌ Upload error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'File upload failed',
+      details: error.message,
+      allowedTypes: allowedMimeTypes.join(', ')
+    });
+  }
+});
+
+// Helper function to format bytes
+function formatBytes(bytes, decimals = 2) {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+router.get("/upload/delivery/:filename", async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const filePath = path.join(uploadsDir, filename);
+    
+    console.log('📥 File download request:', filename);
+    
+    if (!fs.existsSync(filePath)) {
+      console.log('❌ File not found:', filePath);
+      return res.status(404).json({
+        success: false,
+        error: 'File not found'
+      });
+    }
+
+    // Get file stats
+    const stats = fs.statSync(filePath);
+    const ext = path.extname(filename).toLowerCase();
+    
+    // Set appropriate headers for different file types
+    if (['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2'].includes(ext)) {
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    } else {
+      // Try to detect MIME type
+      const mime = getMimeType(ext);
+      if (mime) {
+        res.setHeader('Content-Type', mime);
+      }
+    }
+    
+    res.setHeader('Content-Length', stats.size);
+    
+    console.log('✅ Sending file:', {
+      filename,
+      path: filePath,
+      size: formatBytes(stats.size),
+      type: res.getHeader('Content-Type')
+    });
+    
+    res.sendFile(path.resolve(filePath));
+  } catch (error) {
+    console.error('❌ File retrieval error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve file'
+    });
+  }
+});
+
+// Helper function to get MIME type from extension
+function getMimeType(ext) {
+  const mimeTypes = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.pdf': 'application/pdf',
+    '.mp4': 'video/mp4',
+    '.mov': 'video/quicktime',
+    '.avi': 'video/x-msvideo',
+    '.mp3': 'audio/mpeg',
+    '.wav': 'audio/wav',
+    '.zip': 'application/zip',
+    '.rar': 'application/x-rar-compressed',
+    '.7z': 'application/x-7z-compressed'
+  };
+  return mimeTypes[ext] || 'application/octet-stream';
+}
 
 // ========== ORDER CREATION ========== //
 router.post("/create", authenticateMiddleware, async (req, res) => {
@@ -286,73 +529,19 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
   }
 });
 
-// ========== FILE UPLOAD ROUTES ========== //
-router.post("/upload/delivery", authenticateMiddleware, upload.array('files', 10), async (req, res) => {
-  try {
-    const files = req.files;
-    const userId = req.user.id || req.user._id || req.user.userId;
-    
-    if (!files || files.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'No files uploaded'
-      });
-    }
-
-    const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
-    const uploadedFiles = files.map(file => ({
-      filename: file.filename,
-      originalName: file.originalname,
-      mimeType: file.mimetype,
-      size: file.size,
-      url: `${siteUrl}/${file.path.replace(/\\/g, '/')}`,
-      path: file.path
-    }));
-
-    res.status(200).json({
-      success: true,
-      files: uploadedFiles,
-      count: uploadedFiles.length
-    });
-
-  } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'File upload failed',
-      details: error.message
-    });
-  }
-});
-
-router.get("/upload/delivery/:filename", async (req, res) => {
-  try {
-    const { filename } = req.params;
-    const filePath = path.join(uploadsDir, filename);
-    
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({
-        success: false,
-        error: 'File not found'
-      });
-    }
-
-    res.sendFile(path.resolve(filePath));
-  } catch (error) {
-    console.error('File retrieval error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to retrieve file'
-    });
-  }
-});
-
 // ========== DELIVERY SYSTEM ========== //
 router.put("/:orderId/deliver-with-email", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
     const { deliveryMessage, deliveryFiles = [], attachments = [], isFinalDelivery = true } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
+
+    console.log('📤 Starting delivery for order:', orderId, {
+      messageLength: deliveryMessage?.length,
+      attachmentsCount: attachments?.length,
+      filesCount: deliveryFiles?.length,
+      userId
+    });
 
     const order = await Order.findOne({ 
       _id: orderId, 
@@ -455,6 +644,8 @@ router.put("/:orderId/complete-revision", authenticateMiddleware, async (req, re
     const { orderId } = req.params;
     const { deliveryMessage, deliveryFiles = [], attachments = [], isFinalDelivery = true } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
+
+    console.log('🔄 Completing revision for order:', orderId);
 
     const order = await Order.findOne({ 
       _id: orderId, 
@@ -866,6 +1057,8 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
     const { orderId } = req.params;
     const userId = req.user.id || req.user._id || req.user.userId;
 
+    console.log('✅ Completing order:', orderId);
+
     const order = await Order.findOne({
       _id: orderId,
       buyerId: userId,
@@ -881,6 +1074,7 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
 
     if (order.stripePaymentIntentId && !order.paymentReleased) {
       try {
+        console.log('💰 Capturing payment for order:', orderId);
         await stripe.paymentIntents.capture(order.stripePaymentIntentId);
         
         const platformFeePercent = 0.15;
@@ -898,6 +1092,7 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
             totalEarnings: sellerAmount
           }
         });
+        console.log('💵 Payment released to seller:', sellerAmount);
       } catch (stripeError) {
         console.error('Stripe capture error:', stripeError);
       }
@@ -908,6 +1103,8 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
     await order.save();
 
     await User.findByIdAndUpdate(order.sellerId, { $inc: { completedOrders: 1 } });
+
+    console.log('🎉 Order completed successfully:', orderId);
 
     res.status(200).json({ 
       success: true,
