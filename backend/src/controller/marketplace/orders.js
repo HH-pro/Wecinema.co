@@ -1273,7 +1273,7 @@ router.get("/:orderId", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    // const { isBuyer, isSeller } = validateUserAccess(order, userId);
+    const { isBuyer, isSeller } = validateUserAccess(order, userId);
 
     const deliveries = await Delivery.find({ orderId: order._id })
       .populate('sellerId', 'username avatar')
