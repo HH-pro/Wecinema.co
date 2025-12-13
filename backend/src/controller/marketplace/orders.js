@@ -8,7 +8,7 @@ const User = require("../../models/user");
 const Delivery = require("../../models/marketplace/Delivery"); // Add Delivery model
 const { authenticateMiddleware } = require("../../utils");
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
-const emailService = require("../../service/emailService"); // Add email service
+const emailService = require("../../../service/emailService"); // Add email service
 
 // Helper functions for fee calculation
 function calculatePlatformFee(amount) {
