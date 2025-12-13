@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { getOrderStatusInfo, formatCurrency, formatDate } from '../../../api';
 import OrderStatusTracker from './OrderStatusTracker';
 import OrderActionGuide from './OrderActionGuide';
+import DeliveryModal from './DeliveryModal';
 
 interface Order {
   _id: string;
@@ -24,6 +25,7 @@ interface Order {
   notes?: string;
   revisions?: number;
   maxRevisions?: number;
+  expectedDays?: number;
 }
 
 interface OrdersTabProps {
@@ -40,6 +42,13 @@ interface OrdersTabProps {
   onCancel?: (order: Order) => void;
   onCompleteRevision?: (order: Order) => void;
   actionLoading?: string | null;
+  onActualDeliver?: (deliveryData: {
+    orderId: string;
+    message: string;
+    attachments: File[];
+    isFinal: boolean;
+    revisionsLeft?: number;
+  }) => Promise<void>;
 }
 
 const OrdersTab: React.FC<OrdersTabProps> = ({
@@ -55,9 +64,12 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
   onDeliver,
   onCancel,
   onCompleteRevision,
-  actionLoading
+  actionLoading,
+  onActualDeliver
 }) => {
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
+  const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState<Order | null>(null);
 
   const statusFilters = [
     { value: 'all', label: 'All Orders', count: orders.length },
@@ -76,6 +88,26 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
 
   const toggleExpandOrder = (orderId: string) => {
     setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
+  };
+
+  const handleDeliverClick = (order: Order) => {
+    setSelectedOrderForDelivery(order);
+    setDeliveryModalOpen(true);
+  };
+
+  const handleActualDeliver = async (deliveryData: {
+    orderId: string;
+    message: string;
+    attachments: File[];
+    isFinal: boolean;
+    revisionsLeft?: number;
+  }) => {
+    if (onActualDeliver) {
+      await onActualDeliver(deliveryData);
+      setDeliveryModalOpen(false);
+      setSelectedOrderForDelivery(null);
+      onRefresh();
+    }
   };
 
   const getPriorityColor = (status: string) => {
@@ -102,35 +134,40 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
           text: 'Start Processing',
           color: 'yellow',
           onClick: () => onStartProcessing?.(order._id),
-          description: 'Begin preparing this order'
+          description: 'Begin preparing this order',
+          icon: '⚙️'
         };
       case 'processing':
         return {
           text: 'Start Work',
           color: 'green',
           onClick: () => onStartWork?.(order._id),
-          description: 'Begin working on deliverables'
+          description: 'Begin working on deliverables',
+          icon: '🛠️'
         };
       case 'in_progress':
         return {
           text: 'Deliver Work',
-          color: 'yellow',
-          onClick: () => onDeliver?.(order),
-          description: 'Send completed work to buyer'
+          color: 'purple',
+          onClick: () => handleDeliverClick(order),
+          description: 'Send completed work to buyer',
+          icon: '📤'
         };
       case 'in_revision':
         return {
           text: 'Complete Revision',
           color: 'amber',
           onClick: () => onCompleteRevision?.(order),
-          description: 'Send revised work back'
+          description: 'Send revised work back',
+          icon: '🔄'
         };
       case 'delivered':
         return {
           text: 'Awaiting Buyer',
           color: 'gray',
           onClick: null,
-          description: 'Waiting for buyer review'
+          description: 'Waiting for buyer review',
+          icon: '⏳'
         };
       default:
         return null;
@@ -149,6 +186,34 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     const diffTime = deliveryDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
+  };
+
+  const getPriorityBadge = (order: Order) => {
+    const deliveryDate = calculateDeliveryDate(order.createdAt, order.expectedDays || 7);
+    if (!deliveryDate) return null;
+    
+    const daysRemaining = getDaysRemaining(deliveryDate);
+    
+    if (daysRemaining <= 1) {
+      return {
+        text: 'Urgent',
+        color: 'bg-red-100 text-red-800',
+        icon: '🚨'
+      };
+    } else if (daysRemaining <= 3) {
+      return {
+        text: 'Priority',
+        color: 'bg-orange-100 text-orange-800',
+        icon: '⚡'
+      };
+    } else if (daysRemaining <= 7) {
+      return {
+        text: 'On Track',
+        color: 'bg-green-100 text-green-800',
+        icon: '✅'
+      };
+    }
+    return null;
   };
 
   return (
@@ -267,9 +332,10 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
             {filteredOrders.map(order => {
               const statusInfo = getOrderStatusInfo(order.status);
               const action = getStatusAction(order);
-              const deliveryDate = calculateDeliveryDate(order.createdAt, 7);
+              const deliveryDate = calculateDeliveryDate(order.createdAt, order.expectedDays || 7);
               const daysRemaining = deliveryDate ? getDaysRemaining(deliveryDate) : null;
               const isExpanded = expandedOrderId === order._id;
+              const priorityBadge = getPriorityBadge(order);
 
               return (
                 <div 
@@ -299,6 +365,12 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                               <span className="mr-1">{statusInfo.icon}</span>
                               {statusInfo.text}
                             </span>
+                            {priorityBadge && (
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${priorityBadge.color}`}>
+                                <span className="mr-1">{priorityBadge.icon}</span>
+                                {priorityBadge.text}
+                              </span>
+                            )}
                           </div>
                           
                           <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
@@ -310,11 +382,29 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                               <span className="mr-1">📅</span>
                               <span>{formatDate(order.createdAt)}</span>
                             </div>
-                            {daysRemaining !== null && daysRemaining > 0 && (
+                            {daysRemaining !== null && (
                               <div className="flex items-center">
                                 <span className="mr-1">⏳</span>
-                                <span className={daysRemaining <= 2 ? 'text-red-600 font-medium' : 'text-amber-600'}>
-                                  {daysRemaining} day{daysRemaining !== 1 ? 's' : ''} remaining
+                                <span className={
+                                  daysRemaining <= 0 ? 'text-red-600 font-medium' :
+                                  daysRemaining <= 2 ? 'text-orange-600 font-medium' :
+                                  'text-amber-600'
+                                }>
+                                  {daysRemaining <= 0 
+                                    ? 'Overdue!' 
+                                    : `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining`}
+                                </span>
+                              </div>
+                            )}
+                            {order.revisions !== undefined && (
+                              <div className="flex items-center">
+                                <span className="mr-1">🔄</span>
+                                <span className={
+                                  (order.maxRevisions && order.revisions >= order.maxRevisions) 
+                                    ? 'text-red-600 font-medium' 
+                                    : 'text-gray-600'
+                                }>
+                                  {order.revisions} / {order.maxRevisions || 3} revisions
                                 </span>
                               </div>
                             )}
@@ -332,7 +422,9 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                               <div className="w-full bg-gray-200 rounded-full h-2">
                                 <div 
                                   className={`h-2 rounded-full ${
-                                    order.status === 'processing' ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 w-1/4' : 'bg-gradient-to-r from-green-500 to-green-600 w-3/4'
+                                    order.status === 'processing' 
+                                      ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 w-1/4' 
+                                      : 'bg-gradient-to-r from-green-500 to-green-600 w-3/4'
                                   }`}
                                 ></div>
                               </div>
@@ -358,7 +450,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                           <button
                             onClick={action.onClick}
                             disabled={actionLoading === order._id}
-                            className={`px-4 py-2.5 text-sm font-medium text-white rounded-xl transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow ${
+                            className={`px-4 py-2.5 text-sm font-medium text-white rounded-xl transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow flex items-center gap-2 ${
                               action.color === 'yellow' ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700' :
                               action.color === 'green' ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700' :
                               action.color === 'purple' ? 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700' :
@@ -367,40 +459,46 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                             }`}
                           >
                             {actionLoading === order._id ? (
-                              <span className="flex items-center">
-                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                              <>
+                                <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
                                 Processing...
-                              </span>
+                              </>
                             ) : (
-                              action.text
+                              <>
+                                <span>{action.icon}</span>
+                                {action.text}
+                              </>
                             )}
                           </button>
                         )}
 
-                        {['paid', 'processing'].includes(order.status) && onCancel && (
+                        {['paid', 'processing', 'in_progress'].includes(order.status) && onCancel && (
                           <button
                             onClick={() => onCancel(order)}
                             disabled={actionLoading === order._id}
-                            className="px-4 py-2.5 text-sm font-medium text-red-700 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 rounded-xl transition-all duration-200 disabled:opacity-50 border border-red-200"
+                            className="px-4 py-2.5 text-sm font-medium text-red-700 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 rounded-xl transition-all duration-200 disabled:opacity-50 border border-red-200 flex items-center gap-2"
                           >
+                            <span>❌</span>
                             Cancel
                           </button>
                         )}
 
                         <button
                           onClick={() => toggleExpandOrder(order._id)}
-                          className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 rounded-xl transition-all duration-200 border border-gray-300"
+                          className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 rounded-xl transition-all duration-200 border border-gray-300 flex items-center gap-2"
                         >
+                          <span>{isExpanded ? '▲' : '▼'}</span>
                           {isExpanded ? 'Show Less' : 'More Info'}
                         </button>
 
                         <button
                           onClick={() => onViewOrderDetails(order._id)}
-                          className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-yellow-300 hover:bg-yellow-50 rounded-xl transition-all duration-200 shadow-sm"
+                          className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-yellow-300 hover:bg-yellow-50 rounded-xl transition-all duration-200 shadow-sm flex items-center gap-2"
                         >
+                          <span>📋</span>
                           Details
                         </button>
                       </div>
@@ -424,14 +522,18 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                           
                           {action && (
                             <div className="mt-6 p-4 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl border border-yellow-200">
-                              <p className="font-medium text-yellow-800">Next Step: {action.text}</p>
-                              <p className="text-sm text-yellow-700 mt-1">{action.description}</p>
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-lg">{action.icon}</span>
+                                <p className="font-medium text-yellow-800">Next Step: {action.text}</p>
+                              </div>
+                              <p className="text-sm text-yellow-700 mb-3">{action.description}</p>
                               {action.onClick && (
                                 <button
                                   onClick={action.onClick}
                                   disabled={actionLoading === order._id}
-                                  className="mt-3 w-full px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 disabled:opacity-50 shadow-md"
+                                  className="w-full px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 disabled:opacity-50 shadow-md flex items-center justify-center gap-2"
                                 >
+                                  <span>{action.icon}</span>
                                   Take Action
                                 </button>
                               )}
@@ -448,26 +550,36 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                               <span className="font-medium">{formatDate(order.createdAt)}</span>
                             </div>
                             
-                            {order.expectedDelivery && (
+                            {deliveryDate && (
                               <div className="flex justify-between">
                                 <span className="text-gray-600">Expected Delivery</span>
+                                <span className="font-medium">{formatDate(deliveryDate.toISOString())}</span>
+                              </div>
+                            )}
+                            
+                            {order.expectedDelivery && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">Original ETA</span>
                                 <span className="font-medium">{order.expectedDelivery}</span>
                               </div>
                             )}
                             
                             {order.revisions !== undefined && (
                               <div className="flex justify-between">
-                                <span className="text-gray-600">Revisions</span>
+                                <span className="text-gray-600">Revisions Used</span>
                                 <span className="font-medium">
-                                  {order.revisions} / {order.maxRevisions || 3} used
+                                  {order.revisions} / {order.maxRevisions || 3}
+                                  {order.maxRevisions && order.revisions >= order.maxRevisions && (
+                                    <span className="ml-2 text-xs text-red-600">(Max reached)</span>
+                                  )}
                                 </span>
                               </div>
                             )}
                             
                             {order.notes && (
-                              <div className="mt-4 p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200">
-                                <p className="text-sm text-gray-700">
-                                  <span className="font-medium">Notes: </span>
+                              <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+                                <p className="text-sm text-blue-800">
+                                  <span className="font-medium">Buyer Notes: </span>
                                   {order.notes}
                                 </p>
                               </div>
@@ -479,24 +591,34 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                               <div className="flex flex-wrap gap-2">
                                 <button
                                   onClick={() => onViewOrderDetails(order._id)}
-                                  className="px-3 py-1.5 text-xs bg-gradient-to-r from-yellow-50 to-yellow-100 text-yellow-700 rounded-lg hover:from-yellow-100 hover:to-yellow-200 transition-all duration-200 border border-yellow-200"
+                                  className="px-3 py-1.5 text-xs bg-gradient-to-r from-yellow-50 to-yellow-100 text-yellow-700 rounded-lg hover:from-yellow-100 hover:to-yellow-200 transition-all duration-200 border border-yellow-200 flex items-center gap-1"
                                 >
-                                  📋 View Full Details
+                                  <span>📋</span>
+                                  View Full Details
                                 </button>
                                 <button
                                   onClick={() => window.open(`/messages?order=${order._id}`, '_blank')}
-                                  className="px-3 py-1.5 text-xs bg-gradient-to-r from-green-50 to-green-100 text-green-700 rounded-lg hover:from-green-100 hover:to-green-200 transition-all duration-200 border border-green-200"
+                                  className="px-3 py-1.5 text-xs bg-gradient-to-r from-green-50 to-green-100 text-green-700 rounded-lg hover:from-green-100 hover:to-green-200 transition-all duration-200 border border-green-200 flex items-center gap-1"
                                 >
-                                  💬 Message Buyer
+                                  <span>💬</span>
+                                  Message Buyer
                                 </button>
                                 {order.listingId?.mediaUrls?.[0] && onPlayVideo && (
                                   <button
-                                    onClick={() => onPlayVideo(order.listingId.mediaUrls[0], order.listingId.title)}
-                                    className="px-3 py-1.5 text-xs bg-gradient-to-r from-purple-50 to-purple-100 text-purple-700 rounded-lg hover:from-purple-100 hover:to-purple-200 transition-all duration-200 border border-purple-200"
+                                    onClick={() => onPlayVideo(order.listingId.mediaUrls![0], order.listingId.title)}
+                                    className="px-3 py-1.5 text-xs bg-gradient-to-r from-purple-50 to-purple-100 text-purple-700 rounded-lg hover:from-purple-100 hover:to-purple-200 transition-all duration-200 border border-purple-200 flex items-center gap-1"
                                   >
-                                    ▶️ View Media
+                                    <span>▶️</span>
+                                    View Media
                                   </button>
                                 )}
+                                <button
+                                  onClick={() => navigator.clipboard.writeText(order.orderNumber || order._id)}
+                                  className="px-3 py-1.5 text-xs bg-gradient-to-r from-gray-50 to-gray-100 text-gray-700 rounded-lg hover:from-gray-100 hover:to-gray-200 transition-all duration-200 border border-gray-200 flex items-center gap-1"
+                                >
+                                  <span>📋</span>
+                                  Copy Order ID
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -516,17 +638,34 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
         <div className="bg-white rounded-2xl shadow-sm border border-yellow-200 p-6">
           <h3 className="font-medium text-gray-900 mb-4">Bulk Actions</h3>
           <div className="flex flex-wrap gap-3">
-            <button className="px-4 py-2.5 text-sm bg-gradient-to-r from-yellow-50 to-yellow-100 text-yellow-700 rounded-lg hover:from-yellow-100 hover:to-yellow-200 transition-all duration-200 border border-yellow-300">
+            <button className="px-4 py-2.5 text-sm bg-gradient-to-r from-yellow-50 to-yellow-100 text-yellow-700 rounded-lg hover:from-yellow-100 hover:to-yellow-200 transition-all duration-200 border border-yellow-300 flex items-center gap-2">
+              <span>📊</span>
               Export Orders (CSV)
             </button>
-            <button className="px-4 py-2.5 text-sm bg-gradient-to-r from-green-50 to-green-100 text-green-700 rounded-lg hover:from-green-100 hover:to-green-200 transition-all duration-200 border border-green-300">
+            <button className="px-4 py-2.5 text-sm bg-gradient-to-r from-green-50 to-green-100 text-green-700 rounded-lg hover:from-green-100 hover:to-green-200 transition-all duration-200 border border-green-300 flex items-center gap-2">
+              <span>📧</span>
               Send Bulk Message
             </button>
-            <button className="px-4 py-2.5 text-sm bg-gradient-to-r from-gray-50 to-gray-100 text-gray-700 rounded-lg hover:from-gray-100 hover:to-gray-200 transition-all duration-200 border border-gray-300">
+            <button className="px-4 py-2.5 text-sm bg-gradient-to-r from-gray-50 to-gray-100 text-gray-700 rounded-lg hover:from-gray-100 hover:to-gray-200 transition-all duration-200 border border-gray-300 flex items-center gap-2">
+              <span>🖨️</span>
               Print Order Summaries
             </button>
           </div>
         </div>
+      )}
+
+      {/* Delivery Modal */}
+      {deliveryModalOpen && selectedOrderForDelivery && (
+        <DeliveryModal
+          isOpen={deliveryModalOpen}
+          onClose={() => {
+            setDeliveryModalOpen(false);
+            setSelectedOrderForDelivery(null);
+          }}
+          order={selectedOrderForDelivery}
+          onDeliver={handleActualDeliver}
+          isLoading={actionLoading === selectedOrderForDelivery._id}
+        />
       )}
     </div>
   );
