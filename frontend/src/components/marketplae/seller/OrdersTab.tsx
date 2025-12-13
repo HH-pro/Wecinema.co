@@ -134,7 +134,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
       }
 
       // Send delivery request with email notification
-      const response = await fetch(`/api/orders/${deliveryData.orderId}/deliver-with-email`, {
+      const response = await fetch(`/orders/${deliveryData.orderId}/deliver-with-email`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
