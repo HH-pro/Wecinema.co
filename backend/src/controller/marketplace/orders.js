@@ -157,7 +157,7 @@ const validateUserAccess = (order, userId) => {
   const isBuyer = order.buyerId.toString() === userId.toString();
   const isSeller = order.sellerId.toString() === userId.toString();
   
-  if (!isBuyer && !isSeller) {
+  if (!isBuyer || !isSeller) {
     throw new Error('Access denied to this order');
   }
   
