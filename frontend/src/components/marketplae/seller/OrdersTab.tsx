@@ -1,5 +1,5 @@
-// src/components/marketplace/seller/OrdersTab.tsx
-import React, { useState, useEffect } from 'react';
+// src/components/marketplace/seller/OrdersTab.tsx - SIMPLIFIED WORKING VERSION
+import React, { useState } from 'react';
 import { marketplaceAPI, getOrderStatusInfo, formatCurrency, formatDate } from '../../../api';
 import OrderStatusTracker from './OrderStatusTracker';
 import OrderActionGuide from './OrderActionGuide';
@@ -47,19 +47,6 @@ interface OrdersTabProps {
   onViewOrderDetails: (orderId: string) => void;
   onPlayVideo?: (videoUrl: string, title: string) => void;
   onRefresh: () => void;
-  onStartProcessing?: (orderId: string) => void;
-  onStartWork?: (orderId: string) => void;
-  onDeliver?: (order: Order) => void;
-  onCancel?: (order: Order) => void;
-  onCompleteRevision?: (order: Order) => void;
-  actionLoading?: string | null;
-  onActualDeliver?: (deliveryData: {
-    orderId: string;
-    message: string;
-    attachments: File[];
-    isFinal: boolean;
-    revisionsLeft?: number;
-  }) => Promise<void>;
 }
 
 const OrdersTab: React.FC<OrdersTabProps> = ({
@@ -70,19 +57,11 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
   onViewOrderDetails,
   onPlayVideo,
   onRefresh,
-  onStartProcessing,
-  onStartWork,
-  onDeliver,
-  onCancel,
-  onCompleteRevision,
-  actionLoading,
-  onActualDeliver
 }) => {
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
-  const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState<Order | null>(null);
-  const [isSubmittingDelivery, setIsSubmittingDelivery] = useState(false);
-  const [deliveryHistory, setDeliveryHistory] = useState<Record<string, any[]>>({});
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const statusFilters = [
     { value: 'all', label: 'All Orders', count: orders.length },
@@ -99,190 +78,113 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     ? orders 
     : orders.filter(order => order.status === filter);
 
-  const toggleExpandOrder = async (orderId: string) => {
-    if (expandedOrderId === orderId) {
-      setExpandedOrderId(null);
-    } else {
-      setExpandedOrderId(orderId);
-      // Load delivery history when expanding
-      await loadDeliveryHistory(orderId);
-    }
-  };
-
-  const loadDeliveryHistory = async (orderId: string) => {
+  // SIMPLE FILE UPLOAD FUNCTION - DIRECT FETCH
+  const uploadFilesDirect = async (files: File[]) => {
     try {
-      const response = await marketplaceAPI.orders.getDeliveryHistory(orderId);
-      if (response.success) {
-        setDeliveryHistory(prev => ({
-          ...prev,
-          [orderId]: response.deliveries
-        }));
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append('files', file);
+      });
+
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:3000/marketplace/orders/upload/delivery', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Upload failed');
+      }
+
+      if (data.success) {
+        return data.files;
+      } else {
+        throw new Error(data.error || 'Upload failed');
       }
     } catch (error) {
-      console.error('Error loading delivery history:', error);
+      console.error('Upload error:', error);
+      throw error;
     }
   };
 
-  const handleDeliverClick = (order: Order) => {
-    setSelectedOrderForDelivery(order);
+  // SIMPLIFIED DELIVERY FUNCTION
+  const handleDeliverOrder = async (order: Order) => {
+    setSelectedOrder(order);
     setDeliveryModalOpen(true);
   };
 
-  const handleActualDeliver = async (deliveryData: {
-    orderId: string;
-    message: string;
-    attachments: File[];
-    isFinal: boolean;
-    revisionsLeft?: number;
-  }) => {
-    try {
-      setIsSubmittingDelivery(true);
-
-      // Upload files first if there are attachments
-      let uploadedAttachments: Array<{
-        filename: string;
-        originalName: string;
-        mimeType: string;
-        size: number;
-        url: string;
-        path?: string;
-      }> = [];
-
-      if (deliveryData.attachments && deliveryData.attachments.length > 0) {
-        try {
-          uploadedAttachments = await marketplaceAPI.upload.files(
-            deliveryData.attachments,
-            setIsSubmittingDelivery
-          );
-        } catch (uploadError: any) {
-          throw new Error(`File upload failed: ${uploadError.message}`);
-        }
-      }
-
-      // Determine if this is a revision or initial delivery
-      const isRevision = selectedOrderForDelivery?.status === 'in_revision';
-      
-      if (isRevision) {
-        // Complete revision
-        await marketplaceAPI.orders.completeRevision(
-          deliveryData.orderId,
-          {
-            deliveryMessage: deliveryData.message,
-            attachments: uploadedAttachments,
-            isFinalDelivery: deliveryData.isFinal
-          },
-          setIsSubmittingDelivery
-        );
-        toast.success('Revision completed successfully!');
-      } else {
-        // Initial delivery with email
-        await marketplaceAPI.orders.deliverWithEmail(
-          deliveryData.orderId,
-          {
-            deliveryMessage: deliveryData.message,
-            attachments: uploadedAttachments,
-            isFinalDelivery: deliveryData.isFinal
-          },
-          setIsSubmittingDelivery
-        );
-        toast.success('Order delivered successfully! Buyer has been notified via email.');
-      }
-
-      // Close modal and refresh
-      setDeliveryModalOpen(false);
-      setSelectedOrderForDelivery(null);
-      onRefresh();
-      
-      // Reload delivery history
-      if (expandedOrderId === deliveryData.orderId) {
-        await loadDeliveryHistory(deliveryData.orderId);
-      }
-      
-    } catch (error: any) {
-      console.error('Delivery error:', error);
-      toast.error(`Delivery failed: ${error.message || 'Something went wrong'}`);
-    } finally {
-      setIsSubmittingDelivery(false);
-    }
-  };
-
+  // ACTION HANDLERS
   const handleStartProcessing = async (orderId: string) => {
-    if (onStartProcessing) {
-      onStartProcessing(orderId);
-    } else {
-      try {
-        await marketplaceAPI.orders.startProcessing(orderId, setIsSubmittingDelivery);
-        onRefresh();
-      } catch (error) {
-        console.error('Error starting processing:', error);
-      }
+    try {
+      setActionLoading(orderId);
+      await marketplaceAPI.orders.startProcessing(orderId, setActionLoading);
+      toast.success('Order processing started!');
+      onRefresh();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to start processing');
+    } finally {
+      setActionLoading(null);
     }
   };
 
   const handleStartWork = async (orderId: string) => {
-    if (onStartWork) {
-      onStartWork(orderId);
-    } else {
-      try {
-        await marketplaceAPI.orders.startWork(orderId, setIsSubmittingDelivery);
-        onRefresh();
-      } catch (error) {
-        console.error('Error starting work:', error);
-      }
+    try {
+      setActionLoading(orderId);
+      await marketplaceAPI.orders.startWork(orderId, setActionLoading);
+      toast.success('Work started on order!');
+      onRefresh();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to start work');
+    } finally {
+      setActionLoading(null);
     }
   };
 
-  const handleCompleteRevision = async (order: Order) => {
-    setSelectedOrderForDelivery(order);
-    setDeliveryModalOpen(true);
-  };
-
   const handleCancelOrder = async (order: Order) => {
-    if (confirm(`Are you sure you want to cancel order #${order.orderNumber}? This action cannot be undone.`)) {
+    if (confirm(`Cancel order #${order.orderNumber}? This will refund the buyer.`)) {
       try {
-        await marketplaceAPI.orders.cancelBySeller(order._id, "Cancelled by seller", setIsSubmittingDelivery);
+        setActionLoading(order._id);
+        await marketplaceAPI.orders.cancelBySeller(order._id, 'Cancelled by seller', setActionLoading);
+        toast.success('Order cancelled successfully');
         onRefresh();
       } catch (error: any) {
         toast.error(error.message || 'Failed to cancel order');
+      } finally {
+        setActionLoading(null);
       }
     }
   };
 
   const handleCompleteOrder = async (orderId: string) => {
     try {
-      await marketplaceAPI.orders.complete(orderId, setIsSubmittingDelivery);
+      setActionLoading(orderId);
+      await marketplaceAPI.orders.complete(orderId, setActionLoading);
+      toast.success('Order marked as completed! Payment released to seller.');
       onRefresh();
     } catch (error: any) {
       toast.error(error.message || 'Failed to complete order');
+    } finally {
+      setActionLoading(null);
     }
   };
 
   const handleRequestRevision = async (orderId: string) => {
-    const revisionNotes = prompt('Please provide details about what needs to be revised:');
+    const revisionNotes = prompt('What needs to be revised?');
     if (revisionNotes) {
       try {
-        await marketplaceAPI.orders.requestRevision(orderId, revisionNotes, setIsSubmittingDelivery);
+        setActionLoading(orderId);
+        await marketplaceAPI.orders.requestRevision(orderId, revisionNotes, setActionLoading);
+        toast.success('Revision requested!');
         onRefresh();
       } catch (error: any) {
         toast.error(error.message || 'Failed to request revision');
+      } finally {
+        setActionLoading(null);
       }
-    }
-  };
-
-  const getPriorityColor = (status: string) => {
-    switch (status) {
-      case 'in_revision':
-        return 'bg-red-50 border-red-200';
-      case 'delivered':
-        return 'bg-yellow-50 border-yellow-200';
-      case 'in_progress':
-        return 'bg-green-50 border-green-200';
-      case 'processing':
-        return 'bg-purple-50 border-purple-200';
-      case 'paid':
-        return 'bg-amber-50 border-amber-200';
-      default:
-        return 'bg-gray-50 border-gray-200';
     }
   };
 
@@ -308,7 +210,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
         return {
           text: 'Deliver Work',
           color: 'purple',
-          onClick: () => handleDeliverClick(order),
+          onClick: () => handleDeliverOrder(order),
           description: 'Send completed work to buyer',
           icon: '📤'
         };
@@ -316,7 +218,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
         return {
           text: 'Complete Revision',
           color: 'amber',
-          onClick: () => handleCompleteRevision(order),
+          onClick: () => handleDeliverOrder(order), // Same modal for revisions
           description: 'Send revised work back',
           icon: '🔄'
         };
@@ -333,118 +235,53 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     }
   };
 
-  const calculateDeliveryDate = (createdAt: string, expectedDays?: number) => {
-    if (!expectedDays) return null;
-    const date = new Date(createdAt);
-    date.setDate(date.getDate() + expectedDays);
-    return date;
-  };
-
-  const getDaysRemaining = (deliveryDate: Date) => {
-    const today = new Date();
-    const diffTime = deliveryDate.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
-  const getPriorityBadge = (order: Order) => {
-    const deliveryDate = calculateDeliveryDate(order.createdAt, order.expectedDays || 7);
-    if (!deliveryDate) return null;
-    
-    const daysRemaining = getDaysRemaining(deliveryDate);
-    
-    if (daysRemaining <= 1) {
-      return {
-        text: 'Urgent',
-        color: 'bg-red-100 text-red-800',
-        icon: '🚨'
-      };
-    } else if (daysRemaining <= 3) {
-      return {
-        text: 'Priority',
-        color: 'bg-orange-100 text-orange-800',
-        icon: '⚡'
-      };
-    } else if (daysRemaining <= 7) {
-      return {
-        text: 'On Track',
-        color: 'bg-green-100 text-green-800',
-        icon: '✅'
-      };
+  const getPriorityColor = (status: string) => {
+    switch (status) {
+      case 'in_revision': return 'bg-red-50 border-red-200';
+      case 'delivered': return 'bg-yellow-50 border-yellow-200';
+      case 'in_progress': return 'bg-green-50 border-green-200';
+      case 'processing': return 'bg-purple-50 border-purple-200';
+      case 'paid': return 'bg-amber-50 border-amber-200';
+      default: return 'bg-gray-50 border-gray-200';
     }
-    return null;
-  };
-
-  const getOrderDeliveries = (orderId: string) => {
-    return deliveryHistory[orderId] || [];
-  };
-
-  const getLatestDelivery = (orderId: string) => {
-    const deliveries = getOrderDeliveries(orderId);
-    return deliveries.length > 0 ? deliveries[deliveries.length - 1] : null;
   };
 
   return (
     <div className="space-y-6">
-      {/* Header with Stats */}
+      {/* Header */}
       <div className="bg-white rounded-2xl shadow-sm border border-yellow-200 p-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">My Orders</h2>
-            <p className="text-gray-600 mt-1">Manage and track all your orders in one place</p>
+            <p className="text-gray-600 mt-1">Manage and track all your orders</p>
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onRefresh}
-              disabled={loading}
-              className="px-4 py-2.5 bg-white border border-yellow-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-yellow-50 hover:shadow-sm transition-all duration-200 disabled:opacity-50 shadow-sm"
-            >
-              {loading ? (
-                <>
-                  <svg className="animate-spin h-4 w-4 inline mr-2" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Refreshing...
-                </>
-              ) : 'Refresh'}
-            </button>
-          </div>
+          <button
+            onClick={onRefresh}
+            disabled={loading}
+            className="px-4 py-2.5 bg-white border border-yellow-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-yellow-50 hover:shadow-sm transition-all duration-200 disabled:opacity-50 shadow-sm"
+          >
+            {loading ? 'Refreshing...' : 'Refresh'}
+          </button>
         </div>
 
-        {/* Quick Stats */}
+        {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-gradient-to-br from-yellow-50 to-amber-50 p-4 rounded-xl border border-yellow-200">
-            <div className="text-sm font-medium text-yellow-700">To Start</div>
-            <div className="text-2xl font-bold text-yellow-800">
-              {orders.filter(o => o.status === 'paid').length}
+          {[
+            { status: 'paid', label: 'To Start', color: 'yellow' },
+            { status: 'processing,in_progress', label: 'In Progress', color: 'purple' },
+            { status: 'delivered,in_revision', label: 'For Review', color: 'amber' },
+            { status: 'completed', label: 'Completed', color: 'green' }
+          ].map((stat) => (
+            <div key={stat.label} className={`bg-gradient-to-br from-${stat.color}-50 to-${stat.color}-100 p-4 rounded-xl border border-${stat.color}-200`}>
+              <div className={`text-sm font-medium text-${stat.color}-700`}>{stat.label}</div>
+              <div className={`text-2xl font-bold text-${stat.color}-800`}>
+                {orders.filter(o => stat.status.includes(o.status)).length}
+              </div>
             </div>
-            <div className="text-xs text-yellow-600">Awaiting action</div>
-          </div>
-          <div className="bg-gradient-to-br from-purple-50 to-violet-50 p-4 rounded-xl border border-purple-200">
-            <div className="text-sm font-medium text-purple-700">In Progress</div>
-            <div className="text-2xl font-bold text-purple-800">
-              {orders.filter(o => ['processing', 'in_progress'].includes(o.status)).length}
-            </div>
-            <div className="text-xs text-purple-600">Being worked on</div>
-          </div>
-          <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-4 rounded-xl border border-amber-200">
-            <div className="text-sm font-medium text-amber-700">For Review</div>
-            <div className="text-2xl font-bold text-amber-800">
-              {orders.filter(o => ['delivered', 'in_revision'].includes(o.status)).length}
-            </div>
-            <div className="text-xs text-amber-600">Awaiting buyer</div>
-          </div>
-          <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200">
-            <div className="text-sm font-medium text-green-700">Completed</div>
-            <div className="text-2xl font-bold text-green-800">
-              {orders.filter(o => o.status === 'completed').length}
-            </div>
-            <div className="text-xs text-green-600">Successfully delivered</div>
-          </div>
+          ))}
         </div>
 
-        {/* Status Filter Tabs */}
+        {/* Filters */}
         <div className="border-b border-yellow-200">
           <nav className="-mb-px flex space-x-8 overflow-x-auto">
             {statusFilters.map(({ value, label, count }) => (
@@ -452,19 +289,15 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                 key={value}
                 onClick={() => onFilterChange(value)}
                 className={`py-3 px-1 font-medium text-sm flex items-center whitespace-nowrap transition-all duration-200 relative ${
-                  filter === value
-                    ? 'text-yellow-600'
-                    : 'text-gray-500 hover:text-gray-700'
+                  filter === value ? 'text-yellow-600' : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
                 {label}
-                {count > 0 && (
-                  <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                    filter === value ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {count}
-                  </span>
-                )}
+                <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                  filter === value ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
+                }`}>
+                  {count}
+                </span>
                 {filter === value && (
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-full"></div>
                 )}
@@ -473,9 +306,6 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
           </nav>
         </div>
       </div>
-
-      {/* Order Action Guide */}
-      <OrderActionGuide currentFilter={filter} />
 
       {/* Orders List */}
       <div className="bg-white rounded-2xl shadow-sm border border-yellow-200 overflow-hidden">
@@ -490,36 +320,20 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
             <h3 className="text-lg font-medium text-gray-900">No orders found</h3>
             <p className="mt-2 text-gray-500">
               {filter === 'all' 
-                ? "You don't have any orders yet. When you receive orders, they'll appear here."
+                ? "You don't have any orders yet."
                 : `You don't have any ${filter.replace('_', ' ')} orders.`
               }
             </p>
-            {filter !== 'all' && (
-              <button
-                onClick={() => onFilterChange('all')}
-                className="mt-4 px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 shadow-md hover:shadow"
-              >
-                View All Orders
-              </button>
-            )}
           </div>
         ) : (
           <div className="divide-y divide-yellow-100">
             {filteredOrders.map(order => {
               const statusInfo = getOrderStatusInfo(order.status);
               const action = getStatusAction(order);
-              const deliveryDate = calculateDeliveryDate(order.createdAt, order.expectedDays || 7);
-              const daysRemaining = deliveryDate ? getDaysRemaining(deliveryDate) : null;
               const isExpanded = expandedOrderId === order._id;
-              const priorityBadge = getPriorityBadge(order);
-              const deliveries = getOrderDeliveries(order._id);
-              const latestDelivery = getLatestDelivery(order._id);
 
               return (
-                <div 
-                  key={order._id} 
-                  className={`p-6 hover:bg-yellow-50 transition-colors ${getPriorityColor(order.status)}`}
-                >
+                <div key={order._id} className={`p-6 ${getPriorityColor(order.status)}`}>
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     {/* Order Info */}
                     <div className="flex-1">
@@ -543,12 +357,6 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                               <span className="mr-1">{statusInfo.icon}</span>
                               {statusInfo.text}
                             </span>
-                            {priorityBadge && (
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${priorityBadge.color}`}>
-                                <span className="mr-1">{priorityBadge.icon}</span>
-                                {priorityBadge.text}
-                              </span>
-                            )}
                           </div>
                           
                           <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
@@ -557,154 +365,64 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                               <span>{order.buyerId?.username || 'Buyer'}</span>
                             </div>
                             <div className="flex items-center">
+                              <span className="mr-1">💰</span>
+                              <span className="font-medium">{formatCurrency(order.amount || 0)}</span>
+                            </div>
+                            <div className="flex items-center">
                               <span className="mr-1">📅</span>
                               <span>{formatDate(order.createdAt)}</span>
                             </div>
-                            {daysRemaining !== null && (
-                              <div className="flex items-center">
-                                <span className="mr-1">⏳</span>
-                                <span className={
-                                  daysRemaining <= 0 ? 'text-red-600 font-medium' :
-                                  daysRemaining <= 2 ? 'text-orange-600 font-medium' :
-                                  'text-amber-600'
-                                }>
-                                  {daysRemaining <= 0 
-                                    ? 'Overdue!' 
-                                    : `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining`}
-                                </span>
-                              </div>
-                            )}
-                            {order.revisions !== undefined && (
-                              <div className="flex items-center">
-                                <span className="mr-1">🔄</span>
-                                <span className={
-                                  (order.maxRevisions && order.revisions >= order.maxRevisions) 
-                                    ? 'text-red-600 font-medium' 
-                                    : 'text-gray-600'
-                                }>
-                                  {order.revisions} / {order.maxRevisions || 3} revisions
-                                </span>
-                              </div>
-                            )}
-                            {deliveries.length > 0 && (
-                              <div className="flex items-center">
-                                <span className="mr-1">📤</span>
-                                <span className="text-gray-600">
-                                  {deliveries.length} deliver{deliveries.length !== 1 ? 'ies' : 'y'}
-                                </span>
-                              </div>
-                            )}
                           </div>
-
-                          {/* Progress Bar for In Progress Orders */}
-                          {['processing', 'in_progress'].includes(order.status) && (
-                            <div className="mt-3">
-                              <div className="flex justify-between text-xs text-gray-600 mb-1">
-                                <span>Progress</span>
-                                <span>
-                                  {order.status === 'processing' ? '25%' : '75%'}
-                                </span>
-                              </div>
-                              <div className="w-full bg-gray-200 rounded-full h-2">
-                                <div 
-                                  className={`h-2 rounded-full ${
-                                    order.status === 'processing' 
-                                      ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 w-1/4' 
-                                      : 'bg-gradient-to-r from-green-500 to-green-600 w-3/4'
-                                  }`}
-                                ></div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Latest delivery preview */}
-                          {latestDelivery && isExpanded && (
-                            <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200">
-                              <p className="text-sm text-blue-800">
-                                <span className="font-medium">Latest Delivery: </span>
-                                {latestDelivery.message?.substring(0, 100)}...
-                              </p>
-                              {latestDelivery.attachments && latestDelivery.attachments.length > 0 && (
-                                <p className="text-xs text-blue-600 mt-1">
-                                  📎 {latestDelivery.attachments.length} file{latestDelivery.attachments.length !== 1 ? 's' : ''} attached
-                                </p>
-                              )}
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>
 
-                    {/* Price and Actions */}
-                    <div className="flex flex-col sm:flex-row lg:flex-col items-start sm:items-center lg:items-end gap-4 lg:gap-2">
-                      <div className="text-right">
-                        <p className="text-2xl font-bold text-green-600">
-                          {formatCurrency(order.amount || 0)}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          Order #{order.orderNumber || order._id.slice(-6)}
-                        </p>
-                      </div>
-                      
-                      <div className="flex flex-wrap gap-2">
-                        {action && action.onClick && (
-                          <button
-                            onClick={action.onClick}
-                            disabled={actionLoading === order._id || isSubmittingDelivery}
-                            className={`px-4 py-2.5 text-sm font-medium text-white rounded-xl transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow flex items-center gap-2 ${
-                              action.color === 'yellow' ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700' :
-                              action.color === 'green' ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700' :
-                              action.color === 'purple' ? 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700' :
-                              action.color === 'amber' ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700' :
-                              'bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700'
-                            }`}
-                          >
-                            {(actionLoading === order._id || isSubmittingDelivery) ? (
-                              <>
-                                <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Processing...
-                              </>
-                            ) : (
-                              <>
-                                <span>{action.icon}</span>
-                                {action.text}
-                              </>
-                            )}
-                          </button>
-                        )}
-
-                        {['paid', 'processing', 'in_progress'].includes(order.status) && (
-                          <button
-                            onClick={() => handleCancelOrder(order)}
-                            disabled={actionLoading === order._id || isSubmittingDelivery}
-                            className="px-4 py-2.5 text-sm font-medium text-red-700 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 rounded-xl transition-all duration-200 disabled:opacity-50 border border-red-200 flex items-center gap-2"
-                          >
-                            <span>❌</span>
-                            Cancel
-                          </button>
-                        )}
-
+                    {/* Actions */}
+                    <div className="flex flex-wrap gap-2">
+                      {action && action.onClick && (
                         <button
-                          onClick={() => toggleExpandOrder(order._id)}
-                          disabled={isSubmittingDelivery}
-                          className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 rounded-xl transition-all duration-200 border border-gray-300 flex items-center gap-2 disabled:opacity-50"
+                          onClick={action.onClick}
+                          disabled={actionLoading === order._id}
+                          className={`px-4 py-2.5 text-sm font-medium text-white rounded-xl transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow flex items-center gap-2 ${
+                            action.color === 'yellow' ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700' :
+                            action.color === 'green' ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700' :
+                            action.color === 'purple' ? 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700' :
+                            'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700'
+                          }`}
                         >
-                          <span>{isExpanded ? '▲' : '▼'}</span>
-                          {isExpanded ? 'Show Less' : 'More Info'}
+                          {actionLoading === order._id ? (
+                            <>
+                              <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              <span>{action.icon}</span>
+                              {action.text}
+                            </>
+                          )}
                         </button>
+                      )}
 
+                      {order.status === 'delivered' && (
                         <button
-                          onClick={() => onViewOrderDetails(order._id)}
-                          disabled={isSubmittingDelivery}
-                          className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-yellow-300 hover:bg-yellow-50 rounded-xl transition-all duration-200 shadow-sm flex items-center gap-2 disabled:opacity-50"
+                          onClick={() => handleCompleteOrder(order._id)}
+                          disabled={actionLoading === order._id}
+                          className="px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-xl transition-all duration-200 disabled:opacity-50 shadow-sm flex items-center gap-2"
                         >
-                          <span>📋</span>
-                          Details
+                          ✅ Complete Order
                         </button>
-                      </div>
+                      )}
+
+                      <button
+                        onClick={() => onViewOrderDetails(order._id)}
+                        className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-yellow-300 hover:bg-yellow-50 rounded-xl transition-all duration-200 shadow-sm flex items-center gap-2"
+                      >
+                        📋 Details
+                      </button>
                     </div>
                   </div>
 
@@ -712,7 +430,6 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                   {isExpanded && (
                     <div className="mt-6 pt-6 border-t border-yellow-200">
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Left Column: Status Tracker & Deliveries */}
                         <div>
                           <h4 className="font-medium text-gray-900 mb-4">Order Progress</h4>
                           <OrderStatusTracker
@@ -722,157 +439,34 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                             deliveredAt={order.deliveredAt}
                             completedAt={order.completedAt}
                           />
-                          
-                          {action && (
-                            <div className="mt-6 p-4 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-xl border border-yellow-200">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="text-lg">{action.icon}</span>
-                                <p className="font-medium text-yellow-800">Next Step: {action.text}</p>
-                              </div>
-                              <p className="text-sm text-yellow-700 mb-3">{action.description}</p>
-                              {action.onClick && (
-                                <button
-                                  onClick={action.onClick}
-                                  disabled={actionLoading === order._id || isSubmittingDelivery}
-                                  className="w-full px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 disabled:opacity-50 shadow-md flex items-center justify-center gap-2"
-                                >
-                                  <span>{action.icon}</span>
-                                  Take Action
-                                </button>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Delivery History */}
-                          {deliveries.length > 0 && (
-                            <div className="mt-6">
-                              <h5 className="font-medium text-gray-900 mb-3">Delivery History</h5>
-                              <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
-                                {deliveries.map((delivery, index) => (
-                                  <div key={delivery._id} className="p-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200">
-                                    <div className="flex justify-between items-start mb-2">
-                                      <span className="text-sm font-medium text-blue-800">
-                                        Delivery #{delivery.revisionNumber || index + 1}
-                                      </span>
-                                      <span className="text-xs text-blue-600">
-                                        {formatDate(delivery.createdAt)}
-                                      </span>
-                                    </div>
-                                    <p className="text-sm text-blue-700 mb-2">
-                                      {delivery.message?.substring(0, 150)}...
-                                    </p>
-                                    {delivery.attachments && delivery.attachments.length > 0 && (
-                                      <div className="flex flex-wrap gap-1">
-                                        {delivery.attachments.map((file: any, fileIndex: number) => (
-                                          <a
-                                            key={fileIndex}
-                                            href={file.url || marketplaceAPI.upload.getFile(file.filename)}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center px-2 py-1 text-xs bg-white text-blue-700 rounded border border-blue-300 hover:bg-blue-50 transition-colors"
-                                          >
-                                            <span className="mr-1">📎</span>
-                                            {file.originalName || file.filename}
-                                          </a>
-                                        ))}
-                                      </div>
-                                    )}
-                                    <div className="mt-2 pt-2 border-t border-blue-200">
-                                      <span className="text-xs text-blue-600">
-                                        Status: <span className="font-medium">{delivery.status || 'Delivered'}</span>
-                                      </span>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
                         </div>
-
-                        {/* Right Column: Order Details */}
                         <div>
-                          <h4 className="font-medium text-gray-900 mb-4">Order Details</h4>
+                          <h4 className="font-medium text-gray-900 mb-4">Quick Actions</h4>
                           <div className="space-y-3">
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Order Date</span>
-                              <span className="font-medium">{formatDate(order.createdAt)}</span>
-                            </div>
-                            
-                            {deliveryDate && (
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Expected Delivery</span>
-                                <span className="font-medium">{formatDate(deliveryDate.toISOString())}</span>
-                              </div>
+                            {order.status === 'delivered' && (
+                              <button
+                                onClick={() => handleCompleteOrder(order._id)}
+                                disabled={actionLoading === order._id}
+                                className="w-full px-4 py-3 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 disabled:opacity-50 shadow-md flex items-center justify-center gap-2"
+                              >
+                                ✅ Mark as Completed
+                              </button>
                             )}
-                            
-                            {order.expectedDelivery && (
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Original ETA</span>
-                                <span className="font-medium">{order.expectedDelivery}</span>
-                              </div>
+                            {order.status === 'delivered' && order.revisions !== undefined && order.revisions < (order.maxRevisions || 3) && (
+                              <button
+                                onClick={() => handleRequestRevision(order._id)}
+                                disabled={actionLoading === order._id}
+                                className="w-full px-4 py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-lg hover:from-amber-600 hover:to-amber-700 transition-all duration-200 disabled:opacity-50 shadow-md flex items-center justify-center gap-2"
+                              >
+                                🔄 Request Revision
+                              </button>
                             )}
-                            
-                            {order.revisions !== undefined && (
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Revisions Used</span>
-                                <span className="font-medium">
-                                  {order.revisions} / {order.maxRevisions || 3}
-                                  {order.maxRevisions && order.revisions >= order.maxRevisions && (
-                                    <span className="ml-2 text-xs text-red-600">(Max reached)</span>
-                                  )}
-                                </span>
-                              </div>
-                            )}
-                            
-                            {order.notes && (
-                              <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200">
-                                <p className="text-sm text-blue-800">
-                                  <span className="font-medium">Buyer Notes: </span>
-                                  {order.notes}
-                                </p>
-                              </div>
-                            )}
-
-                            {/* Quick Links */}
-                            <div className="mt-6 pt-4 border-t border-yellow-200">
-                              <p className="text-sm font-medium text-gray-900 mb-2">Quick Actions</p>
-                              <div className="flex flex-wrap gap-2">
-                                <button
-                                  onClick={() => onViewOrderDetails(order._id)}
-                                  disabled={isSubmittingDelivery}
-                                  className="px-3 py-1.5 text-xs bg-gradient-to-r from-yellow-50 to-yellow-100 text-yellow-700 rounded-lg hover:from-yellow-100 hover:to-yellow-200 transition-all duration-200 border border-yellow-200 flex items-center gap-1 disabled:opacity-50"
-                                >
-                                  <span>📋</span>
-                                  View Full Details
-                                </button>
-                                <button
-                                  onClick={() => window.open(`/messages?order=${order._id}`, '_blank')}
-                                  disabled={isSubmittingDelivery}
-                                  className="px-3 py-1.5 text-xs bg-gradient-to-r from-green-50 to-green-100 text-green-700 rounded-lg hover:from-green-100 hover:to-green-200 transition-all duration-200 border border-green-200 flex items-center gap-1 disabled:opacity-50"
-                                >
-                                  <span>💬</span>
-                                  Message Buyer
-                                </button>
-                                {order.listingId?.mediaUrls?.[0] && onPlayVideo && (
-                                  <button
-                                    onClick={() => onPlayVideo(order.listingId.mediaUrls![0], order.listingId.title)}
-                                    disabled={isSubmittingDelivery}
-                                    className="px-3 py-1.5 text-xs bg-gradient-to-r from-purple-50 to-purple-100 text-purple-700 rounded-lg hover:from-purple-100 hover:to-purple-200 transition-all duration-200 border border-purple-200 flex items-center gap-1 disabled:opacity-50"
-                                  >
-                                    <span>▶️</span>
-                                    View Media
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => navigator.clipboard.writeText(order.orderNumber || order._id)}
-                                  disabled={isSubmittingDelivery}
-                                  className="px-3 py-1.5 text-xs bg-gradient-to-r from-gray-50 to-gray-100 text-gray-700 rounded-lg hover:from-gray-100 hover:to-gray-200 transition-all duration-200 border border-gray-200 flex items-center gap-1 disabled:opacity-50"
-                                >
-                                  <span>📋</span>
-                                  Copy Order ID
-                                </button>
-                              </div>
-                            </div>
+                            <button
+                              onClick={() => window.open(`/messages?order=${order._id}`, '_blank')}
+                              className="w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-md flex items-center justify-center gap-2"
+                            >
+                              💬 Message Buyer
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -885,40 +479,190 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
         )}
       </div>
 
-      {/* Bulk Actions */}
-      {filteredOrders.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-yellow-200 p-6">
-          <h3 className="font-medium text-gray-900 mb-4">Bulk Actions</h3>
-          <div className="flex flex-wrap gap-3">
-            <button className="px-4 py-2.5 text-sm bg-gradient-to-r from-yellow-50 to-yellow-100 text-yellow-700 rounded-lg hover:from-yellow-100 hover:to-yellow-200 transition-all duration-200 border border-yellow-300 flex items-center gap-2">
-              <span>📊</span>
-              Export Orders (CSV)
-            </button>
-            <button className="px-4 py-2.5 text-sm bg-gradient-to-r from-green-50 to-green-100 text-green-700 rounded-lg hover:from-green-100 hover:to-green-200 transition-all duration-200 border border-green-300 flex items-center gap-2">
-              <span>📧</span>
-              Send Bulk Message
-            </button>
-            <button className="px-4 py-2.5 text-sm bg-gradient-to-r from-gray-50 to-gray-100 text-gray-700 rounded-lg hover:from-gray-100 hover:to-gray-200 transition-all duration-200 border border-gray-300 flex items-center gap-2">
-              <span>🖨️</span>
-              Print Order Summaries
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Delivery Modal */}
-      {deliveryModalOpen && selectedOrderForDelivery && (
-        <DeliveryModal
-          isOpen={deliveryModalOpen}
-          onClose={() => {
-            setDeliveryModalOpen(false);
-            setSelectedOrderForDelivery(null);
+      {deliveryModalOpen && selectedOrder && (
+        <SimpleDeliveryModal
+          order={selectedOrder}
+          onClose={() => setDeliveryModalOpen(false)}
+          onDeliver={async (data) => {
+            try {
+              setActionLoading(selectedOrder._id);
+              
+              // Upload files
+              let uploadedAttachments = [];
+              if (data.attachments && data.attachments.length > 0) {
+                uploadedAttachments = await uploadFilesDirect(data.attachments);
+              }
+
+              // Send delivery
+              if (selectedOrder.status === 'in_revision') {
+                await marketplaceAPI.orders.completeRevision(
+                  selectedOrder._id,
+                  {
+                    deliveryMessage: data.message,
+                    attachments: uploadedAttachments,
+                    isFinalDelivery: data.isFinal
+                  },
+                  setActionLoading
+                );
+                toast.success('Revision completed!');
+              } else {
+                await marketplaceAPI.orders.deliverWithEmail(
+                  selectedOrder._id,
+                  {
+                    deliveryMessage: data.message,
+                    attachments: uploadedAttachments,
+                    isFinalDelivery: data.isFinal
+                  },
+                  setActionLoading
+                );
+                toast.success('Order delivered! Buyer notified.');
+              }
+
+              setDeliveryModalOpen(false);
+              onRefresh();
+            } catch (error: any) {
+              toast.error(error.message || 'Delivery failed');
+            } finally {
+              setActionLoading(null);
+            }
           }}
-          order={selectedOrderForDelivery}
-          onDeliver={handleActualDeliver}
-          isLoading={actionLoading === selectedOrderForDelivery._id || isSubmittingDelivery}
+          isLoading={actionLoading === selectedOrder._id}
         />
       )}
+    </div>
+  );
+};
+
+// SIMPLE DELIVERY MODAL
+const SimpleDeliveryModal: React.FC<{
+  order: Order;
+  onClose: () => void;
+  onDeliver: (data: {
+    message: string;
+    attachments: File[];
+    isFinal: boolean;
+  }) => Promise<void>;
+  isLoading: boolean;
+}> = ({ order, onClose, onDeliver, isLoading }) => {
+  const [message, setMessage] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const [isFinal, setIsFinal] = useState(true);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!message.trim()) {
+      toast.error('Please enter a delivery message');
+      return;
+    }
+
+    await onDeliver({ message, attachments: files, isFinal });
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setFiles(Array.from(e.target.files));
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-xl font-bold text-gray-900">
+              {order.status === 'in_revision' ? 'Complete Revision' : 'Deliver Order'}
+            </h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              ✕
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Delivery Message *
+              </label>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Describe what you're delivering..."
+                className="w-full h-32 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Attach Files (Optional)
+              </label>
+              <input
+                type="file"
+                multiple
+                onChange={handleFileChange}
+                className="w-full p-2 border border-gray-300 rounded-lg"
+              />
+              {files.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-sm text-gray-600">
+                    Selected {files.length} file{files.length !== 1 ? 's' : ''}:
+                  </p>
+                  <ul className="mt-1 text-xs text-gray-500">
+                    {files.map((file, index) => (
+                      <li key={index} className="truncate">
+                        📎 {file.name} ({Math.round(file.size / 1024)} KB)
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="final-delivery"
+                checked={isFinal}
+                onChange={(e) => setIsFinal(e.target.checked)}
+                className="h-4 w-4 text-yellow-600 focus:ring-yellow-500 border-gray-300 rounded"
+              />
+              <label htmlFor="final-delivery" className="ml-2 text-sm text-gray-700">
+                This is the final delivery
+              </label>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isLoading}
+                className="flex-1 px-4 py-3 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="flex-1 px-4 py-3 text-sm font-medium text-white bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 rounded-lg transition-all duration-200 disabled:opacity-50 shadow-sm flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processing...
+                  </>
+                ) : order.status === 'in_revision' ? (
+                  'Complete Revision'
+                ) : (
+                  'Deliver Order'
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 };
