@@ -214,7 +214,48 @@ export const uploadFiles = async (
 export const getUploadedFile = (filename: string): string => {
   return `http://localhost:3000/marketplace/orders/upload/delivery/${filename}`;
 };
+// api.ts - Update allowed file types in frontend validation
+export const ALLOWED_FILE_TYPES = [
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+  'video/mp4', 'video/quicktime', 'video/x-msvideo',
+  'application/pdf',
+  'application/zip',
+  'application/x-zip-compressed',
+  'application/x-rar-compressed',
+  'application/x-7z-compressed',
+  'text/plain',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'audio/mpeg', 'audio/wav', 'audio/ogg',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+];
 
+export const ALLOWED_FILE_EXTENSIONS = [
+  '.jpg', '.jpeg', '.png', '.gif', '.webp',
+  '.mp4', '.mov', '.avi',
+  '.pdf', '.zip', '.rar', '.7z', '.tar', '.gz', '.bz2',
+  '.txt', '.doc', '.docx',
+  '.mp3', '.wav', '.ogg',
+  '.xls', '.xlsx'
+];
+
+// File validation function
+export const validateFile = (file: File): string | null => {
+  const extension = '.' + file.name.split('.').pop()?.toLowerCase();
+  
+  // Check by MIME type
+  if (ALLOWED_FILE_TYPES.includes(file.type)) {
+    return null; // Valid
+  }
+  
+  // Check by extension
+  if (extension && ALLOWED_FILE_EXTENSIONS.includes(extension)) {
+    return null; // Valid
+  }
+  
+  return `File type not supported. Allowed: ${ALLOWED_FILE_EXTENSIONS.join(', ')}`;
+};
 // ========================
 // AUTH APIs
 // ========================
