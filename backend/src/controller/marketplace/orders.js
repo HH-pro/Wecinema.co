@@ -1,25 +1,108 @@
+// routes/order.js
 const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
 const Order = require("../../models/marketplace/order");
 const MarketplaceListing = require("../../models/marketplace/listing");
 const Offer = require("../../models/marketplace/offer");
 const User = require("../../models/user");
-const Delivery = require("../../models/marketplace/Delivery"); // Add Delivery model
+const Delivery = require("../../models/marketplace/Delivery");
 const { authenticateMiddleware } = require("../../utils");
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
-const emailService = require("../../../services/emailService"); // Add email service
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const emailService = require("../../../services/emailService");
 
-// Helper functions for fee calculation
-function calculatePlatformFee(amount) {
-  const platformFeePercentage = 0.10;
-  return parseFloat((amount * platformFeePercentage).toFixed(2));
+// ========== FILE UPLOAD CONFIGURATION ========== //
+const uploadsDir = 'uploads/deliveries/';
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-function calculateSellerPayout(amount) {
-  const platformFee = calculatePlatformFee(amount);
-  return parseFloat((amount - platformFee).toFixed(2));
-}
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsDir),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const allowedMimeTypes = [
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+  'video/mp4', 'video/quicktime', 'video/x-msvideo',
+  'application/pdf', 'application/zip', 'application/x-rar-compressed',
+  'text/plain', 'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'audio/mpeg', 'audio/wav', 'audio/ogg',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+];
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+  fileFilter: (req, file, cb) => {
+    allowedMimeTypes.includes(file.mimetype) 
+      ? cb(null, true)
+      : cb(new Error(`File type ${file.mimetype} not supported`), false);
+  }
+});
+
+// ========== HELPER FUNCTIONS ========== //
+const calculatePlatformFee = (amount) => parseFloat((amount * 0.10).toFixed(2));
+const calculateSellerPayout = (amount) => parseFloat((amount - calculatePlatformFee(amount)).toFixed(2));
+
+const validateUserAccess = (order, userId) => {
+  const isBuyer = order.buyerId.toString() === userId.toString();
+  const isSeller = order.sellerId.toString() === userId.toString();
+  
+  if (!isBuyer && !isSeller) {
+    throw new Error('Access denied to this order');
+  }
+  
+  return { isBuyer, isSeller };
+};
+
+const populateOrder = (orderId) => Order.findById(orderId)
+  .populate('buyerId', 'username avatar email firstName lastName')
+  .populate('sellerId', 'username avatar sellerRating email firstName lastName stripeAccountId')
+  .populate('listingId', 'title mediaUrls price category type description tags availability deliveryTime')
+  .populate('offerId', 'amount message requirements expectedDelivery createdAt');
+
+const sendDeliveryEmail = async (order, deliveryData, isRevision = false) => {
+  try {
+    const siteName = process.env.SITE_NAME || 'WeCinema';
+    const siteUrl = process.env.SITE_URL || 'http://localhost:5173';
+    const orderLink = `${siteUrl}/orders/${order._id}`;
+
+    const emailContent = {
+      buyerName: order.buyerId.firstName || order.buyerId.username,
+      sellerName: order.sellerId.firstName || order.sellerId.username,
+      orderTitle: order.listingId?.title || 'Your Order',
+      orderAmount: order.amount,
+      orderLink,
+      deliveryMessage: deliveryData.message,
+      attachmentsCount: deliveryData.attachments?.length || 0,
+      isFinalDelivery: deliveryData.isFinalDelivery,
+      revisionsUsed: order.revisions || 0,
+      maxRevisions: order.maxRevisions || 3,
+      orderNumber: order.orderNumber || order._id.toString().slice(-8).toUpperCase(),
+      isRevision
+    };
+
+    await emailService.sendOrderDeliveryNotification(
+      order.buyerId.email,
+      order.sellerId.email,
+      emailContent
+    );
+
+    return true;
+  } catch (error) {
+    console.error('Email sending failed:', error.message);
+    return false;
+  }
+};
 
 // ========== ORDER CREATION ========== //
 router.post("/create", authenticateMiddleware, async (req, res) => {
@@ -38,24 +121,13 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
 
     const currentUserId = req.user.id || req.user._id || req.user.userId;
 
-    console.log("🛒 Creating new order with data:", {
-      offerId,
-      listingId,
-      buyerId,
-      sellerId,
-      amount,
-      currentUserId
-    });
-
-    // Validate required fields
     if (!offerId || !listingId || !buyerId || !sellerId || !amount) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required fields: offerId, listingId, buyerId, sellerId, amount'
+        error: 'Missing required fields'
       });
     }
 
-    // Validate amount is positive
     if (amount <= 0) {
       return res.status(400).json({
         success: false,
@@ -63,7 +135,6 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    // Verify that the current user is the seller
     if (sellerId !== currentUserId) {
       return res.status(403).json({
         success: false,
@@ -71,64 +142,55 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    // Check if seller has connected and active Stripe account
     const seller = await User.findById(sellerId);
     if (!seller) {
-      return res.status(404).json({
-        success: false,
-        error: 'Seller not found'
-      });
+      return res.status(404).json({ success: false, error: 'Seller not found' });
     }
 
     if (!seller.stripeAccountId) {
       return res.status(400).json({
         success: false,
         error: 'Please connect your Stripe account before accepting offers',
-        stripeSetupRequired: true,
-        message: 'You need to set up Stripe payments to receive funds from orders'
+        stripeSetupRequired: true
       });
     }
 
     if (seller.stripeAccountStatus !== 'active') {
       return res.status(400).json({
         success: false,
-        error: 'Your Stripe account is not yet active. Please complete the setup process.',
-        stripeSetupRequired: true,
-        message: 'Complete your Stripe onboarding to start accepting payments'
+        error: 'Your Stripe account is not yet active',
+        stripeSetupRequired: true
       });
     }
 
-    // Check if offer exists and is still pending
-    const offer = await Offer.findById(offerId);
-    if (!offer) {
-      return res.status(404).json({ 
+    const [offer, listing, existingOrder] = await Promise.all([
+      Offer.findById(offerId),
+      MarketplaceListing.findById(listingId),
+      Order.findOne({ offerId })
+    ]);
+
+    if (!offer) return res.status(404).json({ success: false, error: 'Offer not found' });
+    if (!listing) return res.status(404).json({ success: false, error: 'Listing not found' });
+    if (existingOrder) {
+      return res.status(400).json({
         success: false,
-        error: 'Offer not found' 
+        error: 'Order already exists for this offer',
+        orderId: existingOrder._id
       });
     }
 
     if (offer.status !== 'pending') {
       return res.status(400).json({
         success: false,
-        error: 'Offer is no longer available for order creation',
+        error: 'Offer is no longer available',
         currentStatus: offer.status
       });
     }
 
-    // Verify offer belongs to the correct listing and buyer
     if (offer.listingId.toString() !== listingId || offer.buyerId.toString() !== buyerId) {
       return res.status(400).json({
         success: false,
-        error: 'Offer details do not match with provided listing or buyer'
-      });
-    }
-
-    // Check if listing exists and is active
-    const listing = await MarketplaceListing.findById(listingId);
-    if (!listing) {
-      return res.status(404).json({ 
-        success: false,
-        error: 'Listing not found' 
+        error: 'Offer details do not match'
       });
     }
 
@@ -140,29 +202,16 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    // Verify listing belongs to the seller
     if (listing.sellerId.toString() !== sellerId) {
       return res.status(403).json({
         success: false,
-        error: 'You are not authorized to create orders for this listing'
+        error: 'Not authorized to create orders for this listing'
       });
     }
 
-    // Check if order already exists for this offer
-    const existingOrder = await Order.findOne({ offerId });
-    if (existingOrder) {
-      return res.status(400).json({
-        success: false,
-        error: 'Order already exists for this offer',
-        orderId: existingOrder._id
-      });
-    }
-
-    // Calculate expected delivery date
     const expectedDelivery = new Date();
     expectedDelivery.setDate(expectedDelivery.getDate() + parseInt(expectedDeliveryDays));
 
-    // Create new order
     const order = new Order({
       offerId,
       listingId,
@@ -192,57 +241,20 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
 
     await order.save();
 
-    // Update offer status to accepted
     offer.status = 'accepted';
     offer.acceptedAt = new Date();
     offer.orderId = order._id;
     await offer.save();
 
-    // Update listing status to sold if it's a one-time purchase
     if (listing.availability === 'single') {
       listing.status = 'sold';
       listing.soldAt = new Date();
       await listing.save();
     }
 
-    // Update seller stats
-    await User.findByIdAndUpdate(sellerId, {
-      $inc: { totalOrders: 1 }
-    });
+    await User.findByIdAndUpdate(sellerId, { $inc: { totalOrders: 1 } });
 
-    console.log("✅ Order created successfully:", order._id);
-
-    // Populate the order with related data
-    const populatedOrder = await Order.findById(order._id)
-      .populate({
-        path: 'buyerId',
-        select: 'username avatar email firstName lastName',
-        model: 'User'
-      })
-      .populate({
-        path: 'sellerId',
-        select: 'username avatar sellerRating email firstName lastName stripeAccountId',
-        model: 'User'
-      })
-      .populate({
-        path: 'listingId',
-        select: 'title mediaUrls price category type description tags availability deliveryTime',
-        model: 'MarketplaceListing'
-      })
-      .populate({
-        path: 'offerId',
-        select: 'amount message requirements expectedDelivery createdAt',
-        model: 'Offer'
-      })
-      .lean();
-
-    console.log(`🎉 New order created: 
-      Order ID: ${order._id}
-      Amount: $${amount}
-      Seller: ${seller.username} (${seller._id})
-      Buyer: ${populatedOrder.buyerId.username}
-      Listing: ${populatedOrder.listingId.title}
-    `);
+    const populatedOrder = await populateOrder(order._id).lean();
 
     res.status(201).json({
       success: true,
@@ -255,22 +267,15 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error creating order:', error);
+    console.error('Error creating order:', error);
     
     if (error.name === 'ValidationError') {
       const errors = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({
-        success: false,
-        error: 'Validation failed',
-        details: errors
-      });
+      return res.status(400).json({ success: false, error: 'Validation failed', details: errors });
     }
 
     if (error.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        error: 'Order already exists for this offer'
-      });
+      return res.status(400).json({ success: false, error: 'Order already exists for this offer' });
     }
 
     res.status(500).json({
@@ -281,36 +286,79 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
   }
 });
 
-// ========== DELIVERY SYSTEM WITH EMAIL NOTIFICATION ========== //
+// ========== FILE UPLOAD ROUTES ========== //
+router.post("/upload/delivery", authenticateMiddleware, upload.array('files', 10), async (req, res) => {
+  try {
+    const files = req.files;
+    const userId = req.user.id || req.user._id || req.user.userId;
+    
+    if (!files || files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No files uploaded'
+      });
+    }
 
-// 1. Deliver order with email notification (in_progress → delivered)
+    const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
+    const uploadedFiles = files.map(file => ({
+      filename: file.filename,
+      originalName: file.originalname,
+      mimeType: file.mimetype,
+      size: file.size,
+      url: `${siteUrl}/${file.path.replace(/\\/g, '/')}`,
+      path: file.path
+    }));
+
+    res.status(200).json({
+      success: true,
+      files: uploadedFiles,
+      count: uploadedFiles.length
+    });
+
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'File upload failed',
+      details: error.message
+    });
+  }
+});
+
+router.get("/upload/delivery/:filename", async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const filePath = path.join(uploadsDir, filename);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        error: 'File not found'
+      });
+    }
+
+    res.sendFile(path.resolve(filePath));
+  } catch (error) {
+    console.error('File retrieval error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve file'
+    });
+  }
+});
+
+// ========== DELIVERY SYSTEM ========== //
 router.put("/:orderId/deliver-with-email", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { 
-      deliveryMessage, 
-      deliveryFiles = [],
-      attachments = [],
-      isFinalDelivery = true 
-    } = req.body;
-    
+    const { deliveryMessage, deliveryFiles = [], attachments = [], isFinalDelivery = true } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
-    
-    console.log("📤 Seller delivering order with email notification:", orderId);
-    console.log("Delivery details:", {
-      messageLength: deliveryMessage?.length || 0,
-      filesCount: deliveryFiles.length,
-      attachmentsCount: attachments.length,
-      isFinalDelivery
-    });
 
-    // Find the order with populated user data
     const order = await Order.findOne({ 
       _id: orderId, 
       sellerId: userId,
-      status: 'in_progress' // Only deliver if in progress
-    })
-      .populate('buyerId', 'username email firstName lastName')
+      status: 'in_progress'
+    }).populate('buyerId', 'username email firstName lastName')
       .populate('sellerId', 'username email firstName lastName');
 
     if (!order) {
@@ -320,29 +368,23 @@ router.put("/:orderId/deliver-with-email", authenticateMiddleware, async (req, r
       });
     }
 
-    // Validate required fields
-    if (!deliveryMessage || deliveryMessage.trim().length === 0) {
+    if (!deliveryMessage?.trim()) {
       return res.status(400).json({ 
         success: false,
         error: 'Delivery message is required' 
       });
     }
 
-    // Check if we have any delivery content
-    const hasContent = deliveryFiles.length > 0 || attachments.length > 0;
-    
-    if (!hasContent) {
+    if (deliveryFiles.length === 0 && attachments.length === 0) {
       return res.status(400).json({ 
         success: false,
-        error: 'At least one file or attachment is required for delivery' 
+        error: 'At least one file or attachment is required' 
       });
     }
 
-    // Calculate revision number (first delivery = 1)
     const existingDeliveries = await Delivery.countDocuments({ orderId: order._id });
     const revisionNumber = existingDeliveries + 1;
-    
-    // Create delivery record
+
     const delivery = new Delivery({
       orderId: order._id,
       sellerId: userId,
@@ -356,142 +398,47 @@ router.put("/:orderId/deliver-with-email", authenticateMiddleware, async (req, r
         url: att.url || '',
         key: att.key
       })),
-      isFinalDelivery: isFinalDelivery,
-      revisionNumber: revisionNumber,
+      isFinalDelivery,
+      revisionNumber,
       status: 'pending_review'
     });
 
     await delivery.save();
 
-    // Update order status
     order.status = 'delivered';
     order.deliveryMessage = deliveryMessage.trim();
     order.deliveryFiles = deliveryFiles;
     order.deliveredAt = new Date();
-    
-    // Add delivery reference
-    if (!order.deliveries) {
-      order.deliveries = [];
-    }
+    order.deliveries = order.deliveries || [];
     order.deliveries.push(delivery._id);
-    
     await order.save();
 
-    console.log("✅ Order delivered and saved:", {
-      orderId: order._id,
-      revision: revisionNumber,
-      deliveryId: delivery._id
-    });
+    const emailSent = await sendDeliveryEmail(order, { message: deliveryMessage, attachments, isFinalDelivery });
 
-    // Send email notification to buyer
-    try {
-      const siteName = process.env.SITE_NAME || 'WeCinema';
-      const siteUrl = process.env.SITE_URL || 'http://localhost:5173';
-      const orderLink = `${siteUrl}/orders/${order._id}`;
-
-      // Prepare delivery data for email
-      const deliveryData = {
-        message: deliveryMessage,
-        attachments: attachments,
-        isFinalDelivery: isFinalDelivery,
-        revisionNumber: revisionNumber,
-        orderNumber: order.orderNumber || order._id.toString().slice(-8).toUpperCase()
-      };
-
-      // Create email content
-      const emailContent = {
-        buyerName: order.buyerId.firstName || order.buyerId.username,
-        sellerName: order.sellerId.firstName || order.sellerId.username,
-        orderTitle: order.listingId?.title || 'Your Order',
-        orderAmount: order.amount,
-        orderLink: orderLink,
-        deliveryMessage: deliveryMessage,
-        attachmentsCount: attachments.length,
-        isFinalDelivery: isFinalDelivery,
-        revisionsUsed: order.revisions || 0,
-        maxRevisions: order.maxRevisions || 3,
-        orderNumber: order.orderNumber || order._id.toString().slice(-8).toUpperCase()
-      };
-
-      // Send email using existing email service
-      await emailService.sendOrderDeliveryNotification(
-        order.buyerId.email,
-        order.sellerId.email,
-        emailContent
-      );
-
-      console.log("📧 Delivery email sent successfully to:", order.buyerId.email);
-
-      // Send confirmation email to seller
-      await emailService.transporter.sendMail({
-        from: `"${siteName}" <${process.env.GMAIL_USER}>`,
-        to: order.sellerId.email,
-        subject: `✅ Delivery Submitted - Order #${order.orderNumber || order._id.toString().slice(-8).toUpperCase()}`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
-            <h2 style="color: #059669; text-align: center;">✅ Delivery Submitted Successfully</h2>
-            <p>Your delivery for order <strong>#${order.orderNumber || order._id.toString().slice(-8).toUpperCase()}</strong> has been sent to the buyer.</p>
-            
-            <div style="background: #f0f9ff; padding: 15px; border-radius: 5px; margin: 15px 0;">
-              <p><strong>Buyer:</strong> ${order.buyerId.username}</p>
-              <p><strong>Order Amount:</strong> $${order.amount}</p>
-              <p><strong>Delivery Time:</strong> ${new Date().toLocaleString()}</p>
-              <p><strong>Files Sent:</strong> ${attachments.length}</p>
-              <p><strong>Delivery Message:</strong> ${deliveryMessage.substring(0, 100)}${deliveryMessage.length > 100 ? '...' : ''}</p>
-            </div>
-            
-            <p>The buyer has 3 days to review and accept the delivery.</p>
-            <p>You will be notified when the buyer reviews your delivery.</p>
-            
-            <div style="text-align: center; margin-top: 20px;">
-              <a href="${orderLink}" style="background: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
-                View Order Details
-              </a>
-            </div>
-          </div>
-        `,
-        text: `Delivery submitted successfully for order #${order.orderNumber || order._id.toString().slice(-8).toUpperCase()}. Buyer has been notified.`
-      });
-
-    } catch (emailError) {
-      console.error('❌ Email sending failed, but delivery was saved:', emailError.message);
-      // Continue even if email fails - the delivery was saved
-    }
-
-    // Populate the order for response
-    const populatedOrder = await Order.findById(orderId)
+    const updatedOrder = await Order.findById(orderId)
       .populate('buyerId', 'username avatar email firstName lastName')
       .populate('sellerId', 'username avatar email firstName lastName')
       .populate('listingId', 'title')
       .lean();
 
-    console.log("🎉 Delivery process completed successfully");
-
     res.status(200).json({ 
       success: true,
       message: 'Order delivered successfully. Buyer has been notified via email.', 
-      order: populatedOrder,
-      delivery: delivery,
-      emailSent: true,
+      order: updatedOrder,
+      delivery,
+      emailSent,
       nextAction: 'Wait for buyer acceptance or revision request',
       reviewPeriod: 'Buyer has 3 days to review the delivery'
     });
 
   } catch (error) {
-    console.error('❌ Error delivering order:', error);
+    console.error('Error delivering order:', error);
     
     if (error.name === 'ValidationError') {
       return res.status(400).json({ 
         success: false,
         error: 'Validation failed',
         details: Object.values(error.errors).map(err => err.message)
-      });
-    }
-
-    if (error.code === 11000) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'Delivery already exists for this revision number'
       });
     }
 
@@ -503,28 +450,17 @@ router.put("/:orderId/deliver-with-email", authenticateMiddleware, async (req, r
   }
 });
 
-// 2. Complete revision (in_revision → delivered)
 router.put("/:orderId/complete-revision", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
-    const { 
-      deliveryMessage, 
-      deliveryFiles = [],
-      attachments = [],
-      isFinalDelivery = true 
-    } = req.body;
-    
+    const { deliveryMessage, deliveryFiles = [], attachments = [], isFinalDelivery = true } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
 
-    console.log("🔄 Seller completing revision for order:", orderId);
-
-    // Find the order with populated user data
     const order = await Order.findOne({ 
       _id: orderId, 
       sellerId: userId,
-      status: 'in_revision' // Only complete revision if in revision
-    })
-      .populate('buyerId', 'username email firstName lastName')
+      status: 'in_revision'
+    }).populate('buyerId', 'username email firstName lastName')
       .populate('sellerId', 'username email firstName lastName');
 
     if (!order) {
@@ -534,38 +470,29 @@ router.put("/:orderId/complete-revision", authenticateMiddleware, async (req, re
       });
     }
 
-    // Validate required fields
-    if (!deliveryMessage || deliveryMessage.trim().length === 0) {
+    if (!deliveryMessage?.trim()) {
       return res.status(400).json({ 
         success: false,
         error: 'Delivery message is required' 
       });
     }
 
-    // Check if we have any delivery content
-    const hasContent = deliveryFiles.length > 0 || attachments.length > 0;
-    
-    if (!hasContent) {
+    if (deliveryFiles.length === 0 && attachments.length === 0) {
       return res.status(400).json({ 
         success: false,
         error: 'At least one file or attachment is required' 
       });
     }
 
-    // Calculate revision number
     const existingDeliveries = await Delivery.countDocuments({ orderId: order._id });
     const revisionNumber = existingDeliveries + 1;
-    
-    // Update order status back to delivered
+
     order.status = 'delivered';
     order.deliveryMessage = deliveryMessage.trim();
     order.deliveryFiles = deliveryFiles;
     order.deliveredAt = new Date();
-    
-    // Increment revision count
     order.revisions = (order.revisions || 0) + 1;
     
-    // Update revision notes if they exist
     if (order.revisionNotes && order.revisionNotes.length > 0) {
       const lastRevision = order.revisionNotes[order.revisionNotes.length - 1];
       if (lastRevision && !lastRevision.completedAt) {
@@ -573,7 +500,6 @@ router.put("/:orderId/complete-revision", authenticateMiddleware, async (req, re
       }
     }
 
-    // Create delivery record for revision
     const delivery = new Delivery({
       orderId: order._id,
       sellerId: userId,
@@ -587,72 +513,18 @@ router.put("/:orderId/complete-revision", authenticateMiddleware, async (req, re
         url: att.url || '',
         key: att.key
       })),
-      isFinalDelivery: isFinalDelivery,
-      revisionNumber: revisionNumber,
+      isFinalDelivery,
+      revisionNumber,
       status: 'pending_review'
     });
 
     await delivery.save();
-
-    // Add delivery reference
-    if (!order.deliveries) {
-      order.deliveries = [];
-    }
+    order.deliveries = order.deliveries || [];
     order.deliveries.push(delivery._id);
-    
     await order.save();
 
-    console.log("✅ Revision completed successfully:", {
-      orderId: order._id,
-      revision: order.revisions
-    });
+    const emailSent = await sendDeliveryEmail(order, { message: deliveryMessage, attachments, isFinalDelivery }, true);
 
-    // Send email notification to buyer about revision completion
-    try {
-      const siteName = process.env.SITE_NAME || 'WeCinema';
-      const siteUrl = process.env.SITE_URL || 'http://localhost:5173';
-      const orderLink = `${siteUrl}/orders/${order._id}`;
-
-      // Prepare delivery data for email
-      const deliveryData = {
-        message: deliveryMessage,
-        attachments: attachments,
-        isFinalDelivery: isFinalDelivery,
-        revisionNumber: revisionNumber,
-        orderNumber: order.orderNumber || order._id.toString().slice(-8).toUpperCase()
-      };
-
-      // Create email content
-      const emailContent = {
-        buyerName: order.buyerId.firstName || order.buyerId.username,
-        sellerName: order.sellerId.firstName || order.sellerId.username,
-        orderTitle: order.listingId?.title || 'Your Order',
-        orderAmount: order.amount,
-        orderLink: orderLink,
-        deliveryMessage: deliveryMessage,
-        attachmentsCount: attachments.length,
-        isFinalDelivery: isFinalDelivery,
-        revisionsUsed: order.revisions || 0,
-        maxRevisions: order.maxRevisions || 3,
-        orderNumber: order.orderNumber || order._id.toString().slice(-8).toUpperCase(),
-        isRevision: true
-      };
-
-      // Send email using existing email service
-      await emailService.sendOrderDeliveryNotification(
-        order.buyerId.email,
-        order.sellerId.email,
-        emailContent
-      );
-
-      console.log("📧 Revision completion email sent to:", order.buyerId.email);
-
-    } catch (emailError) {
-      console.error('❌ Email sending failed:', emailError.message);
-      // Continue even if email fails
-    }
-
-    // Populate for response
     const updatedOrder = await Order.findById(orderId)
       .populate('buyerId', 'username avatar email firstName lastName')
       .populate('sellerId', 'username avatar email firstName lastName')
@@ -663,14 +535,14 @@ router.put("/:orderId/complete-revision", authenticateMiddleware, async (req, re
       success: true,
       message: 'Revision completed successfully. Buyer has been notified.', 
       order: updatedOrder,
-      delivery: delivery,
+      delivery,
       revisionsUsed: order.revisions,
       revisionsLeft: order.maxRevisions - order.revisions,
-      emailSent: true
+      emailSent
     });
 
   } catch (error) {
-    console.error('❌ Error completing revision:', error);
+    console.error('Error completing revision:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to complete revision',
@@ -679,43 +551,24 @@ router.put("/:orderId/complete-revision", authenticateMiddleware, async (req, re
   }
 });
 
-// 3. Get delivery history for an order
 router.get("/:orderId/deliveries", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
     const userId = req.user.id || req.user._id || req.user.userId;
 
-    console.log("📦 Fetching delivery history for order:", orderId);
-
-    // Check if user has access to this order
     const order = await Order.findById(orderId);
-    
-    if (!order) {
-      return res.status(404).json({ 
-        success: false,
-        error: 'Order not found' 
-      });
-    }
+    if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
 
-    if (order.buyerId.toString() !== userId.toString() && 
-        order.sellerId.toString() !== userId.toString()) {
-      return res.status(403).json({ 
-        success: false,
-        error: 'Access denied to this order' 
-      });
-    }
+    validateUserAccess(order, userId);
 
-    // Fetch all deliveries for this order
     const deliveries = await Delivery.find({ orderId })
       .populate('sellerId', 'username avatar firstName lastName')
       .sort({ revisionNumber: 1 })
       .lean();
 
-    console.log(`✅ Found ${deliveries.length} deliveries for order`);
-
     res.status(200).json({
       success: true,
-      deliveries: deliveries,
+      deliveries,
       count: deliveries.length,
       orderStatus: order.status,
       revisionsUsed: order.revisions || 0,
@@ -723,7 +576,7 @@ router.get("/:orderId/deliveries", authenticateMiddleware, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error fetching deliveries:', error);
+    console.error('Error fetching deliveries:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to fetch delivery history',
@@ -732,13 +585,10 @@ router.get("/:orderId/deliveries", authenticateMiddleware, async (req, res) => {
   }
 });
 
-// 4. Get specific delivery details
 router.get("/deliveries/:deliveryId", authenticateMiddleware, async (req, res) => {
   try {
     const { deliveryId } = req.params;
     const userId = req.user.id || req.user._id || req.user.userId;
-
-    console.log("🔍 Fetching delivery details:", deliveryId);
 
     const delivery = await Delivery.findById(deliveryId)
       .populate('sellerId', 'username avatar firstName lastName')
@@ -746,39 +596,24 @@ router.get("/deliveries/:deliveryId", authenticateMiddleware, async (req, res) =
       .populate({
         path: 'orderId',
         select: 'status amount revisions maxRevisions orderNumber',
-        populate: {
-          path: 'listingId',
-          select: 'title'
-        }
+        populate: { path: 'listingId', select: 'title' }
       })
       .lean();
 
     if (!delivery) {
-      return res.status(404).json({ 
-        success: false,
-        error: 'Delivery not found' 
-      });
+      return res.status(404).json({ success: false, error: 'Delivery not found' });
     }
 
-    // Check access
-    if (delivery.buyerId._id.toString() !== userId.toString() && 
-        delivery.sellerId._id.toString() !== userId.toString()) {
-      return res.status(403).json({ 
-        success: false,
-        error: 'Access denied to this delivery' 
-      });
-    }
-
-    console.log("✅ Delivery details fetched successfully");
+    validateUserAccess(delivery.orderId, userId);
 
     res.status(200).json({
       success: true,
-      delivery: delivery,
+      delivery,
       userRole: delivery.buyerId._id.toString() === userId.toString() ? 'buyer' : 'seller'
     });
 
   } catch (error) {
-    console.error('❌ Error fetching delivery details:', error);
+    console.error('Error fetching delivery details:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to fetch delivery details',
@@ -788,19 +623,15 @@ router.get("/deliveries/:deliveryId", authenticateMiddleware, async (req, res) =
 });
 
 // ========== SELLER ORDER MANAGEMENT ========== //
-
-// 1. Start processing order (paid → processing)
 router.put("/:orderId/start-processing", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
     const userId = req.user.id || req.user._id || req.user.userId;
-    
-    console.log("🔄 Seller starting to process order:", orderId);
 
     const order = await Order.findOne({ 
       _id: orderId, 
       sellerId: userId,
-      status: 'paid' // Only process if paid
+      status: 'paid'
     });
 
     if (!order) {
@@ -810,14 +641,10 @@ router.put("/:orderId/start-processing", authenticateMiddleware, async (req, res
       });
     }
 
-    // Update order status
     order.status = 'processing';
     order.processingAt = new Date();
     await order.save();
 
-    console.log("✅ Order marked as processing");
-
-    // Populate for response
     const updatedOrder = await Order.findById(orderId)
       .populate('buyerId', 'username avatar email')
       .populate('sellerId', 'username avatar')
@@ -831,7 +658,7 @@ router.put("/:orderId/start-processing", authenticateMiddleware, async (req, res
       nextAction: 'Start working on the order'
     });
   } catch (error) {
-    console.error('❌ Error starting order processing:', error);
+    console.error('Error starting order processing:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to start order processing',
@@ -840,18 +667,15 @@ router.put("/:orderId/start-processing", authenticateMiddleware, async (req, res
   }
 });
 
-// 2. Start working on order (processing → in_progress)
 router.put("/:orderId/start-work", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
     const userId = req.user.id || req.user._id || req.user.userId;
 
-    console.log("👨‍💻 Seller starting work on order:", orderId);
-
     const order = await Order.findOne({ 
       _id: orderId, 
       sellerId: userId,
-      status: { $in: ['processing', 'paid'] } // Can start from processing or paid
+      status: { $in: ['processing', 'paid'] }
     });
 
     if (!order) {
@@ -861,14 +685,10 @@ router.put("/:orderId/start-work", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    // Update order status
     order.status = 'in_progress';
     order.startedAt = new Date();
     await order.save();
 
-    console.log("✅ Work started on order");
-
-    // Populate for response
     const updatedOrder = await Order.findById(orderId)
       .populate('buyerId', 'username avatar email')
       .populate('listingId', 'title')
@@ -881,7 +701,7 @@ router.put("/:orderId/start-work", authenticateMiddleware, async (req, res) => {
       nextAction: 'Complete the work and deliver'
     });
   } catch (error) {
-    console.error('❌ Error starting work:', error);
+    console.error('Error starting work:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to start work',
@@ -890,19 +710,17 @@ router.put("/:orderId/start-work", authenticateMiddleware, async (req, res) => {
   }
 });
 
-// 3. Deliver order (in_progress → delivered) - Legacy route for backward compatibility
+// Legacy delivery route
 router.put("/:orderId/deliver", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
     const { deliveryMessage, deliveryFiles } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
-    
-    console.log("📤 Seller delivering order (legacy route):", orderId);
 
     const order = await Order.findOne({ 
       _id: orderId, 
       sellerId: userId,
-      status: 'in_progress' // Only deliver if in progress
+      status: 'in_progress'
     });
 
     if (!order) {
@@ -912,17 +730,12 @@ router.put("/:orderId/deliver", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    // Update order status
     order.status = 'delivered';
     order.deliveryMessage = deliveryMessage || '';
     order.deliveryFiles = deliveryFiles || [];
     order.deliveredAt = new Date();
-    
     await order.save();
 
-    console.log("✅ Order delivered successfully (legacy route)");
-
-    // Populate for response
     const updatedOrder = await Order.findById(orderId)
       .populate('buyerId', 'username avatar email')
       .populate('listingId', 'title')
@@ -935,7 +748,7 @@ router.put("/:orderId/deliver", authenticateMiddleware, async (req, res) => {
       nextAction: 'Wait for buyer acceptance or revision request'
     });
   } catch (error) {
-    console.error('❌ Error delivering order:', error);
+    console.error('Error delivering order:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to deliver order',
@@ -944,19 +757,16 @@ router.put("/:orderId/deliver", authenticateMiddleware, async (req, res) => {
   }
 });
 
-// 4. Seller cancels order
 router.put("/:orderId/cancel-by-seller", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
     const { cancelReason } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
 
-    console.log("❌ Seller cancelling order:", orderId);
-
     const order = await Order.findOne({
       _id: orderId,
       sellerId: userId,
-      status: { $in: ['paid', 'processing'] } // Only cancel if in these statuses
+      status: { $in: ['paid', 'processing'] }
     });
 
     if (!order) {
@@ -966,28 +776,19 @@ router.put("/:orderId/cancel-by-seller", authenticateMiddleware, async (req, res
       });
     }
 
-    // If payment was made, process refund
     if (order.stripePaymentIntentId && order.status === 'paid') {
       try {
-        await stripe.refunds.create({
-          payment_intent: order.stripePaymentIntentId,
-        });
-        console.log("💰 Refund processed for cancelled order");
+        await stripe.refunds.create({ payment_intent: order.stripePaymentIntentId });
       } catch (stripeError) {
-        console.error('❌ Stripe refund error:', stripeError);
-        // Continue with cancellation even if refund fails
+        console.error('Stripe refund error:', stripeError);
       }
     }
 
-    // Update order status
     order.status = 'cancelled';
     order.cancelledAt = new Date();
     order.sellerNotes = cancelReason ? `Cancelled by seller: ${cancelReason}` : 'Cancelled by seller';
     await order.save();
 
-    console.log("✅ Order cancelled by seller successfully");
-
-    // Update offer status if exists
     if (order.offerId) {
       await Offer.findByIdAndUpdate(order.offerId, {
         status: 'cancelled',
@@ -1001,7 +802,7 @@ router.put("/:orderId/cancel-by-seller", authenticateMiddleware, async (req, res
       order: await Order.findById(orderId).lean()
     });
   } catch (error) {
-    console.error('❌ Error cancelling order:', error);
+    console.error('Error cancelling order:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to cancel order',
@@ -1011,20 +812,16 @@ router.put("/:orderId/cancel-by-seller", authenticateMiddleware, async (req, res
 });
 
 // ========== BUYER ORDER MANAGEMENT ========== //
-
-// Buyer requests revision
 router.put("/:orderId/request-revision", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
     const { revisionNotes } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
 
-    console.log("🔄 Buyer requesting revision for order:", orderId);
-
     const order = await Order.findOne({
       _id: orderId,
       buyerId: userId,
-      status: 'delivered' // Only request revision if delivered
+      status: 'delivered'
     });
 
     if (!order) {
@@ -1034,7 +831,6 @@ router.put("/:orderId/request-revision", authenticateMiddleware, async (req, res
       });
     }
 
-    // Check revision limit
     if (order.revisions >= order.maxRevisions) {
       return res.status(400).json({ 
         success: false,
@@ -1042,22 +838,11 @@ router.put("/:orderId/request-revision", authenticateMiddleware, async (req, res
       });
     }
 
-    // Update order status and add revision notes
     order.status = 'in_revision';
     order.revisions += 1;
-    
-    if (!order.revisionNotes) {
-      order.revisionNotes = [];
-    }
-    
-    order.revisionNotes.push({
-      notes: revisionNotes,
-      requestedAt: new Date()
-    });
-    
+    order.revisionNotes = order.revisionNotes || [];
+    order.revisionNotes.push({ notes: revisionNotes, requestedAt: new Date() });
     await order.save();
-
-    console.log("✅ Revision requested successfully");
 
     res.status(200).json({ 
       success: true,
@@ -1067,7 +852,7 @@ router.put("/:orderId/request-revision", authenticateMiddleware, async (req, res
       revisionsLeft: order.maxRevisions - order.revisions
     });
   } catch (error) {
-    console.error('❌ Error requesting revision:', error);
+    console.error('Error requesting revision:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to request revision',
@@ -1076,18 +861,15 @@ router.put("/:orderId/request-revision", authenticateMiddleware, async (req, res
   }
 });
 
-// Buyer accepts delivery and completes order
 router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
     const userId = req.user.id || req.user._id || req.user.userId;
 
-    console.log("✅ Buyer completing order:", orderId);
-
     const order = await Order.findOne({
       _id: orderId,
       buyerId: userId,
-      status: 'delivered' // Only complete if delivered
+      status: 'delivered'
     });
 
     if (!order) {
@@ -1097,13 +879,10 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    // Release payment to seller
     if (order.stripePaymentIntentId && !order.paymentReleased) {
       try {
-        // Capture the payment
         await stripe.paymentIntents.capture(order.stripePaymentIntentId);
         
-        // Calculate platform fee and seller amount
         const platformFeePercent = 0.15;
         const platformFee = order.amount * platformFeePercent;
         const sellerAmount = order.amount - platformFee;
@@ -1113,9 +892,6 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
         order.paymentReleased = true;
         order.releaseDate = new Date();
         
-        console.log("💰 Payment released to seller:", sellerAmount);
-        
-        // Update seller's balance
         await User.findByIdAndUpdate(order.sellerId, {
           $inc: { 
             balance: sellerAmount,
@@ -1123,94 +899,15 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
           }
         });
       } catch (stripeError) {
-        console.error('❌ Stripe capture error:', stripeError);
+        console.error('Stripe capture error:', stripeError);
       }
     }
 
-    // Update order status
     order.status = 'completed';
     order.completedAt = new Date();
     await order.save();
 
-    console.log("✅ Order completed successfully");
-
-    // Update seller stats
-    await User.findByIdAndUpdate(order.sellerId, {
-      $inc: { completedOrders: 1 }
-    });
-
-    // Send completion email to both parties
-    try {
-      const order = await Order.findById(orderId)
-        .populate('buyerId', 'username email firstName lastName')
-        .populate('sellerId', 'username email firstName lastName');
-
-      const siteName = process.env.SITE_NAME || 'WeCinema';
-      const siteUrl = process.env.SITE_URL || 'http://localhost:5173';
-      const orderLink = `${siteUrl}/orders/${order._id}`;
-
-      // Email to buyer
-      await emailService.transporter.sendMail({
-        from: `"${siteName}" <${process.env.GMAIL_USER}>`,
-        to: order.buyerId.email,
-        subject: `✅ Order Completed - Order #${order.orderNumber || order._id.toString().slice(-8).toUpperCase()}`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
-            <h2 style="color: #059669; text-align: center;">✅ Order Completed Successfully</h2>
-            <p>Your order <strong>#${order.orderNumber || order._id.toString().slice(-8).toUpperCase()}</strong> with ${order.sellerId.username} has been completed.</p>
-            
-            <div style="background: #f0f9ff; padding: 15px; border-radius: 5px; margin: 15px 0;">
-              <p><strong>Seller:</strong> ${order.sellerId.username}</p>
-              <p><strong>Order Amount:</strong> $${order.amount}</p>
-              <p><strong>Completed On:</strong> ${new Date().toLocaleString()}</p>
-              <p><strong>Payment Status:</strong> Released to seller</p>
-            </div>
-            
-            <p>Thank you for your business! We hope you were satisfied with the service.</p>
-            
-            <div style="text-align: center; margin-top: 20px;">
-              <a href="${orderLink}" style="background: #059669; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
-                View Order Details
-              </a>
-            </div>
-          </div>
-        `,
-        text: `Order #${order.orderNumber || order._id.toString().slice(-8).toUpperCase()} completed successfully. Thank you for your business!`
-      });
-
-      // Email to seller
-      await emailService.transporter.sendMail({
-        from: `"${siteName}" <${process.env.GMAIL_USER}>`,
-        to: order.sellerId.email,
-        subject: `💰 Payment Released - Order #${order.orderNumber || order._id.toString().slice(-8).toUpperCase()}`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
-            <h2 style="color: #059669; text-align: center;">💰 Payment Released Successfully</h2>
-            <p>Your payment for order <strong>#${order.orderNumber || order._id.toString().slice(-8).toUpperCase()}</strong> has been released.</p>
-            
-            <div style="background: #f0f9ff; padding: 15px; border-radius: 5px; margin: 15px 0;">
-              <p><strong>Buyer:</strong> ${order.buyerId.username}</p>
-              <p><strong>Order Amount:</strong> $${order.amount}</p>
-              <p><strong>Your Earnings:</strong> $${order.sellerAmount || (order.amount * 0.85).toFixed(2)}</p>
-              <p><strong>Platform Fee:</strong> $${order.platformFee || (order.amount * 0.15).toFixed(2)}</p>
-              <p><strong>Released On:</strong> ${new Date().toLocaleString()}</p>
-            </div>
-            
-            <p>The funds have been transferred to your account.</p>
-            
-            <div style="text-align: center; margin-top: 20px;">
-              <a href="${orderLink}" style="background: #059669; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
-                View Order Details
-              </a>
-            </div>
-          </div>
-        `,
-        text: `Payment released for order #${order.orderNumber || order._id.toString().slice(-8).toUpperCase()}. Funds transferred to your account.`
-      });
-
-    } catch (emailError) {
-      console.error('❌ Completion email sending failed:', emailError.message);
-    }
+    await User.findByIdAndUpdate(order.sellerId, { $inc: { completedOrders: 1 } });
 
     res.status(200).json({ 
       success: true,
@@ -1221,7 +918,7 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
         .lean()
     });
   } catch (error) {
-    console.error('❌ Error completing order:', error);
+    console.error('Error completing order:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to complete order',
@@ -1230,19 +927,16 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
   }
 });
 
-// Buyer cancels order
 router.put("/:orderId/cancel-by-buyer", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
     const { cancelReason } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
 
-    console.log("❌ Buyer cancelling order:", orderId);
-
     const order = await Order.findOne({
       _id: orderId,
       buyerId: userId,
-      status: { $in: ['pending_payment', 'paid'] } // Only cancel if in these statuses
+      status: { $in: ['pending_payment', 'paid'] }
     });
 
     if (!order) {
@@ -1252,25 +946,18 @@ router.put("/:orderId/cancel-by-buyer", authenticateMiddleware, async (req, res)
       });
     }
 
-    // If payment was made, process refund
     if (order.stripePaymentIntentId && order.status === 'paid') {
       try {
-        await stripe.refunds.create({
-          payment_intent: order.stripePaymentIntentId,
-        });
-        console.log("💰 Refund processed for cancelled order");
+        await stripe.refunds.create({ payment_intent: order.stripePaymentIntentId });
       } catch (stripeError) {
-        console.error('❌ Stripe refund error:', stripeError);
+        console.error('Stripe refund error:', stripeError);
       }
     }
 
-    // Update order status
     order.status = 'cancelled';
     order.cancelledAt = new Date();
     order.buyerNotes = cancelReason ? `Cancelled by buyer: ${cancelReason}` : 'Cancelled by buyer';
     await order.save();
-
-    console.log("✅ Order cancelled by buyer successfully");
 
     res.status(200).json({ 
       success: true,
@@ -1278,7 +965,7 @@ router.put("/:orderId/cancel-by-buyer", authenticateMiddleware, async (req, res)
       order: await Order.findById(orderId).lean()
     });
   } catch (error) {
-    console.error('❌ Error cancelling order:', error);
+    console.error('Error cancelling order:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to cancel order',
@@ -1288,8 +975,6 @@ router.put("/:orderId/cancel-by-buyer", authenticateMiddleware, async (req, res)
 });
 
 // ========== ORDER QUERIES ========== //
-
-// Get my orders (buyer)
 router.get("/my-orders", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
@@ -1301,30 +986,13 @@ router.get("/my-orders", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    console.log("📦 Fetching orders for buyer:", userId);
-
     const orders = await Order.find({ buyerId: userId })
-      .populate({
-        path: 'sellerId',
-        select: 'username avatar sellerRating email firstName lastName',
-        model: 'User'
-      })
-      .populate({
-        path: 'listingId',
-        select: 'title mediaUrls price category type description tags',
-        model: 'MarketplaceListing'
-      })
-      .populate({
-        path: 'offerId',
-        select: 'amount message requirements expectedDelivery createdAt',
-        model: 'Offer'
-      })
+      .populate('sellerId', 'username avatar sellerRating email firstName lastName')
+      .populate('listingId', 'title mediaUrls price category type description tags')
+      .populate('offerId', 'amount message requirements expectedDelivery createdAt')
       .sort({ createdAt: -1 })
       .lean();
 
-    console.log(`✅ Found ${orders.length} orders for buyer`);
-
-    // Calculate order statistics
     const stats = {
       total: orders.length,
       active: orders.filter(o => ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(o.status)).length,
@@ -1335,12 +1003,12 @@ router.get("/my-orders", authenticateMiddleware, async (req, res) => {
 
     res.status(200).json({
       success: true,
-      orders: orders,
-      stats: stats,
+      orders,
+      stats,
       count: orders.length
     });
   } catch (error) {
-    console.error('❌ Error fetching orders:', error);
+    console.error('Error fetching orders:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to fetch orders',
@@ -1349,7 +1017,6 @@ router.get("/my-orders", authenticateMiddleware, async (req, res) => {
   }
 });
 
-// Get my sales (seller)
 router.get("/my-sales", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
@@ -1361,30 +1028,13 @@ router.get("/my-sales", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    console.log("💰 Fetching sales for seller:", userId);
-
     const sales = await Order.find({ sellerId: userId })
-      .populate({
-        path: 'buyerId',
-        select: 'username avatar email firstName lastName',
-        model: 'User'
-      })
-      .populate({
-        path: 'listingId',
-        select: 'title mediaUrls price category type',
-        model: 'MarketplaceListing'
-      })
-      .populate({
-        path: 'offerId',
-        select: 'amount message requirements',
-        model: 'Offer'
-      })
+      .populate('buyerId', 'username avatar email firstName lastName')
+      .populate('listingId', 'title mediaUrls price category type')
+      .populate('offerId', 'amount message requirements')
       .sort({ createdAt: -1 })
       .lean();
 
-    console.log(`✅ Found ${sales.length} sales for seller`);
-
-    // Calculate sales statistics
     const stats = {
       total: sales.length,
       active: sales.filter(o => ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(o.status)).length,
@@ -1398,12 +1048,12 @@ router.get("/my-sales", authenticateMiddleware, async (req, res) => {
 
     res.status(200).json({
       success: true,
-      sales: sales,
-      stats: stats,
+      sales,
+      stats,
       count: sales.length
     });
   } catch (error) {
-    console.error('❌ Error fetching sales:', error);
+    console.error('Error fetching sales:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to fetch sales',
@@ -1412,36 +1062,12 @@ router.get("/my-sales", authenticateMiddleware, async (req, res) => {
   }
 });
 
-// Get order details
 router.get("/:orderId", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
     const userId = req.user.id || req.user._id || req.user.userId;
 
-    console.log("🔍 Fetching order details:", orderId);
-
-    const order = await Order.findById(orderId)
-      .populate({
-        path: 'buyerId',
-        select: 'username avatar email firstName lastName',
-        model: 'User'
-      })
-      .populate({
-        path: 'sellerId',
-        select: 'username avatar sellerRating email firstName lastName stripeAccountId',
-        model: 'User'
-      })
-      .populate({
-        path: 'listingId',
-        select: 'title mediaUrls price category type description tags',
-        model: 'MarketplaceListing'
-      })
-      .populate({
-        path: 'offerId',
-        select: 'amount message requirements expectedDelivery createdAt',
-        model: 'Offer'
-      })
-      .lean();
+    const order = await populateOrder(orderId).lean();
 
     if (!order) {
       return res.status(404).json({ 
@@ -1450,29 +1076,17 @@ router.get("/:orderId", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    // Check if user has access to this order
-    const isBuyer = order.buyerId && order.buyerId._id.toString() === userId.toString();
-    const isSeller = order.sellerId && order.sellerId._id.toString() === userId.toString();
+    const { isBuyer, isSeller } = validateUserAccess(order, userId);
 
-    if (!isBuyer && !isSeller) {
-      return res.status(403).json({ 
-        success: false,
-        error: 'Access denied to this order' 
-      });
-    }
-
-    // Get deliveries for this order
     const deliveries = await Delivery.find({ orderId: order._id })
       .populate('sellerId', 'username avatar')
       .sort({ revisionNumber: 1 })
       .lean();
 
-    console.log("✅ Order details fetched successfully");
-
     res.status(200).json({
       success: true,
-      order: order,
-      deliveries: deliveries,
+      order,
+      deliveries,
       userRole: isBuyer ? 'buyer' : 'seller',
       permissions: {
         canStartProcessing: isSeller && order.status === 'paid',
@@ -1485,7 +1099,7 @@ router.get("/:orderId", authenticateMiddleware, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Error fetching order details:', error);
+    console.error('Error fetching order details:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to fetch order details',
@@ -1494,77 +1108,23 @@ router.get("/:orderId", authenticateMiddleware, async (req, res) => {
   }
 });
 
-// Get order timeline/status history
 router.get("/:orderId/timeline", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
     const userId = req.user.id || req.user._id || req.user.userId;
 
-    console.log("📅 Fetching timeline for order:", orderId);
-
     const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
+
+    validateUserAccess(order, userId);
+
+    const timeline = [{ status: 'created', date: order.createdAt, description: 'Order created', icon: '📝' }];
+    if (order.paidAt) timeline.push({ status: 'paid', date: order.paidAt, description: 'Payment received', icon: '💳' });
+    if (order.processingAt) timeline.push({ status: 'processing', date: order.processingAt, description: 'Seller started processing', icon: '📦' });
+    if (order.startedAt) timeline.push({ status: 'in_progress', date: order.startedAt, description: 'Seller started work', icon: '👨‍💻' });
+    if (order.deliveredAt) timeline.push({ status: 'delivered', date: order.deliveredAt, description: 'Work delivered', icon: '🚚' });
     
-    if (!order) {
-      return res.status(404).json({ 
-        success: false,
-        error: 'Order not found' 
-      });
-    }
-
-    // Check access
-    if (order.buyerId.toString() !== userId && order.sellerId.toString() !== userId) {
-      return res.status(403).json({ 
-        success: false,
-        error: 'Access denied' 
-      });
-    }
-
-    const timeline = [
-      { 
-        status: 'created', 
-        date: order.createdAt, 
-        description: 'Order created',
-        icon: '📝'
-      }
-    ];
-
-    if (order.paidAt) {
-      timeline.push({
-        status: 'paid',
-        date: order.paidAt,
-        description: 'Payment received',
-        icon: '💳'
-      });
-    }
-
-    if (order.processingAt) {
-      timeline.push({
-        status: 'processing',
-        date: order.processingAt,
-        description: 'Seller started processing order',
-        icon: '📦'
-      });
-    }
-
-    if (order.startedAt) {
-      timeline.push({
-        status: 'in_progress',
-        date: order.startedAt,
-        description: 'Seller started working on order',
-        icon: '👨‍💻'
-      });
-    }
-
-    if (order.deliveredAt) {
-      timeline.push({
-        status: 'delivered',
-        date: order.deliveredAt,
-        description: 'Seller delivered the work',
-        icon: '🚚'
-      });
-    }
-
-    if (order.revisionNotes && order.revisionNotes.length > 0) {
+    if (order.revisionNotes) {
       order.revisionNotes.forEach((revision, index) => {
         if (revision.requestedAt) {
           timeline.push({
@@ -1576,37 +1136,19 @@ router.get("/:orderId/timeline", authenticateMiddleware, async (req, res) => {
         }
       });
     }
+    
+    if (order.completedAt) timeline.push({ status: 'completed', date: order.completedAt, description: 'Order completed', icon: '✅' });
+    if (order.cancelledAt) timeline.push({ status: 'cancelled', date: order.cancelledAt, description: 'Order cancelled', icon: '❌' });
 
-    if (order.completedAt) {
-      timeline.push({
-        status: 'completed',
-        date: order.completedAt,
-        description: 'Order completed',
-        icon: '✅'
-      });
-    }
-
-    if (order.cancelledAt) {
-      timeline.push({
-        status: 'cancelled',
-        date: order.cancelledAt,
-        description: 'Order cancelled',
-        icon: '❌'
-      });
-    }
-
-    // Sort by date
     timeline.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-    console.log("✅ Timeline fetched successfully");
 
     res.status(200).json({
       success: true,
-      timeline: timeline,
+      timeline,
       currentStatus: order.status
     });
   } catch (error) {
-    console.error('❌ Error fetching timeline:', error);
+    console.error('Error fetching timeline:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to fetch timeline',
@@ -1616,23 +1158,13 @@ router.get("/:orderId/timeline", authenticateMiddleware, async (req, res) => {
 });
 
 // ========== ADMIN/UTILITY ROUTES ========== //
-
-// Delete all orders (admin only)
 router.delete("/delete-all-orders", authenticateMiddleware, async (req, res) => {
   try {
-    // Check if user is admin (you should implement proper admin check)
     if (!req.user.isAdmin) {
-      return res.status(403).json({
-        success: false,
-        error: 'Admin access required'
-      });
+      return res.status(403).json({ success: false, error: 'Admin access required' });
     }
 
-    console.log("🗑️ Attempting to delete ALL orders...");
-
     const orderCount = await Order.countDocuments();
-    console.log(`📊 Total orders found: ${orderCount}`);
-
     if (orderCount === 0) {
       return res.status(200).json({
         success: true,
@@ -1643,8 +1175,6 @@ router.delete("/delete-all-orders", authenticateMiddleware, async (req, res) => 
 
     const deleteResult = await Order.deleteMany({});
     
-    console.log(`✅ Successfully deleted ${deleteResult.deletedCount} orders`);
-
     res.status(200).json({
       success: true,
       message: `Successfully deleted all ${deleteResult.deletedCount} orders`,
@@ -1653,7 +1183,7 @@ router.delete("/delete-all-orders", authenticateMiddleware, async (req, res) => 
     });
 
   } catch (error) {
-    console.error('❌ Error deleting all orders:', error);
+    console.error('Error deleting all orders:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to delete all orders',
@@ -1662,20 +1192,13 @@ router.delete("/delete-all-orders", authenticateMiddleware, async (req, res) => 
   }
 });
 
-// Get order statistics
 router.get("/stats/seller", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
 
     const stats = await Order.aggregate([
       { $match: { sellerId: mongoose.Types.ObjectId(userId) } },
-      {
-        $group: {
-          _id: "$status",
-          count: { $sum: 1 },
-          totalAmount: { $sum: "$amount" }
-        }
-      }
+      { $group: { _id: "$status", count: { $sum: 1 }, totalAmount: { $sum: "$amount" } } }
     ]);
 
     const totalStats = {
@@ -1695,11 +1218,11 @@ router.get("/stats/seller", authenticateMiddleware, async (req, res) => {
 
     res.status(200).json({
       success: true,
-      stats: stats,
+      stats,
       totals: totalStats
     });
   } catch (error) {
-    console.error('❌ Error fetching seller stats:', error);
+    console.error('Error fetching seller stats:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to fetch statistics',
@@ -1708,51 +1231,20 @@ router.get("/stats/seller", authenticateMiddleware, async (req, res) => {
   }
 });
 
-// Generic status update route
 router.put("/:orderId/status", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
     const { status } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
 
-    console.log("🔄 Updating order status via /status endpoint:", { 
-      orderId, 
-      status, 
-      userId 
-    });
-
-    // Find the order
     const order = await Order.findById(orderId);
-    
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        error: 'Order not found'
-      });
-    }
+    if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
 
-    // Check if user is authorized (must be seller or buyer of this order)
-    const isSeller = order.sellerId.toString() === userId.toString();
-    const isBuyer = order.buyerId.toString() === userId.toString();
-    
-    if (!isSeller && !isBuyer) {
-      return res.status(403).json({
-        success: false,
-        error: 'You are not authorized to update this order'
-      });
-    }
+    const { isBuyer, isSeller } = validateUserAccess(order, userId);
 
-    // Validate status transitions based on user role
     const validStatuses = [
-      'pending_payment',
-      'paid', 
-      'processing',
-      'in_progress',
-      'delivered',
-      'in_revision',
-      'completed',
-      'cancelled',
-      'disputed'
+      'pending_payment', 'paid', 'processing', 'in_progress', 'delivered',
+      'in_revision', 'completed', 'cancelled', 'disputed'
     ];
 
     if (!validStatuses.includes(status)) {
@@ -1763,137 +1255,49 @@ router.put("/:orderId/status", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    // For sellers: Validate transitions
-    if (isSeller) {
-      const sellerValidTransitions = {
-        'paid': ['processing', 'cancelled'],
-        'processing': ['in_progress', 'cancelled'],
-        'in_progress': ['delivered', 'cancelled'],
-        'delivered': ['in_revision'], // Only if buyer requests revision
-        'in_revision': ['delivered'], // After completing revision
-        'completed': [] // No further changes
-      };
-
-      const allowedTransitions = sellerValidTransitions[order.status] || [];
-      
-      if (!allowedTransitions.includes(status)) {
-        return res.status(400).json({
-          success: false,
-          error: `Invalid status transition from ${order.status} to ${status} for seller`,
-          currentStatus: order.status,
-          allowedTransitions
-        });
-      }
-    }
-
-    // For buyers: Validate transitions
-    if (isBuyer) {
-      const buyerValidTransitions = {
-        'pending_payment': ['cancelled'],
-        'paid': ['cancelled'],
-        'delivered': ['completed', 'in_revision'],
-        'in_revision': [] // Buyer can only request revision, not complete it
-      };
-
-      const allowedTransitions = buyerValidTransitions[order.status] || [];
-      
-      if (!allowedTransitions.includes(status)) {
-        return res.status(400).json({
-          success: false,
-          error: `Invalid status transition from ${order.status} to ${status} for buyer`,
-          currentStatus: order.status,
-          allowedTransitions
-        });
-      }
-    }
-
-    // Update order status
+    const now = new Date();
     const previousStatus = order.status;
     order.status = status;
+
+    if (status === 'paid' && !order.paidAt) order.paidAt = now;
+    if (status === 'processing' && !order.processingAt) order.processingAt = now;
+    if (status === 'in_progress' && !order.startedAt) order.startedAt = now;
+    if (status === 'delivered' && !order.deliveredAt) order.deliveredAt = now;
     
-    // Set timestamps based on status change
-    const now = new Date();
-    
-    if (status === 'paid' && !order.paidAt) {
-      order.paidAt = now;
-    } else if (status === 'processing' && !order.processingAt) {
-      order.processingAt = now;
-    } else if (status === 'in_progress' && !order.startedAt) {
-      order.startedAt = now;
-    } else if (status === 'delivered' && !order.deliveredAt) {
-      order.deliveredAt = now;
-    } else if (status === 'completed' && !order.completedAt) {
+    if (status === 'completed' && !order.completedAt) {
       order.completedAt = now;
-      
-      // Release payment to seller if not already released
       if (order.stripePaymentIntentId && !order.paymentReleased) {
         try {
-          // Capture the payment
           await stripe.paymentIntents.capture(order.stripePaymentIntentId);
-          
-          // Calculate platform fee and seller amount
           const platformFeePercent = 0.15;
           const platformFee = order.amount * platformFeePercent;
-          const sellerAmount = order.amount - platformFee;
-
           order.platformFee = platformFee;
-          order.sellerAmount = sellerAmount;
+          order.sellerAmount = order.amount - platformFee;
           order.paymentReleased = true;
           order.releaseDate = now;
-          
-          console.log("💰 Payment released to seller:", sellerAmount);
         } catch (stripeError) {
-          console.error('❌ Stripe capture error:', stripeError);
-        }
-      }
-    } else if (status === 'cancelled' && !order.cancelledAt) {
-      order.cancelledAt = now;
-      
-      // If payment was made, process refund
-      if (order.stripePaymentIntentId && previousStatus === 'paid') {
-        try {
-          await stripe.refunds.create({
-            payment_intent: order.stripePaymentIntentId,
-          });
-          console.log("💰 Refund processed for cancelled order");
-        } catch (stripeError) {
-          console.error('❌ Stripe refund error:', stripeError);
+          console.error('Stripe capture error:', stripeError);
         }
       }
     }
-
-    // Update permissions based on new status
-    order.permissions = {
-      canStartProcessing: isSeller && status === 'paid',
-      canStartWork: isSeller && (status === 'processing' || status === 'paid'),
-      canDeliver: isSeller && status === 'in_progress',
-      canRequestRevision: isBuyer && status === 'delivered' && order.revisions < order.maxRevisions,
-      canComplete: isBuyer && status === 'delivered',
-      canCancelByBuyer: isBuyer && ['pending_payment', 'paid'].includes(status),
-      canCancelBySeller: isSeller && ['paid', 'processing'].includes(status)
-    };
+    
+    if (status === 'cancelled' && !order.cancelledAt) {
+      order.cancelledAt = now;
+      if (order.stripePaymentIntentId && previousStatus === 'paid') {
+        try {
+          await stripe.refunds.create({ payment_intent: order.stripePaymentIntentId });
+        } catch (stripeError) {
+          console.error('Stripe refund error:', stripeError);
+        }
+      }
+    }
 
     await order.save();
 
-    console.log(`✅ Order ${orderId} status updated: ${previousStatus} → ${status}`);
-
-    // Populate the order for response
     const populatedOrder = await Order.findById(orderId)
-      .populate({
-        path: 'buyerId',
-        select: 'username avatar email',
-        model: 'User'
-      })
-      .populate({
-        path: 'sellerId',
-        select: 'username avatar sellerRating email',
-        model: 'User'
-      })
-      .populate({
-        path: 'listingId',
-        select: 'title mediaUrls price category type',
-        model: 'MarketplaceListing'
-      })
+      .populate('buyerId', 'username avatar email')
+      .populate('sellerId', 'username avatar sellerRating email')
+      .populate('listingId', 'title mediaUrls price category type')
       .lean();
 
     res.status(200).json({
@@ -1906,7 +1310,7 @@ router.put("/:orderId/status", authenticateMiddleware, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error updating order status:', error);
+    console.error('Error updating order status:', error);
     
     if (error.name === 'ValidationError') {
       return res.status(400).json({
