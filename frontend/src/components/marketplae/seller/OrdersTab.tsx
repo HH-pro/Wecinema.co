@@ -114,7 +114,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
             const formData = new FormData();
             formData.append('files', file);
             
-            const uploadResponse = await fetch('/api/upload/delivery', {
+            const uploadResponse = await fetch('/upload/delivery', {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
