@@ -157,6 +157,63 @@ export const deleteRequest = <T>(
     .catch((error) => handleError(error, "delete", setLoading));
 
 // ========================
+// FILE UPLOAD FUNCTIONS
+// ========================
+
+export const uploadFiles = async (
+  files: File[],
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>
+): Promise<Array<{
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  url: string;
+  path: string;
+}>> => {
+  try {
+    setLoading(true);
+    const formData = new FormData();
+    
+    files.forEach((file, index) => {
+      formData.append('files', file);
+    });
+
+    const token = localStorage.getItem("token");
+    const response = await fetch('http://localhost:3000/marketplace/orders/upload/delivery', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Upload failed');
+    }
+
+    const data = await response.json();
+    
+    if (data.success) {
+      toast.success(`Uploaded ${data.count} file(s) successfully`);
+      return data.files;
+    } else {
+      throw new Error(data.error || 'Upload failed');
+    }
+  } catch (error: any) {
+    toast.error(error.message || 'File upload failed');
+    throw error;
+  } finally {
+    setLoading(false);
+  }
+};
+
+export const getUploadedFile = (filename: string): string => {
+  return `http://localhost:3000/marketplace/orders/upload/delivery/${filename}`;
+};
+
+// ========================
 // AUTH APIs
 // ========================
 
@@ -468,7 +525,7 @@ export const offerAPI = {
 };
 
 // ========================
-// ORDER APIs - UPDATED WITH NEW STATUS ENDPOINT
+// ORDER APIs - UPDATED WITH DELIVERY ENDPOINTS
 // ========================
 
 export const orderAPI = {
@@ -511,7 +568,81 @@ export const orderAPI = {
   getOrderDetails: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
     getRequest(`/marketplace/orders/${orderId}`, setLoading),
 
-  // Generic Order Status Update (for when specific endpoints fail)
+  // Delivery System APIs
+  deliverWithEmail: async (
+    orderId: string,
+    deliveryData: {
+      deliveryMessage: string;
+      deliveryFiles?: string[];
+      attachments: Array<{
+        filename: string;
+        originalName: string;
+        mimeType: string;
+        size: number;
+        url: string;
+        key?: string;
+      }>;
+      isFinalDelivery?: boolean;
+    },
+    setLoading: React.Dispatch<React.SetStateAction<boolean>>
+  ) => {
+    try {
+      setLoading(true);
+      
+      const response = await api.put(`/marketplace/orders/${orderId}/deliver-with-email`, deliveryData);
+      
+      toast.success("Order delivered successfully! Buyer has been notified.");
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || 'Failed to deliver order';
+      toast.error(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  },
+
+  completeRevision: async (
+    orderId: string,
+    revisionData: {
+      deliveryMessage: string;
+      deliveryFiles?: string[];
+      attachments: Array<{
+        filename: string;
+        originalName: string;
+        mimeType: string;
+        size: number;
+        url: string;
+        key?: string;
+      }>;
+      isFinalDelivery?: boolean;
+    },
+    setLoading: React.Dispatch<React.SetStateAction<boolean>>
+  ) => {
+    try {
+      setLoading(true);
+      
+      const response = await api.put(`/marketplace/orders/${orderId}/complete-revision`, revisionData);
+      
+      toast.success("Revision completed successfully! Buyer has been notified.");
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || 'Failed to complete revision';
+      toast.error(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  },
+
+  // Delivery History
+  getDeliveryHistory: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest(`/marketplace/orders/${orderId}/deliveries`, setLoading),
+
+  getDeliveryDetails: (deliveryId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest(`/marketplace/orders/deliveries/${deliveryId}`, setLoading),
+
+  // Generic Order Status Update
   updateOrderStatus: async (
     orderId: string,
     status: string,
@@ -574,6 +705,7 @@ export const orderAPI = {
   startWork: (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
     putRequest(`/marketplace/orders/${orderId}/start-work`, {}, setLoading, "Work started on order"),
 
+  // Legacy delivery route
   deliverOrder: (
     orderId: string,
     deliveryData: {
@@ -644,61 +776,11 @@ export const orderAPI = {
   getSellerStats: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
     getRequest('/marketplace/orders/stats/seller', setLoading),
 
-  // Work File Management
-  uploadWorkFile: (
-    orderId: string,
-    fileData: {
-      name: string;
-      url: string;
-      type: string;
-    },
-    setLoading: React.Dispatch<React.SetStateAction<boolean>>
-  ) => postRequest(`/marketplace/orders/${orderId}/upload-work-file`, fileData, setLoading, "File uploaded successfully"),
-
-  // Revision Management
-  completeRevision: (
-    orderId: string,
-    revisionId: string,
-    files?: string[],
-    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-  ) => {
-    return new Promise((resolve, reject) => {
-      setLoading?.(true);
-      api.put(`/marketplace/orders/${orderId}/complete-revision/${revisionId}`, { files })
-        .then(response => {
-          toast.success("Revision completed successfully!");
-          resolve(response.data);
-        })
-        .catch(error => {
-          const errorMessage = error.response?.data?.error || 'Failed to complete revision';
-          toast.error(errorMessage);
-          reject(new Error(errorMessage));
-        })
-        .finally(() => setLoading?.(false));
-    });
-  }
-};
-export const formatDate = (dateString: string): string => {
-  if (!dateString) return 'N/A';
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric'
-  });
+  // Admin: Delete all orders
+  deleteAllOrders: (setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    deleteRequest('/marketplace/orders/delete-all-orders', setLoading, "All orders deleted successfully")
 };
 
-export const formatDateTime = (dateString: string): string => {
-  if (!dateString) return 'N/A';
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-};
 // ========================
 // PAYMENT APIs
 // ========================
@@ -887,10 +969,43 @@ export const notificationAPI = {
 };
 
 // ========================
+// DATE UTILITIES
+// ========================
+
+export const formatDate = (dateString: string): string => {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  });
+};
+
+export const formatDateTime = (dateString: string): string => {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+// ========================
 // MARKETPLACE API GROUP (Main export)
 // ========================
 
 export const marketplaceAPI = {
+  // File Upload
+  upload: {
+    files: uploadFiles,
+    getFile: getUploadedFile
+  },
+  
+  // Listings
   listings: {
     get: listingAPI.getListings,
     getById: listingAPI.getListingById,
@@ -902,6 +1017,8 @@ export const marketplaceAPI = {
     delete: listingAPI.deleteListing,
     toggleStatus: listingAPI.toggleListingStatus
   },
+  
+  // Offers
   offers: {
     make: offerAPI.makeOffer,
     getMy: offerAPI.getMyOffers,
@@ -910,12 +1027,20 @@ export const marketplaceAPI = {
     reject: offerAPI.rejectOffer,
     cancel: offerAPI.cancelOffer
   },
+  
+  // Orders
   orders: {
     // Order Creation & Retrieval
     create: orderAPI.createOrder,
     getMy: orderAPI.getMyOrders,
     getSeller: orderAPI.getSellerOrders,
     getDetails: orderAPI.getOrderDetails,
+    
+    // Delivery System
+    deliverWithEmail: orderAPI.deliverWithEmail,
+    completeRevision: orderAPI.completeRevision,
+    getDeliveryHistory: orderAPI.getDeliveryHistory,
+    getDeliveryDetails: orderAPI.getDeliveryDetails,
     
     // Generic Status Update (fallback endpoint)
     updateStatus: orderAPI.updateOrderStatus,
@@ -937,10 +1062,11 @@ export const marketplaceAPI = {
     getTimeline: orderAPI.getOrderTimeline,
     getSellerStats: orderAPI.getSellerStats,
     
-    // Work Management
-    uploadWorkFile: orderAPI.uploadWorkFile,
-    completeRevision: orderAPI.completeRevision
+    // Admin
+    deleteAll: orderAPI.deleteAllOrders
   },
+  
+  // Payments
   payments: {
     createIntent: paymentAPI.createPaymentIntent,
     confirm: paymentAPI.confirmPayment,
@@ -950,6 +1076,8 @@ export const marketplaceAPI = {
     createOrderPayment: paymentAPI.createOrderPayment,
     confirmOrderPayment: paymentAPI.confirmOrderPayment
   },
+  
+  // Messages
   messages: {
     get: messageAPI.getOrderMessages,
     send: messageAPI.sendMessage,
@@ -957,24 +1085,32 @@ export const marketplaceAPI = {
     getOrderConversation: messageAPI.getOrderConversation,
     sendOrderMessage: messageAPI.sendOrderMessage
   },
+  
+  // Dashboard
   dashboard: {
     getSellerStats: dashboardAPI.getSellerStats,
     getBuyerStats: dashboardAPI.getBuyerStats,
     getOrderStats: dashboardAPI.getOrderStats,
     getRevenueStats: dashboardAPI.getRevenueStats
   },
+  
+  // Reviews
   reviews: {
     create: reviewAPI.createReview,
     getOrderReviews: reviewAPI.getOrderReviews,
     getUserReviews: reviewAPI.getUserReviews,
     getMyReviews: reviewAPI.getMyReviews
   },
+  
+  // Notifications
   notifications: {
     get: notificationAPI.getNotifications,
     markAsRead: notificationAPI.markAsRead,
     markAllAsRead: notificationAPI.markAllAsRead,
     getUnreadCount: notificationAPI.getUnreadCount
   },
+  
+  // Stripe
   stripe: {
     checkStatus: checkStripeStatus,
     createAccount: createStripeAccount,
@@ -1218,6 +1354,25 @@ export const validateOrderData = (data: {
   return errors;
 };
 
+// Delivery validation
+export const validateDeliveryData = (data: {
+  deliveryMessage: string;
+  attachments?: Array<any>;
+  files?: File[];
+}) => {
+  const errors: string[] = [];
+
+  if (!data.deliveryMessage?.trim()) {
+    errors.push('Delivery message is required');
+  }
+
+  if ((!data.attachments || data.attachments.length === 0) && (!data.files || data.files.length === 0)) {
+    errors.push('At least one file or attachment is required');
+  }
+
+  return errors;
+};
+
 // ========================
 // LEGACY INDIVIDUAL EXPORTS (for backward compatibility)
 // ========================
@@ -1227,6 +1382,10 @@ export const loginUser = authAPI.login;
 export const registerUser = authAPI.register;
 export const getCurrentUser = authAPI.getCurrentUser;
 export const updateProfile = authAPI.updateProfile;
+
+// File upload exports
+export const uploadDeliveryFiles = uploadFiles;
+export const getDeliveryFile = getUploadedFile;
 
 // Marketplace exports
 export const getListings = listingAPI.getListings;
@@ -1243,12 +1402,16 @@ export const acceptOffer = offerAPI.acceptOffer;
 export const rejectOffer = offerAPI.rejectOffer;
 export const cancelOffer = offerAPI.cancelOffer;
 
-// Order exports - UPDATED
+// Order exports - UPDATED WITH DELIVERY FUNCTIONS
 export const createOrder = orderAPI.createOrder;
 export const getMyOrders = orderAPI.getMyOrders;
 export const getSellerOrders = orderAPI.getSellerOrders;
 export const getOrderDetails = orderAPI.getOrderDetails;
-export const updateOrderStatus = orderAPI.updateOrderStatus; // NEW
+export const deliverOrderWithEmail = orderAPI.deliverWithEmail;
+export const completeRevision = orderAPI.completeRevision;
+export const getDeliveryHistory = orderAPI.getDeliveryHistory;
+export const getDeliveryDetails = orderAPI.getDeliveryDetails;
+export const updateOrderStatus = orderAPI.updateOrderStatus;
 export const startProcessing = orderAPI.startProcessing;
 export const startWorkOnOrder = orderAPI.startWork;
 export const deliverOrder = orderAPI.deliverOrder;
