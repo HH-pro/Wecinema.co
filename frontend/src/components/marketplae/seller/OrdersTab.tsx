@@ -70,6 +70,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState<Order | null>(null);
+  const [isSubmittingDelivery, setIsSubmittingDelivery] = useState(false);
 
   const statusFilters = [
     { value: 'all', label: 'All Orders', count: orders.length },
@@ -102,11 +103,82 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     isFinal: boolean;
     revisionsLeft?: number;
   }) => {
-    if (onActualDeliver) {
-      await onActualDeliver(deliveryData);
+    try {
+      setIsSubmittingDelivery(true);
+
+      // Upload files first if there are attachments
+      let uploadedAttachments = [];
+      if (deliveryData.attachments && deliveryData.attachments.length > 0) {
+        uploadedAttachments = await Promise.all(
+          deliveryData.attachments.map(async (file) => {
+            const formData = new FormData();
+            formData.append('files', file);
+            
+            const uploadResponse = await fetch('/api/upload/delivery', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              },
+              body: formData
+            });
+            
+            const uploadData = await uploadResponse.json();
+            
+            if (!uploadData.success) {
+              throw new Error(uploadData.error || 'File upload failed');
+            }
+            
+            return uploadData.files[0]; // Get the first uploaded file
+          })
+        );
+      }
+
+      // Send delivery request with email notification
+      const response = await fetch(`/api/orders/${deliveryData.orderId}/deliver-with-email`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          deliveryMessage: deliveryData.message,
+          attachments: uploadedAttachments,
+          isFinalDelivery: deliveryData.isFinal,
+          revisionsLeft: deliveryData.revisionsLeft
+        })
+      });
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Delivery failed');
+      }
+
+      // Show success message
+      alert('✅ Delivery submitted successfully! Buyer has been notified via email.');
+      
+      // Close modal and refresh
       setDeliveryModalOpen(false);
       setSelectedOrderForDelivery(null);
       onRefresh();
+      
+    } catch (error: any) {
+      console.error('Delivery error:', error);
+      alert(`❌ Delivery failed: ${error.message || 'Something went wrong'}`);
+    } finally {
+      setIsSubmittingDelivery(false);
+    }
+  };
+
+  // For revision completion:
+  const handleCompleteRevision = async (order: Order) => {
+    try {
+      // Show delivery modal for revision completion
+      setSelectedOrderForDelivery(order);
+      setDeliveryModalOpen(true);
+    } catch (error: any) {
+      console.error('Revision error:', error);
+      alert(`❌ Revision failed: ${error.message || 'Something went wrong'}`);
     }
   };
 
@@ -157,7 +229,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
         return {
           text: 'Complete Revision',
           color: 'amber',
-          onClick: () => onCompleteRevision?.(order),
+          onClick: () => handleCompleteRevision(order),
           description: 'Send revised work back',
           icon: '🔄'
         };
@@ -449,7 +521,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                         {action && action.onClick && (
                           <button
                             onClick={action.onClick}
-                            disabled={actionLoading === order._id}
+                            disabled={actionLoading === order._id || isSubmittingDelivery}
                             className={`px-4 py-2.5 text-sm font-medium text-white rounded-xl transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow flex items-center gap-2 ${
                               action.color === 'yellow' ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700' :
                               action.color === 'green' ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700' :
@@ -458,7 +530,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                               'bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700'
                             }`}
                           >
-                            {actionLoading === order._id ? (
+                            {(actionLoading === order._id || isSubmittingDelivery) ? (
                               <>
                                 <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -478,7 +550,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                         {['paid', 'processing', 'in_progress'].includes(order.status) && onCancel && (
                           <button
                             onClick={() => onCancel(order)}
-                            disabled={actionLoading === order._id}
+                            disabled={actionLoading === order._id || isSubmittingDelivery}
                             className="px-4 py-2.5 text-sm font-medium text-red-700 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 rounded-xl transition-all duration-200 disabled:opacity-50 border border-red-200 flex items-center gap-2"
                           >
                             <span>❌</span>
@@ -488,7 +560,8 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
 
                         <button
                           onClick={() => toggleExpandOrder(order._id)}
-                          className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 rounded-xl transition-all duration-200 border border-gray-300 flex items-center gap-2"
+                          disabled={isSubmittingDelivery}
+                          className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 rounded-xl transition-all duration-200 border border-gray-300 flex items-center gap-2 disabled:opacity-50"
                         >
                           <span>{isExpanded ? '▲' : '▼'}</span>
                           {isExpanded ? 'Show Less' : 'More Info'}
@@ -496,7 +569,8 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
 
                         <button
                           onClick={() => onViewOrderDetails(order._id)}
-                          className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-yellow-300 hover:bg-yellow-50 rounded-xl transition-all duration-200 shadow-sm flex items-center gap-2"
+                          disabled={isSubmittingDelivery}
+                          className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-yellow-300 hover:bg-yellow-50 rounded-xl transition-all duration-200 shadow-sm flex items-center gap-2 disabled:opacity-50"
                         >
                           <span>📋</span>
                           Details
@@ -530,7 +604,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                               {action.onClick && (
                                 <button
                                   onClick={action.onClick}
-                                  disabled={actionLoading === order._id}
+                                  disabled={actionLoading === order._id || isSubmittingDelivery}
                                   className="w-full px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 disabled:opacity-50 shadow-md flex items-center justify-center gap-2"
                                 >
                                   <span>{action.icon}</span>
@@ -591,14 +665,16 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                               <div className="flex flex-wrap gap-2">
                                 <button
                                   onClick={() => onViewOrderDetails(order._id)}
-                                  className="px-3 py-1.5 text-xs bg-gradient-to-r from-yellow-50 to-yellow-100 text-yellow-700 rounded-lg hover:from-yellow-100 hover:to-yellow-200 transition-all duration-200 border border-yellow-200 flex items-center gap-1"
+                                  disabled={isSubmittingDelivery}
+                                  className="px-3 py-1.5 text-xs bg-gradient-to-r from-yellow-50 to-yellow-100 text-yellow-700 rounded-lg hover:from-yellow-100 hover:to-yellow-200 transition-all duration-200 border border-yellow-200 flex items-center gap-1 disabled:opacity-50"
                                 >
                                   <span>📋</span>
                                   View Full Details
                                 </button>
                                 <button
                                   onClick={() => window.open(`/messages?order=${order._id}`, '_blank')}
-                                  className="px-3 py-1.5 text-xs bg-gradient-to-r from-green-50 to-green-100 text-green-700 rounded-lg hover:from-green-100 hover:to-green-200 transition-all duration-200 border border-green-200 flex items-center gap-1"
+                                  disabled={isSubmittingDelivery}
+                                  className="px-3 py-1.5 text-xs bg-gradient-to-r from-green-50 to-green-100 text-green-700 rounded-lg hover:from-green-100 hover:to-green-200 transition-all duration-200 border border-green-200 flex items-center gap-1 disabled:opacity-50"
                                 >
                                   <span>💬</span>
                                   Message Buyer
@@ -606,7 +682,8 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                                 {order.listingId?.mediaUrls?.[0] && onPlayVideo && (
                                   <button
                                     onClick={() => onPlayVideo(order.listingId.mediaUrls![0], order.listingId.title)}
-                                    className="px-3 py-1.5 text-xs bg-gradient-to-r from-purple-50 to-purple-100 text-purple-700 rounded-lg hover:from-purple-100 hover:to-purple-200 transition-all duration-200 border border-purple-200 flex items-center gap-1"
+                                    disabled={isSubmittingDelivery}
+                                    className="px-3 py-1.5 text-xs bg-gradient-to-r from-purple-50 to-purple-100 text-purple-700 rounded-lg hover:from-purple-100 hover:to-purple-200 transition-all duration-200 border border-purple-200 flex items-center gap-1 disabled:opacity-50"
                                   >
                                     <span>▶️</span>
                                     View Media
@@ -614,7 +691,8 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                                 )}
                                 <button
                                   onClick={() => navigator.clipboard.writeText(order.orderNumber || order._id)}
-                                  className="px-3 py-1.5 text-xs bg-gradient-to-r from-gray-50 to-gray-100 text-gray-700 rounded-lg hover:from-gray-100 hover:to-gray-200 transition-all duration-200 border border-gray-200 flex items-center gap-1"
+                                  disabled={isSubmittingDelivery}
+                                  className="px-3 py-1.5 text-xs bg-gradient-to-r from-gray-50 to-gray-100 text-gray-700 rounded-lg hover:from-gray-100 hover:to-gray-200 transition-all duration-200 border border-gray-200 flex items-center gap-1 disabled:opacity-50"
                                 >
                                   <span>📋</span>
                                   Copy Order ID
@@ -664,7 +742,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
           }}
           order={selectedOrderForDelivery}
           onDeliver={handleActualDeliver}
-          isLoading={actionLoading === selectedOrderForDelivery._id}
+          isLoading={actionLoading === selectedOrderForDelivery._id || isSubmittingDelivery}
         />
       )}
     </div>
