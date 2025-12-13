@@ -160,7 +160,7 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
             {/* Create Listing Button */}
             <button
               onClick={onCreateListing}
-              className="inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-blue-yellow text-white font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md hover:shadow-lg"
+              className="inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-yellow-500  text-white font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md hover:shadow-lg"
             >
               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
