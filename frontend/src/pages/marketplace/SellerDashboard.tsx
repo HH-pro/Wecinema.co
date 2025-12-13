@@ -280,7 +280,7 @@ const SellerDashboard: React.FC = () => {
           headers: { Authorization: `Bearer ${token}` },
           timeout: 10000
         }),
-        axios.get(`${API_BASE_URL}/marketplace/offers/received`, {
+        axios.get(`${API_BASE_URL}/marketplace/offers/received-offers`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
         axios.get(`${API_BASE_URL}/marketplace/listings/my-listings`, {
