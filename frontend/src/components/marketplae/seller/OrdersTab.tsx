@@ -1,4 +1,4 @@
-// src/components/marketplace/seller/OrdersTab.tsx - FILE UPLOAD FIXED VERSION
+// src/components/marketplace/seller/OrdersTab.tsx - COMPLETE FIXED VERSION
 import React, { useState } from 'react';
 import { marketplaceAPI, getOrderStatusInfo, formatCurrency, formatDate } from '../../../api';
 import OrderStatusTracker from './OrderStatusTracker';
@@ -107,7 +107,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     setDeliveryModalOpen(true);
   };
 
-  // ✅ FIXED FILE UPLOAD FUNCTION
+  // ✅ IMPROVED FILE UPLOAD FUNCTION WITH BETTER ERROR HANDLING
   const handleActualDeliver = async (deliveryData: {
     orderId: string;
     message: string;
@@ -118,13 +118,18 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     try {
       setIsSubmittingDelivery(true);
       
-      console.log('Starting delivery process...', {
+      console.log('🚀 Starting delivery process...', {
         orderId: deliveryData.orderId,
         messageLength: deliveryData.message?.length,
-        filesCount: deliveryData.attachments?.length
+        filesCount: deliveryData.attachments?.length,
+        files: deliveryData.attachments?.map(f => ({
+          name: f.name,
+          type: f.type,
+          size: f.size,
+          extension: f.name.split('.').pop()?.toLowerCase()
+        }))
       });
 
-      // ✅ FIXED: Use marketplaceAPI.upload.files directly
       let uploadedAttachments: Array<{
         filename: string;
         originalName: string;
@@ -136,30 +141,36 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
 
       // Upload files if available
       if (deliveryData.attachments && deliveryData.attachments.length > 0) {
-        console.log('Uploading files...', deliveryData.attachments.length);
+        console.log('📤 Uploading files...', deliveryData.attachments.length);
         
         try {
-          uploadedAttachments = await marketplaceAPI.upload.files(
-            deliveryData.attachments,
-            setIsSubmittingDelivery
-          );
+          // ✅ Direct file upload with better handling
+          uploadedAttachments = await uploadFilesDirect(deliveryData.attachments);
           
-          console.log('Files uploaded successfully:', uploadedAttachments.length);
+          console.log('✅ Files uploaded successfully:', uploadedAttachments);
         } catch (uploadError: any) {
-          console.error('File upload error:', uploadError);
-          toast.error(`File upload failed: ${uploadError.message || 'Please try again'}`);
+          console.error('❌ File upload error:', uploadError);
+          
+          // Check if it's a file type error
+          if (uploadError.message?.includes('File type') || uploadError.message?.includes('not supported')) {
+            toast.error(`❌ ${uploadError.message}. Please use supported file types.`);
+          } else if (uploadError.message?.includes('size')) {
+            toast.error('❌ File too large. Maximum size is 100MB.');
+          } else {
+            toast.error(`❌ File upload failed: ${uploadError.message || 'Please try again'}`);
+          }
           return; // Stop if file upload fails
         }
       }
 
       // Determine if this is a revision or initial delivery
       const isRevision = selectedOrderForDelivery?.status === 'in_revision';
-      console.log('Is revision?', isRevision);
+      console.log('🔄 Is revision?', isRevision);
       
       try {
         if (isRevision) {
           // Complete revision
-          console.log('Completing revision...');
+          console.log('🔄 Completing revision...');
           await marketplaceAPI.orders.completeRevision(
             deliveryData.orderId,
             {
@@ -172,7 +183,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
           toast.success('✅ Revision completed successfully!');
         } else {
           // Initial delivery with email
-          console.log('Delivering order with email...');
+          console.log('📤 Delivering order with email...');
           await marketplaceAPI.orders.deliverWithEmail(
             deliveryData.orderId,
             {
@@ -185,12 +196,20 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
           toast.success('✅ Order delivered successfully! Buyer has been notified via email.');
         }
       } catch (apiError: any) {
-        console.error('API Error:', apiError);
-        throw apiError; // Re-throw for outer catch
+        console.error('❌ API Error:', apiError);
+        
+        // Handle specific API errors
+        if (apiError.message?.includes('Validation failed')) {
+          toast.error('❌ Please check your delivery details and try again.');
+        } else if (apiError.message?.includes('not found')) {
+          toast.error('❌ Order not found or you do not have permission.');
+        } else {
+          throw apiError; // Re-throw for outer catch
+        }
       }
 
       // Success! Close modal and refresh
-      console.log('Delivery successful, refreshing orders...');
+      console.log('🎉 Delivery successful, refreshing orders...');
       setDeliveryModalOpen(false);
       setSelectedOrderForDelivery(null);
       onRefresh();
@@ -205,6 +224,8 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
         errorMessage = 'Invalid file type. Please check allowed file formats.';
       } else if (error.message?.includes('size')) {
         errorMessage = 'File too large. Maximum size is 100MB.';
+      } else if (error.message?.includes('network') || error.message?.includes('Network Error')) {
+        errorMessage = 'Network error. Please check your internet connection.';
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -215,13 +236,69 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     }
   };
 
+  // ✅ DIRECT FILE UPLOAD FUNCTION WITH BETTER ERROR HANDLING
+  const uploadFilesDirect = async (files: File[]) => {
+    try {
+      const formData = new FormData();
+      
+      // Log each file before uploading
+      files.forEach(file => {
+        console.log('📄 File to upload:', {
+          name: file.name,
+          type: file.type,
+          size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+          extension: file.name.split('.').pop()?.toLowerCase()
+        });
+        formData.append('files', file);
+      });
+
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication required. Please login again.');
+      }
+
+      console.log('🌐 Sending file upload request...');
+      
+      const response = await fetch('http://localhost:3000/marketplace/orders/upload/delivery', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          // Don't set Content-Type for FormData, browser will set it automatically
+        },
+        body: formData,
+      });
+
+      console.log('📥 Upload response status:', response.status);
+      
+      const data = await response.json();
+      console.log('📦 Upload response:', data);
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || `Upload failed with status ${response.status}`);
+      }
+
+      if (data.success) {
+        return data.files;
+      } else {
+        throw new Error(data.error || 'Upload failed');
+      }
+    } catch (error: any) {
+      console.error('❌ Upload error details:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      });
+      throw error;
+    }
+  };
+
   // For revision completion:
   const handleCompleteRevision = async (order: Order) => {
     try {
       setSelectedOrderForDelivery(order);
       setDeliveryModalOpen(true);
     } catch (error: any) {
-      console.error('Revision setup error:', error);
+      console.error('❌ Revision setup error:', error);
       toast.error(`❌ ${error.message || 'Failed to start revision'}`);
     }
   };
@@ -332,6 +409,37 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     return null;
   };
 
+  // ✅ FILE VALIDATION HELPER
+  const validateFileBeforeUpload = (file: File): string | null => {
+    const maxSize = 100 * 1024 * 1024; // 100MB
+    const allowedExtensions = [
+      // Images
+      '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg',
+      // Videos
+      '.mp4', '.mov', '.avi', '.webm', '.mkv',
+      // Documents
+      '.pdf', '.txt', '.csv', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+      // Audio
+      '.mp3', '.wav', '.ogg', '.m4a',
+      // Archives
+      '.zip', '.rar', '.7z', '.tar', '.gz', '.tgz', '.bz2', '.tar.gz', '.tar.bz2'
+    ];
+
+    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+
+    // Check file size
+    if (file.size > maxSize) {
+      return `File "${file.name}" is too large. Maximum size is 100MB.`;
+    }
+
+    // Check file extension
+    if (!allowedExtensions.includes(fileExtension)) {
+      return `File type "${fileExtension}" is not supported. Allowed: ${allowedExtensions.join(', ')}`;
+    }
+
+    return null; // File is valid
+  };
+
   return (
     <div className="space-y-6">
       {/* Header with Stats */}
@@ -347,7 +455,15 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
               disabled={loading}
               className="px-4 py-2.5 bg-white border border-yellow-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-yellow-50 hover:shadow-sm transition-all duration-200 disabled:opacity-50 shadow-sm"
             >
-              {loading ? 'Refreshing...' : 'Refresh'}
+              {loading ? (
+                <>
+                  <svg className="animate-spin h-4 w-4 inline mr-2" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Refreshing...
+                </>
+              ) : 'Refresh'}
             </button>
           </div>
         </div>
@@ -493,6 +609,10 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                             <div className="flex items-center">
                               <span className="mr-1">👤</span>
                               <span>{order.buyerId?.username || 'Buyer'}</span>
+                            </div>
+                            <div className="flex items-center">
+                              <span className="mr-1">💰</span>
+                              <span className="font-medium text-green-600">{formatCurrency(order.amount || 0)}</span>
                             </div>
                             <div className="flex items-center">
                               <span className="mr-1">📅</span>
@@ -787,6 +907,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
           order={selectedOrderForDelivery}
           onDeliver={handleActualDeliver}
           isLoading={actionLoading === selectedOrderForDelivery._id || isSubmittingDelivery}
+          validateFile={validateFileBeforeUpload} // ✅ Pass validation function to modal
         />
       )}
     </div>
