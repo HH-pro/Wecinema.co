@@ -71,8 +71,8 @@
 }
 
 .refresh-btn:hover, .settings-btn:hover {
-  background: #eab308;
-  border-color: #eab308;
+  background: #3498db;
+  border-color: #3498db;
   color: white;
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
@@ -129,7 +129,7 @@
 
 .total-orders .stat-icon {
   background: rgba(52, 152, 219, 0.1);
-  color: #eab308;
+  color: #3498db;
 }
 
 .active-orders .stat-icon {
@@ -210,7 +210,7 @@
 
 .status-filter-btn.active {
   background: #e3f2fd;
-  color: #eab308;
+  color: #1976d2;
   font-weight: 600;
   border-color: currentColor;
 }
@@ -264,7 +264,7 @@
 
 .search-input:focus {
   outline: none;
-  border-color: #eab308;
+  border-color: #3498db;
   box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
 }
 
@@ -284,8 +284,8 @@
 }
 
 .filter-toggle:hover {
-  background: #eab308;
-  border-color: #ca8a04;
+  background: #3498db;
+  border-color: #3498db;
   color: white;
 }
 
@@ -401,13 +401,13 @@
 .action-btn:hover {
   transform: translateY(-3px);
   box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
-  border-color: #eab308;
+  border-color: #3498db;
   background: #e3f2fd;
 }
 
 .action-btn.primary {
-  background: #eab308;
-  border-color: #eab308;
+  background: #3498db;
+  border-color: #3498db;
   color: white;
 }
 
@@ -711,7 +711,7 @@
 }
 
 .payment-paid {
-  color: #eab308;
+  color: #3498db;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -751,7 +751,7 @@
 }
 
 .view-order-btn {
-  background: #eab308;
+  background: #3498db;
   color: white;
 }
 
@@ -881,7 +881,7 @@
 
 .cta-button {
   padding: 14px 28px;
-  background: #eab308;
+  background: #3498db;
   color: white;
   border: none;
   border-radius: 8px;
@@ -947,12 +947,12 @@
 .tip-card:hover {
   transform: translateY(-5px);
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-  border-color: #eab308;
+  border-color: #3498db;
 }
 
 .tip-card svg {
   font-size: 32px;
-  color: #eab308;
+  color: #3498db;
   margin-bottom: 5px;
 }
 
@@ -984,7 +984,7 @@
   width: 50px;
   height: 50px;
   border: 3px solid #dee2e6;
-  border-top-color: #eab308;
+  border-top-color: #3498db;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -1113,7 +1113,7 @@
   background: #f8f9fa;
   padding: 20px;
   border-radius: 8px;
-  border-left: 4px solid #eab308;
+  border-left: 4px solid #3498db;
   color: #495057;
   line-height: 1.6;
   font-size: 14px;
@@ -1142,7 +1142,7 @@
 }
 
 .modal-actions .btn.primary {
-  background: #eab308;
+  background: #3498db;
   color: white;
 }
 
@@ -1195,7 +1195,7 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: #eab308;
+  background: #3498db;
   border: 3px solid #fff;
 }
 
@@ -1313,7 +1313,7 @@
 
 .payment-method svg {
   font-size: 24px;
-  color: #eab308;
+  color: #3498db;
 }
 
 .payment-breakdown {
