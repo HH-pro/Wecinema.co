@@ -24,7 +24,7 @@ import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import './BuyerDashboard.css';
 import MarketplaceLayout from '../../components/Layout';
-import { marketplaceAPI, isAuthenticated, formatCurrency } from '../../services/api';
+import { marketplaceAPI, isAuthenticated, formatCurrency } from '../../api';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
 
 interface User {
