@@ -336,7 +336,7 @@
 }
 
 .header__action-btn--upload:hover {
-  background: linear-gradient(135deg, var(--color-success-dark), #ffffff);
+  background:  #ffffff;
 }
 
 .header__dropdown-arrow {
