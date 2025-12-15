@@ -1,4 +1,4 @@
-// api.ts - Complete & Organized Version with marketplaceAPI export
+// api.ts - UPDATED WITH ALL NEW BUYER ROUTES
 import axios, { AxiosResponse, AxiosError, Method } from "axios";
 import { toast } from "react-toastify";
 
@@ -159,7 +159,6 @@ export const deleteRequest = <T>(
 // ========================
 // FILE UPLOAD FUNCTIONS
 // ========================
-// In api.ts - Update the uploadFiles function
 export const uploadFiles = async (
   files: File[],
   setLoading: React.Dispatch<React.SetStateAction<boolean>>
@@ -185,7 +184,6 @@ export const uploadFiles = async (
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
-        // Don't set Content-Type for FormData, browser will set it with boundary
       },
       body: formData,
     });
@@ -211,10 +209,11 @@ export const uploadFiles = async (
     setLoading(false);
   }
 };
+
 export const getUploadedFile = (filename: string): string => {
   return `http://localhost:3000/marketplace/orders/upload/delivery/${filename}`;
 };
-// api.ts - Update allowed file types in frontend validation
+
 export const ALLOWED_FILE_TYPES = [
   'image/jpeg', 'image/png', 'image/gif', 'image/webp',
   'video/mp4', 'video/quicktime', 'video/x-msvideo',
@@ -240,22 +239,20 @@ export const ALLOWED_FILE_EXTENSIONS = [
   '.xls', '.xlsx'
 ];
 
-// File validation function
 export const validateFile = (file: File): string | null => {
   const extension = '.' + file.name.split('.').pop()?.toLowerCase();
   
-  // Check by MIME type
   if (ALLOWED_FILE_TYPES.includes(file.type)) {
-    return null; // Valid
+    return null;
   }
   
-  // Check by extension
   if (extension && ALLOWED_FILE_EXTENSIONS.includes(extension)) {
-    return null; // Valid
+    return null;
   }
   
   return `File type not supported. Allowed: ${ALLOWED_FILE_EXTENSIONS.join(', ')}`;
 };
+
 // ========================
 // AUTH APIs
 // ========================
@@ -381,7 +378,6 @@ export const createLoginLink = (setLoading: React.Dispatch<React.SetStateAction<
 // ========================
 
 export const listingAPI = {
-  // Get all listings with filters
   getListings: (
     params?: {
       type?: string;
@@ -415,11 +411,9 @@ export const listingAPI = {
     return getRequest(`/marketplace/listings/listings${queryString ? `?${queryString}` : ''}`, setLoading);
   },
 
-  // Get single listing by ID
   getListingById: (listingId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
     getRequest(`/marketplace/listings/listing/${listingId}`, setLoading),
 
-  // Get user's own listings
   getMyListings: (params?: { status?: string; page?: number; limit?: number }, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) => {
     const queryParams = new URLSearchParams();
     if (params?.status) queryParams.append('status', params.status);
@@ -430,7 +424,6 @@ export const listingAPI = {
     return getRequest(`/marketplace/listings/my-listings${queryString ? `?${queryString}` : ''}`, setLoading);
   },
 
-  // Create new listing
   createListing: (formData: FormData, setLoading: React.Dispatch<React.SetStateAction<boolean>>) => {
     return new Promise((resolve, reject) => {
       setLoading(true);
@@ -463,19 +456,15 @@ export const listingAPI = {
     });
   },
 
-  // Update existing listing
   updateListing: (listingId: string, data: any, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
     putRequest(`/marketplace/listings/listing/${listingId}`, data, setLoading, "Listing updated successfully"),
 
-  // Delete listing
   deleteListing: (listingId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
     deleteRequest(`/marketplace/listings/listing/${listingId}`, setLoading, "Listing deleted successfully"),
 
-  // Toggle listing status
   toggleListingStatus: (listingId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
     patchRequest(`/marketplace/listings/listing/${listingId}/toggle-status`, {}, setLoading, "Listing status updated"),
 
-  // Get listings by user ID
   getUserListings: (userId: string, params?: { status?: string; page?: number; limit?: number }, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) => {
     const queryParams = new URLSearchParams();
     if (params?.status) queryParams.append('status', params.status);
@@ -486,7 +475,6 @@ export const listingAPI = {
     return getRequest(`/marketplace/listings/user/${userId}/listings${queryString ? `?${queryString}` : ''}`, setLoading);
   },
 
-  // Search listings
   searchListings: (
     params: {
       query?: string;
@@ -568,10 +556,11 @@ export const offerAPI = {
 };
 
 // ========================
-// ORDER APIs - UPDATED WITH DELIVERY ENDPOINTS
+// ORDER APIs - COMPLETE WITH ALL NEW BUYER ROUTES
 // ========================
 
 export const orderAPI = {
+  // Order Creation
   createOrder: async (
     orderData: {
       offerId: string;
@@ -602,16 +591,111 @@ export const orderAPI = {
     }
   },
 
+  // ========== BUYER ORDER QUERIES ========== //
   getMyOrders: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
     getRequest('/marketplace/orders/my-orders', setLoading),
 
-  getSellerOrders: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest('/marketplace/orders/my-sales', setLoading),
+  getBuyerStats: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest('/marketplace/orders/stats/buyer', setLoading),
 
+  // ========== BUYER ORDER DETAILS ========== //
   getOrderDetails: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
     getRequest(`/marketplace/orders/${orderId}`, setLoading),
 
-  // Delivery System APIs
+  // ========== BUYER ORDER TIMELINE ========== //
+  getOrderTimeline: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest(`/marketplace/orders/${orderId}/timeline`, setLoading),
+
+  // ========== BUYER DELIVERY MANAGEMENT ========== //
+  getDeliveryHistory: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest(`/marketplace/orders/${orderId}/deliveries`, setLoading),
+
+  getDeliveryDetails: (deliveryId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest(`/marketplace/orders/deliveries/${deliveryId}`, setLoading),
+
+  // ========== BUYER ORDER ACTIONS ========== //
+  requestRevision: async (
+    orderId: string,
+    revisionNotes: string,
+    setLoading: React.Dispatch<React.SetStateAction<boolean>>
+  ) => {
+    try {
+      setLoading(true);
+      
+      const response = await api.put(`/marketplace/orders/${orderId}/request-revision`, { revisionNotes });
+      
+      toast.success("Revision requested successfully!");
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || 'Failed to request revision';
+      toast.error(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  },
+
+  completeOrder: async (
+    orderId: string,
+    setLoading: React.Dispatch<React.SetStateAction<boolean>>
+  ) => {
+    try {
+      setLoading(true);
+      
+      const response = await api.put(`/marketplace/orders/${orderId}/complete`, {});
+      
+      toast.success("Order completed successfully! Payment released to seller.");
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || 'Failed to complete order';
+      toast.error(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  },
+
+  cancelByBuyer: async (
+    orderId: string,
+    cancelReason?: string,
+    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+  ) => {
+    try {
+      setLoading?.(true);
+      
+      const response = await api.put(`/marketplace/orders/${orderId}/cancel-by-buyer`, { cancelReason });
+      
+      toast.success("Order cancelled successfully!");
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || 'Failed to cancel order';
+      toast.error(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setLoading?.(false);
+    }
+  },
+
+  // ========== BUYER FILE DOWNLOAD ========== //
+  downloadOrderFiles: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest(`/marketplace/orders/${orderId}/download-files`, setLoading),
+
+  // ========== BUYER ORDER SUMMARY ========== //
+  getOrderSummary: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest(`/marketplace/orders/${orderId}/summary`, setLoading),
+
+  // ========== SELLER ORDER QUERIES ========== //
+  getSellerOrders: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest('/marketplace/orders/my-sales', setLoading),
+
+  // ========== SELLER ORDER MANAGEMENT ========== //
+  startProcessing: (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    putRequest(`/marketplace/orders/${orderId}/start-processing`, {}, setLoading, "Order processing started"),
+
+  startWork: (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    putRequest(`/marketplace/orders/${orderId}/start-work`, {}, setLoading, "Work started on order"),
+
+  // ========== DELIVERY SYSTEM ========== //
   deliverWithEmail: async (
     orderId: string,
     deliveryData: {
@@ -678,14 +762,42 @@ export const orderAPI = {
     }
   },
 
-  // Delivery History
-  getDeliveryHistory: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(`/marketplace/orders/${orderId}/deliveries`, setLoading),
+  // Legacy delivery route
+  deliverOrder: (
+    orderId: string,
+    deliveryData: {
+      deliveryMessage?: string;
+      deliveryFiles?: string[];
+    },
+    setLoading: React.Dispatch<React.SetStateAction<boolean>>
+  ) => putRequest(`/marketplace/orders/${orderId}/deliver`, deliveryData, setLoading, "Order delivered successfully"),
 
-  getDeliveryDetails: (deliveryId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(`/marketplace/orders/deliveries/${deliveryId}`, setLoading),
+  cancelBySeller: async (
+    orderId: string,
+    cancelReason?: string,
+    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+  ) => {
+    try {
+      setLoading?.(true);
+      
+      const response = await api.put(`/marketplace/orders/${orderId}/cancel-by-seller`, { cancelReason });
+      
+      toast.success("Order cancelled successfully!");
+      return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || 'Failed to cancel order';
+      toast.error(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setLoading?.(false);
+    }
+  },
 
-  // Generic Order Status Update
+  // ========== SELLER STATISTICS ========== //
+  getSellerStats: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest('/marketplace/orders/stats/seller', setLoading),
+
+  // ========== GENERIC ORDER STATUS UPDATE ========== //
   updateOrderStatus: async (
     orderId: string,
     status: string,
@@ -703,7 +815,6 @@ export const orderAPI = {
       
       const requestData: any = { status };
       
-      // Add optional data based on status
       if (status === 'cancelled' && options?.cancelReason) {
         requestData.cancelReason = options.cancelReason;
       }
@@ -729,7 +840,6 @@ export const orderAPI = {
     } catch (error: any) {
       let errorMessage = error.response?.data?.error || 'Failed to update order status';
       
-      // Show allowed transitions if available
       if (error.response?.data?.allowedTransitions) {
         errorMessage += `. Allowed transitions: ${error.response.data.allowedTransitions.join(', ')}`;
       }
@@ -741,85 +851,7 @@ export const orderAPI = {
     }
   },
 
-  // Seller Order Management
-  startProcessing: (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/marketplace/orders/${orderId}/start-processing`, {}, setLoading, "Order processing started"),
-
-  startWork: (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/marketplace/orders/${orderId}/start-work`, {}, setLoading, "Work started on order"),
-
-  // Legacy delivery route
-  deliverOrder: (
-    orderId: string,
-    deliveryData: {
-      deliveryMessage?: string;
-      deliveryFiles?: string[];
-    },
-    setLoading: React.Dispatch<React.SetStateAction<boolean>>
-  ) => putRequest(`/marketplace/orders/${orderId}/deliver`, deliveryData, setLoading, "Order delivered successfully"),
-
-  // Buyer Order Management
-  requestRevision: (
-    orderId: string,
-    revisionNotes: string,
-    setLoading: React.Dispatch<React.SetStateAction<boolean>>
-  ) => putRequest(`/marketplace/orders/${orderId}/request-revision`, { revisionNotes }, setLoading, "Revision requested"),
-
-  completeOrder: (orderId: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/marketplace/orders/${orderId}/complete`, {}, setLoading, "Order completed successfully"),
-
-  // Order Cancellation (Separate for buyer and seller)
-  cancelByBuyer: (
-    orderId: string,
-    cancelReason?: string,
-    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-  ) => {
-    return new Promise((resolve, reject) => {
-      setLoading?.(true);
-      api.put(`/marketplace/orders/${orderId}/cancel-by-buyer`, { cancelReason })
-        .then(response => {
-          toast.success("Order cancelled successfully!");
-          resolve(response.data);
-        })
-        .catch(error => {
-          const errorMessage = error.response?.data?.error || 'Failed to cancel order';
-          toast.error(errorMessage);
-          reject(new Error(errorMessage));
-        })
-        .finally(() => setLoading?.(false));
-    });
-  },
-
-  cancelBySeller: (
-    orderId: string,
-    cancelReason?: string,
-    setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-  ) => {
-    return new Promise((resolve, reject) => {
-      setLoading?.(true);
-      api.put(`/marketplace/orders/${orderId}/cancel-by-seller`, { cancelReason })
-        .then(response => {
-          toast.success("Order cancelled successfully!");
-          resolve(response.data);
-        })
-        .catch(error => {
-          const errorMessage = error.response?.data?.error || 'Failed to cancel order';
-          toast.error(errorMessage);
-          reject(new Error(errorMessage));
-        })
-        .finally(() => setLoading?.(false));
-    });
-  },
-
-  // Order Timeline
-  getOrderTimeline: (orderId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(`/marketplace/orders/${orderId}/timeline`, setLoading),
-
-  // Seller Statistics
-  getSellerStats: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest('/marketplace/orders/stats/seller', setLoading),
-
-  // Admin: Delete all orders
+  // ========== ADMIN ========== //
   deleteAllOrders: (setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
     deleteRequest('/marketplace/orders/delete-all-orders', setLoading, "All orders deleted successfully")
 };
@@ -855,7 +887,6 @@ export const paymentAPI = {
     setLoading?: React.Dispatch<React.SetStateAction<boolean>>
   ) => getRequest(`/marketplace/payments/payment-status/${orderId}`, setLoading),
 
-  // Order Payment
   createOrderPayment: (
     orderId: string,
     setLoading: React.Dispatch<React.SetStateAction<boolean>>
@@ -893,7 +924,6 @@ export const messageAPI = {
     setLoading: React.Dispatch<React.SetStateAction<boolean>>
   ) => putRequest(`/marketplace/messages/${messageId}/read`, {}, setLoading),
 
-  // Order-specific messages
   getOrderConversation: (
     orderId: string,
     setLoading?: React.Dispatch<React.SetStateAction<boolean>>
@@ -935,7 +965,6 @@ export const dashboardAPI = {
     setLoading?: React.Dispatch<React.SetStateAction<boolean>>
   ) => getRequest('/marketplace/dashboard/buyer-stats', setLoading),
 
-  // Order statistics
   getOrderStats: (
     timeframe?: 'daily' | 'weekly' | 'monthly' | 'yearly',
     setLoading?: React.Dispatch<React.SetStateAction<boolean>>
@@ -946,7 +975,6 @@ export const dashboardAPI = {
     return getRequest(url, setLoading);
   },
 
-  // Revenue statistics
   getRevenueStats: (
     timeframe?: 'daily' | 'weekly' | 'monthly' | 'yearly',
     setLoading?: React.Dispatch<React.SetStateAction<boolean>>
@@ -1071,39 +1099,52 @@ export const marketplaceAPI = {
     cancel: offerAPI.cancelOffer
   },
   
-  // Orders
+  // Orders - UPDATED WITH ALL BUYER ROUTES
   orders: {
-    // Order Creation & Retrieval
+    // Order Creation
     create: orderAPI.createOrder,
-    getMy: orderAPI.getMyOrders,
-    getSeller: orderAPI.getSellerOrders,
-    getDetails: orderAPI.getOrderDetails,
     
-    // Delivery System
-    deliverWithEmail: orderAPI.deliverWithEmail,
-    completeRevision: orderAPI.completeRevision,
+    // ========== BUYER ROUTES ========== //
+    // Buyer Order Queries
+    getMy: orderAPI.getMyOrders,
+    getBuyerStats: orderAPI.getBuyerStats,
+    
+    // Buyer Order Details
+    getDetails: orderAPI.getOrderDetails,
+    getTimeline: orderAPI.getOrderTimeline,
+    
+    // Buyer Delivery Management
     getDeliveryHistory: orderAPI.getDeliveryHistory,
     getDeliveryDetails: orderAPI.getDeliveryDetails,
     
-    // Generic Status Update (fallback endpoint)
-    updateStatus: orderAPI.updateOrderStatus,
+    // Buyer Order Actions
+    requestRevision: orderAPI.requestRevision,
+    complete: orderAPI.completeOrder,
+    cancelByBuyer: orderAPI.cancelByBuyer,
+    
+    // Buyer File Download
+    downloadFiles: orderAPI.downloadOrderFiles,
+    
+    // Buyer Order Summary
+    getSummary: orderAPI.getOrderSummary,
+    
+    // ========== SELLER ROUTES ========== //
+    // Seller Order Queries
+    getSeller: orderAPI.getSellerOrders,
     
     // Seller Order Management
     startProcessing: orderAPI.startProcessing,
     startWork: orderAPI.startWork,
+    deliverWithEmail: orderAPI.deliverWithEmail,
+    completeRevision: orderAPI.completeRevision,
     deliver: orderAPI.deliverOrder,
-    
-    // Buyer Order Management
-    requestRevision: orderAPI.requestRevision,
-    complete: orderAPI.completeOrder,
-    
-    // Order Cancellation
-    cancelByBuyer: orderAPI.cancelByBuyer,
     cancelBySeller: orderAPI.cancelBySeller,
     
-    // Order Timeline & Stats
-    getTimeline: orderAPI.getOrderTimeline,
+    // Seller Statistics
     getSellerStats: orderAPI.getSellerStats,
+    
+    // ========== GENERIC ROUTES ========== //
+    updateStatus: orderAPI.updateOrderStatus,
     
     // Admin
     deleteAll: orderAPI.deleteAllOrders
@@ -1445,25 +1486,29 @@ export const acceptOffer = offerAPI.acceptOffer;
 export const rejectOffer = offerAPI.rejectOffer;
 export const cancelOffer = offerAPI.cancelOffer;
 
-// Order exports - UPDATED WITH DELIVERY FUNCTIONS
+// Order exports - COMPLETE WITH ALL BUYER ROUTES
 export const createOrder = orderAPI.createOrder;
 export const getMyOrders = orderAPI.getMyOrders;
-export const getSellerOrders = orderAPI.getSellerOrders;
+export const getBuyerStats = orderAPI.getBuyerStats;
 export const getOrderDetails = orderAPI.getOrderDetails;
-export const deliverOrderWithEmail = orderAPI.deliverWithEmail;
-export const completeRevision = orderAPI.completeRevision;
+export const getOrderTimeline = orderAPI.getOrderTimeline;
 export const getDeliveryHistory = orderAPI.getDeliveryHistory;
 export const getDeliveryDetails = orderAPI.getDeliveryDetails;
-export const updateOrderStatus = orderAPI.updateOrderStatus;
-export const startProcessing = orderAPI.startProcessing;
-export const startWorkOnOrder = orderAPI.startWork;
-export const deliverOrder = orderAPI.deliverOrder;
 export const requestRevision = orderAPI.requestRevision;
 export const completeOrder = orderAPI.completeOrder;
-export const cancelOrderByBuyer = orderAPI.cancelByBuyer;
-export const cancelOrderBySeller = orderAPI.cancelBySeller;
-export const getOrderTimeline = orderAPI.getOrderTimeline;
-export const getSellerOrderStats = orderAPI.getSellerStats;
+export const cancelByBuyer = orderAPI.cancelByBuyer;
+export const downloadOrderFiles = orderAPI.downloadOrderFiles;
+export const getOrderSummary = orderAPI.getOrderSummary;
+export const getSellerOrders = orderAPI.getSellerOrders;
+export const startProcessing = orderAPI.startProcessing;
+export const startWorkOnOrder = orderAPI.startWork;
+export const deliverWithEmail = orderAPI.deliverWithEmail;
+export const completeRevision = orderAPI.completeRevision;
+export const deliverOrder = orderAPI.deliverOrder;
+export const cancelBySeller = orderAPI.cancelBySeller;
+export const updateOrderStatus = orderAPI.updateOrderStatus;
+export const getSellerStats = orderAPI.getSellerStats;
+export const deleteAllOrders = orderAPI.deleteAllOrders;
 
 // Payment exports
 export const createPaymentIntent = paymentAPI.createPaymentIntent;
@@ -1499,7 +1544,7 @@ export const markNotificationAsRead = notificationAPI.markAsRead;
 export const markAllNotificationsAsRead = notificationAPI.markAllAsRead;
 export const getUnreadNotificationCount = notificationAPI.getUnreadCount;
 
-// Additional Status Utilities for the new endpoint
+// Additional Status Utilities
 export const getValidStatusTransitions = (currentStatus: string, userRole: 'buyer' | 'seller') => {
   const sellerTransitions: { [key: string]: string[] } = {
     'paid': ['processing', 'cancelled'],
