@@ -86,7 +86,7 @@
 
 .total-orders .metric-icon {
   background: rgba(52, 152, 219, 0.1);
-  color: #eab308;
+  color: #3498db;
 }
 
 .success-rate .metric-icon {
@@ -217,7 +217,7 @@
 }
 
 .financial-item .value.category {
-  color: #eab308;
+  color: #3498db;
   background: #e3f2fd;
   padding: 6px 12px;
   border-radius: 20px;
@@ -294,7 +294,7 @@
 }
 
 .action-btn.primary {
-  background: #eab308;
+  background: #3498db;
   color: white;
 }
 
@@ -323,7 +323,7 @@
   width: 50px;
   height: 50px;
   border: 3px solid #dee2e6;
-  border-top-color: #eab308;
+  border-top-color: #3498db;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -356,7 +356,7 @@
 
 .stats-error button {
   padding: 12px 24px;
-  background: #eab308;
+  background: #3498db;
   color: white;
   border: none;
   border-radius: 6px;
