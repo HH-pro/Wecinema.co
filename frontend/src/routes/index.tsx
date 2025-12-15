@@ -82,9 +82,10 @@ const Router: React.FC = () => {
           <Route path="/marketplace/orders/:orderId" element={<OrderDetails />} />
           <Route path="/marketplace/messages" element={<Messages />} />
           <Route path="/marketplace/messages/:orderId" element={<Messages />} />
-          // In your App.js or routing file
           <Route path="/marketplace/my-orders" element={<MyOrders />} />
           <Route path="/marketplace/orders/:orderId" element={<OrderDetails />} />
+           <Route path="/marketplace/offers/my-offers" element={<MyOffersPage />} />
+      <Route path="/marketplace/orders/stats/buyer" element={<BuyerStatsPage />} />
           {/* ========== ADMIN ROUTES ========== */}
           <Route element={<ProtectedRoute />}>
             <Route
