@@ -1484,12 +1484,12 @@ const BuyerDashboard: React.FC = () => {
               />
             </div>
             
-            <button 
+            {/* <button 
               className="filter-toggle" 
               onClick={() => setShowFilters(!showFilters)}
             >
-              {/* <FaFilter /> {showFilters ? 'Hide Filters' : 'Show Filters'} */}
-            </button>
+              <FaFilter /> {showFilters ? 'Hide Filters' : 'Show Filters'}
+            </button> */}
           </div>
           
           {showFilters && (
