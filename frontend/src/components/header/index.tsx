@@ -37,6 +37,7 @@ const Header: React.FC<HeaderProps> = ({
     const genreMenuRef = useRef<HTMLDivElement>(null);
     const ratingMenuRef = useRef<HTMLDivElement>(null);
     const uploadMenuRef = useRef<HTMLDivElement>(null);
+    const mobileSearchRef = useRef<HTMLDivElement>(null);
 
     // Close dropdowns when clicking outside
     useEffect(() => {
@@ -50,11 +51,15 @@ const Header: React.FC<HeaderProps> = ({
             if (uploadMenuRef.current && !uploadMenuRef.current.contains(event.target as Node)) {
                 setIsUploadMenuOpen(false);
             }
+            if (mobileSearchRef.current && isSearchExpanded && 
+                !mobileSearchRef.current.contains(event.target as Node)) {
+                setIsSearchExpanded(false);
+            }
         };
 
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+    }, [isSearchExpanded]);
 
     const toggleSearch = () => setIsSearchExpanded(!isSearchExpanded);
     
@@ -117,7 +122,7 @@ const Header: React.FC<HeaderProps> = ({
     };
 
     return (
-        <header className={`header ${darkMode ? 'header--dark' : 'header--light'}`}>
+        <header className={`header ${darkMode ? 'header--dark' : ''}`}>
             <div className="header__container">
                 {/* Left Section - Logo & Menu */}
                 <div className="header__left">
@@ -187,7 +192,11 @@ const Header: React.FC<HeaderProps> = ({
                     <div className="header__dropdown" ref={uploadMenuRef}>
                         <button
                             className="header__action-btn header__action-btn--upload"
-                            onClick={() => setIsUploadMenuOpen(!isUploadMenuOpen)}
+                            onClick={() => {
+                                setIsUploadMenuOpen(!isUploadMenuOpen);
+                                setIsGenreMenuOpen(false);
+                                setIsRatingMenuOpen(false);
+                            }}
                             aria-expanded={isUploadMenuOpen}
                             aria-label="Upload options"
                         >
@@ -221,6 +230,7 @@ const Header: React.FC<HeaderProps> = ({
                             onClick={() => {
                                 setIsGenreMenuOpen(!isGenreMenuOpen);
                                 setIsRatingMenuOpen(false);
+                                setIsUploadMenuOpen(false);
                             }}
                             aria-expanded={isGenreMenuOpen}
                         >
@@ -260,6 +270,7 @@ const Header: React.FC<HeaderProps> = ({
                             onClick={() => {
                                 setIsRatingMenuOpen(!isRatingMenuOpen);
                                 setIsGenreMenuOpen(false);
+                                setIsUploadMenuOpen(false);
                             }}
                             aria-expanded={isRatingMenuOpen}
                         >
@@ -294,10 +305,15 @@ const Header: React.FC<HeaderProps> = ({
 
                 {/* Mobile Search */}
                 {isMobile && (
-                    <div className="header__mobile-search">
+                    <div className="header__mobile-search" ref={mobileSearchRef}>
                         <button 
                             className="header__mobile-search-toggle"
-                            onClick={toggleSearch}
+                            onClick={() => {
+                                toggleSearch();
+                                setIsGenreMenuOpen(false);
+                                setIsRatingMenuOpen(false);
+                                setIsUploadMenuOpen(false);
+                            }}
                             aria-label={isSearchExpanded ? "Close search" : "Open search"}
                         >
                             {isSearchExpanded ? <X size={20} /> : <Search size={20} />}
