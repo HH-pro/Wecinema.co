@@ -5,7 +5,6 @@ import { FaArrowLeft, FaSpinner, FaExclamationCircle } from 'react-icons/fa';
 import MarketplaceLayout from '../../../src/components/Layout/MarketplaceLayout';
 import { marketplaceAPI } from '../../api';
 import { OrderTimeline, OrderSummary, PaymentDetails } from '../../components/marketplae/BuyerDashboard/BuyerDashboard';
-import './OrderDetailsPage.css';
 
 const OrderDetailsPage: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
