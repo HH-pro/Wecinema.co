@@ -51,9 +51,6 @@ const Header: React.FC<HeaderProps> = ({
             if (uploadRef.current && !uploadRef.current.contains(event.target as Node)) {
                 setUploadMenuOpen(false);
             }
-            if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
-                // Don't close search on outside click for better UX
-            }
         };
 
         document.addEventListener('mousedown', handleClickOutside);
@@ -97,8 +94,17 @@ const Header: React.FC<HeaderProps> = ({
         }
     };
 
-    const getActiveClass = (path: string) => {
-        return window.location.pathname === path ? "active" : "";
+    // Debug function to check if navigation works
+    const handleGenreClick = (genre: string) => {
+        console.log('Navigating to genre:', genre);
+        setIsGenreOpen(false);
+        nav(`/category/${genre}`);
+    };
+
+    const handleRatingClick = (rating: string) => {
+        console.log('Navigating to rating:', rating);
+        setIsRatingOpen(false);
+        nav(`/ratings/${rating}`);
     };
 
     return (
@@ -116,9 +122,13 @@ const Header: React.FC<HeaderProps> = ({
                     
                     <div 
                         className="logo-container"
-                        onClick={() => nav("/")}
+                        onClick={() => {
+                            console.log('Navigating to home');
+                            nav("/");
+                        }}
                         role="button"
                         tabIndex={0}
+                        onKeyPress={(e) => e.key === 'Enter' && nav("/")}
                     >
                         <img 
                             src={logo} 
@@ -131,7 +141,7 @@ const Header: React.FC<HeaderProps> = ({
                     </div>
                 </div>
 
-                {/* Desktop Search Bar - IMPROVED */}
+                {/* Desktop Search Bar */}
                 {!isMobile && (
                     <div className="search-wrapper">
                         <form 
@@ -193,8 +203,9 @@ const Header: React.FC<HeaderProps> = ({
                         {uploadMenuOpen && (
                             <div className="dropdown-menu upload-dropdown">
                                 <button
-                                    className={`dropdown-item ${getActiveClass("/upload")}`}
+                                    className="dropdown-item"
                                     onClick={() => {
+                                        console.log('Upload Video clicked');
                                         toggleUploadModal?.();
                                         setUploadMenuOpen(false);
                                     }}
@@ -203,8 +214,9 @@ const Header: React.FC<HeaderProps> = ({
                                     <span>Upload Video</span>
                                 </button>
                                 <button
-                                    className={`dropdown-item ${getActiveClass("/uploadscripts")}`}
+                                    className="dropdown-item"
                                     onClick={() => {
+                                        console.log('Upload Script clicked');
                                         toggleUploadScriptModal?.();
                                         setUploadMenuOpen(false);
                                     }}
@@ -221,6 +233,7 @@ const Header: React.FC<HeaderProps> = ({
                         <button
                             className="nav-dropdown-button"
                             onClick={() => {
+                                console.log('Genre dropdown toggled');
                                 setIsGenreOpen(!isGenreOpen);
                                 setIsRatingOpen(false);
                             }}
@@ -238,15 +251,14 @@ const Header: React.FC<HeaderProps> = ({
                                 </div>
                                 <div className="dropdown-scroll-container">
                                     {categories.map((genre, index) => (
-                                        <Link
+                                        <button
                                             key={index}
-                                            to={`/category/${genre}`}
                                             className="dropdown-item"
-                                            onClick={() => setIsGenreOpen(false)}
+                                            onClick={() => handleGenreClick(genre)}
                                         >
                                             <span className="genre-bullet"></span>
                                             <span className="genre-text">{genre}</span>
-                                        </Link>
+                                        </button>
                                     ))}
                                 </div>
                             </div>
@@ -258,6 +270,7 @@ const Header: React.FC<HeaderProps> = ({
                         <button
                             className="nav-dropdown-button"
                             onClick={() => {
+                                console.log('Rating dropdown toggled');
                                 setIsRatingOpen(!isRatingOpen);
                                 setIsGenreOpen(false);
                             }}
@@ -274,15 +287,14 @@ const Header: React.FC<HeaderProps> = ({
                                 </div>
                                 <div className="dropdown-content">
                                     {ratings.map((rating, index) => (
-                                        <Link
+                                        <button
                                             key={index}
-                                            to={`/ratings/${rating}`}
                                             className="dropdown-item rating-item"
-                                            onClick={() => setIsRatingOpen(false)}
+                                            onClick={() => handleRatingClick(rating)}
                                         >
                                             <span className="rating-badge">{rating}</span>
                                             <span className="rating-text">{rating}</span>
-                                        </Link>
+                                        </button>
                                     ))}
                                 </div>
                             </div>
@@ -295,7 +307,10 @@ const Header: React.FC<HeaderProps> = ({
                     <>
                         <button 
                             className="mobile-search-button"
-                            onClick={toggleSearch}
+                            onClick={() => {
+                                console.log('Mobile search toggled');
+                                toggleSearch();
+                            }}
                             aria-label="Search"
                         >
                             {isExpanded ? <X size={20} /> : <Search size={20} />}
@@ -331,7 +346,14 @@ const Header: React.FC<HeaderProps> = ({
                                     >
                                         {isListening ? <MdMicOff size={20} /> : <MdMic size={20} />}
                                     </button>
-                                    <button type="submit" className="mobile-search-submit">
+                                    <button 
+                                        type="submit" 
+                                        className="mobile-search-submit"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            handleSearchSubmit(e as any);
+                                        }}
+                                    >
                                         Go
                                     </button>
                                 </form>
