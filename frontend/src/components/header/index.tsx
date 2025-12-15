@@ -225,21 +225,38 @@ const Header: React.FC<HeaderProps> = ({
 
                     {/* Genre Menu */}
                     <div className="header__dropdown" ref={genreMenuRef}>
-                        <button
-                            className="header__action-btn"
-                            onClick={() => {
-                                setIsGenreMenuOpen(!isGenreMenuOpen);
-                                setIsRatingMenuOpen(false);
-                                setIsUploadMenuOpen(false);
-                            }}
-                            aria-expanded={isGenreMenuOpen}
-                        >
-                            <span>Genre</span>
-                            <FaChevronDown 
-                                size={10} 
-                                className={`header__dropdown-arrow ${isGenreMenuOpen ? 'header__dropdown-arrow--open' : ''}`} 
-                            />
-                        </button>
+                        // Genre aur Rating buttons ke liye classes add karein
+<button
+  className="header__action-btn header__action-btn--genre"
+  onClick={() => {
+    setIsGenreMenuOpen(!isGenreMenuOpen);
+    setIsRatingMenuOpen(false);
+    setIsUploadMenuOpen(false);
+  }}
+  aria-expanded={isGenreMenuOpen}
+>
+  <span>Genre</span>
+  <FaChevronDown 
+    size={12} 
+    className={`header__dropdown-arrow ${isGenreMenuOpen ? 'header__dropdown-arrow--open' : ''}`} 
+  />
+</button>
+
+<button
+  className="header__action-btn header__action-btn--rating"
+  onClick={() => {
+    setIsRatingMenuOpen(!isRatingMenuOpen);
+    setIsGenreMenuOpen(false);
+    setIsUploadMenuOpen(false);
+  }}
+  aria-expanded={isRatingMenuOpen}
+>
+  <span>Rating</span>
+  <FaChevronDown 
+    size={12} 
+    className={`header__dropdown-arrow ${isRatingMenuOpen ? 'header__dropdown-arrow--open' : ''}`} 
+  />
+</button>
                         
                         {isGenreMenuOpen && categories && categories.length > 0 && (
                             <div className="dropdown-menu dropdown-menu--genre">
