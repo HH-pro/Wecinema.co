@@ -17,9 +17,9 @@ import {
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import './BuyerDashboard.css';
 import MarketplaceLayout from '../../components/Layout';
+import { marketplaceAPI } from '../../services/api'; // Import the marketplaceAPI
 
 interface User {
   _id: string;
@@ -99,51 +99,51 @@ const BuyerDashboard: React.FC = () => {
     fetchBuyerData();
   }, []);
 
-  const getAuthToken = (): string | null => {
-    return localStorage.getItem('token');
-  };
-
   const fetchBuyerData = async () => {
     try {
       setLoading(true);
-      const token = getAuthToken();
       
-      if (!token) {
+      // Check if user is authenticated
+      if (!marketplaceAPI.auth.isAuthenticated()) {
         toast.error('Please login to view your dashboard');
         navigate('/login');
         return;
       }
 
-      // Fetch orders from your backend API
-      const response = await axios.get(
-        'http://localhost:3000/marketplace/orders/my-orders',
-        { 
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          } 
-        }
-      );
-
-      if (response.data.success) {
-        const buyerOrders = response.data.orders || [];
+      // Fetch orders using marketplaceAPI
+      const response = await marketplaceAPI.orders.getMy(setLoading);
+      
+      if (response.success) {
+        const buyerOrders = response.orders || response.data?.orders || [];
         setOrders(buyerOrders);
         calculateStats(buyerOrders);
+        
+        // Optionally fetch dashboard stats for more detailed statistics
+        try {
+          const dashboardStats = await marketplaceAPI.dashboard.getBuyerStats();
+          if (dashboardStats.success) {
+            // Update stats with dashboard data if available
+            setStats(prev => ({
+              ...prev,
+              ...dashboardStats.data
+            }));
+          }
+        } catch (dashboardError) {
+          console.log('Dashboard stats not available, using calculated stats');
+        }
       } else {
-        throw new Error(response.data.error || 'Failed to fetch orders');
+        throw new Error(response.error || 'Failed to fetch orders');
       }
 
     } catch (error: any) {
       console.error('Error fetching buyer data:', error);
       
-      if (error.response?.status === 401) {
+      if (error.response?.status === 401 || error.message?.includes('unauthorized')) {
         toast.error('Please login to view your dashboard');
         localStorage.removeItem('token');
         navigate('/login');
-      } else if (error.response?.data?.error) {
-        toast.error(error.response.data.error);
       } else {
-        toast.error('Failed to load dashboard data');
+        toast.error(error.message || 'Failed to load dashboard data');
       }
     } finally {
       setLoading(false);
@@ -256,6 +256,52 @@ const BuyerDashboard: React.FC = () => {
     toast.info('Refreshing dashboard...');
   };
 
+  // Add function to handle order actions
+  const handleOrderAction = async (orderId: string, action: string, data?: any) => {
+    try {
+      switch (action) {
+        case 'complete_payment':
+          // Navigate to payment page
+          navigate(`/marketplace/payment/${orderId}`);
+          break;
+          
+        case 'request_revision':
+          const revisionNotes = prompt('Please provide revision notes:');
+          if (revisionNotes) {
+            await marketplaceAPI.orders.requestRevision(orderId, revisionNotes, setLoading);
+            toast.success('Revision requested successfully');
+            fetchBuyerData(); // Refresh data
+          }
+          break;
+          
+        case 'complete_order':
+          await marketplaceAPI.orders.complete(orderId, setLoading);
+          toast.success('Order marked as completed');
+          fetchBuyerData(); // Refresh data
+          break;
+          
+        case 'contact_seller':
+          // Navigate to messages
+          navigate(`/marketplace/messages?order=${orderId}`);
+          break;
+          
+        case 'cancel_order':
+          const cancelReason = prompt('Please provide reason for cancellation:');
+          if (cancelReason) {
+            await marketplaceAPI.orders.cancelByBuyer(orderId, cancelReason, setLoading);
+            toast.success('Order cancelled successfully');
+            fetchBuyerData(); // Refresh data
+          }
+          break;
+          
+        default:
+          console.log('Unknown action:', action);
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to perform action');
+    }
+  };
+
   const formatPrice = (price: number): string => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -269,6 +315,60 @@ const BuyerDashboard: React.FC = () => {
       month: 'short',
       day: 'numeric'
     });
+  };
+
+  // Add a function to get order actions based on status
+  const getOrderActions = (order: Order) => {
+    const actions = [];
+    
+    switch (order.status) {
+      case 'pending_payment':
+        actions.push({
+          label: 'Complete Payment',
+          action: 'complete_payment',
+          className: 'complete-payment-btn'
+        });
+        actions.push({
+          label: 'Cancel Order',
+          action: 'cancel_order',
+          className: 'cancel-btn'
+        });
+        break;
+        
+      case 'delivered':
+        actions.push({
+          label: 'Request Revision',
+          action: 'request_revision',
+          className: 'revision-btn'
+        });
+        actions.push({
+          label: 'Complete Order',
+          action: 'complete_order',
+          className: 'complete-order-btn'
+        });
+        break;
+        
+      case 'in_revision':
+      case 'in_progress':
+      case 'paid':
+        actions.push({
+          label: 'Contact Seller',
+          action: 'contact_seller',
+          className: 'contact-btn'
+        });
+        break;
+        
+      case 'completed':
+        // Check if review can be left
+        actions.push({
+          label: 'Leave Review',
+          action: 'leave_review',
+          className: 'review-btn'
+        });
+        break;
+    }
+    
+    return actions;
   };
 
   if (loading) {
@@ -347,6 +447,20 @@ const BuyerDashboard: React.FC = () => {
               <FaShoppingCart />
               <span>Continue Shopping</span>
             </button>
+            <button 
+              className="action-btn"
+              onClick={() => navigate('/marketplace/offers/my-offers')}
+            >
+              <FaBoxOpen />
+              <span>View My Offers</span>
+            </button>
+            <button 
+              className="action-btn"
+              onClick={() => navigate('/marketplace/messages')}
+            >
+              <FaUser />
+              <span>Messages</span>
+            </button>
           </div>
         </div>
 
@@ -375,7 +489,9 @@ const BuyerDashboard: React.FC = () => {
               <option value="paid">Paid</option>
               <option value="in_progress">In Progress</option>
               <option value="delivered">Delivered</option>
+              <option value="in_revision">Revision</option>
               <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
             </select>
           </div>
         </div>
@@ -390,80 +506,76 @@ const BuyerDashboard: React.FC = () => {
           {/* Orders List */}
           <div className="orders-list">
             {filteredOrders.length > 0 ? (
-              filteredOrders.map(order => (
-                <div key={order._id} className="order-card">
-                  <div className="order-image">
-                    <div className="image-container">
-                      {getListingMedia(order) ? (
-                        <img 
-                          src={getListingMedia(order)} 
-                          alt={getListingTitle(order)}
-                          className="listing-image"
-                        />
-                      ) : (
-                        <div className="image-placeholder">
-                          <FaBoxOpen />
-                        </div>
-                      )}
+              filteredOrders.map(order => {
+                const actions = getOrderActions(order);
+                
+                return (
+                  <div key={order._id} className="order-card">
+                    <div className="order-image">
+                      <div className="image-container">
+                        {getListingMedia(order) ? (
+                          <img 
+                            src={getListingMedia(order)} 
+                            alt={getListingTitle(order)}
+                            className="listing-image"
+                          />
+                        ) : (
+                          <div className="image-placeholder">
+                            <FaBoxOpen />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="order-details">
-                    <h3 className="product-name">{getListingTitle(order)}</h3>
-                    <p className="seller">
-                      <FaUser className="seller-icon" />
-                      Seller: @{getSellerUsername(order)}
-                    </p>
-                    <div className="order-meta">
-                      <span className="price">{formatPrice(order.amount)}</span>
-                      <span className="order-date">
-                        <FaCalendar className="date-icon" />
-                        Ordered: {formatDate(order.createdAt)}
-                      </span>
-                      {order.expectedDelivery && (
-                        <span className="expected-delivery">
-                          <FaClock className="delivery-icon" />
-                          Expected: {formatDate(order.expectedDelivery)}
+                    <div className="order-details">
+                      <h3 className="product-name">{getListingTitle(order)}</h3>
+                      <p className="seller">
+                        <FaUser className="seller-icon" />
+                        Seller: @{getSellerUsername(order)}
+                      </p>
+                      <div className="order-meta">
+                        <span className="price">{formatPrice(order.amount)}</span>
+                        <span className="order-date">
+                          <FaCalendar className="date-icon" />
+                          Ordered: {formatDate(order.createdAt)}
                         </span>
-                      )}
+                        {order.expectedDelivery && (
+                          <span className="expected-delivery">
+                            <FaClock className="delivery-icon" />
+                            Expected: {formatDate(order.expectedDelivery)}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="order-status">
-                    <div className={`status-badge ${getStatusColor(order.status)}`}>
-                      {getStatusIcon(order.status)}
-                      <span>{getStatusText(order.status)}</span>
-                    </div>
-                    
-                    <div className="order-actions">
-                      <button 
-                        onClick={() => handleViewOrder(order._id)}
-                        className="view-details-btn"
-                      >
-                        View Details
-                      </button>
+                    <div className="order-status">
+                      <div className={`status-badge ${getStatusColor(order.status)}`}>
+                        {getStatusIcon(order.status)}
+                        <span>{getStatusText(order.status)}</span>
+                      </div>
                       
-                      {order.status === 'pending_payment' && (
-                        <button 
-                          onClick={() => navigate('/marketplace/checkout')}
-                          className="complete-payment-btn"
-                        >
-                          Complete Payment
-                        </button>
-                      )}
-                      
-                      {order.status === 'delivered' && (
+                      <div className="order-actions">
                         <button 
                           onClick={() => handleViewOrder(order._id)}
-                          className="review-delivery-btn"
+                          className="view-details-btn"
                         >
-                          Review Delivery
+                          View Details
                         </button>
-                      )}
+                        
+                        {actions.map((action, index) => (
+                          <button
+                            key={index}
+                            onClick={() => handleOrderAction(order._id, action.action)}
+                            className={`action-button ${action.className}`}
+                          >
+                            {action.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="no-orders">
                 <FaBoxOpen className="no-orders-icon" />
