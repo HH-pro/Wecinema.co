@@ -37,7 +37,6 @@ const Header: React.FC<HeaderProps> = ({
     const genreRef = useRef<HTMLDivElement>(null);
     const ratingRef = useRef<HTMLDivElement>(null);
     const uploadRef = useRef<HTMLDivElement>(null);
-    const searchRef = useRef<HTMLFormElement>(null);
 
     // Close dropdowns when clicking outside
     useEffect(() => {
@@ -66,8 +65,7 @@ const Header: React.FC<HeaderProps> = ({
     const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (searchTerm.trim()) {
-            const capitalized = searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1);
-            nav(`/search/${capitalized.trim()}`);
+            nav(`/search/${searchTerm.trim()}`);
             setIsExpanded(false);
         }
     };
@@ -105,115 +103,94 @@ const Header: React.FC<HeaderProps> = ({
     };
 
     return (
-        <header className={`header-container ${darkMode ? 'dark-mode' : 'light-mode'}`}>
-            <nav className="header-nav">
-                {/* Logo and Menu Button */}
+        <header className={`header ${darkMode ? 'dark-mode' : 'light-mode'}`}>
+            <div className="header-content">
+                {/* Left Section */}
                 <div className="header-left">
                     <button 
-                        className="menu-button"
-                        onClick={toggleSidebar ? toggleSidebar : toggler}
-                        aria-label="Toggle menu"
+                        className="menu-btn"
+                        onClick={toggleSidebar || toggler}
                     >
-                        <MdMenu size={24} />
+                        <MdMenu size={22} />
                     </button>
                     
                     <div 
-                        className="logo-container"
+                        className="logo"
                         onClick={() => nav("/")}
-                        role="button"
-                        tabIndex={0}
-                        onKeyPress={(e) => e.key === 'Enter' && nav("/")}
                     >
-                        <img 
-                            src={logo} 
-                            alt="WeCinema Logo" 
-                            className="logo-image"
-                        />
-                        {!isMobile && (
-                            <span className="logo-text">WeCinema</span>
-                        )}
+                        <img src={logo} alt="WeCinema" className="logo-img" />
+                        {!isMobile && <span className="logo-text">WeCinema</span>}
                     </div>
                 </div>
 
-                {/* Desktop Search Bar - SMALLER HEIGHT */}
+                {/* Center - Search Bar (Desktop only) */}
                 {!isMobile && (
-                    <div className="search-wrapper">
-                        <form 
-                            className="search-form" 
-                            onSubmit={handleSearchSubmit}
-                            ref={searchRef}
-                        >
-                            <div className="search-container">
-                                <div className="search-input-wrapper">
-                                    <Search size={18} className="search-icon" />
-                                    <input
-                                        type="search"
-                                        placeholder="Search movies, shows, actors..."
-                                        className="search-input"
-                                        value={searchTerm}
-                                        onChange={handleSearchInputChange}
-                                        autoComplete="off"
-                                    />
-                                    {searchTerm && (
-                                        <button
-                                            type="button"
-                                            className="clear-search-button"
-                                            onClick={() => setSearchTerm("")}
-                                            aria-label="Clear search"
-                                        >
-                                            <X size={16} />
-                                        </button>
-                                    )}
-                                    <button 
-                                        type="button" 
-                                        className={`voice-search-button ${isListening ? 'listening' : ''}`}
-                                        onClick={handleVoiceSearch}
-                                        aria-label="Voice search"
+                    <div className="search-section">
+                        <form className="search-form" onSubmit={handleSearchSubmit}>
+                            <div className="search-box">
+                                <Search size={18} className="search-icon" />
+                                <input
+                                    type="text"
+                                    placeholder="Search movies, shows..."
+                                    className="search-input"
+                                    value={searchTerm}
+                                    onChange={handleSearchInputChange}
+                                />
+                                {searchTerm && (
+                                    <button
+                                        type="button"
+                                        className="clear-btn"
+                                        onClick={() => setSearchTerm("")}
                                     >
-                                        {isListening ? <MdMicOff size={18} /> : <MdMic size={18} />}
+                                        <X size={16} />
                                     </button>
-                                </div>
-                                <button type="submit" className="search-submit-button">
-                                    Search
+                                )}
+                                <button 
+                                    type="button" 
+                                    className={`voice-btn ${isListening ? 'listening' : ''}`}
+                                    onClick={handleVoiceSearch}
+                                >
+                                    {isListening ? <MdMicOff size={18} /> : <MdMic size={18} />}
                                 </button>
                             </div>
+                            <button type="submit" className="search-btn">
+                                Search
+                            </button>
                         </form>
                     </div>
                 )}
 
-                {/* Navigation Controls - ALL ALIGNED */}
-                <div className="header-controls">
-                    {/* Upload Dropdown */}
-                    <div className="dropdown-container" ref={uploadRef}>
+                {/* Right Section - Controls */}
+                <div className="header-right">
+                    {/* Upload Button */}
+                    <div className="dropdown-wrapper" ref={uploadRef}>
                         <button
-                            className="upload-button"
+                            className="action-btn upload-btn"
                             onClick={() => setUploadMenuOpen(!uploadMenuOpen)}
-                            aria-label="Upload options"
-                            aria-expanded={uploadMenuOpen}
                         >
                             <FaUpload size={16} />
                         </button>
 
                         {uploadMenuOpen && (
-                            <div className="dropdown-menu upload-dropdown">
+                            <div className="dropdown upload-dropdown">
                                 <button
-                                    className="dropdown-item"
+                                    className="dropdown-option"
                                     onClick={() => {
                                         toggleUploadModal?.();
                                         setUploadMenuOpen(false);
                                     }}
                                 >
-                                    <FaVideo className="dropdown-icon" />
+                                    <FaVideo className="option-icon" />
                                     <span>Upload Video</span>
                                 </button>
                                 <button
-                                    className="dropdown-item"
+                                    className="dropdown-option"
                                     onClick={() => {
                                         toggleUploadScriptModal?.();
                                         setUploadMenuOpen(false);
                                     }}
                                 >
-                                    <FaFileAlt className="dropdown-icon" />
+                                    <FaFileAlt className="option-icon" />
                                     <span>Upload Script</span>
                                 </button>
                             </div>
@@ -221,34 +198,33 @@ const Header: React.FC<HeaderProps> = ({
                     </div>
 
                     {/* Genre Dropdown */}
-                    <div className="dropdown-container" ref={genreRef}>
+                    <div className="dropdown-wrapper" ref={genreRef}>
                         <button
-                            className="nav-dropdown-button"
+                            className="action-btn genre-btn"
                             onClick={() => {
                                 setIsGenreOpen(!isGenreOpen);
                                 setIsRatingOpen(false);
                             }}
-                            aria-expanded={isGenreOpen}
                         >
                             <span>Genre</span>
-                            <FaChevronDown size={10} className={`dropdown-arrow ${isGenreOpen ? 'open' : ''}`} />
+                            <FaChevronDown size={10} className={`arrow ${isGenreOpen ? 'open' : ''}`} />
                         </button>
                         
                         {isGenreOpen && categories && categories.length > 0 && (
-                            <div className="dropdown-menu genre-dropdown">
+                            <div className="dropdown genre-dropdown">
                                 <div className="dropdown-header">
-                                    <h3 className="dropdown-title">Movie Genres</h3>
-                                    <span className="dropdown-count">{categories.length}</span>
+                                    <h3 className="dropdown-title">Genres</h3>
+                                    <span className="count-badge">{categories.length}</span>
                                 </div>
-                                <div className="dropdown-scroll-container">
+                                <div className="dropdown-list">
                                     {categories.map((genre, index) => (
                                         <button
                                             key={index}
-                                            className="dropdown-item"
+                                            className="dropdown-option"
                                             onClick={() => handleGenreClick(genre)}
                                         >
-                                            <span className="genre-bullet"></span>
-                                            <span className="genre-text">{genre}</span>
+                                            <span className="genre-dot"></span>
+                                            <span className="option-text">{genre}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -256,34 +232,33 @@ const Header: React.FC<HeaderProps> = ({
                         )}
                     </div>
 
-                    {/* Rating Dropdown - OPENS ON LEFT SIDE */}
-                    <div className="dropdown-container" ref={ratingRef}>
+                    {/* Rating Dropdown */}
+                    <div className="dropdown-wrapper" ref={ratingRef}>
                         <button
-                            className="nav-dropdown-button"
+                            className="action-btn rating-btn"
                             onClick={() => {
                                 setIsRatingOpen(!isRatingOpen);
                                 setIsGenreOpen(false);
                             }}
-                            aria-expanded={isRatingOpen}
                         >
                             <span>Rating</span>
-                            <FaChevronDown size={10} className={`dropdown-arrow ${isRatingOpen ? 'open' : ''}`} />
+                            <FaChevronDown size={10} className={`arrow ${isRatingOpen ? 'open' : ''}`} />
                         </button>
                         
                         {isRatingOpen && ratings && ratings.length > 0 && (
-                            <div className="dropdown-menu rating-dropdown">
+                            <div className="dropdown rating-dropdown">
                                 <div className="dropdown-header">
-                                    <h3 className="dropdown-title">Content Ratings</h3>
+                                    <h3 className="dropdown-title">Ratings</h3>
                                 </div>
-                                <div className="dropdown-content">
+                                <div className="dropdown-list">
                                     {ratings.map((rating, index) => (
                                         <button
                                             key={index}
-                                            className="dropdown-item rating-item"
+                                            className="dropdown-option rating-option"
                                             onClick={() => handleRatingClick(rating)}
                                         >
-                                            <span className="rating-badge">{rating}</span>
-                                            <span className="rating-text">{rating}</span>
+                                            <span className="rating-tag">{rating}</span>
+                                            <span className="option-text">{rating}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -292,25 +267,24 @@ const Header: React.FC<HeaderProps> = ({
                     </div>
                 </div>
 
-                {/* Mobile Floating Search Button */}
+                {/* Mobile Search Button */}
                 {isMobile && (
-                    <>
+                    <div className="mobile-search">
                         <button 
-                            className="mobile-search-button"
+                            className="mobile-search-btn"
                             onClick={toggleSearch}
-                            aria-label="Search"
                         >
                             {isExpanded ? <X size={20} /> : <Search size={20} />}
                         </button>
                         
                         {isExpanded && (
-                            <div className="mobile-search-expanded">
+                            <div className="mobile-search-panel">
                                 <form className="mobile-search-form" onSubmit={handleSearchSubmit}>
-                                    <div className="mobile-search-input-wrapper">
+                                    <div className="mobile-search-box">
                                         <Search size={18} className="mobile-search-icon" />
                                         <input
-                                            type="search"
-                                            placeholder="Search anything..."
+                                            type="text"
+                                            placeholder="Search..."
                                             className="mobile-search-input"
                                             value={searchTerm}
                                             onChange={handleSearchInputChange}
@@ -319,7 +293,7 @@ const Header: React.FC<HeaderProps> = ({
                                         {searchTerm && (
                                             <button
                                                 type="button"
-                                                className="mobile-clear-button"
+                                                className="mobile-clear-btn"
                                                 onClick={() => setSearchTerm("")}
                                             >
                                                 <X size={16} />
@@ -328,23 +302,20 @@ const Header: React.FC<HeaderProps> = ({
                                     </div>
                                     <button 
                                         type="button" 
-                                        className="mobile-voice-button"
+                                        className="mobile-voice-btn"
                                         onClick={handleVoiceSearch}
                                     >
                                         {isListening ? <MdMicOff size={20} /> : <MdMic size={20} />}
                                     </button>
-                                    <button 
-                                        type="submit" 
-                                        className="mobile-search-submit"
-                                    >
+                                    <button type="submit" className="mobile-search-submit">
                                         Go
                                     </button>
                                 </form>
                             </div>
                         )}
-                    </>
+                    </div>
                 )}
-            </nav>
+            </div>
         </header>
     );
 };
