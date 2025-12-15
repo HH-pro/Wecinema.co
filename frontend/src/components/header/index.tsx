@@ -13,9 +13,7 @@ interface HeaderProps {
     toggleSidebar?: () => void;
     expand: boolean;
     isMobile: boolean;
-    toggleUploadScriptModal?: () toggler: () => void;
-
-  
+    toggleUploadScriptModal?: () => void;
     toggleUploadModal?: () => void;
 }
 
@@ -39,7 +37,6 @@ const Header: React.FC<HeaderProps> = ({
     const genreRef = useRef<HTMLDivElement>(null);
     const ratingRef = useRef<HTMLDivElement>(null);
     const uploadRef = useRef<HTMLDivElement>(null);
-    const searchRef = useRef<HTMLFormElement>(null);
 
     // Close dropdowns when clicking outside
     useEffect(() => {
@@ -52,9 +49,6 @@ const Header: React.FC<HeaderProps> = ({
             }
             if (uploadRef.current && !uploadRef.current.contains(event.target as Node)) {
                 setUploadMenuOpen(false);
-            }
-            if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
-                // Don't close search on outside click for better UX
             }
         };
 
@@ -133,48 +127,40 @@ const Header: React.FC<HeaderProps> = ({
                     </div>
                 </div>
 
-                {/* Desktop Search Bar - IMPROVED */}
+                {/* Desktop Search Bar - WIDER */}
                 {!isMobile && (
-                    <div className="search-wrapper">
-                        <form 
-                            className="search-form" 
-                            onSubmit={handleSearchSubmit}
-                            ref={searchRef}
-                        >
-                            <div className="search-container">
-                                <div className="search-input-wrapper">
-                                    <Search size={20} className="search-icon" />
-                                    <input
-                                        type="search"
-                                        placeholder="Search movies, shows, actors, directors..."
-                                        className="search-input"
-                                        value={searchTerm}
-                                        onChange={handleSearchInputChange}
-                                        autoComplete="off"
-                                    />
-                                    {searchTerm && (
-                                        <button
-                                            type="button"
-                                            className="clear-search-button"
-                                            onClick={() => setSearchTerm("")}
-                                            aria-label="Clear search"
-                                        >
-                                            <X size={18} />
-                                        </button>
-                                    )}
-                                    <button 
-                                        type="button" 
-                                        className={`voice-search-button ${isListening ? 'listening' : ''}`}
-                                        onClick={handleVoiceSearch}
-                                        aria-label="Voice search"
+                    <div className="search-container">
+                        <form className="search-form" onSubmit={handleSearchSubmit}>
+                            <div className="search-input-wrapper">
+                                <Search size={18} className="search-icon" />
+                                <input
+                                    type="search"
+                                    placeholder="Search movies, shows, actors, directors..."
+                                    className="search-input"
+                                    value={searchTerm}
+                                    onChange={handleSearchInputChange}
+                                />
+                                {searchTerm && (
+                                    <button
+                                        type="button"
+                                        className="clear-search-button"
+                                        onClick={() => setSearchTerm("")}
                                     >
-                                        {isListening ? <MdMicOff size={20} /> : <MdMic size={20} />}
+                                        <X size={16} />
                                     </button>
-                                </div>
-                                <button type="submit" className="search-submit-button">
-                                    Search
-                                </button>
+                                )}
                             </div>
+                            <button 
+                                type="button" 
+                                className={`voice-search-button ${isListening ? 'listening' : ''}`}
+                                onClick={handleVoiceSearch}
+                                aria-label="Voice search"
+                            >
+                                {isListening ? <MdMicOff size={20} /> : <MdMic size={20} />}
+                            </button>
+                            <button type="submit" className="search-submit-button">
+                                Search
+                            </button>
                         </form>
                     </div>
                 )}
@@ -218,7 +204,7 @@ const Header: React.FC<HeaderProps> = ({
                         )}
                     </div>
 
-                    {/* Genre Dropdown - SCROLLABLE */}
+                    {/* Genre Dropdown - FIXED */}
                     <div className="dropdown-container" ref={genreRef}>
                         <button
                             className="nav-dropdown-button"
@@ -236,9 +222,8 @@ const Header: React.FC<HeaderProps> = ({
                             <div className="dropdown-menu genre-dropdown">
                                 <div className="dropdown-header">
                                     <h3 className="dropdown-title">Movie Genres</h3>
-                                    <span className="dropdown-count">{categories.length}</span>
                                 </div>
-                                <div className="dropdown-scroll-container">
+                                <div className="dropdown-content">
                                     {categories.map((genre, index) => (
                                         <Link
                                             key={index}
@@ -247,7 +232,7 @@ const Header: React.FC<HeaderProps> = ({
                                             onClick={() => setIsGenreOpen(false)}
                                         >
                                             <span className="genre-bullet"></span>
-                                            <span className="genre-text">{genre}</span>
+                                            {genre}
                                         </Link>
                                     ))}
                                 </div>
@@ -255,7 +240,7 @@ const Header: React.FC<HeaderProps> = ({
                         )}
                     </div>
 
-                    {/* Rating Dropdown - SMALLER WIDTH */}
+                    {/* Rating Dropdown - FIXED */}
                     <div className="dropdown-container" ref={ratingRef}>
                         <button
                             className="nav-dropdown-button"
@@ -272,18 +257,17 @@ const Header: React.FC<HeaderProps> = ({
                         {isRatingOpen && ratings && ratings.length > 0 && (
                             <div className="dropdown-menu rating-dropdown">
                                 <div className="dropdown-header">
-                                    <h3 className="dropdown-title">Content Ratings</h3>
+                                    <h3 className="dropdown-title">Ratings</h3>
                                 </div>
                                 <div className="dropdown-content">
                                     {ratings.map((rating, index) => (
                                         <Link
                                             key={index}
                                             to={`/ratings/${rating}`}
-                                            className="dropdown-item rating-item"
+                                            className="dropdown-item"
                                             onClick={() => setIsRatingOpen(false)}
                                         >
                                             <span className="rating-badge">{rating}</span>
-                                            <span className="rating-text">{rating}</span>
                                         </Link>
                                     ))}
                                 </div>
