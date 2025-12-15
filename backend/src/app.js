@@ -134,7 +134,7 @@ app.use((err, req, res, next) => {
 
 // ✅ MongoDB connection
 connectDB(
-  "mongodb+srv://hamzamanzoor046:9Jf9tuRZv2bEvKES@wecinema.15sml.mongodb.net/database_name?retryWrites=true&w=majority"
+  "mongodb+srv://hamzamanzoor046:oYisNcp2tHTWlQue@wecinema.15sml.mongodb.net/database_name?retryWrites=true&w=majority"
 );
 console.log("connected db");
 
