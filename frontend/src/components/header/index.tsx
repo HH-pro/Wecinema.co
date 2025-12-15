@@ -6,6 +6,7 @@ import close from "../../assets/close.png";
 import { FaUpload, FaVideo, FaFileAlt, FaSearch } from "react-icons/fa";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { categories, ratings } from "../../App";
+import '../header/drowpdown.css';
 import { Search, X } from "lucide-react";
 
 interface HeaderProps {
