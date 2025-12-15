@@ -114,7 +114,7 @@ const Header: React.FC<HeaderProps> = ({
 
                 {/* Mobile Floating Search */}
                 {isMobile && (
-                    <div className="fixed bottom-3 left-6 z-50">
+                    <div className="fixed bottom-3 left-2 z-50">
                         <button className="p-3 bg-yellow-500 rounded-full shadow-lg hover:bg-yellow-500 transition" onClick={toggleSearch}>
                             {isExpanded ? <X size={20} color="white" /> : <Search size={20} color="white" />}
                         </button>
