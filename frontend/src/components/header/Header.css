@@ -255,8 +255,7 @@
 }
 
 .search-form__voice-btn:hover {
-  color: var(--color-primary);
-  background: rgba(59, 130, 246, 0.1);
+ 
 }
 
 .search-form__submit {
