@@ -1474,7 +1474,7 @@ const BuyerDashboard: React.FC = () => {
         <div className="filters-section">
           <div className="search-container">
             <div className="search-box">
-              <FaSearch className="search-icon" />
+              {/* <FaSearch className="search-icon" /> */}
               {/* <input
                 type="text"
                 placeholder="Search orders by title, seller, or order number..."
