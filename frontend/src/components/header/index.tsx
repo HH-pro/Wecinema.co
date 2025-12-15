@@ -1,18 +1,16 @@
 import React, { useState } from 'react';
 import { MdMenu, MdMic, MdMicOff } from "react-icons/md";
 import logo from "../../assets/wecinema.png";
-import search from "../../assets/search.png";
-import close from "../../assets/close.png";
 import { FaUpload, FaVideo, FaFileAlt } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
 import { categories, ratings } from "../../App";
-import '../header/Header.css';
 import { Search, X } from "lucide-react";
+import './Header.css';
 
 interface HeaderProps {
     darkMode: boolean;
     toggler: () => void;
-    toggleSidebar?: () => void; // 👈 for ViewPage only
+    toggleSidebar?: () => void;
     expand: boolean;
     isMobile: boolean;
     toggleUploadScriptModal?: () => void;
@@ -30,17 +28,13 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
     const nav = useNavigate();
     const [isExpanded, setIsExpanded] = useState(false);
-    const [isOpen, setIsOpen] = useState(false);
-    const [isOpened, setIsOpened] = useState(false);
+    const [isGenreOpen, setIsGenreOpen] = useState(false);
+    const [isRatingOpen, setIsRatingOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [isListening, setIsListening] = useState(false);
-    const [uploadMenu, setUploadMenu] = useState(false);
+    const [uploadMenuOpen, setUploadMenuOpen] = useState(false);
 
-    const toggleDropdown = () => setIsOpen(!isOpen);
-    const toggleDropdowned = () => setIsOpened(!isOpened);
-    const toggleUploadMenu = () => setUploadMenu(!uploadMenu);
     const toggleSearch = () => setIsExpanded(!isExpanded);
-
     const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
     };
@@ -75,134 +69,220 @@ const Header: React.FC<HeaderProps> = ({
     };
 
     const getActiveClass = (path: string) => {
-        return window.location.pathname === path ? "text-active" : "";
+        return window.location.pathname === path ? "active" : "";
     };
 
     return (
-        <header className={`text-blue z-50 border-b fixed w-screen border-gray-200 ${darkMode ? "bg-dark text-dark" : "bg-light text-light"}`}>
-            <nav className={`mx-auto flex gap-4 items-center justify-between p-4 sm:pr-12 ${expand && !isMobile ? "px-4" : "sm:px-12"}`}>
-                {/* Logo and Menu */}
-                <ul className="flex gap-4 items-center">
-                    <MdMenu
-                        size={30}
-                        className="cursor-pointer mt-2"
+        <header className={`header-container ${darkMode ? 'dark-mode' : 'light-mode'}`}>
+            <nav className="header-nav">
+                {/* Logo and Menu Button */}
+                <div className="header-left">
+                    <button 
+                        className="menu-button"
                         onClick={toggleSidebar ? toggleSidebar : toggler}
-                    />
-                    <li className="cursor-pointer flex-col sm:flex-row flex gap-2 items-center" onClick={() => nav("/")}>
-                        <img src={logo} alt="logo" width={50} title="wecinema" />
-                        {!isMobile && <p className="text-md sm:text-1xl mt-3 font-mono">WeCinema</p>}
-                    </li>
-                </ul>
-
-                {/* Desktop Search */}
-                {!isMobile && (
-                    <div className="form">
-                        <form className="w-full flex items-center" onSubmit={handleSearchSubmit}>
-                            <input
-                                type="search"
-                                placeholder="Search anything..."
-                                className="w-full flex mx-auto border rounded-xl cursor-pointer p-2 outline-none"
-                                value={searchTerm}
-                                onChange={handleSearchInputChange}
-                            />
-                            <button type="button" onClick={handleVoiceSearch} className="ml-2">
-                                {isListening ? <MdMicOff size={24} /> : <MdMic size={24} />}
-                            </button>
-                        </form>
-                    </div>
-                )}
-
-                {/* Mobile Floating Search */}
-                {isMobile && (
-                    <div className="fixed bottom-3 left-6 z-50">
-                        <button className="p-3 bg-yellow-500 rounded-full shadow-lg hover:bg-yellow-500 transition" onClick={toggleSearch}>
-                            {isExpanded ? <X size={20} color="white" /> : <Search size={20} color="white" />}
-                        </button>
-                    </div>
-                )}
-
-                {isExpanded && (
-                    <div className="fixed bottom-16 right-15 bg-white shadow-lg p-3 rounded-lg flex items-center w-64 border border-gray-300">
-                        <form className="w-full flex items-center" onSubmit={handleSearchSubmit}>
-                            <input
-                                type="search"
-                                placeholder="Search anything..."
-                                className="w-full flex mx-auto border rounded-xl p-2 outline-none"
-                                value={searchTerm}
-                                onChange={handleSearchInputChange}
-                            />
-                            <button type="submit" className="ml-2 text-gray-500 hover:text-gray-700">🔍</button>
-                        </form>
-                    </div>
-                )}
-
-                {/* Upload Dropdown */}
-                <div className="relative">
-                    <button
-                        className="bg-yellow-500 mt-0 text-white p-2 rounded-full hover:bg-yellow-500 transition"
-                        onClick={toggleUploadMenu}
-                        title="Upload Options"
+                        aria-label="Toggle menu"
                     >
-                        <FaUpload size={18} />
+                        <MdMenu size={24} />
                     </button>
+                    
+                    <div 
+                        className="logo-container"
+                        onClick={() => nav("/")}
+                        role="button"
+                        tabIndex={0}
+                    >
+                        <img 
+                            src={logo} 
+                            alt="WeCinema Logo" 
+                            className="logo-image"
+                        />
+                        {!isMobile && (
+                            <span className="logo-text">WeCinema</span>
+                        )}
+                    </div>
+                </div>
 
-                    {uploadMenu && (
-                        <div className="absolute right-0 mt-2 w-40 bg-white border rounded-lg shadow-lg p-2">
-                            <button
-                                className={`flex items-center gap-2 text-gray-700 p-2 w-full hover:bg-gray-200 rounded-md ${getActiveClass("/upload")}`}
-                                onClick={toggleUploadModal}
+                {/* Desktop Search Bar */}
+                {!isMobile && (
+                    <div className="search-container">
+                        <form className="search-form" onSubmit={handleSearchSubmit}>
+                            <div className="search-input-wrapper">
+                                <Search size={18} className="search-icon" />
+                                <input
+                                    type="search"
+                                    placeholder="Search movies, shows, actors..."
+                                    className="search-input"
+                                    value={searchTerm}
+                                    onChange={handleSearchInputChange}
+                                />
+                                {searchTerm && (
+                                    <button
+                                        type="button"
+                                        className="clear-search-button"
+                                        onClick={() => setSearchTerm("")}
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                )}
+                            </div>
+                            <button 
+                                type="button" 
+                                className={`voice-search-button ${isListening ? 'listening' : ''}`}
+                                onClick={handleVoiceSearch}
+                                aria-label="Voice search"
                             >
-                                <FaVideo size={16} />
-                                Video
+                                {isListening ? <MdMicOff size={20} /> : <MdMic size={20} />}
                             </button>
-                            <button
-                                className={`flex items-center gap-2 text-gray-700 p-2 w-full hover:bg-gray-200 rounded-md ${getActiveClass("/uploadscripts")}`}
-                                onClick={toggleUploadScriptModal}
-                            >
-                                <FaFileAlt size={16} />
-                                Script
+                            <button type="submit" className="search-submit-button">
+                                Search
                             </button>
-                        </div>
-                    )}
+                        </form>
+                    </div>
+                )}
+
+                {/* Navigation Controls */}
+                <div className="header-controls">
+                    {/* Upload Dropdown */}
+                    <div className="dropdown-container">
+                        <button
+                            className="upload-button"
+                            onClick={() => setUploadMenuOpen(!uploadMenuOpen)}
+                            aria-label="Upload options"
+                            aria-expanded={uploadMenuOpen}
+                        >
+                            <FaUpload size={18} />
+                        </button>
+
+                        {uploadMenuOpen && (
+                            <div className="dropdown-menu upload-dropdown">
+                                <button
+                                    className={`dropdown-item ${getActiveClass("/upload")}`}
+                                    onClick={() => {
+                                        toggleUploadModal?.();
+                                        setUploadMenuOpen(false);
+                                    }}
+                                >
+                                    <FaVideo className="dropdown-icon" />
+                                    <span>Upload Video</span>
+                                </button>
+                                <button
+                                    className={`dropdown-item ${getActiveClass("/uploadscripts")}`}
+                                    onClick={() => {
+                                        toggleUploadScriptModal?.();
+                                        setUploadMenuOpen(false);
+                                    }}
+                                >
+                                    <FaFileAlt className="dropdown-icon" />
+                                    <span>Upload Script</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Genre Dropdown */}
+                    <div className="dropdown-container">
+                        <button
+                            className="nav-dropdown-button"
+                            onClick={() => setIsGenreOpen(!isGenreOpen)}
+                            aria-expanded={isGenreOpen}
+                        >
+                            <span>Genre</span>
+                            <span className={`dropdown-arrow ${isGenreOpen ? 'open' : ''}`}></span>
+                        </button>
+                        
+                        {isGenreOpen && (
+                            <div className="dropdown-menu genre-dropdown">
+                                {categories.map((genre, index) => (
+                                    <Link
+                                        key={index}
+                                        to={`/category/${genre}`}
+                                        className="dropdown-item"
+                                        onClick={() => setIsGenreOpen(false)}
+                                    >
+                                        {genre}
+                                    </Link>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Rating Dropdown */}
+                    <div className="dropdown-container">
+                        <button
+                            className="nav-dropdown-button"
+                            onClick={() => setIsRatingOpen(!isRatingOpen)}
+                            aria-expanded={isRatingOpen}
+                        >
+                            <span>Rating</span>
+                            <span className={`dropdown-arrow ${isRatingOpen ? 'open' : ''}`}></span>
+                        </button>
+                        
+                        {isRatingOpen && (
+                            <div className="dropdown-menu rating-dropdown">
+                                {ratings.map((rating, index) => (
+                                    <Link
+                                        key={index}
+                                        to={`/ratings/${rating}`}
+                                        className="dropdown-item"
+                                        onClick={() => setIsRatingOpen(false)}
+                                    >
+                                        {rating}
+                                    </Link>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
-                {/* Genre Dropdown */}
-                <div className="dropdown">
-                    <button className="hover:bg-yellow-500 whitespace-nowrap hover:text-white hover:border-white-100 border border-black-700 rounded-xl px-2 py-1 cursor-pointer" onClick={toggleDropdown}>
-                        Genre <span className={`arrow ${isOpen ? 'open' : ''}`}></span>
-                    </button>
-                    {isOpen && (
-                        <ul className="dropdown-menu">
-                            {categories.map((val, idx) => (
-                                <li key={idx} className="duration-75 flex gap-4 mx-4 my-2 cursor-pointer items-center">
-                                    <div onClick={() => nav("/category/" + val)} className="relative flex-shrink-0">
-                                        <div className="rounded-full bg-center bg-no-repeat bg-cover" style={{ width: 10, height: 10 }}></div>
-                                        <Link to="#" className="text-sm">{val}</Link>
+                {/* Mobile Floating Search Button */}
+                {isMobile && (
+                    <>
+                        <button 
+                            className="mobile-search-button"
+                            onClick={toggleSearch}
+                            aria-label="Search"
+                        >
+                            {isExpanded ? <X size={20} /> : <Search size={20} />}
+                        </button>
+                        
+                        {isExpanded && (
+                            <div className="mobile-search-expanded">
+                                <form className="mobile-search-form" onSubmit={handleSearchSubmit}>
+                                    <div className="mobile-search-input-wrapper">
+                                        <Search size={18} className="mobile-search-icon" />
+                                        <input
+                                            type="search"
+                                            placeholder="Search anything..."
+                                            className="mobile-search-input"
+                                            value={searchTerm}
+                                            onChange={handleSearchInputChange}
+                                            autoFocus
+                                        />
+                                        {searchTerm && (
+                                            <button
+                                                type="button"
+                                                className="mobile-clear-button"
+                                                onClick={() => setSearchTerm("")}
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        )}
                                     </div>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </div>
-
-                {/* Rating Dropdown */}
-                <div className="dropdown">
-                    <button className="hover:bg-yellow-500 whitespace-nowrap hover:text-white hover:border-white-100 border border-black-700 rounded-xl px-1 py-1 cursor-pointer" onClick={toggleDropdowned}>
-                        Rating <span className={`arrow ${isOpened ? 'open' : ''}`}></span>
-                    </button>
-                    {isOpened && (
-                        <ul className="dropdown-menu">
-                            {ratings.map((val, idx) => (
-                                <li key={idx} className="duration-75 flex gap-4 mx-4 my-2 cursor-pointer items-center">
-                                    <div onClick={() => nav("/ratings/" + val)} className="relative flex-shrink-0">
-                                        <div className="rounded-full bg-center bg-no-repeat bg-cover" style={{ width: 12, height: 12 }}></div>
-                                        <Link to="#" className="text-sm">{val}</Link>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </div>
+                                    <button 
+                                        type="button" 
+                                        className="mobile-voice-button"
+                                        onClick={handleVoiceSearch}
+                                    >
+                                        {isListening ? <MdMicOff size={20} /> : <MdMic size={20} />}
+                                    </button>
+                                    <button type="submit" className="mobile-search-submit">
+                                        Go
+                                    </button>
+                                </form>
+                            </div>
+                        )}
+                    </>
+                )}
             </nav>
         </header>
     );
