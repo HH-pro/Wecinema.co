@@ -127,7 +127,7 @@ const Header: React.FC<HeaderProps> = ({
                     </div>
                 </div>
 
-                {/* Desktop Search Bar */}
+                {/* Desktop Search Bar - WIDER */}
                 {!isMobile && (
                     <div className="search-container">
                         <form className="search-form" onSubmit={handleSearchSubmit}>
@@ -204,7 +204,7 @@ const Header: React.FC<HeaderProps> = ({
                         )}
                     </div>
 
-                    {/* Genre Dropdown */}
+                    {/* Genre Dropdown - FIXED */}
                     <div className="dropdown-container" ref={genreRef}>
                         <button
                             className="nav-dropdown-button"
@@ -215,10 +215,10 @@ const Header: React.FC<HeaderProps> = ({
                             aria-expanded={isGenreOpen}
                         >
                             <span>Genre</span>
-                            <FaChevronDown size={12} className={`dropdown-icon ${isGenreOpen ? 'rotate' : ''}`} />
+                            <FaChevronDown size={12} className={`dropdown-arrow ${isGenreOpen ? 'open' : ''}`} />
                         </button>
                         
-                        {isGenreOpen && (
+                        {isGenreOpen && categories && categories.length > 0 && (
                             <div className="dropdown-menu genre-dropdown">
                                 <div className="dropdown-header">
                                     <h3 className="dropdown-title">Movie Genres</h3>
@@ -240,7 +240,7 @@ const Header: React.FC<HeaderProps> = ({
                         )}
                     </div>
 
-                    {/* Rating Dropdown */}
+                    {/* Rating Dropdown - FIXED */}
                     <div className="dropdown-container" ref={ratingRef}>
                         <button
                             className="nav-dropdown-button"
@@ -251,10 +251,10 @@ const Header: React.FC<HeaderProps> = ({
                             aria-expanded={isRatingOpen}
                         >
                             <span>Rating</span>
-                            <FaChevronDown size={12} className={`dropdown-icon ${isRatingOpen ? 'rotate' : ''}`} />
+                            <FaChevronDown size={12} className={`dropdown-arrow ${isRatingOpen ? 'open' : ''}`} />
                         </button>
                         
-                        {isRatingOpen && (
+                        {isRatingOpen && ratings && ratings.length > 0 && (
                             <div className="dropdown-menu rating-dropdown">
                                 <div className="dropdown-header">
                                     <h3 className="dropdown-title">Content Ratings</h3>
