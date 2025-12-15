@@ -257,7 +257,7 @@ const Header: React.FC<HeaderProps> = ({
                         {isRatingOpen && ratings && ratings.length > 0 && (
                             <div className="dropdown-menu rating-dropdown">
                                 <div className="dropdown-header">
-                                    <h3 className="dropdown-title">Content Ratings</h3>
+                                    <h3 className="dropdown-title">Ratings</h3>
                                 </div>
                                 <div className="dropdown-content">
                                     {ratings.map((rating, index) => (
