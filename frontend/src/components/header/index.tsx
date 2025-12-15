@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MdMenu, MdMic, MdMicOff } from "react-icons/md";
 import logo from "../../assets/wecinema.png";
 import { FaUpload, FaVideo, FaFileAlt, FaChevronDown } from "react-icons/fa";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { categories, ratings } from "../../App";
 import { Search, X } from "lucide-react";
 import './Header.css';
@@ -94,15 +94,12 @@ const Header: React.FC<HeaderProps> = ({
         }
     };
 
-    // Debug function to check if navigation works
     const handleGenreClick = (genre: string) => {
-        console.log('Navigating to genre:', genre);
         setIsGenreOpen(false);
         nav(`/category/${genre}`);
     };
 
     const handleRatingClick = (rating: string) => {
-        console.log('Navigating to rating:', rating);
         setIsRatingOpen(false);
         nav(`/ratings/${rating}`);
     };
@@ -122,10 +119,7 @@ const Header: React.FC<HeaderProps> = ({
                     
                     <div 
                         className="logo-container"
-                        onClick={() => {
-                            console.log('Navigating to home');
-                            nav("/");
-                        }}
+                        onClick={() => nav("/")}
                         role="button"
                         tabIndex={0}
                         onKeyPress={(e) => e.key === 'Enter' && nav("/")}
@@ -141,7 +135,7 @@ const Header: React.FC<HeaderProps> = ({
                     </div>
                 </div>
 
-                {/* Desktop Search Bar */}
+                {/* Desktop Search Bar - SMALLER HEIGHT */}
                 {!isMobile && (
                     <div className="search-wrapper">
                         <form 
@@ -151,10 +145,10 @@ const Header: React.FC<HeaderProps> = ({
                         >
                             <div className="search-container">
                                 <div className="search-input-wrapper">
-                                    <Search size={20} className="search-icon" />
+                                    <Search size={18} className="search-icon" />
                                     <input
                                         type="search"
-                                        placeholder="Search movies, shows, actors, directors..."
+                                        placeholder="Search movies, shows, actors..."
                                         className="search-input"
                                         value={searchTerm}
                                         onChange={handleSearchInputChange}
@@ -167,7 +161,7 @@ const Header: React.FC<HeaderProps> = ({
                                             onClick={() => setSearchTerm("")}
                                             aria-label="Clear search"
                                         >
-                                            <X size={18} />
+                                            <X size={16} />
                                         </button>
                                     )}
                                     <button 
@@ -176,7 +170,7 @@ const Header: React.FC<HeaderProps> = ({
                                         onClick={handleVoiceSearch}
                                         aria-label="Voice search"
                                     >
-                                        {isListening ? <MdMicOff size={20} /> : <MdMic size={20} />}
+                                        {isListening ? <MdMicOff size={18} /> : <MdMic size={18} />}
                                     </button>
                                 </div>
                                 <button type="submit" className="search-submit-button">
@@ -187,7 +181,7 @@ const Header: React.FC<HeaderProps> = ({
                     </div>
                 )}
 
-                {/* Navigation Controls */}
+                {/* Navigation Controls - ALL ALIGNED */}
                 <div className="header-controls">
                     {/* Upload Dropdown */}
                     <div className="dropdown-container" ref={uploadRef}>
@@ -197,7 +191,7 @@ const Header: React.FC<HeaderProps> = ({
                             aria-label="Upload options"
                             aria-expanded={uploadMenuOpen}
                         >
-                            <FaUpload size={18} />
+                            <FaUpload size={16} />
                         </button>
 
                         {uploadMenuOpen && (
@@ -205,7 +199,6 @@ const Header: React.FC<HeaderProps> = ({
                                 <button
                                     className="dropdown-item"
                                     onClick={() => {
-                                        console.log('Upload Video clicked');
                                         toggleUploadModal?.();
                                         setUploadMenuOpen(false);
                                     }}
@@ -216,7 +209,6 @@ const Header: React.FC<HeaderProps> = ({
                                 <button
                                     className="dropdown-item"
                                     onClick={() => {
-                                        console.log('Upload Script clicked');
                                         toggleUploadScriptModal?.();
                                         setUploadMenuOpen(false);
                                     }}
@@ -228,19 +220,18 @@ const Header: React.FC<HeaderProps> = ({
                         )}
                     </div>
 
-                    {/* Genre Dropdown - SCROLLABLE */}
+                    {/* Genre Dropdown */}
                     <div className="dropdown-container" ref={genreRef}>
                         <button
                             className="nav-dropdown-button"
                             onClick={() => {
-                                console.log('Genre dropdown toggled');
                                 setIsGenreOpen(!isGenreOpen);
                                 setIsRatingOpen(false);
                             }}
                             aria-expanded={isGenreOpen}
                         >
                             <span>Genre</span>
-                            <FaChevronDown size={12} className={`dropdown-arrow ${isGenreOpen ? 'open' : ''}`} />
+                            <FaChevronDown size={10} className={`dropdown-arrow ${isGenreOpen ? 'open' : ''}`} />
                         </button>
                         
                         {isGenreOpen && categories && categories.length > 0 && (
@@ -265,25 +256,24 @@ const Header: React.FC<HeaderProps> = ({
                         )}
                     </div>
 
-                    {/* Rating Dropdown - SMALLER WIDTH */}
+                    {/* Rating Dropdown - OPENS ON LEFT SIDE */}
                     <div className="dropdown-container" ref={ratingRef}>
                         <button
                             className="nav-dropdown-button"
                             onClick={() => {
-                                console.log('Rating dropdown toggled');
                                 setIsRatingOpen(!isRatingOpen);
                                 setIsGenreOpen(false);
                             }}
                             aria-expanded={isRatingOpen}
                         >
                             <span>Rating</span>
-                            <FaChevronDown size={12} className={`dropdown-arrow ${isRatingOpen ? 'open' : ''}`} />
+                            <FaChevronDown size={10} className={`dropdown-arrow ${isRatingOpen ? 'open' : ''}`} />
                         </button>
                         
                         {isRatingOpen && ratings && ratings.length > 0 && (
                             <div className="dropdown-menu rating-dropdown">
                                 <div className="dropdown-header">
-                                    <h3 className="dropdown-title">Ratings</h3>
+                                    <h3 className="dropdown-title">Content Ratings</h3>
                                 </div>
                                 <div className="dropdown-content">
                                     {ratings.map((rating, index) => (
@@ -307,10 +297,7 @@ const Header: React.FC<HeaderProps> = ({
                     <>
                         <button 
                             className="mobile-search-button"
-                            onClick={() => {
-                                console.log('Mobile search toggled');
-                                toggleSearch();
-                            }}
+                            onClick={toggleSearch}
                             aria-label="Search"
                         >
                             {isExpanded ? <X size={20} /> : <Search size={20} />}
@@ -349,10 +336,6 @@ const Header: React.FC<HeaderProps> = ({
                                     <button 
                                         type="submit" 
                                         className="mobile-search-submit"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            handleSearchSubmit(e as any);
-                                        }}
                                     >
                                         Go
                                     </button>
