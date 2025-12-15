@@ -600,7 +600,113 @@ export const getChartData = (labels: string[], datasets: any[]) => ({
     backgroundColor: dataset.backgroundColor || `hsla(${Math.random() * 360}, 70%, 50%, 0.1)`,
   }))
 });
+export const getCurrentUserId = (): string | null => {
+  const token = localStorage.getItem('token');
+  if (!token) return null;
+  
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.userId || payload.sub || null;
+  } catch (error) {
+    console.error('Error decoding token:', error);
+    return null;
+  }
+};
 
+export const getUserRole = (): string | null => {
+  const token = localStorage.getItem('token');
+  if (!token) return null;
+  
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.role || null;
+  } catch (error) {
+    console.error('Error decoding token:', error);
+    return null;
+  }
+};
+
+export const calculateRemainingDays = (expectedDelivery: string): number => {
+  if (!expectedDelivery) return 0;
+  
+  const expectedDate = new Date(expectedDelivery);
+  const today = new Date();
+  
+  // Reset time parts for accurate day calculation
+  expectedDate.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  
+  const diffTime = expectedDate.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  return Math.max(0, diffDays);
+};
+
+export const getOrderProgress = (status: string): number => {
+  const progressMap: Record<string, number> = {
+    pending_payment: 10,
+    paid: 25,
+    processing: 40,
+    in_progress: 60,
+    delivered: 80,
+    in_revision: 65,
+    completed: 100,
+    cancelled: 0,
+    disputed: 0
+  };
+  
+  return progressMap[status] || 0;
+};
+
+export const formatTimeRemaining = (expectedDelivery: string): string => {
+  const remainingDays = calculateRemainingDays(expectedDelivery);
+  
+  if (remainingDays === 0) return 'Due today';
+  if (remainingDays === 1) return 'Due tomorrow';
+  if (remainingDays < 7) return `Due in ${remainingDays} days`;
+  if (remainingDays < 30) return `Due in ${Math.floor(remainingDays / 7)} weeks`;
+  if (remainingDays < 365) return `Due in ${Math.floor(remainingDays / 30)} months`;
+  
+  return `Due in ${Math.floor(remainingDays / 365)} years`;
+};
+
+export const validateRevisionRequest = (notes: string): string | null => {
+  if (!notes || notes.trim().length < 10) {
+    return 'Revision notes must be at least 10 characters long';
+  }
+  
+  if (notes.trim().length > 1000) {
+    return 'Revision notes cannot exceed 1000 characters';
+  }
+  
+  return null;
+};
+
+export const validateOrderCompletion = (order: any): string | null => {
+  if (order.status !== 'delivered') {
+    return 'Order must be delivered before it can be completed';
+  }
+  
+  if (!order.deliveredAt) {
+    return 'Delivery information is missing';
+  }
+  
+  return null;
+};
+
+export const formatOrderNumber = (orderId: string): string => {
+  if (!orderId) return 'N/A';
+  return `#${orderId.slice(-8).toUpperCase()}`;
+};
+
+export const calculatePlatformFee = (amount: number): number => {
+  return parseFloat((amount * 0.15).toFixed(2));
+};
+
+export const calculateSellerAmount = (amount: number): number => {
+  const platformFee = calculatePlatformFee(amount);
+  return parseFloat((amount - platformFee).toFixed(2));
+};
 // ===== Export all utilities =====
 export default {
   // Token & Auth
