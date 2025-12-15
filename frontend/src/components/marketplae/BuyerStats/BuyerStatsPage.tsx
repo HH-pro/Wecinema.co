@@ -11,7 +11,7 @@ import {
   FaSpinner
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-import MarketplaceLayout from '../Layout/MarketplaceLayout';
+import MarketplaceLayout from '../../Layout';
 import { marketplaceAPI } from '../../../api';
 import './BuyerStatsPage.css';
 
