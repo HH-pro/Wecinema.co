@@ -14,7 +14,7 @@ import {
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
-import MarketplaceLayout from '../Layout/MarketplaceLayout';
+import MarketplaceLayout from '../../Layout/';
 import { marketplaceAPI } from '../../../api';
 import './MyOffersPage.css';
 
