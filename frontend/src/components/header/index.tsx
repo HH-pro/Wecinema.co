@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { MdMenu, MdMic, MdMicOff } from "react-icons/md";
 import logo from "../../assets/wecinema.png";
-import { FaUpload, FaVideo, FaFileAlt } from "react-icons/fa";
+import { FaUpload, FaVideo, FaFileAlt, FaChevronDown } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
 import { categories, ratings } from "../../App";
 import { Search, X } from "lucide-react";
@@ -33,8 +33,31 @@ const Header: React.FC<HeaderProps> = ({
     const [searchTerm, setSearchTerm] = useState("");
     const [isListening, setIsListening] = useState(false);
     const [uploadMenuOpen, setUploadMenuOpen] = useState(false);
+    
+    const genreRef = useRef<HTMLDivElement>(null);
+    const ratingRef = useRef<HTMLDivElement>(null);
+    const uploadRef = useRef<HTMLDivElement>(null);
+
+    // Close dropdowns when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (genreRef.current && !genreRef.current.contains(event.target as Node)) {
+                setIsGenreOpen(false);
+            }
+            if (ratingRef.current && !ratingRef.current.contains(event.target as Node)) {
+                setIsRatingOpen(false);
+            }
+            if (uploadRef.current && !uploadRef.current.contains(event.target as Node)) {
+                setUploadMenuOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const toggleSearch = () => setIsExpanded(!isExpanded);
+    
     const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
     };
@@ -44,6 +67,7 @@ const Header: React.FC<HeaderProps> = ({
         if (searchTerm.trim()) {
             const capitalized = searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1);
             nav(`/search/${capitalized.trim()}`);
+            setIsExpanded(false);
         }
     };
 
@@ -60,6 +84,7 @@ const Header: React.FC<HeaderProps> = ({
                 const transcript = event.results[0][0].transcript;
                 setSearchTerm(transcript);
                 nav(`/search/${transcript}`);
+                setIsExpanded(false);
             };
 
             recognition.start();
@@ -110,7 +135,7 @@ const Header: React.FC<HeaderProps> = ({
                                 <Search size={18} className="search-icon" />
                                 <input
                                     type="search"
-                                    placeholder="Search movies, shows, actors..."
+                                    placeholder="Search movies, shows, actors, directors..."
                                     className="search-input"
                                     value={searchTerm}
                                     onChange={handleSearchInputChange}
@@ -143,7 +168,7 @@ const Header: React.FC<HeaderProps> = ({
                 {/* Navigation Controls */}
                 <div className="header-controls">
                     {/* Upload Dropdown */}
-                    <div className="dropdown-container">
+                    <div className="dropdown-container" ref={uploadRef}>
                         <button
                             className="upload-button"
                             onClick={() => setUploadMenuOpen(!uploadMenuOpen)}
@@ -180,55 +205,72 @@ const Header: React.FC<HeaderProps> = ({
                     </div>
 
                     {/* Genre Dropdown */}
-                    <div className="dropdown-container">
+                    <div className="dropdown-container" ref={genreRef}>
                         <button
                             className="nav-dropdown-button"
-                            onClick={() => setIsGenreOpen(!isGenreOpen)}
+                            onClick={() => {
+                                setIsGenreOpen(!isGenreOpen);
+                                setIsRatingOpen(false);
+                            }}
                             aria-expanded={isGenreOpen}
                         >
                             <span>Genre</span>
-                            <span className={`dropdown-arrow ${isGenreOpen ? 'open' : ''}`}></span>
+                            <FaChevronDown size={12} className={`dropdown-icon ${isGenreOpen ? 'rotate' : ''}`} />
                         </button>
                         
                         {isGenreOpen && (
                             <div className="dropdown-menu genre-dropdown">
-                                {categories.map((genre, index) => (
-                                    <Link
-                                        key={index}
-                                        to={`/category/${genre}`}
-                                        className="dropdown-item"
-                                        onClick={() => setIsGenreOpen(false)}
-                                    >
-                                        {genre}
-                                    </Link>
-                                ))}
+                                <div className="dropdown-header">
+                                    <h3 className="dropdown-title">Movie Genres</h3>
+                                </div>
+                                <div className="dropdown-content">
+                                    {categories.map((genre, index) => (
+                                        <Link
+                                            key={index}
+                                            to={`/category/${genre}`}
+                                            className="dropdown-item"
+                                            onClick={() => setIsGenreOpen(false)}
+                                        >
+                                            <span className="genre-bullet"></span>
+                                            {genre}
+                                        </Link>
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </div>
 
                     {/* Rating Dropdown */}
-                    <div className="dropdown-container">
+                    <div className="dropdown-container" ref={ratingRef}>
                         <button
                             className="nav-dropdown-button"
-                            onClick={() => setIsRatingOpen(!isRatingOpen)}
+                            onClick={() => {
+                                setIsRatingOpen(!isRatingOpen);
+                                setIsGenreOpen(false);
+                            }}
                             aria-expanded={isRatingOpen}
                         >
                             <span>Rating</span>
-                            <span className={`dropdown-arrow ${isRatingOpen ? 'open' : ''}`}></span>
+                            <FaChevronDown size={12} className={`dropdown-icon ${isRatingOpen ? 'rotate' : ''}`} />
                         </button>
                         
                         {isRatingOpen && (
                             <div className="dropdown-menu rating-dropdown">
-                                {ratings.map((rating, index) => (
-                                    <Link
-                                        key={index}
-                                        to={`/ratings/${rating}`}
-                                        className="dropdown-item"
-                                        onClick={() => setIsRatingOpen(false)}
-                                    >
-                                        {rating}
-                                    </Link>
-                                ))}
+                                <div className="dropdown-header">
+                                    <h3 className="dropdown-title">Content Ratings</h3>
+                                </div>
+                                <div className="dropdown-content">
+                                    {ratings.map((rating, index) => (
+                                        <Link
+                                            key={index}
+                                            to={`/ratings/${rating}`}
+                                            className="dropdown-item"
+                                            onClick={() => setIsRatingOpen(false)}
+                                        >
+                                            <span className="rating-badge">{rating}</span>
+                                        </Link>
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </div>
