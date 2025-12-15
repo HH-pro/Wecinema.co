@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { MdMenu, MdMic, MdMicOff } from "react-icons/md";
 import logo from "../../assets/wecinema.png";
-import { FaUpload, FaVideo, FaFileAlt, FaSearch } from "react-icons/fa";
+import { FaUpload, FaVideo, FaFileAlt, FaSearch, FaUser } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { categories, ratings } from "../../App";
-import './Header.css';
 import { Search, X } from "lucide-react";
 
 interface HeaderProps {
@@ -35,6 +34,7 @@ const Header: React.FC<HeaderProps> = ({
     const [isListening, setIsListening] = useState(false);
     const [uploadMenuOpen, setUploadMenuOpen] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false);
+    const [userMenuOpen, setUserMenuOpen] = useState(false);
 
     // Handle scroll effect
     useEffect(() => {
@@ -49,10 +49,13 @@ const Header: React.FC<HeaderProps> = ({
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as HTMLElement;
-            if (!target.closest('.header-dropdown') && !target.closest('.header-upload-menu')) {
+            if (!target.closest('.header-dropdown') && 
+                !target.closest('.header-upload-menu') &&
+                !target.closest('.header-user-menu')) {
                 setGenreOpen(false);
                 setRatingOpen(false);
                 setUploadMenuOpen(false);
+                setUserMenuOpen(false);
             }
         };
         document.addEventListener('click', handleClickOutside);
@@ -63,12 +66,14 @@ const Header: React.FC<HeaderProps> = ({
         e.stopPropagation();
         setGenreOpen(!genreOpen);
         setRatingOpen(false);
+        setUserMenuOpen(false);
     };
 
     const toggleRatingDropdown = (e: React.MouseEvent) => {
         e.stopPropagation();
         setRatingOpen(!ratingOpen);
         setGenreOpen(false);
+        setUserMenuOpen(false);
     };
 
     const toggleUploadDropdown = (e: React.MouseEvent) => {
@@ -76,6 +81,15 @@ const Header: React.FC<HeaderProps> = ({
         setUploadMenuOpen(!uploadMenuOpen);
         setGenreOpen(false);
         setRatingOpen(false);
+        setUserMenuOpen(false);
+    };
+
+    const toggleUserDropdown = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setUserMenuOpen(!userMenuOpen);
+        setGenreOpen(false);
+        setRatingOpen(false);
+        setUploadMenuOpen(false);
     };
 
     const toggleMobileSearch = () => setIsExpanded(!isExpanded);
@@ -139,6 +153,27 @@ const Header: React.FC<HeaderProps> = ({
         }
     };
 
+    const handleLogin = () => {
+        nav('/login');
+        setUserMenuOpen(false);
+    };
+
+    const handleSignup = () => {
+        nav('/signup');
+        setUserMenuOpen(false);
+    };
+
+    const handleProfile = () => {
+        nav('/profile');
+        setUserMenuOpen(false);
+    };
+
+    const handleLogout = () => {
+        // Add logout logic here
+        nav('/');
+        setUserMenuOpen(false);
+    };
+
     const isActive = (path: string) => location.pathname === path;
 
     return (
@@ -152,7 +187,7 @@ const Header: React.FC<HeaderProps> = ({
                             onClick={toggleSidebar || toggler}
                             aria-label="Toggle menu"
                         >
-                            <MdMenu size={24} />
+                            <MdMenu size={28} />
                         </button>
                         
                         <div 
@@ -191,7 +226,7 @@ const Header: React.FC<HeaderProps> = ({
                                         className={`header-voice-button ${isListening ? 'header-voice-active' : ''}`}
                                         aria-label={isListening ? "Stop listening" : "Voice search"}
                                     >
-                                        {isListening ? <MdMicOff size={18} /> : <MdMic size={18} />}
+                                        {isListening ? <MdMicOff size={20} /> : <MdMic size={20} />}
                                     </button>
                                 </div>
                             </form>
@@ -207,7 +242,7 @@ const Header: React.FC<HeaderProps> = ({
                                 className="header-mobile-search-button"
                                 aria-label="Search"
                             >
-                                {isExpanded ? <X size={20} /> : <Search size={20} />}
+                                {isExpanded ? <X size={24} /> : <Search size={24} />}
                             </button>
                         )}
 
@@ -218,7 +253,7 @@ const Header: React.FC<HeaderProps> = ({
                                 className="header-upload-button"
                                 aria-label="Upload options"
                             >
-                                <FaUpload size={18} />
+                                <FaUpload size={22} />
                             </button>
                             
                             {uploadMenuOpen && (
@@ -228,14 +263,14 @@ const Header: React.FC<HeaderProps> = ({
                                         className={`header-upload-item ${isActive('/upload') ? 'header-upload-active' : ''}`}
                                     >
                                         <FaVideo className="header-upload-icon" />
-                                        <span>Video</span>
+                                        <span>Upload Video</span>
                                     </button>
                                     <button
                                         onClick={handleUploadScript}
                                         className={`header-upload-item ${isActive('/uploadscripts') ? 'header-upload-active' : ''}`}
                                     >
                                         <FaFileAlt className="header-upload-icon" />
-                                        <span>Script</span>
+                                        <span>Upload Script</span>
                                     </button>
                                 </div>
                             )}
@@ -245,22 +280,25 @@ const Header: React.FC<HeaderProps> = ({
                         <div className="header-dropdown">
                             <button
                                 onClick={toggleGenreDropdown}
-                                className="header-dropdown-button"
+                                className={`header-dropdown-button ${genreOpen ? 'header-dropdown-open' : ''}`}
                             >
                                 Genre <span className={`header-arrow ${genreOpen ? 'header-arrow-open' : ''}`}></span>
                             </button>
                             
                             {genreOpen && (
                                 <div className="header-dropdown-menu">
-                                    {categories.map((genre, idx) => (
-                                        <button
-                                            key={idx}
-                                            onClick={() => handleGenreClick(genre)}
-                                            className="header-dropdown-item"
-                                        >
-                                            {genre}
-                                        </button>
-                                    ))}
+                                    <div className="header-dropdown-title">Browse by Genre</div>
+                                    <div className="header-genre-grid">
+                                        {categories.map((genre, idx) => (
+                                            <button
+                                                key={idx}
+                                                onClick={() => handleGenreClick(genre)}
+                                                className="header-dropdown-item"
+                                            >
+                                                {genre}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -269,22 +307,91 @@ const Header: React.FC<HeaderProps> = ({
                         <div className="header-dropdown">
                             <button
                                 onClick={toggleRatingDropdown}
-                                className="header-dropdown-button"
+                                className={`header-dropdown-button ${ratingOpen ? 'header-dropdown-open' : ''}`}
                             >
                                 Rating <span className={`header-arrow ${ratingOpen ? 'header-arrow-open' : ''}`}></span>
                             </button>
                             
                             {ratingOpen && (
                                 <div className="header-dropdown-menu">
+                                    <div className="header-dropdown-title">Browse by Rating</div>
                                     {ratings.map((rating, idx) => (
                                         <button
                                             key={idx}
                                             onClick={() => handleRatingClick(rating)}
                                             className="header-dropdown-item"
                                         >
-                                            {rating}
+                                            <span className="header-rating-star">★</span> {rating}+
                                         </button>
                                     ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* User Menu Dropdown */}
+                        <div className="header-user-menu">
+                            <button
+                                onClick={toggleUserDropdown}
+                                className={`header-user-button ${userMenuOpen ? 'header-user-active' : ''}`}
+                                aria-label="User menu"
+                            >
+                                <FaUser size={20} />
+                            </button>
+                            
+                            {userMenuOpen && (
+                                <div className="header-user-dropdown">
+                                    <div className="header-user-info">
+                                        <div className="header-user-avatar">
+                                            <FaUser size={32} />
+                                        </div>
+                                        <div className="header-user-details">
+                                            <span className="header-user-name">Guest User</span>
+                                            <span className="header-user-email">guest@wecinema.com</span>
+                                        </div>
+                                    </div>
+                                    <div className="header-user-divider"></div>
+                                    <button
+                                        onClick={handleProfile}
+                                        className="header-user-item"
+                                    >
+                                        <FaUser className="header-user-item-icon" />
+                                        <span>Profile</span>
+                                    </button>
+                                    <button
+                                        onClick={handleUploadVideo}
+                                        className="header-user-item"
+                                    >
+                                        <FaVideo className="header-user-item-icon" />
+                                        <span>My Videos</span>
+                                    </button>
+                                    <button
+                                        onClick={handleUploadScript}
+                                        className="header-user-item"
+                                    >
+                                        <FaFileAlt className="header-user-item-icon" />
+                                        <span>My Scripts</span>
+                                    </button>
+                                    <div className="header-user-divider"></div>
+                                    <div className="header-user-auth">
+                                        <button
+                                            onClick={handleLogin}
+                                            className="header-login-button"
+                                        >
+                                            Login
+                                        </button>
+                                        <button
+                                            onClick={handleSignup}
+                                            className="header-signup-button"
+                                        >
+                                            Sign Up
+                                        </button>
+                                    </div>
+                                    <button
+                                        onClick={handleLogout}
+                                        className="header-logout-button"
+                                    >
+                                        Logout
+                                    </button>
                                 </div>
                             )}
                         </div>
@@ -316,7 +423,7 @@ const Header: React.FC<HeaderProps> = ({
                                         className={`header-mobile-voice-button ${isListening ? 'header-voice-active' : ''}`}
                                         aria-label={isListening ? "Stop listening" : "Voice search"}
                                     >
-                                        {isListening ? <MdMicOff size={18} /> : <MdMic size={18} />}
+                                        {isListening ? <MdMicOff size={20} /> : <MdMic size={20} />}
                                     </button>
                                 </div>
                                 <div className="header-mobile-search-actions">
