@@ -10,7 +10,7 @@ import {
   FaCalendarAlt,
   FaIdCard
 } from 'react-icons/fa';
-import { formatCurrency } from '../../api';
+import { formatCurrency } from '../../../api';
 
 interface PaymentDetailsProps {
   payment: {
