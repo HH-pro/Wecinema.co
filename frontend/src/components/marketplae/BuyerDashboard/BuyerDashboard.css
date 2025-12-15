@@ -130,7 +130,7 @@
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, var(--card-color, #3498db), transparent);
+  background: linear-gradient(90deg, var(--card-color, #d69e2e), transparent);
 }
 
 .stat-card:hover {
@@ -147,7 +147,7 @@
   justify-content: center;
   font-size: 32px;
   background: rgba(var(--card-rgb, 52, 152, 219), 0.1);
-  color: var(--card-color, #3498db);
+  color: var(--card-color, #d69e2e);
   flex-shrink: 0;
 }
 
@@ -176,7 +176,7 @@
 
 .total-orders .stat-icon {
   background: rgba(52, 152, 219, 0.1);
-  color: #3498db;
+  color: #d69e2e;
 }
 
 .active-orders .stat-icon {
