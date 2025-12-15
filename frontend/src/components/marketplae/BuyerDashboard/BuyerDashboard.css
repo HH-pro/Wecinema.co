@@ -472,7 +472,7 @@
 .action-btn:hover {
   transform: translateY(-5px);
   box-shadow: 0 15px 30px rgba(0, 0, 0, 0.12);
-  border-color: #667eea;
+  border-color: #d69e2e;
 }
 
 .action-btn:hover::before {
@@ -480,13 +480,13 @@
 }
 
 .action-btn.primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #d69e2e 0%, #764ba2 100%);
   border-color: transparent;
   color: white;
 }
 
 .action-btn.primary:hover {
-  background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+  background: linear-gradient(135deg, #d69e2e 0%, #6b46c1 100%);
   transform: translateY(-5px);
   box-shadow: 0 15px 30px rgba(102, 126, 234, 0.3);
 }
