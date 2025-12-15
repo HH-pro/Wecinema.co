@@ -18,7 +18,10 @@ import {
   FaCreditCard,
   FaComment,
   FaReply,
-  FaTimes
+  FaTimes,
+  FaDownload,
+  FaStar,
+  FaListAlt
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
@@ -48,22 +51,11 @@ interface Listing {
   tags?: string[];
 }
 
-interface Offer {
-  _id: string;
-  amount: number;
-  message?: string;
-  requirements?: string;
-  expectedDelivery?: string;
-  createdAt: string;
-}
-
 interface Order {
   _id: string;
   buyerId: User | string;
   sellerId: User | string;
   listingId: Listing | string;
-  offerId?: Offer | string;
-  orderType: 'direct_purchase' | 'accepted_offer' | 'commission';
   amount: number;
   status: 'pending_payment' | 'paid' | 'processing' | 'in_progress' | 'delivered' | 'in_revision' | 'completed' | 'cancelled' | 'disputed';
   paymentReleased: boolean;
@@ -74,7 +66,6 @@ interface Order {
   completedAt?: string;
   revisions: number;
   maxRevisions: number;
-  requirements?: string;
   deliveryMessage?: string;
   deliveryFiles?: string[];
   expectedDelivery?: string;
@@ -83,36 +74,6 @@ interface Order {
   orderNumber?: string;
   processingAt?: string;
   startedAt?: string;
-  revisionNotes?: Array<{
-    notes: string;
-    requestedAt: string;
-    completedAt?: string;
-  }>;
-  // New fields from your backend
-  sellerPayoutAmount?: number;
-  cancelledAt?: string;
-  buyerNotes?: string;
-  sellerNotes?: string;
-}
-
-interface Delivery {
-  _id: string;
-  orderId: string | Order;
-  sellerId: User | string;
-  buyerId: User | string;
-  message: string;
-  attachments: Array<{
-    filename: string;
-    originalName: string;
-    mimeType: string;
-    size: number;
-    url: string;
-    key?: string;
-  }>;
-  isFinalDelivery: boolean;
-  revisionNumber: number;
-  status: 'pending_review';
-  createdAt: string;
 }
 
 interface BuyerStats {
@@ -120,8 +81,8 @@ interface BuyerStats {
   pendingOrders: number;
   completedOrders: number;
   activeOrders: number;
+  cancelledOrders: number;
   totalSpent: number;
-  cancelledOrders?: number;
   totalRevenue?: number;
   pendingRevenue?: number;
 }
@@ -129,30 +90,9 @@ interface BuyerStats {
 interface DashboardResponse {
   success: boolean;
   orders?: Order[];
-  sales?: Order[];
-  data?: {
-    orders?: Order[];
-    stats?: BuyerStats;
-  };
-  stats?: {
-    total: number;
-    active: number;
-    completed: number;
-    pending: number;
-    cancelled: number;
-    totalRevenue?: number;
-    pendingRevenue?: number;
-  };
+  stats?: BuyerStats;
   error?: string;
   count?: number;
-}
-
-interface Stats {
-  total: number;
-  active: number;
-  completed: number;
-  pending: number;
-  cancelled: number;
 }
 
 const BuyerDashboard: React.FC = () => {
@@ -162,6 +102,7 @@ const BuyerDashboard: React.FC = () => {
     pendingOrders: 0,
     completedOrders: 0,
     activeOrders: 0,
+    cancelledOrders: 0,
     totalSpent: 0,
   });
   const [loading, setLoading] = useState(true);
@@ -177,38 +118,25 @@ const BuyerDashboard: React.FC = () => {
     try {
       setLoading(true);
       
-      // Check authentication
       if (!isAuthenticated()) {
         toast.error('Please login to view your dashboard');
         navigate('/login');
         return;
       }
 
-      // Fetch orders using marketplaceAPI.orders.getMy()
+      // Fetch buyer orders
       const response = await marketplaceAPI.orders.getMy(setLoading) as DashboardResponse;
       
-      console.log('API Response:', response); // Debug log
+      console.log('Buyer Orders Response:', response);
       
-      if (response.success) {
-        const buyerOrders = response.orders || [];
-        setOrders(buyerOrders);
+      if (response.success && response.orders) {
+        setOrders(response.orders);
         
-        // Calculate stats from orders
-        const calculatedStats = calculateStats(buyerOrders);
-        
-        // Use backend stats if available, otherwise use calculated
+        // Use stats from API or calculate them
         if (response.stats) {
-          setStats({
-            totalOrders: response.stats.total || calculatedStats.totalOrders,
-            pendingOrders: response.stats.pending || calculatedStats.pendingOrders,
-            completedOrders: response.stats.completed || calculatedStats.completedOrders,
-            activeOrders: response.stats.active || calculatedStats.activeOrders,
-            cancelledOrders: response.stats.cancelled || calculatedStats.cancelledOrders,
-            totalSpent: calculatedStats.totalSpent,
-            totalRevenue: response.stats.totalRevenue,
-            pendingRevenue: response.stats.pendingRevenue
-          });
+          setStats(response.stats);
         } else {
+          const calculatedStats = calculateStats(response.orders);
           setStats(calculatedStats);
         }
         
@@ -253,7 +181,6 @@ const BuyerDashboard: React.FC = () => {
     };
   };
 
-  // Helper functions to handle populated data
   const getSellerUsername = (order: Order): string => {
     if (typeof order.sellerId === 'object' && order.sellerId !== null) {
       const seller = order.sellerId as User;
@@ -328,25 +255,29 @@ const BuyerDashboard: React.FC = () => {
   const getOrderDescription = (order: Order): string => {
     switch (order.status) {
       case 'pending_payment':
-        return 'Waiting for payment completion';
+        return 'Complete payment to start order';
       case 'paid':
-        return 'Payment received, seller will start soon';
+        return 'Waiting for seller to start';
       case 'processing':
         return 'Seller is preparing your order';
       case 'in_progress':
         return 'Seller is working on your order';
       case 'delivered':
-        return 'Work delivered, please review';
+        if (order.revisions < order.maxRevisions) {
+          return `Review delivery (${order.revisions}/${order.maxRevisions} revisions used)`;
+        } else {
+          return 'Review delivery - No revisions left';
+        }
       case 'in_revision':
-        return `Revision requested (${order.revisions || 0}/${order.maxRevisions || 3})`;
+        return `Revision in progress (${order.revisions}/${order.maxRevisions})`;
       case 'completed':
-        return 'Order successfully completed';
+        return 'Order completed successfully';
       case 'cancelled':
-        return 'Order has been cancelled';
+        return 'Order was cancelled';
       case 'disputed':
         return 'Order is under dispute';
       default:
-        return 'Order is being processed';
+        return 'Order in progress';
     }
   };
 
@@ -372,28 +303,28 @@ const BuyerDashboard: React.FC = () => {
     toast.info('Refreshing dashboard...');
   };
 
-  // Handle order actions
   const handleOrderAction = async (orderId: string, action: string, data?: any) => {
     try {
       switch (action) {
         case 'complete_payment':
-          // Navigate to payment page
           navigate(`/marketplace/payment/${orderId}`);
           break;
           
         case 'request_revision':
-          const revisionNotes = prompt('Please provide revision notes:');
-          if (revisionNotes) {
-            await marketplaceAPI.orders.requestRevision(orderId, revisionNotes, setLoading);
+          const revisionNotes = prompt('Please provide detailed revision notes:');
+          if (revisionNotes && revisionNotes.trim().length >= 10) {
+            await marketplaceAPI.orders.requestRevision(orderId, revisionNotes.trim(), setLoading);
             toast.success('Revision requested successfully');
-            fetchBuyerData(); // Refresh data
+            fetchBuyerData();
+          } else if (revisionNotes) {
+            toast.error('Revision notes must be at least 10 characters');
           }
           break;
           
         case 'complete_order':
           await marketplaceAPI.orders.complete(orderId, setLoading);
-          toast.success('Order marked as completed');
-          fetchBuyerData(); // Refresh data
+          toast.success('Order completed successfully! Payment released to seller.');
+          fetchBuyerData();
           break;
           
         case 'contact_seller':
@@ -405,8 +336,24 @@ const BuyerDashboard: React.FC = () => {
           if (cancelReason) {
             await marketplaceAPI.orders.cancelByBuyer(orderId, cancelReason, setLoading);
             toast.success('Order cancelled successfully');
-            fetchBuyerData(); // Refresh data
+            fetchBuyerData();
           }
+          break;
+          
+        case 'download_files':
+          navigate(`/marketplace/orders/${orderId}?tab=files`);
+          break;
+          
+        case 'leave_review':
+          navigate(`/marketplace/reviews/create?orderId=${orderId}`);
+          break;
+          
+        case 'view_timeline':
+          navigate(`/marketplace/orders/${orderId}?tab=timeline`);
+          break;
+          
+        case 'view_summary':
+          navigate(`/marketplace/orders/${orderId}?tab=summary`);
           break;
           
         default:
@@ -417,7 +364,6 @@ const BuyerDashboard: React.FC = () => {
     }
   };
 
-  // Get available actions based on order status
   const getOrderActions = (order: Order): Array<{label: string, action: string, className: string, icon: JSX.Element}> => {
     const actions: Array<{label: string, action: string, className: string, icon: JSX.Element}> = [];
     
@@ -461,6 +407,12 @@ const BuyerDashboard: React.FC = () => {
           icon: <FaCheckCircle />
         });
         actions.push({
+          label: 'Download Files',
+          action: 'download_files',
+          className: 'download-btn',
+          icon: <FaDownload />
+        });
+        actions.push({
           label: 'Contact Seller',
           action: 'contact_seller',
           className: 'contact-btn',
@@ -469,6 +421,20 @@ const BuyerDashboard: React.FC = () => {
         break;
         
       case 'in_revision':
+        actions.push({
+          label: 'Contact Seller',
+          action: 'contact_seller',
+          className: 'contact-btn',
+          icon: <FaComment />
+        });
+        actions.push({
+          label: 'Download Files',
+          action: 'download_files',
+          className: 'download-btn',
+          icon: <FaDownload />
+        });
+        break;
+        
       case 'in_progress':
       case 'paid':
       case 'processing':
@@ -478,6 +444,12 @@ const BuyerDashboard: React.FC = () => {
           className: 'contact-btn',
           icon: <FaComment />
         });
+        actions.push({
+          label: 'View Timeline',
+          action: 'view_timeline',
+          className: 'timeline-btn',
+          icon: <FaListAlt />
+        });
         break;
         
       case 'completed':
@@ -485,7 +457,19 @@ const BuyerDashboard: React.FC = () => {
           label: 'Leave Review',
           action: 'leave_review',
           className: 'review-btn',
-          icon: <FaComment />
+          icon: <FaStar />
+        });
+        actions.push({
+          label: 'Download Files',
+          action: 'download_files',
+          className: 'download-btn',
+          icon: <FaDownload />
+        });
+        actions.push({
+          label: 'View Summary',
+          action: 'view_summary',
+          className: 'summary-btn',
+          icon: <FaListAlt />
         });
         break;
     }
@@ -596,6 +580,13 @@ const BuyerDashboard: React.FC = () => {
               <FaComment />
               <span>Messages</span>
             </button>
+            <button 
+              className="action-btn"
+              onClick={() => navigate('/marketplace/orders/stats/buyer')}
+            >
+              <FaListAlt />
+              <span>View Stats</span>
+            </button>
           </div>
         </div>
 
@@ -635,8 +626,18 @@ const BuyerDashboard: React.FC = () => {
         {/* Orders Section */}
         <div className="orders-section">
           <div className="section-header">
-            <h2>Recent Orders</h2>
-            <span className="orders-count">{filteredOrders.length} orders</span>
+            <h2>Recent Orders ({filteredOrders.length})</h2>
+            <div className="header-actions">
+              <span className="orders-count">{filteredOrders.length} orders</span>
+              {filteredOrders.length > 0 && (
+                <button 
+                  className="export-btn"
+                  onClick={() => toast.info('Export feature coming soon')}
+                >
+                  Export Orders
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Orders List */}
@@ -644,15 +645,18 @@ const BuyerDashboard: React.FC = () => {
             {filteredOrders.length > 0 ? (
               filteredOrders.map(order => {
                 const actions = getOrderActions(order);
+                const sellerUsername = getSellerUsername(order);
+                const listingTitle = getListingTitle(order);
+                const mediaUrl = getListingMedia(order);
                 
                 return (
                   <div key={order._id} className="order-card" style={{ borderLeftColor: getStatusColor(order.status) }}>
                     <div className="order-image">
                       <div className="image-container">
-                        {getListingMedia(order) ? (
+                        {mediaUrl ? (
                           <img 
-                            src={getListingMedia(order)} 
-                            alt={getListingTitle(order)}
+                            src={mediaUrl} 
+                            alt={listingTitle}
                             className="listing-image"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src = 'https://via.placeholder.com/100x100?text=No+Image';
@@ -667,10 +671,15 @@ const BuyerDashboard: React.FC = () => {
                     </div>
 
                     <div className="order-details">
-                      <h3 className="product-name">{getListingTitle(order)}</h3>
+                      <div className="order-header">
+                        <h3 className="product-name">{listingTitle}</h3>
+                        {order.orderNumber && (
+                          <span className="order-number">#{order.orderNumber}</span>
+                        )}
+                      </div>
                       <p className="seller">
                         <FaUser className="seller-icon" />
-                        Seller: {getSellerUsername(order)}
+                        Seller: {sellerUsername}
                       </p>
                       <div className="order-meta">
                         <span className="price">{formatPrice(order.amount)}</span>
@@ -690,6 +699,12 @@ const BuyerDashboard: React.FC = () => {
                             Delivered: {formatDate(order.deliveredAt)}
                           </span>
                         )}
+                        {(order.revisions > 0) && (
+                          <span className="revisions-count">
+                            <FaReply className="revision-icon" />
+                            Revisions: {order.revisions}/{order.maxRevisions}
+                          </span>
+                        )}
                       </div>
                       <div className="order-description">
                         <p>{getOrderDescription(order)}</p>
@@ -697,32 +712,34 @@ const BuyerDashboard: React.FC = () => {
                     </div>
 
                     <div className="order-status">
-                      <div className="status-badge" style={{ backgroundColor: getStatusColor(order.status) }}>
-                        {getStatusIcon(order.status)}
-                        <span>{getStatusText(order.status)}</span>
+                      <div className="status-section">
+                        <div className="status-badge" style={{ backgroundColor: getStatusColor(order.status) }}>
+                          {getStatusIcon(order.status)}
+                          <span>{getStatusText(order.status)}</span>
+                        </div>
+                        {order.paymentReleased && (
+                          <div className="payment-badge">
+                            <FaCheckCircle />
+                            <span>Payment Released</span>
+                          </div>
+                        )}
                       </div>
                       
                       <div className="order-actions">
                         {actions.map((action, index) => (
-                          action.action === 'view_details' ? (
-                            <button
-                              key={index}
-                              onClick={() => handleViewOrder(order._id)}
-                              className={`action-button ${action.className}`}
-                            >
-                              {action.icon}
-                              <span>{action.label}</span>
-                            </button>
-                          ) : (
-                            <button
-                              key={index}
-                              onClick={() => handleOrderAction(order._id, action.action)}
-                              className={`action-button ${action.className}`}
-                            >
-                              {action.icon}
-                              <span>{action.label}</span>
-                            </button>
-                          )
+                          <button
+                            key={index}
+                            onClick={() => 
+                              action.action === 'view_details' 
+                                ? handleViewOrder(order._id)
+                                : handleOrderAction(order._id, action.action)
+                            }
+                            className={`action-button ${action.className}`}
+                            title={action.label}
+                          >
+                            {action.icon}
+                            <span>{action.label}</span>
+                          </button>
                         ))}
                       </div>
                     </div>
