@@ -19,7 +19,7 @@ import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import './BuyerDashboard.css';
 import MarketplaceLayout from '../../components/Layout';
-import { marketplaceAPI } from '../../services/api'; // Import the marketplaceAPI
+import { marketplaceAPI } from '../../api'; // Import the marketplaceAPI
 
 interface User {
   _id: string;
