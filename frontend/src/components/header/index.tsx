@@ -4,6 +4,7 @@ import logo from "../../assets/wecinema.png";
 import { FaUpload, FaVideo, FaFileAlt, FaSearch, FaUser } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { categories, ratings } from "../../App";
+import './Header.css';
 import { Search, X } from "lucide-react";
 
 interface HeaderProps {
