@@ -1,35 +1,38 @@
-/* Base Styles */
+/* ============================================
+   DROPDOWN STYLES
+   ============================================ */
+
+/* Base Dropdown Container */
 .dropdown {
   position: relative;
   display: inline-block;
-  margin-left: 0; /* Remove negative margin for better responsiveness */
-  width: 8%;
-  max-width: 200px; /* Ensures dropdown isn't too wide on large screens */
-}
-
-.form {
-  width: 90%; /* Makes form responsive */
-  max-width: 600px; /* Ensures it doesn't exceed this width */
-  margin: 0 auto; /* Centers the form */
 }
 
 /* Dropdown Button */
 .dropdown-button {
   background-color: #fff;
   border: 1px solid #ccc;
-  padding: 10px 20px;
+  padding: 8px 16px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
-  max-width: 150px; /* Prevents button from being too large on bigger screens */
+  min-width: 100px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.dropdown-button:hover {
+  border-color: #eab308;
+  background-color: #fef9c3;
 }
 
 /* Dropdown Arrow */
 .arrow {
-  margin-left: 10px;
-  border: solid black;
+  margin-left: 8px;
+  border: solid currentColor;
   border-width: 0 2px 2px 0;
   display: inline-block;
   padding: 3px;
@@ -47,215 +50,156 @@
   top: 100%;
   left: 0;
   background-color: #fff;
-  border: 1px solid #ccc;
-  width: 100%;
-  max-width: 200px; /* Keeps menu contained */
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  z-index: 1;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  width: 200px;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 50;
+  margin-top: 4px;
+  animation: dropdownFadeIn 0.2s ease-out;
 }
 
-/* RESPONSIVE DESIGN */
-
-/* Small Screens (Mobile) */
-@media (max-width: 768px) {
-  .dropdown {
-      width: 100%;
-      max-width: 100%; /* Full width for small screens */
-  }
-
-  .form {
-      width: 100%;
-      max-width: 100%;
-      margin-right: 0;
-      padding: 10px;
-  }
-
-  .dropdown-button {
-      width: 100%;
-      max-width: 100%;
-  }
-
-  .dropdown-menu {
-      width: 100%;
-      max-width: 100%;
-  }
-}
-
-/* Medium Screens (Tablets) */
-@media (min-width: 768px) and (max-width: 1024px) {
-  .form {
-      max-width: 500px;
-  }
-
-  .dropdown {
-      max-width: 250px;
-  }
-}
-
-/* Large Screens (Desktops) */
-@media (min-width: 1024px) {
-  .form {
-      max-width: 600px;
-  }
-
-  .dropdown {
-      max-width: 300px;
-  }
-}
-
-
-/* src/Dropdown.css */
-.dropdown1 {
-  position: relative;
-  display: inline-block;
-  margin-left: -70px;
-}
-.form1{
-width: 600px;
-margin-right: 50px;
-
-}
-/* Dropdown Menu (Upper Direction) */
-.dropdown-menu-upper1 {
-position: absolute;
-bottom: 100%; /* Position above the button */
-left: -15%;
-transform: translateY(-5%); /* Center horizontally */
-
-background-color: white;
-border: 1px solid #ccc;
-border-radius: 8px;
-box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-padding: 8px;
-z-index: 1000;
-list-style: none;
-margin: 0;
-min-width: 150px;
-}
-
-
-/* Arrow for Dropdown */
-.arrow1 {
-display: inline-block;
-margin-left: 8px;
-width: 0;
-height: 0;
-border-left: 5px solid transparent;
-border-right: 5px solid transparent;
-border-bottom: 5px solid black; /* Arrow pointing up */
-transition: transform 0.3s ease;
-}
-
-.arrow.open1 {
-transform: rotate(180deg); /* Rotate arrow when dropdown is open */
-}
-
-
+/* Dropdown Menu Items */
 .dropdown-item {
-    padding: 10px 20px;
-    cursor: pointer;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
+  font-size: 14px;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
 }
 
 .dropdown-item:hover {
-    background-color: #f1f1f1;
+  background-color: #f9fafb;
+  color: #111827;
 }
-.social-media-icons {
-    display: flex;
-    justify-content: left;
-    gap: 15px;
-    margin-top: 20px;
-    margin-left: 50px;
 
-  }
-  
-  .social-media-icons a {
-    color: #000000;
-    font-size: 24px;
-    transition: color 0.3s;
-  }
-  
-  .social-media-icons a:hover {
-    color: #3a04ff;
-  }
-  /* Button.css */
-.styled-button {
-    background-color: #007bff;
-    border: none;
-    border-radius: 5px;
-    color: white;
-    padding: 10px 20px;
-    font-size: 16px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-  }
-  
-  .styled-button:hover {
-    background-color: #0056b3;
-  }
-  .square-button {
-    width: 50px;
-    height: 50px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 16px;
-    transition: background-color 0.3s;
-    border-radius: 4px; /* Optional: to slightly round the corners */
-  }
-  
-  .square-button:hover {
-    background-color: #0056b3;
-  }  
-  .search-container {
-    position: relative;
-    display: inline-block;
+/* ============================================
+   FORM STYLES
+   ============================================ */
+
+.form {
+  width: 100%;
+  max-width: 600px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 10px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  background-color: #fff;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #eab308;
+  box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.1);
+}
+
+.form-input::placeholder {
+  color: #9ca3af;
+}
+
+/* ============================================
+   SEARCH COMPONENT STYLES
+   ============================================ */
+
+.search-container {
+  position: relative;
+  display: inline-block;
 }
 
 .search-form {
-    display: flex;
-    align-items: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .search-input {
-    width: 0;
-    transition: width 0.3s, opacity 0.3s, visibility 0.3s;
-    border: none;
-    outline: none;
-    padding: 0;
-    margin: 0;
-    opacity: 0;
-    visibility: hidden;
+  width: 0;
+  transition: all 0.3s ease;
+  border: none;
+  outline: none;
+  opacity: 0;
+  visibility: hidden;
+  border-radius: 8px;
+  font-size: 14px;
 }
 
 .search-input.expanded {
-    width: 200px; /* Adjust as needed */
-    padding: 8px;
-    margin-left: 10px;
-    opacity: 1;
-    visibility: visible;
-    border: 1px solid #ccc;
-    border-radius: 8px;
+  width: 200px;
+  padding: 10px 16px;
+  opacity: 1;
+  visibility: visible;
+  border: 1px solid #d1d5db;
+  background-color: #fff;
 }
 
 .search-icon {
-    cursor: pointer;
-    font-size: 1.5em;
-    margin-left: -130px;
-    margin-right: 40px;
-}
-.left-container {
-  float: left;
-  width: 30%; /* adjust the width as needed */
+  cursor: pointer;
+  font-size: 1.25rem;
+  color: #6b7280;
+  transition: color 0.3s ease;
 }
 
-.right-container {
-  float: right;
-  width: 70%; /* adjust the width as needed */
+.search-icon:hover {
+  color: #374151;
 }
+
+/* ============================================
+   BUTTON STYLES
+   ============================================ */
+
+/* Primary Button */
+.styled-button {
+  background-color: #3b82f6;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.styled-button:hover {
+  background-color: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+}
+
+/* Square Button */
+.square-button {
+  width: 50px;
+  height: 50px;
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  border-radius: 8px;
+}
+
+.square-button:hover {
+  background-color: #2563eb;
+  transform: scale(1.05);
+}
+
+/* Active Button */
 .active-button {
   position: relative;
 }
@@ -265,29 +209,80 @@ transform: rotate(180deg); /* Rotate arrow when dropdown is open */
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-53%, -90%);
-  width: 30px;
-  height: 30px;
-  background-color: #FFC300;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  background-color: #eab308;
   border-radius: 50%;
   z-index: -1;
+  opacity: 0.2;
 }
+
+/* ============================================
+   SOCIAL MEDIA STYLES
+   ============================================ */
+
+.social-media-icons {
+  display: flex;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.social-media-icons a {
+  color: #6b7280;
+  font-size: 24px;
+  transition: all 0.3s ease;
+}
+
+.social-media-icons a:hover {
+  color: #eab308;
+  transform: translateY(-2px);
+}
+
+/* ============================================
+   LAYOUT CONTAINERS
+   ============================================ */
+
+.left-container {
+  float: left;
+  width: 30%;
+}
+
+.right-container {
+  float: right;
+  width: 70%;
+}
+
+/* Clear floats */
+.clearfix::after {
+  content: "";
+  display: table;
+  clear: both;
+}
+
+/* ============================================
+   CUSTOMER CARE STYLES
+   ============================================ */
 
 .customer-care-page {
   max-width: 800px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 32px 20px;
 }
 
 .customer-support-form {
-  background-color: #f9f9f9;
-  padding: 20px;
-  border-radius: 8px;
+  background-color: #f9fafb;
+  padding: 24px;
+  border-radius: 12px;
   margin-bottom: 40px;
+  border: 1px solid #e5e7eb;
 }
 
 .customer-support-form h2 {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  color: #111827;
+  font-size: 24px;
+  font-weight: 600;
 }
 
 .form-group {
@@ -296,38 +291,44 @@ transform: rotate(180deg); /* Rotate arrow when dropdown is open */
 
 .form-group label {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
+  color: #374151;
+  font-weight: 500;
+  font-size: 14px;
 }
 
 .form-group input,
-.form-group textarea {
+.form-group textarea,
+.form-group select {
   width: 100%;
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  background-color: #fff;
 }
 
-button {
-  background-color: #007bff;
-  color: #fff;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-button:hover {
-  background-color: #0056b3;
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #eab308;
+  box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.1);
 }
 
 .faq-section {
-  background-color: #f1f1f1;
-  padding: 20px;
-  border-radius: 8px;
+  background-color: #f9fafb;
+  padding: 24px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
 }
 
 .faq-section h2 {
   margin-bottom: 20px;
+  color: #111827;
+  font-size: 24px;
+  font-weight: 600;
 }
 
 .faq-section ul {
@@ -337,26 +338,43 @@ button:hover {
 
 .faq-section li {
   margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.faq-section li:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
 }
 
 .faq-section strong {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
+  color: #111827;
+  font-size: 16px;
 }
+
+/* ============================================
+   CONTACT FORM STYLES
+   ============================================ */
+
 .contact-form-container {
   max-width: 600px;
   margin: 50px auto;
-  padding: 20px;
-  background: #f9f9f9;
-  border-radius: 10px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  padding: 32px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e5e7eb;
 }
 
 .contact-form-container h2 {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
   font-size: 24px;
-  color: #333;
+  color: #111827;
+  font-weight: 600;
 }
 
 .contact-form {
@@ -364,50 +382,33 @@ button:hover {
   flex-direction: column;
 }
 
-.form-group {
-  margin-bottom: 15px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 5px;
-  font-weight: bold;
-  color: #555;
-}
-
-.form-group input,
-.form-group textarea {
-  width: calc(100% - 20px);
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  font-size: 16px;
-}
-
-.form-group textarea {
-  height: 100px;
-  resize: vertical;
-}
-
 .submit-button {
-  padding: 10px 20px;
-  background-color: #007bff;
+  padding: 12px 24px;
+  background-color: #eab308;
   color: #fff;
   border: none;
-  border-radius: 5px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 16px;
-  transition: background-color 0.3s;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  margin-top: 16px;
 }
 
 .submit-button:hover {
-  background-color: #0056b3;
+  background-color: #ca8a04;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(234, 179, 8, 0.2);
 }
-/* drowpdown.css or another CSS file */
+
+/* ============================================
+   WHATSAPP BUTTON
+   ============================================ */
+
 .whatsapp-button {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
+  bottom: 24px;
+  right: 24px;
   background-color: #25d366;
   border-radius: 50%;
   width: 60px;
@@ -415,121 +416,161 @@ button:hover {
   display: flex;
   justify-content: center;
   align-items: center;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
   cursor: pointer;
   z-index: 1000;
+  transition: all 0.3s ease;
+}
+
+.whatsapp-button:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(37, 211, 102, 0.4);
 }
 
 .whatsapp-button img {
-  width: 35px;
-  height: 35px;
+  width: 32px;
+  height: 32px;
 }
+
+/* ============================================
+   CHAT CONTAINER STYLES
+   ============================================ */
+
 .chat-container {
   display: flex;
   flex-direction: column;
   width: 100%;
   max-width: 800px;
   margin: auto;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  background-color: #fff;
 }
 
 .messages {
   flex: 1;
-  padding: 20px;
+  padding: 24px;
   overflow-y: auto;
-  border-bottom: 1px solid #eee;
+  max-height: 400px;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .message {
-  margin: 10px 0;
-  padding: 10px;
-  border-radius: 5px;
+  margin: 12px 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  max-width: 70%;
+  word-wrap: break-word;
 }
 
 .sent {
-  background-color: #d4edda;
+  background-color: #dbeafe;
   align-self: flex-end;
+  color: #1e40af;
+  border-bottom-right-radius: 4px;
 }
 
 .received {
-  background-color: #f8d7da;
+  background-color: #f3f4f6;
   align-self: flex-start;
+  color: #374151;
+  border-bottom-left-radius: 4px;
 }
 
 .order-section {
   margin: 20px 0;
+  padding: 20px;
+  background-color: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
 }
 
 .order {
-  margin: 10px 0;
-  padding: 10px;
-  border: 1px solid #007bff;
-  border-radius: 5px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid #3b82f6;
+  border-radius: 8px;
+  background-color: #eff6ff;
 }
 
-textarea {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  margin: 5px 0;
-}
-
-button {
-  padding: 10px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-}
-
-button:hover {
-  background-color: #0056b3;
-}
-/* src/pages/TermsAndConditions.css */
+/* ============================================
+   TERMS & CONDITIONS STYLES
+   ============================================ */
 
 .terms-conditions {
-  padding: 20px;
+  padding: 32px 20px;
   max-width: 800px;
   margin: auto;
-  font-family: Arial, sans-serif;
+  font-family: system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+  color: #374151;
 }
 
-h1 {
+.terms-conditions h1 {
+  font-size: 32px;
+  margin-bottom: 24px;
+  color: #111827;
+  font-weight: 700;
+}
+
+.terms-conditions h2 {
   font-size: 24px;
-  margin-bottom: 20px;
+  margin-top: 32px;
+  margin-bottom: 16px;
+  color: #111827;
+  font-weight: 600;
 }
 
-h2 {
-  font-size: 20px;
-  margin-top: 20px;
-}
-
-h3 {
+.terms-conditions h3 {
   font-size: 18px;
-  margin-top: 15px;
+  margin-top: 20px;
+  margin-bottom: 12px;
+  color: #374151;
+  font-weight: 600;
 }
 
-p {
-  margin: 10px 0;
+.terms-conditions p {
+  margin: 12px 0;
+  color: #4b5563;
 }
 
 .signatories {
   display: flex;
   justify-content: space-between;
-  margin-top: 30px;
+  margin-top: 40px;
+  padding-top: 32px;
+  border-top: 2px solid #e5e7eb;
 }
 
 .signatories div {
   width: 45%;
 }
+
+.signatories p {
+  margin: 8px 0;
+  color: #6b7280;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes enter {
   from {
     opacity: 0;
-    transform: translateY(-10%);
+    transform: translateY(-10px);
   }
   to {
     opacity: 1;
@@ -544,7 +585,7 @@ p {
   }
   to {
     opacity: 0;
-    transform: translateY(-10%);
+    transform: translateY(-10px);
   }
 }
 
@@ -554,4 +595,281 @@ p {
 
 .animate-leave {
   animation: leave 0.3s ease-in forwards;
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+
+/* Small Screens (Mobile) */
+@media (max-width: 640px) {
+  .dropdown {
+    width: 100%;
+  }
+
+  .dropdown-button {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .dropdown-menu {
+    width: 100%;
+    left: 0;
+    right: 0;
+  }
+
+  .form {
+    width: 100%;
+  }
+
+  .search-input.expanded {
+    width: 180px;
+  }
+
+  .left-container,
+  .right-container {
+    float: none;
+    width: 100%;
+    margin-bottom: 20px;
+  }
+
+  .customer-care-page,
+  .contact-form-container {
+    padding: 20px 16px;
+    margin: 20px auto;
+  }
+
+  .signatories {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .signatories div {
+    width: 100%;
+  }
+
+  .whatsapp-button {
+    bottom: 16px;
+    right: 16px;
+    width: 50px;
+    height: 50px;
+  }
+
+  .whatsapp-button img {
+    width: 26px;
+    height: 26px;
+  }
+}
+
+/* Medium Screens (Tablets) */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .dropdown {
+    width: auto;
+  }
+
+  .form {
+    max-width: 500px;
+  }
+
+  .search-input.expanded {
+    width: 220px;
+  }
+
+  .contact-form-container {
+    margin: 40px auto;
+    padding: 24px;
+  }
+}
+
+/* Large Screens (Desktops) */
+@media (min-width: 1025px) {
+  .dropdown {
+    width: auto;
+  }
+
+  .form {
+    max-width: 600px;
+  }
+
+  .search-input.expanded {
+    width: 250px;
+  }
+}
+
+/* ============================================
+   DARK MODE SUPPORT
+   ============================================ */
+
+@media (prefers-color-scheme: dark) {
+  .dropdown-button,
+  .dropdown-menu,
+  .dropdown-item,
+  .form-input,
+  .search-input,
+  .customer-support-form,
+  .faq-section,
+  .contact-form-container,
+  .chat-container,
+  .order-section,
+  .terms-conditions {
+    background-color: #1f2937;
+    color: #f9fafb;
+    border-color: #374151;
+  }
+
+  .dropdown-button:hover {
+    background-color: #374151;
+  }
+
+  .dropdown-item:hover {
+    background-color: #374151;
+  }
+
+  .form-input::placeholder {
+    color: #9ca3af;
+  }
+
+  .customer-support-form h2,
+  .faq-section h2,
+  .contact-form-container h2,
+  .terms-conditions h1,
+  .terms-conditions h2,
+  .terms-conditions h3 {
+    color: #f9fafb;
+  }
+
+  .form-group label {
+    color: #d1d5db;
+  }
+
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    background-color: #374151;
+    color: #f9fafb;
+    border-color: #4b5563;
+  }
+
+  .message.sent {
+    background-color: #1e40af;
+    color: #dbeafe;
+  }
+
+  .message.received {
+    background-color: #374151;
+    color: #f3f4f6;
+  }
+
+  .order {
+    background-color: #374151;
+    border-color: #3b82f6;
+  }
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+.text-yellow-500 {
+  color: #eab308;
+}
+
+.bg-yellow-500 {
+  background-color: #eab308;
+}
+
+.border-yellow-500 {
+  border-color: #eab308;
+}
+
+.hover\:bg-yellow-500:hover {
+  background-color: #eab308;
+}
+
+.hover\:text-yellow-500:hover {
+  color: #eab308;
+}
+
+.transition-all {
+  transition: all 0.3s ease;
+}
+
+.shadow-sm {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.shadow-md {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.rounded-lg {
+  border-radius: 12px;
+}
+
+.rounded-xl {
+  border-radius: 16px;
+}
+
+.z-50 {
+  z-index: 50;
+}
+
+.flex {
+  display: flex;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.gap-2 {
+  gap: 8px;
+}
+
+.gap-4 {
+  gap: 16px;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.h-full {
+  height: 100%;
+}
+
+.mt-2 {
+  margin-top: 8px;
+}
+
+.mb-4 {
+  margin-bottom: 16px;
+}
+
+.p-4 {
+  padding: 16px;
+}
+
+.text-sm {
+  font-size: 14px;
+}
+
+.text-base {
+  font-size: 16px;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.font-semibold {
+  font-weight: 600;
 }
