@@ -13,7 +13,9 @@ interface HeaderProps {
     toggleSidebar?: () => void;
     expand: boolean;
     isMobile: boolean;
-    toggleUploadScriptModal?: () => void;
+    toggleUploadScriptModal?: () toggler: () => void;
+
+  
     toggleUploadModal?: () => void;
 }
 
