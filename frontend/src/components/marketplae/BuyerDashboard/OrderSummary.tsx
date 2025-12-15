@@ -10,7 +10,7 @@ import {
   FaCheckCircle,
   FaTimes
 } from 'react-icons/fa';
-import { formatCurrency } from '../../api';
+import { formatCurrency } from '../../../api';
 
 interface OrderSummaryProps {
   order: {
