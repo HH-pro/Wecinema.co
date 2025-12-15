@@ -5,6 +5,8 @@ import { FaArrowLeft, FaSpinner, FaExclamationCircle } from 'react-icons/fa';
 import MarketplaceLayout from '../../../src/components/Layout';
 import { marketplaceAPI } from '../../api';
 import { OrderTimeline, OrderSummary, PaymentDetails } from '../../components/marketplae/BuyerDashboard';
+import './OrderDetailsPage.css';
+
 const OrderDetailsPage: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
   const [searchParams] = useSearchParams();
