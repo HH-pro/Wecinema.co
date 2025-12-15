@@ -30,8 +30,14 @@ import {
   Transactions,
   Settings,
   Scripts,
-  OrderDetailsPage
+  OrderDetailsPage,
+  
+
 } from "../pages";
+import {
+  MyOffersPage,
+  BuyerStatsPage,
+} from '../components/marketplae/BuyerDashboard';
 import Layout from "../components/admin/Layout";
 
 // 🆕 IMPORT MARKETPLACE PAGES
