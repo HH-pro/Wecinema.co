@@ -1,18 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MdMenu, MdMic, MdMicOff } from "react-icons/md";
 import logo from "../../assets/wecinema.png";
-import search from "../../assets/search.png";
-import close from "../../assets/close.png";
-import { FaUpload, FaVideo, FaFileAlt } from "react-icons/fa";
-import { Link, useNavigate } from "react-router-dom";
+import { FaUpload, FaVideo, FaFileAlt, FaSearch } from "react-icons/fa";
+import { useNavigate, useLocation } from "react-router-dom";
 import { categories, ratings } from "../../App";
-import '../header/drowpdown.css';
+import './Header.css';
 import { Search, X } from "lucide-react";
 
 interface HeaderProps {
     darkMode: boolean;
     toggler: () => void;
-    toggleSidebar?: () => void; // 👈 for ViewPage only
+    toggleSidebar?: () => void;
     expand: boolean;
     isMobile: boolean;
     toggleUploadScriptModal?: () => void;
@@ -29,17 +27,58 @@ const Header: React.FC<HeaderProps> = ({
     toggleUploadModal,
 }) => {
     const nav = useNavigate();
+    const location = useLocation();
     const [isExpanded, setIsExpanded] = useState(false);
-    const [isOpen, setIsOpen] = useState(false);
-    const [isOpened, setIsOpened] = useState(false);
+    const [genreOpen, setGenreOpen] = useState(false);
+    const [ratingOpen, setRatingOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [isListening, setIsListening] = useState(false);
-    const [uploadMenu, setUploadMenu] = useState(false);
+    const [uploadMenuOpen, setUploadMenuOpen] = useState(false);
+    const [isScrolled, setIsScrolled] = useState(false);
 
-    const toggleDropdown = () => setIsOpen(!isOpen);
-    const toggleDropdowned = () => setIsOpened(!isOpened);
-    const toggleUploadMenu = () => setUploadMenu(!uploadMenu);
-    const toggleSearch = () => setIsExpanded(!isExpanded);
+    // Handle scroll effect
+    useEffect(() => {
+        const handleScroll = () => {
+            setIsScrolled(window.scrollY > 10);
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    // Close dropdowns when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as HTMLElement;
+            if (!target.closest('.header-dropdown') && !target.closest('.header-upload-menu')) {
+                setGenreOpen(false);
+                setRatingOpen(false);
+                setUploadMenuOpen(false);
+            }
+        };
+        document.addEventListener('click', handleClickOutside);
+        return () => document.removeEventListener('click', handleClickOutside);
+    }, []);
+
+    const toggleGenreDropdown = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setGenreOpen(!genreOpen);
+        setRatingOpen(false);
+    };
+
+    const toggleRatingDropdown = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setRatingOpen(!ratingOpen);
+        setGenreOpen(false);
+    };
+
+    const toggleUploadDropdown = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setUploadMenuOpen(!uploadMenuOpen);
+        setGenreOpen(false);
+        setRatingOpen(false);
+    };
+
+    const toggleMobileSearch = () => setIsExpanded(!isExpanded);
 
     const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -50,6 +89,7 @@ const Header: React.FC<HeaderProps> = ({
         if (searchTerm.trim()) {
             const capitalized = searchTerm.charAt(0).toUpperCase() + searchTerm.slice(1);
             nav(`/search/${capitalized.trim()}`);
+            setIsExpanded(false);
         }
     };
 
@@ -66,6 +106,7 @@ const Header: React.FC<HeaderProps> = ({
                 const transcript = event.results[0][0].transcript;
                 setSearchTerm(transcript);
                 nav(`/search/${transcript}`);
+                setIsExpanded(false);
             };
 
             recognition.start();
@@ -74,136 +115,230 @@ const Header: React.FC<HeaderProps> = ({
         }
     };
 
-    const getActiveClass = (path: string) => {
-        return window.location.pathname === path ? "text-active" : "";
+    const handleGenreClick = (genre: string) => {
+        nav(`/category/${genre}`);
+        setGenreOpen(false);
     };
 
+    const handleRatingClick = (rating: string) => {
+        nav(`/ratings/${rating}`);
+        setRatingOpen(false);
+    };
+
+    const handleUploadVideo = () => {
+        if (toggleUploadModal) {
+            toggleUploadModal();
+            setUploadMenuOpen(false);
+        }
+    };
+
+    const handleUploadScript = () => {
+        if (toggleUploadScriptModal) {
+            toggleUploadScriptModal();
+            setUploadMenuOpen(false);
+        }
+    };
+
+    const isActive = (path: string) => location.pathname === path;
+
     return (
-        <header className={`text-blue z-50 border-b fixed w-screen border-gray-200 ${darkMode ? "bg-dark text-dark" : "bg-light text-light"}`}>
-            <nav className={`mx-auto flex gap-4 items-center justify-between p-4 sm:pr-12 ${expand && !isMobile ? "px-4" : "sm:px-12"}`}>
-                {/* Logo and Menu */}
-                <ul className="flex gap-4 items-center">
-                    <MdMenu
-                        size={30}
-                        className="cursor-pointer mt-2"
-                        onClick={toggleSidebar ? toggleSidebar : toggler}
-                    />
-                    <li className="cursor-pointer flex-col sm:flex-row flex gap-2 items-center" onClick={() => nav("/")}>
-                        <img src={logo} alt="logo" width={50} title="wecinema" />
-                        {!isMobile && <p className="text-md sm:text-1xl mt-3 font-mono">WeCinema</p>}
-                    </li>
-                </ul>
-
-                {/* Desktop Search */}
-                {!isMobile && (
-                    <div className="form">
-                        <form className="w-full flex items-center" onSubmit={handleSearchSubmit}>
-                            <input
-                                type="search"
-                                placeholder="Search anything..."
-                                className="w-full flex mx-auto border rounded-xl cursor-pointer p-2 outline-none"
-                                value={searchTerm}
-                                onChange={handleSearchInputChange}
-                            />
-                            <button type="button" onClick={handleVoiceSearch} className="ml-2">
-                                {isListening ? <MdMicOff size={24} /> : <MdMic size={24} />}
-                            </button>
-                        </form>
-                    </div>
-                )}
-
-                {/* Mobile Floating Search */}
-                {isMobile && (
-                    <div className="fixed bottom-3 left-6 z-50">
-                        <button className="p-3 bg-yellow-500 rounded-full shadow-lg hover:bg-yellow-500 transition" onClick={toggleSearch}>
-                            {isExpanded ? <X size={20} color="white" /> : <Search size={20} color="white" />}
+        <header className={`header-container ${darkMode ? 'header-dark' : 'header-light'} ${isScrolled ? 'header-scrolled' : ''}`}>
+            <div className={`header-content ${expand && !isMobile ? 'header-content-expanded' : ''}`}>
+                <nav className="header-nav">
+                    {/* Left Section: Logo and Menu */}
+                    <div className="header-left">
+                        <button
+                            className="header-menu-button"
+                            onClick={toggleSidebar || toggler}
+                            aria-label="Toggle menu"
+                        >
+                            <MdMenu size={24} />
                         </button>
-                    </div>
-                )}
-
-                {isExpanded && (
-                    <div className="fixed bottom-16 right-15 bg-white shadow-lg p-3 rounded-lg flex items-center w-64 border border-gray-300">
-                        <form className="w-full flex items-center" onSubmit={handleSearchSubmit}>
-                            <input
-                                type="search"
-                                placeholder="Search anything..."
-                                className="w-full flex mx-auto border rounded-xl p-2 outline-none"
-                                value={searchTerm}
-                                onChange={handleSearchInputChange}
+                        
+                        <div 
+                            className="header-logo"
+                            onClick={() => nav("/")}
+                            role="button"
+                            tabIndex={0}
+                        >
+                            <img 
+                                src={logo} 
+                                alt="WeCinema Logo" 
+                                className="header-logo-image"
                             />
-                            <button type="submit" className="ml-2 text-gray-500 hover:text-gray-700">🔍</button>
-                        </form>
+                            {!isMobile && (
+                                <span className="header-logo-text">WeCinema</span>
+                            )}
+                        </div>
                     </div>
-                )}
 
-                {/* Upload Dropdown */}
-                <div className="relative">
-                    <button
-                        className="bg-yellow-500 mt-0 text-white p-2 rounded-full hover:bg-yellow-500 transition"
-                        onClick={toggleUploadMenu}
-                        title="Upload Options"
-                    >
-                        <FaUpload size={18} />
-                    </button>
-
-                    {uploadMenu && (
-                        <div className="absolute right-0 mt-2 w-40 bg-white border rounded-lg shadow-lg p-2">
-                            <button
-                                className={`flex items-center gap-2 text-gray-700 p-2 w-full hover:bg-gray-200 rounded-md ${getActiveClass("/upload")}`}
-                                onClick={toggleUploadModal}
-                            >
-                                <FaVideo size={16} />
-                                Video
-                            </button>
-                            <button
-                                className={`flex items-center gap-2 text-gray-700 p-2 w-full hover:bg-gray-200 rounded-md ${getActiveClass("/uploadscripts")}`}
-                                onClick={toggleUploadScriptModal}
-                            >
-                                <FaFileAlt size={16} />
-                                Script
-                            </button>
+                    {/* Center Section: Search (Desktop) */}
+                    {!isMobile && (
+                        <div className="header-search-desktop">
+                            <form onSubmit={handleSearchSubmit} className="header-search-form">
+                                <div className="header-search-wrapper">
+                                    <input
+                                        type="search"
+                                        placeholder="Search movies, shows, actors..."
+                                        className="header-search-input"
+                                        value={searchTerm}
+                                        onChange={handleSearchInputChange}
+                                    />
+                                    <FaSearch className="header-search-icon" />
+                                    <button
+                                        type="button"
+                                        onClick={handleVoiceSearch}
+                                        className={`header-voice-button ${isListening ? 'header-voice-active' : ''}`}
+                                        aria-label={isListening ? "Stop listening" : "Voice search"}
+                                    >
+                                        {isListening ? <MdMicOff size={18} /> : <MdMic size={18} />}
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     )}
-                </div>
 
-                {/* Genre Dropdown */}
-                <div className="dropdown">
-                    <button className="hover:bg-yellow-500 whitespace-nowrap hover:text-white hover:border-white-100 border border-black-700 rounded-xl px-2 py-1 cursor-pointer" onClick={toggleDropdown}>
-                        Genre <span className={`arrow ${isOpen ? 'open' : ''}`}></span>
-                    </button>
-                    {isOpen && (
-                        <ul className="dropdown-menu">
-                            {categories.map((val, idx) => (
-                                <li key={idx} className="duration-75 flex gap-4 mx-4 my-2 cursor-pointer items-center">
-                                    <div onClick={() => nav("/category/" + val)} className="relative flex-shrink-0">
-                                        <div className="rounded-full bg-center bg-no-repeat bg-cover" style={{ width: 10, height: 10 }}></div>
-                                        <Link to="#" className="text-sm">{val}</Link>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </div>
+                    {/* Right Section: Navigation Items */}
+                    <div className="header-right">
+                        {/* Mobile Search Button */}
+                        {isMobile && (
+                            <button
+                                onClick={toggleMobileSearch}
+                                className="header-mobile-search-button"
+                                aria-label="Search"
+                            >
+                                {isExpanded ? <X size={20} /> : <Search size={20} />}
+                            </button>
+                        )}
 
-                {/* Rating Dropdown */}
-                <div className="dropdown">
-                    <button className="hover:bg-yellow-500 whitespace-nowrap hover:text-white hover:border-white-100 border border-black-700 rounded-xl px-1 py-1 cursor-pointer" onClick={toggleDropdowned}>
-                        Rating <span className={`arrow ${isOpened ? 'open' : ''}`}></span>
-                    </button>
-                    {isOpened && (
-                        <ul className="dropdown-menu">
-                            {ratings.map((val, idx) => (
-                                <li key={idx} className="duration-75 flex gap-4 mx-4 my-2 cursor-pointer items-center">
-                                    <div onClick={() => nav("/ratings/" + val)} className="relative flex-shrink-0">
-                                        <div className="rounded-full bg-center bg-no-repeat bg-cover" style={{ width: 12, height: 12 }}></div>
-                                        <Link to="#" className="text-sm">{val}</Link>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </div>
-            </nav>
+                        {/* Upload Dropdown */}
+                        <div className="header-upload-menu">
+                            <button
+                                onClick={toggleUploadDropdown}
+                                className="header-upload-button"
+                                aria-label="Upload options"
+                            >
+                                <FaUpload size={18} />
+                            </button>
+                            
+                            {uploadMenuOpen && (
+                                <div className="header-upload-dropdown">
+                                    <button
+                                        onClick={handleUploadVideo}
+                                        className={`header-upload-item ${isActive('/upload') ? 'header-upload-active' : ''}`}
+                                    >
+                                        <FaVideo className="header-upload-icon" />
+                                        <span>Video</span>
+                                    </button>
+                                    <button
+                                        onClick={handleUploadScript}
+                                        className={`header-upload-item ${isActive('/uploadscripts') ? 'header-upload-active' : ''}`}
+                                    >
+                                        <FaFileAlt className="header-upload-icon" />
+                                        <span>Script</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Genre Dropdown */}
+                        <div className="header-dropdown">
+                            <button
+                                onClick={toggleGenreDropdown}
+                                className="header-dropdown-button"
+                            >
+                                Genre <span className={`header-arrow ${genreOpen ? 'header-arrow-open' : ''}`}></span>
+                            </button>
+                            
+                            {genreOpen && (
+                                <div className="header-dropdown-menu">
+                                    {categories.map((genre, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => handleGenreClick(genre)}
+                                            className="header-dropdown-item"
+                                        >
+                                            {genre}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Rating Dropdown */}
+                        <div className="header-dropdown">
+                            <button
+                                onClick={toggleRatingDropdown}
+                                className="header-dropdown-button"
+                            >
+                                Rating <span className={`header-arrow ${ratingOpen ? 'header-arrow-open' : ''}`}></span>
+                            </button>
+                            
+                            {ratingOpen && (
+                                <div className="header-dropdown-menu">
+                                    {ratings.map((rating, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => handleRatingClick(rating)}
+                                            className="header-dropdown-item"
+                                        >
+                                            {rating}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </nav>
+
+                {/* Mobile Search Overlay */}
+                {isExpanded && isMobile && (
+                    <>
+                        <div 
+                            className="header-mobile-overlay"
+                            onClick={() => setIsExpanded(false)}
+                        />
+                        <div className="header-mobile-search">
+                            <form onSubmit={handleSearchSubmit} className="header-mobile-search-form">
+                                <div className="header-mobile-search-wrapper">
+                                    <input
+                                        type="search"
+                                        placeholder="Search movies, shows, actors..."
+                                        className="header-mobile-search-input"
+                                        value={searchTerm}
+                                        onChange={handleSearchInputChange}
+                                        autoFocus
+                                    />
+                                    <FaSearch className="header-mobile-search-icon" />
+                                    <button
+                                        type="button"
+                                        onClick={handleVoiceSearch}
+                                        className={`header-mobile-voice-button ${isListening ? 'header-voice-active' : ''}`}
+                                        aria-label={isListening ? "Stop listening" : "Voice search"}
+                                    >
+                                        {isListening ? <MdMicOff size={18} /> : <MdMic size={18} />}
+                                    </button>
+                                </div>
+                                <div className="header-mobile-search-actions">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsExpanded(false)}
+                                        className="header-mobile-cancel"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="header-mobile-submit"
+                                    >
+                                        Search
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </>
+                )}
+            </div>
         </header>
     );
 };
