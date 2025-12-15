@@ -615,7 +615,7 @@
   top: 0;
   bottom: 0;
   width: 6px;
-  background: var(--status-color, #3498db);
+  background: var(--status-color, #d69e2e);
 }
 
 .order-card:hover {
@@ -806,7 +806,7 @@
 }
 
 .payment-paid {
-  color: #3498db;
+  color: #d69e2e;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -1277,7 +1277,7 @@
   background: #f8f9fa;
   padding: 20px;
   border-radius: 8px;
-  border-left: 4px solid #3498db;
+  border-left: 4px solid #d69e2e;
   color: #495057;
   line-height: 1.6;
   font-size: 14px;
@@ -1306,7 +1306,7 @@
 }
 
 .modal-actions .btn.primary {
-  background: #3498db;
+  background: #d69e2e;
   color: white;
 }
 
@@ -1359,7 +1359,7 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: #3498db;
+  background: #d69e2e;
   border: 3px solid #fff;
 }
 
@@ -1477,7 +1477,7 @@
 
 .payment-method svg {
   font-size: 24px;
-  color: #3498db;
+  color: #d69e2e;
 }
 
 .payment-breakdown {
