@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { MdMenu, MdMic, MdMicOff } from "react-icons/md";
+import { MdMenu, MdMic, MdMicOff, MdAccountCircle } from "react-icons/md";
 import logo from "../../assets/wecinema.png";
-import { FaUpload, FaVideo, FaFileAlt, FaSearch, FaUser } from "react-icons/fa";
+import { FaUpload, FaVideo, FaFileAlt, FaSearch, FaStar, FaHeart, FaHistory, FaUserCog } from "react-icons/fa";
+import { IoLogOut, IoLogIn, IoPersonAdd } from "react-icons/io5";
 import { useNavigate, useLocation } from "react-router-dom";
 import { categories, ratings } from "../../App";
 import './Header.css';
-import { Search, X } from "lucide-react";
+import { Search, X, Bell, TrendingUp } from "lucide-react";
 
 interface HeaderProps {
     darkMode: boolean;
@@ -36,6 +37,7 @@ const Header: React.FC<HeaderProps> = ({
     const [uploadMenuOpen, setUploadMenuOpen] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
+    const [notificationsOpen, setNotificationsOpen] = useState(false);
 
     // Handle scroll effect
     useEffect(() => {
@@ -50,13 +52,15 @@ const Header: React.FC<HeaderProps> = ({
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as HTMLElement;
-            if (!target.closest('.header-dropdown') && 
-                !target.closest('.header-upload-menu') &&
-                !target.closest('.header-user-menu')) {
+            if (!target.closest('.nav-dropdown') && 
+                !target.closest('.upload-dropdown') &&
+                !target.closest('.user-dropdown') &&
+                !target.closest('.notifications-dropdown')) {
                 setGenreOpen(false);
                 setRatingOpen(false);
                 setUploadMenuOpen(false);
                 setUserMenuOpen(false);
+                setNotificationsOpen(false);
             }
         };
         document.addEventListener('click', handleClickOutside);
@@ -68,6 +72,7 @@ const Header: React.FC<HeaderProps> = ({
         setGenreOpen(!genreOpen);
         setRatingOpen(false);
         setUserMenuOpen(false);
+        setNotificationsOpen(false);
     };
 
     const toggleRatingDropdown = (e: React.MouseEvent) => {
@@ -75,6 +80,7 @@ const Header: React.FC<HeaderProps> = ({
         setRatingOpen(!ratingOpen);
         setGenreOpen(false);
         setUserMenuOpen(false);
+        setNotificationsOpen(false);
     };
 
     const toggleUploadDropdown = (e: React.MouseEvent) => {
@@ -83,6 +89,7 @@ const Header: React.FC<HeaderProps> = ({
         setGenreOpen(false);
         setRatingOpen(false);
         setUserMenuOpen(false);
+        setNotificationsOpen(false);
     };
 
     const toggleUserDropdown = (e: React.MouseEvent) => {
@@ -91,6 +98,16 @@ const Header: React.FC<HeaderProps> = ({
         setGenreOpen(false);
         setRatingOpen(false);
         setUploadMenuOpen(false);
+        setNotificationsOpen(false);
+    };
+
+    const toggleNotifications = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setNotificationsOpen(!notificationsOpen);
+        setGenreOpen(false);
+        setRatingOpen(false);
+        setUploadMenuOpen(false);
+        setUserMenuOpen(false);
     };
 
     const toggleMobileSearch = () => setIsExpanded(!isExpanded);
@@ -177,14 +194,24 @@ const Header: React.FC<HeaderProps> = ({
 
     const isActive = (path: string) => location.pathname === path;
 
+    // Mock notifications data
+    const notifications = [
+        { id: 1, text: "New movie added: Spider-Man", time: "5 min ago", read: false },
+        { id: 2, text: "Your script was reviewed", time: "1 hour ago", read: true },
+        { id: 3, text: "Trending: Avengers Endgame", time: "2 hours ago", read: true },
+        { id: 4, text: "Weekly recommendations ready", time: "1 day ago", read: true },
+    ];
+
+    const unreadCount = notifications.filter(n => !n.read).length;
+
     return (
-        <header className={`header-container ${darkMode ? 'header-dark' : 'header-light'} ${isScrolled ? 'header-scrolled' : ''}`}>
-            <div className={`header-content ${expand && !isMobile ? 'header-content-expanded' : ''}`}>
+        <header className={`main-header ${darkMode ? 'dark-theme' : 'light-theme'} ${isScrolled ? 'header-shadow' : ''}`}>
+            <div className={`header-wrapper ${expand && !isMobile ? 'header-expanded' : ''}`}>
                 <nav className="header-nav">
                     {/* Left Section: Logo and Menu */}
-                    <div className="header-left">
+                    <div className="header-left-section">
                         <button
-                            className="header-menu-button"
+                            className="menu-toggle-btn"
                             onClick={toggleSidebar || toggler}
                             aria-label="Toggle menu"
                         >
@@ -192,7 +219,7 @@ const Header: React.FC<HeaderProps> = ({
                         </button>
                         
                         <div 
-                            className="header-logo"
+                            className="logo-container"
                             onClick={() => nav("/")}
                             role="button"
                             tabIndex={0}
@@ -200,31 +227,31 @@ const Header: React.FC<HeaderProps> = ({
                             <img 
                                 src={logo} 
                                 alt="WeCinema Logo" 
-                                className="header-logo-image"
+                                className="logo-image"
                             />
                             {!isMobile && (
-                                <span className="header-logo-text">WeCinema</span>
+                                <span className="logo-text">WeCinema</span>
                             )}
                         </div>
                     </div>
 
                     {/* Center Section: Search (Desktop) */}
                     {!isMobile && (
-                        <div className="header-search-desktop">
-                            <form onSubmit={handleSearchSubmit} className="header-search-form">
-                                <div className="header-search-wrapper">
+                        <div className="search-container">
+                            <form onSubmit={handleSearchSubmit} className="search-form">
+                                <div className="search-input-wrapper">
+                                    <FaSearch className="search-icon" />
                                     <input
                                         type="search"
                                         placeholder="Search movies, shows, actors..."
-                                        className="header-search-input"
+                                        className="search-field"
                                         value={searchTerm}
                                         onChange={handleSearchInputChange}
                                     />
-                                    <FaSearch className="header-search-icon" />
                                     <button
                                         type="button"
                                         onClick={handleVoiceSearch}
-                                        className={`header-voice-button ${isListening ? 'header-voice-active' : ''}`}
+                                        className={`voice-search-btn ${isListening ? 'listening-active' : ''}`}
                                         aria-label={isListening ? "Stop listening" : "Voice search"}
                                     >
                                         {isListening ? <MdMicOff size={20} /> : <MdMic size={20} />}
@@ -235,68 +262,127 @@ const Header: React.FC<HeaderProps> = ({
                     )}
 
                     {/* Right Section: Navigation Items */}
-                    <div className="header-right">
+                    <div className="header-right-section">
                         {/* Mobile Search Button */}
                         {isMobile && (
                             <button
                                 onClick={toggleMobileSearch}
-                                className="header-mobile-search-button"
+                                className="mobile-search-toggle"
                                 aria-label="Search"
                             >
                                 {isExpanded ? <X size={24} /> : <Search size={24} />}
                             </button>
                         )}
 
+                        {/* Notifications */}
+                        <div className="notifications-dropdown">
+                            <button
+                                onClick={toggleNotifications}
+                                className={`notification-btn ${notificationsOpen ? 'notification-active' : ''}`}
+                                aria-label="Notifications"
+                            >
+                                <Bell size={22} />
+                                {unreadCount > 0 && (
+                                    <span className="notification-badge">{unreadCount}</span>
+                                )}
+                            </button>
+                            
+                            {notificationsOpen && (
+                                <div className="notification-panel">
+                                    <div className="notification-header">
+                                        <h3>Notifications</h3>
+                                        <button className="mark-all-read">Mark all as read</button>
+                                    </div>
+                                    <div className="notification-list">
+                                        {notifications.map(notification => (
+                                            <div 
+                                                key={notification.id} 
+                                                className={`notification-item ${!notification.read ? 'notification-unread' : ''}`}
+                                            >
+                                                <div className="notification-content">
+                                                    <p className="notification-text">{notification.text}</p>
+                                                    <span className="notification-time">{notification.time}</span>
+                                                </div>
+                                                {!notification.read && <div className="unread-indicator"></div>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <button className="view-all-notifications">View All Notifications</button>
+                                </div>
+                            )}
+                        </div>
+
                         {/* Upload Dropdown */}
-                        <div className="header-upload-menu">
+                        <div className="upload-dropdown">
                             <button
                                 onClick={toggleUploadDropdown}
-                                className="header-upload-button"
+                                className={`upload-main-btn ${uploadMenuOpen ? 'upload-active' : ''}`}
                                 aria-label="Upload options"
                             >
                                 <FaUpload size={22} />
+                                {!isMobile && <span className="btn-label">Upload</span>}
                             </button>
                             
                             {uploadMenuOpen && (
-                                <div className="header-upload-dropdown">
+                                <div className="upload-options-panel">
+                                    <div className="upload-header">
+                                        <TrendingUp size={20} />
+                                        <h3>Upload Content</h3>
+                                    </div>
                                     <button
                                         onClick={handleUploadVideo}
-                                        className={`header-upload-item ${isActive('/upload') ? 'header-upload-active' : ''}`}
+                                        className={`upload-option-btn ${isActive('/upload') ? 'option-active' : ''}`}
                                     >
-                                        <FaVideo className="header-upload-icon" />
-                                        <span>Upload Video</span>
+                                        <FaVideo className="option-icon" />
+                                        <div className="option-details">
+                                            <span className="option-title">Upload Video</span>
+                                            <span className="option-desc">Share your video content</span>
+                                        </div>
                                     </button>
                                     <button
                                         onClick={handleUploadScript}
-                                        className={`header-upload-item ${isActive('/uploadscripts') ? 'header-upload-active' : ''}`}
+                                        className={`upload-option-btn ${isActive('/uploadscripts') ? 'option-active' : ''}`}
                                     >
-                                        <FaFileAlt className="header-upload-icon" />
-                                        <span>Upload Script</span>
+                                        <FaFileAlt className="option-icon" />
+                                        <div className="option-details">
+                                            <span className="option-title">Upload Script</span>
+                                            <span className="option-desc">Share your scripts</span>
+                                        </div>
                                     </button>
                                 </div>
                             )}
                         </div>
 
                         {/* Genre Dropdown */}
-                        <div className="header-dropdown">
+                        <div className="nav-dropdown">
                             <button
                                 onClick={toggleGenreDropdown}
-                                className={`header-dropdown-button ${genreOpen ? 'header-dropdown-open' : ''}`}
+                                className={`nav-main-btn ${genreOpen ? 'nav-active' : ''}`}
                             >
-                                Genre <span className={`header-arrow ${genreOpen ? 'header-arrow-open' : ''}`}></span>
+                                <span className="btn-text">Genres</span>
+                                <span className={`dropdown-arrow ${genreOpen ? 'arrow-open' : ''}`}></span>
                             </button>
                             
                             {genreOpen && (
-                                <div className="header-dropdown-menu">
-                                    <div className="header-dropdown-title">Browse by Genre</div>
-                                    <div className="header-genre-grid">
+                                <div className="mega-dropdown">
+                                    <div className="dropdown-header">
+                                        <FaVideo className="dropdown-icon" />
+                                        <div className="dropdown-title">
+                                            <h3>Browse Genres</h3>
+                                            <p>Explore movies by category</p>
+                                        </div>
+                                    </div>
+                                    <div className="genre-grid">
                                         {categories.map((genre, idx) => (
                                             <button
                                                 key={idx}
                                                 onClick={() => handleGenreClick(genre)}
-                                                className="header-dropdown-item"
+                                                className="genre-option"
                                             >
-                                                {genre}
+                                                <div className="genre-icon">
+                                                    {idx % 3 === 0 ? '🎬' : idx % 3 === 1 ? '🎭' : '🌟'}
+                                                </div>
+                                                <span className="genre-name">{genre}</span>
                                             </button>
                                         ))}
                                     </div>
@@ -305,94 +391,132 @@ const Header: React.FC<HeaderProps> = ({
                         </div>
 
                         {/* Rating Dropdown */}
-                        <div className="header-dropdown">
+                        <div className="nav-dropdown">
                             <button
                                 onClick={toggleRatingDropdown}
-                                className={`header-dropdown-button ${ratingOpen ? 'header-dropdown-open' : ''}`}
+                                className={`nav-main-btn ${ratingOpen ? 'nav-active' : ''}`}
                             >
-                                Rating <span className={`header-arrow ${ratingOpen ? 'header-arrow-open' : ''}`}></span>
+                                <span className="btn-text">Ratings</span>
+                                <span className={`dropdown-arrow ${ratingOpen ? 'arrow-open' : ''}`}></span>
                             </button>
                             
                             {ratingOpen && (
-                                <div className="header-dropdown-menu">
-                                    <div className="header-dropdown-title">Browse by Rating</div>
-                                    {ratings.map((rating, idx) => (
-                                        <button
-                                            key={idx}
-                                            onClick={() => handleRatingClick(rating)}
-                                            className="header-dropdown-item"
-                                        >
-                                            <span className="header-rating-star">★</span> {rating}+
-                                        </button>
-                                    ))}
+                                <div className="rating-dropdown">
+                                    <div className="dropdown-header">
+                                        <FaStar className="dropdown-icon" />
+                                        <div className="dropdown-title">
+                                            <h3>Top Rated Content</h3>
+                                            <p>Filter by ratings</p>
+                                        </div>
+                                    </div>
+                                    <div className="rating-list">
+                                        {ratings.map((rating, idx) => (
+                                            <button
+                                                key={idx}
+                                                onClick={() => handleRatingClick(rating)}
+                                                className="rating-option"
+                                            >
+                                                <div className="rating-stars">
+                                                    {[...Array(5)].map((_, i) => (
+                                                        <FaStar 
+                                                            key={i} 
+                                                            className={`star-icon ${i < parseInt(rating)/2 ? 'star-filled' : 'star-empty'}`}
+                                                        />
+                                                    ))}
+                                                </div>
+                                                <span className="rating-value">{rating}+</span>
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
                         </div>
 
                         {/* User Menu Dropdown */}
-                        <div className="header-user-menu">
+                        <div className="user-dropdown">
                             <button
                                 onClick={toggleUserDropdown}
-                                className={`header-user-button ${userMenuOpen ? 'header-user-active' : ''}`}
+                                className={`user-profile-btn ${userMenuOpen ? 'profile-active' : ''}`}
                                 aria-label="User menu"
                             >
-                                <FaUser size={20} />
+                                <MdAccountCircle size={28} />
+                                {!isMobile && (
+                                    <div className="user-info">
+                                        <span className="user-name">Guest User</span>
+                                        <span className="user-status">View Profile</span>
+                                    </div>
+                                )}
                             </button>
                             
                             {userMenuOpen && (
-                                <div className="header-user-dropdown">
-                                    <div className="header-user-info">
-                                        <div className="header-user-avatar">
-                                            <FaUser size={32} />
+                                <div className="user-menu-panel">
+                                    <div className="user-header">
+                                        <div className="user-avatar">
+                                            <MdAccountCircle size={48} />
                                         </div>
-                                        <div className="header-user-details">
-                                            <span className="header-user-name">Guest User</span>
-                                            <span className="header-user-email">guest@wecinema.com</span>
+                                        <div className="user-details">
+                                            <h3 className="user-full-name">Guest User</h3>
+                                            <p className="user-email">guest@wecinema.com</p>
+                                            <button className="upgrade-btn">Upgrade to Pro</button>
                                         </div>
                                     </div>
-                                    <div className="header-user-divider"></div>
-                                    <button
-                                        onClick={handleProfile}
-                                        className="header-user-item"
-                                    >
-                                        <FaUser className="header-user-item-icon" />
-                                        <span>Profile</span>
-                                    </button>
-                                    <button
-                                        onClick={handleUploadVideo}
-                                        className="header-user-item"
-                                    >
-                                        <FaVideo className="header-user-item-icon" />
-                                        <span>My Videos</span>
-                                    </button>
-                                    <button
-                                        onClick={handleUploadScript}
-                                        className="header-user-item"
-                                    >
-                                        <FaFileAlt className="header-user-item-icon" />
-                                        <span>My Scripts</span>
-                                    </button>
-                                    <div className="header-user-divider"></div>
-                                    <div className="header-user-auth">
-                                        <button
-                                            onClick={handleLogin}
-                                            className="header-login-button"
-                                        >
-                                            Login
+                                    
+                                    <div className="user-quick-stats">
+                                        <div className="stat-item">
+                                            <span className="stat-value">0</span>
+                                            <span className="stat-label">Videos</span>
+                                        </div>
+                                        <div className="stat-item">
+                                            <span className="stat-value">0</span>
+                                            <span className="stat-label">Scripts</span>
+                                        </div>
+                                        <div className="stat-item">
+                                            <span className="stat-value">0</span>
+                                            <span className="stat-label">Likes</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="user-menu-list">
+                                        <button onClick={handleProfile} className="menu-item">
+                                            <MdAccountCircle className="menu-icon" />
+                                            <span>My Profile</span>
                                         </button>
-                                        <button
-                                            onClick={handleSignup}
-                                            className="header-signup-button"
-                                        >
-                                            Sign Up
+                                        <button onClick={handleUploadVideo} className="menu-item">
+                                            <FaVideo className="menu-icon" />
+                                            <span>My Videos</span>
+                                        </button>
+                                        <button onClick={handleUploadScript} className="menu-item">
+                                            <FaFileAlt className="menu-icon" />
+                                            <span>My Scripts</span>
+                                        </button>
+                                        <button className="menu-item">
+                                            <FaHeart className="menu-icon" />
+                                            <span>Watchlist</span>
+                                        </button>
+                                        <button className="menu-item">
+                                            <FaHistory className="menu-icon" />
+                                            <span>Watch History</span>
+                                        </button>
+                                        <button className="menu-item">
+                                            <FaUserCog className="menu-icon" />
+                                            <span>Settings</span>
                                         </button>
                                     </div>
-                                    <button
-                                        onClick={handleLogout}
-                                        className="header-logout-button"
-                                    >
-                                        Logout
-                                    </button>
+                                    
+                                    <div className="user-actions">
+                                        <button onClick={handleLogin} className="action-btn login-btn">
+                                            <IoLogIn className="action-icon" />
+                                            <span>Login</span>
+                                        </button>
+                                        <button onClick={handleSignup} className="action-btn signup-btn">
+                                            <IoPersonAdd className="action-icon" />
+                                            <span>Sign Up</span>
+                                        </button>
+                                        <button onClick={handleLogout} className="action-btn logout-btn">
+                                            <IoLogOut className="action-icon" />
+                                            <span>Logout</span>
+                                        </button>
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -403,41 +527,55 @@ const Header: React.FC<HeaderProps> = ({
                 {isExpanded && isMobile && (
                     <>
                         <div 
-                            className="header-mobile-overlay"
+                            className="mobile-search-overlay"
                             onClick={() => setIsExpanded(false)}
                         />
-                        <div className="header-mobile-search">
-                            <form onSubmit={handleSearchSubmit} className="header-mobile-search-form">
-                                <div className="header-mobile-search-wrapper">
+                        <div className="mobile-search-panel">
+                            <form onSubmit={handleSearchSubmit} className="mobile-search-form">
+                                <div className="mobile-search-input-wrapper">
+                                    <FaSearch className="mobile-search-icon" />
                                     <input
                                         type="search"
                                         placeholder="Search movies, shows, actors..."
-                                        className="header-mobile-search-input"
+                                        className="mobile-search-field"
                                         value={searchTerm}
                                         onChange={handleSearchInputChange}
                                         autoFocus
                                     />
-                                    <FaSearch className="header-mobile-search-icon" />
                                     <button
                                         type="button"
                                         onClick={handleVoiceSearch}
-                                        className={`header-mobile-voice-button ${isListening ? 'header-voice-active' : ''}`}
+                                        className={`mobile-voice-btn ${isListening ? 'listening-active' : ''}`}
                                         aria-label={isListening ? "Stop listening" : "Voice search"}
                                     >
                                         {isListening ? <MdMicOff size={20} /> : <MdMic size={20} />}
                                     </button>
                                 </div>
-                                <div className="header-mobile-search-actions">
+                                <div className="search-suggestions">
+                                    <button type="button" className="suggestion-btn">
+                                        <Search size={16} />
+                                        <span>Avengers Endgame</span>
+                                    </button>
+                                    <button type="button" className="suggestion-btn">
+                                        <Search size={16} />
+                                        <span>Spider-Man: No Way Home</span>
+                                    </button>
+                                    <button type="button" className="suggestion-btn">
+                                        <Search size={16} />
+                                        <span>Stranger Things</span>
+                                    </button>
+                                </div>
+                                <div className="mobile-search-actions">
                                     <button
                                         type="button"
                                         onClick={() => setIsExpanded(false)}
-                                        className="header-mobile-cancel"
+                                        className="cancel-search-btn"
                                     >
                                         Cancel
                                     </button>
                                     <button
                                         type="submit"
-                                        className="header-mobile-submit"
+                                        className="submit-search-btn"
                                     >
                                         Search
                                     </button>
