@@ -1,0 +1,557 @@
+/* Base Styles */
+.dropdown {
+  position: relative;
+  display: inline-block;
+  margin-left: 0; /* Remove negative margin for better responsiveness */
+  width: 8%;
+  max-width: 200px; /* Ensures dropdown isn't too wide on large screens */
+}
+
+.form {
+  width: 90%; /* Makes form responsive */
+  max-width: 600px; /* Ensures it doesn't exceed this width */
+  margin: 0 auto; /* Centers the form */
+}
+
+/* Dropdown Button */
+.dropdown-button {
+  background-color: #fff;
+  border: 1px solid #ccc;
+  padding: 10px 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 150px; /* Prevents button from being too large on bigger screens */
+}
+
+/* Dropdown Arrow */
+.arrow {
+  margin-left: 10px;
+  border: solid black;
+  border-width: 0 2px 2px 0;
+  display: inline-block;
+  padding: 3px;
+  transform: rotate(45deg);
+  transition: transform 0.3s ease;
+}
+
+.arrow.open {
+  transform: rotate(-135deg);
+}
+
+/* Dropdown Menu */
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background-color: #fff;
+  border: 1px solid #ccc;
+  width: 100%;
+  max-width: 200px; /* Keeps menu contained */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 1;
+}
+
+/* RESPONSIVE DESIGN */
+
+/* Small Screens (Mobile) */
+@media (max-width: 768px) {
+  .dropdown {
+      width: 100%;
+      max-width: 100%; /* Full width for small screens */
+  }
+
+  .form {
+      width: 100%;
+      max-width: 100%;
+      margin-right: 0;
+      padding: 10px;
+  }
+
+  .dropdown-button {
+      width: 100%;
+      max-width: 100%;
+  }
+
+  .dropdown-menu {
+      width: 100%;
+      max-width: 100%;
+  }
+}
+
+/* Medium Screens (Tablets) */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .form {
+      max-width: 500px;
+  }
+
+  .dropdown {
+      max-width: 250px;
+  }
+}
+
+/* Large Screens (Desktops) */
+@media (min-width: 1024px) {
+  .form {
+      max-width: 600px;
+  }
+
+  .dropdown {
+      max-width: 300px;
+  }
+}
+
+
+/* src/Dropdown.css */
+.dropdown1 {
+  position: relative;
+  display: inline-block;
+  margin-left: -70px;
+}
+.form1{
+width: 600px;
+margin-right: 50px;
+
+}
+/* Dropdown Menu (Upper Direction) */
+.dropdown-menu-upper1 {
+position: absolute;
+bottom: 100%; /* Position above the button */
+left: -15%;
+transform: translateY(-5%); /* Center horizontally */
+
+background-color: white;
+border: 1px solid #ccc;
+border-radius: 8px;
+box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+padding: 8px;
+z-index: 1000;
+list-style: none;
+margin: 0;
+min-width: 150px;
+}
+
+
+/* Arrow for Dropdown */
+.arrow1 {
+display: inline-block;
+margin-left: 8px;
+width: 0;
+height: 0;
+border-left: 5px solid transparent;
+border-right: 5px solid transparent;
+border-bottom: 5px solid black; /* Arrow pointing up */
+transition: transform 0.3s ease;
+}
+
+.arrow.open1 {
+transform: rotate(180deg); /* Rotate arrow when dropdown is open */
+}
+
+
+.dropdown-item {
+    padding: 10px 20px;
+    cursor: pointer;
+}
+
+.dropdown-item:hover {
+    background-color: #f1f1f1;
+}
+.social-media-icons {
+    display: flex;
+    justify-content: left;
+    gap: 15px;
+    margin-top: 20px;
+    margin-left: 50px;
+
+  }
+  
+  .social-media-icons a {
+    color: #000000;
+    font-size: 24px;
+    transition: color 0.3s;
+  }
+  
+  .social-media-icons a:hover {
+    color: #3a04ff;
+  }
+  /* Button.css */
+.styled-button {
+    background-color: #007bff;
+    border: none;
+    border-radius: 5px;
+    color: white;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+  
+  .styled-button:hover {
+    background-color: #0056b3;
+  }
+  .square-button {
+    width: 50px;
+    height: 50px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s;
+    border-radius: 4px; /* Optional: to slightly round the corners */
+  }
+  
+  .square-button:hover {
+    background-color: #0056b3;
+  }  
+  .search-container {
+    position: relative;
+    display: inline-block;
+}
+
+.search-form {
+    display: flex;
+    align-items: center;
+}
+
+.search-input {
+    width: 0;
+    transition: width 0.3s, opacity 0.3s, visibility 0.3s;
+    border: none;
+    outline: none;
+    padding: 0;
+    margin: 0;
+    opacity: 0;
+    visibility: hidden;
+}
+
+.search-input.expanded {
+    width: 200px; /* Adjust as needed */
+    padding: 8px;
+    margin-left: 10px;
+    opacity: 1;
+    visibility: visible;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+}
+
+.search-icon {
+    cursor: pointer;
+    font-size: 1.5em;
+    margin-left: -130px;
+    margin-right: 40px;
+}
+.left-container {
+  float: left;
+  width: 30%; /* adjust the width as needed */
+}
+
+.right-container {
+  float: right;
+  width: 70%; /* adjust the width as needed */
+}
+.active-button {
+  position: relative;
+}
+
+.active-button::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-53%, -90%);
+  width: 30px;
+  height: 30px;
+  background-color: #FFC300;
+  border-radius: 50%;
+  z-index: -1;
+}
+
+.customer-care-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.customer-support-form {
+  background-color: #f9f9f9;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 40px;
+}
+
+.customer-support-form h2 {
+  margin-bottom: 20px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+button {
+  background-color: #007bff;
+  color: #fff;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #0056b3;
+}
+
+.faq-section {
+  background-color: #f1f1f1;
+  padding: 20px;
+  border-radius: 8px;
+}
+
+.faq-section h2 {
+  margin-bottom: 20px;
+}
+
+.faq-section ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.faq-section li {
+  margin-bottom: 20px;
+}
+
+.faq-section strong {
+  display: block;
+  margin-bottom: 5px;
+}
+.contact-form-container {
+  max-width: 600px;
+  margin: 50px auto;
+  padding: 20px;
+  background: #f9f9f9;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.contact-form-container h2 {
+  text-align: center;
+  margin-bottom: 20px;
+  font-size: 24px;
+  color: #333;
+}
+
+.contact-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+  color: #555;
+}
+
+.form-group input,
+.form-group textarea {
+  width: calc(100% - 20px);
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 16px;
+}
+
+.form-group textarea {
+  height: 100px;
+  resize: vertical;
+}
+
+.submit-button {
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s;
+}
+
+.submit-button:hover {
+  background-color: #0056b3;
+}
+/* drowpdown.css or another CSS file */
+.whatsapp-button {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: #25d366;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  z-index: 1000;
+}
+
+.whatsapp-button img {
+  width: 35px;
+  height: 35px;
+}
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 800px;
+  margin: auto;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.messages {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  border-bottom: 1px solid #eee;
+}
+
+.message {
+  margin: 10px 0;
+  padding: 10px;
+  border-radius: 5px;
+}
+
+.sent {
+  background-color: #d4edda;
+  align-self: flex-end;
+}
+
+.received {
+  background-color: #f8d7da;
+  align-self: flex-start;
+}
+
+.order-section {
+  margin: 20px 0;
+}
+
+.order {
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid #007bff;
+  border-radius: 5px;
+}
+
+textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  margin: 5px 0;
+}
+
+button {
+  padding: 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #0056b3;
+}
+/* src/pages/TermsAndConditions.css */
+
+.terms-conditions {
+  padding: 20px;
+  max-width: 800px;
+  margin: auto;
+  font-family: Arial, sans-serif;
+}
+
+h1 {
+  font-size: 24px;
+  margin-bottom: 20px;
+}
+
+h2 {
+  font-size: 20px;
+  margin-top: 20px;
+}
+
+h3 {
+  font-size: 18px;
+  margin-top: 15px;
+}
+
+p {
+  margin: 10px 0;
+}
+
+.signatories {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 30px;
+}
+
+.signatories div {
+  width: 45%;
+}
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(-10%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes leave {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10%);
+  }
+}
+
+.animate-enter {
+  animation: enter 0.3s ease-out forwards;
+}
+
+.animate-leave {
+  animation: leave 0.3s ease-in forwards;
+}
