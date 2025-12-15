@@ -39,9 +39,9 @@ import {
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import './BuyerDashboard.css';
-import MarketplaceLayout from '../Layout/MarketplaceLayout';
-import { marketplaceAPI, isAuthenticated, formatCurrency, getOrderStatusInfo } from '../../api';
-import { getCurrentUserId, calculateRemainingDays } from '../../utilities/helperFunctions';
+import MarketplaceLayout from '../../Layout/MarketplaceLayout';
+import { marketplaceAPI, isAuthenticated, formatCurrency, getOrderStatusInfo } from '../../../api';
+import { getCurrentUserId, calculateRemainingDays } from '../../../utilities/helperfFunction';
 import OrderTimeline from './OrderTimeline';
 import OrderSummary from './OrderSummary';
 import PaymentDetails from './PaymentDetails';
