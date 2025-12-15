@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { 
   FaShoppingBag, 
   FaClock, 
@@ -200,10 +200,109 @@ const BuyerDashboard: React.FC = () => {
     end: new Date().toISOString().split('T')[0] 
   });
   
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  
   const navigate = useNavigate();
+
+  // Status colors configuration
+  const statusColors = {
+    pending_payment: { color: '#f39c12', rgb: '243, 156, 18' },
+    paid: { color: '#3498db', rgb: '52, 152, 219' },
+    processing: { color: '#9b59b6', rgb: '155, 89, 182' },
+    in_progress: { color: '#1abc9c', rgb: '26, 188, 156' },
+    delivered: { color: '#2ecc71', rgb: '46, 204, 113' },
+    in_revision: { color: '#e74c3c', rgb: '231, 76, 60' },
+    completed: { color: '#27ae60', rgb: '39, 174, 96' },
+    cancelled: { color: '#95a5a6', rgb: '149, 165, 166' },
+    disputed: { color: '#c0392b', rgb: '192, 57, 43' }
+  };
+
+  // Stats cards configuration
+  const statCardsConfig = [
+    {
+      key: 'total-orders',
+      icon: <FaShoppingBag />,
+      color: '#3498db',
+      rgb: '52, 152, 219'
+    },
+    {
+      key: 'active-orders',
+      icon: <FaSync />,
+      color: '#9b59b6',
+      rgb: '155, 89, 182'
+    },
+    {
+      key: 'financial-summary',
+      icon: <FaWallet />,
+      color: '#2ecc71',
+      rgb: '46, 204, 113'
+    },
+    {
+      key: 'performance',
+      icon: <FaChartLine />,
+      color: '#f1c40f',
+      rgb: '241, 196, 15'
+    }
+  ];
+
+  // Quick actions configuration
+  const quickActions = [
+    {
+      icon: <FaShoppingCart />,
+      label: 'Continue Shopping',
+      action: () => handleContinueShopping(),
+      type: 'primary' as const
+    },
+    {
+      icon: <FaBoxOpen />,
+      label: 'My Offers',
+      action: () => navigate('/marketplace/offers/my-offers'),
+      type: 'secondary' as const
+    },
+    {
+      icon: <FaComment />,
+      label: 'Messages',
+      action: () => navigate('/marketplace/messages'),
+      type: 'secondary' as const
+    },
+    {
+      icon: <FaListAlt />,
+      label: 'Detailed Stats',
+      action: () => navigate('/marketplace/orders/stats/buyer'),
+      type: 'secondary' as const
+    },
+    {
+      icon: <FaDownload />,
+      label: 'Export Orders',
+      action: () => exportOrders(),
+      type: 'secondary' as const,
+      disabled: filteredOrders.length === 0
+    }
+  ];
 
   useEffect(() => {
     fetchBuyerData();
+    
+    // Click outside handler for dropdowns
+    const handleClickOutside = (event: MouseEvent) => {
+      let clickedInsideDropdown = false;
+      
+      Object.values(dropdownRefs.current).forEach(ref => {
+        if (ref && ref.contains(event.target as Node)) {
+          clickedInsideDropdown = true;
+        }
+      });
+
+      if (!clickedInsideDropdown) {
+        setActiveDropdown(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
   useEffect(() => {
@@ -483,6 +582,8 @@ const BuyerDashboard: React.FC = () => {
       }
     } catch (error) {
       toast.error('Failed to load order details');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -497,6 +598,8 @@ const BuyerDashboard: React.FC = () => {
       }
     } catch (error) {
       toast.error('Failed to load timeline');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -837,15 +940,135 @@ const BuyerDashboard: React.FC = () => {
     }
   };
 
+  // Dropdown toggle function
+  const toggleDropdown = (orderId: string) => {
+    if (activeDropdown === orderId) {
+      setActiveDropdown(null);
+    } else {
+      setActiveDropdown(orderId);
+    }
+  };
+
+  // Render dropdown for order
+  const renderDropdown = (order: Order) => {
+    const actions = getOrderActions(order);
+    const isDropdownOpen = activeDropdown === order._id;
+
+    return (
+      <div className="dropdown-actions" ref={el => dropdownRefs.current[order._id] = el}>
+        <div className="dropdown">
+          <button 
+            className={`dropdown-toggle ${isDropdownOpen ? 'active' : ''}`}
+            onClick={() => toggleDropdown(order._id)}
+          >
+            More Actions
+          </button>
+          <div className={`dropdown-menu ${isDropdownOpen ? 'show' : ''}`}>
+            {actions.map((action, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  handleOrderAction(order._id, action.action);
+                  setActiveDropdown(null);
+                }}
+                className={`dropdown-item ${action.className}`}
+                disabled={action.disabled}
+              >
+                {action.icon}
+                <span>{action.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        {isDropdownOpen && (
+          <div className="dropdown-backdrop show" onClick={() => setActiveDropdown(null)} />
+        )}
+      </div>
+    );
+  };
+
+  // Render stats cards
+  const renderStatsCards = () => (
+    <div className="stats-grid">
+      {statCardsConfig.map((card) => {
+        let value, label, description;
+        
+        switch(card.key) {
+          case 'total-orders':
+            value = stats.totalOrders;
+            label = 'Total Orders';
+            description = `${orderStatusCount.completed} completed • ${orderStatusCount.cancelled} cancelled`;
+            break;
+          case 'active-orders':
+            value = stats.activeOrders;
+            label = 'Active Orders';
+            description = 'In progress and pending delivery';
+            break;
+          case 'financial-summary':
+            value = formatPrice(stats.totalSpent);
+            label = 'Total Spent';
+            description = `${formatPrice(stats.monthlySpent)} this month`;
+            break;
+          case 'performance':
+            value = stats.averageOrderValue ? formatPrice(stats.averageOrderValue) : 'N/A';
+            label = 'Avg. Order Value';
+            description = stats.successRate ? `${stats.successRate.toFixed(1)}% success rate` : 'N/A';
+            break;
+          default:
+            value = 0;
+            label = '';
+            description = '';
+        }
+        
+        return (
+          <div 
+            key={card.key} 
+            className="stat-card"
+            style={{
+              '--card-color': card.color,
+              '--card-rgb': card.rgb
+            } as React.CSSProperties}
+          >
+            <div className="stat-icon">
+              {card.icon}
+            </div>
+            <div className="stat-info">
+              <h3>{value}</h3>
+              <p>{label}</p>
+              <small>{description}</small>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  // Render status filters
   const renderStatusFilters = () => (
     <div className="status-filters">
+      <button
+        className={`status-filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
+        onClick={() => setStatusFilter('all')}
+        style={{
+          '--status-color': '#667eea',
+          '--status-rgb': '102, 126, 234'
+        } as React.CSSProperties}
+      >
+        <FaListAlt />
+        <span>All Orders</span>
+        <span className="filter-count">{orders.length}</span>
+      </button>
+      
       {Object.entries(orderStatusCount).map(([status, count]) => (
         count > 0 && (
           <button
             key={status}
             className={`status-filter-btn ${statusFilter === status ? 'active' : ''}`}
             onClick={() => setStatusFilter(statusFilter === status ? 'all' : status)}
-            style={{ borderLeftColor: getStatusColor(status as any) }}
+            style={{
+              '--status-color': statusColors[status as keyof typeof statusColors]?.color,
+              '--status-rgb': statusColors[status as keyof typeof statusColors]?.rgb
+            } as React.CSSProperties}
           >
             {getStatusIcon(status as any)}
             <span>{getStatusText(status as any)}</span>
@@ -855,6 +1078,162 @@ const BuyerDashboard: React.FC = () => {
       ))}
     </div>
   );
+
+  // Render quick actions
+  const renderQuickActions = () => (
+    <div className="quick-actions">
+      <h2>Quick Actions</h2>
+      <div className="actions-grid">
+        {quickActions.map((action, index) => (
+          <button
+            key={index}
+            className={`action-btn ${action.type}`}
+            onClick={action.action}
+            disabled={action.disabled}
+          >
+            <div className="action-icon-wrapper">
+              {action.icon}
+            </div>
+            <span>{action.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Render order card
+  const renderOrderCard = (order: Order) => {
+    const sellerUsername = getSellerUsername(order);
+    const listingTitle = getListingTitle(order);
+    const mediaUrl = getListingMedia(order);
+    const category = getListingCategory(order);
+    
+    return (
+      <div 
+        key={order._id} 
+        className="order-card" 
+        style={{ 
+          '--status-color': getStatusColor(order.status)
+        } as React.CSSProperties}
+      >
+        <div className="order-image">
+          <div className="image-container">
+            {mediaUrl ? (
+              <img 
+                src={mediaUrl} 
+                alt={listingTitle}
+                className="listing-image"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/100x100?text=No+Image';
+                }}
+              />
+            ) : (
+              <div className="image-placeholder">
+                <FaBoxOpen />
+              </div>
+            )}
+            {category && (
+              <span className="category-badge">
+                <FaTag /> {category}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="order-details">
+          <div className="order-header">
+            <h3 className="product-name">{listingTitle}</h3>
+            <div className="order-meta">
+              {order.orderNumber && (
+                <span className="order-number">#{order.orderNumber}</span>
+              )}
+              <span className="order-date">
+                <FaCalendar />
+                {formatShortDate(order.createdAt)}
+              </span>
+            </div>
+          </div>
+          <p className="seller">
+            <FaUser className="seller-icon" />
+            Seller: {sellerUsername}
+          </p>
+          <div className="order-info">
+            <div className="info-row">
+              <span className="price">{formatPrice(order.amount)}</span>
+              {(order.revisions > 0) && (
+                <span className="revisions-count">
+                  <FaReply />
+                  Revisions: {order.revisions}/{order.maxRevisions}
+                </span>
+              )}
+            </div>
+            <div className="info-row">
+              {order.expectedDelivery && (
+                <span className="expected-delivery">
+                  <FaClock />
+                  Expected: {formatShortDate(order.expectedDelivery)}
+                </span>
+              )}
+              {order.deliveredAt && (
+                <span className="delivered-date">
+                  <FaTruck />
+                  Delivered: {formatShortDate(order.deliveredAt)}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="order-description">
+            <p>{getOrderDescription(order)}</p>
+          </div>
+        </div>
+
+        <div className="order-status-section">
+          <div className="status-section">
+            <div className="status-badge" style={{ backgroundColor: getStatusColor(order.status) }}>
+              {getStatusIcon(order.status)}
+              <span>{getStatusText(order.status)}</span>
+            </div>
+            <div className="payment-status">
+              {order.paymentReleased ? (
+                <span className="payment-released">
+                  <FaCheckCircle /> Payment Released
+                </span>
+              ) : order.paidAt ? (
+                <span className="payment-paid">
+                  <FaCreditCard /> Paid
+                </span>
+              ) : (
+                <span className="payment-pending">
+                  <FaClock /> Payment Pending
+                </span>
+              )}
+            </div>
+          </div>
+          
+          <div className="order-actions">
+            <div className="quick-actions-row">
+              <button
+                onClick={() => handleViewOrder(order._id)}
+                className="view-order-btn"
+              >
+                <FaEye /> View Order
+              </button>
+              {order.status === 'delivered' && (
+                <button
+                  onClick={() => handleOrderAction(order._id, 'download_files')}
+                  className="download-files-btn"
+                >
+                  <FaDownload /> Files
+                </button>
+              )}
+            </div>
+            
+            {renderDropdown(order)}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const renderOrderDetailsModal = () => {
     if (!selectedOrder) return null;
@@ -1083,51 +1462,7 @@ const BuyerDashboard: React.FC = () => {
         </div>
 
         {/* Stats Overview */}
-        <div className="stats-grid">
-          <div className="stat-card total-orders">
-            <div className="stat-icon">
-              <FaShoppingBag />
-            </div>
-            <div className="stat-info">
-              <h3>{stats.totalOrders}</h3>
-              <p>Total Orders</p>
-              <small>{orderStatusCount.completed} completed • {orderStatusCount.cancelled} cancelled</small>
-            </div>
-          </div>
-
-          <div className="stat-card active-orders">
-            <div className="stat-icon">
-              <FaSync />
-            </div>
-            <div className="stat-info">
-              <h3>{stats.activeOrders}</h3>
-              <p>Active Orders</p>
-              <small>In progress and pending delivery</small>
-            </div>
-          </div>
-
-          <div className="stat-card financial-summary">
-            <div className="stat-icon">
-              <FaWallet />
-            </div>
-            <div className="stat-info">
-              <h3>{formatPrice(stats.totalSpent)}</h3>
-              <p>Total Spent</p>
-              <small>{formatPrice(stats.monthlySpent)} this month</small>
-            </div>
-          </div>
-
-          <div className="stat-card performance">
-            <div className="stat-icon">
-              <FaChartLine />
-            </div>
-            <div className="stat-info">
-              <h3>{stats.averageOrderValue ? formatPrice(stats.averageOrderValue) : 'N/A'}</h3>
-              <p>Avg. Order Value</p>
-              <small>{stats.successRate ? `${stats.successRate.toFixed(1)}% success rate` : 'N/A'}</small>
-            </div>
-          </div>
-        </div>
+        {renderStatsCards()}
 
         {/* Status Distribution */}
         <div className="status-distribution">
@@ -1233,44 +1568,7 @@ const BuyerDashboard: React.FC = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="quick-actions">
-          <h2>Quick Actions</h2>
-          <div className="actions-grid">
-            <button className="action-btn primary" onClick={handleContinueShopping}>
-              <FaShoppingCart />
-              <span>Continue Shopping</span>
-            </button>
-            <button 
-              className="action-btn"
-              onClick={() => navigate('/marketplace/offers/my-offers')}
-            >
-              <FaBoxOpen />
-              <span>My Offers</span>
-            </button>
-            <button 
-              className="action-btn"
-              onClick={() => navigate('/marketplace/messages')}
-            >
-              <FaComment />
-              <span>Messages</span>
-            </button>
-            <button 
-              className="action-btn"
-              onClick={() => navigate('/marketplace/orders/stats/buyer')}
-            >
-              <FaListAlt />
-              <span>Detailed Stats</span>
-            </button>
-            <button 
-              className="action-btn"
-              onClick={exportOrders}
-              disabled={filteredOrders.length === 0}
-            >
-              <FaDownload />
-              <span>Export Orders</span>
-            </button>
-          </div>
-        </div>
+        {renderQuickActions()}
 
         {/* Orders Section */}
         <div className="orders-section">
@@ -1285,158 +1583,16 @@ const BuyerDashboard: React.FC = () => {
                   <FaDollarSign /> Value: {formatPrice(filteredOrders.reduce((sum, order) => sum + order.amount, 0))}
                 </span>
               </div>
+              <button className="export-btn" onClick={exportOrders} disabled={filteredOrders.length === 0}>
+                <FaDownload /> Export CSV
+              </button>
             </div>
           </div>
 
           {/* Orders List */}
           <div className="orders-list">
             {filteredOrders.length > 0 ? (
-              filteredOrders.map(order => {
-                const actions = getOrderActions(order);
-                const sellerUsername = getSellerUsername(order);
-                const listingTitle = getListingTitle(order);
-                const mediaUrl = getListingMedia(order);
-                const category = getListingCategory(order);
-                
-                return (
-                  <div key={order._id} className="order-card" style={{ borderLeftColor: getStatusColor(order.status) }}>
-                    <div className="order-image">
-                      <div className="image-container">
-                        {mediaUrl ? (
-                          <img 
-                            src={mediaUrl} 
-                            alt={listingTitle}
-                            className="listing-image"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'https://via.placeholder.com/100x100?text=No+Image';
-                            }}
-                          />
-                        ) : (
-                          <div className="image-placeholder">
-                            <FaBoxOpen />
-                          </div>
-                        )}
-                        {category && (
-                          <span className="category-badge">
-                            <FaTag /> {category}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="order-details">
-                      <div className="order-header">
-                        <h3 className="product-name">{listingTitle}</h3>
-                        <div className="order-meta">
-                          {order.orderNumber && (
-                            <span className="order-number">#{order.orderNumber}</span>
-                          )}
-                          <span className="order-date">
-                            <FaCalendar />
-                            {formatShortDate(order.createdAt)}
-                          </span>
-                        </div>
-                      </div>
-                      <p className="seller">
-                        <FaUser className="seller-icon" />
-                        Seller: {sellerUsername}
-                      </p>
-                      <div className="order-info">
-                        <div className="info-row">
-                          <span className="price">{formatPrice(order.amount)}</span>
-                          {(order.revisions > 0) && (
-                            <span className="revisions-count">
-                              <FaReply />
-                              Revisions: {order.revisions}/{order.maxRevisions}
-                            </span>
-                          )}
-                        </div>
-                        <div className="info-row">
-                          {order.expectedDelivery && (
-                            <span className="expected-delivery">
-                              <FaClock />
-                              Expected: {formatShortDate(order.expectedDelivery)}
-                            </span>
-                          )}
-                          {order.deliveredAt && (
-                            <span className="delivered-date">
-                              <FaTruck />
-                              Delivered: {formatShortDate(order.deliveredAt)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="order-description">
-                        <p>{getOrderDescription(order)}</p>
-                      </div>
-                    </div>
-
-                    <div className="order-status-section">
-                      <div className="status-section">
-                        <div className="status-badge" style={{ backgroundColor: getStatusColor(order.status) }}>
-                          {getStatusIcon(order.status)}
-                          <span>{getStatusText(order.status)}</span>
-                        </div>
-                        <div className="payment-status">
-                          {order.paymentReleased ? (
-                            <span className="payment-released">
-                              <FaCheckCircle /> Payment Released
-                            </span>
-                          ) : order.paidAt ? (
-                            <span className="payment-paid">
-                              <FaCreditCard /> Paid
-                            </span>
-                          ) : (
-                            <span className="payment-pending">
-                              <FaClock /> Payment Pending
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="order-actions">
-                        <div className="quick-actions-row">
-                          <button
-                            onClick={() => handleViewOrder(order._id)}
-                            className="view-order-btn"
-                          >
-                            <FaEye /> View Order
-                          </button>
-                          {order.status === 'delivered' && (
-                            <button
-                              onClick={() => handleOrderAction(order._id, 'download_files')}
-                              className="download-files-btn"
-                            >
-                              <FaDownload /> Files
-                            </button>
-                          )}
-                        </div>
-                        
-                        <div className="dropdown-actions">
-                          <div className="dropdown">
-                            <button className="dropdown-toggle">
-                              More Actions
-                            </button>
-                            <div className="dropdown-menu">
-                              {actions.map((action, index) => (
-                                <button
-                                  key={index}
-                                  onClick={() => handleOrderAction(order._id, action.action)}
-                                  className={`dropdown-item ${action.className}`}
-                                  disabled={action.disabled}
-                                >
-                                  {action.icon}
-                                  <span>{action.label}</span>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
+              filteredOrders.map(order => renderOrderCard(order))
             ) : (
               <div className="no-orders">
                 <FaBoxOpen className="no-orders-icon" />
