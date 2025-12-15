@@ -5,7 +5,7 @@ import { FaUpload, FaVideo, FaFileAlt, FaChevronDown } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { categories, ratings } from "../../App";
 import { Search, X } from "lucide-react";
-import './Header.scss';
+import './Header.css';
 
 interface HeaderProps {
     darkMode: boolean;
