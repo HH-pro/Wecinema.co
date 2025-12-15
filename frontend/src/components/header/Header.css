@@ -236,7 +236,6 @@
 
 .search-form__clear-btn:hover {
   background: #ffffff;
-  color: var(--color-danger);
 }
 
 .search-form__voice-btn {
