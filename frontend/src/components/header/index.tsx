@@ -5,7 +5,7 @@ import { FaUpload, FaVideo, FaFileAlt, FaChevronDown } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { categories, ratings } from "../../App";
 import { Search, X } from "lucide-react";
-import './Header.css';
+import './Header.scss';
 
 interface HeaderProps {
     darkMode: boolean;
@@ -26,29 +26,29 @@ const Header: React.FC<HeaderProps> = ({
     toggleUploadScriptModal,
     toggleUploadModal,
 }) => {
-    const nav = useNavigate();
-    const [isExpanded, setIsExpanded] = useState(false);
-    const [isGenreOpen, setIsGenreOpen] = useState(false);
-    const [isRatingOpen, setIsRatingOpen] = useState(false);
+    const navigate = useNavigate();
+    const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+    const [isGenreMenuOpen, setIsGenreMenuOpen] = useState(false);
+    const [isRatingMenuOpen, setIsRatingMenuOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [isListening, setIsListening] = useState(false);
-    const [uploadMenuOpen, setUploadMenuOpen] = useState(false);
+    const [isUploadMenuOpen, setIsUploadMenuOpen] = useState(false);
     
-    const genreRef = useRef<HTMLDivElement>(null);
-    const ratingRef = useRef<HTMLDivElement>(null);
-    const uploadRef = useRef<HTMLDivElement>(null);
+    const genreMenuRef = useRef<HTMLDivElement>(null);
+    const ratingMenuRef = useRef<HTMLDivElement>(null);
+    const uploadMenuRef = useRef<HTMLDivElement>(null);
 
     // Close dropdowns when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (genreRef.current && !genreRef.current.contains(event.target as Node)) {
-                setIsGenreOpen(false);
+            if (genreMenuRef.current && !genreMenuRef.current.contains(event.target as Node)) {
+                setIsGenreMenuOpen(false);
             }
-            if (ratingRef.current && !ratingRef.current.contains(event.target as Node)) {
-                setIsRatingOpen(false);
+            if (ratingMenuRef.current && !ratingMenuRef.current.contains(event.target as Node)) {
+                setIsRatingMenuOpen(false);
             }
-            if (uploadRef.current && !uploadRef.current.contains(event.target as Node)) {
-                setUploadMenuOpen(false);
+            if (uploadMenuRef.current && !uploadMenuRef.current.contains(event.target as Node)) {
+                setIsUploadMenuOpen(false);
             }
         };
 
@@ -56,7 +56,7 @@ const Header: React.FC<HeaderProps> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const toggleSearch = () => setIsExpanded(!isExpanded);
+    const toggleSearch = () => setIsSearchExpanded(!isSearchExpanded);
     
     const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -65,8 +65,8 @@ const Header: React.FC<HeaderProps> = ({
     const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (searchTerm.trim()) {
-            nav(`/search/${searchTerm.trim()}`);
-            setIsExpanded(false);
+            navigate(`/search/${searchTerm.trim()}`);
+            setIsSearchExpanded(false);
         }
     };
 
@@ -82,8 +82,8 @@ const Header: React.FC<HeaderProps> = ({
             recognition.onresult = (event: any) => {
                 const transcript = event.results[0][0].transcript;
                 setSearchTerm(transcript);
-                nav(`/search/${transcript}`);
-                setIsExpanded(false);
+                navigate(`/search/${transcript}`);
+                setIsSearchExpanded(false);
             };
 
             recognition.start();
@@ -92,139 +92,160 @@ const Header: React.FC<HeaderProps> = ({
         }
     };
 
-    const handleGenreClick = (genre: string) => {
-        setIsGenreOpen(false);
-        nav(`/category/${genre}`);
+    const handleGenreSelect = (genre: string) => {
+        setIsGenreMenuOpen(false);
+        navigate(`/category/${genre}`);
     };
 
-    const handleRatingClick = (rating: string) => {
-        setIsRatingOpen(false);
-        nav(`/ratings/${rating}`);
+    const handleRatingSelect = (rating: string) => {
+        setIsRatingMenuOpen(false);
+        navigate(`/ratings/${rating}`);
+    };
+
+    const handleUploadVideo = () => {
+        toggleUploadModal?.();
+        setIsUploadMenuOpen(false);
+    };
+
+    const handleUploadScript = () => {
+        toggleUploadScriptModal?.();
+        setIsUploadMenuOpen(false);
+    };
+
+    const handleLogoClick = () => {
+        navigate("/");
     };
 
     return (
-        <header className={`header ${darkMode ? 'dark-mode' : 'light-mode'}`}>
-            <div className="header-content">
-                {/* Left Section */}
-                <div className="header-left">
+        <header className={`header ${darkMode ? 'header--dark' : 'header--light'}`}>
+            <div className="header__container">
+                {/* Left Section - Logo & Menu */}
+                <div className="header__left">
                     <button 
-                        className="menu-btn"
+                        className="header__menu-btn"
                         onClick={toggleSidebar || toggler}
+                        aria-label="Toggle menu"
                     >
                         <MdMenu size={22} />
                     </button>
                     
                     <div 
-                        className="logo"
-                        onClick={() => nav("/")}
+                        className="header__logo"
+                        onClick={handleLogoClick}
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Go to homepage"
                     >
-                        <img src={logo} alt="WeCinema" className="logo-img" />
-                        {!isMobile && <span className="logo-text">WeCinema</span>}
+                        <img src={logo} alt="WeCinema" className="header__logo-img" />
+                        {!isMobile && <span className="header__logo-text">WeCinema</span>}
                     </div>
                 </div>
 
                 {/* Center - Search Bar (Desktop only) */}
                 {!isMobile && (
-                    <div className="search-section">
+                    <div className="header__search">
                         <form className="search-form" onSubmit={handleSearchSubmit}>
-                            <div className="search-box">
-                                <Search size={18} className="search-icon" />
+                            <div className="search-form__input-wrapper">
+                                <Search size={18} className="search-form__icon" />
                                 <input
                                     type="text"
-                                    placeholder="Search movies, shows..."
-                                    className="search-input"
+                                    placeholder="Search movies, shows, actors..."
+                                    className="search-form__input"
                                     value={searchTerm}
                                     onChange={handleSearchInputChange}
+                                    aria-label="Search"
                                 />
                                 {searchTerm && (
                                     <button
                                         type="button"
-                                        className="clear-btn"
+                                        className="search-form__clear-btn"
                                         onClick={() => setSearchTerm("")}
+                                        aria-label="Clear search"
                                     >
                                         <X size={16} />
                                     </button>
                                 )}
                                 <button 
                                     type="button" 
-                                    className={`voice-btn ${isListening ? 'listening' : ''}`}
+                                    className={`search-form__voice-btn ${isListening ? 'search-form__voice-btn--listening' : ''}`}
                                     onClick={handleVoiceSearch}
+                                    aria-label="Voice search"
                                 >
                                     {isListening ? <MdMicOff size={18} /> : <MdMic size={18} />}
                                 </button>
                             </div>
-                            <button type="submit" className="search-btn">
+                            <button type="submit" className="search-form__submit">
                                 Search
                             </button>
                         </form>
                     </div>
                 )}
 
-                {/* Right Section - Controls */}
-                <div className="header-right">
-                    {/* Upload Button */}
-                    <div className="dropdown-wrapper" ref={uploadRef}>
+                {/* Right Section - Action Controls */}
+                <div className="header__right">
+                    {/* Upload Menu */}
+                    <div className="header__dropdown" ref={uploadMenuRef}>
                         <button
-                            className="action-btn upload-btn"
-                            onClick={() => setUploadMenuOpen(!uploadMenuOpen)}
+                            className="header__action-btn header__action-btn--upload"
+                            onClick={() => setIsUploadMenuOpen(!isUploadMenuOpen)}
+                            aria-expanded={isUploadMenuOpen}
+                            aria-label="Upload options"
                         >
                             <FaUpload size={16} />
                         </button>
 
-                        {uploadMenuOpen && (
-                            <div className="dropdown upload-dropdown">
+                        {isUploadMenuOpen && (
+                            <div className="dropdown-menu dropdown-menu--upload">
                                 <button
-                                    className="dropdown-option"
-                                    onClick={() => {
-                                        toggleUploadModal?.();
-                                        setUploadMenuOpen(false);
-                                    }}
+                                    className="dropdown-menu__item"
+                                    onClick={handleUploadVideo}
                                 >
-                                    <FaVideo className="option-icon" />
+                                    <FaVideo className="dropdown-menu__icon" />
                                     <span>Upload Video</span>
                                 </button>
                                 <button
-                                    className="dropdown-option"
-                                    onClick={() => {
-                                        toggleUploadScriptModal?.();
-                                        setUploadMenuOpen(false);
-                                    }}
+                                    className="dropdown-menu__item"
+                                    onClick={handleUploadScript}
                                 >
-                                    <FaFileAlt className="option-icon" />
+                                    <FaFileAlt className="dropdown-menu__icon" />
                                     <span>Upload Script</span>
                                 </button>
                             </div>
                         )}
                     </div>
 
-                    {/* Genre Dropdown */}
-                    <div className="dropdown-wrapper" ref={genreRef}>
+                    {/* Genre Menu */}
+                    <div className="header__dropdown" ref={genreMenuRef}>
                         <button
-                            className="action-btn genre-btn"
+                            className="header__action-btn"
                             onClick={() => {
-                                setIsGenreOpen(!isGenreOpen);
-                                setIsRatingOpen(false);
+                                setIsGenreMenuOpen(!isGenreMenuOpen);
+                                setIsRatingMenuOpen(false);
                             }}
+                            aria-expanded={isGenreMenuOpen}
                         >
                             <span>Genre</span>
-                            <FaChevronDown size={10} className={`arrow ${isGenreOpen ? 'open' : ''}`} />
+                            <FaChevronDown 
+                                size={10} 
+                                className={`header__dropdown-arrow ${isGenreMenuOpen ? 'header__dropdown-arrow--open' : ''}`} 
+                            />
                         </button>
                         
-                        {isGenreOpen && categories && categories.length > 0 && (
-                            <div className="dropdown genre-dropdown">
-                                <div className="dropdown-header">
-                                    <h3 className="dropdown-title">Genres</h3>
-                                    <span className="count-badge">{categories.length}</span>
+                        {isGenreMenuOpen && categories && categories.length > 0 && (
+                            <div className="dropdown-menu dropdown-menu--genre">
+                                <div className="dropdown-menu__header">
+                                    <h3 className="dropdown-menu__title">Genres</h3>
+                                    <span className="dropdown-menu__count">{categories.length}</span>
                                 </div>
-                                <div className="dropdown-list">
+                                <div className="dropdown-menu__list">
                                     {categories.map((genre, index) => (
                                         <button
-                                            key={index}
-                                            className="dropdown-option"
-                                            onClick={() => handleGenreClick(genre)}
+                                            key={`genre-${index}`}
+                                            className="dropdown-menu__item"
+                                            onClick={() => handleGenreSelect(genre)}
                                         >
-                                            <span className="genre-dot"></span>
-                                            <span className="option-text">{genre}</span>
+                                            <span className="dropdown-menu__genre-dot"></span>
+                                            <span className="dropdown-menu__text">{genre}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -232,33 +253,37 @@ const Header: React.FC<HeaderProps> = ({
                         )}
                     </div>
 
-                    {/* Rating Dropdown */}
-                    <div className="dropdown-wrapper" ref={ratingRef}>
+                    {/* Rating Menu */}
+                    <div className="header__dropdown" ref={ratingMenuRef}>
                         <button
-                            className="action-btn rating-btn"
+                            className="header__action-btn"
                             onClick={() => {
-                                setIsRatingOpen(!isRatingOpen);
-                                setIsGenreOpen(false);
+                                setIsRatingMenuOpen(!isRatingMenuOpen);
+                                setIsGenreMenuOpen(false);
                             }}
+                            aria-expanded={isRatingMenuOpen}
                         >
                             <span>Rating</span>
-                            <FaChevronDown size={10} className={`arrow ${isRatingOpen ? 'open' : ''}`} />
+                            <FaChevronDown 
+                                size={10} 
+                                className={`header__dropdown-arrow ${isRatingMenuOpen ? 'header__dropdown-arrow--open' : ''}`} 
+                            />
                         </button>
                         
-                        {isRatingOpen && ratings && ratings.length > 0 && (
-                            <div className="dropdown rating-dropdown">
-                                <div className="dropdown-header">
-                                    <h3 className="dropdown-title">Ratings</h3>
+                        {isRatingMenuOpen && ratings && ratings.length > 0 && (
+                            <div className="dropdown-menu dropdown-menu--rating">
+                                <div className="dropdown-menu__header">
+                                    <h3 className="dropdown-menu__title">Ratings</h3>
                                 </div>
-                                <div className="dropdown-list">
+                                <div className="dropdown-menu__list">
                                     {ratings.map((rating, index) => (
                                         <button
-                                            key={index}
-                                            className="dropdown-option rating-option"
-                                            onClick={() => handleRatingClick(rating)}
+                                            key={`rating-${index}`}
+                                            className="dropdown-menu__item dropdown-menu__item--rating"
+                                            onClick={() => handleRatingSelect(rating)}
                                         >
-                                            <span className="rating-tag">{rating}</span>
-                                            <span className="option-text">{rating}</span>
+                                            <span className="dropdown-menu__rating-tag">{rating}</span>
+                                            <span className="dropdown-menu__text">{rating}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -267,34 +292,37 @@ const Header: React.FC<HeaderProps> = ({
                     </div>
                 </div>
 
-                {/* Mobile Search Button */}
+                {/* Mobile Search */}
                 {isMobile && (
-                    <div className="mobile-search">
+                    <div className="header__mobile-search">
                         <button 
-                            className="mobile-search-btn"
+                            className="header__mobile-search-toggle"
                             onClick={toggleSearch}
+                            aria-label={isSearchExpanded ? "Close search" : "Open search"}
                         >
-                            {isExpanded ? <X size={20} /> : <Search size={20} />}
+                            {isSearchExpanded ? <X size={20} /> : <Search size={20} />}
                         </button>
                         
-                        {isExpanded && (
+                        {isSearchExpanded && (
                             <div className="mobile-search-panel">
                                 <form className="mobile-search-form" onSubmit={handleSearchSubmit}>
-                                    <div className="mobile-search-box">
-                                        <Search size={18} className="mobile-search-icon" />
+                                    <div className="mobile-search-form__input-wrapper">
+                                        <Search size={18} className="mobile-search-form__icon" />
                                         <input
                                             type="text"
                                             placeholder="Search..."
-                                            className="mobile-search-input"
+                                            className="mobile-search-form__input"
                                             value={searchTerm}
                                             onChange={handleSearchInputChange}
                                             autoFocus
+                                            aria-label="Search"
                                         />
                                         {searchTerm && (
                                             <button
                                                 type="button"
-                                                className="mobile-clear-btn"
+                                                className="mobile-search-form__clear-btn"
                                                 onClick={() => setSearchTerm("")}
+                                                aria-label="Clear search"
                                             >
                                                 <X size={16} />
                                             </button>
@@ -302,12 +330,13 @@ const Header: React.FC<HeaderProps> = ({
                                     </div>
                                     <button 
                                         type="button" 
-                                        className="mobile-voice-btn"
+                                        className="mobile-search-form__voice-btn"
                                         onClick={handleVoiceSearch}
+                                        aria-label="Voice search"
                                     >
                                         {isListening ? <MdMicOff size={20} /> : <MdMic size={20} />}
                                     </button>
-                                    <button type="submit" className="mobile-search-submit">
+                                    <button type="submit" className="mobile-search-form__submit">
                                         Go
                                     </button>
                                 </form>
