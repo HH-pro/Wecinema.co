@@ -321,7 +321,7 @@
 
 .search-input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #d69e2e;
   box-shadow: 0 4px 30px rgba(102, 126, 234, 0.2);
 }
 
@@ -341,8 +341,8 @@
 }
 
 .filter-toggle:hover {
-  background: #3498db;
-  border-color: #3498db;
+  background: #d69e2e;
+  border-color: #d69e2e;
   color: white;
 }
 
