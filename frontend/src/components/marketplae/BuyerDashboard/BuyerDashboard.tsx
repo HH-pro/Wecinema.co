@@ -1076,9 +1076,9 @@ const BuyerDashboard: React.FC = () => {
             <button className="refresh-btn" onClick={handleRefresh} disabled={loading}>
               <FaSync className={loading ? 'spinning' : ''} /> {loading ? 'Refreshing...' : 'Refresh'}
             </button>
-            <button className="settings-btn" onClick={() => navigate('/marketplace/settings')}>
+            {/* <button className="settings-btn" onClick={() => navigate('/marketplace/settings')}>
               <FaCog /> Settings
-            </button>
+            </button> */}
           </div>
         </div>
 
