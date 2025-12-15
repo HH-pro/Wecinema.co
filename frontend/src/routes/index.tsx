@@ -29,7 +29,8 @@ import {
   Videos,
   Transactions,
   Settings,
-  Scripts
+  Scripts,
+  OrderDetailsPage
 } from "../pages";
 import Layout from "../components/admin/Layout";
 
@@ -37,7 +38,7 @@ import Layout from "../components/admin/Layout";
 import Browse from "../pages/marketplace/Browse";
 import CreateListing from "../pages/marketplace/CreateListing";
 import SellerDashboard from "../pages/marketplace/SellerDashboard";
-import BuyerDashboard from "../pages/marketplace/BuyerDashboard";
+import BuyerDashboard from "../components/marketplae/BuyerDashboard/BuyerDashboard";
 
 import MyOrders from "../pages/marketplace/MyOrders";
 import OrderDetails from "../pages/marketplace/OrderDetails";
@@ -74,7 +75,8 @@ const Router: React.FC = () => {
           <Route path="/marketplace" element={<Browse />} />
           <Route path="/marketplace/create" element={<CreateListing />} />
           <Route path="/marketplace/dashboard" element={<SellerDashboard />} />
-          <Route path="/marketplace/buyer-dashboard" element={<BuyerDashboard />} />
+    <Route path="/marketplace/buyer-dashboard" element={<BuyerDashboard />} />
+      <Route path="/marketplace/orders/:orderId" element={<OrderDetailsPage />} />
 
           <Route path="/marketplace/my-orders" element={<MyOrders />} />
           <Route path="/marketplace/orders/:orderId" element={<OrderDetails />} />
