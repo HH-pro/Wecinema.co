@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { FaArrowLeft, FaSpinner, FaExclamationCircle } from 'react-icons/fa';
-import MarketplaceLayout from '../../../src/components/Layout/MarketplaceLayout';
+import MarketplaceLayout from '../../../src/components/Layout';
 import { marketplaceAPI } from '../../api';
 import { OrderTimeline, OrderSummary, PaymentDetails } from '../../components/marketplae/BuyerDashboard';
 const OrderDetailsPage: React.FC = () => {
