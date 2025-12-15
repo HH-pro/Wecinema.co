@@ -10,9 +10,6 @@ import './Header.css';
 interface HeaderProps {
     darkMode: boolean;
     toggler: () => void;
- 
-   
-
     toggleSidebar?: () => void;
     expand: boolean;
     isMobile: boolean;
