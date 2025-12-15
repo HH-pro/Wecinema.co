@@ -4,8 +4,7 @@ import { toast } from 'react-toastify';
 import { FaArrowLeft, FaSpinner, FaExclamationCircle } from 'react-icons/fa';
 import MarketplaceLayout from '../../../src/components/Layout/MarketplaceLayout';
 import { marketplaceAPI } from '../../api';
-import { OrderTimeline, OrderSummary, PaymentDetails } from '../../components/marketplae/BuyerDashboard/BuyerDashboard';
-
+import { OrderTimeline, OrderSummary, PaymentDetails } from '../../components/marketplae/BuyerDashboard';
 const OrderDetailsPage: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
   const [searchParams] = useSearchParams();
