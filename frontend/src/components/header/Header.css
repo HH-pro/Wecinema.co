@@ -235,7 +235,7 @@
 }
 
 .search-form__clear-btn:hover {
-  background: var(--color-bg-secondary);
+  background: #ffffff;
   color: var(--color-danger);
 }
 
