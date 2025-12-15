@@ -1507,7 +1507,6 @@ export const completeRevision = orderAPI.completeRevision;
 export const deliverOrder = orderAPI.deliverOrder;
 export const cancelBySeller = orderAPI.cancelBySeller;
 export const updateOrderStatus = orderAPI.updateOrderStatus;
-export const getSellerStats = orderAPI.getSellerStats;
 export const deleteAllOrders = orderAPI.deleteAllOrders;
 
 // Payment exports
@@ -1528,7 +1527,6 @@ export const sendOrderMessage = messageAPI.sendOrderMessage;
 
 // Dashboard exports
 export const getSellerStats = dashboardAPI.getSellerStats;
-export const getBuyerStats = dashboardAPI.getBuyerStats;
 export const getOrderStats = dashboardAPI.getOrderStats;
 export const getRevenueStats = dashboardAPI.getRevenueStats;
 
