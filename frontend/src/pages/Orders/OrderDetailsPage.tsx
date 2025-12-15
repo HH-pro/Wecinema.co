@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { FaArrowLeft, FaSpinner, FaExclamationCircle } from 'react-icons/fa';
-import MarketplaceLayout from '../../Layout/MarketplaceLayout';
-import { marketplaceAPI } from '../../../api';
-import { OrderTimeline, OrderSummary, PaymentDetails } from '../BuyerDashboard/BuyerDashboard';
+import MarketplaceLayout from '../../../src/components/Layout/MarketplaceLayout';
+import { marketplaceAPI } from '../../api';
+import { OrderTimeline, OrderSummary, PaymentDetails } from '../../components/marketplae/BuyerDashboard/BuyerDashboard';
 import './OrderDetailsPage.css';
 
 const OrderDetailsPage: React.FC = () => {
