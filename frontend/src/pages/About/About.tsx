@@ -283,11 +283,19 @@ const About: React.FC = () => {
                 through cutting-edge technology and intuitive design. Built for professionals, 
                 by professionals.
               </p>
+              <div className="cta-buttons">
+                <button className="btn btn-primary btn-large">
+                  <FaUserPlus /> <span className="btn-text">Create Professional Account</span>
+                </button>
+                <button className="btn btn-secondary btn-large">
+                  <FaVideo /> <span className="btn-text">Explore Platform Features</span>
+                </button>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Stats Section - Moved Here */}
+        {/* Stats Section */}
         <section className="platform-stats">
           <div className="container">
             <div className="stats-grid">
@@ -388,6 +396,11 @@ const About: React.FC = () => {
                 </div>
               </div>
             </div>
+            <div className="section-cta">
+              <button className="btn btn-primary btn-large">
+                <FaStore /> <span className="btn-text">Start Selling Content</span>
+              </button>
+            </div>
           </div>
         </section>
 
@@ -485,15 +498,15 @@ const About: React.FC = () => {
                     <div className="personal-social">
                       <a href="https://github.com/hamza-manzoor" target="_blank" rel="noopener noreferrer" className="social-btn">
                         <FaGithub />
-                        <span>GitHub Portfolio</span>
+                        <span className="btn-text">GitHub Portfolio</span>
                       </a>
                       <a href="https://linkedin.com/in/hamza-manzoor" target="_blank" rel="noopener noreferrer" className="social-btn">
                         <FaLinkedin />
-                        <span>LinkedIn Profile</span>
+                        <span className="btn-text">LinkedIn Profile</span>
                       </a>
                       <a href="mailto:contact@wecinema.co" className="social-btn">
                         <FaEnvelope />
-                        <span>Professional Email</span>
+                        <span className="btn-text">Professional Email</span>
                       </a>
                     </div>
                   </div>
@@ -522,8 +535,8 @@ const About: React.FC = () => {
           </div>
         </section>
 
-        {/* CTA Section */}
-        <section className="platform-cta">
+        {/* Final CTA Section */}
+        <section className="final-cta">
           <div className="container">
             <div className="cta-content">
               <h2>Ready to Experience Professional Content Creation?</h2>
@@ -534,50 +547,18 @@ const About: React.FC = () => {
               </p>
               <div className="cta-buttons">
                 <button className="btn btn-primary btn-large">
-                  <FaUserPlus /> Create Professional Account
+                  <FaUserPlus /> <span className="btn-text">Create Professional Account</span>
                 </button>
                 <button className="btn btn-secondary btn-large">
-                  <FaVideo /> Explore Platform Features
+                  <FaVideo /> <span className="btn-text">Explore Platform Features</span>
                 </button>
                 <button className="btn btn-outline btn-large">
-                  <FaStore /> Start Selling Content
+                  <FaStore /> <span className="btn-text">Start Selling Content</span>
                 </button>
               </div>
             </div>
           </div>
         </section>
-
-        {/* Simple Footer */}
-        <footer className="simple-footer">
-          <div className="container">
-            <div className="footer-content">
-              <div className="footer-brand">
-                <h3>WeCinema</h3>
-                <p>Professional Platform for Digital Content</p>
-              </div>
-              <div className="footer-links">
-                <a href="#">Platform Features</a>
-                <a href="#">About Creator</a>
-                <a href="#">Contact</a>
-              </div>
-              <div className="footer-social">
-                <a href="https://github.com/hamza-manzoor" target="_blank" rel="noopener noreferrer">
-                  <FaGithub />
-                </a>
-                <a href="https://linkedin.com/in/hamza-manzoor" target="_blank" rel="noopener noreferrer">
-                  <FaLinkedin />
-                </a>
-                <a href="mailto:contact@wecinema.co">
-                  <FaEnvelope />
-                </a>
-              </div>
-            </div>
-            <div className="footer-copyright">
-              <p>&copy; {new Date().getFullYear()} WeCinema. All rights reserved.</p>
-              <p>Developed by <strong>Hamza Manzoor</strong></p>
-            </div>
-          </div>
-        </footer>
       </div>
     </Layout>
   );
