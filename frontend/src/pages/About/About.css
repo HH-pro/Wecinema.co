@@ -1,4 +1,4 @@
-/* About.css - Professional Version */
+/* About.css - Professional Version with Yellow-500 Buttons */
 .about-page {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   color: #333;
@@ -30,7 +30,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, rgba(0, 123, 255, 0.3), rgba(0, 0, 0, 0.7));
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.3), rgba(0, 0, 0, 0.7));
   mix-blend-mode: multiply;
 }
 
@@ -47,14 +47,14 @@
   font-size: 4rem;
   font-weight: 800;
   margin-bottom: 20px;
-  background: linear-gradient(135deg, #007bff, #0056b3);
+  background: linear-gradient(135deg, #eab308, #ca8a04);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .highlight {
-  background: linear-gradient(135deg, #007bff, #0056b3);
+  background: linear-gradient(135deg, #eab308, #ca8a04);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -109,7 +109,7 @@
 .stat-icon-large {
   font-size: 2.5rem;
   margin-bottom: 15px;
-  color: #007bff;
+  color: #eab308;
 }
 
 .platform-stat h3 {
@@ -150,6 +150,12 @@ section {
   line-height: 1.6;
 }
 
+/* Section CTA */
+.section-cta {
+  text-align: center;
+  margin-top: 50px;
+}
+
 /* Website Features - Professional Design */
 .website-features {
   background: white;
@@ -174,12 +180,12 @@ section {
 .feature-card:hover {
   transform: translateY(-5px);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
-  border-color: #007bff;
+  border-color: #eab308;
 }
 
 .feature-icon {
   font-size: 2.5rem;
-  color: #007bff;
+  color: #eab308;
   margin-bottom: 20px;
   width: 70px;
   height: 70px;
@@ -187,7 +193,7 @@ section {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 123, 255, 0.1);
+  background: rgba(234, 179, 8, 0.1);
 }
 
 .feature-card h3 {
@@ -221,9 +227,9 @@ section {
 }
 
 .feature-card:hover .detail-tag {
-  background: #007bff;
+  background: #eab308;
   color: white;
-  border-color: #007bff;
+  border-color: #eab308;
 }
 
 /* Workflow Section - Professional Design */
@@ -257,8 +263,8 @@ section {
 .step-number {
   font-size: 2.5rem;
   font-weight: 800;
-  color: #007bff;
-  background: rgba(0, 123, 255, 0.1);
+  color: #eab308;
+  background: rgba(234, 179, 8, 0.1);
   width: 70px;
   height: 70px;
   border-radius: 50%;
@@ -266,7 +272,7 @@ section {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  border: 2px solid #007bff;
+  border: 2px solid #eab308;
 }
 
 .step-content h3 {
@@ -292,13 +298,13 @@ section {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #007bff;
+  color: #eab308;
   font-weight: 500;
   font-size: 0.95rem;
 }
 
 .step-features svg {
-  color: #007bff;
+  color: #eab308;
   font-size: 1.1rem;
 }
 
@@ -349,7 +355,7 @@ section {
 
 .feature-icon-small {
   font-size: 1.3rem;
-  color: #007bff;
+  color: #eab308;
   background: white;
   width: 45px;
   height: 45px;
@@ -415,7 +421,7 @@ section {
   bottom: -15px;
   left: 50%;
   transform: translateX(-50%);
-  background: #007bff;
+  background: #eab308;
   color: white;
   padding: 10px 20px;
   border-radius: 25px;
@@ -423,7 +429,7 @@ section {
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 5px 15px rgba(0, 123, 255, 0.3);
+  box-shadow: 0 5px 15px rgba(234, 179, 8, 0.3);
   font-size: 0.9rem;
 }
 
@@ -436,7 +442,7 @@ section {
 
 .personal-details .role {
   font-size: 1.1rem;
-  color: #007bff;
+  color: #eab308;
   font-weight: 600;
   margin-bottom: 25px;
 }
@@ -470,7 +476,7 @@ section {
 }
 
 .personal-stat svg {
-  color: #007bff;
+  color: #eab308;
   font-size: 1.8rem;
 }
 
@@ -517,11 +523,20 @@ section {
 }
 
 .social-btn:hover {
-  background: #007bff;
+  background: #eab308;
   color: white;
-  border-color: #007bff;
+  border-color: #eab308;
   transform: translateY(-3px);
-  box-shadow: 0 5px 15px rgba(0, 123, 255, 0.2);
+  box-shadow: 0 5px 15px rgba(234, 179, 8, 0.2);
+}
+
+.social-btn .btn-text {
+  color: #495057;
+  transition: color 0.3s ease;
+}
+
+.social-btn:hover .btn-text {
+  color: white;
 }
 
 /* Principles Section */
@@ -551,7 +566,7 @@ section {
 
 .principle-icon {
   font-size: 2.5rem;
-  color: #007bff;
+  color: #eab308;
   margin-bottom: 20px;
 }
 
@@ -568,8 +583,8 @@ section {
   font-size: 1rem;
 }
 
-/* CTA Section - Professional Design */
-.platform-cta {
+/* Final CTA Section - Professional Design */
+.final-cta {
   background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
   text-align: center;
   border-top: 1px solid #dee2e6;
@@ -601,7 +616,7 @@ section {
   flex-wrap: wrap;
 }
 
-/* Buttons - Professional Design */
+/* Buttons - Professional Design with Yellow-500 */
 .btn {
   padding: 15px 32px;
   border: none;
@@ -617,30 +632,51 @@ section {
   font-family: inherit;
 }
 
+.btn .btn-text {
+  color: #eab308;
+  transition: color 0.3s ease;
+}
+
 .btn-primary {
-  background: #007bff;
+  background: #eab308;
   color: white;
-  box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2);
+  box-shadow: 0 4px 15px rgba(234, 179, 8, 0.2);
+}
+
+.btn-primary .btn-text {
+  color: white;
 }
 
 .btn-primary:hover {
-  background: #0056b3;
+  background: #ca8a04;
   transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(0, 123, 255, 0.3);
+  box-shadow: 0 6px 20px rgba(234, 179, 8, 0.3);
+}
+
+.btn-primary:hover .btn-text {
+  color: white;
 }
 
 .btn-secondary {
   background: white;
-  color: #007bff;
-  border: 2px solid #007bff;
+  color: #eab308;
+  border: 2px solid #eab308;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
 }
 
+.btn-secondary .btn-text {
+  color: #eab308;
+}
+
 .btn-secondary:hover {
-  background: #007bff;
+  background: #eab308;
   color: white;
   transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(0, 123, 255, 0.2);
+  box-shadow: 0 6px 20px rgba(234, 179, 8, 0.2);
+}
+
+.btn-secondary:hover .btn-text {
+  color: white;
 }
 
 .btn-outline {
@@ -649,98 +685,24 @@ section {
   border: 2px solid #dee2e6;
 }
 
+.btn-outline .btn-text {
+  color: #495057;
+}
+
 .btn-outline:hover {
   background: #f8f9fa;
-  border-color: #adb5bd;
-  color: #212529;
+  border-color: #eab308;
+  color: #eab308;
   transform: translateY(-3px);
+}
+
+.btn-outline:hover .btn-text {
+  color: #eab308;
 }
 
 .btn-large {
   padding: 18px 36px;
   font-size: 1.1rem;
-}
-
-/* Simple Footer - Professional Design */
-.simple-footer {
-  background: #2c3e50;
-  color: white;
-  padding: 50px 0 30px;
-}
-
-.footer-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 30px;
-  flex-wrap: wrap;
-  gap: 30px;
-}
-
-.footer-brand h3 {
-  font-size: 1.8rem;
-  margin-bottom: 10px;
-  color: white;
-}
-
-.footer-brand p {
-  color: #b0b0b0;
-  font-size: 1rem;
-}
-
-.footer-links {
-  display: flex;
-  gap: 25px;
-}
-
-.footer-links a {
-  color: #b0b0b0;
-  text-decoration: none;
-  transition: color 0.3s ease;
-  font-size: 1rem;
-}
-
-.footer-links a:hover {
-  color: white;
-}
-
-.footer-social {
-  display: flex;
-  gap: 15px;
-}
-
-.footer-social a {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 1.1rem;
-  transition: all 0.3s ease;
-}
-
-.footer-social a:hover {
-  background: #007bff;
-  transform: translateY(-3px);
-}
-
-.footer-copyright {
-  text-align: center;
-  padding-top: 30px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  color: #b0b0b0;
-  font-size: 0.9rem;
-}
-
-.footer-copyright p {
-  margin: 5px 0;
-}
-
-.footer-copyright strong {
-  color: white;
 }
 
 /* Responsive Design */
@@ -752,16 +714,6 @@ section {
   .personal-info {
     grid-template-columns: 1fr;
     gap: 40px;
-  }
-  
-  .footer-content {
-    flex-direction: column;
-    text-align: center;
-    gap: 20px;
-  }
-  
-  .footer-links {
-    justify-content: center;
   }
 }
 
