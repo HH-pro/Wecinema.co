@@ -48,17 +48,7 @@ import {
   FaQrcode,
   FaWallet,
   FaTrophy,
-  FaHeart,
-  FaBook,
-  FaBlog,
-  FaQuestionCircle,
-  FaFileContract,
-  FaCookie,
-  FaNewspaper,
-  FaInfoCircle,
-  FaPaperPlane,
-  FaYoutube,
-  FaArrowRight
+  FaHeart
 } from 'react-icons/fa';
 import './About.css';
 
@@ -76,27 +66,10 @@ interface WebsiteFeature {
   details: string[];
 }
 
-interface TechStack {
-  category: string;
-  technologies: string[];
-}
-
-interface Principle {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-}
-
 interface Stat {
   number: string;
   label: string;
   icon: React.ReactNode;
-}
-
-interface JourneyItem {
-  date: string;
-  title: string;
-  description: string;
 }
 
 const About: React.FC = () => {
@@ -104,7 +77,7 @@ const About: React.FC = () => {
     {
       icon: <FaUpload />,
       title: 'Video Upload & Management',
-      description: 'Seamless video uploading and content management system',
+      description: 'Seamless video uploading and content management system with 4K support and batch processing',
       details: [
         '4K video support',
         'Batch uploads',
@@ -116,7 +89,7 @@ const About: React.FC = () => {
     {
       icon: <FaUserPlus />,
       title: 'User Registration & Profiles',
-      description: 'Comprehensive user management system',
+      description: 'Comprehensive user management with social login and profile customization',
       details: [
         'Social login options',
         'Profile customization',
@@ -128,7 +101,7 @@ const About: React.FC = () => {
     {
       icon: <FaRobot />,
       title: 'AI Chatbot Assistant',
-      description: 'Intelligent chatbot for customer support',
+      description: 'Intelligent chatbot for 24/7 customer support and automated responses',
       details: [
         '24/7 availability',
         'Multi-language support',
@@ -140,7 +113,7 @@ const About: React.FC = () => {
     {
       icon: <FaBolt />,
       title: 'HypeMode Feature',
-      description: 'Advanced engagement and promotion system',
+      description: 'Advanced engagement system for live streaming and audience interaction',
       details: [
         'Live streaming',
         'Interactive polls',
@@ -152,7 +125,7 @@ const About: React.FC = () => {
     {
       icon: <FaStore />,
       title: 'Seller Marketplace',
-      description: 'Complete e-commerce platform for sellers',
+      description: 'Complete e-commerce platform with inventory management and sales analytics',
       details: [
         'Product listings',
         'Inventory management',
@@ -164,7 +137,7 @@ const About: React.FC = () => {
     {
       icon: <FaShoppingCart />,
       title: 'Buyer Order System',
-      description: 'Streamlined purchasing experience',
+      description: 'Streamlined purchasing experience with multiple payment options',
       details: [
         'Cart management',
         'Multiple payment options',
@@ -176,7 +149,7 @@ const About: React.FC = () => {
     {
       icon: <FaComments />,
       title: 'Live Chat System',
-      description: 'Real-time communication platform',
+      description: 'Real-time communication platform for instant seller-buyer interaction',
       details: [
         'Seller-buyer messaging',
         'File sharing',
@@ -188,7 +161,7 @@ const About: React.FC = () => {
     {
       icon: <FaShieldAlt />,
       title: 'Secure Transactions',
-      description: 'Protected payment processing',
+      description: 'Protected payment processing with enterprise-level security',
       details: [
         'SSL encryption',
         'PCI compliance',
@@ -203,13 +176,13 @@ const About: React.FC = () => {
     {
       icon: <FaSync />,
       title: 'Order Processing',
-      description: 'Automated order workflow management',
+      description: 'Automated order workflow management system',
       category: 'Workflow'
     },
     {
       icon: <FaCog />,
       title: 'Custom Requirements',
-      description: 'Flexible customization options for orders',
+      description: 'Flexible customization options for all orders',
       category: 'Workflow'
     },
     {
@@ -227,19 +200,19 @@ const About: React.FC = () => {
     {
       icon: <FaTrophy />,
       title: 'Achievement System',
-      description: 'Gamified rewards and recognition',
+      description: 'Gamified rewards and recognition system',
       category: 'Engagement'
     },
     {
       icon: <FaHeart />,
       title: 'Favorites System',
-      description: 'Personalized content curation',
+      description: 'Personalized content curation tools',
       category: 'User Experience'
     },
     {
       icon: <FaBell />,
       title: 'Smart Notifications',
-      description: 'Real-time alerts and updates',
+      description: 'Real-time alerts and updates system',
       category: 'Communication'
     },
     {
@@ -250,47 +223,20 @@ const About: React.FC = () => {
     }
   ];
 
-  const techStack: TechStack[] = [
-    {
-      category: 'Frontend',
-      technologies: ['React.js', 'TypeScript', 'Next.js', 'Tailwind CSS', 'Redux', 'WebSocket']
-    },
-    {
-      category: 'Backend',
-      technologies: ['Node.js', 'Express.js', 'Python', 'Django', 'GraphQL', 'REST API']
-    },
-    {
-      category: 'Database',
-      technologies: ['MongoDB', 'PostgreSQL', 'Redis', 'Firebase', 'Elasticsearch']
-    },
-    {
-      category: 'Cloud & DevOps',
-      technologies: ['AWS', 'Docker', 'Kubernetes', 'CI/CD', 'Nginx', 'PM2']
-    },
-    {
-      category: 'AI/ML',
-      technologies: ['TensorFlow', 'OpenAI', 'ChatGPT', 'Computer Vision', 'NLP']
-    },
-    {
-      category: 'Payment',
-      technologies: ['Stripe', 'PayPal', 'Razorpay', 'Wallet System', 'Escrow']
-    }
-  ];
-
   const stats: Stat[] = [
-    { number: '100K+', label: 'Registered Users', icon: <FaUsers /> },
-    { number: '50K+', label: 'Video Uploads', icon: <FaVideo /> },
-    { number: '10K+', label: 'Active Sellers', icon: <FaStore /> },
-    { number: '95%', label: 'Satisfaction Rate', icon: <FaStar /> },
-    { number: '24/7', label: 'Uptime', icon: <FaGlobe /> },
-    { number: '99.9%', label: 'Security Score', icon: <FaLock /> }
+    { number: '500K+', label: 'Monthly Active Users', icon: <FaUsers /> },
+    { number: '1M+', label: 'Total Video Uploads', icon: <FaVideo /> },
+    { number: '50K+', label: 'Verified Sellers', icon: <FaStore /> },
+    { number: '98%', label: 'Customer Satisfaction', icon: <FaStar /> },
+    { number: '99.9%', label: 'Platform Uptime', icon: <FaGlobe /> },
+    { number: '24/7', label: 'Support Available', icon: <FaComments /> }
   ];
 
-  const teamPrinciples: Principle[] = [
+  const teamPrinciples = [
     {
       icon: <FaCode />,
       title: 'Technical Excellence',
-      description: 'Building with cutting-edge technologies and best practices'
+      description: 'Building with cutting-edge technologies and industry best practices'
     },
     {
       icon: <FaPaintBrush />,
@@ -306,34 +252,6 @@ const About: React.FC = () => {
       icon: <FaUsers />,
       title: 'User Centric',
       description: 'Focusing on solving real problems for our users'
-    }
-  ];
-
-  const journey: JourneyItem[] = [
-    {
-      date: '2022 Q4',
-      title: 'Concept & Planning',
-      description: 'Identified market gap for creator-focused platform. Designed initial architecture and feature set.'
-    },
-    {
-      date: '2023 Q1',
-      title: 'Core Development',
-      description: 'Built authentication, video upload, and basic marketplace features. Implemented real-time chat.'
-    },
-    {
-      date: '2023 Q2',
-      title: 'Feature Expansion',
-      description: 'Added HypeMode, AI chatbot, advanced analytics, and payment integration with escrow system.'
-    },
-    {
-      date: '2023 Q3',
-      title: 'Testing & Optimization',
-      description: 'Conducted extensive testing, performance optimization, and security audits. Prepared for launch.'
-    },
-    {
-      date: '2023 Q4',
-      title: 'Launch & Growth',
-      description: 'Official launch with initial user base. Continuous improvements based on user feedback.'
     }
   ];
 
@@ -355,24 +273,31 @@ const About: React.FC = () => {
           <div className="container">
             <div className="hero-content">
               <h1 className="hero-title">
-                Welcome to <span className="highlight">WeCinema.co</span>
+                Welcome to <span className="highlight">WeCinema</span>
               </h1>
               <p className="hero-subtitle">
-                Revolutionizing Digital Content Creation & Consumption
+                The Professional Platform for Digital Content Creation
               </p>
               <p className="hero-description">
-                A complete ecosystem for video creators and consumers, built with cutting-edge technology 
-                and user-centric design. Experience the future of digital content today.
+                WeCinema is a comprehensive platform that empowers creators and engages audiences 
+                through cutting-edge technology and intuitive design. Built for professionals, 
+                by professionals.
               </p>
-              <div className="hero-stats">
-                {stats.slice(0, 4).map((stat, index) => (
-                  <div key={index} className="stat-item">
-                    <div className="stat-icon">{stat.icon}</div>
-                    <h3>{stat.number}</h3>
-                    <p>{stat.label}</p>
-                  </div>
-                ))}
-              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Stats Section - Moved Here */}
+        <section className="platform-stats">
+          <div className="container">
+            <div className="stats-grid">
+              {stats.map((stat, index) => (
+                <div key={index} className="platform-stat">
+                  <div className="stat-icon-large">{stat.icon}</div>
+                  <h3>{stat.number}</h3>
+                  <p>{stat.label}</p>
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -382,7 +307,7 @@ const About: React.FC = () => {
           <div className="container">
             <div className="section-header">
               <h2>Platform Features</h2>
-              <p>Everything You Need in One Powerful Platform</p>
+              <p>Comprehensive Tools for Content Creators and Consumers</p>
             </div>
             <div className="features-grid">
               {websiteFeatures.map((feature, index) => (
@@ -408,14 +333,14 @@ const About: React.FC = () => {
           <div className="container">
             <div className="section-header">
               <h2>How It Works</h2>
-              <p>Simple, Powerful, and Efficient Workflow</p>
+              <p>Streamlined Process from Creation to Consumption</p>
             </div>
             <div className="workflow-steps">
               <div className="workflow-step">
                 <div className="step-number">1</div>
                 <div className="step-content">
                   <h3>Content Creation & Upload</h3>
-                  <p>Sellers upload videos with detailed descriptions, pricing, and requirements</p>
+                  <p>Sellers upload videos with detailed descriptions, pricing, and requirements. Platform supports multiple formats and automatic optimization.</p>
                   <div className="step-features">
                     <span><FaUpload /> Video Upload</span>
                     <span><FaCog /> Custom Requirements</span>
@@ -428,7 +353,7 @@ const About: React.FC = () => {
                 <div className="step-number">2</div>
                 <div className="step-content">
                   <h3>Buyer Discovery & Order</h3>
-                  <p>Buyers browse listings, communicate with sellers, and place orders</p>
+                  <p>Buyers browse listings, communicate with sellers via live chat, and place orders with secure payment options.</p>
                   <div className="step-features">
                     <span><FaShoppingCart /> Order Placement</span>
                     <span><FaComments /> Live Chat</span>
@@ -441,7 +366,7 @@ const About: React.FC = () => {
                 <div className="step-number">3</div>
                 <div className="step-content">
                   <h3>Order Processing & Delivery</h3>
-                  <p>Sellers deliver content, buyers review, and payments are processed</p>
+                  <p>Sellers deliver content, buyers review, and payments are processed securely through our escrow system.</p>
                   <div className="step-features">
                     <span><FaSync /> Order Processing</span>
                     <span><FaVideo /> Content Delivery</span>
@@ -454,7 +379,7 @@ const About: React.FC = () => {
                 <div className="step-number">4</div>
                 <div className="step-content">
                   <h3>Community & Engagement</h3>
-                  <p>Users interact, share feedback, and grow within the community</p>
+                  <p>Users interact through reviews, ratings, and participate in HypeMode events for enhanced engagement.</p>
                   <div className="step-features">
                     <span><FaStar /> Reviews & Ratings</span>
                     <span><FaBolt /> HypeMode Engagement</span>
@@ -471,7 +396,7 @@ const About: React.FC = () => {
           <div className="container">
             <div className="section-header">
               <h2>Advanced Features</h2>
-              <p>Powerful Tools to Enhance Your Experience</p>
+              <p>Enhanced Capabilities for Professional Users</p>
             </div>
             <div className="features-categories">
               {Object.keys(groupedFeatures).map((category) => (
@@ -494,61 +419,12 @@ const About: React.FC = () => {
           </div>
         </section>
 
-        {/* Technology Stack */}
-        <section className="tech-stack-section">
-          <div className="container">
-            <div className="section-header">
-              <h2>Technology Stack</h2>
-              <p>Modern Technologies Powering WeCinema</p>
-            </div>
-            <div className="tech-grid">
-              {techStack.map((stack, index) => (
-                <div key={index} className="tech-category">
-                  <div className="tech-category-header">
-                    <h3>{stack.category}</h3>
-                    <div className="tech-count">{stack.technologies.length} tools</div>
-                  </div>
-                  <div className="tech-tags">
-                    {stack.technologies.map((tech, idx) => (
-                      <span key={idx} className="tech-tag">
-                        {tech}
-                        <span className="tech-tag-icon">
-                          {idx % 3 === 0 ? <FaCode /> : 
-                           idx % 3 === 1 ? <FaCog /> : <FaBolt />}
-                        </span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="tech-stats">
-              <div className="tech-stat">
-                <h4>99.9%</h4>
-                <p>Uptime</p>
-              </div>
-              <div className="tech-stat">
-                <h4>⚡</h4>
-                <p>Fast Performance</p>
-              </div>
-              <div className="tech-stat">
-                <h4>🛡️</h4>
-                <p>Enterprise Security</p>
-              </div>
-              <div className="tech-stat">
-                <h4>📈</h4>
-                <p>Scalable Architecture</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
         {/* About Me Section */}
         <section className="personal-section">
           <div className="container">
             <div className="section-header">
-              <h2>Meet the Developer</h2>
-              <p>The Visionary Behind WeCinema</p>
+              <h2>About the Creator</h2>
+              <p>Professional Developer Behind WeCinema</p>
             </div>
             <div className="personal-content">
               <div className="personal-info">
@@ -567,14 +443,16 @@ const About: React.FC = () => {
                   
                   <div className="personal-bio">
                     <p>
-                      As the creator of WeCinema, I combine technical expertise with creative vision to build 
-                      platforms that solve real-world problems. With 5+ years in full-stack development, 
-                      I've crafted WeCinema to be more than just a platform - it's a complete ecosystem 
-                      for content creators and consumers.
+                      As the creator of WeCinema, I bring together technical expertise and creative 
+                      vision to build platforms that solve real-world problems. With extensive experience 
+                      in full-stack development, I've designed WeCinema to be a comprehensive ecosystem 
+                      that serves both content creators and consumers.
                     </p>
                     <p>
-                      My philosophy is simple: Build fast, test rigorously, and always prioritize user 
-                      experience. Every feature in WeCinema is designed with purpose and precision.
+                      My approach combines modern development practices with user-centric design, 
+                      ensuring that every feature in WeCinema is not only functional but also intuitive 
+                      and efficient. The platform represents years of dedication to creating the ultimate 
+                      digital content experience.
                     </p>
                   </div>
                   
@@ -583,43 +461,39 @@ const About: React.FC = () => {
                       <FaCode />
                       <div>
                         <h4>5+ Years</h4>
-                        <p>Experience</p>
+                        <p>Development Experience</p>
                       </div>
                     </div>
                     <div className="personal-stat">
                       <FaProjectDiagram />
                       <div>
                         <h4>100+</h4>
-                        <p>Projects</p>
+                        <p>Projects Completed</p>
                       </div>
                     </div>
                     <div className="personal-stat">
                       <FaAward />
                       <div>
                         <h4>Expert</h4>
-                        <p>MERN Stack</p>
+                        <p>MERN Stack Developer</p>
                       </div>
                     </div>
                   </div>
                   
                   <div className="personal-contact">
-                    <h4>Connect With Me</h4>
+                    <h4>Professional Contact</h4>
                     <div className="personal-social">
                       <a href="https://github.com/hamza-manzoor" target="_blank" rel="noopener noreferrer" className="social-btn">
                         <FaGithub />
-                        <span>GitHub</span>
+                        <span>GitHub Portfolio</span>
                       </a>
                       <a href="https://linkedin.com/in/hamza-manzoor" target="_blank" rel="noopener noreferrer" className="social-btn">
                         <FaLinkedin />
-                        <span>LinkedIn</span>
+                        <span>LinkedIn Profile</span>
                       </a>
-                      <a href="https://twitter.com/hamza_manzoor" target="_blank" rel="noopener noreferrer" className="social-btn">
-                        <FaTwitter />
-                        <span>Twitter</span>
-                      </a>
-                      <a href="mailto:hamza@wecinema.co" className="social-btn">
+                      <a href="mailto:contact@wecinema.co" className="social-btn">
                         <FaEnvelope />
-                        <span>Email</span>
+                        <span>Professional Email</span>
                       </a>
                     </div>
                   </div>
@@ -629,77 +503,19 @@ const About: React.FC = () => {
           </div>
         </section>
 
-        {/* Development Journey */}
-        <section className="journey-section">
+        {/* Development Principles */}
+        <section className="principles-section">
           <div className="container">
             <div className="section-header">
-              <h2>Development Journey</h2>
-              <p>From Vision to Reality: The WeCinema Story</p>
+              <h2>Development Philosophy</h2>
+              <p>Principles That Guide Our Platform Development</p>
             </div>
-            <div className="journey-container">
-              <div className="journey-timeline">
-                {journey.map((item, index) => (
-                  <div key={index} className={`timeline-item ${index % 2 === 0 ? 'left' : 'right'}`}>
-                    <div className="timeline-content">
-                      <div className="timeline-date">
-                        <span className="date-badge">{item.date}</span>
-                      </div>
-                      <div className="timeline-card">
-                        <div className="timeline-icon">
-                          {index === 0 && <FaLightbulb />}
-                          {index === 1 && <FaCode />}
-                          {index === 2 && <FaRocket />}
-                          {index === 3 && <FaTools />}
-                          {index === 4 && <FaTrophy />}
-                        </div>
-                        <h3>{item.title}</h3>
-                        <p>{item.description}</p>
-                        <div className="timeline-progress">
-                          <div className="progress-bar" style={{ width: `${(index + 1) * 20}%` }}></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="journey-stats">
-                <div className="journey-stat">
-                  <h4>12+</h4>
-                  <p>Months of Development</p>
-                </div>
-                <div className="journey-stat">
-                  <h4>50K+</h4>
-                  <p>Lines of Code</p>
-                </div>
-                <div className="journey-stat">
-                  <h4>100+</h4>
-                  <p>Features Implemented</p>
-                </div>
-                <div className="journey-stat">
-                  <h4>24/7</h4>
-                  <p>Continuous Improvement</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Stats Section */}
-        <section className="platform-stats">
-          <div className="container">
-            <div className="section-header">
-              <h2>Platform Statistics</h2>
-              <p>Numbers That Speak Volumes</p>
-            </div>
-            <div className="stats-grid">
-              {stats.map((stat, index) => (
-                <div key={index} className="platform-stat">
-                  <div className="stat-icon-large">{stat.icon}</div>
-                  <h3>{stat.number}</h3>
-                  <p>{stat.label}</p>
-                  <div className="stat-progress">
-                    <div className="progress-bar" style={{ width: `${85 + index * 2}%` }}></div>
-                  </div>
+            <div className="principles-grid">
+              {teamPrinciples.map((principle, index) => (
+                <div key={index} className="principle-card">
+                  <div className="principle-icon">{principle.icon}</div>
+                  <h3>{principle.title}</h3>
+                  <p>{principle.description}</p>
                 </div>
               ))}
             </div>
@@ -710,129 +526,55 @@ const About: React.FC = () => {
         <section className="platform-cta">
           <div className="container">
             <div className="cta-content">
-              <h2>Ready to Transform Your Content Experience?</h2>
+              <h2>Ready to Experience Professional Content Creation?</h2>
               <p>
-                Join thousands of creators and consumers who are already enjoying the WeCinema 
-                revolution. Start your journey today!
+                Join thousands of professional creators and consumers who trust WeCinema for 
+                their digital content needs. Experience the difference of a professionally 
+                developed platform.
               </p>
               <div className="cta-buttons">
                 <button className="btn btn-primary btn-large">
-                  <FaUserPlus /> Sign Up Free
+                  <FaUserPlus /> Create Professional Account
                 </button>
                 <button className="btn btn-secondary btn-large">
-                  <FaVideo /> Watch Demo
+                  <FaVideo /> Explore Platform Features
                 </button>
                 <button className="btn btn-outline btn-large">
-                  <FaStore /> Become a Seller
+                  <FaStore /> Start Selling Content
                 </button>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Footer */}
-        <footer className="platform-footer">
-          <div className="footer-waves">
-            <div className="wave wave1"></div>
-            <div className="wave wave2"></div>
-            <div className="wave wave3"></div>
-          </div>
+        {/* Simple Footer */}
+        <footer className="simple-footer">
           <div className="container">
             <div className="footer-content">
               <div className="footer-brand">
-                <div className="footer-logo">
-                  <FaFilm className="logo-icon" />
-                  <h3>WeCinema.co</h3>
-                </div>
-                <p className="footer-tagline">
-                  Empowering creators, delighting consumers, building the future of digital content.
-                </p>
-                <div className="footer-social">
-                  <a href="#" className="social-circle">
-                    <FaGithub />
-                  </a>
-                  <a href="#" className="social-circle">
-                    <FaTwitter />
-                  </a>
-                  <a href="#" className="social-circle">
-                    <FaLinkedin />
-                  </a>
-                  <a href="#" className="social-circle">
-                    <FaEnvelope />
-                  </a>
-                  <a href="#" className="social-circle">
-                    <FaYoutube />
-                  </a>
-                </div>
-                <div className="footer-newsletter">
-                  <h4>Stay Updated</h4>
-                  <div className="newsletter-form">
-                    <input type="email" placeholder="Enter your email" />
-                    <button className="btn-newsletter">
-                      <FaPaperPlane />
-                    </button>
-                  </div>
-                </div>
+                <h3>WeCinema</h3>
+                <p>Professional Platform for Digital Content</p>
               </div>
-              
-              <div className="footer-links-container">
-                <div className="footer-links">
-                  <div className="link-group">
-                    <h4>Platform</h4>
-                    <a href="#"><FaRocket /> Features</a>
-                    <a href="#"><FaChartLine /> Pricing</a>
-                    <a href="#"><FaCode /> API</a>
-                    <a href="#"><FaServer /> Status</a>
-                  </div>
-                  <div className="link-group">
-                    <h4>Resources</h4>
-                    <a href="#"><FaBook /> Documentation</a>
-                    <a href="#"><FaBlog /> Blog</a>
-                    <a href="#"><FaUsers /> Community</a>
-                    <a href="#"><FaQuestionCircle /> Support</a>
-                  </div>
-                  <div className="link-group">
-                    <h4>Legal</h4>
-                    <a href="#"><FaShieldAlt /> Privacy Policy</a>
-                    <a href="#"><FaFileContract /> Terms</a>
-                    <a href="#"><FaCookie /> Cookies</a>
-                    <a href="#"><FaLock /> Security</a>
-                  </div>
-                  <div className="link-group">
-                    <h4>Company</h4>
-                    <a href="#"><FaInfoCircle /> About</a>
-                    <a href="#"><FaBriefcase /> Careers</a>
-                    <a href="#"><FaNewspaper /> Press</a>
-                    <a href="#"><FaHandshake /> Partners</a>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="footer-divider"></div>
-            
-            <div className="footer-bottom">
-              <div className="footer-copyright">
-                <p>&copy; {new Date().getFullYear()} <strong>WeCinema.co</strong>. All rights reserved.</p>
-                <p>Built with <FaHeart className="heart-icon" /> by <strong>Hamza Manzoor</strong></p>
-              </div>
-              <div className="footer-badges">
-                <span className="badge">
-                  <FaShieldAlt /> Secure Platform
-                </span>
-                <span className="badge">
-                  <FaBolt /> High Performance
-                </span>
-                <span className="badge">
-                  <FaGlobe /> Global Service
-                </span>
-              </div>
-              <div className="footer-extra">
-                <a href="#">Sitemap</a>
-                <a href="#">Accessibility</a>
-                <a href="#">Report Issue</a>
+              <div className="footer-links">
+                <a href="#">Platform Features</a>
+                <a href="#">About Creator</a>
                 <a href="#">Contact</a>
               </div>
+              <div className="footer-social">
+                <a href="https://github.com/hamza-manzoor" target="_blank" rel="noopener noreferrer">
+                  <FaGithub />
+                </a>
+                <a href="https://linkedin.com/in/hamza-manzoor" target="_blank" rel="noopener noreferrer">
+                  <FaLinkedin />
+                </a>
+                <a href="mailto:contact@wecinema.co">
+                  <FaEnvelope />
+                </a>
+              </div>
+            </div>
+            <div className="footer-copyright">
+              <p>&copy; {new Date().getFullYear()} WeCinema. All rights reserved.</p>
+              <p>Developed by <strong>Hamza Manzoor</strong></p>
             </div>
           </div>
         </footer>
