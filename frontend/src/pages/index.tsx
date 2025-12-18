@@ -29,6 +29,8 @@ export { default as Signin   } from "./admin/Signin";
 export { default as Dashboard   } from "./admin/Dashboard";
 export { default as Scripts   } from "./admin/Scripts";
 export { default as Domain   } from "./admin/AddDomain";
+export { default as About   } from "./About/About";
+
 
 
 
