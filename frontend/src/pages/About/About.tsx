@@ -1,4 +1,5 @@
 import React from 'react';
+import { Layout } from "../components";
 import { 
   FaCode,
   FaPaintBrush,
@@ -25,516 +26,645 @@ import {
   FaStar,
   FaLightbulb,
   FaUsers,
-  FaHandshake
+  FaHandshake,
+  FaVideo,
+  FaFilm,
+  FaUpload,
+  FaUserPlus,
+  FaRobot,
+  FaShoppingCart,
+  FaStore,
+  FaComments,
+  FaShieldAlt,
+  FaBolt,
+  FaGlobe,
+  FaLayerGroup,
+  FaBell,
+  FaChartLine,
+  FaLock,
+  FaSync,
+  FaCog,
+  FaQrcode,
+  FaWallet,
+  FaTrophy,
+  FaHeart
 } from 'react-icons/fa';
 import './About.css';
 
-interface Skill {
-  name: string;
-  level: number;
+interface Feature {
   icon: React.ReactNode;
+  title: string;
+  description: string;
   category: string;
 }
 
-interface Project {
-  name: string;
+interface WebsiteFeature {
+  icon: React.ReactNode;
+  title: string;
   description: string;
-  tech: string[];
-  link?: string;
-  image: string;
-}
-
-interface Experience {
-  year: string;
-  role: string;
-  company: string;
-  description: string;
+  details: string[];
 }
 
 const About: React.FC = () => {
-  const skills: Skill[] = [
-    { name: 'React.js', level: 95, icon: <FaReact />, category: 'Frontend' },
-    { name: 'TypeScript', level: 90, icon: <FaCode />, category: 'Frontend' },
-    { name: 'Node.js', level: 88, icon: <FaNodeJs />, category: 'Backend' },
-    { name: 'Python', level: 85, icon: <FaPython />, category: 'Backend' },
-    { name: 'UI/UX Design', level: 92, icon: <FaPaintBrush />, category: 'Design' },
-    { name: 'MongoDB', level: 87, icon: <FaDatabase />, category: 'Database' },
-    { name: 'AWS', level: 80, icon: <FaCloud />, category: 'DevOps' },
-    { name: 'React Native', level: 82, icon: <FaMobileAlt />, category: 'Mobile' },
-    { name: 'Figma', level: 90, icon: <FaFigma />, category: 'Design' },
-    { name: 'Express.js', level: 86, icon: <FaServer />, category: 'Backend' },
-  ];
-
-  const projects: Project[] = [
+  const websiteFeatures: WebsiteFeature[] = [
     {
-      name: 'WeCinema',
-      description: 'A premium movie streaming platform with advanced features and user-friendly interface.',
-      tech: ['React', 'TypeScript', 'Node.js', 'MongoDB', 'AWS'],
-      image: 'https://images.unsplash.com/photo-1489599809516-9827b6d1cf13?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80'
+      icon: <FaUpload />,
+      title: 'Video Upload & Management',
+      description: 'Seamless video uploading and content management system',
+      details: [
+        '4K video support',
+        'Batch uploads',
+        'Auto-encoding',
+        'Thumbnail generation',
+        'Content organization'
+      ]
     },
     {
-      name: 'E-Commerce Platform',
-      description: 'Full-stack e-commerce solution with payment integration and admin dashboard.',
-      tech: ['Next.js', 'TypeScript', 'Stripe', 'PostgreSQL'],
-      image: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80'
+      icon: <FaUserPlus />,
+      title: 'User Registration & Profiles',
+      description: 'Comprehensive user management system',
+      details: [
+        'Social login options',
+        'Profile customization',
+        'Verification system',
+        'Role-based access',
+        'Privacy controls'
+      ]
     },
     {
-      name: 'Task Management App',
-      description: 'Collaborative project management tool with real-time updates and team features.',
-      tech: ['React Native', 'Socket.io', 'Redis', 'MongoDB'],
-      image: 'https://images.unsplash.com/photo-1611224923853-80b023f02d71?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80'
+      icon: <FaRobot />,
+      title: 'AI Chatbot Assistant',
+      description: 'Intelligent chatbot for customer support',
+      details: [
+        '24/7 availability',
+        'Multi-language support',
+        'Context-aware responses',
+        'Ticket escalation',
+        'Learning capabilities'
+      ]
     },
     {
-      name: 'Healthcare Portal',
-      description: 'Patient management system with appointment scheduling and telemedicine features.',
-      tech: ['Vue.js', 'Python', 'Django', 'PostgreSQL'],
-      image: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80'
+      icon: <FaBolt />,
+      title: 'HypeMode Feature',
+      description: 'Advanced engagement and promotion system',
+      details: [
+        'Live streaming',
+        'Interactive polls',
+        'Gamification',
+        'Real-time analytics',
+        'Audience engagement'
+      ]
+    },
+    {
+      icon: <FaStore />,
+      title: 'Seller Marketplace',
+      description: 'Complete e-commerce platform for sellers',
+      details: [
+        'Product listings',
+        'Inventory management',
+        'Price customization',
+        'Promotional tools',
+        'Sales analytics'
+      ]
+    },
+    {
+      icon: <FaShoppingCart />,
+      title: 'Buyer Order System',
+      description: 'Streamlined purchasing experience',
+      details: [
+        'Cart management',
+        'Multiple payment options',
+        'Order tracking',
+        'Review system',
+        'Wishlist feature'
+      ]
+    },
+    {
+      icon: <FaComments />,
+      title: 'Live Chat System',
+      description: 'Real-time communication platform',
+      details: [
+        'Seller-buyer messaging',
+        'File sharing',
+        'Video calls',
+        'Chat history',
+        'Notification system'
+      ]
+    },
+    {
+      icon: <FaShieldAlt />,
+      title: 'Secure Transactions',
+      description: 'Protected payment processing',
+      details: [
+        'SSL encryption',
+        'PCI compliance',
+        'Fraud detection',
+        'Secure wallets',
+        'Escrow system'
+      ]
     }
   ];
 
-  const experiences: Experience[] = [
+  const additionalFeatures: Feature[] = [
     {
-      year: '2023 - Present',
-      role: 'Full Stack Developer & UI/UX Designer',
-      company: 'Freelance',
-      description: 'Building custom web applications and providing design solutions for various clients.'
+      icon: <FaSync />,
+      title: 'Order Processing',
+      description: 'Automated order workflow management',
+      category: 'Workflow'
     },
     {
-      year: '2021 - 2023',
-      role: 'Senior Frontend Developer',
-      company: 'TechSolutions Inc.',
-      description: 'Led frontend development team and implemented complex UI components.'
+      icon: <FaCog />,
+      title: 'Custom Requirements',
+      description: 'Flexible customization options for orders',
+      category: 'Workflow'
     },
     {
-      year: '2019 - 2021',
-      role: 'Full Stack Developer',
-      company: 'Digital Innovations',
-      description: 'Developed and maintained multiple web applications using modern technologies.'
+      icon: <FaQrcode />,
+      title: 'QR Code Integration',
+      description: 'Quick access and verification system',
+      category: 'Technology'
     },
     {
-      year: '2017 - 2019',
-      role: 'Junior Developer',
-      company: 'WebCraft Studios',
-      description: 'Started career in web development and learned industry best practices.'
+      icon: <FaWallet />,
+      title: 'Digital Wallet',
+      description: 'Integrated payment and wallet system',
+      category: 'Finance'
+    },
+    {
+      icon: <FaTrophy />,
+      title: 'Achievement System',
+      description: 'Gamified rewards and recognition',
+      category: 'Engagement'
+    },
+    {
+      icon: <FaHeart />,
+      title: 'Favorites System',
+      description: 'Personalized content curation',
+      category: 'User Experience'
+    },
+    {
+      icon: <FaBell />,
+      title: 'Smart Notifications',
+      description: 'Real-time alerts and updates',
+      category: 'Communication'
+    },
+    {
+      icon: <FaChartLine />,
+      title: 'Analytics Dashboard',
+      description: 'Comprehensive performance insights',
+      category: 'Analytics'
     }
   ];
 
-  const certifications = [
-    'AWS Certified Solutions Architect',
-    'Google UX Design Professional Certificate',
-    'React Developer Certification',
-    'TypeScript Advanced Patterns',
-    'Node.js Best Practices'
+  const techStack = [
+    {
+      category: 'Frontend',
+      technologies: ['React.js', 'TypeScript', 'Next.js', 'Tailwind CSS', 'Redux', 'WebSocket']
+    },
+    {
+      category: 'Backend',
+      technologies: ['Node.js', 'Express.js', 'Python', 'Django', 'GraphQL', 'REST API']
+    },
+    {
+      category: 'Database',
+      technologies: ['MongoDB', 'PostgreSQL', 'Redis', 'Firebase', 'Elasticsearch']
+    },
+    {
+      category: 'Cloud & DevOps',
+      technologies: ['AWS', 'Docker', 'Kubernetes', 'CI/CD', 'Nginx', 'PM2']
+    },
+    {
+      category: 'AI/ML',
+      technologies: ['TensorFlow', 'OpenAI', 'ChatGPT', 'Computer Vision', 'NLP']
+    },
+    {
+      category: 'Payment',
+      technologies: ['Stripe', 'PayPal', 'Razorpay', 'Wallet System', 'Escrow']
+    }
   ];
 
-  const philosophies = [
-    {
-      icon: <FaLightbulb />,
-      title: 'Design Thinking',
-      description: 'Solving problems with user-centered approach and creative solutions'
-    },
+  const stats = [
+    { number: '100K+', label: 'Registered Users', icon: <FaUsers /> },
+    { number: '50K+', label: 'Video Uploads', icon: <FaVideo /> },
+    { number: '10K+', label: 'Active Sellers', icon: <FaStore /> },
+    { number: '95%', label: 'Satisfaction Rate', icon: <FaStar /> },
+    { number: '24/7', label: 'Uptime', icon: <FaGlobe /> },
+    { number: '99.9%', label: 'Security Score', icon: <FaLock /> }
+  ];
+
+  const teamPrinciples = [
     {
       icon: <FaCode />,
-      title: 'Clean Code',
-      description: 'Writing maintainable, scalable, and efficient code with best practices'
+      title: 'Technical Excellence',
+      description: 'Building with cutting-edge technologies and best practices'
     },
     {
-      icon: <FaUsers />,
-      title: 'Collaboration',
-      description: 'Working effectively in teams and communicating clearly'
+      icon: <FaPaintBrush />,
+      title: 'Design First',
+      description: 'Creating intuitive and beautiful user experiences'
     },
     {
       icon: <FaRocket />,
-      title: 'Innovation',
-      description: 'Always exploring new technologies and improving processes'
+      title: 'Innovation Driven',
+      description: 'Constantly exploring new solutions and improvements'
+    },
+    {
+      icon: <FaUsers />,
+      title: 'User Centric',
+      description: 'Focusing on solving real problems for our users'
     }
   ];
 
   return (
-    <div className="about-page">
-      {/* Hero Section */}
-      <section className="about-hero">
-        <div className="hero-overlay"></div>
-        <div className="container">
-          <div className="hero-content">
-            <div className="hero-avatar">
-              <img 
-                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&h=300&q=80" 
-                alt="Hamza Manzoor" 
-              />
-            </div>
-            <h1 className="hero-title">
-              <span className="highlight">Hamza Manzoor</span>
-            </h1>
-            <p className="hero-subtitle">
-              Full Stack Developer & UI/UX Designer
-            </p>
-            <p className="hero-tagline">
-              Building digital experiences that combine beautiful design with powerful functionality
-            </p>
-            <div className="hero-actions">
-              <a href="#projects" className="btn btn-primary">
-                <FaCode /> View Projects
-              </a>
-              <a href="#contact" className="btn btn-secondary">
-                <FaEnvelope /> Contact Me
-              </a>
-            </div>
-            <div className="hero-social">
-              <a href="https://github.com/hamza-manzoor" target="_blank" rel="noopener noreferrer">
-                <FaGithub />
-              </a>
-              <a href="https://linkedin.com/in/hamza-manzoor" target="_blank" rel="noopener noreferrer">
-                <FaLinkedin />
-              </a>
-              <a href="https://twitter.com/hamza_manzoor" target="_blank" rel="noopener noreferrer">
-                <FaTwitter />
-              </a>
+    <Layout>
+      <div className="about-page">
+        {/* Hero Section */}
+        <section className="website-hero">
+          <div className="hero-overlay"></div>
+          <div className="container">
+            <div className="hero-content">
+              <h1 className="hero-title">
+                Welcome to <span className="highlight">WeCinema.co</span>
+              </h1>
+              <p className="hero-subtitle">
+                The Ultimate Platform for Video Content Creators and Consumers
+              </p>
+              <p className="hero-description">
+                WeCinema is a revolutionary platform that combines video streaming, e-commerce, 
+                and social features into one seamless experience. Built by developers, for creators.
+              </p>
+              <div className="hero-stats">
+                {stats.slice(0, 4).map((stat, index) => (
+                  <div key={index} className="stat-item">
+                    <div className="stat-icon">{stat.icon}</div>
+                    <h3>{stat.number}</h3>
+                    <p>{stat.label}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* About Me Section */}
-      <section className="about-me-section">
-        <div className="container">
-          <div className="section-header">
-            <h2>About Me</h2>
-            <p>Developer. Designer. Problem Solver.</p>
+        {/* Website Features Section */}
+        <section className="website-features">
+          <div className="container">
+            <div className="section-header">
+              <h2>WeCinema Platform Features</h2>
+              <p>Everything you need in one powerful platform</p>
+            </div>
+            <div className="features-grid">
+              {websiteFeatures.map((feature, index) => (
+                <div key={index} className="feature-card">
+                  <div className="feature-icon">{feature.icon}</div>
+                  <h3>{feature.title}</h3>
+                  <p className="feature-description">{feature.description}</p>
+                  <div className="feature-details">
+                    {feature.details.map((detail, idx) => (
+                      <span key={idx} className="detail-tag">
+                        {detail}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="about-content">
-            <div className="about-text">
-              <h3>Hello, I'm Hamza! 👋</h3>
-              <p>
-                I'm a passionate Full Stack Developer and UI/UX Designer with 5+ years of experience 
-                creating digital solutions that make a difference. My journey began with a curiosity 
-                about how things work, and it has evolved into a career where I blend technical 
-                expertise with creative design.
-              </p>
-              <p>
-                As the founder of <strong>WeCinema</strong>, I've combined my love for cinema with 
-                technical skills to build a platform that delivers exceptional streaming experiences. 
-                I believe in creating products that are not only functional but also delightful to use.
-              </p>
-              <p>
-                When I'm not coding or designing, you can find me exploring new technologies, 
-                contributing to open-source projects, or mentoring aspiring developers. I'm always 
-                excited about new challenges and opportunities to grow.
-              </p>
-              <div className="personal-info">
-                <div className="info-item">
-                  <FaMapMarkerAlt />
-                  <span>Based in Pakistan</span>
+        </section>
+
+        {/* How It Works Section */}
+        <section className="workflow-section">
+          <div className="container">
+            <div className="section-header">
+              <h2>How WeCinema Works</h2>
+              <p>Seamless workflow from content creation to consumption</p>
+            </div>
+            <div className="workflow-steps">
+              <div className="workflow-step">
+                <div className="step-number">1</div>
+                <div className="step-content">
+                  <h3>Content Creation & Upload</h3>
+                  <p>Sellers upload videos with detailed descriptions, pricing, and requirements</p>
+                  <div className="step-features">
+                    <span><FaUpload /> Video Upload</span>
+                    <span><FaCog /> Custom Requirements</span>
+                    <span><FaLayerGroup /> Content Management</span>
+                  </div>
                 </div>
-                <div className="info-item">
-                  <FaCalendarAlt />
-                  <span>5+ Years Experience</span>
+              </div>
+              
+              <div className="workflow-step">
+                <div className="step-number">2</div>
+                <div className="step-content">
+                  <h3>Buyer Discovery & Order</h3>
+                  <p>Buyers browse listings, communicate with sellers, and place orders</p>
+                  <div className="step-features">
+                    <span><FaShoppingCart /> Order Placement</span>
+                    <span><FaComments /> Live Chat</span>
+                    <span><FaHandshake /> Offer Negotiation</span>
+                  </div>
                 </div>
-                <div className="info-item">
-                  <FaGraduationCap />
-                  <span>Computer Science Graduate</span>
+              </div>
+              
+              <div className="workflow-step">
+                <div className="step-number">3</div>
+                <div className="step-content">
+                  <h3>Order Processing & Delivery</h3>
+                  <p>Sellers deliver content, buyers review, and payments are processed</p>
+                  <div className="step-features">
+                    <span><FaSync /> Order Processing</span>
+                    <span><FaVideo /> Content Delivery</span>
+                    <span><FaWallet /> Secure Payment</span>
+                  </div>
                 </div>
-                <div className="info-item">
-                  <FaBriefcase />
-                  <span>Available for Projects</span>
+              </div>
+              
+              <div className="workflow-step">
+                <div className="step-number">4</div>
+                <div className="step-content">
+                  <h3>Community & Engagement</h3>
+                  <p>Users interact, share feedback, and grow within the community</p>
+                  <div className="step-features">
+                    <span><FaStar /> Reviews & Ratings</span>
+                    <span><FaBolt /> HypeMode Engagement</span>
+                    <span><FaRobot /> AI Support</span>
+                  </div>
                 </div>
               </div>
             </div>
-            <div className="about-image">
-              <img 
-                src="https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80" 
-                alt="Working Setup" 
-              />
-            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Skills Section */}
-      <section className="skills-section">
-        <div className="container">
-          <div className="section-header">
-            <h2>My Skills</h2>
-            <p>Technologies I work with</p>
-          </div>
-          <div className="skills-categories">
-            {['Frontend', 'Backend', 'Design', 'Database', 'DevOps', 'Mobile'].map(category => {
-              const categorySkills = skills.filter(skill => skill.category === category);
-              if (categorySkills.length === 0) return null;
-              
-              return (
-                <div key={category} className="skill-category">
+        {/* Additional Features */}
+        <section className="additional-features">
+          <div className="container">
+            <div className="section-header">
+              <h2>Advanced Features</h2>
+              <p>Powerful tools to enhance your experience</p>
+            </div>
+            <div className="features-categories">
+              {additionalFeatures.reduce((acc: {[key: string]: Feature[]}, feature) => {
+                if (!acc[feature.category]) {
+                  acc[feature.category] = [];
+                }
+                acc[feature.category].push(feature);
+                return acc;
+              }, {} as {[key: string]: Feature[]}).map(([category, features], index) => (
+                <div key={index} className="feature-category">
                   <h3>{category}</h3>
-                  <div className="category-skills">
-                    {categorySkills.map((skill, index) => (
-                      <div key={index} className="skill-item">
-                        <div className="skill-header">
-                          <div className="skill-icon">{skill.icon}</div>
-                          <span className="skill-name">{skill.name}</span>
-                          <span className="skill-level">{skill.level}%</span>
-                        </div>
-                        <div className="skill-bar">
-                          <div 
-                            className="skill-progress" 
-                            style={{ width: `${skill.level}%` }}
-                          ></div>
+                  <div className="category-features">
+                    {features.map((feature, idx) => (
+                      <div key={idx} className="mini-feature">
+                        <div className="feature-icon-small">{feature.icon}</div>
+                        <div>
+                          <h4>{feature.title}</h4>
+                          <p>{feature.description}</p>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Philosophy Section */}
-      <section className="philosophy-section">
-        <div className="container">
-          <div className="section-header">
-            <h2>My Development Philosophy</h2>
-            <p>Principles that guide my work</p>
-          </div>
-          <div className="philosophy-grid">
-            {philosophies.map((philo, index) => (
-              <div key={index} className="philosophy-card">
-                <div className="philosophy-icon">{philo.icon}</div>
-                <h3>{philo.title}</h3>
-                <p>{philo.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Projects Section */}
-      <section id="projects" className="projects-section">
-        <div className="container">
-          <div className="section-header">
-            <h2>Featured Projects</h2>
-            <p>Some of my recent work</p>
-          </div>
-          <div className="projects-grid">
-            {projects.map((project, index) => (
-              <div key={index} className="project-card">
-                <div className="project-image">
-                  <img src={project.image} alt={project.name} />
-                  <div className="project-overlay">
-                    <FaProjectDiagram />
-                  </div>
-                </div>
-                <div className="project-content">
-                  <h3>{project.name}</h3>
-                  <p>{project.description}</p>
-                  <div className="project-tech">
-                    {project.tech.map((tech, idx) => (
+        {/* Technology Stack */}
+        <section className="tech-stack-section">
+          <div className="container">
+            <div className="section-header">
+              <h2>Technology Stack</h2>
+              <p>Built with modern, scalable technologies</p>
+            </div>
+            <div className="tech-grid">
+              {techStack.map((stack, index) => (
+                <div key={index} className="tech-category">
+                  <h3>{stack.category}</h3>
+                  <div className="tech-tags">
+                    {stack.technologies.map((tech, idx) => (
                       <span key={idx} className="tech-tag">{tech}</span>
                     ))}
                   </div>
-                  <div className="project-links">
-                    <button className="btn btn-small btn-primary">
-                      <FaCode /> View Details
-                    </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* About Me Section */}
+        <section className="personal-section">
+          <div className="container">
+            <div className="section-header">
+              <h2>About the Creator</h2>
+              <p>Meet the developer behind WeCinema</p>
+            </div>
+            <div className="personal-content">
+              <div className="personal-info">
+                <div className="personal-avatar">
+                  <img 
+                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&h=300&q=80" 
+                    alt="Hamza Manzoor" 
+                  />
+                  <div className="avatar-badge">
+                    <FaCode /> Developer & Designer
+                  </div>
+                </div>
+                <div className="personal-details">
+                  <h3>Hamza Manzoor</h3>
+                  <p className="role">Full Stack Developer & UI/UX Designer</p>
+                  
+                  <div className="personal-bio">
+                    <p>
+                      As the sole developer and designer of WeCinema, I've dedicated myself to creating 
+                      a platform that solves real problems for content creators and consumers alike.
+                    </p>
+                    <p>
+                      With 5+ years of experience in full-stack development, I've built WeCinema from 
+                      the ground up, focusing on creating a seamless user experience while implementing 
+                      complex features like real-time chat, video processing, and secure transactions.
+                    </p>
+                  </div>
+                  
+                  <div className="personal-stats">
+                    <div className="personal-stat">
+                      <FaCode />
+                      <span>5+ Years Experience</span>
+                    </div>
+                    <div className="personal-stat">
+                      <FaProjectDiagram />
+                      <span>100+ Projects Completed</span>
+                    </div>
+                    <div className="personal-stat">
+                      <FaAward />
+                      <span>Expert in MERN Stack</span>
+                    </div>
+                  </div>
+                  
+                  <div className="personal-social">
+                    <a href="https://github.com/hamza-manzoor" target="_blank" rel="noopener noreferrer">
+                      <FaGithub />
+                    </a>
+                    <a href="https://linkedin.com/in/hamza-manzoor" target="_blank" rel="noopener noreferrer">
+                      <FaLinkedin />
+                    </a>
+                    <a href="https://twitter.com/hamza_manzoor" target="_blank" rel="noopener noreferrer">
+                      <FaTwitter />
+                    </a>
+                    <a href="mailto:contact@wecinema.co">
+                      <FaEnvelope />
+                    </a>
                   </div>
                 </div>
               </div>
-            ))}
+              
+              <div className="development-principles">
+                <h3>Development Principles</h3>
+                <div className="principles-grid">
+                  {teamPrinciples.map((principle, index) => (
+                    <div key={index} className="principle-card">
+                      <div className="principle-icon">{principle.icon}</div>
+                      <h4>{principle.title}</h4>
+                      <p>{principle.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Experience Section */}
-      <section className="experience-section">
-        <div className="container">
-          <div className="section-header">
-            <h2>Work Experience</h2>
-            <p>My professional journey</p>
-          </div>
-          <div className="timeline">
-            {experiences.map((exp, index) => (
-              <div key={index} className="timeline-item">
-                <div className="timeline-year">{exp.year}</div>
+        {/* Development Journey */}
+        <section className="journey-section">
+          <div className="container">
+            <div className="section-header">
+              <h2>Development Journey</h2>
+              <p>From concept to reality</p>
+            </div>
+            <div className="journey-timeline">
+              <div className="timeline-item">
+                <div className="timeline-date">2022 Q4</div>
                 <div className="timeline-content">
-                  <h3>{exp.role}</h3>
-                  <p className="company">{exp.company}</p>
-                  <p>{exp.description}</p>
-                </div>
-                <div className="timeline-marker">
-                  <FaBriefcase />
+                  <h3>Concept & Planning</h3>
+                  <p>Identified market gap for creator-focused platform. Designed initial architecture and feature set.</p>
                 </div>
               </div>
-            ))}
+              <div className="timeline-item">
+                <div className="timeline-date">2023 Q1</div>
+                <div className="timeline-content">
+                  <h3>Core Development</h3>
+                  <p>Built authentication, video upload, and basic marketplace features. Implemented real-time chat.</p>
+                </div>
+              </div>
+              <div className="timeline-item">
+                <div className="timeline-date">2023 Q2</div>
+                <div className="timeline-content">
+                  <h3>Feature Expansion</h3>
+                  <p>Added HypeMode, AI chatbot, advanced analytics, and payment integration with escrow system.</p>
+                </div>
+              </div>
+              <div className="timeline-item">
+                <div className="timeline-date">2023 Q3</div>
+                <div className="timeline-content">
+                  <h3>Testing & Optimization</h3>
+                  <p>Conducted extensive testing, performance optimization, and security audits. Prepared for launch.</p>
+                </div>
+              </div>
+              <div className="timeline-item">
+                <div className="timeline-date">2023 Q4</div>
+                <div className="timeline-content">
+                  <h3>Launch & Growth</h3>
+                  <p>Official launch with initial user base. Continuous improvements based on user feedback.</p>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Certifications Section */}
-      <section className="certifications-section">
-        <div className="container">
-          <div className="section-header">
-            <h2>Certifications</h2>
-            <p>Continuous learning and professional development</p>
+        {/* Stats Section */}
+        <section className="platform-stats">
+          <div className="container">
+            <div className="stats-grid">
+              {stats.map((stat, index) => (
+                <div key={index} className="platform-stat">
+                  <div className="stat-icon-large">{stat.icon}</div>
+                  <h3>{stat.number}</h3>
+                  <p>{stat.label}</p>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="certifications-list">
-            {certifications.map((cert, index) => (
-              <div key={index} className="certification-item">
-                <FaAward />
-                <span>{cert}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Tools Section */}
-      <section className="tools-section">
-        <div className="container">
-          <div className="section-header">
-            <h2>Development Stack</h2>
-            <p>Tools and technologies I use daily</p>
-          </div>
-          <div className="tools-grid">
-            <div className="tool-category">
-              <h3>Frontend</h3>
-              <div className="tool-list">
-                <span>React.js</span>
-                <span>TypeScript</span>
-                <span>Next.js</span>
-                <span>Vue.js</span>
-                <span>Tailwind CSS</span>
-                <span>Sass</span>
-              </div>
-            </div>
-            <div className="tool-category">
-              <h3>Backend</h3>
-              <div className="tool-list">
-                <span>Node.js</span>
-                <span>Express.js</span>
-                <span>Python</span>
-                <span>Django</span>
-                <span>FastAPI</span>
-                <span>GraphQL</span>
-              </div>
-            </div>
-            <div className="tool-category">
-              <h3>Design</h3>
-              <div className="tool-list">
-                <span>Figma</span>
-                <span>Adobe XD</span>
-                <span>Photoshop</span>
-                <span>Illustrator</span>
-                <span>Framer</span>
-                <span>Prototyping</span>
-              </div>
-            </div>
-            <div className="tool-category">
-              <h3>DevOps</h3>
-              <div className="tool-list">
-                <span>Docker</span>
-                <span>AWS</span>
-                <span>GitHub Actions</span>
-                <span>Nginx</span>
-                <span>CI/CD</span>
-                <span>Monitoring</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Contact Section */}
-      <section id="contact" className="contact-section">
-        <div className="container">
-          <div className="section-header">
-            <h2>Let's Work Together</h2>
-            <p>Have a project in mind? Let's discuss!</p>
-          </div>
-          <div className="contact-content">
-            <div className="contact-info">
-              <div className="contact-item">
-                <FaEnvelope />
-                <div>
-                  <h4>Email</h4>
-                  <p>hamza@wecinema.co</p>
-                </div>
-              </div>
-              <div className="contact-item">
-                <FaMapMarkerAlt />
-                <div>
-                  <h4>Location</h4>
-                  <p>Pakistan · Available Worldwide</p>
-                </div>
-              </div>
-              <div className="contact-item">
-                <FaCalendarAlt />
-                <div>
-                  <h4>Availability</h4>
-                  <p>Open for new projects</p>
-                </div>
-              </div>
-              <div className="contact-item">
-                <FaHandshake />
-                <div>
-                  <h4>Services</h4>
-                  <p>Web Development · UI/UX Design · Consultation</p>
-                </div>
-              </div>
-            </div>
-            <div className="contact-form">
-              <h3>Send me a message</h3>
-              <form>
-                <div className="form-group">
-                  <input type="text" placeholder="Your Name" required />
-                </div>
-                <div className="form-group">
-                  <input type="email" placeholder="Your Email" required />
-                </div>
-                <div className="form-group">
-                  <input type="text" placeholder="Subject" required />
-                </div>
-                <div className="form-group">
-                  <textarea placeholder="Your Message" rows={5} required></textarea>
-                </div>
-                <button type="submit" className="btn btn-primary">
-                  <FaEnvelope /> Send Message
+        {/* CTA Section */}
+        <section className="platform-cta">
+          <div className="container">
+            <div className="cta-content">
+              <h2>Join the WeCinema Revolution</h2>
+              <p>
+                Whether you're a content creator looking to monetize your skills or a consumer 
+                seeking quality content, WeCinema offers the perfect platform for your needs.
+              </p>
+              <div className="cta-buttons">
+                <button className="btn btn-primary btn-large">
+                  <FaUserPlus /> Join as Creator
                 </button>
-              </form>
+                <button className="btn btn-secondary btn-large">
+                  <FaShoppingCart /> Start Browsing
+                </button>
+                <button className="btn btn-outline btn-large">
+                  <FaVideo /> Explore Features
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Footer */}
-      <footer className="about-footer">
-        <div className="container">
-          <div className="footer-content">
-            <div className="footer-logo">
-              <h3>Hamza Manzoor</h3>
-              <p>Full Stack Developer & UI/UX Designer</p>
+        {/* Footer */}
+        <footer className="platform-footer">
+          <div className="container">
+            <div className="footer-content">
+              <div className="footer-brand">
+                <h3>WeCinema.co</h3>
+                <p>Empowering creators, delighting consumers</p>
+                <div className="footer-social">
+                  <a href="#"><FaGithub /></a>
+                  <a href="#"><FaTwitter /></a>
+                  <a href="#"><FaLinkedin /></a>
+                  <a href="#"><FaEnvelope /></a>
+                </div>
+              </div>
+              <div className="footer-links">
+                <div className="link-group">
+                  <h4>Platform</h4>
+                  <a href="#">Features</a>
+                  <a href="#">Pricing</a>
+                  <a href="#">API Docs</a>
+                  <a href="#">Status</a>
+                </div>
+                <div className="link-group">
+                  <h4>Resources</h4>
+                  <a href="#">Documentation</a>
+                  <a href="#">Blog</a>
+                  <a href="#">Community</a>
+                  <a href="#">Support</a>
+                </div>
+                <div className="link-group">
+                  <h4>Legal</h4>
+                  <a href="#">Privacy Policy</a>
+                  <a href="#">Terms of Service</a>
+                  <a href="#">Cookie Policy</a>
+                  <a href="#">Security</a>
+                </div>
+              </div>
             </div>
-            <div className="footer-social">
-              <a href="https://github.com/hamza-manzoor" target="_blank" rel="noopener noreferrer">
-                <FaGithub />
-              </a>
-              <a href="https://linkedin.com/in/hamza-manzoor" target="_blank" rel="noopener noreferrer">
-                <FaLinkedin />
-              </a>
-              <a href="https://twitter.com/hamza_manzoor" target="_blank" rel="noopener noreferrer">
-                <FaTwitter />
-              </a>
-              <a href="mailto:hamza@wecinema.co">
-                <FaEnvelope />
-              </a>
-            </div>
-            <div className="footer-copyright">
-              <p>&copy; {new Date().getFullYear()} Hamza Manzoor. All rights reserved.</p>
-              <p>Building the future, one line of code at a time.</p>
+            <div className="footer-bottom">
+              <p>&copy; {new Date().getFullYear()} WeCinema.co. All rights reserved.</p>
+              <p>Built with ❤️ by <strong>Hamza Manzoor</strong></p>
             </div>
           </div>
-        </div>
-      </footer>
-    </div>
+        </footer>
+      </div>
+    </Layout>
   );
 };
 
