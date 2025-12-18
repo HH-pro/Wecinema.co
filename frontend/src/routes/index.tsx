@@ -31,6 +31,7 @@ import {
   Settings,
   Scripts,
   OrderDetailsPage,
+  About
   
 
 } from "../pages";
@@ -75,6 +76,8 @@ const Router: React.FC = () => {
           <Route path="/customersupport" element={<CustomerSupportPage />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+          <Route path="/about" element={<TermsAndConditions />} />
+
           <Route path="/admin" element={<Signin />} />
 
           {/* ========== 🆕 MARKETPLACE ROUTES ========== */}
