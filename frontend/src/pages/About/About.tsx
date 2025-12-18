@@ -1,6 +1,5 @@
 import React from 'react';
-import MarketplaceLayout from '../../components/Layout';
-
+import { Layout } from "../components";
 import { 
   FaCode,
   FaPaintBrush,
@@ -64,6 +63,29 @@ interface WebsiteFeature {
   title: string;
   description: string;
   details: string[];
+}
+
+interface TechStack {
+  category: string;
+  technologies: string[];
+}
+
+interface Principle {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+}
+
+interface Stat {
+  number: string;
+  label: string;
+  icon: React.ReactNode;
+}
+
+interface JourneyItem {
+  date: string;
+  title: string;
+  description: string;
 }
 
 const About: React.FC = () => {
@@ -217,7 +239,7 @@ const About: React.FC = () => {
     }
   ];
 
-  const techStack = [
+  const techStack: TechStack[] = [
     {
       category: 'Frontend',
       technologies: ['React.js', 'TypeScript', 'Next.js', 'Tailwind CSS', 'Redux', 'WebSocket']
@@ -244,7 +266,7 @@ const About: React.FC = () => {
     }
   ];
 
-  const stats = [
+  const stats: Stat[] = [
     { number: '100K+', label: 'Registered Users', icon: <FaUsers /> },
     { number: '50K+', label: 'Video Uploads', icon: <FaVideo /> },
     { number: '10K+', label: 'Active Sellers', icon: <FaStore /> },
@@ -253,7 +275,7 @@ const About: React.FC = () => {
     { number: '99.9%', label: 'Security Score', icon: <FaLock /> }
   ];
 
-  const teamPrinciples = [
+  const teamPrinciples: Principle[] = [
     {
       icon: <FaCode />,
       title: 'Technical Excellence',
@@ -276,8 +298,45 @@ const About: React.FC = () => {
     }
   ];
 
+  const journey: JourneyItem[] = [
+    {
+      date: '2022 Q4',
+      title: 'Concept & Planning',
+      description: 'Identified market gap for creator-focused platform. Designed initial architecture and feature set.'
+    },
+    {
+      date: '2023 Q1',
+      title: 'Core Development',
+      description: 'Built authentication, video upload, and basic marketplace features. Implemented real-time chat.'
+    },
+    {
+      date: '2023 Q2',
+      title: 'Feature Expansion',
+      description: 'Added HypeMode, AI chatbot, advanced analytics, and payment integration with escrow system.'
+    },
+    {
+      date: '2023 Q3',
+      title: 'Testing & Optimization',
+      description: 'Conducted extensive testing, performance optimization, and security audits. Prepared for launch.'
+    },
+    {
+      date: '2023 Q4',
+      title: 'Launch & Growth',
+      description: 'Official launch with initial user base. Continuous improvements based on user feedback.'
+    }
+  ];
+
+  // Group features by category
+  const groupedFeatures = additionalFeatures.reduce((acc: Record<string, Feature[]>, feature) => {
+    if (!acc[feature.category]) {
+      acc[feature.category] = [];
+    }
+    acc[feature.category].push(feature);
+    return acc;
+  }, {});
+
   return (
-    <MarketplaceLayout>
+    <Layout>
       <div className="about-page">
         {/* Hero Section */}
         <section className="website-hero">
@@ -404,17 +463,11 @@ const About: React.FC = () => {
               <p>Powerful tools to enhance your experience</p>
             </div>
             <div className="features-categories">
-              {additionalFeatures.reduce((acc: {[key: string]: Feature[]}, feature) => {
-                if (!acc[feature.category]) {
-                  acc[feature.category] = [];
-                }
-                acc[feature.category].push(feature);
-                return acc;
-              }, {} as {[key: string]: Feature[]}).map(([category, features], index) => (
-                <div key={index} className="feature-category">
+              {Object.keys(groupedFeatures).map((category) => (
+                <div key={category} className="feature-category">
                   <h3>{category}</h3>
                   <div className="category-features">
-                    {features.map((feature, idx) => (
+                    {groupedFeatures[category].map((feature, idx) => (
                       <div key={idx} className="mini-feature">
                         <div className="feature-icon-small">{feature.icon}</div>
                         <div>
@@ -542,41 +595,15 @@ const About: React.FC = () => {
               <p>From concept to reality</p>
             </div>
             <div className="journey-timeline">
-              <div className="timeline-item">
-                <div className="timeline-date">2022 Q4</div>
-                <div className="timeline-content">
-                  <h3>Concept & Planning</h3>
-                  <p>Identified market gap for creator-focused platform. Designed initial architecture and feature set.</p>
+              {journey.map((item, index) => (
+                <div key={index} className="timeline-item">
+                  <div className="timeline-date">{item.date}</div>
+                  <div className="timeline-content">
+                    <h3>{item.title}</h3>
+                    <p>{item.description}</p>
+                  </div>
                 </div>
-              </div>
-              <div className="timeline-item">
-                <div className="timeline-date">2023 Q1</div>
-                <div className="timeline-content">
-                  <h3>Core Development</h3>
-                  <p>Built authentication, video upload, and basic marketplace features. Implemented real-time chat.</p>
-                </div>
-              </div>
-              <div className="timeline-item">
-                <div className="timeline-date">2023 Q2</div>
-                <div className="timeline-content">
-                  <h3>Feature Expansion</h3>
-                  <p>Added HypeMode, AI chatbot, advanced analytics, and payment integration with escrow system.</p>
-                </div>
-              </div>
-              <div className="timeline-item">
-                <div className="timeline-date">2023 Q3</div>
-                <div className="timeline-content">
-                  <h3>Testing & Optimization</h3>
-                  <p>Conducted extensive testing, performance optimization, and security audits. Prepared for launch.</p>
-                </div>
-              </div>
-              <div className="timeline-item">
-                <div className="timeline-date">2023 Q4</div>
-                <div className="timeline-content">
-                  <h3>Launch & Growth</h3>
-                  <p>Official launch with initial user base. Continuous improvements based on user feedback.</p>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </section>
@@ -665,7 +692,7 @@ const About: React.FC = () => {
           </div>
         </footer>
       </div>
-    </MarketplaceLayout>
+    </Layout>
   );
 };
 
