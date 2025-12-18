@@ -1,5 +1,6 @@
 import React from 'react';
-import { Layout } from "../../components/Layout/MarketplaceLayout";
+import MarketplaceLayout from '../../components/Layout';
+
 import { 
   FaCode,
   FaPaintBrush,
@@ -276,7 +277,7 @@ const About: React.FC = () => {
   ];
 
   return (
-    <Layout>
+    <MarketplaceLayout>
       <div className="about-page">
         {/* Hero Section */}
         <section className="website-hero">
@@ -664,7 +665,7 @@ const About: React.FC = () => {
           </div>
         </footer>
       </div>
-    </Layout>
+    </MarketplaceLayout>
   );
 };
 
