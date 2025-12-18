@@ -295,20 +295,7 @@ const About: React.FC = () => {
           </div>
         </section>
 
-        {/* Stats Section */}
-        <section className="platform-stats">
-          <div className="container">
-            <div className="stats-grid">
-              {stats.map((stat, index) => (
-                <div key={index} className="platform-stat">
-                  <div className="stat-icon-large">{stat.icon}</div>
-                  <h3>{stat.number}</h3>
-                  <p>{stat.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+       
 
         {/* Website Features Section */}
         <section className="website-features">
