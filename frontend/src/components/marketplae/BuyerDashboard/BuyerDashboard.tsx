@@ -34,7 +34,8 @@ import {
   FaShoppingBasket,
   FaLayerGroup,
   FaFileInvoiceDollar,
-  FaSpinner
+  FaSpinner,
+  FaChevronDown
 } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
@@ -286,15 +287,12 @@ const BuyerDashboard: React.FC = () => {
     
     // Click outside handler for dropdowns
     const handleClickOutside = (event: MouseEvent) => {
-      let clickedInsideDropdown = false;
+      if (!activeDropdown) return;
       
-      Object.values(dropdownRefs.current).forEach(ref => {
-        if (ref && ref.contains(event.target as Node)) {
-          clickedInsideDropdown = true;
-        }
-      });
-
-      if (!clickedInsideDropdown) {
+      const clickedElement = event.target as HTMLElement;
+      const dropdownElement = dropdownRefs.current[activeDropdown];
+      
+      if (dropdownElement && !dropdownElement.contains(clickedElement)) {
         setActiveDropdown(null);
       }
     };
@@ -303,7 +301,7 @@ const BuyerDashboard: React.FC = () => {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
+  }, [activeDropdown]);
 
   useEffect(() => {
     filterAndSortOrders();
@@ -321,8 +319,6 @@ const BuyerDashboard: React.FC = () => {
 
       // Fetch buyer orders
       const ordersResponse = await marketplaceAPI.orders.getMy(setLoading) as DashboardResponse;
-      
-      console.log('Buyer Orders Response:', ordersResponse);
       
       if (ordersResponse.success && ordersResponse.orders) {
         const fetchedOrders = ordersResponse.orders;
@@ -941,7 +937,8 @@ const BuyerDashboard: React.FC = () => {
   };
 
   // Dropdown toggle function
-  const toggleDropdown = (orderId: string) => {
+  const toggleDropdown = (orderId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     if (activeDropdown === orderId) {
       setActiveDropdown(null);
     } else {
@@ -949,30 +946,63 @@ const BuyerDashboard: React.FC = () => {
     }
   };
 
+  // Close all dropdowns
+  const closeAllDropdowns = () => {
+    setActiveDropdown(null);
+  };
+
   // Render dropdown for order
   const renderDropdown = (order: Order) => {
     const actions = getOrderActions(order);
     const isDropdownOpen = activeDropdown === order._id;
 
+    if (actions.length <= 1) return null; // Don't show dropdown if only view details is available
+
     return (
-      <div className="dropdown-actions" ref={el => dropdownRefs.current[order._id] = el}>
+      <div 
+        className="dropdown-actions" 
+        ref={el => {
+          if (el) dropdownRefs.current[order._id] = el;
+        }}
+      >
         <div className="dropdown">
           <button 
             className={`dropdown-toggle ${isDropdownOpen ? 'active' : ''}`}
-            onClick={() => toggleDropdown(order._id)}
+            onClick={(e) => toggleDropdown(order._id, e)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleDropdown(order._id, e as any);
+              }
+            }}
+            aria-haspopup="true"
+            aria-expanded={isDropdownOpen}
           >
-            More Actions
+            <span>More Actions</span>
+            <FaChevronDown className={`dropdown-arrow ${isDropdownOpen ? 'rotate' : ''}`} />
           </button>
-          <div className={`dropdown-menu ${isDropdownOpen ? 'show' : ''}`}>
+          
+          <div 
+            className={`dropdown-menu ${isDropdownOpen ? 'show' : ''}`}
+            onClick={(e) => e.stopPropagation()}
+          >
             {actions.map((action, index) => (
               <button
                 key={index}
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   handleOrderAction(order._id, action.action);
-                  setActiveDropdown(null);
+                  closeAllDropdowns();
                 }}
                 className={`dropdown-item ${action.className}`}
                 disabled={action.disabled}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleOrderAction(order._id, action.action);
+                    closeAllDropdowns();
+                  }
+                }}
               >
                 {action.icon}
                 <span>{action.label}</span>
@@ -980,9 +1010,6 @@ const BuyerDashboard: React.FC = () => {
             ))}
           </div>
         </div>
-        {isDropdownOpen && (
-          <div className="dropdown-backdrop show" onClick={() => setActiveDropdown(null)} />
-        )}
       </div>
     );
   };
@@ -1115,6 +1142,7 @@ const BuyerDashboard: React.FC = () => {
         style={{ 
           '--status-color': getStatusColor(order.status)
         } as React.CSSProperties}
+        onClick={() => closeAllDropdowns()}
       >
         <div className="order-image">
           <div className="image-container">
@@ -1433,7 +1461,7 @@ const BuyerDashboard: React.FC = () => {
 
   return (
     <MarketplaceLayout>
-      <div className="buyer-dashboard">
+      <div className="buyer-dashboard" onClick={closeAllDropdowns}>
         {/* Header */}
         <div className="dashboard-header">
           <div className="header-left">
@@ -1455,9 +1483,6 @@ const BuyerDashboard: React.FC = () => {
             <button className="refresh-btn" onClick={handleRefresh} disabled={loading}>
               <FaSync className={loading ? 'spinning' : ''} /> {loading ? 'Refreshing...' : 'Refresh'}
             </button>
-            {/* <button className="settings-btn" onClick={() => navigate('/marketplace/settings')}>
-              <FaCog /> Settings
-            </button> */}
           </div>
         </div>
 
@@ -1474,26 +1499,30 @@ const BuyerDashboard: React.FC = () => {
         <div className="filters-section">
           <div className="search-container">
             <div className="search-box">
-              {/* <FaSearch className="search-icon" /> */}
-              {/* <input
+              <FaSearch className="search-icon" />
+              <input
                 type="text"
                 placeholder="Search orders by title, seller, or order number..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="search-input"
-              /> */}
+                onClick={(e) => e.stopPropagation()}
+              />
             </div>
             
-            {/* <button 
+            <button 
               className="filter-toggle" 
-              onClick={() => setShowFilters(!showFilters)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowFilters(!showFilters);
+              }}
             >
               <FaFilter /> {showFilters ? 'Hide Filters' : 'Show Filters'}
-            </button> */}
+            </button>
           </div>
           
           {showFilters && (
-            <div className="advanced-filters">
+            <div className="advanced-filters" onClick={(e) => e.stopPropagation()}>
               <div className="filter-group">
                 <label>Sort By:</label>
                 <select 
