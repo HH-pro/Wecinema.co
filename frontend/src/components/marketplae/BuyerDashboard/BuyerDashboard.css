@@ -1,4 +1,4 @@
-/* BuyerDashboard.css - Fixed More Actions Dropdown */
+/* BuyerDashboard.css - کام کرنے والا ورژن */
 .buyer-dashboard {
   max-width: 1400px;
   margin: 0 auto;
@@ -848,11 +848,13 @@
   box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
 }
 
-/* Fixed Dropdown Actions - UPDATED */
+/* =========================================== */
+/* FIXED DROPDOWN STYLES - کام کرنے والا CSS */
+/* =========================================== */
+
 .dropdown-actions {
   position: relative;
   width: 100%;
-  z-index: 10;
 }
 
 .dropdown {
@@ -865,7 +867,7 @@
   padding: 12px 20px;
   background: #f8f9fa;
   border: 1px solid #dee2e6;
-  border-radius: 10px;
+  border-radius: 8px;
   color: #495057;
   cursor: pointer;
   font-size: 14px;
@@ -879,8 +881,7 @@
 
 .dropdown-toggle:hover {
   background: #e9ecef;
-  border-color: #667eea;
-  transform: translateY(-2px);
+  border-color: #d69e2e;
 }
 
 .dropdown-toggle.active {
@@ -889,27 +890,39 @@
   border-color: #d69e2e;
 }
 
+.dropdown-arrow {
+  font-size: 10px;
+  margin-left: 8px;
+  transition: transform 0.3s ease;
+}
+
+.dropdown-arrow.rotate {
+  transform: rotate(180deg);
+}
+
+/* DROPDOWN MENU - یہ سب سے اہم حصہ ہے */
 .dropdown-menu {
   position: absolute;
-  top: calc(100% + 5px);
+  top: 100%;
   left: 0;
   right: 0;
-  background: #fff;
+  background: white;
   border: 1px solid #dee2e6;
-  border-radius: 12px;
-  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
-  z-index: 1001;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
   display: none;
   flex-direction: column;
   overflow: hidden;
+  margin-top: 5px;
+  min-width: 180px;
   max-height: 400px;
   overflow-y: auto;
-  animation: slideDown 0.2s ease;
-  border-top: 3px solid #d69e2e;
 }
 
 .dropdown-menu.show {
-  display: flex;
+  display: flex !important;
+  animation: slideDown 0.2s ease;
 }
 
 .dropdown-item {
@@ -925,6 +938,7 @@
   transition: all 0.2s ease;
   font-size: 14px;
   border-bottom: 1px solid #f8f9fa;
+  width: 100%;
 }
 
 .dropdown-item:last-child {
@@ -939,15 +953,25 @@
 .dropdown-item:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  pointer-events: none;
 }
 
-.dropdown-item:disabled:hover {
-  background: none;
-  color: #495057;
+/* Dropdown backdrop for click outside */
+.dropdown-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+  background: transparent;
+  display: none;
 }
 
-/* Special styles for different button types */
+.dropdown-backdrop.show {
+  display: block;
+}
+
+/* Special action colors */
 .dropdown-item.view-details-btn:hover {
   background: #007bff;
   color: white;
@@ -1001,22 +1025,6 @@
 .dropdown-item.payment-btn:hover {
   background: #6c757d;
   color: white;
-}
-
-/* Dropdown backdrop */
-.dropdown-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 999;
-  background: transparent;
-  display: none;
-}
-
-.dropdown-backdrop.show {
-  display: block;
 }
 
 /* No Orders */
@@ -1626,19 +1634,6 @@
   .order-status-section {
     min-width: auto;
   }
-  
-  .order-actions {
-    flex-direction: row;
-    align-items: center;
-  }
-  
-  .quick-actions-row {
-    flex: 1;
-  }
-  
-  .dropdown-actions {
-    flex: 0 0 auto;
-  }
 }
 
 @media (max-width: 768px) {
@@ -1683,32 +1678,17 @@
     gap: 10px;
   }
   
-  .order-actions {
-    flex-direction: column;
-    width: 100%;
-  }
-  
   .quick-actions-row {
     flex-direction: column;
-    width: 100%;
-  }
-  
-  .view-order-btn,
-  .download-files-btn {
-    width: 100%;
-  }
-  
-  .dropdown-actions {
-    width: 100%;
-  }
-  
-  .dropdown-toggle {
-    width: 100%;
   }
   
   .dropdown-menu {
-    left: 0;
-    right: 0;
+    position: fixed;
+    left: 20px;
+    right: 20px;
+    top: auto;
+    bottom: 20px;
+    max-height: 50vh;
   }
   
   .modal-content {
@@ -1779,9 +1759,5 @@
   
   .tip-card {
     padding: 25px 20px;
-  }
-  
-  .order-actions {
-    align-items: stretch;
   }
 }
