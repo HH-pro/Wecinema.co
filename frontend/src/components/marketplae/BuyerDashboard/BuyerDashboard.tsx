@@ -1012,8 +1012,9 @@ const BuyerDashboard: React.FC = () => {
     return (
       <MarketplaceLayout>
         <div className="buyer-dashboard-loading">
-          <FaSpinner className="loading-spinner" />
-          <p>Loading your dashboard...</p>
+        {/* Option 1: Simple spinner */}
+        <div className="loading-spinner"></div>
+        <p className="text-lg text-gray-800 font-medium">Loading your dashboard...</p>
         </div>
       </MarketplaceLayout>
     );
