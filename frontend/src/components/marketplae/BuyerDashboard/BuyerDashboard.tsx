@@ -1176,34 +1176,7 @@ const BuyerDashboard: React.FC = () => {
           {renderStatusFilters()}
         </div>
 
-        {/* Search and Filters */}
-        <div className="filters-section">
-          <div className="search-container">
-            <div className="search-box">
-              <FaSearch className="search-icon" />
-              <input
-                type="text"
-                placeholder="Search orders by title, seller, or order number..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="search-input"
-                aria-label="Search orders"
-              />
-              {searchQuery && (
-                <button 
-                  className="clear-search" 
-                  onClick={() => setSearchQuery('')}
-                  aria-label="Clear search"
-                >
-                  <FaTimes />
-                </button>
-              )}
-            </div>
-            
-           
-          </div>
-          
-        </div>
+    
 
         {/* Orders Section - PROFESSIONAL STYLING */}
         <div className="orders-section">
