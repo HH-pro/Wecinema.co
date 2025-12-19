@@ -156,15 +156,7 @@ const BuyerDashboard: React.FC = () => {
       color: '#f59e0b',
       badge: 'New'
     },
-    {
-      icon: <FaBoxOpen />,
-      label: 'My Offers',
-      description: 'View & manage offers',
-      action: () => navigate('/marketplace/offers/my-offers'),
-      type: 'secondary' as const,
-      color: '#8b5cf6',
-      badge: orders.filter(o => o.status === 'pending_payment').length > 0 ? `${orders.filter(o => o.status === 'pending_payment').length} Pending` : undefined
-    },
+   
     {
       icon: <FaComment />,
       label: 'Messages',
@@ -182,22 +174,8 @@ const BuyerDashboard: React.FC = () => {
       type: 'secondary' as const,
       color: '#10b981'
     },
-    {
-      icon: <FaShoppingBasket />,
-      label: 'Wishlist',
-      description: 'Saved items',
-      action: () => navigate('/marketplace/wishlist'),
-      type: 'secondary' as const,
-      color: '#ec4899'
-    },
-    {
-      icon: <FaBell />,
-      label: 'Notifications',
-      description: 'Updates & alerts',
-      action: () => navigate('/notifications'),
-      type: 'secondary' as const,
-      color: '#f97316'
-    }
+   
+    
   ];
 
   // Category icons mapping
