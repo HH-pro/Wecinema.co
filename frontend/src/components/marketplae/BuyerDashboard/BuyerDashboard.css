@@ -1,4 +1,4 @@
-/* BuyerDashboard.css */
+/* BuyerDashboard.css - Fixed More Actions Dropdown */
 .buyer-dashboard {
   max-width: 1400px;
   margin: 0 auto;
@@ -172,26 +172,6 @@
   display: flex;
   align-items: center;
   gap: 5px;
-}
-
-.total-orders .stat-icon {
-  background: rgba(52, 152, 219, 0.1);
-  color: #d69e2e;
-}
-
-.active-orders .stat-icon {
-  background: rgba(155, 89, 182, 0.1);
-  color: #9b59b6;
-}
-
-.financial-summary .stat-icon {
-  background: rgba(46, 204, 113, 0.1);
-  color: #2ecc71;
-}
-
-.performance .stat-icon {
-  background: rgba(241, 196, 15, 0.1);
-  color: #f1c40f;
 }
 
 /* Status Distribution */
@@ -868,19 +848,21 @@
   box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
 }
 
-/* Fixed Dropdown Actions */
+/* Fixed Dropdown Actions - UPDATED */
 .dropdown-actions {
   position: relative;
+  width: 100%;
+  z-index: 10;
 }
 
 .dropdown {
-  width: 100%;
   position: relative;
+  width: 100%;
 }
 
 .dropdown-toggle {
   width: 100%;
-  padding: 12px;
+  padding: 12px 20px;
   background: #f8f9fa;
   border: 1px solid #dee2e6;
   border-radius: 10px;
@@ -895,19 +877,16 @@
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
-.dropdown-toggle::after {
-  content: '▼';
-  font-size: 10px;
-  transition: transform 0.3s ease;
-}
-
-.dropdown-toggle.active::after {
-  transform: rotate(180deg);
-}
-
 .dropdown-toggle:hover {
   background: #e9ecef;
   border-color: #667eea;
+  transform: translateY(-2px);
+}
+
+.dropdown-toggle.active {
+  background: #d69e2e;
+  color: white;
+  border-color: #d69e2e;
 }
 
 .dropdown-menu {
@@ -918,29 +897,19 @@
   background: #fff;
   border: 1px solid #dee2e6;
   border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+  z-index: 1001;
   display: none;
   flex-direction: column;
   overflow: hidden;
-  max-height: 300px;
+  max-height: 400px;
   overflow-y: auto;
-  animation: fadeInUp 0.2s ease;
+  animation: slideDown 0.2s ease;
+  border-top: 3px solid #d69e2e;
 }
 
 .dropdown-menu.show {
   display: flex;
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .dropdown-item {
@@ -958,18 +927,19 @@
   border-bottom: 1px solid #f8f9fa;
 }
 
-.dropdown-item:hover {
-  background: #f8f9fa;
-  color: #667eea;
-}
-
 .dropdown-item:last-child {
   border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background: #f8f9fa;
+  color: #d69e2e;
 }
 
 .dropdown-item:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 .dropdown-item:disabled:hover {
@@ -977,7 +947,63 @@
   color: #495057;
 }
 
-/* Dropdown کے لیے click-outside کے لیے */
+/* Special styles for different button types */
+.dropdown-item.view-details-btn:hover {
+  background: #007bff;
+  color: white;
+}
+
+.dropdown-item.complete-payment-btn:hover {
+  background: #28a745;
+  color: white;
+}
+
+.dropdown-item.cancel-btn:hover {
+  background: #dc3545;
+  color: white;
+}
+
+.dropdown-item.contact-btn:hover {
+  background: #17a2b8;
+  color: white;
+}
+
+.dropdown-item.timeline-btn:hover {
+  background: #6f42c1;
+  color: white;
+}
+
+.dropdown-item.revision-btn:hover {
+  background: #ffc107;
+  color: #212529;
+}
+
+.dropdown-item.complete-order-btn:hover {
+  background: #28a745;
+  color: white;
+}
+
+.dropdown-item.download-btn:hover {
+  background: #20c997;
+  color: white;
+}
+
+.dropdown-item.review-btn:hover {
+  background: #fd7e14;
+  color: white;
+}
+
+.dropdown-item.summary-btn:hover {
+  background: #6610f2;
+  color: white;
+}
+
+.dropdown-item.payment-btn:hover {
+  background: #6c757d;
+  color: white;
+}
+
+/* Dropdown backdrop */
 .dropdown-backdrop {
   position: fixed;
   top: 0;
@@ -985,6 +1011,7 @@
   right: 0;
   bottom: 0;
   z-index: 999;
+  background: transparent;
   display: none;
 }
 
@@ -1169,7 +1196,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 2000;
   padding: 20px;
   animation: fadeIn 0.3s ease;
 }
@@ -1599,6 +1626,19 @@
   .order-status-section {
     min-width: auto;
   }
+  
+  .order-actions {
+    flex-direction: row;
+    align-items: center;
+  }
+  
+  .quick-actions-row {
+    flex: 1;
+  }
+  
+  .dropdown-actions {
+    flex: 0 0 auto;
+  }
 }
 
 @media (max-width: 768px) {
@@ -1643,8 +1683,32 @@
     gap: 10px;
   }
   
+  .order-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  
   .quick-actions-row {
     flex-direction: column;
+    width: 100%;
+  }
+  
+  .view-order-btn,
+  .download-files-btn {
+    width: 100%;
+  }
+  
+  .dropdown-actions {
+    width: 100%;
+  }
+  
+  .dropdown-toggle {
+    width: 100%;
+  }
+  
+  .dropdown-menu {
+    left: 0;
+    right: 0;
   }
   
   .modal-content {
@@ -1715,5 +1779,9 @@
   
   .tip-card {
     padding: 25px 20px;
+  }
+  
+  .order-actions {
+    align-items: stretch;
   }
 }
