@@ -417,14 +417,7 @@ const BuyerDashboard: React.FC = () => {
           description: 'Download order files',
           color: '#059669'
         });
-        actions.push({
-          label: 'Leave Review',
-          action: 'leave_review',
-          className: 'action-review',
-          icon: <FaStar />,
-          description: 'Rate your experience',
-          color: '#f59e0b'
-        });
+        
         actions.push({
           label: 'View Invoice',
           action: 'view_invoice',
@@ -532,9 +525,7 @@ const BuyerDashboard: React.FC = () => {
           }
           break;
           
-        case 'leave_review':
-          navigate(`/marketplace/reviews/create?orderId=${orderId}`);
-          break;
+      
           
         case 'view_invoice':
           navigate(`/marketplace/orders/${orderId}/invoice`);
