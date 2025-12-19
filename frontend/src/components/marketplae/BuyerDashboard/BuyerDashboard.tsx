@@ -1011,11 +1011,10 @@ const BuyerDashboard: React.FC = () => {
   if (loading && orders.length === 0) {
     return (
       <MarketplaceLayout>
-        <div className="buyer-dashboard-loading">
-        {/* Option 1: Simple spinner */}
-        <div className="loading-spinner"></div>
-        <p className="text-lg text-gray-800 font-medium">Loading your dashboard...</p>
-        </div>
+       <div className="text-center">
+                   <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+                   <p className="text-lg text-gray-800 font-medium">Loading your dashboard...</p>
+                 </div>
       </MarketplaceLayout>
     );
   }
