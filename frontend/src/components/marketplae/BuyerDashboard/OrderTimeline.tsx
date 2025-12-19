@@ -69,9 +69,12 @@ const OrderTimeline: React.FC<OrderTimelineProps> = ({ events, loading }) => {
 
   if (loading) {
     return (
-      <div className="timeline-loading">
-        <FaSpinner className="loading-spinner" />
-        <p>Loading timeline...</p>
+          <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+                  <p className="text-lg text-gray-800 font-medium">Loading timeline...</p>
+                </div>
+          
       </div>
     );
   }
