@@ -908,7 +908,6 @@ const BuyerDashboard: React.FC = () => {
               <FaUserCircle className="seller-icon" />
               <span className="seller-name">Seller: {seller}</span>
               <span className="seller-rating">
-                <FaStar /> 4.8
               </span>
             </p>
           </div>
