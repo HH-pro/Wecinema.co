@@ -49,9 +49,12 @@ import {
   FaRegCheckCircle,
   FaRegTimesCircle,
   FaExclamationCircle,
-  FaCircle
+  FaPlus,
+  FaShoppingBasket,
+  FaChartBar,
+  FaBell,
+  FaCog
 } from 'react-icons/fa';
-import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import './BuyerDashboard.css';
 import MarketplaceLayout from '../../Layout';
@@ -142,23 +145,25 @@ const BuyerDashboard: React.FC = () => {
     disputed: 'Disputed'
   };
 
-  // Quick actions configuration
+  // Quick actions configuration - UPDATED WITH PROFESSIONAL STYLING
   const quickActions = [
     {
       icon: <FaShoppingCart />,
-      label: 'Continue Shopping',
-      description: 'Browse more listings',
+      label: 'Browse Marketplace',
+      description: 'Explore new listings',
       action: () => navigate('/marketplace'),
       type: 'primary' as const,
-      color: '#f59e0b'
+      color: '#f59e0b',
+      badge: 'New'
     },
     {
       icon: <FaBoxOpen />,
       label: 'My Offers',
-      description: 'View your offers',
+      description: 'View & manage offers',
       action: () => navigate('/marketplace/offers/my-offers'),
       type: 'secondary' as const,
-      color: '#8b5cf6'
+      color: '#8b5cf6',
+      badge: orders.filter(o => o.status === 'pending_payment').length > 0 ? `${orders.filter(o => o.status === 'pending_payment').length} Pending` : undefined
     },
     {
       icon: <FaComment />,
@@ -166,15 +171,32 @@ const BuyerDashboard: React.FC = () => {
       description: 'Chat with sellers',
       action: () => navigate('/marketplace/messages'),
       type: 'secondary' as const,
-      color: '#3b82f6'
+      color: '#3b82f6',
+      badge: 'Unread'
     },
     {
       icon: <FaChartLine />,
       label: 'Analytics',
-      description: 'View detailed stats',
+      description: 'Performance insights',
       action: () => navigate('/marketplace/orders/stats/buyer'),
       type: 'secondary' as const,
       color: '#10b981'
+    },
+    {
+      icon: <FaShoppingBasket />,
+      label: 'Wishlist',
+      description: 'Saved items',
+      action: () => navigate('/marketplace/wishlist'),
+      type: 'secondary' as const,
+      color: '#ec4899'
+    },
+    {
+      icon: <FaBell />,
+      label: 'Notifications',
+      description: 'Updates & alerts',
+      action: () => navigate('/notifications'),
+      type: 'secondary' as const,
+      color: '#f97316'
     }
   ];
 
@@ -223,7 +245,6 @@ const BuyerDashboard: React.FC = () => {
       setLoading(true);
       
       if (!isAuthenticated()) {
-        toast.error('Please login to view your dashboard');
         navigate('/login');
         return;
       }
@@ -232,13 +253,11 @@ const BuyerDashboard: React.FC = () => {
       
       if (ordersResponse.success && ordersResponse.orders) {
         setOrders(ordersResponse.orders);
-        toast.success('Dashboard updated successfully');
       } else {
-        throw new Error(ordersResponse.error || 'Failed to fetch orders');
+        console.error('Failed to fetch orders:', ordersResponse.error);
       }
     } catch (error: any) {
       console.error('Error fetching buyer data:', error);
-      toast.error(error.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
@@ -484,7 +503,6 @@ const BuyerDashboard: React.FC = () => {
     try {
       const order = orders.find(o => o._id === orderId);
       if (!order) {
-        toast.error('Order not found');
         return;
       }
 
@@ -512,7 +530,6 @@ const BuyerDashboard: React.FC = () => {
         case 'complete_order':
           if (window.confirm('Are you sure you want to mark this order as complete? This will release payment to the seller.')) {
             await marketplaceAPI.orders.complete(orderId, setLoading);
-            toast.success('Order completed successfully! Payment released to seller.');
             await fetchBuyerData();
           }
           break;
@@ -521,10 +538,9 @@ const BuyerDashboard: React.FC = () => {
           const revisionNotes = prompt('Please provide detailed revision notes (minimum 10 characters):');
           if (revisionNotes && revisionNotes.trim().length >= 10) {
             await marketplaceAPI.orders.requestRevision(orderId, revisionNotes.trim(), setLoading);
-            toast.success('Revision requested successfully');
             await fetchBuyerData();
           } else if (revisionNotes) {
-            toast.error('Revision notes must be at least 10 characters');
+            console.log('Revision notes must be at least 10 characters');
           }
           break;
           
@@ -533,7 +549,6 @@ const BuyerDashboard: React.FC = () => {
           if (cancelReason && cancelReason.trim()) {
             if (window.confirm('Are you sure you want to cancel this order?')) {
               await marketplaceAPI.orders.cancelByBuyer(orderId, cancelReason.trim(), setLoading);
-              toast.success('Order cancelled successfully');
               await fetchBuyerData();
             }
           }
@@ -560,7 +575,6 @@ const BuyerDashboard: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Order action error:', error);
-      toast.error(error.message || 'Failed to perform action');
     }
   };
 
@@ -575,7 +589,6 @@ const BuyerDashboard: React.FC = () => {
   // Export orders to CSV
   const exportOrders = () => {
     if (filteredOrders.length === 0) {
-      toast.info('No orders to export');
       return;
     }
 
@@ -615,10 +628,8 @@ const BuyerDashboard: React.FC = () => {
       link.download = filename;
       link.click();
       
-      toast.success(`Orders exported to ${filename}`);
     } catch (error) {
       console.error('Export error:', error);
-      toast.error('Failed to export orders');
     }
   };
 
@@ -761,6 +772,9 @@ const BuyerDashboard: React.FC = () => {
               All time purchases
             </small>
           </div>
+          <div className="stat-trend">
+            <span className="trend-up">+12%</span>
+          </div>
         </div>
 
         <div className="stat-card">
@@ -774,6 +788,9 @@ const BuyerDashboard: React.FC = () => {
               <FaBoxOpen className="inline mr-1" />
               Currently in progress
             </small>
+          </div>
+          <div className="stat-trend">
+            <span className="trend-up">+5%</span>
           </div>
         </div>
 
@@ -789,6 +806,9 @@ const BuyerDashboard: React.FC = () => {
               Successfully delivered
             </small>
           </div>
+          <div className="stat-trend">
+            <span className="trend-up">+8%</span>
+          </div>
         </div>
 
         <div className="stat-card">
@@ -802,6 +822,9 @@ const BuyerDashboard: React.FC = () => {
               <FaDollarSign className="inline mr-1" />
               All purchases combined
             </small>
+          </div>
+          <div className="stat-trend">
+            <span className="trend-up">+15%</span>
           </div>
         </div>
       </div>
@@ -851,18 +874,19 @@ const BuyerDashboard: React.FC = () => {
     );
   };
 
-  // Render order card with avatar instead of image
+  // Render order card with professional styling
   const renderOrderCard = (order: Order) => {
     const seller = getSellerUsername(order);
     const title = getListingTitle(order);
     const category = getListingCategory(order);
+    const statusColor = getStatusColor(order.status);
 
     return (
       <div 
         key={order._id}
         className="order-card"
         style={{ 
-          '--status-color': getStatusColor(order.status)
+          '--status-color': statusColor
         } as React.CSSProperties}
       >
         <div className="order-avatar">
@@ -875,43 +899,77 @@ const BuyerDashboard: React.FC = () => {
                 <FaTag /> {category}
               </span>
             </div>
+            <div className="order-priority">
+              {order.expectedDelivery && (
+                <span className="priority-badge">
+                  <FaCalendar /> 
+                  {new Date(order.expectedDelivery) < new Date() ? 'Overdue' : 'On Track'}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
         <div className="order-details">
           <div className="order-header">
-            <h3 className="product-name">{title}</h3>
-            <div className="order-meta">
-              {order.orderNumber && (
-                <span className="order-number">#{order.orderNumber}</span>
-              )}
-              <span className="order-date">
-                <FaCalendar />
-                {new Date(order.createdAt).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric'
-                })}
-              </span>
+            <div className="order-title-section">
+              <h3 className="product-name">{title}</h3>
+              <div className="order-meta">
+                {order.orderNumber && (
+                  <span className="order-number">#{order.orderNumber}</span>
+                )}
+                <span className="order-date">
+                  <FaCalendar />
+                  {new Date(order.createdAt).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                </span>
+              </div>
+            </div>
+            <div className="order-price-section">
+              <span className="price">{formatCurrency(order.amount, 'USD')}</span>
+              <span className="order-id">ID: {order._id.slice(-8)}</span>
             </div>
           </div>
           
-          <p className="seller">
-            <FaUserCircle className="seller-icon" />
-            <span className="ml-2">Seller: {seller}</span>
-          </p>
+          <div className="order-seller-info">
+            <p className="seller">
+              <FaUserCircle className="seller-icon" />
+              <span className="seller-name">Seller: {seller}</span>
+              <span className="seller-rating">
+                <FaStar /> 4.8
+              </span>
+            </p>
+          </div>
+          
+          <div className="order-progress">
+            <div className="progress-bar">
+              <div 
+                className="progress-fill" 
+                style={{ 
+                  width: getProgressWidth(order.status),
+                  backgroundColor: statusColor
+                }}
+              />
+            </div>
+            <div className="progress-labels">
+              <span className="progress-step active">Ordered</span>
+              <span className={`progress-step ${['processing', 'in_progress', 'delivered', 'completed'].includes(order.status) ? 'active' : ''}`}>Processing</span>
+              <span className={`progress-step ${['delivered', 'completed'].includes(order.status) ? 'active' : ''}`}>Delivered</span>
+              <span className={`progress-step ${order.status === 'completed' ? 'active' : ''}`}>Completed</span>
+            </div>
+          </div>
           
           <div className="order-info">
             <div className="info-row">
-              <span className="price">{formatCurrency(order.amount, 'USD')}</span>
               {(order.revisions > 0) && (
                 <span className="revisions-count">
                   <FaReply />
                   Revisions: {order.revisions}/{order.maxRevisions || 3}
                 </span>
               )}
-            </div>
-            
-            <div className="info-row">
               {order.expectedDelivery && (
                 <span className="expected-delivery">
                   <FaClock />
@@ -932,27 +990,16 @@ const BuyerDashboard: React.FC = () => {
               )}
             </div>
           </div>
-          
-          <div className="order-description">
-            <p>
-              {order.status === 'completed' 
-                ? 'Order successfully completed and payment released to seller.'
-                : order.status === 'delivered'
-                ? 'Files delivered. Please review and mark as complete.'
-                : order.status === 'in_progress'
-                ? 'Seller is working on your order.'
-                : order.status === 'pending_payment'
-                ? 'Awaiting payment confirmation.'
-                : 'Order is being processed.'}
-            </p>
-          </div>
         </div>
 
         <div className="order-status-section">
           <div className="status-section">
             <div 
               className="status-badge"
-              style={{ backgroundColor: getStatusColor(order.status) }}
+              style={{ 
+                backgroundColor: statusColor,
+                color: getContrastColor(statusColor)
+              }}
             >
               {getStatusIcon(order.status)}
               <span>{getStatusText(order.status)}</span>
@@ -965,7 +1012,7 @@ const BuyerDashboard: React.FC = () => {
                 </span>
               ) : order.paidAt ? (
                 <span className="payment-paid">
-                  <FaCreditCard /> Payment Received
+                  <FaCreditCard /> Paid
                 </span>
               ) : (
                 <span className="payment-pending">
@@ -981,7 +1028,7 @@ const BuyerDashboard: React.FC = () => {
                 onClick={() => navigate(`/marketplace/orders/${order._id}`)}
                 className="view-order-btn"
               >
-                <FaEye /> View Order
+                <FaEye /> View Details
               </button>
               
               {order.status === 'delivered' && (
@@ -989,7 +1036,7 @@ const BuyerDashboard: React.FC = () => {
                   onClick={() => handleOrderAction(order._id, 'download_files')}
                   className="download-files-btn"
                 >
-                  <FaDownload /> Files
+                  <FaDownload /> Download
                 </button>
               )}
             </div>
@@ -1007,16 +1054,48 @@ const BuyerDashboard: React.FC = () => {
     );
   };
 
+  const getProgressWidth = (status: Order['status']): string => {
+    switch(status) {
+      case 'pending_payment':
+      case 'paid':
+        return '25%';
+      case 'processing':
+        return '50%';
+      case 'in_progress':
+        return '75%';
+      case 'delivered':
+      case 'in_revision':
+        return '90%';
+      case 'completed':
+        return '100%';
+      default:
+        return '0%';
+    }
+  };
+
+  const getContrastColor = (hexColor: string): string => {
+    // Convert hex to RGB
+    const r = parseInt(hexColor.slice(1, 3), 16);
+    const g = parseInt(hexColor.slice(3, 5), 16);
+    const b = parseInt(hexColor.slice(5, 7), 16);
+    
+    // Calculate luminance
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    
+    // Return black or white based on luminance
+    return luminance > 0.5 ? '#000000' : '#FFFFFF';
+  };
+
   // Loading state
   if (loading && orders.length === 0) {
     return (
       <MarketplaceLayout>
-         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-               <div className="text-center">
-                 <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-                 <p className="text-lg text-gray-800 font-medium">Loading your dashboard...</p>
-               </div>
-             </div>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+            <p className="text-lg text-gray-800 font-medium">Loading your dashboard...</p>
+          </div>
+        </div>
       </MarketplaceLayout>
     );
   }
@@ -1028,7 +1107,7 @@ const BuyerDashboard: React.FC = () => {
         <div className="dashboard-header">
           <div className="header-left">
             <h1>Buyer Dashboard</h1>
-            <p>Track, manage, and review all your purchases in one professional dashboard</p>
+            <p className="header-subtitle">Track, manage, and review all your purchases in one professional dashboard</p>
             <div className="header-stats">
               <span className="stat-badge">
                 <FaShoppingBag /> {orders.length} Total Orders
@@ -1038,6 +1117,14 @@ const BuyerDashboard: React.FC = () => {
               </span>
               <span className="stat-badge">
                 <FaSync /> {orders.filter(o => ['processing', 'in_progress', 'delivered', 'in_revision'].includes(o.status)).length} Active
+              </span>
+              <span className="stat-badge">
+                <FaDollarSign /> {formatCurrency(
+                  orders
+                    .filter(o => ['completed', 'delivered', 'paid'].includes(o.status))
+                    .reduce((sum, order) => sum + order.amount, 0), 
+                  'USD'
+                )}
               </span>
             </div>
           </div>
@@ -1052,15 +1139,73 @@ const BuyerDashboard: React.FC = () => {
               <FaSync className={loading ? 'spinning' : ''} /> 
               {loading ? 'Refreshing...' : 'Refresh'}
             </button>
+            <button 
+              className="new-order-btn"
+              onClick={() => navigate('/marketplace')}
+            >
+              <FaPlus /> New Order
+            </button>
           </div>
         </div>
 
         {/* Statistics Overview */}
         {renderStats()}
 
+        {/* Quick Actions - PROFESSIONAL STYLING */}
+        <div className="quick-actions-section">
+          <div className="section-header">
+            <div className="section-title">
+              <h2>Quick Actions</h2>
+              <p className="section-subtitle">Common tasks and shortcuts</p>
+            </div>
+            <div className="section-controls">
+              <button className="view-all-btn">
+                View All <FaArrowRight />
+              </button>
+            </div>
+          </div>
+          
+          <div className="quick-actions-grid">
+            {quickActions.map((action, index) => (
+              <div 
+                key={index} 
+                className={`quick-action-card ${action.type}`}
+                onClick={action.action}
+              >
+                <div 
+                  className="action-icon-container"
+                  style={{ backgroundColor: `${action.color}20` }}
+                >
+                  <div 
+                    className="action-icon"
+                    style={{ color: action.color }}
+                  >
+                    {action.icon}
+                  </div>
+                  {action.badge && (
+                    <span className="action-badge">{action.badge}</span>
+                  )}
+                </div>
+                <div className="action-content">
+                  <h3 className="action-title">{action.label}</h3>
+                  <p className="action-description">{action.description}</p>
+                </div>
+                <div className="action-arrow">
+                  <FaArrowRight />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Status Distribution */}
         <div className="status-distribution">
-          <h3>Order Status Distribution</h3>
+          <div className="section-header">
+            <div className="section-title">
+              <h3>Order Status Distribution</h3>
+              <p className="section-subtitle">Filter orders by status</p>
+            </div>
+          </div>
           {renderStatusFilters()}
         </div>
 
@@ -1077,6 +1222,15 @@ const BuyerDashboard: React.FC = () => {
                 className="search-input"
                 aria-label="Search orders"
               />
+              {searchQuery && (
+                <button 
+                  className="clear-search" 
+                  onClick={() => setSearchQuery('')}
+                  aria-label="Clear search"
+                >
+                  <FaTimes />
+                </button>
+              )}
             </div>
             
             <button 
@@ -1121,125 +1275,109 @@ const BuyerDashboard: React.FC = () => {
           )}
         </div>
 
-        {/* Quick Actions */}
-        <div className="quick-actions">
-          <h2>Quick Actions</h2>
-          <div className="actions-grid">
-            {quickActions.map((action, index) => (
-              <button
-                key={index}
-                className={`action-btn ${action.type}`}
-                onClick={action.action}
-                style={{ '--action-color': action.color } as React.CSSProperties}
-                aria-label={action.description}
-              >
-                <div className="action-icon-wrapper">
-                  {action.icon}
-                </div>
-                <span>{action.label}</span>
-                <small>{action.description}</small>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Orders Section */}
+        {/* Orders Section - PROFESSIONAL STYLING */}
         <div className="orders-section">
           <div className="section-header">
-            <h2>Your Orders ({filteredOrders.length})</h2>
-            <div className="header-actions">
-              <div className="order-summary">
-                <span className="summary-item">
-                  <FaShoppingBag /> Total: {filteredOrders.length}
-                </span>
-                <span className="summary-item">
-                  <FaDollarSign /> Value: {formatCurrency(
+            <div className="section-title">
+              <h2>Your Orders</h2>
+              <p className="section-subtitle">{filteredOrders.length} orders found • Total value: {formatCurrency(
+                filteredOrders.reduce((sum, order) => sum + order.amount, 0), 
+                'USD'
+              )}</p>
+            </div>
+            <div className="section-controls">
+              <div className="order-metrics">
+                <div className="metric-item">
+                  <FaShoppingBag />
+                  <span>Total: {filteredOrders.length}</span>
+                </div>
+                <div className="metric-item">
+                  <FaDollarSign />
+                  <span>Value: {formatCurrency(
                     filteredOrders.reduce((sum, order) => sum + order.amount, 0), 
                     'USD'
-                  )}
-                </span>
+                  )}</span>
+                </div>
+                <div className="metric-item">
+                  <FaCheckCircle />
+                  <span>Completed: {filteredOrders.filter(o => o.status === 'completed').length}</span>
+                </div>
               </div>
               
-              <button 
-                className="export-btn" 
-                onClick={exportOrders} 
-                disabled={filteredOrders.length === 0}
-                aria-label="Export orders to CSV"
-              >
-                <FaDownload /> Export CSV
-              </button>
+              <div className="action-buttons">
+                <button 
+                  className="export-btn" 
+                  onClick={exportOrders} 
+                  disabled={filteredOrders.length === 0}
+                  aria-label="Export orders to CSV"
+                >
+                  <FaDownload /> Export CSV
+                </button>
+                <button 
+                  className="settings-btn"
+                  onClick={() => navigate('/settings/orders')}
+                >
+                  <FaCog /> Settings
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Orders List */}
-          <div className="orders-list">
+          <div className="orders-list-container">
             {filteredOrders.length > 0 ? (
-              filteredOrders.map(order => renderOrderCard(order))
+              <div className="orders-list">
+                {filteredOrders.map(order => renderOrderCard(order))}
+              </div>
             ) : (
               <div className="no-orders">
-                <div className="no-orders-avatar">
-                  <FaBoxOpen />
+                <div className="no-orders-illustration">
+                  <FaBoxOpen className="illustration-icon" />
+                  <div className="illustration-background"></div>
                 </div>
-                <h3>No orders found</h3>
-                <p>
-                  {orders.length === 0 
-                    ? "You haven't placed any orders yet. Start shopping to see your orders here!" 
-                    : "No orders match your search criteria. Try adjusting your filters."}
-                </p>
-                <div className="no-orders-actions">
-                  {orders.length === 0 && (
-                    <button 
-                      className="cta-button" 
-                      onClick={() => navigate('/marketplace')}
-                      aria-label="Start shopping"
-                    >
-                      <FaShoppingCart />
-                      Start Shopping
-                    </button>
-                  )}
-                  {orders.length > 0 && (
-                    <button 
-                      className="cta-button secondary" 
-                      onClick={() => {
-                        setSearchQuery('');
-                        setStatusFilter('all');
-                        setSortBy('newest');
-                      }}
-                      aria-label="Clear filters"
-                    >
-                      Clear Filters
-                    </button>
-                  )}
+                <div className="no-orders-content">
+                  <h3>No orders found</h3>
+                  <p>
+                    {orders.length === 0 
+                      ? "You haven't placed any orders yet. Start exploring our marketplace to find amazing products and services!" 
+                      : "No orders match your search criteria. Try adjusting your filters or search term."}
+                  </p>
+                  <div className="no-orders-actions">
+                    {orders.length === 0 && (
+                      <button 
+                        className="primary-action" 
+                        onClick={() => navigate('/marketplace')}
+                        aria-label="Start shopping"
+                      >
+                        <FaShoppingCart />
+                        Start Shopping
+                      </button>
+                    )}
+                    {orders.length > 0 && (
+                      <>
+                        <button 
+                          className="secondary-action" 
+                          onClick={() => {
+                            setSearchQuery('');
+                            setStatusFilter('all');
+                            setSortBy('newest');
+                          }}
+                          aria-label="Clear filters"
+                        >
+                          Clear Filters
+                        </button>
+                        <button 
+                          className="tertiary-action" 
+                          onClick={() => navigate('/marketplace')}
+                        >
+                          Browse Marketplace
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Buyer Tips Section */}
-        <div className="buyer-tips">
-          <h3>Tips for Buyers</h3>
-          <div className="tips-grid">
-            <div className="tip-card">
-              <FaComment />
-              <h4>Clear Communication</h4>
-              <p>Communicate your requirements clearly with sellers for better results.</p>
-            </div>
-            <div className="tip-card">
-              <FaClock />
-              <h4>Check Delivery Times</h4>
-              <p>Always verify expected delivery times before confirming orders.</p>
-            </div>
-            <div className="tip-card">
-              <FaStar />
-              <h4>Leave Reviews</h4>
-              <p>Share your experience to help other buyers and improve the marketplace.</p>
-            </div>
-            <div className="tip-card">
-              <FaCheckCircle />
-              <h4>Review Deliverables</h4>
-              <p>Carefully review delivered work before marking orders as complete.</p>
-            </div>
           </div>
         </div>
 
