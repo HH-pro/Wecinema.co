@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { 
   FaShoppingBag, 
   FaClock, 
@@ -203,6 +203,7 @@ const BuyerDashboard: React.FC = () => {
   
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const dropdownToggleRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
   
   const navigate = useNavigate();
 
@@ -282,24 +283,27 @@ const BuyerDashboard: React.FC = () => {
     }
   ];
 
+  // ==================== FIXED: Click Outside Handler ====================
   useEffect(() => {
     fetchBuyerData();
     
-    // Click outside handler for dropdowns
+    // Simple click outside handler
     const handleClickOutside = (event: MouseEvent) => {
       if (!activeDropdown) return;
       
-      const clickedElement = event.target as HTMLElement;
-      const dropdownElement = dropdownRefs.current[activeDropdown];
+      const target = event.target as HTMLElement;
+      const isClickInside = Object.values(dropdownRefs.current).some(ref => 
+        ref && ref.contains(target)
+      );
       
-      if (dropdownElement && !dropdownElement.contains(clickedElement)) {
+      if (!isClickInside) {
         setActiveDropdown(null);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('click', handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('click', handleClickOutside);
     };
   }, [activeDropdown]);
 
@@ -936,79 +940,69 @@ const BuyerDashboard: React.FC = () => {
     }
   };
 
-  // Dropdown toggle function
-  const toggleDropdown = (orderId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (activeDropdown === orderId) {
-      setActiveDropdown(null);
-    } else {
-      setActiveDropdown(orderId);
-    }
-  };
+  // ==================== FIXED: Dropdown toggle function ====================
+  const toggleDropdown = useCallback((orderId: string) => {
+    console.log('Toggling dropdown for:', orderId);
+    setActiveDropdown(prev => prev === orderId ? null : orderId);
+  }, []);
 
-  // Close all dropdowns
-  const closeAllDropdowns = () => {
-    setActiveDropdown(null);
-  };
-
-  // Render dropdown for order
+  // ==================== FIXED: renderDropdown function ====================
   const renderDropdown = (order: Order) => {
     const actions = getOrderActions(order);
     const isDropdownOpen = activeDropdown === order._id;
 
-    if (actions.length <= 1) return null; // Don't show dropdown if only view details is available
+    // اگر actions نہ ہوں تو dropdown نہ دکھائیں
+    if (actions.length <= 1) {
+      return null;
+    }
 
     return (
       <div 
-        className="dropdown-actions" 
+        className="dropdown-actions"
         ref={el => {
           if (el) dropdownRefs.current[order._id] = el;
         }}
       >
         <div className="dropdown">
-          <button 
-            className={`dropdown-toggle ${isDropdownOpen ? 'active' : ''}`}
-            onClick={(e) => toggleDropdown(order._id, e)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                toggleDropdown(order._id, e as any);
-              }
+          <button
+            ref={el => {
+              if (el) dropdownToggleRefs.current[order._id] = el;
             }}
-            aria-haspopup="true"
-            aria-expanded={isDropdownOpen}
+            className={`dropdown-toggle ${isDropdownOpen ? 'active' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              toggleDropdown(order._id);
+            }}
+            type="button"
           >
             <span>More Actions</span>
             <FaChevronDown className={`dropdown-arrow ${isDropdownOpen ? 'rotate' : ''}`} />
           </button>
           
-          <div 
-            className={`dropdown-menu ${isDropdownOpen ? 'show' : ''}`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {actions.map((action, index) => (
-              <button
-                key={index}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleOrderAction(order._id, action.action);
-                  closeAllDropdowns();
-                }}
-                className={`dropdown-item ${action.className}`}
-                disabled={action.disabled}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
+          {isDropdownOpen && (
+            <div 
+              className="dropdown-menu show"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {actions.map((action, index) => (
+                <button
+                  key={index}
+                  className={`dropdown-item ${action.className}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
                     handleOrderAction(order._id, action.action);
-                    closeAllDropdowns();
-                  }
-                }}
-              >
-                {action.icon}
-                <span>{action.label}</span>
-              </button>
-            ))}
-          </div>
+                    setActiveDropdown(null);
+                  }}
+                  disabled={action.disabled}
+                  type="button"
+                >
+                  {action.icon}
+                  <span>{action.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1142,7 +1136,12 @@ const BuyerDashboard: React.FC = () => {
         style={{ 
           '--status-color': getStatusColor(order.status)
         } as React.CSSProperties}
-        onClick={() => closeAllDropdowns()}
+        onClick={() => {
+          // Close dropdown if open
+          if (activeDropdown === order._id) {
+            setActiveDropdown(null);
+          }
+        }}
       >
         <div className="order-image">
           <div className="image-container">
@@ -1461,7 +1460,7 @@ const BuyerDashboard: React.FC = () => {
 
   return (
     <MarketplaceLayout>
-      <div className="buyer-dashboard" onClick={closeAllDropdowns}>
+      <div className="buyer-dashboard">
         {/* Header */}
         <div className="dashboard-header">
           <div className="header-left">
@@ -1506,23 +1505,19 @@ const BuyerDashboard: React.FC = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="search-input"
-                onClick={(e) => e.stopPropagation()}
               />
             </div>
             
             <button 
               className="filter-toggle" 
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowFilters(!showFilters);
-              }}
+              onClick={() => setShowFilters(!showFilters)}
             >
               <FaFilter /> {showFilters ? 'Hide Filters' : 'Show Filters'}
             </button>
           </div>
           
           {showFilters && (
-            <div className="advanced-filters" onClick={(e) => e.stopPropagation()}>
+            <div className="advanced-filters">
               <div className="filter-group">
                 <label>Sort By:</label>
                 <select 
