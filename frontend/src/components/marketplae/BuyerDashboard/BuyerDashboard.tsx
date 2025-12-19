@@ -1291,12 +1291,7 @@ const BuyerDashboard: React.FC = () => {
                 >
                   <FaDownload /> Export CSV
                 </button>
-                <button 
-                  className="settings-btn"
-                  onClick={() => navigate('/settings/orders')}
-                >
-                  <FaCog /> Settings
-                </button>
+               
               </div>
             </div>
           </div>
