@@ -19,7 +19,7 @@ import { IoSunnyOutline } from "react-icons/io5";
 import { CgProfile } from "react-icons/cg";
 import { Link } from "react-router-dom";
 import { TbVideoPlus } from "react-icons/tb";
-import { FaUser, FaSignOutAlt, FaUserTie, FaShoppingCart } from "react-icons/fa";
+import { FaUser, FaSignOutAlt, FaUserTie, FaShoppingCart, FaInfoCircle } from "react-icons/fa";
 import { RiCustomerService2Line } from "react-icons/ri";
 import { MdOutlinePrivacyTip } from "react-icons/md";
 import { toast } from "react-toastify";
@@ -191,8 +191,6 @@ const Sidebar: React.FC<SidebarProps> = ({
           {/* Buyer Specific Links */}
           {userType === 'buyer' && (
             <>
-             
-
               <Link
                 to="/marketplace/buyer-dashboard"
                 className={`sidebar-item ${getActiveClass(
@@ -217,7 +215,6 @@ const Sidebar: React.FC<SidebarProps> = ({
           {/* Seller Specific Links */}
           {userType === 'seller' && (
             <>
-             
               <Link
                 to="/marketplace/create"
                 className={`sidebar-item ${getActiveClass(
@@ -228,16 +225,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <span className="sidebar-text">Create Listing</span>
               </Link>
 
-              {/* <Link
-                to="/marketplace/seller-orders"
-                className={`sidebar-item ${getActiveClass(
-                  "/marketplace/seller-orders"
-                )} ${expand ? "" : "collapsed"}`}
-              >
-                <RiShoppingBagLine className="sidebar-icon" />
-                <span className="sidebar-text">Orders Received</span>
-              </Link> */}
-
               <Link
                 to="/marketplace/dashboard"
                 className={`sidebar-item ${getActiveClass(
@@ -247,16 +234,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <RiListCheck className="sidebar-icon" />
                 <span className="sidebar-text">Seller Dashboard</span>
               </Link>
-
-              {/* <Link
-                to="/marketplace/my-listings"
-                className={`sidebar-item ${getActiveClass(
-                  "/marketplace/my-listings"
-                )} ${expand ? "" : "collapsed"}`}
-              >
-                <RiListCheck className="sidebar-icon" />
-                <span className="sidebar-text">My Listings</span>
-              </Link> */}
             </>
           )}
         </ul>
@@ -375,7 +352,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       {/* -------- SETTINGS / ACCOUNT -------- */}
       <nav className="sidebar-section-container">
         <h2 className={`sidebar-section-title ${expand ? "" : "collapsed"}`}>
-          Theme
+          Settings
         </h2>
         <ul className="sidebar-section">
           <div
@@ -396,6 +373,16 @@ const Sidebar: React.FC<SidebarProps> = ({
             <IoSunnyOutline className="sidebar-icon" />
             <span className="sidebar-text">Light mode</span>
           </div>
+
+          <Link
+            to="/about"
+            className={`sidebar-item ${getActiveClass("/about")} ${
+              expand ? "" : "collapsed"
+            }`}
+          >
+            <FaInfoCircle className="sidebar-icon" />
+            <span className="sidebar-text">About WeCinema</span>
+          </Link>
 
           {isLoggedIn ? (
             <>
