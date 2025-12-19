@@ -845,7 +845,6 @@ const BuyerDashboard: React.FC = () => {
 
   // Render order card with professional styling
   const renderOrderCard = (order: Order) => {
-    const seller = getSellerUsername(order);
     const title = getListingTitle(order);
     const category = getListingCategory(order);
     const statusColor = getStatusColor(order.status);
