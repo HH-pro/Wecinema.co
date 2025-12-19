@@ -144,6 +144,7 @@ const BuyerStatsPage: React.FC = () => {
                    <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
                    <p className="text-lg text-gray-800 font-medium">Loading statistics...</p>
                  </div>
+                 </div>
          
       </MarketplaceLayout>
     );
