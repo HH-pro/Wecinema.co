@@ -111,7 +111,6 @@ const BuyerDashboard: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('newest');
   const [showOrderDetails, setShowOrderDetails] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [showActionsModal, setShowActionsModal] = useState(false);
   const [selectedOrderForActions, setSelectedOrderForActions] = useState<Order | null>(null);
@@ -1201,46 +1200,9 @@ const BuyerDashboard: React.FC = () => {
               )}
             </div>
             
-            <button 
-              className="filter-toggle" 
-              onClick={() => setShowFilters(!showFilters)}
-              aria-expanded={showFilters}
-            >
-              <FaFilter /> {showFilters ? 'Hide Filters' : 'Show Filters'}
-            </button>
+           
           </div>
           
-          {showFilters && (
-            <div className="advanced-filters">
-              <div className="filter-group">
-                <label>Sort By:</label>
-                <select 
-                  value={sortBy} 
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="filter-select"
-                  aria-label="Sort orders by"
-                >
-                  <option value="newest">Newest First</option>
-                  <option value="oldest">Oldest First</option>
-                  <option value="price_high">Price: High to Low</option>
-                  <option value="price_low">Price: Low to High</option>
-                  <option value="status">Status</option>
-                </select>
-              </div>
-              
-              <button 
-                className="clear-filters" 
-                onClick={() => {
-                  setSearchQuery('');
-                  setStatusFilter('all');
-                  setSortBy('newest');
-                }}
-                aria-label="Clear all filters"
-              >
-                Clear All Filters
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Orders Section - PROFESSIONAL STYLING */}
