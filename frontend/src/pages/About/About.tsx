@@ -430,7 +430,7 @@ const About: React.FC = () => {
               <div className="personal-info">
                 <div className="personal-avatar">
                   <img 
-                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&h=300&q=80" 
+                    src="" 
                     alt="Hamza Manzoor" 
                   />
                   <div className="avatar-badge">
