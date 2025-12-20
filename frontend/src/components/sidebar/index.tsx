@@ -374,16 +374,6 @@ const Sidebar: React.FC<SidebarProps> = ({
             <span className="sidebar-text">Light mode</span>
           </div>
 
-          <Link
-            to="/about"
-            className={`sidebar-item ${getActiveClass("/about")} ${
-              expand ? "" : "collapsed"
-            }`}
-          >
-            <FaInfoCircle className="sidebar-icon" />
-            <span className="sidebar-text">About WeCinema</span>
-          </Link>
-
           {isLoggedIn ? (
             <>
               <Link
@@ -446,6 +436,16 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             <MdOutlinePrivacyTip className="sidebar-icon" />
             <span className="sidebar-text">Privacy</span>
+          </Link>
+
+          <Link
+            to="/about"
+            className={`sidebar-item ${getActiveClass("/about")} ${
+              expand ? "" : "collapsed"
+            }`}
+          >
+            <FaInfoCircle className="sidebar-icon" />
+            <span className="sidebar-text">About</span>
           </Link>
 
           <Link
