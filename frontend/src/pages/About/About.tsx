@@ -1,5 +1,6 @@
 import React from 'react';
 import Layout from '../../components/Layout';
+import profileImg from "../../assets/profile.png";
 
 import { 
   FaCode,
@@ -429,10 +430,7 @@ const About: React.FC = () => {
             <div className="personal-content">
               <div className="personal-info">
                 <div className="personal-avatar">
-                  <img 
-                    src="" 
-                    alt="Hamza Manzoor" 
-                  />
+                <img src={profileImg} alt="Hamza Manzoor" />
                   <div className="avatar-badge">
                     <FaCode /> Founder & Lead Developer
                   </div>
