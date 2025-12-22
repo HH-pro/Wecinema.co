@@ -4,7 +4,6 @@ import { marketplaceAPI, getOrderStatusInfo, formatCurrency, formatDate } from '
 import OrderStatusTracker from './OrderStatusTracker';
 import OrderActionGuide from './OrderActionGuide';
 import DeliveryModal from './DeliveryModal';
-import { toast } from 'react-toastify';
 
 interface Order {
   _id: string;
@@ -107,7 +106,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     setDeliveryModalOpen(true);
   };
 
-  // ✅ IMPROVED FILE UPLOAD FUNCTION WITH BETTER ERROR HANDLING
+  // ✅ IMPROVED FILE UPLOAD FUNCTION WITHOUT TOASTS
   const handleActualDeliver = async (deliveryData: {
     orderId: string;
     message: string;
@@ -153,11 +152,11 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
           
           // Check if it's a file type error
           if (uploadError.message?.includes('File type') || uploadError.message?.includes('not supported')) {
-            toast.error(`❌ ${uploadError.message}. Please use supported file types.`);
+            console.error(`❌ ${uploadError.message}. Please use supported file types.`);
           } else if (uploadError.message?.includes('size')) {
-            toast.error('❌ File too large. Maximum size is 100MB.');
+            console.error('❌ File too large. Maximum size is 100MB.');
           } else {
-            toast.error(`❌ File upload failed: ${uploadError.message || 'Please try again'}`);
+            console.error(`❌ File upload failed: ${uploadError.message || 'Please try again'}`);
           }
           return; // Stop if file upload fails
         }
@@ -180,7 +179,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
             },
             setIsSubmittingDelivery
           );
-          toast.success('✅ Revision completed successfully!');
+          console.log('✅ Revision completed successfully!');
         } else {
           // Initial delivery with email
           console.log('📤 Delivering order with email...');
@@ -193,16 +192,16 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
             },
             setIsSubmittingDelivery
           );
-          toast.success('✅ Order delivered successfully! Buyer has been notified via email.');
+          console.log('✅ Order delivered successfully! Buyer has been notified via email.');
         }
       } catch (apiError: any) {
         console.error('❌ API Error:', apiError);
         
         // Handle specific API errors
         if (apiError.message?.includes('Validation failed')) {
-          toast.error('❌ Please check your delivery details and try again.');
+          console.error('❌ Please check your delivery details and try again.');
         } else if (apiError.message?.includes('not found')) {
-          toast.error('❌ Order not found or you do not have permission.');
+          console.error('❌ Order not found or you do not have permission.');
         } else {
           throw apiError; // Re-throw for outer catch
         }
@@ -217,7 +216,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     } catch (error: any) {
       console.error('❌ Delivery error:', error);
       
-      // Show specific error messages
+      // Show specific error messages in console only
       let errorMessage = 'Delivery failed. Please try again.';
       
       if (error.message?.includes('File type')) {
@@ -230,13 +229,13 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
         errorMessage = error.message;
       }
       
-      toast.error(`❌ ${errorMessage}`);
+      console.error(`❌ ${errorMessage}`);
     } finally {
       setIsSubmittingDelivery(false);
     }
   };
 
-  // ✅ DIRECT FILE UPLOAD FUNCTION WITH BETTER ERROR HANDLING
+  // ✅ DIRECT FILE UPLOAD FUNCTION WITHOUT TOASTS
   const uploadFilesDirect = async (files: File[]) => {
     try {
       const formData = new FormData();
@@ -299,7 +298,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
       setDeliveryModalOpen(true);
     } catch (error: any) {
       console.error('❌ Revision setup error:', error);
-      toast.error(`❌ ${error.message || 'Failed to start revision'}`);
+      console.error(`❌ ${error.message || 'Failed to start revision'}`);
     }
   };
 
