@@ -614,21 +614,7 @@ export const getUserRole = (): string | null => {
     return null;
   }
 };
-export const getCurrentUserId = (): string | null => {
-  if (typeof window === 'undefined') return null;
-  
-  const userData = localStorage.getItem('user');
-  if (userData) {
-    try {
-      const user = JSON.parse(userData);
-      return user._id || user.id || null;
-    } catch (error) {
-      console.error('Error parsing user data:', error);
-      return null;
-    }
-  }
-  return null;
-};
+
 
 /**
  * Check if a string is a valid MongoDB ObjectId
