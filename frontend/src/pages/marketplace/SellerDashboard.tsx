@@ -1,7 +1,7 @@
 // src/pages/seller/SellerDashboard.tsx
 import React, { useState, useEffect } from 'react';
 import MarketplaceLayout from '../../components/Layout';
-import { getCurrentUserId } from '../../utilities/helperfFunction';
+import { getCurrentUserId, isValidObjectId } from '../../utilities/helperfFunction';
 import { formatCurrency } from '../../api';
 import axios from 'axios';
 
@@ -205,12 +205,12 @@ const SellerDashboard: React.FC = () => {
   const activeListings = listingsData?.listings?.filter((listing) => listing.status === 'active').length || 0;
   const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
 
-  // Tab configuration - MOVE THIS AFTER pendingOffers is calculated
+  // Tab configuration
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊', badge: null },
-    { id: 'offers', label: 'Offers', icon: '💼', badge: pendingOffers },
-    { id: 'listings', label: 'My Listings', icon: '🏠', badge: totalListings },
-    { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders }
+    { id: 'offers', label: 'Offers', icon: '💼', badge: pendingOffers > 0 ? pendingOffers : null },
+    { id: 'listings', label: 'My Listings', icon: '🏠', badge: totalListings > 0 ? totalListings : null },
+    { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders > 0 ? orderStats.activeOrders : null }
   ];
 
   // Action cards data
@@ -445,7 +445,17 @@ const SellerDashboard: React.FC = () => {
 
   const checkStripeAccountStatus = async () => {
     try {
-      // Your Stripe status check logic here
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/status`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      
+      if (response.data.success) {
+        setStripeStatus(response.data);
+      }
     } catch (err) {
       console.error('Error checking Stripe status:', err);
     }
@@ -480,7 +490,7 @@ const SellerDashboard: React.FC = () => {
     setRefreshing(false);
   };
 
-  // Simplified order management functions
+  // Order management functions
   const handleSimpleStartProcessing = async (order: Order) => {
     try {
       setOrderActionLoading(order._id);
@@ -636,6 +646,29 @@ const SellerDashboard: React.FC = () => {
   };
 
   const handleViewOrderDetails = (orderId: string) => {
+    // Validate the order ID
+    if (!orderId) {
+      setError('No order ID provided');
+      return;
+    }
+
+    // Check if it's a valid MongoDB ObjectId
+    if (!isValidObjectId(orderId)) {
+      // Try to find the order by orderNumber or other identifier
+      const foundOrder = orders.find(order => 
+        order.orderNumber === orderId || 
+        order._id === orderId
+      );
+      
+      if (foundOrder && isValidObjectId(foundOrder._id)) {
+        setSelectedOrderId(foundOrder._id);
+        setShowOrderModal(true);
+      } else {
+        setError(`Invalid order ID: ${orderId}. Please try again.`);
+      }
+      return;
+    }
+
     setSelectedOrderId(orderId);
     setShowOrderModal(true);
   };
@@ -657,7 +690,38 @@ const SellerDashboard: React.FC = () => {
   };
 
   const handleOfferAction = async (offerId: string, action: string) => {
-    // Your offer action logic here
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/offers/${offerId}/${action}`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      
+      if (response.data.success) {
+        setSuccessMessage(`Offer ${action === 'accept' ? 'accepted' : 'rejected'} successfully!`);
+        // Refresh offers
+        const offersResponse = await axios.get(
+          `${API_BASE_URL}/marketplace/offers/received-offers`,
+          {
+            headers: { Authorization: `Bearer ${token}` }
+          }
+        );
+        
+        if (offersResponse.data.success) {
+          setOffers(offersResponse.data.offers || []);
+        }
+      }
+    } catch (error: any) {
+      console.error('Error handling offer action:', error);
+      setError(`Failed to ${action} offer. Please try again.`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleStripeSetupSuccess = () => {
@@ -667,6 +731,11 @@ const SellerDashboard: React.FC = () => {
       checkStripeAccountStatus();
       fetchDashboardData();
     }, 2000);
+  };
+
+  const handleOrderUpdate = (orderId: string, newStatus: string) => {
+    updateOrderInState(orderId, newStatus);
+    setSuccessMessage(`Order status updated to ${newStatus}!`);
   };
 
   // Clear messages after 5 seconds
@@ -716,7 +785,7 @@ const SellerDashboard: React.FC = () => {
             earnings={formatCurrency(orderStats.totalRevenue)}
             onRefresh={handleRefresh}
             refreshing={refreshing}
-            // showStripeButton={!(stripeStatus?.connected && stripeStatus?.chargesEnabled)}
+            showStripeButton={!(stripeStatus?.connected && stripeStatus?.chargesEnabled)}
             onStripeSetup={() => setShowStripeSetup(true)}
           />
 
@@ -863,6 +932,7 @@ const SellerDashboard: React.FC = () => {
                 setShowOrderModal(false);
                 setSelectedOrderId(null);
               }}
+              onOrderUpdate={handleOrderUpdate}
             />
           )}
 
@@ -874,7 +944,11 @@ const SellerDashboard: React.FC = () => {
                 setShowEditModal(false);
                 setEditingListing(null);
               }}
-              onUpdate={() => {}}
+              onUpdate={() => {
+                setShowEditModal(false);
+                setEditingListing(null);
+                fetchListings();
+              }}
               loading={false}
             />
           )}
@@ -887,7 +961,11 @@ const SellerDashboard: React.FC = () => {
                 setShowDeleteModal(false);
                 setDeletingListing(null);
               }}
-              onConfirm={() => {}}
+              onConfirm={() => {
+                setShowDeleteModal(false);
+                setDeletingListing(null);
+                fetchListings();
+              }}
               loading={false}
             />
           )}
