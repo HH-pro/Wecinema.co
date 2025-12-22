@@ -1,4 +1,4 @@
-// src/components/marketplae/seller/OrderDetailsModal.tsx
+// src/components/marketplace/seller/OrderDetailsModal.tsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
@@ -72,18 +72,34 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     }
   }, [isOpen, orderId]);
 
+  const isValidObjectId = (id: string): boolean => {
+    return /^[0-9a-fA-F]{24}$/.test(id);
+  };
+
   const fetchOrderDetails = async () => {
     if (!orderId) return;
+    
+    // Validate orderId format
+    if (!isValidObjectId(orderId)) {
+      setError('Invalid order ID format');
+      return;
+    }
     
     try {
       setLoading(true);
       setError('');
       
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      
+      // Use a non-conflicting endpoint
       const response = await axios.get(
-        `${API_BASE_URL}/marketplace/orders/${orderId}`,
+        `${API_BASE_URL}/marketplace/order-details`, // New endpoint that doesn't conflict
         {
-          headers: { Authorization: `Bearer ${token}` },
+          params: { orderId },
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Cache-Control': 'no-cache'
+          },
           timeout: 10000
         }
       );
@@ -91,11 +107,37 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       if (response.data.success) {
         setOrderDetails(response.data.order);
       } else {
-        setError('Failed to load order details');
+        setError(response.data.error || 'Failed to load order details');
       }
     } catch (err: any) {
       console.error('Error fetching order details:', err);
-      setError(err.response?.data?.error || 'Failed to load order details');
+      
+      // Fallback: Try alternative endpoint
+      if (err.response?.status === 404 || err.response?.status === 500) {
+        try {
+          const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+          // Try alternative endpoint pattern
+          const fallbackResponse = await axios.get(
+            `${API_BASE_URL}/marketplace/orders/details/${orderId}`,
+            {
+              headers: { 
+                Authorization: `Bearer ${token}`,
+                'Cache-Control': 'no-cache'
+              },
+              timeout: 10000
+            }
+          );
+          
+          if (fallbackResponse.data.success) {
+            setOrderDetails(fallbackResponse.data.order);
+            return;
+          }
+        } catch (fallbackErr) {
+          console.error('Fallback fetch failed:', fallbackErr);
+        }
+      }
+      
+      setError(err.response?.data?.error || 'Failed to load order details. Please try again.');
     } finally {
       setLoading(false);
     }
