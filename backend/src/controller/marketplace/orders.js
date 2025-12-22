@@ -642,12 +642,74 @@ router.get("/stats/buyer", authenticateMiddleware, async (req, res) => {
   }
 });
 
-// ========== BUYER ORDER DETAILS ========== //
+// ======================================================
+// ========== SELLER-SPECIFIC ROUTES ==========
+// ======================================================
+
+// ========== SELLER ORDER QUERIES ========== //
+router.get("/my-sales", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ 
+        success: false,
+        error: 'Authentication required' 
+      });
+    }
+
+    const sales = await Order.find({ sellerId: userId })
+      .populate('buyerId', 'username avatar email firstName lastName')
+      .populate('listingId', 'title mediaUrls price category type')
+      .populate('offerId', 'amount message requirements')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const stats = {
+      total: sales.length,
+      active: sales.filter(o => ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(o.status)).length,
+      completed: sales.filter(o => o.status === 'completed').length,
+      pending: sales.filter(o => o.status === 'pending_payment').length,
+      cancelled: sales.filter(o => o.status === 'cancelled').length,
+      totalRevenue: sales.filter(o => o.status === 'completed').reduce((sum, order) => sum + (order.amount || 0), 0),
+      pendingRevenue: sales.filter(o => ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(o.status))
+        .reduce((sum, order) => sum + (order.amount || 0), 0)
+    };
+
+    res.status(200).json({
+      success: true,
+      sales,
+      stats,
+      count: sales.length
+    });
+  } catch (error) {
+    console.error('Error fetching sales:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch sales',
+      details: error.message 
+    });
+  }
+});
+
+// ========== SINGLE ORDER DETAILS ROUTE ========== //
+// ✅ FIXED: This route should be AFTER special routes like /my-sales
 router.get("/:orderId", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
     const userId = req.user.id || req.user._id || req.user.userId;
     const userRole = req.user.role || 'buyer';
+
+    console.log('Fetching order details for:', { orderId, userId, userRole });
+
+    // ✅ FIXED: First check if it's a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid order ID format',
+        details: 'Order ID must be a valid MongoDB ObjectId'
+      });
+    }
 
     const order = await populateOrder(orderId).lean();
 
@@ -659,7 +721,25 @@ router.get("/:orderId", authenticateMiddleware, async (req, res) => {
     }
 
     // Validate user access
-    const { isBuyer, isSeller } = validateUserAccess(order, userId, userRole);
+    let isBuyer = false;
+    let isSeller = false;
+    
+    try {
+      const access = validateUserAccess(order, userId, userRole);
+      if (access === true) {
+        // Admin access
+        isBuyer = false;
+        isSeller = false;
+      } else {
+        isBuyer = access.isBuyer;
+        isSeller = access.isSeller;
+      }
+    } catch (accessError) {
+      return res.status(403).json({ 
+        success: false,
+        error: accessError.message 
+      });
+    }
 
     const deliveries = await Delivery.find({ orderId: order._id })
       .populate('sellerId', 'username avatar firstName lastName')
@@ -685,7 +765,7 @@ router.get("/:orderId", authenticateMiddleware, async (req, res) => {
       deliveries,
       deliveryFiles,
       timeline,
-      userRole: isBuyer ? 'buyer' : 'seller',
+      userRole: isBuyer ? 'buyer' : (isSeller ? 'seller' : 'admin'),
       permissions: {
         canCompletePayment: isBuyer && order.status === 'pending_payment',
         canRequestRevision: isBuyer && order.status === 'delivered' && order.revisions < order.maxRevisions,
@@ -694,7 +774,11 @@ router.get("/:orderId", authenticateMiddleware, async (req, res) => {
         canDownloadFiles: isBuyer && ['delivered', 'completed', 'in_revision'].includes(order.status),
         canContactSeller: isBuyer,
         canLeaveReview: isBuyer && order.status === 'completed',
-        canViewDeliveryHistory: isBuyer
+        canViewDeliveryHistory: isBuyer || isSeller,
+        canStartProcessing: isSeller && order.status === 'paid',
+        canStartWork: isSeller && ['processing', 'paid'].includes(order.status),
+        canDeliver: isSeller && order.status === 'in_progress',
+        canCompleteRevision: isSeller && order.status === 'in_revision'
       },
       orderSummary: {
         totalAmount: order.amount,
@@ -750,6 +834,14 @@ router.get("/:orderId/timeline", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
     const userId = req.user.id || req.user._id || req.user.userId;
+
+    // ✅ FIXED: Check if valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid order ID' 
+      });
+    }
 
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
@@ -809,6 +901,14 @@ router.get("/:orderId/deliveries", authenticateMiddleware, async (req, res) => {
     const { orderId } = req.params;
     const userId = req.user.id || req.user._id || req.user.userId;
 
+    // ✅ FIXED: Check if valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid order ID' 
+      });
+    }
+
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
 
@@ -842,6 +942,14 @@ router.get("/deliveries/:deliveryId", authenticateMiddleware, async (req, res) =
   try {
     const { deliveryId } = req.params;
     const userId = req.user.id || req.user._id || req.user.userId;
+
+    // ✅ FIXED: Check if valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(deliveryId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid delivery ID' 
+      });
+    }
 
     const delivery = await Delivery.findById(deliveryId)
       .populate('sellerId', 'username avatar firstName lastName')
@@ -894,6 +1002,14 @@ router.put("/:orderId/request-revision", authenticateMiddleware, async (req, res
     const { orderId } = req.params;
     const { revisionNotes } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
+
+    // ✅ FIXED: Check if valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid order ID' 
+      });
+    }
 
     console.log('📝 Buyer requesting revision for order:', orderId, { userId });
 
@@ -991,6 +1107,14 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
     const userId = req.user.id || req.user._id || req.user.userId;
+
+    // ✅ FIXED: Check if valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid order ID' 
+      });
+    }
 
     console.log('✅ Buyer completing order:', orderId);
 
@@ -1135,6 +1259,14 @@ router.put("/:orderId/cancel-by-buyer", authenticateMiddleware, async (req, res)
     const { cancelReason } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
 
+    // ✅ FIXED: Check if valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid order ID' 
+      });
+    }
+
     console.log('❌ Buyer cancelling order:', orderId);
 
     const order = await Order.findOne({
@@ -1233,6 +1365,14 @@ router.get("/:orderId/download-files", authenticateMiddleware, async (req, res) 
     const { orderId } = req.params;
     const userId = req.user.id || req.user._id || req.user.userId;
 
+    // ✅ FIXED: Check if valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid order ID' 
+      });
+    }
+
     const order = await Order.findOne({
       _id: orderId,
       buyerId: userId,
@@ -1308,6 +1448,14 @@ router.get("/:orderId/summary", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
     const userId = req.user.id || req.user._id || req.user.userId;
+
+    // ✅ FIXED: Check if valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid order ID' 
+      });
+    }
 
     const order = await Order.findOne({
       _id: orderId,
@@ -1436,61 +1584,19 @@ function getBuyerNextActions(status, revisionsUsed, maxRevisions) {
   return actions;
 }
 
-// ======================================================
-// ========== SELLER-SPECIFIC ROUTES ==========
-// ======================================================
-
-// ========== SELLER ORDER QUERIES ========== //
-router.get("/my-sales", authenticateMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.id || req.user._id || req.user.userId;
-    
-    if (!userId) {
-      return res.status(401).json({ 
-        success: false,
-        error: 'Authentication required' 
-      });
-    }
-
-    const sales = await Order.find({ sellerId: userId })
-      .populate('buyerId', 'username avatar email firstName lastName')
-      .populate('listingId', 'title mediaUrls price category type')
-      .populate('offerId', 'amount message requirements')
-      .sort({ createdAt: -1 })
-      .lean();
-
-    const stats = {
-      total: sales.length,
-      active: sales.filter(o => ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(o.status)).length,
-      completed: sales.filter(o => o.status === 'completed').length,
-      pending: sales.filter(o => o.status === 'pending_payment').length,
-      cancelled: sales.filter(o => o.status === 'cancelled').length,
-      totalRevenue: sales.filter(o => o.status === 'completed').reduce((sum, order) => sum + (order.amount || 0), 0),
-      pendingRevenue: sales.filter(o => ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(o.status))
-        .reduce((sum, order) => sum + (order.amount || 0), 0)
-    };
-
-    res.status(200).json({
-      success: true,
-      sales,
-      stats,
-      count: sales.length
-    });
-  } catch (error) {
-    console.error('Error fetching sales:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to fetch sales',
-      details: error.message 
-    });
-  }
-});
-
 // ========== SELLER ORDER MANAGEMENT ========== //
 router.put("/:orderId/start-processing", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
     const userId = req.user.id || req.user._id || req.user.userId;
+
+    // ✅ FIXED: Check if valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid order ID' 
+      });
+    }
 
     const order = await Order.findOne({ 
       _id: orderId, 
@@ -1536,6 +1642,14 @@ router.put("/:orderId/start-work", authenticateMiddleware, async (req, res) => {
     const { orderId } = req.params;
     const userId = req.user.id || req.user._id || req.user.userId;
 
+    // ✅ FIXED: Check if valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid order ID' 
+      });
+    }
+
     const order = await Order.findOne({ 
       _id: orderId, 
       sellerId: userId,
@@ -1580,6 +1694,14 @@ router.put("/:orderId/deliver-with-email", authenticateMiddleware, async (req, r
     const { orderId } = req.params;
     const { deliveryMessage, deliveryFiles = [], attachments = [], isFinalDelivery = true } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
+
+    // ✅ FIXED: Check if valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid order ID' 
+      });
+    }
 
     console.log('📤 Starting delivery for order:', orderId, {
       messageLength: deliveryMessage?.length,
@@ -1690,6 +1812,14 @@ router.put("/:orderId/complete-revision", authenticateMiddleware, async (req, re
     const { deliveryMessage, deliveryFiles = [], attachments = [], isFinalDelivery = true } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
 
+    // ✅ FIXED: Check if valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid order ID' 
+      });
+    }
+
     console.log('🔄 Completing revision for order:', orderId);
 
     const order = await Order.findOne({ 
@@ -1794,6 +1924,14 @@ router.put("/:orderId/deliver", authenticateMiddleware, async (req, res) => {
     const { deliveryMessage, deliveryFiles } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
 
+    // ✅ FIXED: Check if valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid order ID' 
+      });
+    }
+
     const order = await Order.findOne({ 
       _id: orderId, 
       sellerId: userId,
@@ -1839,6 +1977,14 @@ router.put("/:orderId/cancel-by-seller", authenticateMiddleware, async (req, res
     const { orderId } = req.params;
     const { cancelReason } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
+
+    // ✅ FIXED: Check if valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid order ID' 
+      });
+    }
 
     const order = await Order.findOne({
       _id: orderId,
@@ -1971,6 +2117,14 @@ router.put("/:orderId/status", authenticateMiddleware, async (req, res) => {
     const { orderId } = req.params;
     const { status } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
+
+    // ✅ FIXED: Check if valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid order ID' 
+      });
+    }
 
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
