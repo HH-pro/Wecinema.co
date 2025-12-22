@@ -217,50 +217,6 @@ const sendDeliveryEmail = async (order, deliveryData, isRevision = false) => {
     return false;
   }
 };
-// ✅ Query parameter endpoint
-router.get('/order-details', authenticateMiddleware, async (req, res) => {
-  try {
-    const { orderId } = req.query;
-    
-    if (!orderId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Order ID is required'
-      });
-    }
-    
-    if (!mongoose.Types.ObjectId.isValid(orderId)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid order ID format'
-      });
-    }
-    
-    const order = await Order.findById(orderId)
-      .populate('buyerId', 'username avatar email firstName lastName')
-      .populate('sellerId', 'username avatar sellerRating email')
-      .populate('listingId', 'title mediaUrls price category type description tags')
-      .populate('offerId', 'amount message requirements expectedDelivery');
-    
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        error: 'Order not found'
-      });
-    }
-    
-    res.json({
-      success: true,
-      order
-    });
-  } catch (error) {
-    console.error('Error fetching order details:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch order details'
-    });
-  }
-});
 
 // ========== FILE UPLOAD ROUTES ========== //
 router.post("/upload/delivery", authenticateMiddleware, upload.array('files', 10), async (req, res) => {
