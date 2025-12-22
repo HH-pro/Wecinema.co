@@ -614,7 +614,70 @@ export const getUserRole = (): string | null => {
     return null;
   }
 };
+export const getCurrentUserId = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  
+  const userData = localStorage.getItem('user');
+  if (userData) {
+    try {
+      const user = JSON.parse(userData);
+      return user._id || user.id || null;
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+      return null;
+    }
+  }
+  return null;
+};
 
+/**
+ * Check if a string is a valid MongoDB ObjectId
+ * MongoDB ObjectIds are 24-character hex strings
+ */
+export const isValidObjectId = (id: string): boolean => {
+  if (!id || typeof id !== 'string') return false;
+  
+  // Check if it's a 24-character hex string
+  const objectIdPattern = /^[0-9a-fA-F]{24}$/;
+  return objectIdPattern.test(id);
+};
+
+/**
+ * Format a date string to a readable format
+ */
+export const formatDate = (dateString: string): string => {
+  return new Date(dateString).toLocaleDateString('en-IN', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+/**
+ * Truncate a string to a specified length
+ */
+export const truncateString = (str: string, length: number): string => {
+  if (str.length <= length) return str;
+  return str.substring(0, length) + '...';
+};
+
+/**
+ * Get a random color based on a string
+ */
+export const getRandomColor = (str: string): string => {
+  const colors = [
+    'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 
+    'bg-red-500', 'bg-purple-500', 'bg-pink-500',
+    'bg-indigo-500', 'bg-teal-500', 'bg-orange-500'
+  ];
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
+};
 export const calculateRemainingDays = (expectedDelivery: string): number => {
   if (!expectedDelivery) return 0;
   
