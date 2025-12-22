@@ -1,237 +1,101 @@
-// src/components/marketplace/seller/OrderDetailsModal.tsx
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useMarketplace } from '../../context/MarketplaceContext';
+import { marketplaceAPI } from '../../api';
+import MarketplaceLayout from '../../components/Layout';
 
-const API_BASE_URL = 'http://localhost:3000';
-
-interface OrderDetails {
-  _id: string;
-  status: string;
-  amount: number;
-  paymentMethod: string;
-  paymentStatus: string;
-  shippingAddress: string;
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
-  stripePaymentIntentId?: string;
-  buyerId?: {
-    _id: string;
-    username: string;
-    avatar?: string;
-    email: string;
-  };
-  sellerId?: {
-    _id: string;
-    username: string;
-    avatar?: string;
-    sellerRating?: number;
-    email: string;
-  };
-  listingId?: {
-    _id: string;
-    title: string;
-    mediaUrls?: string[];
-    price: number;
-    category: string;
-    type: string;
-    description?: string;
-    tags?: string[];
-  };
-  offerId?: {
-    _id: string;
-    amount: number;
-    message?: string;
-    requirements?: string;
-    expectedDelivery?: string;
-  };
+interface OrderDetailsState {
+  order: any;
+  loading: boolean;
+  activeTab: 'details' | 'messages' | 'delivery';
+  deliveryMessage: string;
 }
 
-interface OrderDetailsModalProps {
-  orderId: string;
-  isOpen: boolean;
-  onClose: () => void;
-  onOrderUpdate?: (orderId: string, newStatus: string) => void;
-}
-
-const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
-  orderId,
-  isOpen,
-  onClose,
-  onOrderUpdate
-}) => {
-  const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [updating, setUpdating] = useState(false);
-  const [activeSection, setActiveSection] = useState<'status' | 'info'>('status');
+const OrderDetails: React.FC = () => {
+  const { orderId } = useParams<{ orderId: string }>();
+  const navigate = useNavigate();
+  const { updateOrderStatus, deliverOrder } = useMarketplace();
+  
+  const [state, setState] = useState<OrderDetailsState>({
+    order: null,
+    loading: true,
+    activeTab: 'details',
+    deliveryMessage: ''
+  });
 
   useEffect(() => {
-    if (isOpen && orderId) {
+    if (orderId) {
       fetchOrderDetails();
     }
-  }, [isOpen, orderId]);
-
-  const isValidObjectId = (id: string): boolean => {
-    return /^[0-9a-fA-F]{24}$/.test(id);
-  };
+  }, [orderId]);
 
   const fetchOrderDetails = async () => {
-    if (!orderId) {
-      setError('Order ID is missing');
-      return;
-    }
-    
-    // Validate orderId format
-    if (!isValidObjectId(orderId)) {
-      setError(`Invalid order ID format: ${orderId}. Please check the order ID.`);
-      return;
-    }
-    
     try {
-      setLoading(true);
-      setError('');
-      
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      if (!token) {
-        setError('Authentication required. Please log in again.');
-        setLoading(false);
-        return;
-      }
-
-      console.log('🔍 Fetching order details for ID:', orderId);
-      
-      // TRY DIFFERENT ENDPOINTS IN SEQUENCE
-      
-      // Option 1: Try the original endpoint (if routes are fixed)
-      try {
-        const response = await axios.get(
-          `${API_BASE_URL}/marketplace/orders/${orderId}`,
-          {
-            headers: { 
-              Authorization: `Bearer ${token}`,
-              'Cache-Control': 'no-cache'
-            },
-            timeout: 5000
-          }
-        );
-
-        if (response.data.success) {
-          console.log('✅ Order details fetched successfully from /orders/:orderId');
-          setOrderDetails(response.data.order);
-          return;
-        }
-      } catch (err: any) {
-        console.log('⚠️ Endpoint 1 failed, trying next...');
-      }
-      
-      // Option 2: Try query parameter endpoint
-      try {
-        const response = await axios.get(
-          `${API_BASE_URL}/marketplace/order-details`,
-          {
-            params: { orderId },
-            headers: { 
-              Authorization: `Bearer ${token}`,
-              'Cache-Control': 'no-cache'
-            },
-            timeout: 5000
-          }
-        );
-
-        if (response.data.success) {
-          console.log('✅ Order details fetched successfully from /order-details');
-          setOrderDetails(response.data.order);
-          return;
-        }
-      } catch (err: any) {
-        console.log('⚠️ Endpoint 2 failed, trying next...');
-      }
-      
-      // Option 3: Try get-order endpoint
-      try {
-        const response = await axios.get(
-          `${API_BASE_URL}/marketplace/orders/get-order/${orderId}`,
-          {
-            headers: { 
-              Authorization: `Bearer ${token}`,
-              'Cache-Control': 'no-cache'
-            },
-            timeout: 5000
-          }
-        );
-
-        if (response.data.success) {
-          console.log('✅ Order details fetched successfully from /orders/get-order/:orderId');
-          setOrderDetails(response.data.order);
-          return;
-        }
-      } catch (err: any) {
-        console.log('⚠️ Endpoint 3 failed');
-      }
-      
-      // If all endpoints fail
-      setError('Failed to load order details. Please try again or contact support.');
-      
-    } catch (err: any) {
-      console.error('❌ Error fetching order details:', err);
-      
-      // More specific error messages
-      if (err.response?.status === 404) {
-        setError(`Order not found with ID: ${orderId}`);
-      } else if (err.response?.status === 500 && err.response?.data?.error?.includes('Cast to ObjectId')) {
-        setError(`Server error: Invalid order ID format. Please check backend routes.`);
-      } else if (err.code === 'ECONNABORTED') {
-        setError('Request timeout. Please check your internet connection.');
-      } else {
-        setError(err.response?.data?.error || 'Failed to load order details. Please try again.');
-      }
-    } finally {
-      setLoading(false);
+      setState(prev => ({ ...prev, loading: true }));
+      const orderData = await marketplaceAPI.orders.getDetails(orderId!);
+      setState(prev => ({ ...prev, order: orderData, loading: false }));
+    } catch (error) {
+      console.error('Error fetching order details:', error);
+      setState(prev => ({ ...prev, loading: false }));
     }
   };
 
-  const handleStatusUpdate = async (newStatus: string) => {
-    if (!orderId || !orderDetails) return;
-    
-    if (!window.confirm(`Change order status to "${newStatus}"?`)) return;
-    
+  const handleStartWork = async () => {
     try {
-      setUpdating(true);
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      
-      const response = await axios.put(
-        `${API_BASE_URL}/marketplace/orders/${orderId}/status`,
-        { status: newStatus },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 10000
-        }
-      );
-
-      if (response.data.success) {
-        setOrderDetails(prev => prev ? { ...prev, status: newStatus } : null);
-        onOrderUpdate?.(orderId, newStatus);
-        fetchOrderDetails(); // Refresh data
-      }
-    } catch (err: any) {
-      console.error('Error updating order status:', err);
-      setError(err.response?.data?.error || 'Failed to update status');
-    } finally {
-      setUpdating(false);
+      await updateOrderStatus(orderId!, 'in_progress');
+      await fetchOrderDetails();
+    } catch (error) {
+      console.error('Error starting work:', error);
     }
   };
 
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-    }).format(amount || 0);
+  const handleDeliverOrder = async () => {
+    try {
+      await deliverOrder(orderId!, {
+        deliveryMessage: state.deliveryMessage,
+        deliveryFiles: []
+      });
+      setState(prev => ({ ...prev, deliveryMessage: '' }));
+      await fetchOrderDetails();
+    } catch (error) {
+      console.error('Error delivering order:', error);
+    }
   };
 
-  const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
+  const handleAcceptDelivery = async () => {
+    try {
+      await marketplaceAPI.payments.capture(orderId!, () => {});
+      await fetchOrderDetails();
+    } catch (error) {
+      console.error('Error accepting delivery:', error);
+    }
+  };
+
+  const handleRequestRevision = async () => {
+    try {
+      await marketplaceAPI.orders.requestRevision(orderId!, 'Please make the requested changes', () => {});
+      await fetchOrderDetails();
+    } catch (error) {
+      console.error('Error requesting revision:', error);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    const colors: { [key: string]: string } = {
+      pending_payment: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      paid: 'bg-blue-100 text-blue-800 border-blue-200',
+      in_progress: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+      delivered: 'bg-purple-100 text-purple-800 border-purple-200',
+      completed: 'bg-green-100 text-green-800 border-green-200',
+      cancelled: 'bg-red-100 text-red-800 border-red-200',
+      disputed: 'bg-orange-100 text-orange-800 border-orange-200'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800 border-gray-200';
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
@@ -239,376 +103,387 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     });
   };
 
-  const getStatusColor = (status: string): string => {
-    const statusLower = status?.toLowerCase() || '';
-    if (['completed', 'paid', 'delivered'].includes(statusLower)) return 'bg-green-100 text-green-800';
-    if (['pending_payment', 'pending'].includes(statusLower)) return 'bg-yellow-100 text-yellow-800';
-    if (['in_progress', 'shipped', 'in_transit'].includes(statusLower)) return 'bg-blue-100 text-blue-800';
-    if (['cancelled', 'failed', 'rejected'].includes(statusLower)) return 'bg-red-100 text-red-800';
-    return 'bg-gray-100 text-gray-800';
+  const formatAmount = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
   };
 
-  const getStatusOptions = (currentStatus: string) => {
-    const options: { value: string; label: string; color: string }[] = [];
-    const status = currentStatus?.toLowerCase() || '';
-    
-    if (status === 'pending_payment') {
-      options.push(
-        { value: 'confirmed', label: 'Confirm', color: 'green' },
-        { value: 'cancelled', label: 'Cancel', color: 'red' }
-      );
-    } else if (status === 'confirmed' || status === 'paid') {
-      options.push(
-        { value: 'in_progress', label: 'Start Work', color: 'blue' },
-        { value: 'cancelled', label: 'Cancel', color: 'red' }
-      );
-    } else if (status === 'in_progress') {
-      options.push(
-        { value: 'shipped', label: 'Ship', color: 'blue' },
-        { value: 'completed', label: 'Complete', color: 'green' },
-        { value: 'cancelled', label: 'Cancel', color: 'red' }
-      );
-    } else if (status === 'shipped') {
-      options.push(
-        { value: 'delivered', label: 'Deliver', color: 'green' },
-        { value: 'completed', label: 'Complete', color: 'green' }
-      );
-    }
-    
-    return options;
-  };
+  if (state.loading) {
+    return (
+      <MarketplaceLayout>
+        <div className="min-h-screen bg-gray-50 py-8">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-4 text-gray-600">Loading order details...</p>
+            </div>
+          </div>
+        </div>
+      </MarketplaceLayout>
+    );
+  }
 
-  if (!isOpen) return null;
+  if (!state.order) {
+    return (
+      <MarketplaceLayout>
+        <div className="min-h-screen bg-gray-50 py-8">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center py-12">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 max-w-md mx-auto">
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">Order Not Found</h2>
+                <p className="text-gray-600 mb-6">The order you're looking for doesn't exist.</p>
+                <button 
+                  onClick={() => navigate('/marketplace/orders')} 
+                  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Back to Orders
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </MarketplaceLayout>
+    );
+  }
+
+  const { order } = state;
+  const isSeller = true; // You would get this from auth context
+  const isBuyer = true; // You would get this from auth context
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[85vh] overflow-hidden">
-        {/* Header */}
-        <div className="px-3 py-2 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
+    <MarketplaceLayout>
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Header */}
+          <div className="mb-8">
+            <button 
+              onClick={() => navigate(-1)} 
+              className="flex items-center text-gray-600 hover:text-gray-900 mb-4 transition-colors"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
+              Back
             </button>
-            <h2 className="text-sm font-bold text-gray-900">
-              Order {orderDetails ? `#${orderId?.slice(-6)}` : `#${orderId?.slice(-6)}`}
-            </h2>
-          </div>
-          <div className="flex items-center space-x-1">
-            {orderDetails && (
-              <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(orderDetails.status)}`}>
-                {orderDetails.status?.replace('_', ' ') || 'Unknown'}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Order #{order._id.slice(-8).toUpperCase()}</h1>
+                <p className="text-gray-600 mt-1">Placed on {formatDate(order.createdAt)}</p>
+              </div>
+              <span 
+                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border mt-2 sm:mt-0 ${getStatusColor(order.status)}`}
+              >
+                {order.status.replace('_', ' ').toUpperCase()}
               </span>
-            )}
+            </div>
           </div>
-        </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-gray-200">
-          <button
-            onClick={() => setActiveSection('status')}
-            className={`flex-1 py-2 text-xs font-medium ${activeSection === 'status' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
-          >
-            Status & Actions
-          </button>
-          <button
-            onClick={() => setActiveSection('info')}
-            className={`flex-1 py-2 text-xs font-medium ${activeSection === 'info' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
-          >
-            Order Info
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="overflow-y-auto max-h-[calc(85vh-80px)] p-3">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-              <p className="text-sm text-gray-600">Loading order details...</p>
-              <p className="text-xs text-gray-500 mt-1">Order ID: {orderId}</p>
-            </div>
-          ) : error ? (
-            <div className="text-center py-6">
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <p className="text-sm text-gray-700 mb-2 font-medium">Unable to Load Order</p>
-              <p className="text-xs text-gray-600 mb-4 max-w-sm mx-auto">{error}</p>
-              <div className="flex flex-col gap-2">
-                <button
-                  onClick={fetchOrderDetails}
-                  className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-                >
-                  Try Again
-                </button>
-                <button
-                  onClick={onClose}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded hover:bg-gray-50"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          ) : orderDetails ? (
-            <>
-              {/* Status & Actions Tab */}
-              {activeSection === 'status' ? (
-                <div className="space-y-3">
-                  {/* Amount & Date */}
-                  <div className="bg-blue-50 border border-blue-200 rounded p-3">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-xs text-gray-600">Order Amount</p>
-                        <p className="text-lg font-bold text-green-600">{formatCurrency(orderDetails.amount)}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-gray-600">Order Date</p>
-                        <p className="text-xs text-gray-900">{formatDate(orderDetails.createdAt)}</p>
-                      </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Main Content */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Order Summary Card */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Order Summary</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Amount</span>
+                      <span className="font-semibold text-gray-900">{formatAmount(order.amount)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Order Type</span>
+                      <span className="text-gray-900">{order.orderType.replace('_', ' ')}</span>
                     </div>
                   </div>
-
-                  {/* Status Actions */}
-                  <div>
-                    <p className="text-xs font-medium text-gray-700 mb-2">Update Status:</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {getStatusOptions(orderDetails.status).map((option) => (
-                        <button
-                          key={option.value}
-                          onClick={() => handleStatusUpdate(option.value)}
-                          disabled={updating}
-                          className={`p-2 rounded text-xs font-medium ${
-                            option.color === 'green'
-                              ? 'bg-green-600 hover:bg-green-700 text-white'
-                              : option.color === 'red'
-                              ? 'bg-red-600 hover:bg-red-700 text-white'
-                              : 'bg-blue-600 hover:bg-blue-700 text-white'
-                          } disabled:opacity-50`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Created</span>
+                      <span className="text-gray-900">{formatDate(order.createdAt)}</span>
                     </div>
-                  </div>
-
-                  {/* Product Info */}
-                  <div className="border border-gray-200 rounded p-3">
-                    <div className="flex items-start space-x-3">
-                      {orderDetails.listingId?.mediaUrls?.[0] ? (
-                        <img
-                          src={orderDetails.listingId.mediaUrls[0]}
-                          alt={orderDetails.listingId.title}
-                          className="w-14 h-14 object-cover rounded border border-gray-300"
-                        />
-                      ) : (
-                        <div className="w-14 h-14 bg-gradient-to-br from-purple-100 to-pink-100 rounded border border-purple-200 flex items-center justify-center">
-                          <div className="text-xl">📦</div>
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <h4 className="text-sm font-medium text-gray-900 mb-1">{orderDetails.listingId?.title}</h4>
-                        <div className="flex items-center justify-between text-xs text-gray-600">
-                          <span>Price: {formatCurrency(orderDetails.listingId?.price || 0)}</span>
-                          <span>Sold: {formatCurrency(orderDetails.amount)}</span>
-                        </div>
+                    {order.paidAt && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Paid On</span>
+                        <span className="text-gray-900">{formatDate(order.paidAt)}</span>
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Quick Info */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-gray-50 border border-gray-200 rounded p-2">
-                      <p className="text-xs text-gray-600">Payment Method</p>
-                      <p className="text-sm font-medium text-gray-900 capitalize">{orderDetails.paymentMethod || 'N/A'}</p>
-                    </div>
-                    <div className="bg-gray-50 border border-gray-200 rounded p-2">
-                      <p className="text-xs text-gray-600">Payment Status</p>
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs ${getStatusColor(orderDetails.paymentStatus)}`}>
-                        {orderDetails.paymentStatus || 'Unknown'}
-                      </span>
-                    </div>
+                    )}
+                    {order.deliveredAt && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Delivered On</span>
+                        <span className="text-gray-900">{formatDate(order.deliveredAt)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
-              ) : (
-                /* Info Tab */
-                <div className="space-y-3">
-                  {/* Buyer & Seller */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="border border-gray-200 rounded p-2">
-                      <p className="text-xs font-medium text-gray-700 mb-1">Buyer</p>
-                      <div className="flex items-center space-x-2">
-                        {orderDetails.buyerId?.avatar ? (
-                          <img src={orderDetails.buyerId.avatar} alt={orderDetails.buyerId.username} className="w-6 h-6 rounded-full" />
-                        ) : (
-                          <div className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs">
-                            {orderDetails.buyerId?.username?.charAt(0) || 'B'}
-                          </div>
-                        )}
-                        <div>
-                          <p className="text-xs font-medium text-gray-900">{orderDetails.buyerId?.username}</p>
-                          <p className="text-xs text-gray-500 truncate max-w-[100px]">{orderDetails.buyerId?.email}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="border border-gray-200 rounded p-2">
-                      <p className="text-xs font-medium text-gray-700 mb-1">Seller</p>
-                      <div className="flex items-center space-x-2">
-                        {orderDetails.sellerId?.avatar ? (
-                          <img src={orderDetails.sellerId.avatar} alt={orderDetails.sellerId.username} className="w-6 h-6 rounded-full" />
-                        ) : (
-                          <div className="w-6 h-6 rounded-full bg-green-500 text-white flex items-center justify-center text-xs">
-                            {orderDetails.sellerId?.username?.charAt(0) || 'S'}
-                          </div>
-                        )}
-                        <div>
-                          <p className="text-xs font-medium text-gray-900">{orderDetails.sellerId?.username}</p>
-                          {orderDetails.sellerId?.sellerRating && (
-                            <div className="flex items-center">
-                              <span className="text-xs text-yellow-600 mr-1">★</span>
-                              <span className="text-xs text-gray-600">{orderDetails.sellerId.sellerRating.toFixed(1)}</span>
+              </div>
+
+              {/* Tabs */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                {/* Tab Headers */}
+                <div className="border-b border-gray-200">
+                  <nav className="-mb-px flex">
+                    <button 
+                      className={`py-4 px-6 text-sm font-medium border-b-2 transition-colors ${
+                        state.activeTab === 'details' 
+                          ? 'border-blue-500 text-blue-600' 
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                      onClick={() => setState(prev => ({ ...prev, activeTab: 'details' }))}
+                    >
+                      Order Details
+                    </button>
+                    <button 
+                      className={`py-4 px-6 text-sm font-medium border-b-2 transition-colors ${
+                        state.activeTab === 'messages' 
+                          ? 'border-blue-500 text-blue-600' 
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                      onClick={() => setState(prev => ({ ...prev, activeTab: 'messages' }))}
+                    >
+                      Messages
+                    </button>
+                    <button 
+                      className={`py-4 px-6 text-sm font-medium border-b-2 transition-colors ${
+                        state.activeTab === 'delivery' 
+                          ? 'border-blue-500 text-blue-600' 
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                      onClick={() => setState(prev => ({ ...prev, activeTab: 'delivery' }))}
+                    >
+                      Delivery
+                    </button>
+                  </nav>
+                </div>
+
+                {/* Tab Content */}
+                <div className="p-6">
+                  {/* Details Tab */}
+                  {state.activeTab === 'details' && (
+                    <div className="space-y-6">
+                      <div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">Order Information</h3>
+                        <div className="space-y-4">
+                          {order.requirements && (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Requirements</label>
+                              <p className="text-gray-900 bg-gray-50 rounded-md p-4 border border-gray-200">{order.requirements}</p>
+                            </div>
+                          )}
+                          {order.buyerNotes && (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Buyer Notes</label>
+                              <p className="text-gray-900 bg-gray-50 rounded-md p-4 border border-gray-200">{order.buyerNotes}</p>
                             </div>
                           )}
                         </div>
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Shipping */}
-                  <div className="border border-gray-200 rounded p-2">
-                    <div className="flex items-start space-x-2">
-                      <svg className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      <div className="flex-1">
-                        <p className="text-xs font-medium text-gray-700 mb-1">Shipping Address</p>
-                        <p className="text-xs text-gray-900 whitespace-pre-line">{orderDetails.shippingAddress || 'Not provided'}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Product Details */}
-                  <div className="border border-gray-200 rounded p-2">
-                    <p className="text-xs font-medium text-gray-700 mb-2">Product Details</p>
-                    <div className="space-y-2">
-                      {orderDetails.listingId?.description && (
-                        <div>
-                          <p className="text-xs text-gray-600 mb-0.5">Description</p>
-                          <p className="text-xs text-gray-900 line-clamp-3">{orderDetails.listingId.description}</p>
-                        </div>
-                      )}
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <p className="text-xs text-gray-600">Category</p>
-                          <p className="text-xs font-medium text-gray-900">{orderDetails.listingId?.category || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-600">Type</p>
-                          <p className="text-xs font-medium text-gray-900">{orderDetails.listingId?.type || 'N/A'}</p>
+                      <div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">Parties</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Buyer</label>
+                            <span className="text-gray-900 font-medium">{order.buyerId?.username || 'Unknown'}</span>
+                          </div>
+                          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Seller</label>
+                            <span className="text-gray-900 font-medium">{order.sellerId?.username || 'Unknown'}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
 
-                  {/* Additional Info */}
-                  {(orderDetails.notes || orderDetails.offerId?.message || orderDetails.offerId?.requirements) && (
-                    <div className="space-y-2">
-                      {orderDetails.notes && (
-                        <div className="border border-yellow-200 bg-yellow-50 rounded p-2">
-                          <p className="text-xs font-medium text-gray-700 mb-1">Notes</p>
-                          <p className="text-xs text-gray-900 line-clamp-2">{orderDetails.notes}</p>
-                        </div>
-                      )}
-                      {orderDetails.offerId?.message && (
-                        <div className="border border-blue-200 bg-blue-50 rounded p-2">
-                          <p className="text-xs font-medium text-gray-700 mb-1">Offer Message</p>
-                          <p className="text-xs text-gray-900 line-clamp-2">{orderDetails.offerId.message}</p>
-                        </div>
-                      )}
-                      {orderDetails.offerId?.requirements && (
-                        <div className="border border-green-200 bg-green-50 rounded p-2">
-                          <p className="text-xs font-medium text-gray-700 mb-1">Requirements</p>
-                          <p className="text-xs text-gray-900 line-clamp-2">{orderDetails.offerId.requirements}</p>
+                      {order.listingId && (
+                        <div>
+                          <h3 className="text-lg font-medium text-gray-900 mb-4">Listing Details</h3>
+                          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                            <h4 className="font-medium text-gray-900 mb-2">{order.listingId.title}</h4>
+                            {order.listingId.description && (
+                              <p className="text-gray-700">{order.listingId.description}</p>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
                   )}
 
-                  {/* Timeline */}
-                  <div className="border border-gray-200 rounded p-2">
-                    <p className="text-xs font-medium text-gray-700 mb-2">Timeline</p>
-                    <div className="space-y-1">
-                      <div className="flex justify-between">
-                        <span className="text-xs text-gray-600">Created</span>
-                        <span className="text-xs text-gray-900">{formatDate(orderDetails.createdAt)}</span>
+                  {/* Messages Tab */}
+                  {state.activeTab === 'messages' && (
+                    <div className="text-center py-8">
+                      <div className="max-w-md mx-auto">
+                        <div className="mx-auto h-16 w-16 text-gray-400 mb-4">
+                          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                          </svg>
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">Order Messages</h3>
+                        <p className="text-gray-600 mb-4">Direct messaging system will be implemented here.</p>
+                        <p className="text-gray-500 text-sm mb-6">
+                          You'll be able to communicate with the {isSeller ? 'buyer' : 'seller'} about this order.
+                        </p>
+                        <button 
+                          onClick={() => navigate(`/marketplace/messages/${orderId}`)}
+                          className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                        >
+                          Open Messages
+                        </button>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-xs text-gray-600">Updated</span>
-                        <span className="text-xs text-gray-900">{formatDate(orderDetails.updatedAt)}</span>
-                      </div>
-                      {orderDetails.offerId?.expectedDelivery && (
-                        <div className="flex justify-between">
-                          <span className="text-xs text-gray-600">Expected Delivery</span>
-                          <span className="text-xs text-gray-900">{orderDetails.offerId.expectedDelivery}</span>
+                    </div>
+                  )}
+
+                  {/* Delivery Tab */}
+                  {state.activeTab === 'delivery' && (
+                    <div className="space-y-6">
+                      {order.status === 'paid' && isSeller && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                          <h3 className="text-lg font-medium text-blue-900 mb-2">Start Working</h3>
+                          <p className="text-blue-700 mb-4">Begin working on the order and deliver when ready.</p>
+                          <button 
+                            onClick={handleStartWork} 
+                            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                          >
+                            Start Work
+                          </button>
                         </div>
                       )}
-                    </div>
-                  </div>
 
-                  {/* Stripe */}
-                  {orderDetails.stripePaymentIntentId && (
-                    <div className="border border-purple-200 bg-purple-50 rounded p-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-medium text-gray-700">Stripe Payment</p>
-                        <a
-                          href={`https://dashboard.stripe.com/payments/${orderDetails.stripePaymentIntentId}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-2 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700"
-                        >
-                          View
-                        </a>
-                      </div>
-                      <p className="text-xs text-gray-600 mt-1 font-mono">ID: {orderDetails.stripePaymentIntentId.slice(-8)}</p>
+                      {order.status === 'in_progress' && isSeller && (
+                        <div className="bg-white border border-gray-200 rounded-lg p-6">
+                          <h3 className="text-lg font-medium text-gray-900 mb-4">Deliver Work</h3>
+                          <textarea
+                            value={state.deliveryMessage}
+                            onChange={(e) => setState(prev => ({ ...prev, deliveryMessage: e.target.value }))}
+                            placeholder="Add delivery message and instructions..."
+                            rows={4}
+                            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                          <button 
+                            onClick={handleDeliverOrder}
+                            disabled={!state.deliveryMessage.trim()}
+                            className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors mt-4"
+                          >
+                            Deliver Order
+                          </button>
+                        </div>
+                      )}
+
+                      {order.status === 'delivered' && isBuyer && (
+                        <div className="bg-white border border-gray-200 rounded-lg p-6">
+                          <h3 className="text-lg font-medium text-gray-900 mb-4">Review Delivery</h3>
+                          {order.deliveryMessage && (
+                            <div className="bg-gray-50 rounded-lg p-4 mb-4 border border-gray-200">
+                              <strong className="text-gray-700 block mb-2">Seller's Message:</strong>
+                              <p className="text-gray-900">{order.deliveryMessage}</p>
+                            </div>
+                          )}
+                          <div className="flex flex-col sm:flex-row gap-3">
+                            <button 
+                              onClick={handleAcceptDelivery} 
+                              className="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition-colors flex-1"
+                            >
+                              Accept Delivery & Release Payment
+                            </button>
+                            <button 
+                              onClick={handleRequestRevision} 
+                              className="bg-yellow-600 text-white px-6 py-2 rounded-md hover:bg-yellow-700 transition-colors flex-1"
+                            >
+                              Request Revision
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {order.status === 'completed' && (
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+                          <h3 className="text-lg font-medium text-green-900 mb-2">✅ Order Completed</h3>
+                          <p className="text-green-700">This order has been successfully completed.</p>
+                          {order.completedAt && (
+                            <p className="text-green-600 text-sm mt-2">Completed on: {formatDate(order.completedAt)}</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              )}
-            </>
-          ) : null}
-        </div>
+              </div>
+            </div>
 
-        {/* Footer */}
-        <div className="px-3 py-2 border-t border-gray-200 bg-gray-50">
-          <div className="flex justify-between items-center">
-            <button
-              onClick={onClose}
-              className="px-3 py-1 border border-gray-300 text-gray-700 text-xs rounded hover:bg-gray-50"
-            >
-              Close
-            </button>
-            <div className="flex space-x-2">
-              <button
-                onClick={fetchOrderDetails}
-                className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center"
-              >
-                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                Refresh
-              </button>
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Timeline */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Timeline</h3>
+                <div className="space-y-4">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0 w-3 h-3 bg-green-500 rounded-full mt-1.5"></div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-900">Order Created</p>
+                      <p className="text-sm text-gray-500">{formatDate(order.createdAt)}</p>
+                    </div>
+                  </div>
+                  
+                  {order.paidAt && (
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0 w-3 h-3 bg-green-500 rounded-full mt-1.5"></div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-900">Payment Received</p>
+                        <p className="text-sm text-gray-500">{formatDate(order.paidAt)}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {order.deliveredAt && (
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0 w-3 h-3 bg-green-500 rounded-full mt-1.5"></div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-900">Work Delivered</p>
+                        <p className="text-sm text-gray-500">{formatDate(order.deliveredAt)}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {order.completedAt && (
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0 w-3 h-3 bg-green-500 rounded-full mt-1.5"></div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-900">Order Completed</p>
+                        <p className="text-sm text-gray-500">{formatDate(order.completedAt)}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                <div className="space-y-3">
+                  <button 
+                    onClick={() => navigate(`/marketplace/messages/${orderId}`)}
+                    className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition-colors text-sm font-medium"
+                  >
+                    Contact {isSeller ? 'Buyer' : 'Seller'}
+                  </button>
+                  <button 
+                    onClick={() => navigate('/marketplace/help')}
+                    className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition-colors text-sm font-medium"
+                  >
+                    Get Help
+                  </button>
+                  <button 
+                    onClick={() => window.print()}
+                    className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition-colors text-sm font-medium"
+                  >
+                    Print Order Details
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </MarketplaceLayout>
   );
 };
 
-export default OrderDetailsModal;
+export default OrderDetails;
