@@ -154,7 +154,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     if (['completed', 'paid', 'delivered'].includes(statusLower)) return 'bg-green-100 text-green-800';
     if (['pending_payment', 'pending'].includes(statusLower)) return 'bg-yellow-100 text-yellow-800';
     if (['in_progress', 'shipped', 'in_transit'].includes(statusLower)) return 'bg-blue-100 text-blue-800';
-    if (['cancelled', 'failed', 'rejected'].includes(statusLower)) return 'bg-red-100 text-red-800';
+    // if (['cancelled', 'failed', 'rejected'].includes(statusLower)) return 'bg-red-100 text-red-800';
     return 'bg-gray-100 text-gray-800';
   };
 
