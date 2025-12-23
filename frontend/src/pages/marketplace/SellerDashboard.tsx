@@ -1,4 +1,4 @@
-// src/pages/seller/SellerDashboard.tsx - FINAL WORKING VERSION
+// src/pages/seller/SellerDashboard.tsx - FINAL SOLUTION
 import React, { useState, useEffect, useCallback } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
@@ -208,9 +208,6 @@ const SellerDashboard: React.FC = () => {
   const [ordersLimit] = useState(10);
   
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-
-  // Edit modal operation type
-  const [operationType, setOperationType] = useState<'update' | 'delete' | 'toggle' | null>(null);
   
   // Calculate stats
   const totalListings = listingsData?.listings?.length || 0;
@@ -449,19 +446,12 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ UPDATED: Fetch listings with proper error handling
   const fetchListings = async () => {
     try {
       setListingsLoading(true);
       const currentUserId = getCurrentUserId();
       if (!currentUserId) {
         setError('User not authenticated. Please log in again.');
-        return;
-      }
-
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      if (!token) {
-        setError('Authentication token not found');
         return;
       }
 
@@ -475,30 +465,23 @@ const SellerDashboard: React.FC = () => {
         params.status = listingsStatusFilter;
       }
       
-      console.log('🔍 Fetching listings with params:', params);
-      
       const response = await axios.get(
         `${API_BASE_URL}/marketplace/listings/my-listings`,
         {
           params,
           headers: { 
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${localStorage.getItem('token') || sessionStorage.getItem('token')}`,
             'Cache-Control': 'no-cache, no-store, must-revalidate'
           },
           timeout: 10000
         }
       );
       
-      console.log('📋 Listings API response:', response.data);
-      
       if (response.data.success) {
         setListingsData(response.data);
-        setSuccessMessage('Listings loaded successfully');
-      } else {
-        setError(response.data.message || 'Failed to load listings');
       }
     } catch (error: any) {
-      console.error('❌ Error fetching listings:', error);
+      console.error('Error fetching listings:', error);
       setError('Failed to load listings. Please try again.');
     } finally {
       setListingsLoading(false);
@@ -581,213 +564,6 @@ const SellerDashboard: React.FC = () => {
     } finally {
       setRefreshing(false);
     }
-  };
-
-  // ✅ NEW: Listing Management Functions
-  const handleUpdateListing = async (updatedData: any) => {
-    if (!editingListing) return;
-    
-    try {
-      setListingActionLoading(`updating-${editingListing._id}`);
-      setOperationType('update');
-      
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      if (!token) {
-        setError('Authentication required. Please log in again.');
-        return;
-      }
-
-      console.log('🔄 Updating listing:', editingListing._id, updatedData);
-      
-      const response = await axios.put(
-        `${API_BASE_URL}/marketplace/listings/${editingListing._id}`,
-        updatedData,
-        {
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 10000
-        }
-      );
-
-      if (response.data.success) {
-        setSuccessMessage('✅ Listing updated successfully!');
-        
-        // Update local state
-        setListingsData(prev => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            listings: prev.listings.map(listing => 
-              listing._id === editingListing._id 
-                ? { ...listing, ...updatedData, updatedAt: new Date().toISOString() }
-                : listing
-            )
-          };
-        });
-        
-        // Close modal
-        setShowEditModal(false);
-        setEditingListing(null);
-        
-        // Refresh listings
-        await fetchListings();
-      } else {
-        setError(response.data.message || 'Failed to update listing');
-      }
-    } catch (error: any) {
-      console.error('❌ Error updating listing:', error);
-      setError(error.response?.data?.message || 'Failed to update listing. Please try again.');
-    } finally {
-      setListingActionLoading(null);
-      setOperationType(null);
-    }
-  };
-
-  const handleDeleteListing = async (listing: Listing) => {
-    if (window.confirm(`Are you sure you want to delete "${listing.title}"? This action cannot be undone.`)) {
-      try {
-        setListingActionLoading(`deleting-${listing._id}`);
-        setOperationType('delete');
-        
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        if (!token) {
-          setError('Authentication required. Please log in again.');
-          return;
-        }
-
-        console.log('🗑️ Deleting listing:', listing._id);
-        
-        const response = await axios.delete(
-          `${API_BASE_URL}/marketplace/listings/${listing._id}`,
-          {
-            headers: { 
-              Authorization: `Bearer ${token}`
-            },
-            timeout: 10000
-          }
-        );
-
-        if (response.data.success) {
-          setSuccessMessage('✅ Listing deleted successfully!');
-          
-          // Update local state
-          setListingsData(prev => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              listings: prev.listings.filter(l => l._id !== listing._id)
-            };
-          });
-          
-          // Close modal if open
-          setShowDeleteModal(false);
-          setDeletingListing(null);
-          
-          // Refresh listings
-          await fetchListings();
-        } else {
-          setError(response.data.message || 'Failed to delete listing');
-        }
-      } catch (error: any) {
-        console.error('❌ Error deleting listing:', error);
-        setError(error.response?.data?.message || 'Failed to delete listing. Please try again.');
-      } finally {
-        setListingActionLoading(null);
-        setOperationType(null);
-      }
-    }
-  };
-
-  const handleToggleListingStatus = async (listing: Listing) => {
-    const newStatus = listing.status === 'active' ? 'inactive' : 'active';
-    const action = newStatus === 'active' ? 'activate' : 'deactivate';
-    
-    if (window.confirm(`Are you sure you want to ${action} "${listing.title}"?`)) {
-      try {
-        setListingActionLoading(`toggling-${listing._id}`);
-        setOperationType('toggle');
-        
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        if (!token) {
-          setError('Authentication required. Please log in again.');
-          return;
-        }
-
-        console.log('🔄 Toggling listing status:', listing._id, newStatus);
-        
-        const response = await axios.put(
-          `${API_BASE_URL}/marketplace/listings/${listing._id}/status`,
-          { status: newStatus },
-          {
-            headers: { 
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            timeout: 10000
-          }
-        );
-
-        if (response.data.success) {
-          const successMsg = newStatus === 'active' 
-            ? '✅ Listing activated successfully!' 
-            : '✅ Listing deactivated successfully!';
-          setSuccessMessage(successMsg);
-          
-          // Update local state
-          setListingsData(prev => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              listings: prev.listings.map(l => 
-                l._id === listing._id 
-                  ? { ...l, status: newStatus, updatedAt: new Date().toISOString() }
-                  : l
-              )
-            };
-          });
-          
-          // If editing modal is open, update it
-          if (editingListing && editingListing._id === listing._id) {
-            setEditingListing({...editingListing, status: newStatus});
-          }
-          
-          // Refresh listings
-          await fetchListings();
-        } else {
-          setError(response.data.message || `Failed to ${action} listing`);
-        }
-      } catch (error: any) {
-        console.error(`❌ Error ${action}ing listing:`, error);
-        setError(error.response?.data?.message || `Failed to ${action} listing. Please try again.`);
-      } finally {
-        setListingActionLoading(null);
-        setOperationType(null);
-      }
-    }
-  };
-
-  const handleDeleteFromModal = async () => {
-    if (!deletingListing) return;
-    await handleDeleteListing(deletingListing);
-  };
-
-  const handleToggleFromModal = async () => {
-    if (!editingListing) return;
-    await handleToggleListingStatus(editingListing);
-  };
-
-  const handleEditListing = (listing: Listing) => {
-    console.log('📝 Editing listing:', listing);
-    setEditingListing(listing);
-    setShowEditModal(true);
-  };
-
-  const handleListingDelete = (listing: Listing) => {
-    console.log('🗑️ Deleting listing:', listing);
-    setDeletingListing(listing);
-    setShowDeleteModal(true);
   };
 
   // Order management functions
@@ -997,6 +773,16 @@ const SellerDashboard: React.FC = () => {
     setCurrentVideoUrl(videoUrl);
     setCurrentVideoTitle(title);
     setShowVideoModal(true);
+  };
+
+  const handleEditListing = (listing: Listing) => {
+    setEditingListing(listing);
+    setShowEditModal(true);
+  };
+
+  const handleDeleteListing = (listing: Listing) => {
+    setDeletingListing(listing);
+    setShowDeleteModal(true);
   };
 
   const handleOfferAction = async (offerId: string, action: 'accept' | 'reject') => {
@@ -1252,8 +1038,7 @@ const SellerDashboard: React.FC = () => {
                 onStatusFilterChange={setListingsStatusFilter}
                 onPageChange={setListingsPage}
                 onEditListing={handleEditListing}
-                onDeleteListing={handleListingDelete}
-                onToggleStatus={handleToggleListingStatus}
+                onDeleteListing={handleDeleteListing}
                 onPlayVideo={handlePlayVideo}
                 onRefresh={fetchListings}
                 actionLoading={listingActionLoading}
@@ -1315,11 +1100,12 @@ const SellerDashboard: React.FC = () => {
                 setShowEditModal(false);
                 setEditingListing(null);
               }}
-              onUpdate={handleUpdateListing}
-              onDelete={handleDeleteFromModal}
-              onToggleStatus={handleToggleFromModal}
-              loading={listingActionLoading !== null}
-              operationType={operationType}
+              onUpdate={() => {
+                setShowEditModal(false);
+                setEditingListing(null);
+                fetchListings();
+              }}
+              loading={false}
             />
           )}
 
@@ -1332,9 +1118,11 @@ const SellerDashboard: React.FC = () => {
                 setDeletingListing(null);
               }}
               onConfirm={() => {
-                handleDeleteListing(deletingListing);
+                setShowDeleteModal(false);
+                setDeletingListing(null);
+                fetchListings();
               }}
-              loading={listingActionLoading !== null}
+              loading={false}
             />
           )}
 
