@@ -1,4 +1,4 @@
-// src/components/marketplace/seller/OrdersTab.tsx - UPDATED & FIXED VERSION
+// src/components/marketplace/seller/OrdersTab.tsx - COMPLETE FIXED VERSION
 import React, { useState } from 'react';
 import { marketplaceAPI, getOrderStatusInfo, formatCurrency, formatDate } from '../../../api';
 import OrderStatusTracker from './OrderStatusTracker';
@@ -38,21 +38,6 @@ interface Order {
   payments?: any[];
 }
 
-interface OrderStats {
-  totalOrders: number;
-  activeOrders: number;
-  pendingPayment: number;
-  processing: number;
-  inProgress: number;
-  delivered: number;
-  completed: number;
-  cancelled: number;
-  totalRevenue: number;
-  pendingRevenue: number;
-  thisMonthOrders: number;
-  thisMonthRevenue: number;
-}
-
 interface OrdersTabProps {
   orders: Order[];
   loading: boolean;
@@ -74,7 +59,6 @@ interface OrdersTabProps {
     isFinal: boolean;
     revisionsLeft?: number;
   }) => Promise<void>;
-  stats?: OrderStats; // Added stats prop
 }
 
 const OrdersTab: React.FC<OrdersTabProps> = ({
@@ -91,25 +75,22 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
   onCancel,
   onCompleteRevision,
   actionLoading,
-  onActualDeliver,
-  stats // Receive stats from dashboard
+  onActualDeliver
 }) => {
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState<Order | null>(null);
   const [isSubmittingDelivery, setIsSubmittingDelivery] = useState(false);
-  const [showCancelConfirm, setShowCancelConfirm] = useState<string | null>(null);
 
   const statusFilters = [
     { value: 'all', label: 'All Orders', count: orders.length },
-    { value: 'pending_payment', label: 'Pending Payment', count: orders.filter(o => o.status === 'pending_payment').length },
     { value: 'paid', label: 'To Start', count: orders.filter(o => o.status === 'paid').length },
     { value: 'processing', label: 'Processing', count: orders.filter(o => o.status === 'processing').length },
     { value: 'in_progress', label: 'In Progress', count: orders.filter(o => o.status === 'in_progress').length },
     { value: 'delivered', label: 'Delivered', count: orders.filter(o => o.status === 'delivered').length },
     { value: 'in_revision', label: 'Revision', count: orders.filter(o => o.status === 'in_revision').length },
     { value: 'completed', label: 'Completed', count: orders.filter(o => o.status === 'completed').length },
-    { value: 'cancelled', label: 'Cancelled', count: orders.filter(o => o.status === 'cancelled').length },
+    // { value: 'cancelled', label: 'Cancelled', count: orders.filter(o => o.status === 'cancelled').length },
   ];
 
   const filteredOrders = filter === 'all' 
@@ -125,104 +106,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     setDeliveryModalOpen(true);
   };
 
-  // Determine if order can be cancelled
-  const canCancelOrder = (order: Order): boolean => {
-    // Only allow cancellation in these statuses (before work starts)
-    const cancellableStatuses = ['pending_payment', 'paid', 'processing'];
-    return cancellableStatuses.includes(order.status);
-  };
-
-  // Get cancellation configuration
-  const getCancelConfig = (order: Order) => {
-    switch (order.status) {
-      case 'pending_payment':
-        return {
-          canCancel: true,
-          reason: 'Payment not completed yet',
-          message: 'Buyer hasn\'t completed payment. Order can be cancelled.',
-          warning: 'No payment has been made yet.'
-        };
-      
-      case 'paid':
-        return {
-          canCancel: true,
-          reason: 'Order not started yet',
-          message: 'You can cancel before starting work on this order.',
-          warning: 'Full or partial refund may be required based on your cancellation policy.'
-        };
-      
-      case 'processing':
-        return {
-          canCancel: true,
-          reason: 'Work preparation stage',
-          message: 'You can cancel before actual work begins.',
-          warning: 'Any preparation work done will be lost.'
-        };
-      
-      case 'in_progress':
-        return {
-          canCancel: false,
-          reason: 'Work already started',
-          message: 'Cannot cancel once work has started',
-          warning: 'Complete the order or discuss with buyer.'
-        };
-      
-      case 'delivered':
-        return {
-          canCancel: false,
-          reason: 'Work delivered to buyer',
-          message: 'Cannot cancel after delivery',
-          warning: 'Awaiting buyer acceptance or request revisions.'
-        };
-      
-      case 'in_revision':
-        return {
-          canCancel: false,
-          reason: 'Revision in progress',
-          message: 'Cannot cancel during revision',
-          warning: 'Complete the revision process.'
-        };
-      
-      case 'completed':
-        return {
-          canCancel: false,
-          reason: 'Order completed',
-          message: 'Cannot cancel completed orders',
-          warning: 'Order has been successfully completed.'
-        };
-      
-      case 'cancelled':
-        return {
-          canCancel: false,
-          reason: 'Already cancelled',
-          message: 'Order is already cancelled',
-          warning: 'This order was cancelled previously.'
-        };
-      
-      default:
-        return {
-          canCancel: false,
-          reason: 'Unknown status',
-          message: 'Cannot cancel',
-          warning: 'Please check order status.'
-        };
-    }
-  };
-
-  // Handle cancel order with confirmation
-  const handleCancelOrder = (order: Order) => {
-    if (!canCancelOrder(order) || !onCancel) return;
-    setShowCancelConfirm(order._id);
-  };
-
-  const confirmCancelOrder = (order: Order) => {
-    if (onCancel) {
-      onCancel(order);
-    }
-    setShowCancelConfirm(null);
-  };
-
-  // Handle deliver work
+  // ✅ IMPROVED FILE UPLOAD FUNCTION WITHOUT TOASTS
   const handleActualDeliver = async (deliveryData: {
     orderId: string;
     message: string;
@@ -259,11 +143,14 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
         console.log('📤 Uploading files...', deliveryData.attachments.length);
         
         try {
+          // ✅ Direct file upload with better handling
           uploadedAttachments = await uploadFilesDirect(deliveryData.attachments);
+          
           console.log('✅ Files uploaded successfully:', uploadedAttachments);
         } catch (uploadError: any) {
           console.error('❌ File upload error:', uploadError);
           
+          // Check if it's a file type error
           if (uploadError.message?.includes('File type') || uploadError.message?.includes('not supported')) {
             console.error(`❌ ${uploadError.message}. Please use supported file types.`);
           } else if (uploadError.message?.includes('size')) {
@@ -271,7 +158,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
           } else {
             console.error(`❌ File upload failed: ${uploadError.message || 'Please try again'}`);
           }
-          return;
+          return; // Stop if file upload fails
         }
       }
 
@@ -310,12 +197,13 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
       } catch (apiError: any) {
         console.error('❌ API Error:', apiError);
         
+        // Handle specific API errors
         if (apiError.message?.includes('Validation failed')) {
           console.error('❌ Please check your delivery details and try again.');
         } else if (apiError.message?.includes('not found')) {
           console.error('❌ Order not found or you do not have permission.');
         } else {
-          throw apiError;
+          throw apiError; // Re-throw for outer catch
         }
       }
 
@@ -328,6 +216,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     } catch (error: any) {
       console.error('❌ Delivery error:', error);
       
+      // Show specific error messages in console only
       let errorMessage = 'Delivery failed. Please try again.';
       
       if (error.message?.includes('File type')) {
@@ -346,11 +235,12 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     }
   };
 
-  // Direct file upload function
+  // ✅ DIRECT FILE UPLOAD FUNCTION WITHOUT TOASTS
   const uploadFilesDirect = async (files: File[]) => {
     try {
       const formData = new FormData();
       
+      // Log each file before uploading
       files.forEach(file => {
         console.log('📄 File to upload:', {
           name: file.name,
@@ -372,6 +262,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
+          // Don't set Content-Type for FormData, browser will set it automatically
         },
         body: formData,
       });
@@ -401,13 +292,13 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
   };
 
   // For revision completion:
-  const handleCompleteRevision = (order: Order) => {
-    if (onCompleteRevision) {
-      onCompleteRevision(order);
-    } else {
-      // Fallback to deliver if onCompleteRevision not provided
+  const handleCompleteRevision = async (order: Order) => {
+    try {
       setSelectedOrderForDelivery(order);
       setDeliveryModalOpen(true);
+    } catch (error: any) {
+      console.error('❌ Revision setup error:', error);
+      console.error(`❌ ${error.message || 'Failed to start revision'}`);
     }
   };
 
@@ -517,7 +408,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     return null;
   };
 
-  // File validation helper
+  // ✅ FILE VALIDATION HELPER
   const validateFileBeforeUpload = (file: File): string | null => {
     const maxSize = 100 * 1024 * 1024; // 100MB
     const allowedExtensions = [
@@ -548,85 +439,8 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     return null; // File is valid
   };
 
-  // Calculate stats from orders if not provided
-  const calculatedStats = stats || {
-    totalOrders: orders.length,
-    activeOrders: orders.filter(o => ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(o.status)).length,
-    pendingPayment: orders.filter(o => o.status === 'pending_payment').length,
-    processing: orders.filter(o => o.status === 'processing').length,
-    inProgress: orders.filter(o => o.status === 'in_progress').length,
-    delivered: orders.filter(o => o.status === 'delivered').length,
-    completed: orders.filter(o => o.status === 'completed').length,
-    cancelled: orders.filter(o => o.status === 'cancelled').length,
-    totalRevenue: orders.filter(o => o.status === 'completed').reduce((sum, order) => sum + order.amount, 0),
-    pendingRevenue: orders.filter(o => ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(o.status)).reduce((sum, order) => sum + order.amount, 0),
-    thisMonthOrders: 0,
-    thisMonthRevenue: 0
-  };
-
   return (
     <div className="space-y-6">
-      {/* Cancel Confirmation Modal */}
-      {showCancelConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                <span className="text-red-600 text-xl">❌</span>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900">Cancel Order</h3>
-            </div>
-            
-            <div className="mb-6">
-              <p className="text-gray-700 mb-2">
-                Are you sure you want to cancel this order? This action cannot be undone.
-              </p>
-              {(() => {
-                const order = orders.find(o => o._id === showCancelConfirm);
-                if (!order) return null;
-                const config = getCancelConfig(order);
-                return (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
-                    <p className="text-sm text-yellow-800">
-                      <span className="font-medium">Note:</span> {config.warning}
-                    </p>
-                  </div>
-                );
-              })()}
-            </div>
-            
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowCancelConfirm(null)}
-                className="flex-1 px-4 py-2.5 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors font-medium"
-              >
-                Keep Order
-              </button>
-              <button
-                onClick={() => {
-                  const order = orders.find(o => o._id === showCancelConfirm);
-                  if (order) confirmCancelOrder(order);
-                }}
-                className="flex-1 px-4 py-2.5 text-white bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded-xl transition-all duration-200 font-medium shadow-sm hover:shadow"
-                disabled={actionLoading === showCancelConfirm}
-              >
-                {actionLoading === showCancelConfirm ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4 inline mr-2" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Cancelling...
-                  </>
-                ) : (
-                  'Yes, Cancel Order'
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header with Stats */}
       <div className="bg-white rounded-2xl shadow-sm border border-yellow-200 p-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
@@ -653,28 +467,35 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
           </div>
         </div>
 
-        {/* Earning Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200">
-            <div className="text-sm font-medium text-green-700">Total Earnings</div>
-            <div className="text-2xl font-bold text-green-800">
-              {formatCurrency(calculatedStats.totalRevenue)}
-            </div>
-            <div className="text-xs text-green-600">Completed orders</div>
-          </div>
-          <div className="bg-gradient-to-br from-blue-50 to-cyan-50 p-4 rounded-xl border border-blue-200">
-            <div className="text-sm font-medium text-blue-700">Pending Revenue</div>
-            <div className="text-2xl font-bold text-blue-800">
-              {formatCurrency(calculatedStats.pendingRevenue)}
-            </div>
-            <div className="text-xs text-blue-600">Active orders</div>
-          </div>
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-gradient-to-br from-yellow-50 to-amber-50 p-4 rounded-xl border border-yellow-200">
-            <div className="text-sm font-medium text-yellow-700">Total Orders</div>
+            <div className="text-sm font-medium text-yellow-700">To Start</div>
             <div className="text-2xl font-bold text-yellow-800">
-              {calculatedStats.totalOrders}
+              {orders.filter(o => o.status === 'paid').length}
             </div>
-            <div className="text-xs text-yellow-600">All time orders</div>
+            <div className="text-xs text-yellow-600">Awaiting action</div>
+          </div>
+          <div className="bg-gradient-to-br from-purple-50 to-violet-50 p-4 rounded-xl border border-purple-200">
+            <div className="text-sm font-medium text-purple-700">In Progress</div>
+            <div className="text-2xl font-bold text-purple-800">
+              {orders.filter(o => ['processing', 'in_progress'].includes(o.status)).length}
+            </div>
+            <div className="text-xs text-purple-600">Being worked on</div>
+          </div>
+          {/* <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-4 rounded-xl border border-amber-200">
+            <div className="text-sm font-medium text-amber-700">For Review</div>
+            <div className="text-2xl font-bold text-amber-800">
+              {orders.filter(o => ['delivered', 'in_revision'].includes(o.status)).length}
+            </div>
+            <div className="text-xs text-amber-600">Awaiting buyer</div>
+          </div> */}
+          <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200">
+            <div className="text-sm font-medium text-green-700">Completed</div>
+            <div className="text-2xl font-bold text-green-800">
+              {orders.filter(o => o.status === 'completed').length}
+            </div>
+            <div className="text-xs text-green-600">Successfully delivered</div>
           </div>
         </div>
 
@@ -746,7 +567,6 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
               const daysRemaining = deliveryDate ? getDaysRemaining(deliveryDate) : null;
               const isExpanded = expandedOrderId === order._id;
               const priorityBadge = getPriorityBadge(order);
-              const cancelConfig = getCancelConfig(order);
 
               return (
                 <div 
@@ -890,37 +710,15 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                           </button>
                         )}
 
-                        {/* Cancel Button with Conditional Logic */}
-                        {cancelConfig.canCancel && onCancel && (
-                          <div className="relative group">
-                            <button
-                              onClick={() => handleCancelOrder(order)}
-                              disabled={actionLoading === order._id || isSubmittingDelivery}
-                              className="px-4 py-2.5 text-sm font-medium text-red-700 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 rounded-xl transition-all duration-200 disabled:opacity-50 border border-red-200 flex items-center gap-2 group-hover:shadow-sm"
-                            >
-                              <span>❌</span>
-                              Cancel
-                            </button>
-                            <div className="absolute z-10 invisible group-hover:visible bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg shadow-lg whitespace-nowrap">
-                              {cancelConfig.message}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Show disabled cancel button for non-cancellable orders */}
-                        {!cancelConfig.canCancel && (
-                          <div className="relative group">
-                            <button
-                              disabled
-                              className="px-4 py-2.5 text-sm font-medium text-gray-400 bg-gray-100 rounded-xl cursor-not-allowed border border-gray-300 flex items-center gap-2"
-                            >
-                              <span>🚫</span>
-                              Cannot Cancel
-                            </button>
-                            <div className="absolute z-10 invisible group-hover:visible bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-xs text-gray-700 bg-white border border-gray-200 rounded-lg shadow-lg whitespace-nowrap">
-                              {cancelConfig.message}
-                            </div>
-                          </div>
+                        {['paid', 'processing', 'in_progress'].includes(order.status) && onCancel && (
+                          <button
+                            onClick={() => onCancel(order)}
+                            disabled={actionLoading === order._id || isSubmittingDelivery}
+                            className="px-4 py-2.5 text-sm font-medium text-red-700 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 rounded-xl transition-all duration-200 disabled:opacity-50 border border-red-200 flex items-center gap-2"
+                          >
+                            <span>❌</span>
+                            Cancel
+                          </button>
                         )}
 
                         <button
@@ -1015,36 +813,6 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                               </div>
                             )}
                             
-                            {/* Cancellation Status */}
-                            <div className={`mt-3 p-3 rounded-lg border ${
-                              cancelConfig.canCancel 
-                                ? 'bg-red-50 border-red-200' 
-                                : 'bg-gray-50 border-gray-200'
-                            }`}>
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className={`font-medium ${
-                                    cancelConfig.canCancel ? 'text-red-800' : 'text-gray-800'
-                                  }`}>
-                                    {cancelConfig.canCancel ? '✅ Can be cancelled' : '❌ Cannot be cancelled'}
-                                  </p>
-                                  <p className="text-sm ${
-                                    cancelConfig.canCancel ? 'text-red-700' : 'text-gray-600'
-                                  }">
-                                    {cancelConfig.message}
-                                  </p>
-                                </div>
-                                {cancelConfig.canCancel && (
-                                  <button
-                                    onClick={() => handleCancelOrder(order)}
-                                    className="px-3 py-1.5 text-sm text-red-700 bg-white border border-red-300 hover:bg-red-50 rounded-lg transition-colors"
-                                  >
-                                    Cancel Now
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                            
                             {order.notes && (
                               <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200">
                                 <p className="text-sm text-blue-800">
@@ -1138,7 +906,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
           order={selectedOrderForDelivery}
           onDeliver={handleActualDeliver}
           isLoading={actionLoading === selectedOrderForDelivery._id || isSubmittingDelivery}
-          validateFile={validateFileBeforeUpload}
+          validateFile={validateFileBeforeUpload} // ✅ Pass validation function to modal
         />
       )}
     </div>
