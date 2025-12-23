@@ -1,4 +1,4 @@
-// src/pages/Messages.tsx - CLEAN & RESPONSIVE WITH 20%/80% LAYOUT
+// src/pages/Messages.tsx - FIXED CHAT DISPLAY
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import FirebaseChatInterface from '../../components/chat/FirebaseChatInterface';
@@ -59,8 +59,18 @@ const Messages: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showChatListMobile, setShowChatListMobile] = useState(true);
 
+  // ✅ FIX: Debug log
+  console.log('Messages Page - Current state:', {
+    chatsCount: chats.length,
+    chatsLoading,
+    currentUser: currentUser?.id,
+    authUser: authUser?.id,
+    selectedChatId: selectedChat?.firebaseChatId
+  });
+
   // Initialize current user from auth
   useEffect(() => {
+    console.log('🔥 Auth user effect triggered:', authUser);
     if (authUser) {
       setCurrentUser({
         id: authUser.id || authUser._id,
@@ -70,21 +80,28 @@ const Messages: React.FC = () => {
         role: authUser.role
       });
       setLoading(false);
+      console.log('✅ User set from auth:', authUser.username);
     }
   }, [authUser]);
 
-  // Fetch user details
+  // ✅ FIX: Fetch user details
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
         const token = localStorage.getItem('token');
+        console.log('🔑 Token check:', token ? 'Token exists' : 'No token');
+        
         if (!token) {
           navigate('/login');
           return;
         }
 
-        if (currentUser) return;
+        if (currentUser) {
+          console.log('✅ User already exists, skipping fetch');
+          return;
+        }
 
+        console.log('🌐 Fetching user details...');
         const response = await fetch('http://localhost:3000/api/auth/me', {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -92,8 +109,11 @@ const Messages: React.FC = () => {
           }
         });
 
+        console.log('📥 User fetch response:', response.status, response.statusText);
+
         if (response.ok) {
           const userData = await response.json();
+          console.log('✅ User data received:', userData.username);
           setCurrentUser({
             id: userData._id || userData.id,
             username: userData.username,
@@ -101,27 +121,60 @@ const Messages: React.FC = () => {
             avatar: userData.avatar,
             role: userData.role
           });
+        } else {
+          console.warn('⚠️ User fetch failed, trying token decode');
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            setCurrentUser({
+              id: payload.userId || payload.id,
+              username: payload.username || 'User',
+              email: payload.email || '',
+              role: payload.role
+            });
+            console.log('✅ User set from token payload');
+          } catch (parseError) {
+            console.error('❌ Token parse error:', parseError);
+          }
         }
       } catch (error) {
-        console.error('Error fetching user:', error);
+        console.error('❌ Error fetching user:', error);
       } finally {
         setLoading(false);
+        console.log('🏁 Loading set to false');
       }
     };
 
     if (!currentUser && !authUser) {
+      console.log('🔄 Fetching user because no currentUser and no authUser');
       fetchCurrentUser();
+    } else if (authUser) {
+      console.log('✅ AuthUser exists, skipping fetch');
+      setLoading(false);
     }
   }, [authUser, currentUser, navigate]);
 
-  // Fetch chats
+  // ✅ FIX: Fetch chats with better error handling
   const fetchChats = useCallback(async () => {
-    if (!currentUser?.id) return;
+    console.log('🔄 fetchChats called, currentUser ID:', currentUser?.id);
+    
+    if (!currentUser?.id) {
+      console.log('❌ No currentUser ID, skipping fetchChats');
+      return;
+    }
 
     try {
       setChatsLoading(true);
       const token = localStorage.getItem('token');
+      console.log('🔑 Token for chat fetch:', token ? 'Exists' : 'Missing');
       
+      if (!token) {
+        console.error('❌ No token found for chat fetch');
+        toast.error('Please login again');
+        navigate('/login');
+        return;
+      }
+
+      console.log('🌐 Fetching chats from API...');
       const response = await fetch('http://localhost:3000/marketplace/chat/my-chats', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -129,60 +182,115 @@ const Messages: React.FC = () => {
         }
       });
 
-      if (response.ok) {
-        const data = await response.json();
+      console.log('📥 Chat fetch response:', response.status, response.statusText);
+      
+      const data = await response.json();
+      console.log('📦 Chat fetch data:', data);
+      
+      if (response.ok && data) {
+        // ✅ FIX: Handle different response formats
+        const chatsData = data.data || data.chats || data || [];
+        console.log(`📊 Processing ${chatsData.length} chats`);
         
-        const transformedChats: Chat[] = (data.data || []).map((chat: any) => ({
-          firebaseChatId: chat.firebaseChatId || chat._id,
-          otherUser: {
-            id: chat.otherUser?._id || chat.otherUserId || 'unknown',
-            username: chat.otherUser?.username || 'Unknown User',
-            avatar: chat.otherUser?.avatar || '',
-            email: chat.otherUser?.email || ''
-          },
-          listing: {
-            id: chat.listing?._id || chat.listingId || 'unknown',
-            title: chat.listing?.title || 'Unknown Listing',
-            price: chat.listing?.price || 0,
-            mediaUrls: chat.listing?.mediaUrls || []
-          },
-          order: chat.order ? {
-            _id: chat.order._id,
-            amount: chat.order.amount,
-            status: chat.order.status,
-            listingTitle: chat.order.listingTitle,
-            createdAt: chat.order.createdAt
-          } : undefined,
-          lastMessage: chat.lastMessage || {
-            text: 'No messages yet',
-            senderId: '',
-            timestamp: new Date().toISOString()
-          },
-          unreadCount: chat.unreadCount || 0,
-          updatedAt: chat.updatedAt || chat.lastMessageAt || new Date().toISOString()
-        }));
+        const transformedChats: Chat[] = chatsData.map((chat: any, index: number) => {
+          const transformed = {
+            firebaseChatId: chat.firebaseChatId || chat.chatId || chat._id || `chat-${index}`,
+            otherUser: {
+              id: chat.otherUser?._id || chat.otherUserId || chat.otherUser?.id || 'unknown',
+              username: chat.otherUser?.username || 'Unknown User',
+              avatar: chat.otherUser?.avatar || '',
+              email: chat.otherUser?.email || ''
+            },
+            listing: {
+              id: chat.listing?._id || chat.listingId || 'unknown',
+              title: chat.listing?.title || chat.listingTitle || 'Unknown Listing',
+              price: chat.listing?.price || chat.price || 0,
+              mediaUrls: chat.listing?.mediaUrls || []
+            },
+            order: chat.order ? {
+              _id: chat.order._id,
+              amount: chat.order.amount,
+              status: chat.order.status,
+              listingTitle: chat.order.listingTitle,
+              createdAt: chat.order.createdAt
+            } : undefined,
+            lastMessage: chat.lastMessage || {
+              text: 'Start a conversation',
+              senderId: '',
+              timestamp: new Date().toISOString()
+            },
+            unreadCount: chat.unreadCount || chat.unreadMessages || 0,
+            updatedAt: chat.updatedAt || chat.lastMessageAt || new Date().toISOString()
+          };
+          
+          console.log(`💬 Chat ${index}:`, {
+            id: transformed.firebaseChatId,
+            user: transformed.otherUser.username,
+            listing: transformed.listing.title
+          });
+          
+          return transformed;
+        });
         
+        console.log('✅ Setting chats:', transformedChats);
         setChats(transformedChats);
+        
         const totalUnread = transformedChats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0);
         setUnreadCount(totalUnread);
+        console.log(`📨 Total unread: ${totalUnread}`);
+        
+        // Auto-select first chat if none selected and chats exist
+        if (transformedChats.length > 0 && !selectedChat) {
+          console.log('🤖 Auto-selecting first chat');
+          setSelectedChat(transformedChats[0]);
+        }
+        
+        toast.success(`Loaded ${transformedChats.length} conversations`);
+      } else {
+        console.error('❌ Chat fetch failed:', data);
+        toast.error(data?.message || 'Failed to load conversations');
       }
-    } catch (error) {
-      console.error('Error fetching chats:', error);
-      toast.error('Failed to load conversations');
+    } catch (error: any) {
+      console.error('❌ Error fetching chats:', error);
+      console.error('Error details:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      });
+      toast.error(error.message || 'Network error loading conversations');
     } finally {
       setChatsLoading(false);
+      console.log('🏁 Chat loading set to false');
     }
-  }, [currentUser?.id]);
+  }, [currentUser?.id, selectedChat, navigate]);
 
+  // ✅ FIX: Fetch chats when currentUser is available
   useEffect(() => {
-    if (currentUser?.id && !loading) {
+    console.log('📡 useEffect for chats triggered', {
+      currentUserId: currentUser?.id,
+      loading,
+      chatsLoading
+    });
+    
+    if (currentUser?.id && !loading && !chatsLoading) {
+      console.log('🚀 Fetching chats now...');
       fetchChats();
     }
-  }, [currentUser?.id, loading, fetchChats]);
+  }, [currentUser?.id, loading, chatsLoading, fetchChats]);
 
-  // Handle URL parameters
+  // ✅ FIX: Handle URL parameters
   useEffect(() => {
-    if (chatsLoading || !chats.length) return;
+    console.log('🔗 URL params effect:', {
+      chatsLoading,
+      chatsCount: chats.length,
+      urlChatId: searchParams.get('chat'),
+      orderId: searchParams.get('order')
+    });
+    
+    if (chatsLoading || !chats.length) {
+      console.log('⏳ Skipping URL params - loading or no chats');
+      return;
+    }
     
     const urlChatId = searchParams.get('chat');
     const orderId = searchParams.get('order');
@@ -190,27 +298,35 @@ const Messages: React.FC = () => {
     let foundChat: Chat | null = null;
     
     if (urlChatId) {
+      console.log('🔍 Looking for chat by ID:', urlChatId);
       foundChat = chats.find(c => c.firebaseChatId === urlChatId) || null;
     } else if (orderId) {
+      console.log('🔍 Looking for chat by order ID:', orderId);
       foundChat = chats.find(c => c.order?._id === orderId) || null;
     }
     
     if (foundChat && foundChat.firebaseChatId !== selectedChat?.firebaseChatId) {
+      console.log('🎯 Setting selected chat from URL:', foundChat.otherUser.username);
       setSelectedChat(foundChat);
-      setShowChatListMobile(false);
+      if (window.innerWidth < 640) {
+        setShowChatListMobile(false);
+      }
     }
   }, [chats, chatsLoading, searchParams, selectedChat]);
 
   // Chat selection
   const handleChatSelect = useCallback((chat: Chat) => {
+    console.log('👆 Chat selected:', chat.otherUser.username);
     if (selectedChat?.firebaseChatId === chat.firebaseChatId) return;
     setSelectedChat(chat);
-    setShowChatListMobile(false);
+    if (window.innerWidth < 640) {
+      setShowChatListMobile(false);
+    }
   }, [selectedChat]);
 
   const handleRefreshChats = () => {
+    console.log('🔄 Manual refresh triggered');
     fetchChats();
-    toast.success('Refreshed conversations');
   };
 
   // Format functions
@@ -223,14 +339,19 @@ const Messages: React.FC = () => {
   };
 
   const formatTime = (dateString: string): string => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffMins < 24 * 60) return `${Math.floor(diffMins / 60)}h ago`;
-    return `${Math.floor(diffMins / (60 * 24))}d ago`;
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / (1000 * 60));
+      
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffMins < 24 * 60) return `${Math.floor(diffMins / 60)}h ago`;
+      return `${Math.floor(diffMins / (60 * 24))}d ago`;
+    } catch (error) {
+      return 'Recently';
+    }
   };
 
   // Toggle chat list on mobile
@@ -240,6 +361,77 @@ const Messages: React.FC = () => {
 
   const handleBackToChatList = () => {
     setShowChatListMobile(true);
+  };
+
+  // ✅ FIX: Test chats if API fails
+  const loadTestChats = () => {
+    console.log('🧪 Loading test chats for debugging');
+    const testChats: Chat[] = [
+      {
+        firebaseChatId: 'test-chat-1',
+        otherUser: {
+          id: 'user-1',
+          username: 'John Doe',
+          email: 'john@example.com',
+          avatar: ''
+        },
+        listing: {
+          id: 'listing-1',
+          title: 'Website Design Service',
+          price: 2999,
+          mediaUrls: []
+        },
+        order: {
+          _id: 'order-123',
+          amount: 2999,
+          status: 'in_progress',
+          listingTitle: 'Website Design Service',
+          createdAt: new Date().toISOString()
+        },
+        lastMessage: {
+          text: 'Hello, when will the design be ready?',
+          senderId: 'user-1',
+          timestamp: new Date().toISOString()
+        },
+        unreadCount: 2,
+        updatedAt: new Date().toISOString()
+      },
+      {
+        firebaseChatId: 'test-chat-2',
+        otherUser: {
+          id: 'user-2',
+          username: 'Jane Smith',
+          email: 'jane@example.com',
+          avatar: ''
+        },
+        listing: {
+          id: 'listing-2',
+          title: 'Logo Design Package',
+          price: 1499,
+          mediaUrls: []
+        },
+        order: {
+          _id: 'order-456',
+          amount: 1499,
+          status: 'completed',
+          listingTitle: 'Logo Design Package',
+          createdAt: new Date().toISOString()
+        },
+        lastMessage: {
+          text: 'Thank you for the great work!',
+          senderId: 'current-user',
+          timestamp: new Date(Date.now() - 3600000).toISOString()
+        },
+        unreadCount: 0,
+        updatedAt: new Date(Date.now() - 3600000).toISOString()
+      }
+    ];
+    
+    setChats(testChats);
+    if (!selectedChat) {
+      setSelectedChat(testChats[0]);
+    }
+    toast.success('Loaded test conversations for debugging');
   };
 
   // Loading state
@@ -259,21 +451,20 @@ const Messages: React.FC = () => {
   return (
     <MarketplaceLayout>
       <div className="min-h-screen bg-white">
-        {/* CSS Styles - Inline for this component */}
+        {/* Debug button - remove in production */}
+        <button
+          onClick={loadTestChats}
+          className="fixed bottom-4 right-4 z-50 px-3 py-1.5 bg-red-500 text-white text-xs rounded-lg shadow-lg hover:bg-red-600"
+          style={{ display: 'none' }} // Hidden by default
+        >
+          Load Test Chats
+        </button>
+
+        {/* CSS Styles */}
         <style jsx global>{`
           @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
-          }
-          
-          @keyframes slideIn {
-            from { transform: translateX(-100%); }
-            to { transform: translateX(0); }
-          }
-          
-          @keyframes slideOut {
-            from { transform: translateX(0); }
-            to { transform: translateX(-100%); }
           }
           
           @keyframes float {
@@ -301,16 +492,6 @@ const Messages: React.FC = () => {
           .chat-scrollbar::-webkit-scrollbar-thumb:hover {
             background: #d1d5db;
           }
-          
-          @media (max-width: 768px) {
-            .mobile-slide-in {
-              animation: slideIn 0.3s ease-out;
-            }
-            
-            .mobile-slide-out {
-              animation: slideOut 0.3s ease-out;
-            }
-          }
         `}</style>
 
         {/* Header */}
@@ -319,7 +500,7 @@ const Messages: React.FC = () => {
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Messages</h1>
               <p className="mt-1 text-gray-500 text-xs sm:text-sm">
-                Communicate with buyers and sellers
+                {chats.length} conversations • {unreadCount} unread
               </p>
             </div>
             
@@ -336,6 +517,7 @@ const Messages: React.FC = () => {
               >
                 <FiRefreshCw className={`w-4 h-4 mr-2 ${chatsLoading ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">Refresh</span>
+                <span className="sm:hidden">⟳</span>
               </button>
             </div>
           </div>
@@ -354,7 +536,7 @@ const Messages: React.FC = () => {
                   <div>
                     <h2 className="text-sm sm:text-base font-semibold text-gray-900">Conversations</h2>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {chats.length} total • {unreadCount} unread
+                      {chats.length} found
                     </p>
                   </div>
                   {chatsLoading && (
@@ -365,23 +547,31 @@ const Messages: React.FC = () => {
               
               {/* Chat List Items */}
               <div className="flex-1 overflow-y-auto chat-scrollbar">
-                {chatsLoading && chats.length === 0 ? (
+                {chatsLoading ? (
                   <div className="p-6 text-center">
                     <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-300 border-t-yellow-500 mx-auto"></div>
-                    <p className="mt-3 text-gray-500 text-xs">Loading...</p>
+                    <p className="mt-3 text-gray-500 text-xs">Loading conversations...</p>
                   </div>
                 ) : chats.length === 0 ? (
                   <div className="p-6 text-center animate-fade-in">
                     <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
                       <FiMail className="w-6 h-6 text-gray-400" />
                     </div>
-                    <p className="text-sm text-gray-500 mb-3">No conversations</p>
-                    <button
-                      onClick={() => navigate('/marketplace')}
-                      className="px-3 py-1.5 text-xs bg-yellow-500 text-white font-medium rounded-lg hover:bg-yellow-600 transition-colors"
-                    >
-                      Browse Marketplace
-                    </button>
+                    <p className="text-sm text-gray-500 mb-3">No conversations found</p>
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => navigate('/marketplace')}
+                        className="w-full px-3 py-1.5 text-xs bg-yellow-500 text-white font-medium rounded-lg hover:bg-yellow-600 transition-colors"
+                      >
+                        Browse Marketplace
+                      </button>
+                      <button
+                        onClick={handleRefreshChats}
+                        className="w-full px-3 py-1.5 text-xs border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        Try Again
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="animate-fade-in">
@@ -408,7 +598,7 @@ const Messages: React.FC = () => {
                             )}
                             {chat.unreadCount > 0 && (
                               <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center animate-pulse">
-                                {chat.unreadCount}
+                                {chat.unreadCount > 9 ? '9+' : chat.unreadCount}
                               </span>
                             )}
                           </div>
@@ -424,7 +614,7 @@ const Messages: React.FC = () => {
                             </div>
                             
                             <p className="text-xs text-gray-600 truncate mb-1">
-                              {chat.lastMessage?.text || 'No messages yet'}
+                              {chat.lastMessage?.text || 'Start a conversation'}
                             </p>
                             
                             <div className="flex items-center gap-1 text-xs">
@@ -552,8 +742,8 @@ const Messages: React.FC = () => {
                       </div>
                       <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2 sm:mb-3">No conversations yet</h3>
                       <p className="text-gray-600 max-w-sm sm:max-w-md mb-6 sm:mb-7 text-sm leading-relaxed">
-                        When you place an order or receive an offer, your conversations will appear here.
-                        Start exploring listings to connect with sellers!
+                        Start by browsing the marketplace and placing an order.
+                        Your conversations will appear here.
                       </p>
                       <div className="flex flex-col sm:flex-row gap-3">
                         <button
@@ -578,14 +768,11 @@ const Messages: React.FC = () => {
                       </div>
                       <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2 sm:mb-3">Select a conversation</h3>
                       <p className="text-gray-600 max-w-sm sm:max-w-md mb-6 sm:mb-7 text-sm">
-                        Choose a conversation from the list to start messaging
+                        Choose a conversation from the list on the left
                       </p>
-                      <button
-                        onClick={() => navigate('/marketplace')}
-                        className="px-4 py-2.5 text-sm text-yellow-600 hover:text-yellow-700 transition-colors font-medium"
-                      >
-                        Browse Marketplace →
-                      </button>
+                      <div className="text-xs sm:text-sm text-gray-500">
+                        {chats.length} conversations available
+                      </div>
                     </div>
                   )}
                 </div>
