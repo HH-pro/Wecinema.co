@@ -208,7 +208,7 @@ const SellerDashboard: React.FC = () => {
   // Tab configuration - MOVE THIS AFTER pendingOffers is calculated
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊', badge: null },
-    { id: 'offers', label: 'Offers', icon: '💼', badge: pendingOffers },
+    // { id: 'offers', label: 'Offers', icon: '💼', badge: pendingOffers },
     { id: 'listings', label: 'My Listings', icon: '🏠', badge: totalListings },
     { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders }
   ];
