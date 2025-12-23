@@ -710,7 +710,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                           </button>
                         )}
 
-                        {['paid', 'processing', 'in_progress'].includes(order.status) && onCancel && (
+                        {/* {['paid', 'processing', 'in_progress'].includes(order.status) && onCancel && (
                           <button
                             onClick={() => onCancel(order)}
                             disabled={actionLoading === order._id || isSubmittingDelivery}
@@ -719,7 +719,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                             <span>❌</span>
                             Cancel
                           </button>
-                        )}
+                        )} */}
 
                         <button
                           onClick={() => toggleExpandOrder(order._id)}
