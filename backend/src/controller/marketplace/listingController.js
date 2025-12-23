@@ -264,6 +264,8 @@ function isValidEmail(email) {
 // ===================================================
 // ✅ EDIT/UPDATE LISTING
 // ===================================================
+// ✅ EDIT/UPDATE LISTING (Refactored)
+// ===================================================
 router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== EDIT LISTING REQUEST ===");
@@ -271,7 +273,6 @@ router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
     console.log("Update data:", req.body);
     console.log("User ID:", req.user._id);
 
-    const { title, description, price, type, category, tags, mediaUrls } = req.body;
     const listingId = req.params.id;
     const sellerId = req.user._id;
 
@@ -283,36 +284,23 @@ router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
 
     if (!existingListing) {
       return res.status(404).json({ 
+        success: false,
         error: "Listing not found or you don't have permission to edit this listing" 
       });
     }
 
-    // Build update object with only provided fields
-    const updateData = {};
-    
-    if (title !== undefined) updateData.title = title.trim();
-    if (description !== undefined) updateData.description = description.trim();
-    if (price !== undefined) {
-      if (typeof price !== 'number' || price <= 0) {
-        return res.status(400).json({
-          error: "Price must be a positive number",
-          received: price
-        });
-      }
-      updateData.price = parseFloat(price).toFixed(2);
+    // Use shared validation (isEdit = true)
+    const validationErrors = listingUtils.validateListingData(req.body, true);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Validation failed",
+        details: validationErrors
+      });
     }
-    if (type !== undefined) updateData.type = type;
-    if (category !== undefined) updateData.category = category.trim() || 'uncategorized';
-    
-    if (tags !== undefined) {
-      const tagsArray = Array.isArray(tags) ? tags : (tags ? [tags] : []);
-      updateData.tags = tagsArray.map(tag => tag.trim()).filter(tag => tag);
-    }
-    
-    if (mediaUrls !== undefined) {
-      const mediaArray = Array.isArray(mediaUrls) ? mediaUrls : (mediaUrls ? [mediaUrls] : []);
-      updateData.mediaUrls = mediaArray;
-    }
+
+    // Use shared field processing
+    const updateData = listingUtils.processFields(req.body);
     
     // Add updated timestamp
     updateData.updatedAt = new Date();
@@ -321,16 +309,24 @@ router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
     const updatedListing = await MarketplaceListing.findByIdAndUpdate(
       listingId,
       { $set: updateData },
-      { new: true, runValidators: true }
-    ).select("title price type category tags description mediaUrls status updatedAt");
+      { 
+        new: true, 
+        runValidators: true,
+        select: "title price type category tags description mediaUrls status sellerId createdAt updatedAt"
+      }
+    );
 
     if (!updatedListing) {
-      return res.status(404).json({ error: "Failed to update listing" });
+      return res.status(404).json({ 
+        success: false,
+        error: "Failed to update listing" 
+      });
     }
 
     console.log("✅ Listing updated successfully:", updatedListing._id);
 
     res.status(200).json({ 
+      success: true,
       message: "Listing updated successfully", 
       listing: updatedListing 
     });
@@ -339,17 +335,25 @@ router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
     console.error("❌ Error updating listing:", error);
     
     if (error.name === 'CastError') {
-      return res.status(400).json({ error: "Invalid listing ID format" });
+      return res.status(400).json({ 
+        success: false,
+        error: "Invalid listing ID format" 
+      });
     }
     
     if (error.name === 'ValidationError') {
       return res.status(400).json({
+        success: false,
         error: "Validation failed",
         details: Object.values(error.errors).map(err => err.message)
       });
     }
     
-    res.status(500).json({ error: "Failed to update listing" });
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to update listing",
+      details: error.message 
+    });
   }
 });
 
