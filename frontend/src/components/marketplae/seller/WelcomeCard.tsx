@@ -21,61 +21,81 @@ const WelcomeCard: React.FC<WelcomeCardProps> = ({
   secondaryAction
 }) => {
   return (
-    <div className="bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 rounded-2xl shadow-xl p-6 md:p-8 text-white">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-        <div className="flex-1">
-          <div className="mb-6">
-            <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-yellow-500/20 to-yellow-600/20 rounded-xl border border-yellow-400/30 mb-4">
-              <span className="text-2xl">🚀</span>
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-2">{title}</h2>
-            <p className="text-blue-100 text-lg">{subtitle}</p>
-          </div>
-          
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={primaryAction.onClick}
-              className="px-5 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 shadow-lg hover:shadow-xl flex items-center"
-            >
-              {primaryAction.label}
-            </button>
-            
-            {secondaryAction?.visible && (
-              <button
-                onClick={secondaryAction.onClick}
-                className="px-5 py-3 bg-white/10 text-white font-medium rounded-xl hover:bg-white/20 transition-all duration-200 border border-white/20 hover:border-white/40 flex items-center backdrop-blur-sm"
-              >
-                {secondaryAction.label}
-              </button>
-            )}
-          </div>
-        </div>
-        
-        <div className="lg:w-64">
-          <div className="bg-gradient-to-br from-blue-800/50 to-blue-900/50 rounded-xl border border-blue-700/50 p-4 backdrop-blur-sm">
-            <div className="flex items-center mb-3">
-              <div className="w-8 h-8 bg-yellow-500/20 rounded-lg flex items-center justify-center mr-3 border border-yellow-500/30">
-                <span className="text-yellow-300">📊</span>
+    <div className="bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 rounded-3xl shadow-2xl p-8 text-white overflow-hidden">
+      {/* Background pattern */}
+      <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/10 to-transparent rounded-full -translate-y-32 translate-x-16"></div>
+      <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-indigo-500/10 to-transparent rounded-full translate-y-24 -translate-x-16"></div>
+      
+      <div className="relative z-10">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8">
+          <div className="flex-1">
+            <div className="flex items-start space-x-4 mb-6">
+              <div className="w-14 h-14 bg-gradient-to-br from-yellow-500 to-amber-600 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
+                <span className="text-2xl">👋</span>
               </div>
               <div>
-                <p className="text-sm font-medium text-white">Your Progress</p>
-                <div className="flex items-center mt-1">
-                  <div className="w-24 h-1.5 bg-blue-700/50 rounded-full overflow-hidden">
-                    <div className="h-full bg-yellow-500 w-3/4"></div>
-                  </div>
-                  <span className="text-xs text-blue-200 ml-2">75%</span>
-                </div>
+                <h2 className="text-3xl font-bold text-white mb-3">{title}</h2>
+                <p className="text-blue-100 text-lg opacity-90">{subtitle}</p>
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="flex items-center">
-                <div className="w-1.5 h-1.5 bg-green-400 rounded-full mr-2"></div>
-                <span className="text-blue-200">Active</span>
+            <div className="flex flex-wrap gap-4">
+              <button
+                onClick={primaryAction.onClick}
+                className="px-6 py-3.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-semibold rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 flex items-center"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                {primaryAction.label}
+              </button>
+              
+              {secondaryAction?.visible && (
+                <button
+                  onClick={secondaryAction.onClick}
+                  className="px-6 py-3.5 bg-white/10 text-white font-semibold rounded-xl hover:bg-white/20 transition-all duration-300 border border-white/30 hover:border-white/50 flex items-center backdrop-blur-sm hover:scale-105"
+                >
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  {secondaryAction.label}
+                </button>
+              )}
+            </div>
+          </div>
+          
+          <div className="lg:w-72">
+            <div className="bg-gradient-to-br from-blue-800/40 to-indigo-900/40 rounded-2xl border border-blue-700/50 p-5 backdrop-blur-sm">
+              <div className="flex items-center mb-4">
+                <div className="w-10 h-10 bg-gradient-to-br from-yellow-500/20 to-amber-600/20 rounded-xl flex items-center justify-center mr-3 border border-yellow-500/30">
+                  <span className="text-yellow-300 text-lg">🎯</span>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-white">Dashboard Stats</p>
+                  <div className="flex items-center mt-2">
+                    <div className="w-32 h-2 bg-blue-900/50 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-yellow-500 to-amber-600 w-3/4"></div>
+                    </div>
+                    <span className="text-sm text-yellow-300 font-medium ml-3">75%</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center">
-                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-2"></div>
-                <span className="text-blue-200">Live</span>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-blue-900/30 rounded-lg p-3 border border-blue-700/30">
+                  <div className="flex items-center">
+                    <div className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse"></div>
+                    <span className="text-sm text-blue-100">Online</span>
+                  </div>
+                  <p className="text-xs text-blue-300 mt-1">Ready to sell</p>
+                </div>
+                <div className="bg-blue-900/30 rounded-lg p-3 border border-blue-700/30">
+                  <div className="flex items-center">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+                    <span className="text-sm text-blue-100">Active</span>
+                  </div>
+                  <p className="text-xs text-blue-300 mt-1">24/7 Support</p>
+                </div>
               </div>
             </div>
           </div>
