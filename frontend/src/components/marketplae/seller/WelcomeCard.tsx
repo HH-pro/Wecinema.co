@@ -21,10 +21,8 @@ const WelcomeCard: React.FC<WelcomeCardProps> = ({
   secondaryAction
 }) => {
   return (
-    <div className="bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 rounded-3xl shadow-2xl p-8 text-white overflow-hidden">
-      {/* Background pattern */}
-      <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/10 to-transparent rounded-full -translate-y-32 translate-x-16"></div>
-      <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-indigo-500/10 to-transparent rounded-full translate-y-24 -translate-x-16"></div>
+    <div className="bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 rounded-3xl shadow-2xl p-8 text-white overflow-hidden">
+      {/* Removed background pattern balls */}
       
       <div className="relative z-10">
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8">
@@ -35,7 +33,7 @@ const WelcomeCard: React.FC<WelcomeCardProps> = ({
               </div>
               <div>
                 <h2 className="text-3xl font-bold text-white mb-3">{title}</h2>
-                <p className="text-blue-100 text-lg opacity-90">{subtitle}</p>
+                <p className="text-gray-300 text-lg opacity-90">{subtitle}</p>
               </div>
             </div>
             
@@ -65,15 +63,15 @@ const WelcomeCard: React.FC<WelcomeCardProps> = ({
           </div>
           
           <div className="lg:w-72">
-            <div className="bg-gradient-to-br from-blue-800/40 to-indigo-900/40 rounded-2xl border border-blue-700/50 p-5 backdrop-blur-sm">
+            <div className="bg-gradient-to-br from-gray-900/50 to-slate-900/50 rounded-2xl border border-gray-800/50 p-5 backdrop-blur-sm">
               <div className="flex items-center mb-4">
                 <div className="w-10 h-10 bg-gradient-to-br from-yellow-500/20 to-amber-600/20 rounded-xl flex items-center justify-center mr-3 border border-yellow-500/30">
-                  <span className="text-yellow-300 text-lg">🎯</span>
+                  <span className="text-yellow-300 text-lg">📊</span>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-white">Dashboard Stats</p>
                   <div className="flex items-center mt-2">
-                    <div className="w-32 h-2 bg-blue-900/50 rounded-full overflow-hidden">
+                    <div className="w-32 h-2 bg-gray-800/70 rounded-full overflow-hidden">
                       <div className="h-full bg-gradient-to-r from-yellow-500 to-amber-600 w-3/4"></div>
                     </div>
                     <span className="text-sm text-yellow-300 font-medium ml-3">75%</span>
@@ -82,19 +80,19 @@ const WelcomeCard: React.FC<WelcomeCardProps> = ({
               </div>
               
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-blue-900/30 rounded-lg p-3 border border-blue-700/30">
+                <div className="bg-gray-900/40 rounded-lg p-3 border border-gray-800/40">
                   <div className="flex items-center">
                     <div className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse"></div>
-                    <span className="text-sm text-blue-100">Online</span>
+                    <span className="text-sm text-gray-200">Online</span>
                   </div>
-                  <p className="text-xs text-blue-300 mt-1">Ready to sell</p>
+                  <p className="text-xs text-gray-400 mt-1">Ready to sell</p>
                 </div>
-                <div className="bg-blue-900/30 rounded-lg p-3 border border-blue-700/30">
+                <div className="bg-gray-900/40 rounded-lg p-3 border border-gray-800/40">
                   <div className="flex items-center">
-                    <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
-                    <span className="text-sm text-blue-100">Active</span>
+                    <div className="w-2 h-2 bg-yellow-400 rounded-full mr-2"></div>
+                    <span className="text-sm text-gray-200">Active</span>
                   </div>
-                  <p className="text-xs text-blue-300 mt-1">24/7 Support</p>
+                  <p className="text-xs text-gray-400 mt-1">24/7 Support</p>
                 </div>
               </div>
             </div>
