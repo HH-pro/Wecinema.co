@@ -1,5 +1,5 @@
 // src/components/marketplace/seller/EditListingModal.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
@@ -32,30 +32,50 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
     title: '',
     description: '',
     price: '',
-    type: '',
+    listType: '',
     category: '',
     tags: '',
-    mediaUrls: '',
   });
   
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
+  const [existingMediaUrls, setExistingMediaUrls] = useState<string[]>([]);
+  const [mediaToRemove, setMediaToRemove] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
   
-  const listingTypes = ['product', 'service', 'rental', 'event', 'job', 'other'];
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Listing types as per requirement
+  const listingTypes = [
+    { value: 'for-sale', label: 'For Sale' },
+    { value: 'licensing', label: 'Licensing' },
+    { value: 'adoption-rights', label: 'Adoption Rights' },
+    { value: 'commission', label: 'Commission' }
+  ];
+
+  // Categories
   const categories = [
-    'electronics',
-    'fashion',
-    'home & garden',
-    'vehicles',
-    'real estate',
-    'services',
-    'jobs',
-    'events',
-    'education',
-    'health',
-    'sports',
-    'hobbies',
-    'other'
+    'Music',
+    'Art',
+    'Photography',
+    'Video Content',
+    'Writing',
+    'Software',
+    'Design',
+    'Fashion',
+    'Home Decor',
+    'Electronics',
+    'Vehicles',
+    'Real Estate',
+    'Services',
+    'Jobs',
+    'Events',
+    'Education',
+    'Health & Wellness',
+    'Sports Equipment',
+    'Collectibles',
+    'Other'
   ];
 
   useEffect(() => {
@@ -64,46 +84,53 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
         title: listing.title || '',
         description: listing.description || '',
         price: listing.price ? listing.price.toString() : '',
-        type: listing.type || '',
+        listType: listing.type || '',
         category: listing.category || '',
         tags: listing.tags ? listing.tags.join(', ') : '',
-        mediaUrls: listing.mediaUrls ? listing.mediaUrls.join(', ') : '',
       });
+      setExistingMediaUrls(listing.mediaUrls || []);
+      setMediaFiles([]);
+      setMediaToRemove([]);
       setErrors({});
+      setUploadProgress(0);
     }
   }, [listing]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
     
-    // Title validation (required)
+    // Title validation
     if (!formData.title.trim()) {
       newErrors.title = 'Title is required';
+    } else if (formData.title.trim().length < 3) {
+      newErrors.title = 'Title must be at least 3 characters';
     }
     
-    // Description validation (required)
+    // Description validation
     if (!formData.description.trim()) {
       newErrors.description = 'Description is required';
     } else if (formData.description.trim().length < 10) {
       newErrors.description = 'Description must be at least 10 characters';
     }
     
-    // Price validation (required)
+    // Price validation
     if (!formData.price) {
       newErrors.price = 'Price is required';
     } else {
       const priceNum = parseFloat(formData.price);
-      if (isNaN(priceNum) || priceNum <= 0) {
-        newErrors.price = 'Price must be a positive number';
+      if (isNaN(priceNum)) {
+        newErrors.price = 'Price must be a valid number';
+      } else if (priceNum <= 0) {
+        newErrors.price = 'Price must be greater than 0';
       }
     }
     
-    // Type validation (required)
-    if (!formData.type) {
-      newErrors.type = 'Type is required';
+    // Listing Type validation
+    if (!formData.listType) {
+      newErrors.listType = 'Listing type is required';
     }
     
-    // Category validation (required)
+    // Category validation
     if (!formData.category) {
       newErrors.category = 'Category is required';
     }
@@ -119,7 +146,6 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
       [name]: value
     }));
     
-    // Clear error for this field when user starts typing
     if (errors[name]) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -127,6 +153,91 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
         return newErrors;
       });
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const newFiles = Array.from(files);
+    
+    // Validate file types
+    const validFiles = newFiles.filter(file => {
+      const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime', 'video/x-msvideo'];
+      if (!validTypes.includes(file.type)) {
+        toast.error(`${file.name}: Invalid file type. Only images and videos are allowed.`);
+        return false;
+      }
+      
+      // Validate file size (max 50MB)
+      const maxSize = 50 * 1024 * 1024; // 50MB
+      if (file.size > maxSize) {
+        toast.error(`${file.name}: File size must be less than 50MB`);
+        return false;
+      }
+      
+      return true;
+    });
+
+    setMediaFiles(prev => [...prev, ...validFiles]);
+    
+    // Clear file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeNewFile = (index: number) => {
+    setMediaFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeExistingMedia = (url: string) => {
+    setExistingMediaUrls(prev => prev.filter(u => u !== url));
+    setMediaToRemove(prev => [...prev, url]);
+  };
+
+  const restoreExistingMedia = (url: string) => {
+    setExistingMediaUrls(prev => [...prev, url]);
+    setMediaToRemove(prev => prev.filter(u => u !== url));
+  };
+
+  const uploadFilesToCloudinary = async (files: File[]): Promise<string[]> => {
+    if (files.length === 0) return [];
+    
+    const uploadedUrls: string[] = [];
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET || 'your_upload_preset');
+      formData.append('folder', 'marketplace-listings');
+
+      try {
+        const response = await axios.post(
+          `https://api.cloudinary.com/v1_1/${process.env.REACT_APP_CLOUDINARY_CLOUD_NAME}/upload`,
+          formData,
+          {
+            onUploadProgress: (progressEvent) => {
+              const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
+              setUploadProgress(percentCompleted);
+            },
+            headers: {
+              'Content-Type': 'multipart/form-data'
+            }
+          }
+        );
+        
+        uploadedUrls.push(response.data.secure_url);
+        toast.success(`Uploaded ${file.name} (${i + 1}/${files.length})`);
+      } catch (error) {
+        console.error(`Error uploading ${file.name}:`, error);
+        toast.error(`Failed to upload ${file.name}`);
+        throw error;
+      }
+    }
+    
+    return uploadedUrls;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -137,19 +248,39 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
     }
     
     setLoading(true);
+    setUploadProgress(0);
+    
     try {
+      let newMediaUrls: string[] = [];
+      
+      // Upload new media files if any
+      if (mediaFiles.length > 0) {
+        toast.info('Uploading media files...');
+        newMediaUrls = await uploadFilesToCloudinary(mediaFiles);
+      }
+      
+      // Combine existing media (excluding removed ones) with new media
+      const finalMediaUrls = [
+        ...existingMediaUrls,
+        ...newMediaUrls
+      ];
+      
+      // Prepare data for API
       const token = localStorage.getItem('token');
+      const payload = {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        price: parseFloat(formData.price),
+        type: formData.listType,
+        category: formData.category,
+        tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
+        mediaUrls: finalMediaUrls,
+        mediaToRemove: mediaToRemove // Optional: for backend to delete from storage
+      };
+      
       const response = await axios.put(
         `${process.env.REACT_APP_API_URL}/api/marketplace/listing/${listing._id}`,
-        {
-          title: formData.title.trim(),
-          description: formData.description.trim(),
-          price: parseFloat(formData.price),
-          type: formData.type,
-          category: formData.category,
-          tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
-          mediaUrls: formData.mediaUrls.split(',').map(url => url.trim()).filter(url => url),
-        },
+        payload,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -169,7 +300,6 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
       console.error('Error updating listing:', error);
       
       if (error.response?.data?.details) {
-        // Handle server validation errors
         const serverErrors = error.response.data.details;
         if (typeof serverErrors === 'object') {
           setErrors(serverErrors);
@@ -183,7 +313,18 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
       }
     } finally {
       setLoading(false);
+      setUploadProgress(0);
     }
+  };
+
+  const isImageFile = (url: string | File): boolean => {
+    const urlString = typeof url === 'string' ? url : url.name.toLowerCase();
+    return /\.(jpg|jpeg|png|gif|webp)$/i.test(urlString);
+  };
+
+  const isVideoFile = (url: string | File): boolean => {
+    const urlString = typeof url === 'string' ? url : url.name.toLowerCase();
+    return /\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i.test(urlString);
   };
 
   if (!isOpen || !listing) return null;
@@ -192,15 +333,15 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Background overlay */}
-        <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose}></div>
+        <div className="fixed inset-0 transition-opacity bg-gray-900 bg-opacity-75" onClick={onClose}></div>
 
         {/* Modal panel */}
-        <div className="inline-block w-full max-w-2xl my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
-          <div className="px-6 pt-5 pb-4 bg-gradient-to-r from-blue-50 to-white border-b border-gray-200">
+        <div className="inline-block w-full max-w-3xl my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
+          <div className="px-6 pt-5 pb-4 bg-gradient-to-r from-purple-50 to-blue-50 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-semibold text-gray-900">Edit Listing</h3>
-                <p className="text-sm text-gray-600 mt-1">Update your listing details</p>
+                <p className="text-sm text-gray-600 mt-1">Update your listing information</p>
               </div>
               <button
                 onClick={onClose}
@@ -214,8 +355,8 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
           </div>
 
           <form onSubmit={handleSubmit}>
-            <div className="px-6 py-5 space-y-6">
-              {/* Title Field */}
+            <div className="px-6 py-5 space-y-6 max-h-[70vh] overflow-y-auto">
+              {/* Title */}
               <div>
                 <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
                   Title *
@@ -238,7 +379,7 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
                 )}
               </div>
 
-              {/* Description Field */}
+              {/* Description */}
               <div>
                 <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
                   Description *
@@ -262,7 +403,7 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Price Field */}
+                {/* Price */}
                 <div>
                   <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-2">
                     Price (₹) *
@@ -287,37 +428,37 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
                   )}
                 </div>
 
-                {/* Type Field */}
+                {/* Listing Type */}
                 <div>
-                  <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-2">
-                    Type *
+                  <label htmlFor="listType" className="block text-sm font-medium text-gray-700 mb-2">
+                    Listing Type *
                   </label>
                   <select
-                    id="type"
-                    name="type"
-                    value={formData.type}
+                    id="listType"
+                    name="listType"
+                    value={formData.listType}
                     onChange={handleInputChange}
                     className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:outline-none transition-all ${
-                      errors.type 
+                      errors.listType 
                         ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
                         : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
                     }`}
                   >
-                    <option value="">Select Type</option>
+                    <option value="">Select Listing Type</option>
                     {listingTypes.map(type => (
-                      <option key={type} value={type}>
-                        {type.charAt(0).toUpperCase() + type.slice(1)}
+                      <option key={type.value} value={type.value}>
+                        {type.label}
                       </option>
                     ))}
                   </select>
-                  {errors.type && (
-                    <p className="mt-2 text-sm text-red-600">{errors.type}</p>
+                  {errors.listType && (
+                    <p className="mt-2 text-sm text-red-600">{errors.listType}</p>
                   )}
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Category Field */}
+                {/* Category */}
                 <div>
                   <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
                     Category *
@@ -336,7 +477,7 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
                     <option value="">Select Category</option>
                     {categories.map(category => (
                       <option key={category} value={category}>
-                        {category.charAt(0).toUpperCase() + category.slice(1)}
+                        {category}
                       </option>
                     ))}
                   </select>
@@ -345,10 +486,10 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
                   )}
                 </div>
 
-                {/* Tags Field */}
+                {/* Tags/Keywords */}
                 <div>
                   <label htmlFor="tags" className="block text-sm font-medium text-gray-700 mb-2">
-                    Tags
+                    Tags / Keywords
                   </label>
                   <input
                     type="text"
@@ -357,97 +498,200 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
                     value={formData.tags}
                     onChange={handleInputChange}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all"
-                    placeholder="tag1, tag2, tag3"
+                    placeholder="music, art, digital, creative, etc."
                   />
                   <p className="mt-2 text-xs text-gray-500">Separate tags with commas</p>
                 </div>
               </div>
 
-              {/* Media URLs Field */}
-              <div>
-                <label htmlFor="mediaUrls" className="block text-sm font-medium text-gray-700 mb-2">
-                  Media URLs
-                </label>
-                <input
-                  type="text"
-                  id="mediaUrls"
-                  name="mediaUrls"
-                  value={formData.mediaUrls}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all"
-                  placeholder="https://example.com/image1.jpg, https://example.com/video.mp4"
-                />
-                <p className="mt-2 text-xs text-gray-500">
-                  Enter comma-separated URLs for images or videos. First image/video will be shown as thumbnail.
-                </p>
-              </div>
-
-              {/* Current Media Preview */}
-              {listing.mediaUrls && listing.mediaUrls.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Current Media ({listing.mediaUrls.length})
+              {/* Media Upload Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Media Files
                   </label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {listing.mediaUrls.slice(0, 4).map((url, index) => (
-                      <div key={index} className="relative h-20 rounded-lg overflow-hidden">
-                        {url.toLowerCase().endsWith('.mp4') || 
-                         url.toLowerCase().endsWith('.mov') ? (
-                          <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                            <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M8 5v14l11-7z" />
-                            </svg>
-                          </div>
-                        ) : (
-                          <img
-                            src={url}
-                            alt={`Media ${index + 1}`}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150';
-                            }}
-                          />
-                        )}
-                      </div>
-                    ))}
-                    {listing.mediaUrls.length > 4 && (
-                      <div className="h-20 bg-gray-100 rounded-lg flex items-center justify-center">
-                        <span className="text-sm font-medium text-gray-600">
-                          +{listing.mediaUrls.length - 4} more
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                  <span className="text-xs text-gray-500">
+                    Upload images or videos (max 50MB each)
+                  </span>
                 </div>
-              )}
+
+                {/* Upload Progress */}
+                {uploadProgress > 0 && uploadProgress < 100 && (
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div 
+                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    ></div>
+                    <p className="text-xs text-gray-600 mt-1 text-center">
+                      Uploading: {uploadProgress}%
+                    </p>
+                  </div>
+                )}
+
+                {/* File Upload Button */}
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    multiple
+                    accept="image/*,video/*"
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all"
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    Select Files
+                  </button>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Drag & drop images or videos, or click to browse
+                  </p>
+                </div>
+
+                {/* Preview New Media Files */}
+                {mediaFiles.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">
+                      New Media to Upload ({mediaFiles.length})
+                    </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {mediaFiles.map((file, index) => (
+                        <div key={index} className="relative group">
+                          <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                            {isImageFile(file) ? (
+                              <img
+                                src={URL.createObjectURL(file)}
+                                alt={file.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : isVideoFile(file) ? (
+                              <div className="w-full h-full flex items-center justify-center bg-gray-800">
+                                <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M8 5v14l11-7z" />
+                                </svg>
+                              </div>
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <span className="text-xs text-gray-500">{file.name}</span>
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeNewFile(index)}
+                            className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                          <p className="text-xs text-gray-600 mt-1 truncate" title={file.name}>
+                            {file.name.length > 15 ? file.name.substring(0, 15) + '...' : file.name}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Existing Media Preview */}
+                {existingMediaUrls.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">
+                      Existing Media ({existingMediaUrls.length})
+                    </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {existingMediaUrls.map((url, index) => {
+                        const isRemoved = mediaToRemove.includes(url);
+                        return (
+                          <div key={index} className={`relative group ${isRemoved ? 'opacity-50' : ''}`}>
+                            <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                              {isImageFile(url) ? (
+                                <img
+                                  src={url}
+                                  alt={`Media ${index + 1}`}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150?text=Image+Error';
+                                  }}
+                                />
+                              ) : isVideoFile(url) ? (
+                                <div className="w-full h-full flex items-center justify-center bg-gray-800">
+                                  <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M8 5v14l11-7z" />
+                                  </svg>
+                                </div>
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <span className="text-xs text-gray-500">Media {index + 1}</span>
+                                </div>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => isRemoved ? restoreExistingMedia(url) : removeExistingMedia(url)}
+                              className={`absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity ${
+                                isRemoved ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                              }`}
+                            >
+                              {isRemoved ? (
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              ) : (
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              )}
+                            </button>
+                            <p className="text-xs text-gray-600 mt-1 truncate">
+                              {isRemoved ? 'Click to restore' : 'Click to remove'}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Modal footer */}
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={loading}
-                className="px-6 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? (
-                  <span className="flex items-center">
-                    <svg className="w-4 h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Updating...
-                  </span>
-                ) : (
-                  'Update Listing'
-                )}
-              </button>
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
+              <div className="text-sm text-gray-500">
+                * Required fields
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={loading}
+                  className="px-6 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg hover:from-purple-700 hover:to-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? (
+                    <span className="flex items-center">
+                      <svg className="w-4 h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      {uploadProgress > 0 ? `Uploading... ${uploadProgress}%` : 'Updating...'}
+                    </span>
+                  ) : (
+                    'Update Listing'
+                  )}
+                </button>
+              </div>
             </div>
           </form>
         </div>
