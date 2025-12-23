@@ -422,8 +422,8 @@ const Messages: React.FC = () => {
 
           {/* Main Content */}
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 h-[calc(100vh-180px)] flex overflow-hidden">
-            {/* Chat List */}
-            <div className="w-full md:w-96 border-r border-gray-200 flex flex-col">
+            {/* Chat List - Fixed width 205px */}
+            <div className="w-52 border-r border-gray-200 flex flex-col">
               <div className="p-4 border-b border-gray-200">
                 <h2 className="text-lg font-semibold text-gray-900">Conversations</h2>
                 <p className="text-sm text-gray-500 mt-1">
@@ -453,8 +453,8 @@ const Messages: React.FC = () => {
               </div>
             </div>
 
-            {/* Chat Interface */}
-            <div className="flex-1 flex flex-col">
+            {/* Chat Interface - 80% width */}
+            <div className="flex-1 w-4/5 flex flex-col">
               {selectedChat && selectedChat.otherUser ? (
                 <>
                   {/* Chat Header */}
