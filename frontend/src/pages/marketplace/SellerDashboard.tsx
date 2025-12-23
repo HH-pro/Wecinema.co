@@ -217,7 +217,7 @@ const SellerDashboard: React.FC = () => {
   // Tab configuration
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊', badge: null },
-    { id: 'offers', label: 'Offers', icon: '💼', badge: pendingOffers > 0 ? pendingOffers : null },
+    // { id: 'offers', label: 'Offers', icon: '💼', badge: pendingOffers > 0 ? pendingOffers : null },
     { id: 'listings', label: 'My Listings', icon: '🏠', badge: totalListings > 0 ? totalListings : null },
     { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders > 0 ? orderStats.activeOrders : null }
   ];
