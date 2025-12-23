@@ -487,9 +487,9 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
             <div className="text-sm font-medium text-amber-700">For Review</div>
             <div className="text-2xl font-bold text-amber-800">
               {orders.filter(o => ['delivered', 'in_revision'].includes(o.status)).length}
-            </div> */}
+            </div>
             <div className="text-xs text-amber-600">Awaiting buyer</div>
-          </div>
+          </div> */}
           <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200">
             <div className="text-sm font-medium text-green-700">Completed</div>
             <div className="text-2xl font-bold text-green-800">
