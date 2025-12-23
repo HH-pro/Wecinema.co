@@ -1073,7 +1073,13 @@ const SellerDashboard: React.FC = () => {
           </div>
 
           {/* Modals */}
-         
+          {showStripeSetup && (
+            <StripeSetupModal
+              show={showStripeSetup}
+              onClose={() => setShowStripeSetup(false)}
+              onSuccess={handleStripeSetupSuccess}
+            />
+          )}
 
           {selectedOrderId && (
             <OrderDetailsModal
