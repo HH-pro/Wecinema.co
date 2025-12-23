@@ -922,9 +922,6 @@ if (type === "login") {
 		}
 	}
 );
-Popup.defaultProps = {
-	background: "linear-gradient(to right, #ffd700, #ffff00)",
-	type: "",
-};
+
 
 export default Popup;
