@@ -21,12 +21,11 @@ router.get("/listings", async (req, res) => {
 
 /// ===================================================
 // ✅ GET USER'S LISTINGS (My Listings)
-// ===================================================
 router.get("/my-listings", authenticateMiddleware, async (req, res) => {
   try {
     const sellerId = req.user._id;
     
-    const { status, page = 1, limit = 20 } = req.query;
+    const { status, page = 1, limit = 10 } = req.query;
     
     const filter = { sellerId };
     if (status) filter.status = status;
@@ -35,44 +34,44 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
     
     console.log("📝 Fetching my listings for seller:", sellerId);
 
+    // Get listings with pagination
     const listings = await MarketplaceListing.find(filter)
-      .select("title price status mediaUrls description category tags createdAt updatedAt")
+      .select("title price status mediaUrls description category tags createdAt updatedAt views sellerId")
+      .populate("sellerId", "username avatar sellerRating")
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
 
     const total = await MarketplaceListing.countDocuments(filter);
 
-    // Cache headers
-    const lastModified = listings[0]?.updatedAt || new Date();
-    const etag = `"${lastModified.getTime()}"`;
+    // ✅ REMOVE or modify cache headers to prevent 304
+    // Option 1: Remove cache headers entirely
+    // Option 2: Add cache-busting headers
     
-    res.setHeader('Cache-Control', 'private, max-age=60');
-    res.setHeader('Last-Modified', lastModified.toUTCString());
-    res.setHeader('ETag', etag);
-    
-    // Conditional request check
-    const ifNoneMatch = req.headers['if-none-match'];
-    if (ifNoneMatch === etag) {
-      return res.status(304).send();
-    }
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     
     res.status(200).json({
+      success: true,
       listings,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
         pages: Math.ceil(total / parseInt(limit))
-      }
+      },
+      timestamp: new Date().getTime() // Add timestamp to prevent caching
     });
     
   } catch (error) {
     console.error("❌ Error fetching my listings:", error);
-    res.status(500).json({ error: "Failed to fetch my listings" });
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to fetch my listings" 
+    });
   }
 });
-
 // ===================================================
 // ✅ CREATE LISTING
 router.post("/create-listing", authenticateMiddleware, async (req, res) => {
@@ -265,6 +264,7 @@ function isValidEmail(email) {
 // ===================================================
 // ✅ EDIT/UPDATE LISTING
 // ===================================================
+// ===================================================
 router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== EDIT LISTING REQUEST ===");
@@ -288,22 +288,80 @@ router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    // Build update object with only provided fields
+    // Build update object with validation (like create listing)
     const updateData = {};
     
-    if (title !== undefined) updateData.title = title.trim();
-    if (description !== undefined) updateData.description = description.trim();
+    // Required fields validation (same as create listing)
+    if (title !== undefined) {
+      if (!title || title.trim() === '') {
+        return res.status(400).json({
+          error: "Title is required",
+          received: title
+        });
+      }
+      updateData.title = title.trim();
+    } else {
+      return res.status(400).json({ 
+        error: "Title is required for update",
+        required: ["title"]
+      });
+    }
+    
+    if (description !== undefined) {
+      if (!description || description.trim() === '') {
+        return res.status(400).json({
+          error: "Description is required",
+          received: description
+        });
+      }
+      updateData.description = description.trim();
+    } else {
+      return res.status(400).json({ 
+        error: "Description is required for update",
+        required: ["description"]
+      });
+    }
+    
     if (price !== undefined) {
-      if (typeof price !== 'number' || price <= 0) {
+      if (!price) {
+        return res.status(400).json({
+          error: "Price is required",
+          received: price
+        });
+      }
+      if (isNaN(price) || price <= 0) {
         return res.status(400).json({
           error: "Price must be a positive number",
           received: price
         });
       }
       updateData.price = parseFloat(price).toFixed(2);
+    } else {
+      return res.status(400).json({ 
+        error: "Price is required for update",
+        required: ["price"]
+      });
     }
-    if (type !== undefined) updateData.type = type;
-    if (category !== undefined) updateData.category = category.trim() || 'uncategorized';
+    
+    if (type !== undefined) {
+      if (!type || type.trim() === '') {
+        return res.status(400).json({
+          error: "Type is required",
+          received: type
+        });
+      }
+      updateData.type = type;
+    } else {
+      return res.status(400).json({ 
+        error: "Type is required for update",
+        required: ["type"]
+      });
+    }
+    
+    // Optional fields
+    if (category !== undefined) {
+      updateData.category = category.trim() || 'uncategorized';
+    }
     
     if (tags !== undefined) {
       const tagsArray = Array.isArray(tags) ? tags : (tags ? [tags] : []);
@@ -332,6 +390,7 @@ router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
     console.log("✅ Listing updated successfully:", updatedListing._id);
 
     res.status(200).json({ 
+      success: true,
       message: "Listing updated successfully", 
       listing: updatedListing 
     });
@@ -340,20 +399,48 @@ router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
     console.error("❌ Error updating listing:", error);
     
     if (error.name === 'CastError') {
-      return res.status(400).json({ error: "Invalid listing ID format" });
-    }
-    
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({
-        error: "Validation failed",
-        details: Object.values(error.errors).map(err => err.message)
+      return res.status(400).json({ 
+        success: false,
+        error: "Invalid listing ID format" 
       });
     }
     
-    res.status(500).json({ error: "Failed to update listing" });
+    if (error.name === 'ValidationError') {
+      const errors = {};
+      Object.keys(error.errors).forEach(key => {
+        errors[key] = error.errors[key].message;
+      });
+      
+      return res.status(400).json({
+        success: false,
+        error: "Validation failed",
+        details: errors
+      });
+    }
+    
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        error: "Listing with similar details already exists",
+        details: error.keyValue
+      });
+    }
+
+    if (error.name === 'MongooseError' || error.message.includes('buffering timed out')) {
+      return res.status(503).json({
+        success: false,
+        error: "Database temporarily unavailable",
+        details: "Please try again in a moment"
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to update listing",
+      details: error.message 
+    });
   }
 });
-
 // ===================================================
 // ✅ TOGGLE LISTING STATUS (Active/Inactive)
 // ===================================================
