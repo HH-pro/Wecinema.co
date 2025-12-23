@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const { authenticateMiddleware } = require("../../utils");
 
@@ -108,8 +108,8 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
           console.log('6a. Account needs additional verification');
           const accountLink = await stripe.accountLinks.create({
             account: user.stripeAccountId,
-            refresh_url: `http://localhost:5173/marketplace/dashboard?stripe=refresh&account_id=${user.stripeAccountId}`,
-            return_url: `http://localhost:5173/marketplace/dashboard?stripe=success&account_id=${user.stripeAccountId}`,
+            refresh_url: `${process.env.FRONTEND_URL}/marketplace/dashboard?stripe=refresh&account_id=${user.stripeAccountId}`,
+            return_url: `${process.env.FRONTEND_URL}/marketplace/dashboard?stripe=success&account_id=${user.stripeAccountId}`,
             type: 'account_onboarding',
           });
 
@@ -125,8 +125,8 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
         console.log('7. Creating account link for existing account...');
         const accountLink = await stripe.accountLinks.create({
           account: user.stripeAccountId,
-          refresh_url: `http://localhost:5173/marketplace/dashboard?stripe=refresh&account_id=${user.stripeAccountId}`,
-          return_url: `http://localhost:5173/marketplace/dashboard?stripe=success&account_id=${user.stripeAccountId}`,
+          refresh_url: `${process.env.FRONTEND_URL}/marketplace/dashboard?stripe=refresh&account_id=${user.stripeAccountId}`,
+          return_url: `${process.env.FRONTEND_URL}/marketplace/dashboard?stripe=success&account_id=${user.stripeAccountId}`,
           type: 'account_onboarding',
         });
 
@@ -152,7 +152,7 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
     console.log('11. Creating new Stripe account...');
     const accountData = {
       type: 'express',
-      country: 'US',
+      country: process.env.STRIPE_DEFAULT_COUNTRY || 'US',
       email: user.email,
       capabilities: {
         card_payments: { requested: true },
@@ -165,8 +165,8 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
         last_name: user.lastName || 'User',
       },
       business_profile: {
-        url: 'http://localhost:5173',
-        mcc: '5734', // Computer Software Stores
+        url: process.env.FRONTEND_URL || 'http://localhost:5173',
+        mcc: process.env.STRIPE_MCC_CODE || '5734', // Computer Software Stores
         product_description: 'Digital products and services'
       },
       settings: {
@@ -178,7 +178,7 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
       },
       metadata: {
         userId: userId.toString(),
-        platform: 'WECINEMA'
+        platform: process.env.PLATFORM_NAME || 'WECINEMA'
       }
     };
 
@@ -199,8 +199,8 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
     console.log('15. Creating account link...');
     const accountLink = await stripe.accountLinks.create({
       account: account.id,
-      refresh_url: `http://localhost:5173/marketplace/dashboard?stripe=refresh&account_id=${account.id}`,
-      return_url: `http://localhost:5173/marketplace/dashboard?stripe=success&account_id=${account.id}`,
+      refresh_url: `${process.env.FRONTEND_URL}/marketplace/dashboard?stripe=refresh&account_id=${account.id}`,
+      return_url: `${process.env.FRONTEND_URL}/marketplace/dashboard?stripe=success&account_id=${account.id}`,
       type: 'account_onboarding',
     });
     console.log('16. ✅ Account link created:', accountLink.url);
@@ -397,14 +397,15 @@ router.post('/create-payment-intent', authenticateMiddleware, async (req, res) =
       });
     }
 
-    // Calculate platform fee (15%)
-    const platformFee = Math.round(order.amount * 0.15 * 100); // in paise
+    // Calculate platform fee
+    const platformFeePercentage = parseFloat(process.env.STRIPE_PLATFORM_FEE_PERCENTAGE) || 15;
+    const platformFee = Math.round(order.amount * (platformFeePercentage / 100) * 100);
     const amount = Math.round(order.amount * 100); // in paise
 
     // Create payment intent with application fee
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amount,
-      currency: 'inr',
+      currency: process.env.STRIPE_CURRENCY || 'inr',
       automatic_payment_methods: {
         enabled: true,
       },
@@ -431,7 +432,7 @@ router.post('/create-payment-intent', authenticateMiddleware, async (req, res) =
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
       amount: order.amount,
-      currency: 'inr',
+      currency: process.env.STRIPE_CURRENCY || 'inr',
       platformFee: platformFee / 100,
       message: 'Payment intent created successfully'
     });
@@ -542,15 +543,16 @@ router.get('/balance', authenticateMiddleware, async (req, res) => {
       stripeAccount: user.stripeAccountId
     });
 
-    const available = balance.available.find(b => b.currency === 'inr') || { amount: 0 };
-    const pending = balance.pending.find(b => b.currency === 'inr') || { amount: 0 };
+    const currency = process.env.STRIPE_CURRENCY || 'inr';
+    const available = balance.available.find(b => b.currency === currency) || { amount: 0 };
+    const pending = balance.pending.find(b => b.currency === currency) || { amount: 0 };
 
     res.json({
       success: true,
       balance: {
-        available: available.amount / 100, // Convert to rupees
-        pending: pending.amount / 100, // Convert to rupees
-        currency: 'inr'
+        available: available.amount / 100,
+        pending: pending.amount / 100,
+        currency: currency
       },
       availableBalance: available.amount / 100,
       pendingBalance: pending.amount / 100
@@ -598,9 +600,9 @@ router.post('/create-payout', authenticateMiddleware, async (req, res) => {
 
     // Create payout
     const payout = await stripe.payouts.create({
-      amount: Math.round(amount * 100), // Convert to paise
-      currency: 'inr',
-      method: 'standard', // or 'instant' for instant payouts (additional fees)
+      amount: Math.round(amount * 100), // Convert to smallest currency unit
+      currency: process.env.STRIPE_CURRENCY || 'inr',
+      method: process.env.STRIPE_PAYOUT_METHOD || 'standard',
     }, {
       stripeAccount: user.stripeAccountId
     });
@@ -708,7 +710,13 @@ router.post('/webhook', express.raw({type: 'application/json'}), async (req, res
 
   try {
     // Verify webhook signature
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      console.error('STRIPE_WEBHOOK_SECRET is not set in environment variables');
+      return res.status(400).send('Webhook Error: Webhook secret not configured');
+    }
+
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
   } catch (err) {
     console.error('Webhook signature verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
