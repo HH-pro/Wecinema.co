@@ -421,7 +421,7 @@ const Messages: React.FC = () => {
           </div>
 
           {/* Main Content */}
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 h-[calc(100vh-180px)] flex overflow-hidden">
+          <div className="bg-white rounded-xl shadow-lg border border-gray-200 h-[calc(10vh-180px)] flex overflow-hidden">
             {/* Chat List */}
             <div className="w-full md:w-96 border-r border-gray-200 flex flex-col">
               <div className="p-4 border-b border-gray-200">
