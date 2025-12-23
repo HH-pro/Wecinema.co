@@ -1,4 +1,4 @@
-// src/pages/seller/SellerDashboard.tsx - COMPLETE FIXED VERSION
+// src/pages/seller/SellerDashboard.tsx - FINAL SOLUTION
 import React, { useState, useEffect, useCallback } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
@@ -178,8 +178,8 @@ const SellerDashboard: React.FC = () => {
   const [listingsLoading, setListingsLoading] = useState(false);
   const [offersLoading, setOffersLoading] = useState(false);
   
-  // Track if orders have been loaded at least once
-  const [ordersLoaded, setOrdersLoaded] = useState(false);
+  // Track if initial data has been loaded
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   
   // Modal states
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -262,7 +262,7 @@ const SellerDashboard: React.FC = () => {
              orderDate.getFullYear() === thisYear;
     });
 
-    const stats = {
+    return {
       totalOrders: orders.length,
       activeOrders: orders.filter(order => 
         ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(order.status)
@@ -284,12 +284,62 @@ const SellerDashboard: React.FC = () => {
         .filter(order => order.status === 'completed')
         .reduce((sum, order) => sum + order.amount, 0)
     };
-    
-    console.log('📊 Calculated Stats:', stats);
-    return stats;
   }, []);
 
-  // ✅ FIXED: Main data fetch function - CALLED ON INITIAL LOAD
+  // ✅ FIXED: SINGLE SOURCE OF TRUTH - Fetch all orders with proper endpoint
+  const fetchAllOrders = async (): Promise<Order[]> => {
+    try {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        console.error('No token found');
+        return [];
+      }
+
+      console.log('📦 Fetching ALL orders from API...');
+      
+      // Try multiple endpoints - use the one that works
+      const endpoints = [
+        `${API_BASE_URL}/marketplace/my-sales`,
+        `${API_BASE_URL}/marketplace/orders/my-sales`,
+        `${API_BASE_URL}/marketplace/seller/orders`
+      ];
+      
+      let ordersData: Order[] = [];
+      
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`🔄 Trying endpoint: ${endpoint}`);
+          const response = await axios.get(endpoint, {
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Cache-Control': 'no-cache'
+            },
+            params: {
+              limit: 100,
+              _t: new Date().getTime()
+            },
+            timeout: 8000
+          });
+          
+          if (response.data.success) {
+            ordersData = response.data.sales || response.data.orders || response.data.data || [];
+            console.log(`✅ Success from ${endpoint}: ${ordersData.length} orders`);
+            break;
+          }
+        } catch (err) {
+          console.log(`❌ Failed from ${endpoint}:`, err.message);
+          continue;
+        }
+      }
+      
+      return ordersData;
+    } catch (error) {
+      console.error('❌ Error fetching all orders:', error);
+      return [];
+    }
+  };
+
+  // ✅ FIXED: Main data fetch function - FETCHES EVERYTHING ON INITIAL LOAD
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -302,127 +352,94 @@ const SellerDashboard: React.FC = () => {
         return;
       }
 
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      
-      console.log('🔄 Fetching dashboard data...');
-      
-      // ✅ Fetch ALL orders initially
-      const ordersResponse = await axios.get(
-        `${API_BASE_URL}/marketplace/my-sales`,
-        {
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Cache-Control': 'no-cache, no-store, must-revalidate'
-          },
-          timeout: 10000,
-          params: {
-            limit: 100, // Get all orders initially
-            _t: new Date().getTime() // Prevent caching
-          }
-        }
-      ).catch(err => {
-        console.error('Orders fetch error:', err);
-        return { data: { success: false, sales: [] } };
-      });
+      console.log('🚀 Loading dashboard data...');
 
-      let ordersData: Order[] = [];
-      if (ordersResponse.data.success) {
-        ordersData = ordersResponse.data.sales || ordersResponse.data.orders || [];
-        console.log('✅ Orders loaded:', ordersData.length);
+      // ✅ STEP 1: Fetch ALL orders FIRST - This is most important
+      const ordersData = await fetchAllOrders();
+      console.log('📊 Orders fetched:', ordersData.length);
+      
+      if (ordersData.length > 0) {
+        // Calculate stats from orders
+        const stats = calculateOrderStats(ordersData);
+        console.log('💰 Stats calculated:', stats);
+        
+        // Set orders and stats
+        setOrders(ordersData);
+        setOrderStats(stats);
+      } else {
+        console.log('⚠️ No orders found');
       }
 
-      // Fetch offers and listings in parallel
+      // ✅ STEP 2: Fetch offers and listings in parallel
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      
       const [offersResponse, listingsResponse] = await Promise.allSettled([
         axios.get(`${API_BASE_URL}/marketplace/offers/received-offers`, {
           headers: { Authorization: `Bearer ${token}` },
-          timeout: 10000
-        }),
+          timeout: 8000
+        }).catch(err => ({ data: { success: false, offers: [] } })),
         axios.get(`${API_BASE_URL}/marketplace/listings/my-listings`, {
           params: { limit: 5 },
           headers: { Authorization: `Bearer ${token}` },
-          timeout: 10000
-        })
+          timeout: 8000
+        }).catch(err => ({ data: { success: false } }))
       ]);
 
-      // Process offers response
-      let offersData: Offer[] = [];
+      // Process offers
       if (offersResponse.status === 'fulfilled' && offersResponse.value.data.success) {
-        offersData = offersResponse.value.data.offers || [];
+        const offersData = offersResponse.value.data.offers || [];
+        setOffers(offersData);
+        console.log('💼 Offers fetched:', offersData.length);
       }
 
-      // Process listings response
+      // Process listings
       if (listingsResponse.status === 'fulfilled' && listingsResponse.value.data.success) {
         setListingsData(listingsResponse.value.data);
+        console.log('🏠 Listings fetched');
       }
 
-      // ✅ ALWAYS set orders and calculate stats
-      const stats = calculateOrderStats(ordersData);
-      setOrders(ordersData);
-      setOrderStats(stats);
-      setOffers(offersData);
-      setOrdersLoaded(true);
-      
+      // Mark initial data as loaded
+      setInitialDataLoaded(true);
       console.log('✅ Dashboard data loaded successfully');
-      console.log('📈 Stats:', stats);
 
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('❌ Error fetching dashboard data:', error);
       setError('Failed to load dashboard data. Please try refreshing the page.');
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ FIXED: Fetch orders for OrdersTab - UPDATES MAIN STATE
+  // ✅ FIXED: Fetch orders for OrdersTab - Uses same logic
   const fetchSellerOrders = async () => {
     try {
       setOrdersLoading(true);
-      setError('');
       
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const ordersData = await fetchAllOrders();
+      console.log('📦 OrdersTab orders:', ordersData.length);
       
-      const params: any = {
-        page: ordersPage,
-        limit: ordersLimit,
-        _t: new Date().getTime() // Prevent caching
-      };
-      
-      if (ordersFilter !== 'all') {
-        params.status = ordersFilter;
-      }
-      
-      console.log('🔄 Fetching seller orders with params:', params);
-      
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/orders/my-sales`,
-        {
-          params,
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Cache-Control': 'no-cache, no-store, must-revalidate'
-          },
-          timeout: 10000
+      if (ordersData.length > 0) {
+        // Filter orders if needed
+        let filteredOrders = ordersData;
+        if (ordersFilter !== 'all') {
+          filteredOrders = ordersData.filter(order => order.status === ordersFilter);
         }
-      );
-      
-      if (response.data.success) {
-        const ordersData = response.data.sales || response.data.orders || [];
-        console.log('✅ Seller orders fetched:', ordersData.length);
         
-        // ✅ CRITICAL: Update main orders state
-        setOrders(ordersData);
+        // Paginate
+        const startIndex = (ordersPage - 1) * ordersLimit;
+        const paginatedOrders = filteredOrders.slice(startIndex, startIndex + ordersLimit);
         
-        // ✅ Calculate and update stats
+        // Update state
+        setOrders(paginatedOrders);
+        
+        // Calculate stats from ALL orders (not just paginated)
         const stats = calculateOrderStats(ordersData);
         setOrderStats(stats);
         
-        // Mark as loaded
-        setOrdersLoaded(true);
-        
-        console.log('✅ Orders and stats updated:', stats);
+        console.log('📊 OrdersTab stats updated');
       }
     } catch (error: any) {
-      console.error('Error fetching seller orders:', error);
+      console.error('❌ Error fetching seller orders:', error);
       setError('Failed to load orders. Please try again.');
     } finally {
       setOrdersLoading(false);
@@ -535,21 +552,15 @@ const SellerDashboard: React.FC = () => {
     setRefreshing(true);
     
     try {
-      // Always refresh dashboard data first
+      // Always refresh ALL data
       await fetchDashboardData();
       
-      // Then refresh specific tab data
-      if (activeTab === 'listings') {
-        await fetchListings();
-      } else if (activeTab === 'orders') {
-        await fetchSellerOrders();
-      } else if (activeTab === 'offers') {
-        await fetchOffers();
-      }
-      
       await checkStripeAccountStatus();
+      
+      setSuccessMessage('✅ Dashboard refreshed successfully!');
     } catch (error) {
       console.error('Refresh error:', error);
+      setError('Failed to refresh data. Please try again.');
     } finally {
       setRefreshing(false);
     }
@@ -745,7 +756,7 @@ const SellerDashboard: React.FC = () => {
       return order;
     }));
     
-    // ✅ FIXED: Recalculate stats with updated orders
+    // Recalculate stats with updated orders
     const updatedOrders = orders.map(order => 
       order._id === orderId ? { ...order, status: newStatus, ...updates } : order
     );
@@ -816,6 +827,7 @@ const SellerDashboard: React.FC = () => {
     
     const loadInitialData = async () => {
       try {
+        // Load ALL data including orders
         await fetchDashboardData();
         await checkStripeAccountStatus();
         handleStripeReturn();
@@ -825,11 +837,6 @@ const SellerDashboard: React.FC = () => {
     };
     
     loadInitialData();
-    
-    // Cleanup function
-    return () => {
-      console.log('🧹 SellerDashboard unmounting');
-    };
   }, []); // Empty dependency array - only run once on mount
 
   // ✅ FIXED: Fetch listings when tab changes
@@ -840,7 +847,7 @@ const SellerDashboard: React.FC = () => {
     }
   }, [activeTab, listingsPage, listingsStatusFilter]);
 
-  // ✅ FIXED: Fetch orders when orders tab is active - UPDATES MAIN STATE
+  // ✅ FIXED: Fetch orders when orders tab is active
   useEffect(() => {
     if (activeTab === 'orders') {
       console.log('📦 Switching to Orders tab');
@@ -881,7 +888,7 @@ const SellerDashboard: React.FC = () => {
 
   // Determine loading state based on active tab
   const getCurrentLoadingState = () => {
-    if (activeTab === 'overview') return loading && !ordersLoaded;
+    if (activeTab === 'overview') return loading && !initialDataLoaded;
     if (activeTab === 'listings') return listingsLoading;
     if (activeTab === 'orders') return ordersLoading;
     if (activeTab === 'offers') return offersLoading;
@@ -891,7 +898,7 @@ const SellerDashboard: React.FC = () => {
   const currentLoading = getCurrentLoadingState();
 
   // Show loading only on initial load
-  if (loading && !ordersLoaded) {
+  if (loading && !initialDataLoaded) {
     return (
       <MarketplaceLayout>
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
