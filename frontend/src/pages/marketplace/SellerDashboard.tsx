@@ -923,7 +923,7 @@ const SellerDashboard: React.FC = () => {
             onRefresh={handleRefresh}
             refreshing={refreshing}
             showStripeButton={!(stripeStatus?.connected && stripeStatus?.chargesEnabled)}
-            onStripeSetup={() => setShowStripeSetup(true)}
+            // onStripeSetup={() => setShowStripeSetup(true)}
           />
 
           {/* Alerts */}
