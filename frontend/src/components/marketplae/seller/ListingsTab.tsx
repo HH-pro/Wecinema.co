@@ -71,29 +71,39 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
   };
 
   const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 1) {
-      return 'Yesterday';
-    } else if (diffDays < 7) {
-      return `${diffDays} days ago`;
-    } else if (diffDays < 30) {
-      const weeks = Math.floor(diffDays / 7);
-      return `${weeks} week${weeks > 1 ? 's' : ''} ago`;
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Recently';
+      }
+      
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - date.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 1) {
+        return 'Yesterday';
+      } else if (diffDays < 7) {
+        return `${diffDays} days ago`;
+      } else if (diffDays < 30) {
+        const weeks = Math.floor(diffDays / 7);
+        return `${weeks} week${weeks > 1 ? 's' : ''} ago`;
+      }
+      
+      return date.toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+      });
+    } catch (error) {
+      return 'Recently';
     }
-    
-    return date.toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
-    });
   };
 
   const getStatusColor = (status: string): string => {
-    switch (status?.toLowerCase()) {
+    if (!status) return 'bg-gray-50 text-gray-700 border-gray-200';
+    
+    switch (status.toLowerCase()) {
       case 'active': return 'bg-green-50 text-green-700 border-green-200';
       case 'inactive': return 'bg-gray-50 text-gray-700 border-gray-200';
       case 'sold': return 'bg-blue-50 text-blue-700 border-blue-200';
@@ -103,7 +113,15 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
   };
 
   const getStatusIcon = (status: string): JSX.Element => {
-    switch (status?.toLowerCase()) {
+    if (!status) {
+      return (
+        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      );
+    }
+    
+    switch (status.toLowerCase()) {
       case 'active':
         return (
           <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
@@ -171,10 +189,16 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
     }
     
     // Return first URL as fallback
-    return { url: mediaUrls[0], isVideo: isVideoUrl(mediaUrls[0]), isImage: isImageUrl(mediaUrls[0]) };
+    return { 
+      url: mediaUrls[0], 
+      isVideo: isVideoUrl(mediaUrls[0]), 
+      isImage: isImageUrl(mediaUrls[0]) 
+    };
   };
 
-  const getListingTypeLabel = (type: string): string => {
+  const getListingTypeLabel = (type: string | undefined): string => {
+    if (!type) return 'Unspecified';
+    
     const typeMap: Record<string, string> = {
       'for-sale': 'For Sale',
       'licensing': 'Licensing',
@@ -187,7 +211,19 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
       'job': 'Job',
       'other': 'Other'
     };
-    return typeMap[type] || type.charAt(0).toUpperCase() + type.slice(1);
+    
+    return typeMap[type] || 
+           type.charAt(0).toUpperCase() + type.slice(1);
+  };
+
+  const getCategoryLabel = (category: string | undefined): string => {
+    if (!category) return 'Uncategorized';
+    return category.charAt(0).toUpperCase() + category.slice(1);
+  };
+
+  const getStatusText = (status: string | undefined): string => {
+    if (!status) return 'Unknown';
+    return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
   const listings = listingsData?.listings || [];
@@ -317,7 +353,7 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
                           // Image thumbnail
                           <img
                             src={mediaUrl}
-                            alt={listing.title}
+                            alt={listing.title || 'Listing image'}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             loading="lazy"
                             onError={(e) => {
@@ -351,7 +387,7 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
                       <div className="absolute top-3 right-3">
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(listing.status)}`}>
                           {getStatusIcon(listing.status)}
-                          {listing.status.charAt(0).toUpperCase() + listing.status.slice(1)}
+                          {getStatusText(listing.status)}
                         </span>
                       </div>
                     </div>
@@ -359,21 +395,23 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
                     {/* Listing Info */}
                     <div className="p-5">
                       <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h3 className="font-semibold text-gray-900 text-base mb-1 truncate" title={listing.title}>
-                            {listing.title}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-900 text-base mb-1 truncate" title={listing.title || 'Untitled Listing'}>
+                            {listing.title || 'Untitled Listing'}
                           </h3>
-                          <p className="text-xs text-gray-500 capitalize mb-1">
-                            {getListingTypeLabel(listing.type)} • {listing.category}
+                          <p className="text-xs text-gray-500 mb-1 truncate">
+                            {getListingTypeLabel(listing.type)} • {getCategoryLabel(listing.category)}
                           </p>
                         </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-green-600">{formatCurrency(listing.price)}</p>
+                        <div className="text-right ml-3">
+                          <p className="text-lg font-bold text-green-600 whitespace-nowrap">
+                            {formatCurrency(listing.price || 0)}
+                          </p>
                         </div>
                       </div>
                       
-                      <p className="text-sm text-gray-600 mb-3 line-clamp-2 min-h-[2.5rem]" title={listing.description}>
-                        {listing.description}
+                      <p className="text-sm text-gray-600 mb-3 line-clamp-2 min-h-[2.5rem]" title={listing.description || 'No description'}>
+                        {listing.description || 'No description provided'}
                       </p>
                       
                       <div className="flex items-center justify-between mb-4">
@@ -435,7 +473,7 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
                               </svg>
                               Deactivate
                             </>
-                          ) : listing.status === 'inactive' ? (
+                          ) : (listing.status === 'inactive' || !listing.status) ? (
                             <>
                               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -465,19 +503,17 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
                       </div>
                       
                       {/* Media Info */}
-                      {listing.mediaUrls && listing.mediaUrls.length > 0 && (
-                        <div className="flex justify-between items-center text-xs text-gray-500 mt-3">
-                          <span className="flex items-center">
-                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            {listing.mediaUrls.length} {listing.mediaUrls.length === 1 ? 'media file' : 'media files'}
-                          </span>
-                          <span className="text-xs text-gray-400">
-                            ID: {listing._id.substring(18)}
-                          </span>
-                        </div>
-                      )}
+                      <div className="flex justify-between items-center text-xs text-gray-500 mt-3">
+                        <span className="flex items-center">
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          {listing.mediaUrls?.length || 0} media
+                        </span>
+                        <span className="text-xs text-gray-400 truncate ml-2" title={listing._id}>
+                          ID: {listing._id ? listing._id.substring(listing._id.length - 6) : 'N/A'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 );
