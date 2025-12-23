@@ -25,7 +25,7 @@ interface Order {
 }
 
 const Messages: React.FC = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user: authUser } = useAuth();
   
@@ -35,9 +35,12 @@ const Messages: React.FC = () => {
   const [chatsLoading, setChatsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [unreadCount, setUnreadCount] = useState<number>(0);
-  const [searchQuery, setSearchQuery] = useState('');
   
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitialMount = useRef(true);
   const hasProcessedUrlChat = useRef(false);
+  const lastChatIdRef = useRef<string | null>(null);
+  const lastChatsLengthRef = useRef<number>(0);
 
   // Fetch current user
   useEffect(() => {
@@ -98,8 +101,8 @@ const Messages: React.FC = () => {
     fetchCurrentUser();
   }, [authUser, navigate]);
 
-  // Fetch user chats
-  const fetchChats = useCallback(async () => {
+  // Fetch user chats - WITHOUT AUTO-RELOADING SELECTED CHAT
+  const fetchChats = useCallback(async (showToast = false) => {
     if (!currentUser?.id) return;
 
     try {
@@ -143,7 +146,22 @@ const Messages: React.FC = () => {
           updatedAt: chat.updatedAt || chat.lastMessageAt || new Date().toISOString()
         }));
         
-        setChats(transformedChats);
+        // Only update if chats actually changed
+        const chatsChanged = JSON.stringify(transformedChats) !== JSON.stringify(chats);
+        if (chatsChanged) {
+          setChats(transformedChats);
+          lastChatsLengthRef.current = transformedChats.length;
+          
+          // Don't auto-select chat when chats update
+          // Only select chat if it's a new chat and user hasn't manually selected one
+          if (selectedChat && transformedChats.length > lastChatsLengthRef.current) {
+            // Check if our selected chat still exists
+            const chatStillExists = transformedChats.some(c => c.firebaseChatId === selectedChat.firebaseChatId);
+            if (!chatStillExists) {
+              setSelectedChat(null);
+            }
+          }
+        }
         
         const totalUnread = transformedChats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0);
         setUnreadCount(totalUnread);
@@ -153,107 +171,215 @@ const Messages: React.FC = () => {
         } else {
           document.title = 'Messages - Marketplace';
         }
+
+        if (showToast) {
+          toast.success('Conversations updated');
+        }
       }
     } catch (error) {
       console.error('Error fetching chats:', error);
+      if (showToast) {
+        toast.error('Failed to refresh conversations');
+      }
     } finally {
       setChatsLoading(false);
-      setLoading(false);
+      if (isInitialMount.current) {
+        setLoading(false);
+        isInitialMount.current = false;
+      }
     }
+  }, [currentUser?.id, chats, selectedChat]);
+
+  // Initial fetch only - NO POLLING
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    // Initial fetch only
+    fetchChats(false);
+
+    // NO POLLING - Chat list won't auto-refresh
+    // pollIntervalRef.current = setInterval(() => fetchChats(false), 30000);
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+    };
   }, [currentUser?.id]);
 
-  // Initial fetch
+  // Handle URL parameters and auto-select chat (ONLY ONCE)
   useEffect(() => {
-    if (currentUser?.id) {
-      fetchChats();
-    }
-  }, [currentUser?.id, fetchChats]);
-
-  // Handle URL parameters
-  useEffect(() => {
-    if (chatsLoading || chats.length === 0 || hasProcessedUrlChat.current) return;
-
-    const urlChatId = searchParams.get('chat');
-    const orderId = searchParams.get('order');
-
-    if (urlChatId || orderId) {
+    const handleUrlChat = () => {
+      // Don't process if already processed or still loading
+      if (hasProcessedUrlChat.current || chatsLoading || !chats.length) return;
+      
+      const urlChatId = searchParams.get('chat');
+      const orderId = searchParams.get('order');
+      
+      if (!urlChatId && !orderId) {
+        hasProcessedUrlChat.current = true;
+        return;
+      }
+      
+      // Prevent re-selecting same chat
+      if (urlChatId && urlChatId === lastChatIdRef.current) {
+        hasProcessedUrlChat.current = true;
+        return;
+      }
+      
+      // Mark as processed
+      hasProcessedUrlChat.current = true;
+      lastChatIdRef.current = urlChatId;
+      
       let foundChat: Chat | null = null;
-
+      
+      // If we have URL chat ID, try to find the chat
       if (urlChatId) {
         foundChat = chats.find(c => c.firebaseChatId === urlChatId) || null;
       } else if (orderId) {
         foundChat = chats.find(c => c.order?._id === orderId) || null;
       }
-
+      
       if (foundChat) {
         setSelectedChat(foundChat);
+        if (urlChatId) {
+          setSearchParams({ chat: urlChatId }, { replace: true });
+        }
       }
-      hasProcessedUrlChat.current = true;
-    }
-  }, [chats, chatsLoading, searchParams]);
+    };
+
+    handleUrlChat();
+  }, [chats, chatsLoading, searchParams, setSearchParams]);
+
+  // Reset URL processing flag when leaving page
+  useEffect(() => {
+    return () => {
+      hasProcessedUrlChat.current = false;
+      lastChatIdRef.current = null;
+    };
+  }, []);
 
   // Handle chat selection
   const handleChatSelect = useCallback((chat: Chat) => {
+    // Don't reselect same chat
     if (selectedChat?.firebaseChatId === chat.firebaseChatId) return;
     
     setSelectedChat(chat);
-    navigate(`/messages?chat=${chat.firebaseChatId}`, { replace: true });
-  }, [selectedChat, navigate]);
+    setSearchParams({ chat: chat.firebaseChatId }, { replace: true });
+    lastChatIdRef.current = chat.firebaseChatId;
+  }, [selectedChat, setSearchParams]);
 
   const handleSendMessage = async (message: string) => {
+    // REMOVED BACKEND LOGGING - Only Firebase will be used
     toast.success('Message sent!');
   };
 
   const handleRefreshChats = () => {
-    fetchChats();
-    toast.success('Conversations refreshed');
+    // Manual refresh only
+    fetchChats(true);
   };
 
-  // Filter chats based on search
-  const filteredChats = chats.filter(chat => {
-    if (!searchQuery) return true;
-    
-    const query = searchQuery.toLowerCase();
-    return (
-      chat.otherUser.username.toLowerCase().includes(query) ||
-      chat.listing.title.toLowerCase().includes(query) ||
-      (chat.lastMessage?.content?.toLowerCase() || '').includes(query)
-    );
-  });
-
-  // Get avatar fallback
+  // Get first letter of name for avatar
   const getAvatarFallback = (username: string): string => {
     if (!username || username.trim().length === 0) return 'U';
     return username.charAt(0).toUpperCase();
   };
 
-  // Render empty state
+  // Get avatar color based on user ID
+  const getAvatarColor = (userId: string): string => {
+    const colors = [
+      'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500',
+      'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500'
+    ];
+    
+    if (!userId) return colors[0];
+    
+    let hash = 0;
+    for (let i = 0; i < userId.length; i++) {
+      hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    const index = Math.abs(hash) % colors.length;
+    return colors[index];
+  };
+
+  // Render avatar with fallback
+  const renderAvatar = (chat: Chat) => {
+    const { otherUser } = chat;
+    const avatarColor = getAvatarColor(otherUser.id);
+    
+    if (otherUser.avatar) {
+      return (
+        <div className="relative">
+          <img
+            src={otherUser.avatar}
+            alt={otherUser.username}
+            className="w-12 h-12 rounded-full border-2 border-white shadow-sm object-cover"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              const parent = e.currentTarget.parentElement;
+              if (parent) {
+                const fallback = parent.querySelector('.avatar-fallback');
+                if (fallback) {
+                  (fallback as HTMLElement).style.display = 'flex';
+                }
+              }
+            }}
+          />
+          <div 
+            className={`${avatarColor} absolute inset-0 w-12 h-12 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-white font-bold text-lg avatar-fallback hidden`}
+          >
+            {getAvatarFallback(otherUser.username)}
+          </div>
+        </div>
+      );
+    }
+    
+    return (
+      <div 
+        className={`${avatarColor} w-12 h-12 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-white font-bold text-lg`}
+      >
+        {getAvatarFallback(otherUser.username)}
+      </div>
+    );
+  };
+
   const renderEmptyState = () => (
-    <div className="flex-1 flex flex-col items-center justify-center p-8">
-      <div className="w-32 h-32 mx-auto mb-6 bg-gray-50 rounded-full flex items-center justify-center">
-        <svg className="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+      <div className="w-32 h-32 mx-auto mb-6 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-full flex items-center justify-center">
+        <svg className="w-16 h-16 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
         </svg>
       </div>
-      <h3 className="text-xl font-semibold text-gray-900 mb-2">No conversations yet</h3>
-      <p className="text-gray-600 text-center mb-6 max-w-sm">
+      <h3 className="text-2xl font-bold text-gray-900 mb-3">No conversations yet</h3>
+      <p className="text-gray-600 max-w-md mb-8">
         When you place an order or receive an offer, your conversations will appear here.
+        Start exploring listings to connect with sellers!
       </p>
-      <button
-        onClick={() => navigate('/marketplace')}
-        className="px-5 py-2.5 bg-[#1DBF73] text-white font-medium rounded-md hover:bg-[#19a463] transition-colors"
-      >
-        Browse Marketplace
-      </button>
+      <div className="space-x-4">
+        <button
+          onClick={() => navigate('/marketplace')}
+          className="px-6 py-3 bg-yellow-600 text-white font-semibold rounded-lg hover:bg-yellow-700 transition-colors"
+        >
+          Browse Marketplace
+        </button>
+        <button
+          onClick={handleRefreshChats}
+          className="px-6 py-3 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 transition-colors"
+        >
+          Refresh
+        </button>
+      </div>
     </div>
   );
 
-  if (loading) {
+  // Render loading state
+  if (loading && isInitialMount.current) {
     return (
       <MarketplaceLayout>
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1DBF73] mx-auto"></div>
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-600 mx-auto"></div>
             <p className="mt-4 text-gray-600">Loading your messages...</p>
           </div>
         </div>
@@ -263,27 +389,27 @@ const Messages: React.FC = () => {
 
   return (
     <MarketplaceLayout>
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-6 sm:py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="mb-8">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
-                <p className="mt-1 text-gray-600">
-                  Manage your conversations with buyers and sellers
+                <h1 className="text-3xl font-bold text-gray-900">Messages</h1>
+                <p className="mt-2 text-gray-600">
+                  Communicate with buyers and sellers about your orders
                 </p>
               </div>
               
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-4">
                 {unreadCount > 0 && (
-                  <span className="px-3 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
                     {unreadCount} unread
                   </span>
                 )}
                 <button
                   onClick={handleRefreshChats}
-                  className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
                 >
                   <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -295,166 +421,76 @@ const Messages: React.FC = () => {
           </div>
 
           {/* Main Content */}
-          <div className="bg-white rounded-lg shadow border border-gray-200 h-[calc(100vh-200px)] flex overflow-hidden">
-            {/* Chat List - Left Sidebar */}
-            <div className="w-full md:w-80 lg:w-96 border-r border-gray-200 flex flex-col">
-              {/* Search Bar */}
+          <div className="bg-white rounded-xl shadow-lg border border-gray-200 h-[calc(100vh-180px)] flex overflow-hidden">
+            {/* Chat List */}
+            <div className="w-full md:w-96 border-r border-gray-200 flex flex-col">
               <div className="p-4 border-b border-gray-200">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Search conversations..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-md bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#1DBF73] focus:border-transparent text-sm"
-                  />
-                </div>
+                <h2 className="text-lg font-semibold text-gray-900">Conversations</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {chats.length} conversation{chats.length !== 1 ? 's' : ''}
+                </p>
               </div>
-
-              {/* Chat List Header */}
-              <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                    Conversations
-                  </h2>
-                  <span className="text-xs text-gray-500">
-                    {filteredChats.length} of {chats.length}
-                  </span>
-                </div>
-              </div>
-
-              {/* Chat List Content */}
+              
               <div className="flex-1 overflow-y-auto">
                 {chatsLoading ? (
-                  <div className="p-6 text-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#1DBF73] mx-auto"></div>
-                    <p className="mt-3 text-sm text-gray-500">Loading conversations...</p>
+                  <div className="p-8 text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600 mx-auto"></div>
+                    <p className="mt-3 text-gray-500">Loading conversations...</p>
                   </div>
-                ) : filteredChats.length === 0 ? (
-                  searchQuery ? (
-                    <div className="p-6 text-center">
-                      <p className="text-gray-500 text-sm">No conversations match your search</p>
-                    </div>
-                  ) : (
-                    <div className="p-6 text-center">
-                      <p className="text-gray-500 text-sm">No conversations yet</p>
-                    </div>
-                  )
+                ) : chats.length === 0 ? (
+                  <div className="p-8 text-center text-gray-500">
+                    <p>No conversations yet</p>
+                  </div>
                 ) : (
-                  <div className="divide-y divide-gray-100">
-                    {filteredChats.map((chat) => (
-                      <div
-                        key={chat.firebaseChatId}
-                        className={`px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors ${
-                          selectedChat?.firebaseChatId === chat.firebaseChatId ? 'bg-blue-50' : ''
-                        }`}
-                        onClick={() => handleChatSelect(chat)}
-                      >
-                        <div className="flex items-center space-x-3">
-                          {/* Avatar */}
-                          <div className="relative flex-shrink-0">
-                            {chat.otherUser.avatar ? (
-                              <img
-                                src={chat.otherUser.avatar}
-                                alt={chat.otherUser.username}
-                                className="w-10 h-10 rounded-full object-cover border border-gray-200"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded-full bg-[#1DBF73] flex items-center justify-center text-white font-semibold">
-                                {getAvatarFallback(chat.otherUser.username)}
-                              </div>
-                            )}
-                            {chat.unreadCount > 0 && (
-                              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                                {chat.unreadCount}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Chat Info */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
-                              <h4 className="text-sm font-semibold text-gray-900 truncate">
-                                {chat.otherUser.username}
-                              </h4>
-                              <span className="text-xs text-gray-500">
-                                {new Date(chat.updatedAt).toLocaleTimeString([], { 
-                                  hour: '2-digit', 
-                                  minute: '2-digit' 
-                                })}
-                              </span>
-                            </div>
-                            <p className="text-sm text-gray-600 truncate mb-1">
-                              {chat.listing.title}
-                            </p>
-                            {chat.lastMessage && (
-                              <p className="text-xs text-gray-500 truncate">
-                                {chat.lastMessage.content}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Order Status Badge */}
-                        {chat.order && (
-                          <div className="mt-2">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                              chat.order.status === 'completed' ? 'bg-green-100 text-green-800' :
-                              chat.order.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                              chat.order.status === 'paid' ? 'bg-purple-100 text-purple-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {chat.order.status.replace('_', ' ')}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  <ChatList
+                    chats={chats}
+                    currentChatId={selectedChat?.firebaseChatId || null}
+                    onChatSelect={handleChatSelect}
+                    loading={chatsLoading}
+                    renderAvatar={renderAvatar}
+                  />
                 )}
               </div>
             </div>
 
-            {/* Chat Interface - Main Content */}
+            {/* Chat Interface */}
             <div className="flex-1 flex flex-col">
               {selectedChat && selectedChat.otherUser ? (
                 <>
                   {/* Chat Header */}
-                  <div className="border-b border-gray-200 p-4">
+                  <div className="border-b border-gray-200 p-4 bg-gradient-to-r from-gray-50 to-white">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        {selectedChat.otherUser.avatar ? (
-                          <img
-                            src={selectedChat.otherUser.avatar}
-                            alt={selectedChat.otherUser.username}
-                            className="w-10 h-10 rounded-full object-cover border border-gray-200"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-[#1DBF73] flex items-center justify-center text-white font-semibold">
-                            {getAvatarFallback(selectedChat.otherUser.username)}
-                          </div>
-                        )}
+                      <div className="flex items-center space-x-4">
+                        {renderAvatar(selectedChat)}
                         <div>
-                          <h3 className="font-semibold text-gray-900">
-                            {selectedChat.otherUser.username}
+                          <div className="flex items-center space-x-2">
+                            <h3 className="font-bold text-gray-900 text-lg">
+                              {selectedChat.otherUser.username}
+                            </h3>
                             {selectedChat.order?.status && (
-                              <span className={`ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                                selectedChat.order.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                'bg-gray-100 text-gray-800'
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                selectedChat.order.status === 'paid' 
+                                  ? 'bg-green-100 text-green-800'
+                                  : selectedChat.order.status === 'in_progress'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : selectedChat.order.status === 'completed'
+                                  ? 'bg-purple-100 text-purple-800'
+                                  : 'bg-gray-100 text-gray-800'
                               }`}>
-                                {selectedChat.order.status.replace('_', ' ')}
+                                {selectedChat.order.status.replace('_', ' ').toUpperCase()}
                               </span>
                             )}
-                          </h3>
-                          <div className="flex items-center text-sm text-gray-600">
-                            <span className="truncate max-w-xs">{selectedChat.listing.title}</span>
-                            <span className="mx-2">•</span>
-                            <span className="font-medium">${selectedChat.order?.amount || selectedChat.listing.price}</span>
+                          </div>
+                          <div className="flex items-center space-x-3 text-sm text-gray-600 mt-1">
+                            <span className="font-medium">{selectedChat.listing.title}</span>
+                            <span>•</span>
+                            <span className="font-bold text-gray-900">${selectedChat.order?.amount || selectedChat.listing.price}</span>
+                            {selectedChat.order?._id && (
+                              <>
+                                <span>•</span>
+                                <span className="text-gray-500">Order #{selectedChat.order._id.slice(-6)}</span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -463,7 +499,7 @@ const Messages: React.FC = () => {
                         {selectedChat.order?._id && (
                           <button
                             onClick={() => navigate(`/orders/${selectedChat.order!._id}`)}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                           >
                             View Order
                           </button>
@@ -488,32 +524,43 @@ const Messages: React.FC = () => {
                 </>
               ) : (
                 // No chat selected view
-                <div className="flex-1 flex items-center justify-center p-8">
+                <div className="flex-1 flex flex-col items-center justify-center p-8">
                   {chats.length === 0 ? (
                     renderEmptyState()
                   ) : (
-                    <div className="text-center">
-                      <div className="w-24 h-24 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
-                        <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    <>
+                      <div className="w-48 h-48 mx-auto mb-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-full flex items-center justify-center">
+                        <svg className="w-24 h-24 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
                         </svg>
                       </div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Select a conversation</h3>
-                      <p className="text-gray-600 text-sm mb-6">
-                        Choose a conversation from the list to start messaging
+                      <h3 className="text-2xl font-bold text-gray-900 mb-3">Select a conversation</h3>
+                      <p className="text-gray-600 max-w-md text-center mb-8">
+                        Choose a conversation from the list to start messaging.
+                        All your order-related chats are listed on the left.
                       </p>
-                    </div>
+                      <div className="flex items-center space-x-4">
+                        <button
+                          onClick={() => navigate('/marketplace')}
+                          className="px-6 py-3 bg-yellow-600 text-white font-semibold rounded-lg hover:bg-yellow-700 transition-colors flex items-center"
+                        >
+                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                          Browse Listings
+                        </button>
+                        <button
+                          onClick={handleRefreshChats}
+                          className="px-6 py-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                          Refresh List
+                        </button>
+                      </div>
+                    </>
                   )}
                 </div>
               )}
             </div>
-          </div>
-
-          {/* Mobile Tips */}
-          <div className="mt-6 md:hidden">
-            <p className="text-sm text-gray-500 text-center">
-              💡 Tap on a conversation to view messages
-            </p>
           </div>
         </div>
       </div>
