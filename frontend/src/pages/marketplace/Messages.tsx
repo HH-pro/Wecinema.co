@@ -1,4 +1,4 @@
-// src/pages/Messages.tsx - PROFESSIONAL & CLEAN VERSION
+// src/pages/Messages.tsx - FIXED LOADING & YELLOW THEME VERSION
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import ChatList, { Chat } from '../../components/chat/ChatList';
@@ -29,26 +29,32 @@ const Messages: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Fetch current user
+  // ✅ FIX: Initialize currentUser from auth context immediately
+  useEffect(() => {
+    if (authUser) {
+      setCurrentUser({
+        id: authUser.id || authUser._id,
+        username: authUser.username || 'User',
+        email: authUser.email || '',
+        avatar: authUser.avatar,
+        role: authUser.role
+      });
+      setLoading(false); // ✅ Set loading false immediately if authUser exists
+    }
+  }, [authUser]);
+
+  // ✅ FIX: Fetch user details only if not in auth context
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
-        if (authUser) {
-          setCurrentUser({
-            id: authUser.id || authUser._id,
-            username: authUser.username || 'User',
-            email: authUser.email || '',
-            avatar: authUser.avatar,
-            role: authUser.role
-          });
-          return;
-        }
-
         const token = localStorage.getItem('token');
         if (!token) {
           navigate('/login');
           return;
         }
+
+        // Skip if already set from auth context
+        if (currentUser) return;
 
         const response = await fetch('http://localhost:3000/api/auth/me', {
           headers: {
@@ -66,16 +72,34 @@ const Messages: React.FC = () => {
             avatar: userData.avatar,
             role: userData.role
           });
+        } else {
+          // Fallback to token parsing
+          try {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            setCurrentUser({
+              id: payload.userId || payload.id,
+              username: payload.username || 'User',
+              email: payload.email || '',
+              role: payload.role
+            });
+          } catch (parseError) {
+            console.error('Error parsing token:', parseError);
+          }
         }
       } catch (error) {
         console.error('Error fetching user:', error);
+        toast.error('Failed to load user data');
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchCurrentUser();
-  }, [authUser, navigate]);
+    if (!currentUser && !authUser) {
+      fetchCurrentUser();
+    }
+  }, [authUser, currentUser, navigate]);
 
-  // Fetch user chats
+  // ✅ FIX: Fetch user chats with proper error handling
   const fetchChats = useCallback(async () => {
     if (!currentUser?.id) return;
 
@@ -131,23 +155,25 @@ const Messages: React.FC = () => {
         } else {
           document.title = 'Messages - Marketplace';
         }
+      } else {
+        throw new Error('Failed to fetch chats');
       }
     } catch (error) {
       console.error('Error fetching chats:', error);
       toast.error('Failed to load conversations');
     } finally {
       setChatsLoading(false);
-      setLoading(false);
     }
   }, [currentUser?.id]);
 
-  // Initial fetch
+  // ✅ FIX: Fetch chats when currentUser is available
   useEffect(() => {
-    if (!currentUser?.id) return;
-    fetchChats();
-  }, [currentUser?.id, fetchChats]);
+    if (currentUser?.id && !loading) {
+      fetchChats();
+    }
+  }, [currentUser?.id, loading, fetchChats]);
 
-  // Handle URL parameters
+  // ✅ FIX: Handle URL parameters - simplified
   useEffect(() => {
     if (chatsLoading || !chats.length) return;
     
@@ -183,7 +209,7 @@ const Messages: React.FC = () => {
     fetchChats();
   };
 
-  // Get status color
+  // ✅ FIX: Yellow theme status colors
   const getStatusColor = (status: string): string => {
     switch (status?.toLowerCase()) {
       case 'completed': return 'bg-green-100 text-green-800';
@@ -203,11 +229,11 @@ const Messages: React.FC = () => {
     }).format(price || 0);
   };
 
-  // Render empty state
+  // ✅ FIX: Render empty state with yellow theme
   const renderEmptyState = () => (
     <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-      <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-        <FiMessageSquare className="w-10 h-10 text-gray-400" />
+      <div className="w-20 h-20 bg-yellow-50 rounded-full flex items-center justify-center mb-4 border border-yellow-200">
+        <FiMessageSquare className="w-10 h-10 text-yellow-600" />
       </div>
       <h3 className="text-lg font-semibold text-gray-900 mb-2">No conversations yet</h3>
       <p className="text-gray-600 max-w-sm mb-6 text-sm">
@@ -215,7 +241,7 @@ const Messages: React.FC = () => {
       </p>
       <button
         onClick={() => navigate('/marketplace')}
-        className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-black transition-colors flex items-center"
+        className="px-4 py-2 bg-yellow-600 text-white text-sm font-medium rounded-lg hover:bg-yellow-700 transition-colors flex items-center shadow-sm"
       >
         <FiShoppingBag className="w-4 h-4 mr-2" />
         Browse Marketplace
@@ -223,12 +249,13 @@ const Messages: React.FC = () => {
     </div>
   );
 
+  // ✅ FIX: Loading state with yellow spinner
   if (loading) {
     return (
       <MarketplaceLayout>
-        <div className="min-h-screen flex items-center justify-center">
+        <div className="min-h-screen flex items-center justify-center bg-white">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600 mx-auto"></div>
             <p className="mt-4 text-gray-600 text-sm">Loading messages...</p>
           </div>
         </div>
@@ -240,7 +267,7 @@ const Messages: React.FC = () => {
     <MarketplaceLayout>
       <div className="min-h-screen bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {/* Header */}
+          {/* Header with yellow theme */}
           <div className="mb-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
@@ -261,7 +288,7 @@ const Messages: React.FC = () => {
                   disabled={chatsLoading}
                   className="inline-flex items-center px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <FiRefreshCw className={`w-4 h-4 mr-2 ${chatsLoading ? 'animate-spin' : ''}`} />
+                  <FiRefreshCw className={`w-4 h-4 mr-2 ${chatsLoading ? 'animate-spin text-yellow-600' : ''}`} />
                   Refresh
                 </button>
               </div>
@@ -280,18 +307,27 @@ const Messages: React.FC = () => {
                       {chats.length} total
                     </p>
                   </div>
+                  {chatsLoading && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600"></div>
+                  )}
                 </div>
               </div>
               
               <div className="flex-1 overflow-y-auto">
-                {chatsLoading ? (
+                {chatsLoading && chats.length === 0 ? (
                   <div className="p-6 text-center">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 mx-auto"></div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600 mx-auto"></div>
                     <p className="mt-3 text-gray-500 text-sm">Loading conversations...</p>
                   </div>
                 ) : chats.length === 0 ? (
                   <div className="p-6 text-center text-gray-500">
                     <p className="text-sm">No conversations</p>
+                    <button
+                      onClick={() => navigate('/marketplace')}
+                      className="mt-3 px-3 py-1.5 text-sm text-yellow-600 hover:text-yellow-700 transition-colors"
+                    >
+                      Browse Listings
+                    </button>
                   </div>
                 ) : (
                   <ChatList
@@ -308,7 +344,7 @@ const Messages: React.FC = () => {
             <div className="flex-1 flex flex-col">
               {selectedChat && selectedChat.otherUser ? (
                 <>
-                  {/* Chat Header */}
+                  {/* Chat Header with yellow accent */}
                   <div className="border-b border-gray-200 p-4 bg-white">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -319,8 +355,8 @@ const Messages: React.FC = () => {
                             className="w-10 h-10 rounded-full border border-gray-300 object-cover"
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-300 flex items-center justify-center">
-                            <FiUser className="w-5 h-5 text-gray-600" />
+                          <div className="w-10 h-10 rounded-full bg-yellow-50 border border-yellow-200 flex items-center justify-center">
+                            <FiUser className="w-5 h-5 text-yellow-600" />
                           </div>
                         )}
                         <div className="min-w-0">
@@ -337,7 +373,7 @@ const Messages: React.FC = () => {
                           <div className="flex items-center gap-2 text-xs text-gray-600 mt-0.5 truncate">
                             <span className="truncate">{selectedChat.listing.title}</span>
                             <span>•</span>
-                            <span className="font-medium">{formatPrice(selectedChat.order?.amount || selectedChat.listing.price)}</span>
+                            <span className="font-medium text-yellow-700">{formatPrice(selectedChat.order?.amount || selectedChat.listing.price)}</span>
                             {selectedChat.order?._id && (
                               <>
                                 <span>•</span>
@@ -351,7 +387,7 @@ const Messages: React.FC = () => {
                       {selectedChat.order?._id && (
                         <button
                           onClick={() => navigate(`/marketplace/orders/${selectedChat.order!._id}`)}
-                          className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors whitespace-nowrap"
+                          className="px-3 py-1.5 text-sm font-medium text-yellow-700 bg-yellow-50 hover:bg-yellow-100 rounded-lg transition-colors whitespace-nowrap border border-yellow-200"
                         >
                           View Order
                         </button>
@@ -372,19 +408,25 @@ const Messages: React.FC = () => {
                   </div>
                 </>
               ) : (
-                // No chat selected view
+                // No chat selected view with yellow theme
                 <div className="flex-1 flex items-center justify-center p-6">
                   {chats.length === 0 ? (
                     renderEmptyState()
                   ) : (
                     <div className="text-center">
-                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <FiMessageSquare className="w-8 h-8 text-gray-400" />
+                      <div className="w-16 h-16 bg-yellow-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-yellow-200">
+                        <FiMessageSquare className="w-8 h-8 text-yellow-600" />
                       </div>
                       <h3 className="text-base font-semibold text-gray-900 mb-2">Select a conversation</h3>
                       <p className="text-gray-600 max-w-sm text-sm mb-6">
                         Choose a conversation from the list to start messaging
                       </p>
+                      <button
+                        onClick={() => navigate('/marketplace')}
+                        className="px-4 py-2 text-sm text-yellow-600 hover:text-yellow-700 transition-colors"
+                      >
+                        Browse Marketplace →
+                      </button>
                     </div>
                   )}
                 </div>
