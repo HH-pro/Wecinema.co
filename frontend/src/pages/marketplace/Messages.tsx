@@ -1,5 +1,5 @@
-// src/pages/Messages.tsx - FIXED CHAT DISPLAY
-import React, { useState, useEffect, useCallback } from 'react';
+// src/pages/Messages.tsx - FIXED VERSION
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import FirebaseChatInterface from '../../components/chat/FirebaseChatInterface';
 import MarketplaceLayout from '../../components/Layout';
@@ -49,7 +49,7 @@ interface Chat {
 const Messages: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user: authUser } = useAuth();
+  const { user: authUser, logout } = useAuth();
   
   const [chats, setChats] = useState<Chat[]>([]);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
@@ -58,58 +58,64 @@ const Messages: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showChatListMobile, setShowChatListMobile] = useState(true);
+  
+  const hasFetchedChats = useRef(false);
+  const isInitialMount = useRef(true);
 
-  // ✅ FIX: Debug log
   console.log('Messages Page - Current state:', {
     chatsCount: chats.length,
     chatsLoading,
     currentUser: currentUser?.id,
     authUser: authUser?.id,
-    selectedChatId: selectedChat?.firebaseChatId
+    selectedChatId: selectedChat?.firebaseChatId,
+    hasFetched: hasFetchedChats.current
   });
 
-  // Initialize current user from auth
+  // ✅ FIX: Handle authentication and user initialization
   useEffect(() => {
     console.log('🔥 Auth user effect triggered:', authUser);
-    if (authUser) {
-      setCurrentUser({
-        id: authUser.id || authUser._id,
-        username: authUser.username || 'User',
-        email: authUser.email || '',
-        avatar: authUser.avatar,
-        role: authUser.role
-      });
-      setLoading(false);
-      console.log('✅ User set from auth:', authUser.username);
-    }
-  }, [authUser]);
-
-  // ✅ FIX: Fetch user details
-  useEffect(() => {
-    const fetchCurrentUser = async () => {
+    
+    const initializeUser = async () => {
       try {
+        // If we have auth user from context, use it
+        if (authUser) {
+          setCurrentUser({
+            id: authUser.id || authUser._id,
+            username: authUser.username || 'User',
+            email: authUser.email || '',
+            avatar: authUser.avatar,
+            role: authUser.role
+          });
+          setLoading(false);
+          console.log('✅ User set from auth context');
+          return;
+        }
+
+        // Try to get user from token/localStorage
         const token = localStorage.getItem('token');
-        console.log('🔑 Token check:', token ? 'Token exists' : 'No token');
-        
         if (!token) {
+          console.log('❌ No token found, redirecting to login');
           navigate('/login');
           return;
         }
 
-        if (currentUser) {
-          console.log('✅ User already exists, skipping fetch');
-          return;
-        }
-
-        console.log('🌐 Fetching user details...');
+        // Fetch user from API
+        console.log('🌐 Fetching user from API...');
         const response = await fetch('http://localhost:3000/api/auth/me', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
-          }
+          },
+          credentials: 'include'
         });
 
-        console.log('📥 User fetch response:', response.status, response.statusText);
+        if (response.status === 401) {
+          console.log('❌ Token expired or invalid');
+          logout?.();
+          localStorage.removeItem('token');
+          navigate('/login');
+          return;
+        }
 
         if (response.ok) {
           const userData = await response.json();
@@ -122,186 +128,214 @@ const Messages: React.FC = () => {
             role: userData.role
           });
         } else {
-          console.warn('⚠️ User fetch failed, trying token decode');
-          try {
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            setCurrentUser({
-              id: payload.userId || payload.id,
-              username: payload.username || 'User',
-              email: payload.email || '',
-              role: payload.role
-            });
-            console.log('✅ User set from token payload');
-          } catch (parseError) {
-            console.error('❌ Token parse error:', parseError);
-          }
+          throw new Error('Failed to fetch user');
         }
       } catch (error) {
-        console.error('❌ Error fetching user:', error);
+        console.error('❌ Error initializing user:', error);
+        toast.error('Please login to continue');
+        navigate('/login');
       } finally {
         setLoading(false);
-        console.log('🏁 Loading set to false');
       }
     };
 
-    if (!currentUser && !authUser) {
-      console.log('🔄 Fetching user because no currentUser and no authUser');
-      fetchCurrentUser();
-    } else if (authUser) {
-      console.log('✅ AuthUser exists, skipping fetch');
-      setLoading(false);
-    }
-  }, [authUser, currentUser, navigate]);
+    initializeUser();
+  }, [authUser, navigate, logout]);
 
-  // ✅ FIX: Fetch chats with better error handling
+  // ✅ FIX: Fetch chats with proper cleanup and race condition prevention
   const fetchChats = useCallback(async () => {
-    console.log('🔄 fetchChats called, currentUser ID:', currentUser?.id);
-    
     if (!currentUser?.id) {
-      console.log('❌ No currentUser ID, skipping fetchChats');
+      console.log('⏳ Waiting for currentUser ID...');
       return;
     }
+
+    // Prevent multiple simultaneous fetches
+    if (chatsLoading) {
+      console.log('⏳ Chat fetch already in progress');
+      return;
+    }
+
+    console.log('🔄 Starting fetchChats for user:', currentUser.id);
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
 
     try {
       setChatsLoading(true);
       const token = localStorage.getItem('token');
-      console.log('🔑 Token for chat fetch:', token ? 'Exists' : 'Missing');
       
       if (!token) {
-        console.error('❌ No token found for chat fetch');
+        console.error('❌ No token found');
         toast.error('Please login again');
         navigate('/login');
         return;
       }
 
-      console.log('🌐 Fetching chats from API...');
       const response = await fetch('http://localhost:3000/marketplace/chat/my-chats', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        }
+        },
+        signal: controller.signal,
+        credentials: 'include'
       });
+
+      clearTimeout(timeoutId);
 
       console.log('📥 Chat fetch response:', response.status, response.statusText);
       
-      const data = await response.json();
-      console.log('📦 Chat fetch data:', data);
-      
-      if (response.ok && data) {
-        // ✅ FIX: Handle different response formats
-        const chatsData = data.data || data.chats || data || [];
-        console.log(`📊 Processing ${chatsData.length} chats`);
-        
-        const transformedChats: Chat[] = chatsData.map((chat: any, index: number) => {
-          const transformed = {
-            firebaseChatId: chat.firebaseChatId || chat.chatId || chat._id || `chat-${index}`,
-            otherUser: {
-              id: chat.otherUser?._id || chat.otherUserId || chat.otherUser?.id || 'unknown',
-              username: chat.otherUser?.username || 'Unknown User',
-              avatar: chat.otherUser?.avatar || '',
-              email: chat.otherUser?.email || ''
-            },
-            listing: {
-              id: chat.listing?._id || chat.listingId || 'unknown',
-              title: chat.listing?.title || chat.listingTitle || 'Unknown Listing',
-              price: chat.listing?.price || chat.price || 0,
-              mediaUrls: chat.listing?.mediaUrls || []
-            },
-            order: chat.order ? {
-              _id: chat.order._id,
-              amount: chat.order.amount,
-              status: chat.order.status,
-              listingTitle: chat.order.listingTitle,
-              createdAt: chat.order.createdAt
-            } : undefined,
-            lastMessage: chat.lastMessage || {
-              text: 'Start a conversation',
-              senderId: '',
-              timestamp: new Date().toISOString()
-            },
-            unreadCount: chat.unreadCount || chat.unreadMessages || 0,
-            updatedAt: chat.updatedAt || chat.lastMessageAt || new Date().toISOString()
-          };
-          
-          console.log(`💬 Chat ${index}:`, {
-            id: transformed.firebaseChatId,
-            user: transformed.otherUser.username,
-            listing: transformed.listing.title
-          });
-          
-          return transformed;
-        });
-        
-        console.log('✅ Setting chats:', transformedChats);
-        setChats(transformedChats);
-        
-        const totalUnread = transformedChats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0);
-        setUnreadCount(totalUnread);
-        console.log(`📨 Total unread: ${totalUnread}`);
-        
-        // Auto-select first chat if none selected and chats exist
-        if (transformedChats.length > 0 && !selectedChat) {
-          console.log('🤖 Auto-selecting first chat');
-          setSelectedChat(transformedChats[0]);
-        }
-        
-        toast.success(`Loaded ${transformedChats.length} conversations`);
-      } else {
-        console.error('❌ Chat fetch failed:', data);
-        toast.error(data?.message || 'Failed to load conversations');
+      if (response.status === 401) {
+        console.log('❌ Unauthorized - token expired');
+        logout?.();
+        localStorage.removeItem('token');
+        navigate('/login');
+        return;
       }
-    } catch (error: any) {
-      console.error('❌ Error fetching chats:', error);
-      console.error('Error details:', {
-        message: error.message,
-        name: error.name,
-        stack: error.stack
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch chats: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('📦 Chat fetch data received');
+      
+      // Handle different response formats
+      const chatsData = Array.isArray(data) 
+        ? data 
+        : data?.data || data?.chats || [];
+      
+      console.log(`📊 Processing ${chatsData.length} chats`);
+      
+      const transformedChats: Chat[] = chatsData.map((chat: any, index: number) => {
+        // Determine other user (not current user)
+        const otherUser = chat.participants?.find((p: any) => 
+          p._id !== currentUser.id && p.id !== currentUser.id
+        ) || chat.otherUser || {};
+
+        return {
+          firebaseChatId: chat.firebaseChatId || chat.chatId || chat._id || `chat-${index}`,
+          otherUser: {
+            id: otherUser._id || otherUser.id || 'unknown',
+            username: otherUser.username || 'Unknown User',
+            avatar: otherUser.avatar || '',
+            email: otherUser.email || ''
+          },
+          listing: {
+            id: chat.listing?._id || chat.listingId || 'unknown',
+            title: chat.listing?.title || chat.listingTitle || 'Unknown Listing',
+            price: chat.listing?.price || chat.price || 0,
+            mediaUrls: chat.listing?.mediaUrls || []
+          },
+          order: chat.order ? {
+            _id: chat.order._id,
+            amount: chat.order.amount,
+            status: chat.order.status,
+            listingTitle: chat.order.listingTitle,
+            createdAt: chat.order.createdAt
+          } : undefined,
+          lastMessage: chat.lastMessage || {
+            text: 'Start a conversation',
+            senderId: '',
+            timestamp: new Date().toISOString()
+          },
+          unreadCount: chat.unreadCount || chat.unreadMessages || 0,
+          updatedAt: chat.updatedAt || chat.lastMessageAt || new Date().toISOString()
+        };
       });
-      toast.error(error.message || 'Network error loading conversations');
+
+      // Sort by last message time (newest first)
+      transformedChats.sort((a, b) => 
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      );
+
+      console.log('✅ Setting chats:', transformedChats.length);
+      setChats(transformedChats);
+      hasFetchedChats.current = true;
+
+      // Calculate unread count
+      const totalUnread = transformedChats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0);
+      setUnreadCount(totalUnread);
+      console.log(`📨 Total unread: ${totalUnread}`);
+
+      // Auto-select chat based on URL or first chat
+      const urlChatId = searchParams.get('chat');
+      const orderId = searchParams.get('order');
+      let chatToSelect = null;
+
+      if (urlChatId) {
+        chatToSelect = transformedChats.find(c => c.firebaseChatId === urlChatId);
+      } else if (orderId) {
+        chatToSelect = transformedChats.find(c => c.order?._id === orderId);
+      }
+
+      if (chatToSelect) {
+        console.log('🎯 Setting selected chat from URL:', chatToSelect.otherUser.username);
+        setSelectedChat(chatToSelect);
+      } else if (transformedChats.length > 0 && !selectedChat) {
+        console.log('🤖 Auto-selecting first chat');
+        setSelectedChat(transformedChats[0]);
+      }
+
+      if (transformedChats.length > 0) {
+        toast.success(`Loaded ${transformedChats.length} conversations`);
+      }
+
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      
+      if (error.name === 'AbortError') {
+        console.error('❌ Request timeout');
+        toast.error('Request timeout. Please try again.');
+      } else {
+        console.error('❌ Error fetching chats:', error);
+        console.error('Error details:', error.message);
+        toast.error(error.message || 'Failed to load conversations');
+      }
     } finally {
       setChatsLoading(false);
-      console.log('🏁 Chat loading set to false');
+      console.log('🏁 Chat loading complete');
     }
-  }, [currentUser?.id, selectedChat, navigate]);
+  }, [currentUser?.id, selectedChat, navigate, logout, searchParams]);
 
   // ✅ FIX: Fetch chats when currentUser is available
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
     console.log('📡 useEffect for chats triggered', {
       currentUserId: currentUser?.id,
       loading,
-      chatsLoading
+      hasFetched: hasFetchedChats.current
     });
     
-    if (currentUser?.id && !loading && !chatsLoading) {
+    if (currentUser?.id && !loading && !hasFetchedChats.current) {
       console.log('🚀 Fetching chats now...');
       fetchChats();
     }
-  }, [currentUser?.id, loading, chatsLoading, fetchChats]);
+  }, [currentUser?.id, loading, fetchChats]);
 
-  // ✅ FIX: Handle URL parameters
+  // ✅ FIX: Handle URL parameters after chats are loaded
   useEffect(() => {
-    console.log('🔗 URL params effect:', {
-      chatsLoading,
-      chatsCount: chats.length,
-      urlChatId: searchParams.get('chat'),
-      orderId: searchParams.get('order')
-    });
-    
-    if (chatsLoading || !chats.length) {
-      console.log('⏳ Skipping URL params - loading or no chats');
+    if (chatsLoading || chats.length === 0) {
       return;
     }
-    
+
     const urlChatId = searchParams.get('chat');
     const orderId = searchParams.get('order');
     
+    console.log('🔗 URL params processing:', { urlChatId, orderId, chatsCount: chats.length });
+
+    if (!urlChatId && !orderId) {
+      return;
+    }
+
     let foundChat: Chat | null = null;
     
     if (urlChatId) {
-      console.log('🔍 Looking for chat by ID:', urlChatId);
       foundChat = chats.find(c => c.firebaseChatId === urlChatId) || null;
     } else if (orderId) {
-      console.log('🔍 Looking for chat by order ID:', orderId);
       foundChat = chats.find(c => c.order?._id === orderId) || null;
     }
     
@@ -318,7 +352,21 @@ const Messages: React.FC = () => {
   const handleChatSelect = useCallback((chat: Chat) => {
     console.log('👆 Chat selected:', chat.otherUser.username);
     if (selectedChat?.firebaseChatId === chat.firebaseChatId) return;
+    
     setSelectedChat(chat);
+    
+    // Mark as read locally
+    setChats(prevChats => 
+      prevChats.map(c => 
+        c.firebaseChatId === chat.firebaseChatId 
+          ? { ...c, unreadCount: 0 }
+          : c
+      )
+    );
+    
+    // Update unread count
+    setUnreadCount(prev => Math.max(0, prev - chat.unreadCount));
+    
     if (window.innerWidth < 640) {
       setShowChatListMobile(false);
     }
@@ -326,6 +374,7 @@ const Messages: React.FC = () => {
 
   const handleRefreshChats = () => {
     console.log('🔄 Manual refresh triggered');
+    hasFetchedChats.current = false;
     fetchChats();
   };
 
@@ -363,7 +412,7 @@ const Messages: React.FC = () => {
     setShowChatListMobile(true);
   };
 
-  // ✅ FIX: Test chats if API fails
+  // Load test chats for debugging
   const loadTestChats = () => {
     console.log('🧪 Loading test chats for debugging');
     const testChats: Chat[] = [
@@ -448,17 +497,41 @@ const Messages: React.FC = () => {
     );
   }
 
+  // If not authenticated
+  if (!currentUser) {
+    return (
+      <MarketplaceLayout>
+        <div className="min-h-screen flex items-center justify-center bg-white">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FiUser className="w-8 h-8 text-red-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Authentication Required</h3>
+            <p className="text-gray-600 mb-6">Please login to view messages</p>
+            <button
+              onClick={() => navigate('/login')}
+              className="px-4 py-2 bg-yellow-500 text-white font-medium rounded-lg hover:bg-yellow-600 transition-colors"
+            >
+              Go to Login
+            </button>
+          </div>
+        </div>
+      </MarketplaceLayout>
+    );
+  }
+
   return (
     <MarketplaceLayout>
       <div className="min-h-screen bg-white">
         {/* Debug button - remove in production */}
-        <button
-          onClick={loadTestChats}
-          className="fixed bottom-4 right-4 z-50 px-3 py-1.5 bg-red-500 text-white text-xs rounded-lg shadow-lg hover:bg-red-600"
-          style={{ display: 'none' }} // Hidden by default
-        >
-          Load Test Chats
-        </button>
+        {process.env.NODE_ENV === 'development' && (
+          <button
+            onClick={loadTestChats}
+            className="fixed bottom-4 right-4 z-50 px-3 py-1.5 bg-red-500 text-white text-xs rounded-lg shadow-lg hover:bg-red-600"
+          >
+            Load Test Chats
+          </button>
+        )}
 
         {/* CSS Styles */}
         <style jsx global>{`
@@ -523,10 +596,10 @@ const Messages: React.FC = () => {
           </div>
         </div>
 
-        {/* Main Content - 20%/80% Layout */}
+        {/* Main Content */}
         <div className="max-w-7xl mx-auto px-0 sm:px-4 lg:px-6 h-[calc(100vh-120px)]">
           <div className="bg-white border border-gray-200 rounded-lg sm:rounded-xl h-full flex overflow-hidden">
-            {/* Chat List - 20% width */}
+            {/* Chat List */}
             <div className={`w-full sm:w-1/5 lg:w-[20%] border-r border-gray-200 flex flex-col absolute sm:relative inset-0 z-10 bg-white transition-transform duration-300 ${
               showChatListMobile ? 'translate-x-0' : '-translate-x-full sm:translate-x-0'
             }`}>
@@ -590,6 +663,9 @@ const Messages: React.FC = () => {
                                 src={chat.otherUser.avatar}
                                 alt={chat.otherUser.username}
                                 className="w-8 h-8 rounded-full border border-gray-200 object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/32';
+                                }}
                               />
                             ) : (
                               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 border border-gray-200 flex items-center justify-center">
@@ -635,7 +711,7 @@ const Messages: React.FC = () => {
               </div>
             </div>
 
-            {/* Chat Interface - 80% width */}
+            {/* Chat Interface */}
             <div className={`flex-1 flex flex-col w-full sm:w-4/5 lg:w-[80%] ${
               !showChatListMobile ? 'block' : 'hidden sm:flex'
             }`}>
@@ -662,6 +738,9 @@ const Messages: React.FC = () => {
                               src={selectedChat.otherUser.avatar}
                               alt={selectedChat.otherUser.username}
                               className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-white shadow-sm object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/48';
+                              }}
                             />
                           ) : (
                             <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-white shadow-sm flex items-center justify-center">
@@ -725,7 +804,11 @@ const Messages: React.FC = () => {
                     <FirebaseChatInterface
                       chatId={selectedChat.firebaseChatId}
                       currentUser={currentUser}
-                      onSendMessage={() => toast.success('Message sent!')}
+                      onSendMessage={() => {
+                        toast.success('Message sent!');
+                        // Refresh chats to update last message
+                        setTimeout(() => fetchChats(), 1000);
+                      }}
                       className="h-full"
                       orderId={selectedChat.order?._id}
                       otherUser={selectedChat.otherUser}
