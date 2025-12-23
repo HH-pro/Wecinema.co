@@ -708,19 +708,22 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
               >
                 Close
               </button>
-              <div className="order-1 sm:order-2 flex flex-col sm:flex-row gap-2">
-                {orderDetails?.buyerId && (
-                  <button
-                    onClick={() => window.open(`/messages?user=${orderDetails.buyerId?._id}`, '_blank')}
-                    className="inline-flex items-center justify-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors"
-                  >
-                    <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                    </svg>
-                    Contact Buyer
-                  </button>
-                )}
-              </div>
+             <div className="order-1 sm:order-2 flex flex-col sm:flex-row gap-2">
+  {orderDetails?.buyerId && (
+    <button
+      onClick={() => {
+        // Sirf marketplace/messages page par navigate karen
+        window.location.href = '/marketplace/messages';
+      }}
+      className="inline-flex items-center justify-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors"
+    >
+      <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+      </svg>
+      Contact Buyer
+    </button>
+  )}
+</div>
             </div>
           </div>
         </div>
