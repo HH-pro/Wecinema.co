@@ -1,5 +1,5 @@
 // src/pages/seller/SellerDashboard.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
 import { formatCurrency } from '../../api';
@@ -149,13 +149,23 @@ const SellerDashboard: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [listingsData, setListingsData] = useState<ListingsData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [error, setError] = useState('');
   const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-   const navigate = useNavigate();
+  const navigate = useNavigate();
+  
+  // Use refs to track initial loads
+  const initialLoadDone = useRef(false);
+  const dataLoadedRef = useRef({
+    orders: false,
+    offers: false,
+    listings: false,
+    stripe: false
+  });
+
   // Order stats
   const [orderStats, setOrderStats] = useState<OrderStats>({
     totalOrders: 0,
@@ -205,7 +215,7 @@ const SellerDashboard: React.FC = () => {
   const activeListings = listingsData?.listings?.filter((listing) => listing.status === 'active').length || 0;
   const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
 
-  // Tab configuration - MOVE THIS AFTER pendingOffers is calculated
+  // Tab configuration
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊', badge: null },
     // { id: 'offers', label: 'Offers', icon: '💼', badge: pendingOffers },
@@ -241,27 +251,44 @@ const SellerDashboard: React.FC = () => {
     }
   ];
 
+  // Initial data fetch - runs once on mount
   useEffect(() => {
-    fetchDashboardData();
-    checkStripeAccountStatus();
-    handleStripeReturn();
+    if (!initialLoadDone.current) {
+      fetchInitialData();
+      initialLoadDone.current = true;
+    }
+  }, []);
+
+  // Handle stripe return from redirect
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const stripeStatus = urlParams.get('stripe');
+    
+    if (stripeStatus === 'success') {
+      setSuccessMessage('Stripe account setup completed successfully!');
+      setTimeout(() => {
+        checkStripeAccountStatus();
+        // Clean URL
+        window.history.replaceState({}, '', window.location.pathname);
+      }, 3000);
+    }
   }, []);
 
   // Fetch listings when tab changes or page/filter changes
   useEffect(() => {
-    if (activeTab === 'listings') {
+    if (activeTab === 'listings' && !dataLoadedRef.current.listings) {
       fetchListings();
     }
   }, [activeTab, listingsPage, listingsStatusFilter]);
 
   // Fetch orders when orders tab is active
   useEffect(() => {
-    if (activeTab === 'orders') {
+    if (activeTab === 'orders' && !dataLoadedRef.current.orders) {
       fetchSellerOrders();
     }
   }, [activeTab, ordersPage, ordersFilter]);
 
-  const fetchDashboardData = async () => {
+  const fetchInitialData = async () => {
     try {
       setLoading(true);
       setError('');
@@ -273,59 +300,155 @@ const SellerDashboard: React.FC = () => {
         return;
       }
 
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      
-      const [ordersResponse, offersResponse, listingsResponse] = await Promise.allSettled([
-        axios.get(`${API_BASE_URL}/marketplace/my-sales`, {
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 10000
-        }),
-        axios.get(`${API_BASE_URL}/marketplace/offers/received-offers`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        axios.get(`${API_BASE_URL}/marketplace/listings/my-listings`, {
-          params: { limit: 5 },
-          headers: { Authorization: `Bearer ${token}` }
-        })
+      // Only fetch essential data for overview initially
+      await Promise.all([
+        fetchDashboardOverview(),
+        checkStripeAccountStatus()
       ]);
 
-      // Process orders response
-      let ordersData: Order[] = [];
-      if (ordersResponse.status === 'fulfilled') {
-        const response = ordersResponse.value;
-        if (response.data.success) {
-          ordersData = response.data.sales || response.data.orders || [];
-        }
-      }
-
-      // Process offers response
-      let offersData: Offer[] = [];
-      if (offersResponse.status === 'fulfilled') {
-        const response = offersResponse.value;
-        if (response.data.success) {
-          offersData = response.data.offers || [];
-        }
-      }
-
-      // Process listings response
-      if (listingsResponse.status === 'fulfilled') {
-        const response = listingsResponse.value;
-        if (response.data.success) {
-          setListingsData(response.data);
-        }
-      }
-
-      // Calculate order stats
-      const stats = calculateOrderStats(ordersData);
-      setOrderStats(stats);
-      setOrders(ordersData);
-      setOffers(offersData);
-
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      setError('Failed to load dashboard data. Please try refreshing the page.');
+      console.error('Error fetching initial data:', error);
+      setError('Failed to load dashboard. Please try refreshing the page.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDashboardOverview = async () => {
+    try {
+      const currentUserId = getCurrentUserId();
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      
+      // Fetch orders for overview
+      const ordersResponse = await axios.get(`${API_BASE_URL}/marketplace/my-sales`, {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 10000,
+        params: { limit: 10 } // Limit for overview
+      });
+
+      if (ordersResponse.data.success) {
+        const ordersData = ordersResponse.data.sales || ordersResponse.data.orders || [];
+        setOrders(ordersData);
+        const stats = calculateOrderStats(ordersData);
+        setOrderStats(stats);
+        dataLoadedRef.current.orders = true;
+      }
+
+    } catch (error) {
+      console.error('Error fetching dashboard overview:', error);
+    }
+  };
+
+  const fetchSellerOrders = async () => {
+    if (dataLoadedRef.current.orders && activeTab === 'orders') {
+      return; // Already loaded
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      
+      const params: any = {
+        page: ordersPage,
+        limit: ordersLimit
+      };
+      
+      if (ordersFilter !== 'all') {
+        params.status = ordersFilter;
+      }
+      
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/my-sales`,
+        {
+          params,
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          }
+        }
+      );
+      
+      if (response.data.success) {
+        const ordersData = response.data.sales || response.data.orders || [];
+        setOrders(ordersData);
+        const stats = calculateOrderStats(ordersData);
+        setOrderStats(stats);
+        dataLoadedRef.current.orders = true;
+      }
+    } catch (error: any) {
+      console.error('Error fetching seller orders:', error);
+      setError('Failed to load orders. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchListings = async () => {
+    if (dataLoadedRef.current.listings && activeTab === 'listings') {
+      return; // Already loaded
+    }
+
+    try {
+      setLoading(true);
+      const currentUserId = getCurrentUserId();
+      if (!currentUserId) {
+        setError('User not authenticated. Please log in again.');
+        return;
+      }
+
+      const params: any = {
+        page: listingsPage,
+        limit: listingsLimit
+      };
+      
+      if (listingsStatusFilter) {
+        params.status = listingsStatusFilter;
+      }
+      
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/listings/my-listings`,
+        {
+          params,
+          headers: { 
+            Authorization: `Bearer ${localStorage.getItem('token') || sessionStorage.getItem('token')}`,
+            'Cache-Control': 'no-cache'
+          }
+        }
+      );
+      
+      if (response.data.success) {
+        setListingsData(response.data);
+        dataLoadedRef.current.listings = true;
+      }
+    } catch (error: any) {
+      console.error('Error fetching listings:', error);
+      setError('Failed to load listings. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkStripeAccountStatus = async () => {
+    if (dataLoadedRef.current.stripe) return;
+
+    try {
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/seller/stripe-status`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 5000
+        }
+      );
+
+      if (response.data.success) {
+        setStripeStatus(response.data);
+        dataLoadedRef.current.stripe = true;
+      }
+    } catch (err) {
+      console.error('Error checking Stripe status:', err);
     }
   };
 
@@ -364,120 +487,28 @@ const SellerDashboard: React.FC = () => {
     };
   };
 
-  const fetchSellerOrders = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      
-      const params: any = {
-        page: ordersPage,
-        limit: ordersLimit
-      };
-      
-      if (ordersFilter !== 'all') {
-        params.status = ordersFilter;
-      }
-      
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/orders/my-sales`,
-        {
-          params,
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Cache-Control': 'no-cache, no-store, must-revalidate'
-          }
-        }
-      );
-      
-      if (response.data.success) {
-        const ordersData = response.data.sales || response.data.orders || [];
-        setOrders(ordersData);
-        const stats = calculateOrderStats(ordersData);
-        setOrderStats(stats);
-      }
-    } catch (error: any) {
-      console.error('Error fetching seller orders:', error);
-      setError('Failed to load orders. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchListings = async () => {
-    try {
-      const currentUserId = getCurrentUserId();
-      if (!currentUserId) {
-        setError('User not authenticated. Please log in again.');
-        return;
-      }
-
-      const params: any = {
-        page: listingsPage,
-        limit: listingsLimit,
-        _t: new Date().getTime()
-      };
-      
-      if (listingsStatusFilter) {
-        params.status = listingsStatusFilter;
-      }
-      
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/listings/my-listings`,
-        {
-          params,
-          headers: { 
-            Authorization: `Bearer ${localStorage.getItem('token') || sessionStorage.getItem('token')}`,
-            'Cache-Control': 'no-cache, no-store, must-revalidate'
-          }
-        }
-      );
-      
-      if (response.data.success) {
-        setListingsData(response.data);
-      }
-    } catch (error: any) {
-      console.error('Error fetching listings:', error);
-      setError('Failed to load listings. Please try again.');
-    }
-  };
-
-  const checkStripeAccountStatus = async () => {
-    try {
-      // Your Stripe status check logic here
-    } catch (err) {
-      console.error('Error checking Stripe status:', err);
-    }
-  };
-
-  const handleStripeReturn = () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const stripeStatus = urlParams.get('stripe');
-    
-    if (stripeStatus === 'success') {
-      setSuccessMessage('Stripe account setup completed successfully!');
-      setTimeout(() => {
-        checkStripeAccountStatus();
-        fetchDashboardData();
-      }, 3000);
-    }
-  };
-
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([
-      fetchDashboardData(),
-      checkStripeAccountStatus()
-    ]);
     
-    if (activeTab === 'listings') {
+    // Reset loaded flags for the active tab
+    if (activeTab === 'overview') {
+      dataLoadedRef.current.orders = false;
+      dataLoadedRef.current.offers = false;
+      await fetchDashboardOverview();
+    } else if (activeTab === 'listings') {
+      dataLoadedRef.current.listings = false;
       await fetchListings();
     } else if (activeTab === 'orders') {
+      dataLoadedRef.current.orders = false;
       await fetchSellerOrders();
     }
     
+    // Always check stripe status on refresh
+    dataLoadedRef.current.stripe = false;
+    await checkStripeAccountStatus();
+    
     setRefreshing(false);
+    setSuccessMessage('Dashboard refreshed successfully!');
   };
 
   // Simplified order management functions
@@ -664,9 +695,23 @@ const SellerDashboard: React.FC = () => {
     setShowStripeSetup(false);
     setSuccessMessage('Stripe account connected successfully!');
     setTimeout(() => {
+      dataLoadedRef.current.stripe = false;
       checkStripeAccountStatus();
-      fetchDashboardData();
+      fetchDashboardOverview();
     }, 2000);
+  };
+
+  // Tab change handler
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+    // Reset page when switching tabs
+    if (tabId === 'listings') {
+      setListingsPage(1);
+      setListingsStatusFilter('');
+    } else if (tabId === 'orders') {
+      setOrdersPage(1);
+      setOrdersFilter('all');
+    }
   };
 
   // Clear messages after 5 seconds
@@ -716,7 +761,7 @@ const SellerDashboard: React.FC = () => {
             earnings={formatCurrency(orderStats.totalRevenue)}
             onRefresh={handleRefresh}
             refreshing={refreshing}
-            // showStripeButton={!(stripeStatus?.connected && stripeStatus?.chargesEnabled)}
+            showStripeButton={!(stripeStatus?.connected && stripeStatus?.chargesEnabled)}
             onStripeSetup={() => setShowStripeSetup(true)}
           />
 
@@ -734,7 +779,7 @@ const SellerDashboard: React.FC = () => {
           <TabNavigation
             tabs={tabs}
             activeTab={activeTab}
-            onTabChange={setActiveTab}
+            onTabChange={handleTabChange}
           />
 
           {/* Tab Content */}
@@ -744,10 +789,10 @@ const SellerDashboard: React.FC = () => {
               <WelcomeCard
                 title="Welcome back, Seller! 👋"
                 subtitle="Manage your business efficiently with real-time insights and quick actions."
-                 primaryAction={{
-          label: '+ Create New Listing',
-          onClick: () => navigate('/marketplace/create') // Same tab mein open hoga
-        }}
+                primaryAction={{
+                  label: '+ Create New Listing',
+                  onClick: () => navigate('/marketplace/create')
+                }}
                 secondaryAction={{
                   label: '💰 Setup Payments',
                   onClick: () => setShowStripeSetup(true),
@@ -780,8 +825,8 @@ const SellerDashboard: React.FC = () => {
                 onDeliver={handleSimpleDeliver}
                 onCancel={handleSimpleCancel}
                 onCompleteRevision={handleSimpleCompleteRevision}
-                onViewAll={() => setActiveTab('orders')}
-                onCreateListing={() => window.open('/create-listing', '_blank')}
+                onViewAll={() => handleTabChange('orders')}
+                onCreateListing={() => navigate('/marketplace/create')}
                 orderActionLoading={orderActionLoading}
               />
 
@@ -801,7 +846,10 @@ const SellerDashboard: React.FC = () => {
               loading={loading}
               onOfferAction={handleOfferAction}
               onPlayVideo={handlePlayVideo}
-              onRefresh={handleRefresh}
+              onRefresh={() => {
+                dataLoadedRef.current.offers = false;
+                // Add offers fetch function here
+              }}
             />
           )}
 
@@ -816,21 +864,27 @@ const SellerDashboard: React.FC = () => {
               onEditListing={handleEditListing}
               onDeleteListing={handleDeleteListing}
               onPlayVideo={handlePlayVideo}
-              onRefresh={fetchListings}
+              onRefresh={() => {
+                dataLoadedRef.current.listings = false;
+                fetchListings();
+              }}
               actionLoading={listingActionLoading}
-              onCreateListing={() => window.open('/create-listing', '_blank')}
+              onCreateListing={() => navigate('/marketplace/create')}
             />
           )}
 
           {activeTab === 'orders' && (
             <OrdersTab
               orders={orders}
-              loading={loading}
+              loading={loading && activeTab === 'orders'}
               filter={ordersFilter}
               onFilterChange={setOrdersFilter}
               onViewOrderDetails={handleViewOrderDetails}
               onPlayVideo={handlePlayVideo}
-              onRefresh={handleRefresh}
+              onRefresh={() => {
+                dataLoadedRef.current.orders = false;
+                fetchSellerOrders();
+              }}
               onStartProcessing={(orderId) => {
                 const order = orders.find(o => o._id === orderId);
                 if (order) handleSimpleStartProcessing(order);
@@ -874,7 +928,10 @@ const SellerDashboard: React.FC = () => {
                 setShowEditModal(false);
                 setEditingListing(null);
               }}
-              onUpdate={() => {}}
+              onUpdate={() => {
+                dataLoadedRef.current.listings = false;
+                fetchListings();
+              }}
               loading={false}
             />
           )}
@@ -887,7 +944,10 @@ const SellerDashboard: React.FC = () => {
                 setShowDeleteModal(false);
                 setDeletingListing(null);
               }}
-              onConfirm={() => {}}
+              onConfirm={() => {
+                dataLoadedRef.current.listings = false;
+                fetchListings();
+              }}
               loading={false}
             />
           )}
