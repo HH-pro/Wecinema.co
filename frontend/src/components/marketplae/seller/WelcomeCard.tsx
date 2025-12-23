@@ -21,7 +21,7 @@ const WelcomeCard: React.FC<WelcomeCardProps> = ({
   secondaryAction
 }) => {
   return (
-    <div className="bg-black rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8">
+    <div className="bg-blue rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
         <div className="flex-1">
           <div className="mb-6">
