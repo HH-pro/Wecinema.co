@@ -1,4 +1,4 @@
-// src/components/marketplace/seller/OrdersTab.tsx - COMPLETE FIXED VERSION
+// src/components/marketplace/seller/OrdersTab.tsx - UPDATED & FIXED VERSION
 import React, { useState } from 'react';
 import { marketplaceAPI, getOrderStatusInfo, formatCurrency, formatDate } from '../../../api';
 import OrderStatusTracker from './OrderStatusTracker';
@@ -38,6 +38,21 @@ interface Order {
   payments?: any[];
 }
 
+interface OrderStats {
+  totalOrders: number;
+  activeOrders: number;
+  pendingPayment: number;
+  processing: number;
+  inProgress: number;
+  delivered: number;
+  completed: number;
+  cancelled: number;
+  totalRevenue: number;
+  pendingRevenue: number;
+  thisMonthOrders: number;
+  thisMonthRevenue: number;
+}
+
 interface OrdersTabProps {
   orders: Order[];
   loading: boolean;
@@ -59,6 +74,7 @@ interface OrdersTabProps {
     isFinal: boolean;
     revisionsLeft?: number;
   }) => Promise<void>;
+  stats?: OrderStats; // Added stats prop
 }
 
 const OrdersTab: React.FC<OrdersTabProps> = ({
@@ -75,7 +91,8 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
   onCancel,
   onCompleteRevision,
   actionLoading,
-  onActualDeliver
+  onActualDeliver,
+  stats // Receive stats from dashboard
 }) => {
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
@@ -85,6 +102,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
 
   const statusFilters = [
     { value: 'all', label: 'All Orders', count: orders.length },
+    { value: 'pending_payment', label: 'Pending Payment', count: orders.filter(o => o.status === 'pending_payment').length },
     { value: 'paid', label: 'To Start', count: orders.filter(o => o.status === 'paid').length },
     { value: 'processing', label: 'Processing', count: orders.filter(o => o.status === 'processing').length },
     { value: 'in_progress', label: 'In Progress', count: orders.filter(o => o.status === 'in_progress').length },
@@ -198,11 +216,13 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
   };
 
   const confirmCancelOrder = (order: Order) => {
-    onCancel(order);
+    if (onCancel) {
+      onCancel(order);
+    }
     setShowCancelConfirm(null);
   };
 
-  // ✅ IMPROVED FILE UPLOAD FUNCTION WITHOUT TOASTS
+  // Handle deliver work
   const handleActualDeliver = async (deliveryData: {
     orderId: string;
     message: string;
@@ -239,14 +259,11 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
         console.log('📤 Uploading files...', deliveryData.attachments.length);
         
         try {
-          // ✅ Direct file upload with better handling
           uploadedAttachments = await uploadFilesDirect(deliveryData.attachments);
-          
           console.log('✅ Files uploaded successfully:', uploadedAttachments);
         } catch (uploadError: any) {
           console.error('❌ File upload error:', uploadError);
           
-          // Check if it's a file type error
           if (uploadError.message?.includes('File type') || uploadError.message?.includes('not supported')) {
             console.error(`❌ ${uploadError.message}. Please use supported file types.`);
           } else if (uploadError.message?.includes('size')) {
@@ -254,7 +271,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
           } else {
             console.error(`❌ File upload failed: ${uploadError.message || 'Please try again'}`);
           }
-          return; // Stop if file upload fails
+          return;
         }
       }
 
@@ -293,13 +310,12 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
       } catch (apiError: any) {
         console.error('❌ API Error:', apiError);
         
-        // Handle specific API errors
         if (apiError.message?.includes('Validation failed')) {
           console.error('❌ Please check your delivery details and try again.');
         } else if (apiError.message?.includes('not found')) {
           console.error('❌ Order not found or you do not have permission.');
         } else {
-          throw apiError; // Re-throw for outer catch
+          throw apiError;
         }
       }
 
@@ -312,7 +328,6 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     } catch (error: any) {
       console.error('❌ Delivery error:', error);
       
-      // Show specific error messages in console only
       let errorMessage = 'Delivery failed. Please try again.';
       
       if (error.message?.includes('File type')) {
@@ -331,12 +346,11 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     }
   };
 
-  // ✅ DIRECT FILE UPLOAD FUNCTION WITHOUT TOASTS
+  // Direct file upload function
   const uploadFilesDirect = async (files: File[]) => {
     try {
       const formData = new FormData();
       
-      // Log each file before uploading
       files.forEach(file => {
         console.log('📄 File to upload:', {
           name: file.name,
@@ -358,7 +372,6 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-          // Don't set Content-Type for FormData, browser will set it automatically
         },
         body: formData,
       });
@@ -388,13 +401,13 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
   };
 
   // For revision completion:
-  const handleCompleteRevision = async (order: Order) => {
-    try {
+  const handleCompleteRevision = (order: Order) => {
+    if (onCompleteRevision) {
+      onCompleteRevision(order);
+    } else {
+      // Fallback to deliver if onCompleteRevision not provided
       setSelectedOrderForDelivery(order);
       setDeliveryModalOpen(true);
-    } catch (error: any) {
-      console.error('❌ Revision setup error:', error);
-      console.error(`❌ ${error.message || 'Failed to start revision'}`);
     }
   };
 
@@ -504,7 +517,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     return null;
   };
 
-  // ✅ FILE VALIDATION HELPER
+  // File validation helper
   const validateFileBeforeUpload = (file: File): string | null => {
     const maxSize = 100 * 1024 * 1024; // 100MB
     const allowedExtensions = [
@@ -533,6 +546,22 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     }
 
     return null; // File is valid
+  };
+
+  // Calculate stats from orders if not provided
+  const calculatedStats = stats || {
+    totalOrders: orders.length,
+    activeOrders: orders.filter(o => ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(o.status)).length,
+    pendingPayment: orders.filter(o => o.status === 'pending_payment').length,
+    processing: orders.filter(o => o.status === 'processing').length,
+    inProgress: orders.filter(o => o.status === 'in_progress').length,
+    delivered: orders.filter(o => o.status === 'delivered').length,
+    completed: orders.filter(o => o.status === 'completed').length,
+    cancelled: orders.filter(o => o.status === 'cancelled').length,
+    totalRevenue: orders.filter(o => o.status === 'completed').reduce((sum, order) => sum + order.amount, 0),
+    pendingRevenue: orders.filter(o => ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(o.status)).reduce((sum, order) => sum + order.amount, 0),
+    thisMonthOrders: 0,
+    thisMonthRevenue: 0
   };
 
   return (
@@ -624,35 +653,28 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
           </div>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-gradient-to-br from-yellow-50 to-amber-50 p-4 rounded-xl border border-yellow-200">
-            <div className="text-sm font-medium text-yellow-700">To Start</div>
-            <div className="text-2xl font-bold text-yellow-800">
-              {orders.filter(o => o.status === 'paid').length}
-            </div>
-            <div className="text-xs text-yellow-600">Awaiting action</div>
-          </div>
-          <div className="bg-gradient-to-br from-purple-50 to-violet-50 p-4 rounded-xl border border-purple-200">
-            <div className="text-sm font-medium text-purple-700">In Progress</div>
-            <div className="text-2xl font-bold text-purple-800">
-              {orders.filter(o => ['processing', 'in_progress'].includes(o.status)).length}
-            </div>
-            <div className="text-xs text-purple-600">Being worked on</div>
-          </div>
+        {/* Earning Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200">
-            <div className="text-sm font-medium text-green-700">Completed</div>
+            <div className="text-sm font-medium text-green-700">Total Earnings</div>
             <div className="text-2xl font-bold text-green-800">
-              {orders.filter(o => o.status === 'completed').length}
+              {formatCurrency(calculatedStats.totalRevenue)}
             </div>
-            <div className="text-xs text-green-600">Successfully delivered</div>
+            <div className="text-xs text-green-600">Completed orders</div>
           </div>
-          <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl border border-gray-200">
-            <div className="text-sm font-medium text-gray-700">Cancellable</div>
-            <div className="text-2xl font-bold text-gray-800">
-              {orders.filter(o => canCancelOrder(o)).length}
+          <div className="bg-gradient-to-br from-blue-50 to-cyan-50 p-4 rounded-xl border border-blue-200">
+            <div className="text-sm font-medium text-blue-700">Pending Revenue</div>
+            <div className="text-2xl font-bold text-blue-800">
+              {formatCurrency(calculatedStats.pendingRevenue)}
             </div>
-            <div className="text-xs text-gray-600">Can be cancelled</div>
+            <div className="text-xs text-blue-600">Active orders</div>
+          </div>
+          <div className="bg-gradient-to-br from-yellow-50 to-amber-50 p-4 rounded-xl border border-yellow-200">
+            <div className="text-sm font-medium text-yellow-700">Total Orders</div>
+            <div className="text-2xl font-bold text-yellow-800">
+              {calculatedStats.totalOrders}
+            </div>
+            <div className="text-xs text-yellow-600">All time orders</div>
           </div>
         </div>
 
@@ -994,11 +1016,11 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                             )}
                             
                             {/* Cancellation Status */}
-                            <div className="mt-3 p-3 rounded-lg border ${
+                            <div className={`mt-3 p-3 rounded-lg border ${
                               cancelConfig.canCancel 
                                 ? 'bg-red-50 border-red-200' 
                                 : 'bg-gray-50 border-gray-200'
-                            }">
+                            }`}>
                               <div className="flex items-center justify-between">
                                 <div>
                                   <p className={`font-medium ${
@@ -1116,7 +1138,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
           order={selectedOrderForDelivery}
           onDeliver={handleActualDeliver}
           isLoading={actionLoading === selectedOrderForDelivery._id || isSubmittingDelivery}
-          validateFile={validateFileBeforeUpload} // ✅ Pass validation function to modal
+          validateFile={validateFileBeforeUpload}
         />
       )}
     </div>
