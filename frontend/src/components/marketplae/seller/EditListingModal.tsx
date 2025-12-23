@@ -46,6 +46,11 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Environment variables with fallbacks
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  const CLOUDINARY_CLOUD_NAME = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME || 'your-cloud-name';
+  const CLOUDINARY_UPLOAD_PRESET = process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET || 'your_upload_preset';
+
   // Listing types as per requirement
   const listingTypes = [
     { value: 'for-sale', label: 'For Sale' },
@@ -163,7 +168,13 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
     
     // Validate file types
     const validFiles = newFiles.filter(file => {
-      const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime', 'video/x-msvideo'];
+      const validTypes = [
+        'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 
+        'image/webp', 'image/svg+xml', 'video/mp4', 'video/mpeg',
+        'video/quicktime', 'video/x-msvideo', 'video/x-matroska',
+        'video/webm'
+      ];
+      
       if (!validTypes.includes(file.type)) {
         toast.error(`${file.name}: Invalid file type. Only images and videos are allowed.`);
         return false;
@@ -210,28 +221,102 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
       const file = files[i];
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('upload_preset', process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET || 'your_upload_preset');
+      formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
       formData.append('folder', 'marketplace-listings');
 
       try {
+        // Check if Cloudinary credentials are available
+        if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+          toast.error('Cloudinary configuration is missing. Please contact administrator.');
+          throw new Error('Cloudinary configuration missing');
+        }
+
+        const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/upload`;
+        
+        console.log('Uploading to Cloudinary:', {
+          cloudName: CLOUDINARY_CLOUD_NAME,
+          uploadPreset: CLOUDINARY_UPLOAD_PRESET,
+          file: file.name,
+          size: file.size
+        });
+
         const response = await axios.post(
-          `https://api.cloudinary.com/v1_1/${process.env.REACT_APP_CLOUDINARY_CLOUD_NAME}/upload`,
+          cloudinaryUrl,
           formData,
           {
             onUploadProgress: (progressEvent) => {
-              const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
-              setUploadProgress(percentCompleted);
+              if (progressEvent.total) {
+                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                setUploadProgress(percentCompleted);
+              }
             },
             headers: {
               'Content-Type': 'multipart/form-data'
+            },
+            timeout: 300000 // 5 minutes timeout for large files
+          }
+        );
+        
+        if (response.data.secure_url) {
+          uploadedUrls.push(response.data.secure_url);
+          toast.success(`Uploaded ${file.name} (${i + 1}/${files.length})`);
+        } else {
+          throw new Error('No secure URL returned from Cloudinary');
+        }
+      } catch (error: any) {
+        console.error(`Error uploading ${file.name}:`, error);
+        
+        if (error.response) {
+          // Server responded with error
+          toast.error(`${file.name}: Upload failed - ${error.response.data?.error?.message || 'Server error'}`);
+        } else if (error.request) {
+          // No response received
+          toast.error(`${file.name}: Network error - No response from server`);
+        } else {
+          // Other errors
+          toast.error(`${file.name}: Upload failed - ${error.message}`);
+        }
+        
+        throw error;
+      }
+    }
+    
+    return uploadedUrls;
+  };
+
+  const uploadFilesToServer = async (files: File[]): Promise<string[]> => {
+    // Alternative: Upload to your own server if Cloudinary not available
+    const uploadedUrls: string[] = [];
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const formData = new FormData();
+      formData.append('media', file);
+      
+      try {
+        const response = await axios.post(
+          `${API_URL}/api/marketplace/upload-media`,
+          formData,
+          {
+            onUploadProgress: (progressEvent) => {
+              if (progressEvent.total) {
+                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                setUploadProgress(percentCompleted);
+              }
+            },
+            headers: {
+              'Content-Type': 'multipart/form-data',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
           }
         );
         
-        uploadedUrls.push(response.data.secure_url);
-        toast.success(`Uploaded ${file.name} (${i + 1}/${files.length})`);
+        if (response.data.url) {
+          uploadedUrls.push(response.data.url);
+          toast.success(`Uploaded ${file.name}`);
+        }
       } catch (error) {
-        console.error(`Error uploading ${file.name}:`, error);
+        console.error('Error uploading to server:', error);
         toast.error(`Failed to upload ${file.name}`);
         throw error;
       }
@@ -255,8 +340,22 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
       
       // Upload new media files if any
       if (mediaFiles.length > 0) {
-        toast.info('Uploading media files...');
-        newMediaUrls = await uploadFilesToCloudinary(mediaFiles);
+        toast.info(`Uploading ${mediaFiles.length} media file(s)...`);
+        
+        try {
+          // Try Cloudinary first if configured
+          if (CLOUDINARY_CLOUD_NAME && CLOUDINARY_UPLOAD_PRESET) {
+            newMediaUrls = await uploadFilesToCloudinary(mediaFiles);
+          } else {
+            // Fallback to server upload
+            newMediaUrls = await uploadFilesToServer(mediaFiles);
+          }
+        } catch (uploadError) {
+          console.error('Media upload failed:', uploadError);
+          toast.error('Media upload failed. Please try again or upload smaller files.');
+          setLoading(false);
+          return;
+        }
       }
       
       // Combine existing media (excluding removed ones) with new media
@@ -278,8 +377,10 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
         mediaToRemove: mediaToRemove // Optional: for backend to delete from storage
       };
       
+      console.log('Updating listing with:', payload);
+      
       const response = await axios.put(
-        `${process.env.REACT_APP_API_URL}/api/marketplace/listing/${listing._id}`,
+        `${API_URL}/api/marketplace/listing/${listing._id}`,
         payload,
         {
           headers: {
@@ -308,8 +409,12 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
         } else {
           toast.error(error.response.data.error || 'Failed to update listing');
         }
+      } else if (error.response?.data?.error) {
+        toast.error(error.response.data.error);
+      } else if (error.message) {
+        toast.error(error.message);
       } else {
-        toast.error(error.message || 'Failed to update listing');
+        toast.error('Failed to update listing');
       }
     } finally {
       setLoading(false);
@@ -318,13 +423,13 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
   };
 
   const isImageFile = (url: string | File): boolean => {
-    const urlString = typeof url === 'string' ? url : url.name.toLowerCase();
-    return /\.(jpg|jpeg|png|gif|webp)$/i.test(urlString);
+    const urlString = typeof url === 'string' ? url.toLowerCase() : url.name.toLowerCase();
+    return /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(urlString);
   };
 
   const isVideoFile = (url: string | File): boolean => {
-    const urlString = typeof url === 'string' ? url : url.name.toLowerCase();
-    return /\.(mp4|mov|avi|wmv|flv|mkv|webm)$/i.test(urlString);
+    const urlString = typeof url === 'string' ? url.toLowerCase() : url.name.toLowerCase();
+    return /\.(mp4|mov|avi|wmv|flv|mkv|webm|mpeg|mpg)$/i.test(urlString);
   };
 
   if (!isOpen || !listing) return null;
@@ -334,6 +439,8 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Background overlay */}
         <div className="fixed inset-0 transition-opacity bg-gray-900 bg-opacity-75" onClick={onClose}></div>
+
+        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
         {/* Modal panel */}
         <div className="inline-block w-full max-w-3xl my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
@@ -346,6 +453,7 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
               <button
                 onClick={onClose}
                 className="text-gray-400 hover:text-gray-500 transition-colors"
+                disabled={loading}
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -367,11 +475,12 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
                   name="title"
                   value={formData.title}
                   onChange={handleInputChange}
+                  disabled={loading}
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:outline-none transition-all ${
                     errors.title 
                       ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
                       : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
-                  }`}
+                  } ${loading ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                   placeholder="Enter listing title"
                 />
                 {errors.title && (
@@ -389,12 +498,13 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
                   name="description"
                   value={formData.description}
                   onChange={handleInputChange}
+                  disabled={loading}
                   rows={4}
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:outline-none transition-all ${
                     errors.description 
                       ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
                       : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
-                  }`}
+                  } ${loading ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                   placeholder="Describe your listing in detail"
                 />
                 {errors.description && (
@@ -414,13 +524,14 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
                     name="price"
                     value={formData.price}
                     onChange={handleInputChange}
+                    disabled={loading}
                     step="0.01"
                     min="0"
                     className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:outline-none transition-all ${
                       errors.price 
                         ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
                         : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
+                    } ${loading ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     placeholder="0.00"
                   />
                   {errors.price && (
@@ -438,11 +549,12 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
                     name="listType"
                     value={formData.listType}
                     onChange={handleInputChange}
+                    disabled={loading}
                     className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:outline-none transition-all ${
                       errors.listType 
                         ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
                         : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
+                    } ${loading ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                   >
                     <option value="">Select Listing Type</option>
                     {listingTypes.map(type => (
@@ -468,11 +580,12 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
                     name="category"
                     value={formData.category}
                     onChange={handleInputChange}
+                    disabled={loading}
                     className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:outline-none transition-all ${
                       errors.category 
                         ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
                         : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
+                    } ${loading ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                   >
                     <option value="">Select Category</option>
                     {categories.map(category => (
@@ -497,7 +610,10 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
                     name="tags"
                     value={formData.tags}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none transition-all"
+                    disabled={loading}
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:outline-none transition-all border-gray-300 focus:ring-blue-500 focus:border-blue-500 ${
+                      loading ? 'bg-gray-100 cursor-not-allowed' : ''
+                    }`}
                     placeholder="music, art, digital, creative, etc."
                   />
                   <p className="mt-2 text-xs text-gray-500">Separate tags with commas</p>
@@ -517,19 +633,23 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
 
                 {/* Upload Progress */}
                 {uploadProgress > 0 && uploadProgress < 100 && (
-                  <div className="w-full bg-gray-200 rounded-full h-2.5">
-                    <div 
-                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-                      style={{ width: `${uploadProgress}%` }}
-                    ></div>
-                    <p className="text-xs text-gray-600 mt-1 text-center">
+                  <div className="space-y-2">
+                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                      <div 
+                        className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                      ></div>
+                    </div>
+                    <p className="text-xs text-gray-600 text-center">
                       Uploading: {uploadProgress}%
                     </p>
                   </div>
                 )}
 
                 {/* File Upload Button */}
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
+                <div className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                  loading ? 'border-gray-200 bg-gray-50' : 'border-gray-300 hover:border-blue-500'
+                }`}>
                   <input
                     type="file"
                     ref={fileInputRef}
@@ -537,16 +657,22 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
                     multiple
                     accept="image/*,video/*"
                     className="hidden"
+                    disabled={loading}
                   />
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all"
+                    disabled={loading}
+                    className={`inline-flex items-center px-4 py-2 font-medium rounded-lg transition-all ${
+                      loading 
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                        : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800'
+                    }`}
                   >
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                     </svg>
-                    Select Files
+                    {loading ? 'Please wait...' : 'Select Files'}
                   </button>
                   <p className="text-sm text-gray-500 mt-2">
                     Drag & drop images or videos, or click to browse
@@ -584,14 +710,18 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
                           <button
                             type="button"
                             onClick={() => removeNewFile(index)}
-                            className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            disabled={loading}
+                            className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
                           >
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                           </button>
                           <p className="text-xs text-gray-600 mt-1 truncate" title={file.name}>
-                            {file.name.length > 15 ? file.name.substring(0, 15) + '...' : file.name}
+                            {file.name.length > 15 ? `${file.name.substring(0, 15)}...` : file.name}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {(file.size / (1024 * 1024)).toFixed(2)} MB
                           </p>
                         </div>
                       ))}
@@ -635,9 +765,10 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
                             <button
                               type="button"
                               onClick={() => isRemoved ? restoreExistingMedia(url) : removeExistingMedia(url)}
+                              disabled={loading}
                               className={`absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity ${
                                 isRemoved ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-                              }`}
+                              } disabled:opacity-50`}
                             >
                               {isRemoved ? (
                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
