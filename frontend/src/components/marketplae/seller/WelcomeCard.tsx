@@ -46,9 +46,7 @@ const WelcomeCard: React.FC<WelcomeCardProps> = ({
                 onClick={secondaryAction.onClick}
                 className="px-5 py-3 bg-white text-gray-800 font-medium rounded-xl hover:bg-gray-50 transition-all duration-200 border border-gray-300 hover:border-gray-400 flex items-center"
               >
-                <svg className="w-5 h-5 mr-2 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
-                </svg>
+               
                 {secondaryAction.label}
               </button>
             )}
