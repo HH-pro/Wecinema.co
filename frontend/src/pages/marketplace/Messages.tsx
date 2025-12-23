@@ -35,6 +35,7 @@ const Messages: React.FC = () => {
   const [chatsLoading, setChatsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [searchQuery, setSearchQuery] = useState('');
   
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialMount = useRef(true);
@@ -101,7 +102,7 @@ const Messages: React.FC = () => {
     fetchCurrentUser();
   }, [authUser, navigate]);
 
-  // Fetch user chats - WITHOUT AUTO-RELOADING SELECTED CHAT
+  // Fetch user chats
   const fetchChats = useCallback(async (showToast = false) => {
     if (!currentUser?.id) return;
 
@@ -279,6 +280,18 @@ const Messages: React.FC = () => {
     fetchChats(true);
   };
 
+  // Filter chats based on search
+  const filteredChats = chats.filter(chat => {
+    if (!searchQuery) return true;
+    
+    const query = searchQuery.toLowerCase();
+    return (
+      chat.otherUser.username.toLowerCase().includes(query) ||
+      chat.listing.title.toLowerCase().includes(query) ||
+      (chat.lastMessage?.content?.toLowerCase() || '').includes(query)
+    );
+  });
+
   // Get first letter of name for avatar
   const getAvatarFallback = (username: string): string => {
     if (!username || username.trim().length === 0) return 'U';
@@ -304,9 +317,17 @@ const Messages: React.FC = () => {
   };
 
   // Render avatar with fallback
-  const renderAvatar = (chat: Chat) => {
+  const renderAvatar = (chat: Chat, size = 'medium') => {
     const { otherUser } = chat;
     const avatarColor = getAvatarColor(otherUser.id);
+    
+    const sizeClasses = {
+      small: 'w-10 h-10 text-sm',
+      medium: 'w-12 h-12 text-base',
+      large: 'w-16 h-16 text-lg'
+    };
+    
+    const avatarClass = sizeClasses[size as keyof typeof sizeClasses] || sizeClasses.medium;
     
     if (otherUser.avatar) {
       return (
@@ -314,7 +335,7 @@ const Messages: React.FC = () => {
           <img
             src={otherUser.avatar}
             alt={otherUser.username}
-            className="w-12 h-12 rounded-full border-2 border-white shadow-sm object-cover"
+            className={`${avatarClass} rounded-full border-2 border-white shadow-sm object-cover`}
             onError={(e) => {
               e.currentTarget.style.display = 'none';
               const parent = e.currentTarget.parentElement;
@@ -327,7 +348,7 @@ const Messages: React.FC = () => {
             }}
           />
           <div 
-            className={`${avatarColor} absolute inset-0 w-12 h-12 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-white font-bold text-lg avatar-fallback hidden`}
+            className={`${avatarColor} absolute inset-0 ${avatarClass} rounded-full border-2 border-white shadow-sm flex items-center justify-center text-white font-bold avatar-fallback hidden`}
           >
             {getAvatarFallback(otherUser.username)}
           </div>
@@ -337,7 +358,7 @@ const Messages: React.FC = () => {
     
     return (
       <div 
-        className={`${avatarColor} w-12 h-12 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-white font-bold text-lg`}
+        className={`${avatarColor} ${avatarClass} rounded-full border-2 border-white shadow-sm flex items-center justify-center text-white font-bold`}
       >
         {getAvatarFallback(otherUser.username)}
       </div>
@@ -390,7 +411,7 @@ const Messages: React.FC = () => {
   return (
     <MarketplaceLayout>
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-6 sm:py-8">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="mb-8">
             <div className="flex items-center justify-between">
@@ -420,40 +441,131 @@ const Messages: React.FC = () => {
             </div>
           </div>
 
-          {/* Main Content */}
+          {/* Main Content - 20% chat list, 80% chat interface */}
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 h-[calc(100vh-180px)] flex overflow-hidden">
-            {/* Chat List */}
-            <div className="w-full md:w-96 border-r border-gray-200 flex flex-col">
+            {/* Chat List - 20% width */}
+            <div className="w-1/5 min-w-[250px] max-w-[300px] border-r border-gray-200 flex flex-col">
+              {/* Search Bar */}
               <div className="p-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Conversations</h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  {chats.length} conversation{chats.length !== 1 ? 's' : ''}
-                </p>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search conversations..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Chat List Header */}
+              <div className="p-4 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-gray-900">Conversations</h2>
+                  <span className="text-sm text-gray-500">
+                    {filteredChats.length} of {chats.length}
+                  </span>
+                </div>
               </div>
               
+              {/* Chat List Content */}
               <div className="flex-1 overflow-y-auto">
                 {chatsLoading ? (
                   <div className="p-8 text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600 mx-auto"></div>
                     <p className="mt-3 text-gray-500">Loading conversations...</p>
                   </div>
-                ) : chats.length === 0 ? (
+                ) : filteredChats.length === 0 ? (
                   <div className="p-8 text-center text-gray-500">
-                    <p>No conversations yet</p>
+                    {searchQuery ? (
+                      <p>No conversations match your search</p>
+                    ) : (
+                      <p>No conversations yet</p>
+                    )}
                   </div>
                 ) : (
-                  <ChatList
-                    chats={chats}
-                    currentChatId={selectedChat?.firebaseChatId || null}
-                    onChatSelect={handleChatSelect}
-                    loading={chatsLoading}
-                    renderAvatar={renderAvatar}
-                  />
+                  <div className="divide-y divide-gray-100">
+                    {filteredChats.map((chat) => (
+                      <div
+                        key={chat.firebaseChatId}
+                        className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${
+                          selectedChat?.firebaseChatId === chat.firebaseChatId 
+                            ? 'bg-yellow-50 border-l-4 border-l-yellow-500' 
+                            : ''
+                        }`}
+                        onClick={() => handleChatSelect(chat)}
+                      >
+                        <div className="flex items-center space-x-3">
+                          {/* Avatar */}
+                          <div className="relative flex-shrink-0">
+                            {chat.otherUser.avatar ? (
+                              <img
+                                src={chat.otherUser.avatar}
+                                alt={chat.otherUser.username}
+                                className="w-10 h-10 rounded-full border border-gray-200"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-yellow-600 flex items-center justify-center text-white font-semibold">
+                                {getAvatarFallback(chat.otherUser.username)}
+                              </div>
+                            )}
+                            {chat.unreadCount > 0 && (
+                              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                                {chat.unreadCount}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Chat Info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1">
+                              <h4 className="text-sm font-semibold text-gray-900 truncate">
+                                {chat.otherUser.username}
+                              </h4>
+                              <span className="text-xs text-gray-500">
+                                {new Date(chat.updatedAt).toLocaleTimeString([], { 
+                                  hour: '2-digit', 
+                                  minute: '2-digit' 
+                                })}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-600 truncate mb-1">
+                              {chat.listing.title}
+                            </p>
+                            {chat.lastMessage && (
+                              <p className="text-xs text-gray-500 truncate">
+                                {chat.lastMessage.content}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Order Status Badge */}
+                        {chat.order && (
+                          <div className="mt-2">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                              chat.order.status === 'completed' ? 'bg-green-100 text-green-800' :
+                              chat.order.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                              chat.order.status === 'paid' ? 'bg-purple-100 text-purple-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {chat.order.status.replace('_', ' ')}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* Chat Interface */}
+            {/* Chat Interface - 80% width */}
             <div className="flex-1 flex flex-col">
               {selectedChat && selectedChat.otherUser ? (
                 <>
