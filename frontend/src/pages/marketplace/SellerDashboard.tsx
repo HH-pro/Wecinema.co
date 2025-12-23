@@ -155,7 +155,8 @@ const SellerDashboard: React.FC = () => {
   const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-   const navigate = useNavigate();
+  const navigate = useNavigate();
+  
   // Order stats
   const [orderStats, setOrderStats] = useState<OrderStats>({
     totalOrders: 0,
@@ -171,6 +172,11 @@ const SellerDashboard: React.FC = () => {
     thisMonthOrders: 0,
     thisMonthRevenue: 0
   });
+  
+  // Separate loading states for different tabs
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [listingsLoading, setListingsLoading] = useState(false);
+  const [offersLoading, setOffersLoading] = useState(false);
   
   // Modal states
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -205,12 +211,12 @@ const SellerDashboard: React.FC = () => {
   const activeListings = listingsData?.listings?.filter((listing) => listing.status === 'active').length || 0;
   const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
 
-  // Tab configuration - MOVE THIS AFTER pendingOffers is calculated
+  // Tab configuration
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊', badge: null },
-    // { id: 'offers', label: 'Offers', icon: '💼', badge: pendingOffers },
-    { id: 'listings', label: 'My Listings', icon: '🏠', badge: totalListings },
-    { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders }
+    { id: 'offers', label: 'Offers', icon: '💼', badge: pendingOffers > 0 ? pendingOffers : null },
+    { id: 'listings', label: 'My Listings', icon: '🏠', badge: totalListings > 0 ? totalListings : null },
+    { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders > 0 ? orderStats.activeOrders : null }
   ];
 
   // Action cards data
@@ -260,6 +266,13 @@ const SellerDashboard: React.FC = () => {
       fetchSellerOrders();
     }
   }, [activeTab, ordersPage, ordersFilter]);
+
+  // Fetch offers when offers tab is active
+  useEffect(() => {
+    if (activeTab === 'offers') {
+      fetchOffers();
+    }
+  }, [activeTab]);
 
   const fetchDashboardData = async () => {
     try {
@@ -366,7 +379,7 @@ const SellerDashboard: React.FC = () => {
 
   const fetchSellerOrders = async () => {
     try {
-      setLoading(true);
+      setOrdersLoading(true);
       setError('');
       
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -401,12 +414,13 @@ const SellerDashboard: React.FC = () => {
       console.error('Error fetching seller orders:', error);
       setError('Failed to load orders. Please try again.');
     } finally {
-      setLoading(false);
+      setOrdersLoading(false);
     }
   };
 
   const fetchListings = async () => {
     try {
+      setListingsLoading(true);
       const currentUserId = getCurrentUserId();
       if (!currentUserId) {
         setError('User not authenticated. Please log in again.');
@@ -440,12 +454,50 @@ const SellerDashboard: React.FC = () => {
     } catch (error: any) {
       console.error('Error fetching listings:', error);
       setError('Failed to load listings. Please try again.');
+    } finally {
+      setListingsLoading(false);
+    }
+  };
+
+  const fetchOffers = async () => {
+    try {
+      setOffersLoading(true);
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/offers/received-offers`,
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          }
+        }
+      );
+      
+      if (response.data.success) {
+        setOffers(response.data.offers || []);
+      }
+    } catch (error: any) {
+      console.error('Error fetching offers:', error);
+      setError('Failed to load offers. Please try again.');
+    } finally {
+      setOffersLoading(false);
     }
   };
 
   const checkStripeAccountStatus = async () => {
     try {
-      // Your Stripe status check logic here
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/status`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      
+      if (response.data.success) {
+        setStripeStatus(response.data);
+      }
     } catch (err) {
       console.error('Error checking Stripe status:', err);
     }
@@ -466,21 +518,23 @@ const SellerDashboard: React.FC = () => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([
-      fetchDashboardData(),
-      checkStripeAccountStatus()
-    ]);
     
-    if (activeTab === 'listings') {
+    // Refresh based on active tab
+    if (activeTab === 'overview') {
+      await fetchDashboardData();
+    } else if (activeTab === 'listings') {
       await fetchListings();
     } else if (activeTab === 'orders') {
       await fetchSellerOrders();
+    } else if (activeTab === 'offers') {
+      await fetchOffers();
     }
     
+    await checkStripeAccountStatus();
     setRefreshing(false);
   };
 
-  // Simplified order management functions
+  // Order management functions
   const handleSimpleStartProcessing = async (order: Order) => {
     try {
       setOrderActionLoading(order._id);
@@ -560,22 +614,60 @@ const SellerDashboard: React.FC = () => {
   const handleSimpleDeliver = async (order: Order) => {
     try {
       setSelectedOrder(order);
-      // You can create a delivery modal component
-      setSuccessMessage('Delivery functionality - create a delivery modal component');
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${order._id}/status`,
+        { status: 'delivered' },
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.data.success) {
+        setSuccessMessage('✅ Order delivered successfully!');
+        updateOrderInState(order._id, 'delivered', {
+          deliveredAt: new Date().toISOString()
+        });
+      }
     } catch (error: any) {
-      console.error('Error in deliver:', error);
-      setError('Failed to deliver. Please try again.');
+      console.error('Error delivering order:', error);
+      setError('Failed to deliver order. Please try again.');
     }
   };
 
   const handleSimpleCancel = async (order: Order) => {
-    try {
-      setSelectedOrder(order);
-      // You can create a cancellation modal component
-      setSuccessMessage('Cancellation functionality - create a cancellation modal component');
-    } catch (error: any) {
-      console.error('Error in cancel:', error);
-      setError('Failed to cancel. Please try again.');
+    if (window.confirm('Are you sure you want to cancel this order?')) {
+      try {
+        setOrderActionLoading(order._id);
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        
+        const response = await axios.put(
+          `${API_BASE_URL}/marketplace/orders/${order._id}/status`,
+          { status: 'cancelled' },
+          {
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (response.data.success) {
+          setSuccessMessage('✅ Order cancelled successfully!');
+          updateOrderInState(order._id, 'cancelled', {
+            cancelledAt: new Date().toISOString()
+          });
+        }
+      } catch (error: any) {
+        console.error('Error cancelling order:', error);
+        setError('Failed to cancel order. Please try again.');
+      } finally {
+        setOrderActionLoading(null);
+      }
     }
   };
 
@@ -623,6 +715,7 @@ const SellerDashboard: React.FC = () => {
         return { 
           ...order, 
           status: newStatus,
+          updatedAt: new Date().toISOString(),
           ...updates
         };
       }
@@ -656,8 +749,30 @@ const SellerDashboard: React.FC = () => {
     setShowDeleteModal(true);
   };
 
-  const handleOfferAction = async (offerId: string, action: string) => {
-    // Your offer action logic here
+  const handleOfferAction = async (offerId: string, action: 'accept' | 'reject') => {
+    try {
+      setOrderActionLoading(offerId);
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/offers/${offerId}/${action}`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      if (response.data.success) {
+        setSuccessMessage(`✅ Offer ${action}ed successfully!`);
+        // Update offers list
+        setOffers(prev => prev.filter(offer => offer._id !== offerId));
+      }
+    } catch (error: any) {
+      console.error(`Error ${action}ing offer:`, error);
+      setError(`Failed to ${action} offer. Please try again.`);
+    } finally {
+      setOrderActionLoading(null);
+    }
   };
 
   const handleStripeSetupSuccess = () => {
@@ -692,7 +807,18 @@ const SellerDashboard: React.FC = () => {
     };
   }, [successMessage, error]);
 
-  if (loading && activeTab !== 'listings' && activeTab !== 'orders') {
+  // Determine loading state based on active tab
+  const getCurrentLoadingState = () => {
+    if (activeTab === 'overview') return loading;
+    if (activeTab === 'listings') return listingsLoading;
+    if (activeTab === 'orders') return ordersLoading;
+    if (activeTab === 'offers') return offersLoading;
+    return loading;
+  };
+
+  const currentLoading = getCurrentLoadingState();
+
+  if (currentLoading && activeTab === 'overview') {
     return (
       <MarketplaceLayout>
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
@@ -716,7 +842,7 @@ const SellerDashboard: React.FC = () => {
             earnings={formatCurrency(orderStats.totalRevenue)}
             onRefresh={handleRefresh}
             refreshing={refreshing}
-            // showStripeButton={!(stripeStatus?.connected && stripeStatus?.chargesEnabled)}
+            showStripeButton={!(stripeStatus?.connected && stripeStatus?.chargesEnabled)}
             onStripeSetup={() => setShowStripeSetup(true)}
           />
 
@@ -738,113 +864,117 @@ const SellerDashboard: React.FC = () => {
           />
 
           {/* Tab Content */}
-          {activeTab === 'overview' && (
-            <div className="space-y-8">
-              {/* Welcome Card */}
-              <WelcomeCard
-                title="Welcome back, Seller! 👋"
-                subtitle="Manage your business efficiently with real-time insights and quick actions."
-                 primaryAction={{
-          label: '+ Create New Listing',
-          onClick: () => navigate('/marketplace/create') // Same tab mein open hoga
-        }}
-                secondaryAction={{
-                  label: '💰 Setup Payments',
-                  onClick: () => setShowStripeSetup(true),
-                  visible: !(stripeStatus?.connected && stripeStatus?.chargesEnabled)
-                }}
-              />
+          <div className="mt-8">
+            {activeTab === 'overview' && (
+              <div className="space-y-8">
+                {/* Welcome Card */}
+                <WelcomeCard
+                  title="Welcome back, Seller! 👋"
+                  subtitle="Manage your business efficiently with real-time insights and quick actions."
+                  primaryAction={{
+                    label: '+ Create New Listing',
+                    onClick: () => navigate('/marketplace/create')
+                  }}
+                  secondaryAction={{
+                    label: '💰 Setup Payments',
+                    onClick: () => setShowStripeSetup(true),
+                    visible: !(stripeStatus?.connected && stripeStatus?.chargesEnabled)
+                  }}
+                />
 
-              {/* Stats Grid */}
-              <StatsGrid
-                stats={{
-                  totalRevenue: orderStats.totalRevenue,
-                  totalOrders: orderStats.totalOrders,
-                  activeOrders: orderStats.activeOrders,
-                  pendingOffers: pendingOffers,
-                  totalListings: totalListings,
-                  activeListings: activeListings
-                }}
-                onTabChange={setActiveTab}
-              />
+                {/* Stats Grid */}
+                <StatsGrid
+                  stats={{
+                    totalRevenue: orderStats.totalRevenue,
+                    totalOrders: orderStats.totalOrders,
+                    activeOrders: orderStats.activeOrders,
+                    pendingOffers: pendingOffers,
+                    totalListings: totalListings,
+                    activeListings: activeListings
+                  }}
+                  onTabChange={setActiveTab}
+                />
 
-              {/* Order Workflow Guide */}
-              <OrderWorkflowGuide />
+                {/* Order Workflow Guide */}
+                <OrderWorkflowGuide />
 
-              {/* Recent Orders */}
-              <RecentOrders
-                orders={orders.slice(0, 5)}
-                onViewOrderDetails={handleViewOrderDetails}
-                onStartProcessing={handleSimpleStartProcessing}
-                onStartWork={handleSimpleStartWork}
-                onDeliver={handleSimpleDeliver}
-                onCancel={handleSimpleCancel}
-                onCompleteRevision={handleSimpleCompleteRevision}
-                onViewAll={() => setActiveTab('orders')}
-                onCreateListing={() => window.open('/create-listing', '_blank')}
-                orderActionLoading={orderActionLoading}
-              />
+                {/* Recent Orders */}
+                <RecentOrders
+                  orders={orders.slice(0, 5)}
+                  onViewOrderDetails={handleViewOrderDetails}
+                  onStartProcessing={handleSimpleStartProcessing}
+                  onStartWork={handleSimpleStartWork}
+                  onDeliver={handleSimpleDeliver}
+                  onCancel={handleSimpleCancel}
+                  onCompleteRevision={handleSimpleCompleteRevision}
+                  onViewAll={() => setActiveTab('orders')}
+                  onCreateListing={() => navigate('/marketplace/create')}
+                  orderActionLoading={orderActionLoading}
+                />
 
-              {/* Action Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {actionCards.map((card, index) => (
-                  <ActionCard key={index} {...card} />
-                ))}
+                {/* Action Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {actionCards.map((card, index) => (
+                    <ActionCard key={index} {...card} />
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Other Tabs */}
-          {activeTab === 'offers' && (
-            <OffersTab
-              offers={offers}
-              loading={loading}
-              onOfferAction={handleOfferAction}
-              onPlayVideo={handlePlayVideo}
-              onRefresh={handleRefresh}
-            />
-          )}
+            {/* Other Tabs */}
+            {activeTab === 'offers' && (
+              <OffersTab
+                offers={offers}
+                loading={offersLoading}
+                onOfferAction={handleOfferAction}
+                onPlayVideo={handlePlayVideo}
+                onRefresh={() => fetchOffers()}
+                actionLoading={orderActionLoading}
+              />
+            )}
 
-          {activeTab === 'listings' && (
-            <ListingsTab
-              listingsData={listingsData}
-              loading={loading && activeTab === 'listings'}
-              statusFilter={listingsStatusFilter}
-              currentPage={listingsPage}
-              onStatusFilterChange={setListingsStatusFilter}
-              onPageChange={setListingsPage}
-              onEditListing={handleEditListing}
-              onDeleteListing={handleDeleteListing}
-              onPlayVideo={handlePlayVideo}
-              onRefresh={fetchListings}
-              actionLoading={listingActionLoading}
-              onCreateListing={() => window.open('/create-listing', '_blank')}
-            />
-          )}
+            {activeTab === 'listings' && (
+              <ListingsTab
+                listingsData={listingsData}
+                loading={listingsLoading}
+                statusFilter={listingsStatusFilter}
+                currentPage={listingsPage}
+                onStatusFilterChange={setListingsStatusFilter}
+                onPageChange={setListingsPage}
+                onEditListing={handleEditListing}
+                onDeleteListing={handleDeleteListing}
+                onPlayVideo={handlePlayVideo}
+                onRefresh={fetchListings}
+                actionLoading={listingActionLoading}
+                onCreateListing={() => navigate('/marketplace/create')}
+              />
+            )}
 
-          {activeTab === 'orders' && (
-            <OrdersTab
-              orders={orders}
-              loading={loading}
-              filter={ordersFilter}
-              onFilterChange={setOrdersFilter}
-              onViewOrderDetails={handleViewOrderDetails}
-              onPlayVideo={handlePlayVideo}
-              onRefresh={handleRefresh}
-              onStartProcessing={(orderId) => {
-                const order = orders.find(o => o._id === orderId);
-                if (order) handleSimpleStartProcessing(order);
-              }}
-              onStartWork={(orderId) => {
-                const order = orders.find(o => o._id === orderId);
-                if (order) handleSimpleStartWork(order);
-              }}
-              onDeliver={(order) => handleSimpleDeliver(order)}
-              onCancel={(order) => handleSimpleCancel(order)}
-              onCompleteRevision={(order) => handleSimpleCompleteRevision(order)}
-              actionLoading={orderActionLoading}
-            />
-          )}
+            {activeTab === 'orders' && (
+              <OrdersTab
+                orders={orders}
+                loading={ordersLoading}
+                filter={ordersFilter}
+                onFilterChange={setOrdersFilter}
+                onViewOrderDetails={handleViewOrderDetails}
+                onPlayVideo={handlePlayVideo}
+                onRefresh={() => fetchSellerOrders()}
+                onStartProcessing={(orderId) => {
+                  const order = orders.find(o => o._id === orderId);
+                  if (order) handleSimpleStartProcessing(order);
+                }}
+                onStartWork={(orderId) => {
+                  const order = orders.find(o => o._id === orderId);
+                  if (order) handleSimpleStartWork(order);
+                }}
+                onDeliver={(order) => handleSimpleDeliver(order)}
+                onCancel={(order) => handleSimpleCancel(order)}
+                onCompleteRevision={(order) => handleSimpleCompleteRevision(order)}
+                actionLoading={orderActionLoading}
+                stats={orderStats}
+              />
+            )}
+          </div>
 
           {/* Modals */}
           {showStripeSetup && (
@@ -874,7 +1004,11 @@ const SellerDashboard: React.FC = () => {
                 setShowEditModal(false);
                 setEditingListing(null);
               }}
-              onUpdate={() => {}}
+              onUpdate={() => {
+                setShowEditModal(false);
+                setEditingListing(null);
+                fetchListings();
+              }}
               loading={false}
             />
           )}
@@ -887,7 +1021,11 @@ const SellerDashboard: React.FC = () => {
                 setShowDeleteModal(false);
                 setDeletingListing(null);
               }}
-              onConfirm={() => {}}
+              onConfirm={() => {
+                setShowDeleteModal(false);
+                setDeletingListing(null);
+                fetchListings();
+              }}
               loading={false}
             />
           )}
