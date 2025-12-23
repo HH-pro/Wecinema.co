@@ -1,4 +1,4 @@
-// src/components/marketplae/seller/ListingsTab.tsx
+// src/components/marketplace/seller/ListingsTab.tsx
 import React from 'react';
 
 interface Listing {
@@ -65,6 +65,8 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(amount || 0);
   };
 
@@ -84,6 +86,16 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
       case 'sold': return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'draft': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getStatusText = (status: string): string => {
+    switch (status?.toLowerCase()) {
+      case 'active': return 'Active';
+      case 'inactive': return 'Inactive';
+      case 'sold': return 'Sold';
+      case 'draft': return 'Draft';
+      default: return status;
     }
   };
 
@@ -127,58 +139,81 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
   const listings = listingsData?.listings || [];
   const pagination = listingsData?.pagination;
 
+  // Get status filter options based on available listings
+  const getStatusOptions = () => {
+    const statuses = ['all', 'active', 'inactive', 'sold', 'draft'];
+    return statuses.map(status => ({
+      value: status === 'all' ? '' : status,
+      label: status === 'all' ? 'All Listings' : 
+             status.charAt(0).toUpperCase() + status.slice(1),
+      count: status === 'all' ? listingsData?.pagination?.total || 0 :
+             listings.filter(l => l.status.toLowerCase() === status).length
+    }));
+  };
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
           <div>
             <h2 className="text-xl font-semibold text-gray-900">My Listings</h2>
-            <p className="text-sm text-gray-600 mt-1">Manage all your listings in one place</p>
+            <p className="text-sm text-gray-600 mt-1">
+              Manage your products and services ({listingsData?.pagination?.total || 0} total)
+            </p>
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
-            {/* Status Filter */}
-            <div className="relative">
-              <select
-                value={statusFilter}
-                onChange={(e) => onStatusFilterChange(e.target.value)}
-                className="appearance-none bg-white border border-gray-300 rounded-lg pl-4 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer"
-              >
-                <option value="">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="sold">Sold</option>
-                <option value="draft">Draft</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
+            {/* Status Filter Tabs */}
+            <div className="flex flex-wrap gap-2">
+              {getStatusOptions().map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => onStatusFilterChange(option.value)}
+                  className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    statusFilter === option.value
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {option.label}
+                  {option.count > 0 && (
+                    <span className={`ml-2 px-1.5 py-0.5 text-xs rounded-full ${
+                      statusFilter === option.value
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {option.count}
+                    </span>
+                  )}
+                </button>
+              ))}
             </div>
             
-            {/* Create Listing Button */}
-            <button
-              onClick={onCreateListing}
-              className="inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-yellow-600 to-yellow-700 text-white font-medium rounded-lg hover:from-yellow-700 hover:to-yellow-800 transition-all duration-200 shadow-md hover:shadow-lg"
-            >
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              New Listing
-            </button>
-            
-            {/* Refresh Button */}
-            <button
-              onClick={onRefresh}
-              disabled={loading || actionLoading !== null}
-              className="inline-flex items-center px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:shadow-sm transition-all duration-200 disabled:opacity-50"
-            >
-              <svg className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              {loading ? 'Loading...' : 'Refresh'}
-            </button>
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              {/* Create Listing Button */}
+              <button
+                onClick={onCreateListing}
+                className="inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md hover:shadow-lg"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                New Listing
+              </button>
+              
+              {/* Refresh Button */}
+              <button
+                onClick={onRefresh}
+                disabled={loading || actionLoading !== null}
+                className="inline-flex items-center px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:shadow-sm transition-all duration-200 disabled:opacity-50"
+                title="Refresh listings"
+              >
+                <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -190,7 +225,7 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
             <h3 className="text-lg font-medium text-gray-900">No listings found</h3>
             <p className="mt-2 text-gray-500">
               {statusFilter 
-                ? `You don't have any ${statusFilter} listings.`
+                ? `You don't have any ${getStatusText(statusFilter).toLowerCase()} listings.`
                 : "You haven't created any listings yet."}
             </p>
             <button
@@ -205,6 +240,26 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
           </div>
         ) : (
           <>
+            {/* Summary Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-xl p-4">
+                <div className="text-2xl font-bold text-green-700">{listings.filter(l => l.status === 'active').length}</div>
+                <div className="text-sm text-green-600">Active</div>
+              </div>
+              <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4">
+                <div className="text-2xl font-bold text-blue-700">{listings.filter(l => l.status === 'sold').length}</div>
+                <div className="text-sm text-blue-600">Sold</div>
+              </div>
+              <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-xl p-4">
+                <div className="text-2xl font-bold text-yellow-700">{listings.filter(l => l.status === 'draft').length}</div>
+                <div className="text-sm text-yellow-600">Drafts</div>
+              </div>
+              <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-xl p-4">
+                <div className="text-2xl font-bold text-gray-700">{listings.filter(l => l.status === 'inactive').length}</div>
+                <div className="text-sm text-gray-600">Inactive</div>
+              </div>
+            </div>
+            
             {/* Listings Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
               {listings.map(listing => {
@@ -254,6 +309,9 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
                             alt={listing.title}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             loading="lazy"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x300?text=Image+Error';
+                            }}
                           />
                         ) : (
                           // Generic media
@@ -281,16 +339,21 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
                       {/* Status Badge */}
                       <div className="absolute top-3 right-3">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(listing.status)}`}>
-                          {listing.status}
+                          {getStatusText(listing.status)}
                         </span>
                       </div>
                     </div>
                     
                     {/* Listing Info */}
                     <div className="p-5">
-                      <h3 className="font-semibold text-gray-900 mb-2 truncate" title={listing.title}>
-                        {listing.title}
-                      </h3>
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-semibold text-gray-900 truncate flex-1 mr-2" title={listing.title}>
+                          {listing.title}
+                        </h3>
+                        <span className="text-xs font-medium px-2 py-1 rounded bg-gray-100 text-gray-600">
+                          {listing.type}
+                        </span>
+                      </div>
                       
                       <p className="text-sm text-gray-600 mb-3 line-clamp-2" title={listing.description}>
                         {listing.description}
@@ -311,12 +374,12 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
                       {listing.tags && listing.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-4">
                           {listing.tags.slice(0, 3).map((tag, index) => (
-                            <span key={index} className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">
-                              {tag}
+                            <span key={index} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-50 text-blue-700 border border-blue-100">
+                              #{tag}
                             </span>
                           ))}
                           {listing.tags.length > 3 && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-200 text-gray-600">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
                               +{listing.tags.length - 3}
                             </span>
                           )}
@@ -330,28 +393,52 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
                           disabled={isProcessing}
                           className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2.5 px-3 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                          Edit
+                          {actionLoading === 'updating' && actionLoading.includes(listing._id) ? (
+                            <>
+                              <svg className="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Editing...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              Edit
+                            </>
+                          )}
                         </button>
                         
                         <button
                           onClick={() => onToggleStatus(listing)}
                           disabled={isProcessing}
-                          className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium py-2.5 px-3 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                          className={`flex-1 text-sm font-medium py-2.5 px-3 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed ${
+                            listing.status === 'active'
+                              ? 'bg-orange-100 text-orange-700 hover:bg-orange-200 border border-orange-200'
+                              : 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-200'
+                          }`}
                         >
-                          {listing.status === 'active' ? (
+                          {actionLoading === `toggling-${listing._id}` ? (
+                            <>
+                              <svg className="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Updating...
+                            </>
+                          ) : listing.status === 'active' ? (
                             <>
                               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                               </svg>
                               Deactivate
                             </>
                           ) : (
                             <>
                               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                               </svg>
                               Activate
                             </>
@@ -361,18 +448,35 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
                         <button
                           onClick={() => onDeleteListing(listing)}
                           disabled={isProcessing}
-                          className="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-medium py-2.5 px-3 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 text-sm font-medium py-2.5 px-3 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed border border-red-200"
                         >
-                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                          Delete
+                          {actionLoading === 'deleting' && actionLoading.includes(listing._id) ? (
+                            <>
+                              <svg className="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Deleting...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              Delete
+                            </>
+                          )}
                         </button>
                       </div>
                       
                       {/* Last Updated & Media Info */}
                       <div className="flex justify-between items-center text-xs text-gray-500 mt-3">
-                        <span>Updated {formatDate(listing.updatedAt)}</span>
+                        <span className="flex items-center">
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Updated {formatDate(listing.updatedAt)}
+                        </span>
                         {listing.mediaUrls && listing.mediaUrls.length > 0 && (
                           <span className="flex items-center">
                             <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -390,32 +494,68 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
             
             {/* Pagination */}
             {pagination && pagination.pages > 1 && (
-              <div className="flex justify-center items-center space-x-4">
-                <button
-                  onClick={() => onPageChange(currentPage - 1)}
-                  disabled={currentPage === 1 || loading || actionLoading !== null}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  Previous
-                </button>
+              <div className="flex flex-col sm:flex-row justify-between items-center pt-6 border-t border-gray-200">
+                <div className="text-sm text-gray-600 mb-4 sm:mb-0">
+                  Showing <span className="font-semibold">{(currentPage - 1) * pagination.limit + 1}</span> to{' '}
+                  <span className="font-semibold">
+                    {Math.min(currentPage * pagination.limit, pagination.total)}
+                  </span> of{' '}
+                  <span className="font-semibold">{pagination.total}</span> listings
+                </div>
                 
-                <span className="text-sm text-gray-700">
-                  Page <span className="font-semibold">{currentPage}</span> of <span className="font-semibold">{pagination.pages}</span>
-                </span>
-                
-                <button
-                  onClick={() => onPageChange(currentPage + 1)}
-                  disabled={currentPage === pagination.pages || loading || actionLoading !== null}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                  <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => onPageChange(currentPage - 1)}
+                    disabled={currentPage === 1 || loading || actionLoading !== null}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Previous
+                  </button>
+                  
+                  <div className="flex space-x-1">
+                    {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
+                      let pageNum;
+                      if (pagination.pages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= pagination.pages - 2) {
+                        pageNum = pagination.pages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => onPageChange(pageNum)}
+                          disabled={loading || actionLoading !== null}
+                          className={`w-10 h-10 flex items-center justify-center rounded-lg text-sm font-medium ${
+                            currentPage === pageNum
+                              ? 'bg-blue-600 text-white'
+                              : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  <button
+                    onClick={() => onPageChange(currentPage + 1)}
+                    disabled={currentPage === pagination.pages || loading || actionLoading !== null}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                    <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             )}
           </>
