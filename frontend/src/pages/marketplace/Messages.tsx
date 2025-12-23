@@ -1,11 +1,12 @@
-// src/pages/Messages.tsx - CLEAN & PROFESSIONAL VERSION
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+// src/pages/Messages.tsx - PROFESSIONAL & CLEAN VERSION
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import ChatList, { Chat } from '../../components/chat/ChatList';
 import FirebaseChatInterface from '../../components/chat/FirebaseChatInterface';
 import MarketplaceLayout from '../../components/Layout';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
+import { FiMessageSquare, FiRefreshCw, FiShoppingBag, FiUser } from 'react-icons/fi';
 
 // Types
 interface User {
@@ -16,14 +17,6 @@ interface User {
   role?: 'buyer' | 'seller' | 'admin';
 }
 
-interface Order {
-  _id: string;
-  amount: number;
-  status: string;
-  listingTitle?: string;
-  createdAt: string;
-}
-
 const Messages: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -32,10 +25,9 @@ const Messages: React.FC = () => {
   const [chats, setChats] = useState<Chat[]>([]);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [loading, setLoading] = useState(true);
-  const [chatsLoading, setChatsLoading] = useState(true);
+  const [chatsLoading, setChatsLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  
-  const hasProcessedUrlChat = useRef(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Fetch current user
   useEffect(() => {
@@ -128,9 +120,21 @@ const Messages: React.FC = () => {
         }));
         
         setChats(transformedChats);
+        
+        // Calculate total unread messages
+        const totalUnread = transformedChats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0);
+        setUnreadCount(totalUnread);
+        
+        // Update page title
+        if (totalUnread > 0) {
+          document.title = `(${totalUnread}) Messages - Marketplace`;
+        } else {
+          document.title = 'Messages - Marketplace';
+        }
       }
     } catch (error) {
       console.error('Error fetching chats:', error);
+      toast.error('Failed to load conversations');
     } finally {
       setChatsLoading(false);
       setLoading(false);
@@ -145,17 +149,12 @@ const Messages: React.FC = () => {
 
   // Handle URL parameters
   useEffect(() => {
-    if (hasProcessedUrlChat.current || chatsLoading || !chats.length) return;
+    if (chatsLoading || !chats.length) return;
     
     const urlChatId = searchParams.get('chat');
     const orderId = searchParams.get('order');
     
-    if (!urlChatId && !orderId) {
-      hasProcessedUrlChat.current = true;
-      return;
-    }
-    
-    hasProcessedUrlChat.current = true;
+    if (!urlChatId && !orderId) return;
     
     let foundChat: Chat | null = null;
     
@@ -165,10 +164,10 @@ const Messages: React.FC = () => {
       foundChat = chats.find(c => c.order?._id === orderId) || null;
     }
     
-    if (foundChat) {
+    if (foundChat && foundChat.firebaseChatId !== selectedChat?.firebaseChatId) {
       setSelectedChat(foundChat);
     }
-  }, [chats, chatsLoading, searchParams]);
+  }, [chats, chatsLoading, searchParams, selectedChat]);
 
   // Handle chat selection
   const handleChatSelect = useCallback((chat: Chat) => {
@@ -182,12 +181,11 @@ const Messages: React.FC = () => {
 
   const handleRefreshChats = () => {
     fetchChats();
-    toast.success('Refreshed conversations');
   };
 
   // Get status color
   const getStatusColor = (status: string): string => {
-    switch (status) {
+    switch (status?.toLowerCase()) {
       case 'completed': return 'bg-green-100 text-green-800';
       case 'paid': return 'bg-blue-100 text-blue-800';
       case 'in_progress': return 'bg-yellow-100 text-yellow-800';
@@ -196,22 +194,30 @@ const Messages: React.FC = () => {
     }
   };
 
+  // Format price
+  const formatPrice = (price: number): string => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+    }).format(price || 0);
+  };
+
   // Render empty state
   const renderEmptyState = () => (
     <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-      <div className="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mb-6">
-        <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-        </svg>
+      <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+        <FiMessageSquare className="w-10 h-10 text-gray-400" />
       </div>
-      <h3 className="text-xl font-semibold text-gray-900 mb-2">No conversations yet</h3>
-      <p className="text-gray-600 max-w-sm mb-6">
-        Start a conversation by placing an order or contacting a seller.
+      <h3 className="text-lg font-semibold text-gray-900 mb-2">No conversations yet</h3>
+      <p className="text-gray-600 max-w-sm mb-6 text-sm">
+        Start a conversation by placing an order or contacting a seller
       </p>
       <button
         onClick={() => navigate('/marketplace')}
-        className="px-5 py-2.5 bg-gray-900 text-white font-medium rounded-lg hover:bg-black transition-colors"
+        className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-black transition-colors flex items-center"
       >
+        <FiShoppingBag className="w-4 h-4 mr-2" />
         Browse Marketplace
       </button>
     </div>
@@ -223,7 +229,7 @@ const Messages: React.FC = () => {
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading messages...</p>
+            <p className="mt-4 text-gray-600 text-sm">Loading messages...</p>
           </div>
         </div>
       </MarketplaceLayout>
@@ -232,26 +238,30 @@ const Messages: React.FC = () => {
 
   return (
     <MarketplaceLayout>
-      <div className="min-h-screen bg-gray-50 py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {/* Header */}
           <div className="mb-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
-                <p className="mt-1 text-gray-600">
+                <p className="mt-1 text-gray-600 text-sm">
                   Communicate with buyers and sellers
                 </p>
               </div>
               
               <div className="flex items-center gap-3">
+                {unreadCount > 0 && (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    {unreadCount} unread
+                  </span>
+                )}
                 <button
                   onClick={handleRefreshChats}
-                  className="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  disabled={chatsLoading}
+                  className="inline-flex items-center px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
+                  <FiRefreshCw className={`w-4 h-4 mr-2 ${chatsLoading ? 'animate-spin' : ''}`} />
                   Refresh
                 </button>
               </div>
@@ -259,9 +269,9 @@ const Messages: React.FC = () => {
           </div>
 
           {/* Main Content */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-[calc(100vh-160px)] flex flex-col md:flex-row overflow-hidden">
+          <div className="bg-white rounded-lg border border-gray-200 h-[calc(100vh-160px)] flex flex-col lg:flex-row overflow-hidden">
             {/* Chat List - Left Panel */}
-            <div className="w-full md:w-96 border-b md:border-b-0 md:border-r border-gray-200 flex flex-col">
+            <div className="w-full lg:w-96 border-b lg:border-b-0 lg:border-r border-gray-200 flex flex-col">
               <div className="p-4 border-b border-gray-200 bg-gray-50">
                 <div className="flex items-center justify-between">
                   <div>
@@ -275,9 +285,9 @@ const Messages: React.FC = () => {
               
               <div className="flex-1 overflow-y-auto">
                 {chatsLoading ? (
-                  <div className="p-8 text-center">
+                  <div className="p-6 text-center">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 mx-auto"></div>
-                    <p className="mt-3 text-gray-500 text-sm">Loading...</p>
+                    <p className="mt-3 text-gray-500 text-sm">Loading conversations...</p>
                   </div>
                 ) : chats.length === 0 ? (
                   <div className="p-6 text-center text-gray-500">
@@ -306,18 +316,16 @@ const Messages: React.FC = () => {
                           <img
                             src={selectedChat.otherUser.avatar}
                             alt={selectedChat.otherUser.username}
-                            className="w-10 h-10 rounded-full border border-gray-200"
+                            className="w-10 h-10 rounded-full border border-gray-300 object-cover"
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-full bg-gray-200 border border-gray-300 flex items-center justify-center">
-                            <span className="text-sm font-medium text-gray-700">
-                              {selectedChat.otherUser.username?.charAt(0).toUpperCase()}
-                            </span>
+                          <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-300 flex items-center justify-center">
+                            <FiUser className="w-5 h-5 text-gray-600" />
                           </div>
                         )}
-                        <div>
+                        <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-gray-900">
+                            <h3 className="font-semibold text-gray-900 text-sm truncate">
                               {selectedChat.otherUser.username}
                             </h3>
                             {selectedChat.order?.status && (
@@ -326,10 +334,10 @@ const Messages: React.FC = () => {
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-2 text-sm text-gray-600 mt-0.5">
-                            <span>{selectedChat.listing.title}</span>
+                          <div className="flex items-center gap-2 text-xs text-gray-600 mt-0.5 truncate">
+                            <span className="truncate">{selectedChat.listing.title}</span>
                             <span>•</span>
-                            <span className="font-medium">${selectedChat.order?.amount || selectedChat.listing.price}</span>
+                            <span className="font-medium">{formatPrice(selectedChat.order?.amount || selectedChat.listing.price)}</span>
                             {selectedChat.order?._id && (
                               <>
                                 <span>•</span>
@@ -342,8 +350,8 @@ const Messages: React.FC = () => {
                       
                       {selectedChat.order?._id && (
                         <button
-                          onClick={() => navigate(`/orders/${selectedChat.order!._id}`)}
-                          className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                          onClick={() => navigate(`/marketplace/orders/${selectedChat.order!._id}`)}
+                          className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors whitespace-nowrap"
                         >
                           View Order
                         </button>
@@ -370,13 +378,11 @@ const Messages: React.FC = () => {
                     renderEmptyState()
                   ) : (
                     <div className="text-center">
-                      <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
-                        </svg>
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <FiMessageSquare className="w-8 h-8 text-gray-400" />
                       </div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Select a conversation</h3>
-                      <p className="text-gray-600 max-w-sm mb-6">
+                      <h3 className="text-base font-semibold text-gray-900 mb-2">Select a conversation</h3>
+                      <p className="text-gray-600 max-w-sm text-sm mb-6">
                         Choose a conversation from the list to start messaging
                       </p>
                     </div>
