@@ -600,7 +600,7 @@ const SellerDashboard: React.FC = () => {
       console.log('🔄 Updating listing:', editingListing._id, updatedData);
       
       const response = await axios.put(
-        `${API_BASE_URL}/api/marketplace/listings/${editingListing._id}`,
+        `${API_BASE_URL}/marketplace/listings/${editingListing._id}`,
         updatedData,
         {
           headers: { 
