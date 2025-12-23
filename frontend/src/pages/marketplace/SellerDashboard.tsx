@@ -1,4 +1,4 @@
-// src/pages/seller/SellerDashboard.tsx - COMPLETE FIX
+// src/pages/seller/SellerDashboard.tsx - COMPLETE FIXED VERSION
 import React, { useState, useEffect, useCallback } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
@@ -157,7 +157,7 @@ const SellerDashboard: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const navigate = useNavigate();
   
-  // Order stats - INITIAL VALUES SET
+  // Order stats
   const [orderStats, setOrderStats] = useState<OrderStats>({
     totalOrders: 0,
     activeOrders: 0,
@@ -177,6 +177,9 @@ const SellerDashboard: React.FC = () => {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [listingsLoading, setListingsLoading] = useState(false);
   const [offersLoading, setOffersLoading] = useState(false);
+  
+  // Track if orders have been loaded at least once
+  const [ordersLoaded, setOrdersLoaded] = useState(false);
   
   // Modal states
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -247,7 +250,7 @@ const SellerDashboard: React.FC = () => {
     }
   ];
 
-  // ✅ FIXED: Use useCallback to prevent infinite re-renders
+  // ✅ FIXED: Calculate order stats
   const calculateOrderStats = useCallback((orders: Order[]): OrderStats => {
     const now = new Date();
     const thisMonth = now.getMonth();
@@ -259,7 +262,7 @@ const SellerDashboard: React.FC = () => {
              orderDate.getFullYear() === thisYear;
     });
 
-    return {
+    const stats = {
       totalOrders: orders.length,
       activeOrders: orders.filter(order => 
         ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(order.status)
@@ -281,9 +284,12 @@ const SellerDashboard: React.FC = () => {
         .filter(order => order.status === 'completed')
         .reduce((sum, order) => sum + order.amount, 0)
     };
+    
+    console.log('📊 Calculated Stats:', stats);
+    return stats;
   }, []);
 
-  // ✅ FIXED: Main data fetch function
+  // ✅ FIXED: Main data fetch function - CALLED ON INITIAL LOAD
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -298,54 +304,66 @@ const SellerDashboard: React.FC = () => {
 
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       
-      // ✅ FIXED: Fetch all essential data in parallel
-      const [ordersResponse, offersResponse, listingsResponse] = await Promise.all([
-        axios.get(`${API_BASE_URL}/marketplace/my-sales`, {
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 10000
-        }).catch(err => {
-          console.error('Orders fetch error:', err);
-          return { data: { success: false, sales: [] } };
-        }),
+      console.log('🔄 Fetching dashboard data...');
+      
+      // ✅ Fetch ALL orders initially
+      const ordersResponse = await axios.get(
+        `${API_BASE_URL}/marketplace/my-sales`,
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          },
+          timeout: 10000,
+          params: {
+            limit: 100, // Get all orders initially
+            _t: new Date().getTime() // Prevent caching
+          }
+        }
+      ).catch(err => {
+        console.error('Orders fetch error:', err);
+        return { data: { success: false, sales: [] } };
+      });
+
+      let ordersData: Order[] = [];
+      if (ordersResponse.data.success) {
+        ordersData = ordersResponse.data.sales || ordersResponse.data.orders || [];
+        console.log('✅ Orders loaded:', ordersData.length);
+      }
+
+      // Fetch offers and listings in parallel
+      const [offersResponse, listingsResponse] = await Promise.allSettled([
         axios.get(`${API_BASE_URL}/marketplace/offers/received-offers`, {
           headers: { Authorization: `Bearer ${token}` },
           timeout: 10000
-        }).catch(err => {
-          console.error('Offers fetch error:', err);
-          return { data: { success: false, offers: [] } };
         }),
         axios.get(`${API_BASE_URL}/marketplace/listings/my-listings`, {
           params: { limit: 5 },
           headers: { Authorization: `Bearer ${token}` },
           timeout: 10000
-        }).catch(err => {
-          console.error('Listings fetch error:', err);
-          return { data: { success: false } };
         })
       ]);
 
-      // Process orders response
-      let ordersData: Order[] = [];
-      if (ordersResponse.data.success) {
-        ordersData = ordersResponse.data.sales || ordersResponse.data.orders || [];
-      }
-
       // Process offers response
       let offersData: Offer[] = [];
-      if (offersResponse.data.success) {
-        offersData = offersResponse.data.offers || [];
+      if (offersResponse.status === 'fulfilled' && offersResponse.value.data.success) {
+        offersData = offersResponse.value.data.offers || [];
       }
 
       // Process listings response
-      if (listingsResponse.data.success) {
-        setListingsData(listingsResponse.data);
+      if (listingsResponse.status === 'fulfilled' && listingsResponse.value.data.success) {
+        setListingsData(listingsResponse.value.data);
       }
 
-      // ✅ FIXED: Always calculate stats and set orders
+      // ✅ ALWAYS set orders and calculate stats
       const stats = calculateOrderStats(ordersData);
-      setOrderStats(stats);
       setOrders(ordersData);
+      setOrderStats(stats);
       setOffers(offersData);
+      setOrdersLoaded(true);
+      
+      console.log('✅ Dashboard data loaded successfully');
+      console.log('📈 Stats:', stats);
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -355,7 +373,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ FIXED: Fetch orders separately
+  // ✅ FIXED: Fetch orders for OrdersTab - UPDATES MAIN STATE
   const fetchSellerOrders = async () => {
     try {
       setOrdersLoading(true);
@@ -373,6 +391,8 @@ const SellerDashboard: React.FC = () => {
         params.status = ordersFilter;
       }
       
+      console.log('🔄 Fetching seller orders with params:', params);
+      
       const response = await axios.get(
         `${API_BASE_URL}/marketplace/orders/my-sales`,
         {
@@ -387,9 +407,19 @@ const SellerDashboard: React.FC = () => {
       
       if (response.data.success) {
         const ordersData = response.data.sales || response.data.orders || [];
+        console.log('✅ Seller orders fetched:', ordersData.length);
+        
+        // ✅ CRITICAL: Update main orders state
         setOrders(ordersData);
+        
+        // ✅ Calculate and update stats
         const stats = calculateOrderStats(ordersData);
         setOrderStats(stats);
+        
+        // Mark as loaded
+        setOrdersLoaded(true);
+        
+        console.log('✅ Orders and stats updated:', stats);
       }
     } catch (error: any) {
       console.error('Error fetching seller orders:', error);
@@ -717,7 +747,7 @@ const SellerDashboard: React.FC = () => {
     
     // ✅ FIXED: Recalculate stats with updated orders
     const updatedOrders = orders.map(order => 
-      order._id === orderId ? { ...order, status: newStatus } : order
+      order._id === orderId ? { ...order, status: newStatus, ...updates } : order
     );
     const updatedStats = calculateOrderStats(updatedOrders);
     setOrderStats(updatedStats);
@@ -780,8 +810,10 @@ const SellerDashboard: React.FC = () => {
     }, 2000);
   };
 
-  // ✅ FIXED: Initial data loading
+  // ✅ FIXED: Initial data loading - RUNS ONLY ONCE
   useEffect(() => {
+    console.log('🚀 SellerDashboard mounted - Loading initial data');
+    
     const loadInitialData = async () => {
       try {
         await fetchDashboardData();
@@ -793,18 +825,25 @@ const SellerDashboard: React.FC = () => {
     };
     
     loadInitialData();
-  }, []); // ✅ Empty dependency array - only run once on mount
+    
+    // Cleanup function
+    return () => {
+      console.log('🧹 SellerDashboard unmounting');
+    };
+  }, []); // Empty dependency array - only run once on mount
 
   // ✅ FIXED: Fetch listings when tab changes
   useEffect(() => {
     if (activeTab === 'listings') {
+      console.log('📋 Switching to Listings tab');
       fetchListings();
     }
   }, [activeTab, listingsPage, listingsStatusFilter]);
 
-  // ✅ FIXED: Fetch orders when orders tab is active
+  // ✅ FIXED: Fetch orders when orders tab is active - UPDATES MAIN STATE
   useEffect(() => {
     if (activeTab === 'orders') {
+      console.log('📦 Switching to Orders tab');
       fetchSellerOrders();
     }
   }, [activeTab, ordersPage, ordersFilter]);
@@ -812,6 +851,7 @@ const SellerDashboard: React.FC = () => {
   // ✅ FIXED: Fetch offers when offers tab is active
   useEffect(() => {
     if (activeTab === 'offers') {
+      console.log('💼 Switching to Offers tab');
       fetchOffers();
     }
   }, [activeTab]);
@@ -841,7 +881,7 @@ const SellerDashboard: React.FC = () => {
 
   // Determine loading state based on active tab
   const getCurrentLoadingState = () => {
-    if (activeTab === 'overview') return loading;
+    if (activeTab === 'overview') return loading && !ordersLoaded;
     if (activeTab === 'listings') return listingsLoading;
     if (activeTab === 'orders') return ordersLoading;
     if (activeTab === 'offers') return offersLoading;
@@ -850,8 +890,8 @@ const SellerDashboard: React.FC = () => {
 
   const currentLoading = getCurrentLoadingState();
 
-  // ✅ FIXED: Only show loading for initial load, not tab switches
-  if (loading && orders.length === 0 && listingsData === null) {
+  // Show loading only on initial load
+  if (loading && !ordersLoaded) {
     return (
       <MarketplaceLayout>
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
@@ -868,7 +908,7 @@ const SellerDashboard: React.FC = () => {
     <MarketplaceLayout>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
+          {/* Header - Shows REAL earnings from orderStats */}
           <DashboardHeader
             title="Seller Dashboard"
             subtitle="Manage orders, track earnings, and grow your business"
@@ -915,7 +955,7 @@ const SellerDashboard: React.FC = () => {
                   }}
                 />
 
-                {/* Stats Grid */}
+                {/* Stats Grid - Shows REAL stats from orderStats */}
                 <StatsGrid
                   stats={{
                     totalRevenue: orderStats.totalRevenue,
@@ -931,8 +971,8 @@ const SellerDashboard: React.FC = () => {
                 {/* Order Workflow Guide */}
                 <OrderWorkflowGuide />
 
-                {/* ✅ FIXED: Recent Orders - Show only if orders exist */}
-                {orders.length > 0 && (
+                {/* Recent Orders - Shows from MAIN orders state */}
+                {orders.length > 0 ? (
                   <RecentOrders
                     orders={orders.slice(0, 5)}
                     onViewOrderDetails={handleViewOrderDetails}
@@ -945,6 +985,20 @@ const SellerDashboard: React.FC = () => {
                     onCreateListing={() => navigate('/marketplace/create')}
                     orderActionLoading={orderActionLoading}
                   />
+                ) : (
+                  <div className="bg-white rounded-2xl shadow-sm border border-yellow-200 p-8 text-center">
+                    <div className="text-5xl mb-4 text-gray-300">📦</div>
+                    <h3 className="text-lg font-medium text-gray-900">No Orders Yet</h3>
+                    <p className="mt-2 text-gray-500 mb-6">
+                      You don't have any orders yet. Create listings to start receiving orders.
+                    </p>
+                    <button
+                      onClick={() => navigate('/marketplace/create')}
+                      className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 shadow-md hover:shadow"
+                    >
+                      + Create Your First Listing
+                    </button>
+                  </div>
                 )}
 
                 {/* Action Cards */}
