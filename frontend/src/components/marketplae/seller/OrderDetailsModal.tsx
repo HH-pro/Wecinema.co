@@ -1,4 +1,4 @@
-// src/components/marketplae/seller/OrderDetailsModal.tsx
+// src/components/marketplace/seller/OrderDetailsModal.tsx - FIXED VERSION
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
@@ -101,10 +101,50 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     }
   };
 
+  // ✅ Function to check if order can be cancelled
+  const canCancelOrder = (status: string): boolean => {
+    // Only allow cancellation in these statuses (before work starts)
+    const cancellableStatuses = ['pending_payment', 'paid', 'processing'];
+    return cancellableStatuses.includes(status?.toLowerCase());
+  };
+
+  // ✅ Function to check if shipping option should be shown
+  const canShowShippingOption = (status: string): boolean => {
+    // Only show shipping for specific statuses
+    const shippingStatuses = ['in_progress', 'shipped'];
+    return shippingStatuses.includes(status?.toLowerCase());
+  };
+
+  // ✅ Check if work has started
+  const isWorkStarted = (status: string): boolean => {
+    const workStartedStatuses = ['in_progress', 'delivered', 'in_revision', 'completed', 'shipped'];
+    return workStartedStatuses.includes(status?.toLowerCase());
+  };
+
   const handleStatusUpdate = async (newStatus: string) => {
     if (!orderId || !orderDetails) return;
     
-    if (!window.confirm(`Change order status to "${newStatus}"?`)) return;
+    // Check cancellation restrictions
+    if (newStatus === 'cancelled') {
+      if (!canCancelOrder(orderDetails.status)) {
+        alert('This order cannot be cancelled because work has already started.');
+        return;
+      }
+    }
+    
+    // Check shipping restrictions
+    if (newStatus === 'shipped') {
+      if (!canShowShippingOption(orderDetails.status)) {
+        alert('Cannot ship order at this stage.');
+        return;
+      }
+    }
+    
+    const confirmMessage = newStatus === 'cancelled' 
+      ? `Are you sure you want to cancel this order? This action cannot be undone.`
+      : `Change order status to "${newStatus}"?`;
+    
+    if (!window.confirm(confirmMessage)) return;
     
     try {
       setUpdating(true);
@@ -158,30 +198,85 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     return 'bg-gray-100 text-gray-800';
   };
 
+  // ✅ UPDATED: Get status options based on current status
   const getStatusOptions = (currentStatus: string) => {
-    const options: { value: string; label: string; color: string }[] = [];
+    const options: { value: string; label: string; color: string; disabled?: boolean; tooltip?: string }[] = [];
     const status = currentStatus?.toLowerCase() || '';
     
     if (status === 'pending_payment') {
       options.push(
         { value: 'confirmed', label: 'Confirm', color: 'green' },
-        { value: 'cancelled', label: 'Cancel', color: 'red' }
+        { 
+          value: 'cancelled', 
+          label: 'Cancel', 
+          color: 'red',
+          disabled: !canCancelOrder(status),
+          tooltip: !canCancelOrder(status) ? 'Cannot cancel after payment' : ''
+        }
       );
     } else if (status === 'confirmed' || status === 'paid') {
       options.push(
         { value: 'in_progress', label: 'Start Work', color: 'blue' },
-        { value: 'cancelled', label: 'Cancel', color: 'red' }
+        { 
+          value: 'cancelled', 
+          label: 'Cancel', 
+          color: 'red',
+          disabled: !canCancelOrder(status),
+          tooltip: !canCancelOrder(status) ? 'Cannot cancel after starting work' : ''
+        }
+      );
+    } else if (status === 'processing') {
+      options.push(
+        { value: 'in_progress', label: 'Start Work', color: 'blue' },
+        { 
+          value: 'cancelled', 
+          label: 'Cancel', 
+          color: 'red',
+          disabled: !canCancelOrder(status),
+          tooltip: !canCancelOrder(status) ? 'Cannot cancel after work preparation' : ''
+        }
       );
     } else if (status === 'in_progress') {
       options.push(
-        { value: 'shipped', label: 'Ship', color: 'blue' },
+        { 
+          value: 'shipped', 
+          label: 'Ship', 
+          color: 'blue',
+          disabled: !canShowShippingOption(status),
+          tooltip: !canShowShippingOption(status) ? 'Shipping not available' : ''
+        },
+        { value: 'delivered', label: 'Deliver', color: 'green' },
         { value: 'completed', label: 'Complete', color: 'green' },
-        { value: 'cancelled', label: 'Cancel', color: 'red' }
+        { 
+          value: 'cancelled', 
+          label: 'Cancel', 
+          color: 'red',
+          disabled: true,
+          tooltip: 'Cannot cancel - work has started'
+        }
       );
     } else if (status === 'shipped') {
       options.push(
         { value: 'delivered', label: 'Deliver', color: 'green' },
-        { value: 'completed', label: 'Complete', color: 'green' }
+        { value: 'completed', label: 'Complete', color: 'green' },
+        { 
+          value: 'cancelled', 
+          label: 'Cancel', 
+          color: 'red',
+          disabled: true,
+          tooltip: 'Cannot cancel - order has been shipped'
+        }
+      );
+    } else if (status === 'delivered') {
+      options.push(
+        { value: 'completed', label: 'Complete', color: 'green' },
+        { 
+          value: 'cancelled', 
+          label: 'Cancel', 
+          color: 'red',
+          disabled: true,
+          tooltip: 'Cannot cancel - order has been delivered'
+        }
       );
     }
     
@@ -210,6 +305,23 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(orderDetails?.status || '')}`}>
               {orderDetails?.status?.replace('_', ' ') || 'Loading'}
             </span>
+            {orderDetails && (
+              <div className="flex items-center ml-2">
+                {isWorkStarted(orderDetails.status) ? (
+                  <span className="text-xs px-2 py-1 bg-red-100 text-red-800 rounded-full">
+                    Work Started
+                  </span>
+                ) : canCancelOrder(orderDetails.status) ? (
+                  <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">
+                    Can Cancel
+                  </span>
+                ) : (
+                  <span className="text-xs px-2 py-1 bg-gray-100 text-gray-800 rounded-full">
+                    Cannot Cancel
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -269,27 +381,67 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     </div>
                   </div>
 
+                  {/* Work Status Warning */}
+                  {isWorkStarted(orderDetails.status) && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded p-2">
+                      <div className="flex items-start">
+                        <svg className="w-4 h-4 text-yellow-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.998-.833-2.732 0L4.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                        <div>
+                          <p className="text-xs font-medium text-yellow-800">Work Has Started</p>
+                          <p className="text-xs text-yellow-700">
+                            This order cannot be cancelled because work has already begun.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Status Actions */}
                   <div>
                     <p className="text-xs font-medium text-gray-700 mb-2">Update Status:</p>
                     <div className="grid grid-cols-2 gap-2">
                       {getStatusOptions(orderDetails.status).map((option) => (
-                        <button
-                          key={option.value}
-                          onClick={() => handleStatusUpdate(option.value)}
-                          disabled={updating}
-                          className={`p-2 rounded text-xs font-medium ${
-                            option.color === 'green'
-                              ? 'bg-green-600 hover:bg-green-700 text-white'
-                              : option.color === 'red'
-                              ? 'bg-red-600 hover:bg-red-700 text-white'
-                              : 'bg-blue-600 hover:bg-blue-700 text-white'
-                          } disabled:opacity-50`}
-                        >
-                          {option.label}
-                        </button>
+                        <div key={option.value} className="relative group">
+                          <button
+                            onClick={() => !option.disabled && handleStatusUpdate(option.value)}
+                            disabled={updating || option.disabled}
+                            className={`w-full p-2 rounded text-xs font-medium ${
+                              option.color === 'green'
+                                ? 'bg-green-600 hover:bg-green-700 text-white disabled:bg-green-300'
+                                : option.color === 'red'
+                                ? 'bg-red-600 hover:bg-red-700 text-white disabled:bg-red-300'
+                                : 'bg-blue-600 hover:bg-blue-700 text-white disabled:bg-blue-300'
+                            } ${option.disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+                          >
+                            {option.label}
+                            {option.disabled && (
+                              <svg className="w-3 h-3 ml-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                              </svg>
+                            )}
+                          </button>
+                          {option.disabled && option.tooltip && (
+                            <div className="absolute z-10 invisible group-hover:visible bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-gray-700 bg-white border border-gray-200 rounded shadow-lg whitespace-nowrap">
+                              {option.tooltip}
+                            </div>
+                          )}
+                        </div>
                       ))}
                     </div>
+                    
+                    {/* Cancellation Info */}
+                    {!canCancelOrder(orderDetails.status) && (
+                      <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600">
+                        <p className="font-medium text-gray-700">Cancellation Policy:</p>
+                        <ul className="list-disc pl-4 mt-1 space-y-0.5">
+                          <li>Orders can be cancelled before work starts</li>
+                          <li>Once work begins, cancellation is not possible</li>
+                          <li>Contact buyer for any issues during work</li>
+                        </ul>
+                      </div>
+                    )}
                   </div>
 
                   {/* Product Info */}
@@ -329,6 +481,31 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                       </span>
                     </div>
                   </div>
+
+                  {/* Work Progress Indicator */}
+                  {isWorkStarted(orderDetails.status) && (
+                    <div className="border border-green-200 rounded p-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-medium text-gray-700">Work Progress</p>
+                        <span className="text-xs text-green-600 font-medium">
+                          {orderDetails.status === 'in_progress' ? 'In Progress' : 
+                           orderDetails.status === 'delivered' ? 'Delivered' :
+                           orderDetails.status === 'completed' ? 'Completed' : 
+                           'In Process'}
+                        </span>
+                      </div>
+                      <div className="mt-1 w-full bg-gray-200 rounded-full h-1.5">
+                        <div 
+                          className={`h-1.5 rounded-full ${
+                            orderDetails.status === 'in_progress' ? 'bg-yellow-500 w-1/2' :
+                            orderDetails.status === 'delivered' ? 'bg-green-500 w-3/4' :
+                            orderDetails.status === 'completed' ? 'bg-green-600 w-full' :
+                            'bg-blue-500 w-1/3'
+                          }`}
+                        ></div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* Info Tab */
@@ -371,6 +548,33 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                           )}
                         </div>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Order Status Info */}
+                  <div className="border border-gray-200 rounded p-2">
+                    <div className="flex justify-between items-center mb-1">
+                      <p className="text-xs font-medium text-gray-700">Order Status</p>
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(orderDetails.status)}`}>
+                        {orderDetails.status?.replace('_', ' ') || 'Unknown'}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      {isWorkStarted(orderDetails.status) ? (
+                        <div className="flex items-center text-red-600">
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                          </svg>
+                          Cancellation not available
+                        </div>
+                      ) : (
+                        <div className="flex items-center text-green-600">
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Cancellation available
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -488,15 +692,29 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             >
               Close
             </button>
-            <button
-              onClick={fetchOrderDetails}
-              className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center"
-            >
-              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Refresh
-            </button>
+            <div className="flex space-x-2">
+              {/* Contact Buyer Button */}
+              {orderDetails?.buyerId && (
+                <button
+                  onClick={() => window.open(`/messages?user=${orderDetails.buyerId?._id}`, '_blank')}
+                  className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 flex items-center"
+                >
+                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  Contact
+                </button>
+              )}
+              <button
+                onClick={fetchOrderDetails}
+                className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center"
+              >
+                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh
+              </button>
+            </div>
           </div>
         </div>
       </div>
