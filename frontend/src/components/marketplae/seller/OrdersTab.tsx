@@ -90,7 +90,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     { value: 'delivered', label: 'Delivered', count: orders.filter(o => o.status === 'delivered').length },
     { value: 'in_revision', label: 'Revision', count: orders.filter(o => o.status === 'in_revision').length },
     { value: 'completed', label: 'Completed', count: orders.filter(o => o.status === 'completed').length },
-    // { value: 'cancelled', label: 'Cancelled', count: orders.filter(o => o.status === 'cancelled').length },
+    { value: 'cancelled', label: 'Cancelled', count: orders.filter(o => o.status === 'cancelled').length },
   ];
 
   const filteredOrders = filter === 'all' 
