@@ -155,7 +155,7 @@ const SellerDashboard: React.FC = () => {
   const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  
+   const navigate = useNavigate();
   // Order stats
   const [orderStats, setOrderStats] = useState<OrderStats>({
     totalOrders: 0,
