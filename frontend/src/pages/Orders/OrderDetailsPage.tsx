@@ -227,14 +227,18 @@ const OrderDetailsPage: React.FC = () => {
           >
             Contact Seller
           </button>
-          {order.status === 'delivered' && (
-            <button 
-              className="action-btn success"
-              onClick={() => navigate(`/marketplace/reviews/create?orderId=${orderId}`)}
-            >
-              Leave Review
-            </button>
-          )}
+        {order.status === 'delivered' && (
+  <button 
+    className="action-btn success"
+    onClick={() => {
+      toast.info('Review feature coming soon!');
+      // Ya phir
+      alert('Review feature is under development. Please check back later.');
+    }}
+  >
+    Leave Review
+  </button>
+)}
           {order.status === 'pending_payment' && (
             <button 
               className="action-btn warning"
