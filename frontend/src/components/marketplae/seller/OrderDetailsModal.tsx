@@ -260,7 +260,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     <div className={`fixed inset-0 z-50 overflow-y-auto ${isClosing ? 'animate-fadeOut' : 'animate-fadeIn'}`}>
       <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" onClick={handleClose}></div>
 
-      <div className="flex min-h-full items-center justify-center p-2 sm:p-4 text-center">
+      <div className="flex min-h-full items-center justify-center p-6 sm:p-4 text-center">
         <div className={`relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all w-full max-w-2xl sm:my-8 ${
           isClosing ? 'animate-slideOut' : 'animate-slideIn'
         }`}>
