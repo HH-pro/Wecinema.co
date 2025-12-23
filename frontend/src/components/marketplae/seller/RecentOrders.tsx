@@ -1,7 +1,5 @@
-// src/components/marketplae/seller/RecentOrders.tsx
 import React from 'react';
 import { formatCurrency, getOrderStatusInfo } from '../../../api';
-import OrderStatusTracker from './OrderStatusTracker';
 
 interface Order {
   _id: string;
@@ -10,6 +8,7 @@ interface Order {
   amount: number;
   buyerId: {
     username: string;
+    avatar?: string;
   };
   listingId: {
     title: string;
@@ -49,9 +48,114 @@ const RecentOrders: React.FC<RecentOrdersProps> = ({
     const date = new Date(dateString);
     return date.toLocaleDateString('en-IN', {
       day: 'numeric',
-      month: 'short',
-      year: 'numeric'
+      month: 'short'
     });
+  };
+
+  const getStatusColor = (status: string): string => {
+    const colors: Record<string, string> = {
+      'pending_payment': 'bg-yellow-100 text-yellow-800',
+      'paid': 'bg-blue-100 text-blue-800',
+      'processing': 'bg-purple-100 text-purple-800',
+      'in_progress': 'bg-indigo-100 text-indigo-800',
+      'delivered': 'bg-green-100 text-green-800',
+      'completed': 'bg-emerald-100 text-emerald-800',
+      'cancelled': 'bg-red-100 text-red-800',
+      'in_revision': 'bg-amber-100 text-amber-800'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getActionButtons = (order: Order) => {
+    const actions: React.ReactNode[] = [];
+    
+    // Add status-specific actions
+    switch (order.status) {
+      case 'paid':
+        actions.push(
+          <button
+            key="process"
+            onClick={() => onStartProcessing(order)}
+            disabled={orderActionLoading === order._id}
+            className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow"
+            title="Start Processing"
+          >
+            {orderActionLoading === order._id ? '...' : 'Process'}
+          </button>
+        );
+        break;
+        
+      case 'processing':
+        actions.push(
+          <button
+            key="work"
+            onClick={() => onStartWork(order)}
+            disabled={orderActionLoading === order._id}
+            className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-lg hover:from-indigo-600 hover:to-indigo-700 transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow"
+            title="Start Work"
+          >
+            {orderActionLoading === order._id ? '...' : 'Work'}
+          </button>
+        );
+        break;
+        
+      case 'in_progress':
+        actions.push(
+          <button
+            key="deliver"
+            onClick={() => onDeliver(order)}
+            disabled={orderActionLoading === order._id}
+            className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow"
+            title="Deliver Order"
+          >
+            Deliver
+          </button>
+        );
+        break;
+        
+      case 'in_revision':
+        actions.push(
+          <button
+            key="revision"
+            onClick={() => onCompleteRevision(order)}
+            disabled={orderActionLoading === order._id}
+            className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-lg hover:from-amber-600 hover:to-amber-700 transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow"
+            title="Complete Revision"
+          >
+            Revise
+          </button>
+        );
+        break;
+    }
+    
+    // Add cancel button for certain statuses
+    if (['paid', 'processing'].includes(order.status)) {
+      actions.push(
+        <button
+          key="cancel"
+          onClick={() => onCancel(order)}
+          disabled={orderActionLoading === order._id}
+          className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-red-50 to-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50 border border-red-200"
+          title="Cancel Order"
+        >
+          Cancel
+        </button>
+      );
+    }
+    
+    // Always add details button
+    actions.push(
+      <button
+        key="details"
+        onClick={() => onViewOrderDetails(order._id)}
+        className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors border border-gray-300"
+        title="View Details"
+      >
+        Details
+      </button>
+    );
+    
+    return actions;
   };
 
   if (orders.length === 0) {
@@ -81,7 +185,7 @@ const RecentOrders: React.FC<RecentOrdersProps> = ({
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Recent Orders</h2>
-            <p className="text-sm text-gray-600 mt-1">Quick actions for your latest orders</p>
+            <p className="text-sm text-gray-600 mt-1">Manage your latest orders with quick actions</p>
           </div>
           <button 
             onClick={onViewAll}
@@ -91,119 +195,62 @@ const RecentOrders: React.FC<RecentOrdersProps> = ({
           </button>
         </div>
       </div>
+      
       <div className="p-6">
-        <div className="space-y-4">
-          {orders.slice(0, 5).map(order => {
-            const statusInfo = getOrderStatusInfo(order.status);
-            return (
-              <div 
-                key={order._id} 
-                className="p-4 border border-gray-200 rounded-xl hover:border-yellow-300 hover:shadow-sm transition-all duration-200"
-              >
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center border border-gray-300">
-                      <span className="text-lg font-semibold text-gray-600">
-                        {order.buyerId?.username?.charAt(0).toUpperCase() || 'B'}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{order.listingId?.title || 'Order'}</p>
-                      <p className="text-sm text-gray-500">{order.buyerId?.username || 'Buyer'}</p>
-                      <div className="flex items-center mt-1">
-                        <span 
-                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                          style={{ backgroundColor: `${statusInfo.color}15`, color: statusInfo.color }}
-                        >
-                          <span className="mr-1">{statusInfo.icon}</span>
-                          {statusInfo.text}
-                        </span>
-                        <span className="text-xs text-gray-400 ml-2">
-                          {formatDate(order.createdAt)}
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead>
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order & Buyer</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {orders.slice(0, 5).map(order => (
+                <tr key={order._id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-4">
+                    <div className="flex items-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center border border-gray-300 mr-3">
+                        <span className="font-medium text-gray-600">
+                          {order.buyerId?.username?.charAt(0).toUpperCase() || 'B'}
                         </span>
                       </div>
+                      <div>
+                        <p className="font-medium text-gray-900 text-sm truncate max-w-xs">
+                          {order.listingId?.title || 'Order'}
+                        </p>
+                        <p className="text-xs text-gray-500">{order.buyerId?.username || 'Buyer'}</p>
+                      </div>
                     </div>
-                  </div>
+                  </td>
                   
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                    <div className="text-right">
-                      <p className="font-semibold text-green-600 text-lg">{formatCurrency(order.amount || 0)}</p>
-                      <p className="text-xs text-gray-500">Order #{order.orderNumber || order._id.slice(-6)}</p>
-                    </div>
-                    
+                  <td className="px-4 py-4">
+                    <span className="font-semibold text-green-600">{formatCurrency(order.amount || 0)}</span>
+                    <p className="text-xs text-gray-500">#{order.orderNumber || order._id.slice(-6)}</p>
+                  </td>
+                  
+                  <td className="px-4 py-4">
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                      {order.status.replace('_', ' ').charAt(0).toUpperCase() + order.status.slice(1).replace('_', ' ')}
+                    </span>
+                  </td>
+                  
+                  <td className="px-4 py-4">
+                    <span className="text-sm text-gray-600">{formatDate(order.createdAt)}</span>
+                  </td>
+                  
+                  <td className="px-4 py-4">
                     <div className="flex flex-wrap gap-2">
-                      {order.status === 'paid' && (
-                        <button
-                          onClick={() => onStartProcessing(order)}
-                          disabled={orderActionLoading === order._id}
-                          className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow"
-                        >
-                          {orderActionLoading === order._id ? '...' : 'Start Processing'}
-                        </button>
-                      )}
-                      
-                      {order.status === 'processing' && (
-                        <button
-                          onClick={() => onStartWork(order)}
-                          disabled={orderActionLoading === order._id}
-                          className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow"
-                        >
-                          {orderActionLoading === order._id ? '...' : 'Start Work'}
-                        </button>
-                      )}
-                      
-                      {order.status === 'in_progress' && (
-                        <button
-                          onClick={() => onDeliver(order)}
-                          disabled={orderActionLoading === order._id}
-                          className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow"
-                        >
-                          Deliver
-                        </button>
-                      )}
-                      
-                      {order.status === 'in_revision' && (
-                        <button
-                          onClick={() => onCompleteRevision(order)}
-                          disabled={orderActionLoading === order._id}
-                          className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-lg hover:from-amber-600 hover:to-amber-700 transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow"
-                        >
-                          Complete Revision
-                        </button>
-                      )}
-                      
-                      {['paid', 'processing'].includes(order.status) && (
-                        <button
-                          onClick={() => onCancel(order)}
-                          disabled={orderActionLoading === order._id}
-                          className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-red-50 to-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50 border border-red-200"
-                        >
-                          Cancel
-                        </button>
-                      )}
-                      
-                      <button
-                        onClick={() => onViewOrderDetails(order._id)}
-                        className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors border border-gray-300"
-                      >
-                        Details
-                      </button>
+                      {getActionButtons(order)}
                     </div>
-                  </div>
-                </div>
-                
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <OrderStatusTracker 
-                    currentStatus={order.status}
-                    orderId={order._id}
-                    createdAt={order.createdAt}
-                    deliveredAt={order.deliveredAt}
-                    completedAt={order.completedAt}
-                  />
-                </div>
-              </div>
-            );
-          })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
