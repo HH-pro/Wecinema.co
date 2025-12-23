@@ -946,7 +946,7 @@ const SellerDashboard: React.FC = () => {
           {/* Tab Content */}
           <div className="mt">
             {activeTab === 'overview' && (
-              <div className="space-y-8">
+              <div className="space">
                 {/* Welcome Card */}
                 <WelcomeCard
                   title="Welcome back, Seller! 👋"
