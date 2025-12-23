@@ -260,7 +260,7 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
 });
 
 // ===================================================
-// ✅ UPDATE LISTING (EDIT) - UPDATED FOR FRONTEND
+// ✅ UPDATE LISTING (EDIT) - CORRECTED ROUTE
 // ===================================================
 router.put("/listings/:id", authenticateMiddleware, async (req, res) => {
   try {
@@ -402,12 +402,13 @@ router.put("/listings/:id", authenticateMiddleware, async (req, res) => {
 });
 
 // ===================================================
-// ✅ UPDATE LISTING STATUS (Active/Inactive) - UPDATED FOR FRONTEND
+// ✅ UPDATE LISTING STATUS (Active/Inactive) - CORRECTED ROUTE
 // ===================================================
 router.put("/listings/:id/status", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== UPDATE LISTING STATUS ===");
     console.log("Listing ID:", req.params.id);
+    console.log("Request body:", req.body);
     console.log("User ID:", req.user._id);
 
     const listingId = req.params.id;
@@ -471,6 +472,64 @@ router.put("/listings/:id/status", authenticateMiddleware, async (req, res) => {
       success: false,
       error: "Failed to update listing status" 
     });
+  }
+});
+
+// ===================================================
+// ✅ TOGGLE LISTING STATUS (Alternative route for old frontend)
+// ===================================================
+router.patch("/listing/:id/toggle-status", authenticateMiddleware, async (req, res) => {
+  try {
+    console.log("=== TOGGLE LISTING STATUS (LEGACY) ===");
+    console.log("Listing ID:", req.params.id);
+    console.log("User ID:", req.user._id);
+
+    const listingId = req.params.id;
+    const sellerId = req.user._id;
+
+    // Check if listing exists and user owns it
+    const listing = await MarketplaceListing.findOne({
+      _id: listingId,
+      sellerId: sellerId
+    });
+
+    if (!listing) {
+      return res.status(404).json({ 
+        error: "Listing not found or you don't have permission to modify this listing" 
+      });
+    }
+
+    // Toggle status
+    const newStatus = listing.status === "active" ? "inactive" : "active";
+    
+    const updatedListing = await MarketplaceListing.findByIdAndUpdate(
+      listingId,
+      { 
+        $set: { 
+          status: newStatus,
+          updatedAt: new Date()
+        } 
+      },
+      { new: true }
+    ).select("title status updatedAt");
+
+    console.log(`✅ Listing status changed from ${listing.status} to ${newStatus}`);
+
+    res.status(200).json({ 
+      message: `Listing ${newStatus === "active" ? "activated" : "deactivated"} successfully`,
+      listing: updatedListing,
+      previousStatus: listing.status,
+      newStatus: newStatus
+    });
+
+  } catch (error) {
+    console.error("❌ Error toggling listing status:", error);
+    
+    if (error.name === 'CastError') {
+      return res.status(400).json({ error: "Invalid listing ID format" });
+    }
+    
+    res.status(500).json({ error: "Failed to toggle listing status" });
   }
 });
 
@@ -578,11 +637,65 @@ router.get("/user/:userId/listings", async (req, res) => {
 });
 
 // ===================================================
-// ✅ DELETE LISTING - UPDATED FOR FRONTEND
+// ✅ DELETE LISTING - CORRECTED ROUTE
 // ===================================================
 router.delete("/listings/:id", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== DELETE LISTING REQUEST ===");
+    console.log("Listing ID to delete:", req.params.id);
+    console.log("User making request:", req.user._id);
+
+    const userId = req.user._id;
+    
+    const listing = await MarketplaceListing.findOneAndDelete({
+      _id: req.params.id,
+      sellerId: userId,
+    });
+
+    if (!listing) {
+      console.log("❌ Listing not found or user not authorized:", {
+        listingId: req.params.id,
+        userId: userId
+      });
+      return res.status(404).json({ 
+        success: false,
+        error: "Listing not found or you don't have permission to delete this listing" 
+      });
+    }
+
+    console.log("✅ Listing deleted successfully:", listing._id);
+    res.status(200).json({ 
+      success: true,
+      message: "Listing deleted successfully", 
+      listing: {
+        _id: listing._id,
+        title: listing.title,
+        status: listing.status
+      }
+    });
+  } catch (error) {
+    console.error("❌ Error deleting listing:", error);
+    
+    if (error.name === 'CastError') {
+      return res.status(400).json({ 
+        success: false,
+        error: "Invalid listing ID format" 
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to delete listing" 
+    });
+  }
+});
+
+// ===================================================
+// ✅ Legacy DELETE route (for compatibility)
+// ===================================================
+router.delete("/listing/:id", authenticateMiddleware, async (req, res) => {
+  try {
+    console.log("=== DELETE LISTING REQUEST (LEGACY) ===");
     console.log("Listing ID to delete:", req.params.id);
     console.log("User making request:", req.user._id);
 
