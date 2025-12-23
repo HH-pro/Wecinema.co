@@ -55,7 +55,7 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
     }
   }, [listing, isOpen]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     
@@ -70,20 +70,22 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
     
     if (!formData.title.trim()) {
       newErrors.title = 'Title is required';
-    } else if (formData.title.trim().length < 3) {
-      newErrors.title = 'Title must be at least 3 characters';
     }
     
     if (!formData.description.trim()) {
       newErrors.description = 'Description is required';
-    } else if (formData.description.trim().length < 10) {
-      newErrors.description = 'Description must be at least 10 characters';
     }
     
     if (!formData.price || formData.price <= 0) {
       newErrors.price = 'Price must be greater than 0';
-    } else if (isNaN(Number(formData.price))) {
-      newErrors.price = 'Price must be a valid number';
+    }
+    
+    if (!formData.type) {
+      newErrors.type = 'Type is required';
+    }
+    
+    if (!formData.category.trim()) {
+      newErrors.category = 'Category is required';
     }
     
     setErrors(newErrors);
@@ -97,202 +99,223 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
       return;
     }
     
-    // Send only title, description and price for update
-    // Keep other fields same as original
     const updatedData = {
-      title: formData.title.trim(),
-      description: formData.description.trim(),
+      ...formData,
       price: parseFloat(formData.price.toString()),
-      // Keep original values for other fields
-      type: listing.type,
-      category: listing.category,
-      tags: listing.tags,
-      mediaUrls: listing.mediaUrls
+      tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
+      mediaUrls: formData.mediaUrls.split(',').map(url => url.trim()).filter(url => url)
     };
     
     onUpdate(updatedData);
   };
+
+  const listingTypes = ['product', 'service', 'rental'];
+  const categories = [
+    'electronics',
+    'fashion',
+    'home',
+    'books',
+    'sports',
+    'automotive',
+    'realestate',
+    'services',
+    'other'
+  ];
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        {/* Backdrop */}
-        <div className="fixed inset-0 transition-opacity bg-gray-900 bg-opacity-75" onClick={loading ? undefined : onClose}></div>
+        <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose}></div>
         
-        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-        
-        {/* Modal */}
-        <div className="inline-block w-full max-w-md my-8 overflow-hidden text-left align-middle transition-all transform bg-white rounded-2xl shadow-xl">
-          {/* Header */}
-          <div className="px-6 pt-6 pb-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200">
+        <div className="inline-block w-full max-w-2xl my-8 overflow-hidden text-left align-middle transition-all transform bg-white rounded-2xl shadow-xl">
+          <div className="px-6 pt-6 pb-2">
             <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Edit Listing
-                </h3>
-                <p className="mt-1 text-sm text-gray-600">
-                  Update basic listing information
-                </p>
-              </div>
+              <h3 className="text-lg font-semibold leading-6 text-gray-900">
+                Edit Listing
+              </h3>
               <button
                 onClick={onClose}
-                disabled={loading}
-                className="text-gray-400 hover:text-gray-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                className="text-gray-400 hover:text-gray-500 focus:outline-none"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
+            <p className="mt-1 text-sm text-gray-500">
+              Update your listing information
+            </p>
           </div>
           
-          {/* Form */}
           <form onSubmit={handleSubmit}>
-            <div className="px-6 py-4 space-y-4">
-              {/* Title */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Title *
-                </label>
-                <input
-                  type="text"
-                  name="title"
-                  value={formData.title}
-                  onChange={handleChange}
-                  disabled={loading}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
-                    errors.title ? 'border-red-500' : 'border-gray-300'
-                  } ${loading ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                  placeholder="Enter listing title"
-                />
-                {errors.title && (
-                  <p className="mt-1 text-xs text-red-600">{errors.title}</p>
-                )}
-              </div>
-              
-              {/* Description */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description *
-                </label>
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleChange}
-                  disabled={loading}
-                  rows={4}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
-                    errors.description ? 'border-red-500' : 'border-gray-300'
-                  } ${loading ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                  placeholder="Describe your listing in detail"
-                />
-                {errors.description && (
-                  <p className="mt-1 text-xs text-red-600">{errors.description}</p>
-                )}
-              </div>
-              
-              {/* Price */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Price (₹) *
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2 text-gray-500">₹</span>
+            <div className="px-6 py-4">
+              <div className="space-y-5">
+                {/* Title */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Title *
+                  </label>
                   <input
-                    type="number"
-                    name="price"
-                    value={formData.price}
+                    type="text"
+                    name="title"
+                    value={formData.title}
                     onChange={handleChange}
-                    disabled={loading}
-                    step="0.01"
-                    min="0"
-                    className={`w-full pl-8 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
-                      errors.price ? 'border-red-500' : 'border-gray-300'
-                    } ${loading ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                    placeholder="0.00"
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.title ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="Enter listing title"
                   />
-                </div>
-                {errors.price && (
-                  <p className="mt-1 text-xs text-red-600">{errors.price}</p>
-                )}
-              </div>
-              
-              {/* Read-only Fields */}
-              <div className="space-y-3 pt-4 border-t border-gray-100">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">
-                    Listing Type
-                  </label>
-                  <div className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700">
-                    {listing.type.charAt(0).toUpperCase() + listing.type.slice(1)}
-                  </div>
+                  {errors.title && (
+                    <p className="mt-1 text-sm text-red-600">{errors.title}</p>
+                  )}
                 </div>
                 
+                {/* Description */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">
-                    Category
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Description *
                   </label>
-                  <div className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700">
-                    {listing.category.charAt(0).toUpperCase() + listing.category.slice(1)}
-                  </div>
+                  <textarea
+                    name="description"
+                    value={formData.description}
+                    onChange={handleChange}
+                    rows={4}
+                    className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.description ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="Describe your listing in detail"
+                  />
+                  {errors.description && (
+                    <p className="mt-1 text-sm text-red-600">{errors.description}</p>
+                  )}
                 </div>
                 
-                {listing.tags.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* Price */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">
-                      Tags
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Price (₹) *
                     </label>
-                    <div className="flex flex-wrap gap-1">
-                      {listing.tags.map((tag, index) => (
-                        <span key={index} className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800 border border-gray-200">
-                          {tag}
-                        </span>
+                    <input
+                      type="number"
+                      name="price"
+                      value={formData.price}
+                      onChange={handleChange}
+                      step="0.01"
+                      min="0"
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        errors.price ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="0.00"
+                    />
+                    {errors.price && (
+                      <p className="mt-1 text-sm text-red-600">{errors.price}</p>
+                    )}
+                  </div>
+                  
+                  {/* Type */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Type *
+                    </label>
+                    <select
+                      name="type"
+                      value={formData.type}
+                      onChange={handleChange}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        errors.type ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    >
+                      <option value="">Select Type</option>
+                      {listingTypes.map(type => (
+                        <option key={type} value={type}>
+                          {type.charAt(0).toUpperCase() + type.slice(1)}
+                        </option>
                       ))}
-                    </div>
+                    </select>
+                    {errors.type && (
+                      <p className="mt-1 text-sm text-red-600">{errors.type}</p>
+                    )}
                   </div>
-                )}
+                </div>
                 
-                {listing.mediaUrls.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* Category */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">
-                      Media ({listing.mediaUrls.length})
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Category *
                     </label>
-                    <div className="text-xs text-gray-600">
-                      Media files cannot be changed here. Contact support for media updates.
-                    </div>
+                    <select
+                      name="category"
+                      value={formData.category}
+                      onChange={handleChange}
+                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        errors.category ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                    >
+                      <option value="">Select Category</option>
+                      {categories.map(category => (
+                        <option key={category} value={category}>
+                          {category.charAt(0).toUpperCase() + category.slice(1)}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.category && (
+                      <p className="mt-1 text-sm text-red-600">{errors.category}</p>
+                    )}
                   </div>
-                )}
-              </div>
-              
-              {/* Note */}
-              <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-                <div className="flex items-start">
-                  <svg className="w-4 h-4 text-blue-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <p className="text-xs text-blue-700">
-                    Only title, description and price can be updated. For other changes, please contact support.
+                  
+                  {/* Tags */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tags (comma separated)
+                    </label>
+                    <input
+                      type="text"
+                      name="tags"
+                      value={formData.tags}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="tag1, tag2, tag3"
+                    />
+                  </div>
+                </div>
+                
+                {/* Media URLs */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Image URLs (comma separated)
+                  </label>
+                  <input
+                    type="text"
+                    name="mediaUrls"
+                    value={formData.mediaUrls}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="https://example.com/image1.jpg, https://example.com/image2.jpg"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Separate multiple URLs with commas
                   </p>
                 </div>
               </div>
             </div>
             
-            {/* Footer */}
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end space-x-3 rounded-b-2xl">
+            <div className="px-6 py-4 bg-gray-50 flex justify-end space-x-3 rounded-b-2xl">
               <button
                 type="button"
                 onClick={onClose}
                 disabled={loading}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all disabled:opacity-50"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-700 border border-transparent rounded-lg hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
               >
                 {loading ? (
                   <>
