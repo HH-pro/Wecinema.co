@@ -1,4 +1,4 @@
-// src/components/marketplae/seller/EditListingModal.tsx
+// src/components/marketplace/seller/EditListingModal.tsx
 import React, { useState, useEffect } from 'react';
 
 interface Listing {
@@ -18,6 +18,8 @@ interface EditListingModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUpdate: (data: any) => void;
+  onDelete?: () => void;
+  onToggleStatus?: () => void;
   loading: boolean;
 }
 
@@ -26,16 +28,14 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
   isOpen,
   onClose,
   onUpdate,
+  onDelete,
+  onToggleStatus,
   loading
 }) => {
   const [formData, setFormData] = useState({
     title: listing.title,
     description: listing.description,
     price: listing.price,
-    type: listing.type,
-    category: listing.category,
-    tags: listing.tags.join(', '),
-    mediaUrls: listing.mediaUrls.join(', ')
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -46,16 +46,12 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
         title: listing.title,
         description: listing.description,
         price: listing.price,
-        type: listing.type,
-        category: listing.category,
-        tags: listing.tags.join(', '),
-        mediaUrls: listing.mediaUrls.join(', ')
       });
       setErrors({});
     }
   }, [listing, isOpen]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     
@@ -80,14 +76,6 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
       newErrors.price = 'Price must be greater than 0';
     }
     
-    if (!formData.type) {
-      newErrors.type = 'Type is required';
-    }
-    
-    if (!formData.category.trim()) {
-      newErrors.category = 'Category is required';
-    }
-    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -101,26 +89,24 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
     
     const updatedData = {
       ...formData,
-      price: parseFloat(formData.price.toString()),
-      tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
-      mediaUrls: formData.mediaUrls.split(',').map(url => url.trim()).filter(url => url)
+      price: parseFloat(formData.price.toString())
     };
     
     onUpdate(updatedData);
   };
 
-  const listingTypes = ['product', 'service', 'rental'];
-  const categories = [
-    'electronics',
-    'fashion',
-    'home',
-    'books',
-    'sports',
-    'automotive',
-    'realestate',
-    'services',
-    'other'
-  ];
+  const handleDeleteClick = () => {
+    if (window.confirm('Are you sure you want to delete this listing? This action cannot be undone.')) {
+      onDelete?.();
+    }
+  };
+
+  const handleStatusToggle = () => {
+    const action = listing.status === 'active' ? 'deactivate' : 'activate';
+    if (window.confirm(`Are you sure you want to ${action} this listing?`)) {
+      onToggleStatus?.();
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -129,12 +115,26 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose}></div>
         
-        <div className="inline-block w-full max-w-2xl my-8 overflow-hidden text-left align-middle transition-all transform bg-white rounded-2xl shadow-xl">
+        <div className="inline-block w-full max-w-lg my-8 overflow-hidden text-left align-middle transition-all transform bg-white rounded-2xl shadow-xl">
           <div className="px-6 pt-6 pb-2">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold leading-6 text-gray-900">
-                Edit Listing
-              </h3>
+              <div>
+                <h3 className="text-lg font-semibold leading-6 text-gray-900">
+                  Edit Listing
+                </h3>
+                <div className="flex items-center mt-1">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    listing.status === 'active' 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {listing.status === 'active' ? 'Active' : 'Inactive'}
+                  </span>
+                  <span className="ml-2 text-xs text-gray-500">
+                    {listing.type} • {listing.category}
+                  </span>
+                </div>
+              </div>
               <button
                 onClick={onClose}
                 className="text-gray-400 hover:text-gray-500 focus:outline-none"
@@ -144,9 +144,6 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
                 </svg>
               </button>
             </div>
-            <p className="mt-1 text-sm text-gray-500">
-              Update your listing information
-            </p>
           </div>
           
           <form onSubmit={handleSubmit}>
@@ -192,12 +189,13 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
                   )}
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {/* Price */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Price (₹) *
-                    </label>
+                {/* Price */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Price (₹) *
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-gray-500">₹</span>
                     <input
                       type="number"
                       name="price"
@@ -205,130 +203,137 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
                       onChange={handleChange}
                       step="0.01"
                       min="0"
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      className={`w-full pl-8 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                         errors.price ? 'border-red-500' : 'border-gray-300'
                       }`}
                       placeholder="0.00"
                     />
-                    {errors.price && (
-                      <p className="mt-1 text-sm text-red-600">{errors.price}</p>
-                    )}
                   </div>
-                  
-                  {/* Type */}
+                  {errors.price && (
+                    <p className="mt-1 text-sm text-red-600">{errors.price}</p>
+                  )}
+                </div>
+
+                {/* Current Media Preview */}
+                {listing.mediaUrls && listing.mediaUrls.length > 0 && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Type *
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Current Images
                     </label>
-                    <select
-                      name="type"
-                      value={formData.type}
-                      onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        errors.type ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                    >
-                      <option value="">Select Type</option>
-                      {listingTypes.map(type => (
-                        <option key={type} value={type}>
-                          {type.charAt(0).toUpperCase() + type.slice(1)}
-                        </option>
+                    <div className="flex space-x-2 overflow-x-auto pb-2">
+                      {listing.mediaUrls.map((url, index) => (
+                        <div key={index} className="flex-shrink-0">
+                          <img
+                            src={url}
+                            alt={`Listing ${index + 1}`}
+                            className="w-20 h-20 object-cover rounded-lg border border-gray-200"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://via.placeholder.com/80x80?text=Image+Error';
+                            }}
+                          />
+                        </div>
                       ))}
-                    </select>
-                    {errors.type && (
-                      <p className="mt-1 text-sm text-red-600">{errors.type}</p>
-                    )}
+                    </div>
                   </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {/* Category */}
+                )}
+
+                {/* Current Tags */}
+                {listing.tags && listing.tags.length > 0 && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Category *
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Current Tags
                     </label>
-                    <select
-                      name="category"
-                      value={formData.category}
-                      onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        errors.category ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                    >
-                      <option value="">Select Category</option>
-                      {categories.map(category => (
-                        <option key={category} value={category}>
-                          {category.charAt(0).toUpperCase() + category.slice(1)}
-                        </option>
+                    <div className="flex flex-wrap gap-2">
+                      {listing.tags.map((tag, index) => (
+                        <span
+                          key={index}
+                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                        >
+                          {tag}
+                        </span>
                       ))}
-                    </select>
-                    {errors.category && (
-                      <p className="mt-1 text-sm text-red-600">{errors.category}</p>
-                    )}
+                    </div>
                   </div>
-                  
-                  {/* Tags */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Tags (comma separated)
-                    </label>
-                    <input
-                      type="text"
-                      name="tags"
-                      value={formData.tags}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="tag1, tag2, tag3"
-                    />
-                  </div>
-                </div>
-                
-                {/* Media URLs */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Image URLs (comma separated)
-                  </label>
-                  <input
-                    type="text"
-                    name="mediaUrls"
-                    value={formData.mediaUrls}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="https://example.com/image1.jpg, https://example.com/image2.jpg"
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Separate multiple URLs with commas
-                  </p>
-                </div>
+                )}
               </div>
             </div>
             
-            <div className="px-6 py-4 bg-gray-50 flex justify-end space-x-3 rounded-b-2xl">
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={loading}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-              >
-                {loading ? (
-                  <>
-                    <svg className="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Updating...
-                  </>
-                ) : (
-                  'Update Listing'
-                )}
-              </button>
+            <div className="px-6 py-4 bg-gray-50 rounded-b-2xl">
+              {/* Action Buttons */}
+              <div className="flex flex-col space-y-3">
+                <div className="flex justify-between">
+                  <div className="flex space-x-3">
+                    {/* Delete Button */}
+                    {onDelete && (
+                      <button
+                        type="button"
+                        onClick={handleDeleteClick}
+                        disabled={loading}
+                        className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+                      >
+                        Delete Listing
+                      </button>
+                    )}
+                    
+                    {/* Toggle Status Button */}
+                    {onToggleStatus && (
+                      <button
+                        type="button"
+                        onClick={handleStatusToggle}
+                        disabled={loading}
+                        className={`px-4 py-2 text-sm font-medium text-white border border-transparent rounded-lg hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 ${
+                          listing.status === 'active' 
+                            ? 'bg-orange-600 focus:ring-orange-500' 
+                            : 'bg-green-600 focus:ring-green-500'
+                        }`}
+                      >
+                        {listing.status === 'active' ? 'Deactivate' : 'Activate'}
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="flex space-x-3">
+                    {/* Cancel Button */}
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      disabled={loading}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    
+                    {/* Update Button */}
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                    >
+                      {loading ? (
+                        <>
+                          <svg className="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Updating...
+                        </>
+                      ) : (
+                        'Update Listing'
+                      )}
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Info Message */}
+                <div className="pt-2 border-t border-gray-200">
+                  <p className="text-xs text-gray-500">
+                    Note: Only title, description, and price can be edited. 
+                    {listing.status === 'active' 
+                      ? ' Deactivating will hide your listing from buyers.' 
+                      : ' Activating will make your listing visible to buyers.'}
+                  </p>
+                </div>
+              </div>
             </div>
           </form>
         </div>
