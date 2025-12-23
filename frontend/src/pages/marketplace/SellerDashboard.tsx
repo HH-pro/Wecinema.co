@@ -205,12 +205,12 @@ const SellerDashboard: React.FC = () => {
   
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   
-  // Calculate stats - UPDATE THIS to use current data
+  // Calculate stats
   const totalListings = listingsData?.listings?.length || 0;
   const activeListings = listingsData?.listings?.filter((listing) => listing.status === 'active').length || 0;
   const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
 
-  // Tab configuration - Move after all data is available
+  // Tab configuration
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊', badge: null },
     // { id: 'offers', label: 'Offers', icon: '💼', badge: pendingOffers },
@@ -261,7 +261,9 @@ const SellerDashboard: React.FC = () => {
         const currentUserId = getCurrentUserId();
         if (!currentUserId) {
           setError('User not authenticated. Please log in again.');
-          setLoading(false);
+          if (isMounted.current) {
+            setLoading(false);
+          }
           return;
         }
 
@@ -278,7 +280,9 @@ const SellerDashboard: React.FC = () => {
 
       } catch (error) {
         console.error('Error loading dashboard data:', error);
-        setError('Failed to load dashboard data. Please try refreshing the page.');
+        if (isMounted.current) {
+          setError('Failed to load dashboard data. Please try refreshing the page.');
+        }
       } finally {
         if (isMounted.current) {
           setLoading(false);
@@ -313,24 +317,34 @@ const SellerDashboard: React.FC = () => {
   const fetchAllOrders = async () => {
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
       
       const response = await axios.get(`${API_BASE_URL}/marketplace/my-sales`, {
         headers: { Authorization: `Bearer ${token}` },
-        timeout: 10000,
+        timeout: 15000,
         params: { 
-          limit: 100, // Get more orders for all tabs
+          limit: 100,
           page: 1 
         }
       });
 
       if (response.data.success) {
         const ordersData = response.data.sales || response.data.orders || [];
-        setOrders(ordersData);
-        const stats = calculateOrderStats(ordersData);
-        setOrderStats(stats);
+        if (isMounted.current) {
+          setOrders(ordersData);
+          const stats = calculateOrderStats(ordersData);
+          setOrderStats(stats);
+        }
+      } else {
+        throw new Error(response.data.message || 'Failed to fetch orders');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching orders:', error);
+      if (isMounted.current) {
+        setError('Failed to load orders. Please try refreshing.');
+      }
       throw error;
     }
   };
@@ -339,13 +353,16 @@ const SellerDashboard: React.FC = () => {
   const fetchAllOffers = async () => {
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        return; // Skip offers if no token
+      }
       
       const response = await axios.get(`${API_BASE_URL}/marketplace/offers/received-offers`, {
         headers: { Authorization: `Bearer ${token}` },
         timeout: 10000
       });
 
-      if (response.data.success) {
+      if (response.data.success && isMounted.current) {
         setOffers(response.data.offers || []);
       }
     } catch (error) {
@@ -362,25 +379,36 @@ const SellerDashboard: React.FC = () => {
         throw new Error('User not authenticated');
       }
 
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
       const response = await axios.get(
         `${API_BASE_URL}/marketplace/listings/my-listings`,
         {
           params: { 
-            limit: 50, // Get more listings
+            limit: 50,
             page: 1 
           },
           headers: { 
-            Authorization: `Bearer ${localStorage.getItem('token') || sessionStorage.getItem('token')}`,
+            Authorization: `Bearer ${token}`,
             'Cache-Control': 'no-cache'
-          }
+          },
+          timeout: 15000
         }
       );
       
-      if (response.data.success) {
+      if (response.data.success && isMounted.current) {
         setListingsData(response.data);
+      } else {
+        throw new Error(response.data.message || 'Failed to fetch listings');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching listings:', error);
+      if (isMounted.current) {
+        setError('Failed to load listings. Please try refreshing.');
+      }
       throw error;
     }
   };
@@ -388,6 +416,8 @@ const SellerDashboard: React.FC = () => {
   const checkStripeAccountStatus = async () => {
     try {
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) return;
+      
       const response = await axios.get(
         `${API_BASE_URL}/marketplace/seller/stripe-status`,
         {
@@ -396,7 +426,7 @@ const SellerDashboard: React.FC = () => {
         }
       );
 
-      if (response.data.success) {
+      if (response.data.success && isMounted.current) {
         setStripeStatus(response.data);
       }
     } catch (err) {
@@ -726,14 +756,51 @@ const SellerDashboard: React.FC = () => {
     listingsPage * listingsLimit
   );
 
-  if (loading) {
+  // Check if we have any data loaded
+  const hasData = orders.length > 0 || listingsData?.listings?.length || offers.length > 0;
+
+  // Show loading screen only if we're still loading and have no data
+  if (loading && !hasData) {
     return (
       <MarketplaceLayout>
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
           <div className="text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
             <p className="text-lg text-gray-800 font-medium">Loading your dashboard...</p>
-            <p className="text-sm text-gray-600 mt-2">Fetching all your data...</p>
+            <p className="text-sm text-gray-600 mt-2">Please wait while we fetch your data...</p>
+          </div>
+        </div>
+      </MarketplaceLayout>
+    );
+  }
+
+  // If there's an error and no data, show error screen
+  if (error && !hasData) {
+    return (
+      <MarketplaceLayout>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+          <div className="text-center max-w-md p-8 bg-white rounded-lg shadow">
+            <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Unable to Load Dashboard</h3>
+            <p className="text-gray-600 mb-6">{error}</p>
+            <div className="space-x-4">
+              <button
+                onClick={handleRefresh}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Try Again
+              </button>
+              <button
+                onClick={() => navigate('/')}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Go Home
+              </button>
+            </div>
           </div>
         </div>
       </MarketplaceLayout>
@@ -744,6 +811,16 @@ const SellerDashboard: React.FC = () => {
     <MarketplaceLayout>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Show loading overlay while refreshing */}
+          {refreshing && (
+            <div className="fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center">
+              <div className="bg-white rounded-lg p-6 shadow-xl">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+                <p className="text-gray-800">Refreshing data...</p>
+              </div>
+            </div>
+          )}
+
           {/* Header */}
           <DashboardHeader
             title="Seller Dashboard"
@@ -833,7 +910,7 @@ const SellerDashboard: React.FC = () => {
           {activeTab === 'offers' && (
             <OffersTab
               offers={offers}
-              loading={false} // Already loaded
+              loading={loading && offers.length === 0}
               onOfferAction={handleOfferAction}
               onPlayVideo={handlePlayVideo}
               onRefresh={handleRefreshOffers}
@@ -843,7 +920,7 @@ const SellerDashboard: React.FC = () => {
           {activeTab === 'listings' && (
             <ListingsTab
               listingsData={{
-                ...listingsData!,
+                ...(listingsData || { listings: [], user: { _id: '', username: '' } }),
                 listings: paginatedListings,
                 pagination: {
                   page: listingsPage,
@@ -852,7 +929,7 @@ const SellerDashboard: React.FC = () => {
                   pages: Math.ceil(filteredListings.length / listingsLimit)
                 }
               }}
-              loading={false} // Already loaded
+              loading={loading && !listingsData}
               statusFilter={listingsStatusFilter}
               currentPage={listingsPage}
               onStatusFilterChange={setListingsStatusFilter}
@@ -869,7 +946,7 @@ const SellerDashboard: React.FC = () => {
           {activeTab === 'orders' && (
             <OrdersTab
               orders={paginatedOrders}
-              loading={false} // Already loaded
+              loading={loading && orders.length === 0}
               filter={ordersFilter}
               onFilterChange={setOrdersFilter}
               onViewOrderDetails={handleViewOrderDetails}
