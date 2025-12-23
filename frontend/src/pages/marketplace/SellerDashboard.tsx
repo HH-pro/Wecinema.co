@@ -1,5 +1,5 @@
-// src/pages/seller/SellerDashboard.tsx
-import React, { useState, useEffect } from 'react';
+// src/pages/seller/SellerDashboard.tsx - COMPLETE FIX
+import React, { useState, useEffect, useCallback } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
 import { formatCurrency } from '../../api';
@@ -157,7 +157,7 @@ const SellerDashboard: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const navigate = useNavigate();
   
-  // Order stats
+  // Order stats - INITIAL VALUES SET
   const [orderStats, setOrderStats] = useState<OrderStats>({
     totalOrders: 0,
     activeOrders: 0,
@@ -247,102 +247,8 @@ const SellerDashboard: React.FC = () => {
     }
   ];
 
-  useEffect(() => {
-    fetchDashboardData();
-    checkStripeAccountStatus();
-    handleStripeReturn();
-  }, []);
-
-  // Fetch listings when tab changes or page/filter changes
-  useEffect(() => {
-    if (activeTab === 'listings') {
-      fetchListings();
-    }
-  }, [activeTab, listingsPage, listingsStatusFilter]);
-
-  // Fetch orders when orders tab is active
-  useEffect(() => {
-    if (activeTab === 'orders') {
-      fetchSellerOrders();
-    }
-  }, [activeTab, ordersPage, ordersFilter]);
-
-  // Fetch offers when offers tab is active
-  useEffect(() => {
-    if (activeTab === 'offers') {
-      fetchOffers();
-    }
-  }, [activeTab]);
-
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-      setError('');
-
-      const currentUserId = getCurrentUserId();
-      if (!currentUserId) {
-        setError('User not authenticated. Please log in again.');
-        setLoading(false);
-        return;
-      }
-
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      
-      const [ordersResponse, offersResponse, listingsResponse] = await Promise.allSettled([
-        axios.get(`${API_BASE_URL}/marketplace/my-sales`, {
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 10000
-        }),
-        axios.get(`${API_BASE_URL}/marketplace/offers/received-offers`, {
-          headers: { Authorization: `Bearer ${token}` }
-        }),
-        axios.get(`${API_BASE_URL}/marketplace/listings/my-listings`, {
-          params: { limit: 5 },
-          headers: { Authorization: `Bearer ${token}` }
-        })
-      ]);
-
-      // Process orders response
-      let ordersData: Order[] = [];
-      if (ordersResponse.status === 'fulfilled') {
-        const response = ordersResponse.value;
-        if (response.data.success) {
-          ordersData = response.data.sales || response.data.orders || [];
-        }
-      }
-
-      // Process offers response
-      let offersData: Offer[] = [];
-      if (offersResponse.status === 'fulfilled') {
-        const response = offersResponse.value;
-        if (response.data.success) {
-          offersData = response.data.offers || [];
-        }
-      }
-
-      // Process listings response
-      if (listingsResponse.status === 'fulfilled') {
-        const response = listingsResponse.value;
-        if (response.data.success) {
-          setListingsData(response.data);
-        }
-      }
-
-      // Calculate order stats
-      const stats = calculateOrderStats(ordersData);
-      setOrderStats(stats);
-      setOrders(ordersData);
-      setOffers(offersData);
-
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      setError('Failed to load dashboard data. Please try refreshing the page.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const calculateOrderStats = (orders: Order[]): OrderStats => {
+  // ✅ FIXED: Use useCallback to prevent infinite re-renders
+  const calculateOrderStats = useCallback((orders: Order[]): OrderStats => {
     const now = new Date();
     const thisMonth = now.getMonth();
     const thisYear = now.getFullYear();
@@ -375,8 +281,81 @@ const SellerDashboard: React.FC = () => {
         .filter(order => order.status === 'completed')
         .reduce((sum, order) => sum + order.amount, 0)
     };
+  }, []);
+
+  // ✅ FIXED: Main data fetch function
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const currentUserId = getCurrentUserId();
+      if (!currentUserId) {
+        setError('User not authenticated. Please log in again.');
+        setLoading(false);
+        return;
+      }
+
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      
+      // ✅ FIXED: Fetch all essential data in parallel
+      const [ordersResponse, offersResponse, listingsResponse] = await Promise.all([
+        axios.get(`${API_BASE_URL}/marketplace/my-sales`, {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 10000
+        }).catch(err => {
+          console.error('Orders fetch error:', err);
+          return { data: { success: false, sales: [] } };
+        }),
+        axios.get(`${API_BASE_URL}/marketplace/offers/received-offers`, {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 10000
+        }).catch(err => {
+          console.error('Offers fetch error:', err);
+          return { data: { success: false, offers: [] } };
+        }),
+        axios.get(`${API_BASE_URL}/marketplace/listings/my-listings`, {
+          params: { limit: 5 },
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 10000
+        }).catch(err => {
+          console.error('Listings fetch error:', err);
+          return { data: { success: false } };
+        })
+      ]);
+
+      // Process orders response
+      let ordersData: Order[] = [];
+      if (ordersResponse.data.success) {
+        ordersData = ordersResponse.data.sales || ordersResponse.data.orders || [];
+      }
+
+      // Process offers response
+      let offersData: Offer[] = [];
+      if (offersResponse.data.success) {
+        offersData = offersResponse.data.offers || [];
+      }
+
+      // Process listings response
+      if (listingsResponse.data.success) {
+        setListingsData(listingsResponse.data);
+      }
+
+      // ✅ FIXED: Always calculate stats and set orders
+      const stats = calculateOrderStats(ordersData);
+      setOrderStats(stats);
+      setOrders(ordersData);
+      setOffers(offersData);
+
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      setError('Failed to load dashboard data. Please try refreshing the page.');
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // ✅ FIXED: Fetch orders separately
   const fetchSellerOrders = async () => {
     try {
       setOrdersLoading(true);
@@ -386,7 +365,8 @@ const SellerDashboard: React.FC = () => {
       
       const params: any = {
         page: ordersPage,
-        limit: ordersLimit
+        limit: ordersLimit,
+        _t: new Date().getTime() // Prevent caching
       };
       
       if (ordersFilter !== 'all') {
@@ -400,7 +380,8 @@ const SellerDashboard: React.FC = () => {
           headers: { 
             Authorization: `Bearer ${token}`,
             'Cache-Control': 'no-cache, no-store, must-revalidate'
-          }
+          },
+          timeout: 10000
         }
       );
       
@@ -444,7 +425,8 @@ const SellerDashboard: React.FC = () => {
           headers: { 
             Authorization: `Bearer ${localStorage.getItem('token') || sessionStorage.getItem('token')}`,
             'Cache-Control': 'no-cache, no-store, must-revalidate'
-          }
+          },
+          timeout: 10000
         }
       );
       
@@ -470,7 +452,8 @@ const SellerDashboard: React.FC = () => {
           headers: { 
             Authorization: `Bearer ${token}`,
             'Cache-Control': 'no-cache, no-store, must-revalidate'
-          }
+          },
+          timeout: 10000
         }
       );
       
@@ -491,7 +474,8 @@ const SellerDashboard: React.FC = () => {
       const response = await axios.get(
         `${API_BASE_URL}/marketplace/stripe/status`,
         {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 5000
         }
       );
       
@@ -516,22 +500,29 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
+  // ✅ FIXED: Enhanced refresh function
   const handleRefresh = async () => {
     setRefreshing(true);
     
-    // Refresh based on active tab
-    if (activeTab === 'overview') {
+    try {
+      // Always refresh dashboard data first
       await fetchDashboardData();
-    } else if (activeTab === 'listings') {
-      await fetchListings();
-    } else if (activeTab === 'orders') {
-      await fetchSellerOrders();
-    } else if (activeTab === 'offers') {
-      await fetchOffers();
+      
+      // Then refresh specific tab data
+      if (activeTab === 'listings') {
+        await fetchListings();
+      } else if (activeTab === 'orders') {
+        await fetchSellerOrders();
+      } else if (activeTab === 'offers') {
+        await fetchOffers();
+      }
+      
+      await checkStripeAccountStatus();
+    } catch (error) {
+      console.error('Refresh error:', error);
+    } finally {
+      setRefreshing(false);
     }
-    
-    await checkStripeAccountStatus();
-    setRefreshing(false);
   };
 
   // Order management functions
@@ -623,7 +614,8 @@ const SellerDashboard: React.FC = () => {
           headers: { 
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
-          }
+          },
+          timeout: 10000
         }
       );
 
@@ -652,7 +644,8 @@ const SellerDashboard: React.FC = () => {
             headers: { 
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json'
-            }
+            },
+            timeout: 10000
           }
         );
 
@@ -722,9 +715,11 @@ const SellerDashboard: React.FC = () => {
       return order;
     }));
     
-    const updatedStats = calculateOrderStats(
-      orders.map(order => order._id === orderId ? { ...order, status: newStatus } : order)
+    // ✅ FIXED: Recalculate stats with updated orders
+    const updatedOrders = orders.map(order => 
+      order._id === orderId ? { ...order, status: newStatus } : order
     );
+    const updatedStats = calculateOrderStats(updatedOrders);
     setOrderStats(updatedStats);
   };
 
@@ -758,7 +753,8 @@ const SellerDashboard: React.FC = () => {
         `${API_BASE_URL}/marketplace/offers/${offerId}/${action}`,
         {},
         {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 10000
         }
       );
 
@@ -783,6 +779,42 @@ const SellerDashboard: React.FC = () => {
       fetchDashboardData();
     }, 2000);
   };
+
+  // ✅ FIXED: Initial data loading
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        await fetchDashboardData();
+        await checkStripeAccountStatus();
+        handleStripeReturn();
+      } catch (error) {
+        console.error('Initial data loading error:', error);
+      }
+    };
+    
+    loadInitialData();
+  }, []); // ✅ Empty dependency array - only run once on mount
+
+  // ✅ FIXED: Fetch listings when tab changes
+  useEffect(() => {
+    if (activeTab === 'listings') {
+      fetchListings();
+    }
+  }, [activeTab, listingsPage, listingsStatusFilter]);
+
+  // ✅ FIXED: Fetch orders when orders tab is active
+  useEffect(() => {
+    if (activeTab === 'orders') {
+      fetchSellerOrders();
+    }
+  }, [activeTab, ordersPage, ordersFilter]);
+
+  // ✅ FIXED: Fetch offers when offers tab is active
+  useEffect(() => {
+    if (activeTab === 'offers') {
+      fetchOffers();
+    }
+  }, [activeTab]);
 
   // Clear messages after 5 seconds
   useEffect(() => {
@@ -818,7 +850,8 @@ const SellerDashboard: React.FC = () => {
 
   const currentLoading = getCurrentLoadingState();
 
-  if (currentLoading && activeTab === 'overview') {
+  // ✅ FIXED: Only show loading for initial load, not tab switches
+  if (loading && orders.length === 0 && listingsData === null) {
     return (
       <MarketplaceLayout>
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
@@ -898,19 +931,21 @@ const SellerDashboard: React.FC = () => {
                 {/* Order Workflow Guide */}
                 <OrderWorkflowGuide />
 
-                {/* Recent Orders */}
-                <RecentOrders
-                  orders={orders.slice(0, 5)}
-                  onViewOrderDetails={handleViewOrderDetails}
-                  onStartProcessing={handleSimpleStartProcessing}
-                  onStartWork={handleSimpleStartWork}
-                  onDeliver={handleSimpleDeliver}
-                  onCancel={handleSimpleCancel}
-                  onCompleteRevision={handleSimpleCompleteRevision}
-                  onViewAll={() => setActiveTab('orders')}
-                  onCreateListing={() => navigate('/marketplace/create')}
-                  orderActionLoading={orderActionLoading}
-                />
+                {/* ✅ FIXED: Recent Orders - Show only if orders exist */}
+                {orders.length > 0 && (
+                  <RecentOrders
+                    orders={orders.slice(0, 5)}
+                    onViewOrderDetails={handleViewOrderDetails}
+                    onStartProcessing={handleSimpleStartProcessing}
+                    onStartWork={handleSimpleStartWork}
+                    onDeliver={handleSimpleDeliver}
+                    onCancel={handleSimpleCancel}
+                    onCompleteRevision={handleSimpleCompleteRevision}
+                    onViewAll={() => setActiveTab('orders')}
+                    onCreateListing={() => navigate('/marketplace/create')}
+                    orderActionLoading={orderActionLoading}
+                  />
+                )}
 
                 {/* Action Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
