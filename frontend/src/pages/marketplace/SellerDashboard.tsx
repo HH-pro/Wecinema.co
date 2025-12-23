@@ -4,7 +4,7 @@ import MarketplaceLayout from '../../components/Layout';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
 import { formatCurrency } from '../../api';
 import axios from 'axios';
-
+import { useNavigate } from 'react-router-dom';
 // Import new components
 import DashboardHeader from '../../components/marketplae/seller/DashboardHeader';
 import AlertMessage from '../../components/marketplae/seller/AlertMessage';
@@ -744,10 +744,10 @@ const SellerDashboard: React.FC = () => {
               <WelcomeCard
                 title="Welcome back, Seller! 👋"
                 subtitle="Manage your business efficiently with real-time insights and quick actions."
-                primaryAction={{
-                  label: '+ Create New Listing',
-                  onClick: () => window.open('/create-listing', '_blank')
-                }}
+                 primaryAction={{
+          label: '+ Create New Listing',
+          onClick: () => navigate('/marketplace/create') // Same tab mein open hoga
+        }}
                 secondaryAction={{
                   label: '💰 Setup Payments',
                   onClick: () => setShowStripeSetup(true),
