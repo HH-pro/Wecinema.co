@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Gallery, Layout, Render } from "../components/";
+import { AnalyticsSection } from "../components/Analytics"; // New import
 import { getRequest } from "../api";
 import { useNavigate } from "react-router-dom";
 import LoadingBar from 'react-top-loading-bar';
@@ -86,24 +87,16 @@ const Homepage: React.FC = () => {
     <Layout expand={expand} setExpand={setExpand}>
       <LoadingBar color="#ffb300" progress={progress} height={3} />
       
+      {/* Hero Section */}
       <div className="textured-background homepage-hero">
         <h1 className="main-heading">WECINEMA</h1>
         <p className="sub-heading">Your ultimate platform for cinematic storytelling</p>
-        
-        {/* Analytics Page Link Button */}
-        <div className="analytics-cta">
-          <button 
-            className="analytics-button"
-            onClick={() => nav("/analytics")}
-          >
-            View Analytics Dashboard
-          </button>
-          <p className="analytics-description">
-            Explore trends, genres, themes, and ratings with interactive charts
-          </p>
-        </div>
       </div>
 
+      {/* Analytics Section as Component */}
+      <AnalyticsSection title="Platform Analytics" />
+      
+      {/* Theme Bar */}
       <div className="theme-bar">
         {theme.map((val, index) => (
           <button
@@ -116,49 +109,53 @@ const Homepage: React.FC = () => {
         ))}
       </div>
 
+      {/* Gallery Sections */}
       <Gallery title="Action" category="Action" length={5} isFirst />
       <Gallery title="Comedy" length={5} category="Comedy" />
       <Gallery title="Adventure" length={5} category="Adventure" />
       <Gallery title="Horror" length={5} category="Horror" />
       <Gallery title="Drama" length={5} category="Drama" />
       
-      <div className="z-1 relative p-2 flex flex-wrap border-b border-blue-200 sm:mx-4 pb-4">
-        {!loading && (
-          <h2 className="text-l font-extrabold text-lg sm:text-xl">Latest Scripts</h2>
-        )}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {scripts?.map((script: string, index: number) => (
-            <div
-              key={index}
-              className={`${showMoreIndex === index
-                  ? "script-card-highlighted"
-                  : "script-card"
-                } hide-scrollbar`}
-              onMouseEnter={() => handleScriptMouseEnter(index)}
-              onMouseLeave={handleScriptMouseLeave}
-              onClick={() =>
-                nav(`/script/${data[index]._id}`, {
-                  state: JSON.stringify(data[index]),
-                })
-              }
-            >
-              <h2>{data[index].title}</h2>
-              {showMoreIndex === index && (
-                <button
-                  className="read-more-button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    nav(`/script/${data[index]._id}`, {
-                      state: JSON.stringify(data[index]),
-                    });
-                  }}
-                >
-                  Read More
-                </button>
-              )}
-              <Render htmlString={script} />
-            </div>
-          ))}
+      {/* Scripts Section */}
+      <div className="scripts-section">
+        <div className="z-1 relative p-2 flex flex-wrap border-b border-blue-200 sm:mx-4 pb-4">
+          {!loading && (
+            <h2 className="text-l font-extrabold text-lg sm:text-xl">Latest Scripts</h2>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {scripts?.map((script: string, index: number) => (
+              <div
+                key={index}
+                className={`${showMoreIndex === index
+                    ? "script-card-highlighted"
+                    : "script-card"
+                  } hide-scrollbar`}
+                onMouseEnter={() => handleScriptMouseEnter(index)}
+                onMouseLeave={handleScriptMouseLeave}
+                onClick={() =>
+                  nav(`/script/${data[index]._id}`, {
+                    state: JSON.stringify(data[index]),
+                  })
+                }
+              >
+                <h2>{data[index].title}</h2>
+                {showMoreIndex === index && (
+                  <button
+                    className="read-more-button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      nav(`/script/${data[index]._id}`, {
+                        state: JSON.stringify(data[index]),
+                      });
+                    }}
+                  >
+                    Read More
+                  </button>
+                )}
+                <Render htmlString={script} />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </Layout>
