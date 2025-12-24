@@ -603,3 +603,251 @@
     font-size: 1.1rem;
   }
 }
+
+/* Charts Loading State */
+.charts-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 320px;
+  background: rgba(30, 41, 59, 0.3);
+  border-radius: 16px;
+  border: 1px dashed rgba(255, 255, 255, 0.05);
+  animation: fadeIn 0.5s ease;
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid rgba(59, 130, 246, 0.1);
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1.2s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.loading-spinner::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  right: -3px;
+  bottom: -3px;
+  border: 3px solid transparent;
+  border-top-color: rgba(59, 130, 246, 0.3);
+  border-radius: 50%;
+  animation: spin 1.5s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite reverse;
+}
+
+.loading-text {
+  color: #94a3b8;
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+/* Chart Header Enhancement */
+.chart-title-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.chart-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.indicator-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+.indicator-text {
+  color: #94a3b8;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Chart Canvas */
+.chart-canvas {
+  position: relative;
+  height: 100%;
+  min-height: 200px;
+}
+
+/* No Data State */
+.no-data {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 40px;
+  text-align: center;
+  background: rgba(30, 41, 59, 0.2);
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.05);
+}
+
+.no-data-icon {
+  font-size: 2.5rem;
+  opacity: 0.5;
+  margin-bottom: 16px;
+  filter: grayscale(1);
+}
+
+.no-data-text {
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.no-data-subtext {
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+/* Chart Footer */
+.chart-footer {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.data-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.stat-label {
+  color: #94a3b8;
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stat-value {
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.stat-trend {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+
+.stat-trend.up {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+
+.stat-trend.down {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.stat-trend.stable {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+}
+
+/* Hover Effects for Chart Card */
+.chart-card:hover .chart-indicator {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.chart-card:hover .indicator-dot {
+  animation: pulse 1s infinite;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .charts-loading {
+    height: 280px;
+  }
+  
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .no-data {
+    padding: 30px;
+  }
+  
+  .no-data-icon {
+    font-size: 2rem;
+  }
+  
+  .chart-title-wrapper {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .chart-indicator {
+    align-self: flex-start;
+  }
+  
+  .data-stats {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  
+  .stat-item {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .charts-loading {
+    height: 250px;
+  }
+  
+  .no-data {
+    padding: 20px;
+  }
+  
+  .no-data-icon {
+    font-size: 1.8rem;
+  }
+}
