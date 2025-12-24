@@ -13,6 +13,6 @@ export { default as Theme } from "./theme";
 export { default as Search } from "./search";
 
 
-export { default as AnalyticsSection } from "./Analytics/AnalyticsSection";
-export { default as Charts } from "./Analytics/Charts";
-export { default as StatsSummary } from "./Analytics/StatsSummary";
+export { default as AnalyticsSection } from "../components/Analytics/AnalyticsSection";
+export { default as Charts } from "../components/Analytics/Charts";
+export { default as StatsSummary } from "../components/Analytics/StatsSummary";
