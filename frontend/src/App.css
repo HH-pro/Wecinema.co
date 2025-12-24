@@ -27,143 +27,122 @@
 	background:#00c8ff1a
 	;
   }
-/* Chart Styles */
-.chart-wrapper {
-  display: grid;
-  gap: 1.5rem;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-}
-
-.chart-container {
-  position: relative;
-  padding: 1.5rem;
-  border-radius: 1rem;
-  background: rgba(17, 24, 39, 0.5);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: all 0.3s ease;
-}
-
-.chart-container:hover {
-  border-color: rgba(59, 130, 246, 0.5);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-}
-
-/* Swiper Styles for Mobile */
-.mobile-swiper {
-  position: relative;
-  height: 400px;
-  margin: 2rem 0;
-}
-
-.mobile-swiper .chart-container {
-  height: 350px;
-  margin: 0 1rem;
-  padding: 1.5rem;
-}
-
-/* Custom Navigation Buttons */
-.custom-prev,
-.custom-next {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(0, 0, 0, 0.5);
-  color: white;
-  border: none;
-  padding: 1rem;
-  cursor: pointer;
-  z-index: 10;
-  border-radius: 50%;
-  transition: all 0.3s ease;
-}
-
-.custom-prev:hover,
-.custom-next:hover {
-  background: rgba(59, 130, 246, 0.8);
-}
-
-.custom-prev {
-  left: 10px;
-}
-
-.custom-next {
-  right: 10px;
-}
-
-/* Theme Bar */
-.theme-bar {
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  padding: 1rem 0;
-}
-
-.theme-bar::-webkit-scrollbar {
-  display: none;
-}
-
-.theme-button {
-  flex-shrink: 0;
-  white-space: nowrap;
-  transition: all 0.3s ease;
-}
-
-/* Loading Animation */
-@keyframes pulse {
-  0%, 100% {
+/* Modern Chart Styles */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
     opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
+    transform: translateY(0);
   }
 }
 
-.loading-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
 }
 
-/* Gradient Background */
-.textured-background {
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-  min-height: 100vh;
+/* Smooth transitions */
+* {
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-  .chart-wrapper {
-    grid-template-columns: 1fr;
-  }
-  
-  .chart-container {
-    padding: 1rem;
-  }
-  
-  .mobile-swiper {
-    height: 350px;
-  }
-}
-
-/* Smooth Transitions */
-.chart-container,
-.theme-button,
-.script-card {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Glass Effect */
-.glass-effect {
+/* Glass morphism */
+.glass {
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Line clamp for text */
+/* Compact scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Line clamp utilities */
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .line-clamp-3 {
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Loading dots animation */
+.loading-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.loading-dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: currentColor;
+  animation: dotPulse 1.4s infinite ease-in-out;
+}
+
+.loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+.loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes dotPulse {
+  0%, 80%, 100% { opacity: 0.3; }
+  40% { opacity: 1; }
+}
+
+/* Responsive design */
+@media (max-width: 640px) {
+  .chart-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Enhanced focus styles */
+:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Subtle hover effects */
+.hover-lift {
+  transition: transform 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
 }
   .body-light {
 	background:#fff;
