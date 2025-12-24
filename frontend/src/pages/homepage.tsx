@@ -87,12 +87,7 @@ const Homepage: React.FC = () => {
     <Layout expand={expand} setExpand={setExpand}>
       <LoadingBar color="#ffb300" progress={progress} height={3} />
       
-      {/* Hero Section */}
-      <div className="textured-background homepage-hero">
-        <h1 className="main-heading">WECINEMA</h1>
-        <p className="sub-heading">Your ultimate platform for cinematic storytelling</p>
-      </div>
-
+    
       {/* Analytics Section as Component */}
       <AnalyticsSection title="Platform Analytics" />
       
