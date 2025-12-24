@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Gallery, Layout, Render } from "../components/";
-import { AnalyticsSection } from "../components/Analytics/An"; // New import
+import { AnalyticsSection } from "../components/Analytics/"; // New import
 import { getRequest } from "../api";
 import { useNavigate } from "react-router-dom";
 import LoadingBar from 'react-top-loading-bar';
