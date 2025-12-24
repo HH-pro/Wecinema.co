@@ -129,7 +129,7 @@
 .stylish-bar-title {
   font-size: 1.1rem;
   font-weight: 700;
-  background: white;
+  background: linear-gradient(45deg, #fbbf24, #f59e0b, #d97706);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
