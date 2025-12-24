@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Gallery, Layout, Render } from "../components/";
-import { AnalyticsSection } from "../components/Analytics/"; // New import
+import { Gallery, Layout, Render, AnalyticsSection } from "../components/";
 import { getRequest } from "../api";
 import { useNavigate } from "react-router-dom";
 import LoadingBar from 'react-top-loading-bar';
@@ -87,9 +86,14 @@ const Homepage: React.FC = () => {
     <Layout expand={expand} setExpand={setExpand}>
       <LoadingBar color="#ffb300" progress={progress} height={3} />
       
-    
+      {/* Hero Section */}
+      <div className="textured-background homepage-hero">
+        <h1 className="main-heading">WECINEMA</h1>
+        <p className="sub-heading">Your ultimate platform for cinematic storytelling</p>
+      </div>
+
       {/* Analytics Section as Component */}
-      <AnalyticsSection title="Platform Analytics" />
+      <AnalyticsSection title="Analytics" />
       
       {/* Theme Bar */}
       <div className="theme-bar">
