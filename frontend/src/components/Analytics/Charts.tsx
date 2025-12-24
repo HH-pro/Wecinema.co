@@ -32,6 +32,7 @@ const Charts: React.FC = () => {
   const [genreChartData, setGenreChartData] = useState<any>(null);
   const [themeChartData, setThemeChartData] = useState<any>(null);
   const [ratingChartData, setRatingChartData] = useState<any>(null);
+  const [hoveredChart, setHoveredChart] = useState<number | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -58,23 +59,23 @@ const Charts: React.FC = () => {
             const firstKey = Object.keys(genreData)[0];
             const labels = Object.keys(genreData[firstKey]).reverse();
             
-            // Get top 4 genres by total count
+            // Get top 3 genres by total count
             const genreTotals = Object.keys(genreData).map(genre => ({
               genre,
               total: Object.values(genreData[genre]).reduce((sum: number, val: any) => sum + (val?.count || 0), 0)
-            })).sort((a, b) => b.total - a.total).slice(0, 4);
+            })).sort((a, b) => b.total - a.total).slice(0, 3);
 
             const datasets = genreTotals.map(({ genre }, index) => ({
               label: genre,
               data: labels.map((date: string) => genreData[genre][date]?.count || 0),
-              borderColor: getChartColor(index),
+              borderColor: getGradientColor(index),
               backgroundColor: 'transparent',
-              borderWidth: 2,
+              borderWidth: 3,
               tension: 0.4,
-              pointRadius: 2,
-              pointHoverRadius: 4,
+              pointRadius: 0,
+              pointHoverRadius: 6,
               pointBackgroundColor: '#ffffff',
-              pointBorderColor: getChartColor(index),
+              pointBorderColor: getSolidColor(index),
               pointBorderWidth: 2,
               fill: false,
             }));
@@ -90,23 +91,23 @@ const Charts: React.FC = () => {
             const firstKey = Object.keys(themeData)[0];
             const labels = Object.keys(themeData[firstKey]).reverse();
             
-            // Get top 4 themes by total count
+            // Get top 3 themes by total count
             const themeTotals = Object.keys(themeData).map(theme => ({
               theme,
               total: Object.values(themeData[theme]).reduce((sum: number, val: any) => sum + (val?.count || 0), 0)
-            })).sort((a, b) => b.total - a.total).slice(0, 4);
+            })).sort((a, b) => b.total - a.total).slice(0, 3);
 
             const datasets = themeTotals.map(({ theme }, index) => ({
               label: theme,
               data: labels.map((date: string) => themeData[theme][date]?.count || 0),
-              borderColor: getChartColor(index + 4),
+              borderColor: getGradientColor(index + 3),
               backgroundColor: 'transparent',
-              borderWidth: 2,
+              borderWidth: 3,
               tension: 0.4,
-              pointRadius: 2,
-              pointHoverRadius: 4,
+              pointRadius: 0,
+              pointHoverRadius: 6,
               pointBackgroundColor: '#ffffff',
-              pointBorderColor: getChartColor(index + 4),
+              pointBorderColor: getSolidColor(index + 3),
               pointBorderWidth: 2,
               fill: false,
             }));
@@ -123,33 +124,33 @@ const Charts: React.FC = () => {
             
             const datasets = [
               {
-                label: "Average Rating",
+                label: "Avg Rating",
                 data: labels.map((date: string) => ratingData[date]?.averageRating || 0),
-                borderColor: "#3b82f6",
+                borderColor: 'linear-gradient(90deg, #f59e0b, #fbbf24)',
                 backgroundColor: 'transparent',
                 borderWidth: 3,
                 tension: 0.4,
-                pointRadius: 2,
+                pointRadius: 0,
+                pointHoverRadius: 6,
+                pointBackgroundColor: '#ffffff',
+                pointBorderColor: '#f59e0b',
+                pointBorderWidth: 2,
+                fill: false,
+              },
+              {
+                label: "Total",
+                data: labels.map((date: string) => ratingData[date]?.totalRatings || 0),
+                borderColor: 'linear-gradient(90deg, #3b82f6, #60a5fa)',
+                backgroundColor: 'transparent',
+                borderWidth: 2.5,
+                tension: 0.4,
+                pointRadius: 0,
                 pointHoverRadius: 5,
                 pointBackgroundColor: '#ffffff',
                 pointBorderColor: '#3b82f6',
                 pointBorderWidth: 2,
                 fill: false,
-              },
-              {
-                label: "Total Ratings",
-                data: labels.map((date: string) => ratingData[date]?.totalRatings || 0),
-                borderColor: "#10b981",
-                backgroundColor: 'transparent',
-                borderWidth: 2,
-                tension: 0.4,
-                pointRadius: 2,
-                pointHoverRadius: 4,
-                pointBackgroundColor: '#ffffff',
-                pointBorderColor: '#10b981',
-                pointBorderWidth: 2,
-                fill: false,
-                borderDash: [4, 4],
+                borderDash: [5, 3],
               },
             ];
 
@@ -173,19 +174,25 @@ const Charts: React.FC = () => {
     };
   }, []);
 
-  // Professional color palette
-  const getChartColor = (index: number) => {
-    const colors = [
-      '#3b82f6', // Blue
-      '#10b981', // Emerald
-      '#f59e0b', // Amber
-      '#8b5cf6', // Violet
-      '#ec4899', // Pink
-      '#06b6d4', // Cyan
-      '#84cc16', // Lime
-      '#f97316', // Orange
+  // Gradient colors for stylish lines
+  const getGradientColor = (index: number) => {
+    const gradients = [
+      'linear-gradient(90deg, #3b82f6, #8b5cf6)',
+      'linear-gradient(90deg, #10b981, #06b6d4)',
+      'linear-gradient(90deg, #f59e0b, #f97316)',
+      'linear-gradient(90deg, #ec4899, #8b5cf6)',
+      'linear-gradient(90deg, #06b6d4, #3b82f6)',
+      'linear-gradient(90deg, #84cc16, #10b981)',
     ];
-    
+    return gradients[index % gradients.length];
+  };
+
+  // Solid colors for points
+  const getSolidColor = (index: number) => {
+    const colors = [
+      '#3b82f6', '#10b981', '#f59e0b',
+      '#8b5cf6', '#ec4899', '#06b6d4'
+    ];
     return colors[index % colors.length];
   };
 
@@ -198,7 +205,7 @@ const Charts: React.FC = () => {
     });
   };
 
-  // Professional chart options (clean line graphs)
+  // Stylish chart options
   const chartOptions = (): ChartOptions<"line"> => ({
     responsive: true,
     maintainAspectRatio: false,
@@ -206,25 +213,24 @@ const Charts: React.FC = () => {
       legend: {
         position: "top" as const,
         labels: {
-          color: "#6b7280",
+          color: "#e2e8f0",
           font: { 
             size: 11,
-            family: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-            weight: '500' as const
+            family: "'Inter', -apple-system, sans-serif",
+            weight: '600' as const
           },
           usePointStyle: true,
           boxWidth: 6,
-          padding: 10,
+          padding: 12,
           generateLabels: (chart) => {
             const datasets = chart.data.datasets;
             return datasets.map((dataset, i) => ({
-              text: dataset.label?.length > 12 ? dataset.label.substring(0, 12) + '...' : dataset.label,
-              fillStyle: dataset.borderColor as string,
-              strokeStyle: dataset.borderColor as string,
-              lineWidth: 2,
+              text: dataset.label?.length > 10 ? dataset.label.substring(0, 10) + '...' : dataset.label,
+              fillStyle: dataset.pointBorderColor as string,
+              strokeStyle: dataset.pointBorderColor as string,
+              lineWidth: 3,
               hidden: !chart.isDatasetVisible(i),
-              index: i,
-              pointStyle: 'circle'
+              index: i
             }));
           }
         }
@@ -233,9 +239,9 @@ const Charts: React.FC = () => {
         enabled: true,
         mode: 'index',
         intersect: false,
-        backgroundColor: "rgba(255, 255, 255, 0.95)",
-        titleColor: "#374151",
-        bodyColor: "#4b5563",
+        backgroundColor: "rgba(15, 23, 42, 0.95)",
+        titleColor: "#d1d5db",
+        bodyColor: "#f3f4f6",
         titleFont: {
           size: 12,
           family: "'Inter', -apple-system, sans-serif",
@@ -244,14 +250,14 @@ const Charts: React.FC = () => {
         bodyFont: {
           size: 11,
           family: "'Inter', -apple-system, sans-serif",
-          weight: '400' as const
+          weight: '500' as const
         },
-        padding: 10,
-        cornerRadius: 6,
-        borderColor: "rgba(209, 213, 219, 0.5)",
+        padding: 12,
+        cornerRadius: 10,
+        borderColor: "rgba(255, 255, 255, 0.1)",
         borderWidth: 1,
         displayColors: true,
-        boxPadding: 4,
+        boxPadding: 5,
         usePointStyle: true,
         callbacks: {
           label: function(context) {
@@ -270,19 +276,17 @@ const Charts: React.FC = () => {
     scales: {
       y: {
         grid: {
-          color: "rgba(229, 231, 235, 0.5)",
+          color: "rgba(255, 255, 255, 0.05)",
           drawBorder: false,
-          drawTicks: false,
           lineWidth: 1,
         },
         ticks: { 
-          color: "#6b7280", 
+          color: "#94a3b8", 
           font: { 
             size: 10,
-            family: "'Inter', -apple-system, sans-serif",
-            weight: '400' as const
+            family: "'Inter', -apple-system, sans-serif"
           },
-          padding: 8,
+          padding: 10,
           callback: function(value) {
             const numValue = Number(value);
             if (numValue >= 1000) {
@@ -299,22 +303,20 @@ const Charts: React.FC = () => {
       x: {
         reverse: true,
         grid: {
-          color: "rgba(229, 231, 235, 0.5)",
+          color: "rgba(255, 255, 255, 0.05)",
           drawBorder: false,
-          drawTicks: false,
           lineWidth: 1,
         },
         ticks: { 
-          color: "#6b7280", 
+          color: "#94a3b8", 
           font: { 
             size: 10,
-            family: "'Inter', -apple-system, sans-serif",
-            weight: '400' as const
+            family: "'Inter', -apple-system, sans-serif"
           },
           maxRotation: 0,
           autoSkip: true,
           maxTicksLimit: 6,
-          padding: 8,
+          padding: 10,
         },
         border: {
           display: false,
@@ -324,12 +326,12 @@ const Charts: React.FC = () => {
     elements: {
       line: { 
         tension: 0.4, 
-        borderWidth: 2,
+        borderWidth: 3,
         fill: false,
       },
       point: { 
-        radius: 2,
-        hoverRadius: 4,
+        radius: 0,
+        hoverRadius: 6,
         backgroundColor: "#ffffff",
         borderWidth: 2,
         hoverBorderWidth: 3,
@@ -344,9 +346,12 @@ const Charts: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="charts-loading-compact">
-        <div className="loading-spinner-compact"></div>
-        <p>Loading data...</p>
+      <div className="stylish-loading">
+        <div className="loading-spinner-stylish">
+          <div className="spinner-ring"></div>
+          <div className="spinner-core"></div>
+        </div>
+        <p className="loading-text">Loading visual data...</p>
       </div>
     );
   }
@@ -354,38 +359,79 @@ const Charts: React.FC = () => {
   const charts = [
     { 
       data: genreChartData, 
-      title: "Genres", 
-      description: "Popularity trend"
+      title: "Genre Trends", 
+      description: "Popularity over time",
+      icon: "🎬",
+      color: "#3b82f6"
     },
     { 
       data: themeChartData, 
-      title: "Themes", 
-      description: "Engagement over time"
+      title: "Theme Analysis", 
+      description: "Engagement metrics",
+      icon: "🎯",
+      color: "#10b981"
     },
     { 
       data: ratingChartData, 
-      title: "Ratings", 
-      description: "Average & total ratings"
+      title: "Ratings Overview", 
+      description: "Average & total ratings",
+      icon: "⭐",
+      color: "#f59e0b"
     },
   ];
 
   return (
-    <div className="charts-grid-compact">
+    <div className="charts-grid-stylish">
       {charts.map((chart, idx) => (
-        <div key={idx} className="chart-card-compact">
-          <div className="chart-header-compact">
-            <h3 className="chart-title-compact">{chart.title}</h3>
-            <p className="chart-description-compact">{chart.description}</p>
+        <div 
+          key={idx} 
+          className={`chart-card-stylish ${hoveredChart === idx ? 'hovered' : ''}`}
+          onMouseEnter={() => setHoveredChart(idx)}
+          onMouseLeave={() => setHoveredChart(null)}
+        >
+          <div className="chart-header-stylish">
+            <div className="chart-title-section">
+              <div className="chart-icon-stylish" style={{ 
+                background: `linear-gradient(135deg, ${chart.color}20, ${chart.color}10)`,
+                borderColor: `${chart.color}30`
+              }}>
+                <span>{chart.icon}</span>
+              </div>
+              <div>
+                <h3 className="chart-title">{chart.title}</h3>
+                <p className="chart-description">{chart.description}</p>
+              </div>
+            </div>
+            <div className="chart-status">
+              <span className="status-dot"></span>
+              <span className="status-text">Live</span>
+            </div>
           </div>
           
-          <div className="chart-wrapper-compact">
+          <div className="chart-wrapper-stylish">
             {chart.data ? (
               <Line data={chart.data} options={chartOptions()} />
             ) : (
-              <div className="no-data-compact">
+              <div className="no-data-stylish">
+                <div className="no-data-icon">📊</div>
                 <span>No data available</span>
               </div>
             )}
+          </div>
+          
+          <div className="chart-footer-stylish">
+            <div className="footer-info">
+              <span className="info-item">
+                <span className="info-label">Points:</span>
+                <span className="info-value">{chart.data?.labels.length || 0}</span>
+              </span>
+              <span className="info-item">
+                <span className="info-label">Trend:</span>
+                <span className="info-trend">
+                  {idx === 2 ? '↗ Rising' : '→ Stable'}
+                </span>
+              </span>
+            </div>
           </div>
         </div>
       ))}
