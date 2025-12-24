@@ -837,6 +837,7 @@ nav img {
   transform: translateY(-50%);
   width: 40px;
   height: 40px;
+  background-color: rgba(0, 0, 0, 0.5);
   color: white;
   font-size: 20px;
   display: flex;
