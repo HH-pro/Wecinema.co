@@ -27,7 +27,144 @@
 	background:#00c8ff1a
 	;
   }
+/* Chart Styles */
+.chart-wrapper {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
 
+.chart-container {
+  position: relative;
+  padding: 1.5rem;
+  border-radius: 1rem;
+  background: rgba(17, 24, 39, 0.5);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.chart-container:hover {
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+/* Swiper Styles for Mobile */
+.mobile-swiper {
+  position: relative;
+  height: 400px;
+  margin: 2rem 0;
+}
+
+.mobile-swiper .chart-container {
+  height: 350px;
+  margin: 0 1rem;
+  padding: 1.5rem;
+}
+
+/* Custom Navigation Buttons */
+.custom-prev,
+.custom-next {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  border: none;
+  padding: 1rem;
+  cursor: pointer;
+  z-index: 10;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.custom-prev:hover,
+.custom-next:hover {
+  background: rgba(59, 130, 246, 0.8);
+}
+
+.custom-prev {
+  left: 10px;
+}
+
+.custom-next {
+  right: 10px;
+}
+
+/* Theme Bar */
+.theme-bar {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 1rem 0;
+}
+
+.theme-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.theme-button {
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+}
+
+/* Loading Animation */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.loading-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Gradient Background */
+.textured-background {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  min-height: 100vh;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .chart-wrapper {
+    grid-template-columns: 1fr;
+  }
+  
+  .chart-container {
+    padding: 1rem;
+  }
+  
+  .mobile-swiper {
+    height: 350px;
+  }
+}
+
+/* Smooth Transitions */
+.chart-container,
+.theme-button,
+.script-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Glass Effect */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Line clamp for text */
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
   .body-light {
 	background:#fff;
 	color: var(--texts-color);
