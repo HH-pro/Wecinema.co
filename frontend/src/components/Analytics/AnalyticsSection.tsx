@@ -50,7 +50,7 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
             </button>
           </div>
           
-          {/* Progress Indicators (Mini preview) */}
+          {/* Progress Indicators */}
           <div className="bar-indicators">
             <div className="indicator">
               <div className="indicator-bar" style={{ width: '75%' }}>
