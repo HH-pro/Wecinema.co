@@ -1179,35 +1179,3 @@ nav img {
   background: #f59e0b;
   clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
 }
-.chart-control-btn {
-  background: rgba(255,255,255,0.06);
-  color: #fff;
-  border: 1px solid rgba(255,255,255,0.06);
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: transform .08s ease, background .08s ease;
-}
-.chart-control-btn:hover {
-  transform: translateY(-1px);
-  background: rgba(255,255,255,0.09);
-}
-.chart-container {
-  height: 300px;
-  padding: 12px;
-  position: relative;
-  background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.0));
-  border-radius: 8px;
-}
-/* Larger fullscreen chart container handled inline in TSX */
-.chart-wrapper {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(1, 1fr);
-}
-@media(min-width: 1024px) {
-  .chart-wrapper-lg {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
