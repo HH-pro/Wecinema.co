@@ -1,13 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Layout } from "../components/";
-import { getRequest } from "../api";
-import { useNavigate } from "react-router-dom";
-import { Swiper, SwiperSlide } from "swiper/react";
-import { Pagination, Navigation } from "swiper/modules";
+import { getRequest } from "../../api";
 import { Line } from "react-chartjs-2";
-import "swiper/css";
-import "swiper/css/pagination";
-import "../App.css";
+import "./Analytics.css";
 
 import {
   Chart as ChartJS,
@@ -31,13 +25,15 @@ ChartJS.register(
   Legend
 );
 
-const AnalyticsPage: React.FC = () => {
+interface ChartsProps {
+  showAll?: boolean;
+}
+
+const Charts: React.FC<ChartsProps> = ({ showAll = false }) => {
   const [loading, setLoading] = useState(false);
   const [genreChartData, setGenreChartData] = useState<any>(null);
   const [themeChartData, setThemeChartData] = useState<any>(null);
   const [ratingChartData, setRatingChartData] = useState<any>(null);
-  const nav = useNavigate();
-  const [expand, setExpand] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -217,104 +213,46 @@ const AnalyticsPage: React.FC = () => {
     },
   });
 
-  return (
-    <Layout expand={expand} setExpand={setExpand}>
-      <div className="analytics-container">
-        <div className="analytics-header">
-          <h1 className="analytics-title">Analytics Dashboard</h1>
-          <p className="analytics-subtitle">
-            Track trends and performance metrics over time
-          </p>
-          <button 
-            className="back-to-home"
-            onClick={() => nav("/")}
-          >
-            ← Back to Home
-          </button>
-        </div>
-
-        {window.innerWidth < 768 ? (
-          <div className="mobile-swiper">
-            <Swiper
-              modules={[Pagination, Navigation]}
-              pagination={{
-                clickable: true,
-                dynamicBullets: true,
-                renderBullet: (index, className) => {
-                  return `<span class="${className} swiper-pagination-bullet-custom"></span>`;
-                }
-              }}
-              navigation={{
-                prevEl: ".custom-prev",
-                nextEl: ".custom-next"
-              }}
-              spaceBetween={20}
-              slidesPerView={1}
-              centeredSlides={true}
-              loop={true}
-              watchSlidesProgress={true}
-              className="h-full"
-            >
-              {[genreChartData, themeChartData, ratingChartData].map((chartData, idx) => (
-                <SwiperSlide key={idx}>
-                  <div className="chart-container">
-                    <div className="chart-title">{chartTitles[idx]}</div>
-                    {!loading && chartData && (
-                      <Line data={chartData} options={chartOptions(chartTitles[idx])} />
-                    )}
-                  </div>
-                </SwiperSlide>
-              ))}
-            </Swiper>
-            
-            <div className="custom-prev">❮</div>
-            <div className="custom-next">❯</div>
-          </div>
-        ) : (
-          <div className="analytics-grid">
-            <div className="analytics-card">
-              <h3>Genres Popularity</h3>
-              {!loading && genreChartData && (
-                <Line data={genreChartData} options={chartOptions(chartTitles[0])} />
-              )}
-            </div>
-            
-            <div className="analytics-card">
-              <h3>Themes Popularity</h3>
-              {!loading && themeChartData && (
-                <Line data={themeChartData} options={chartOptions(chartTitles[1])} />
-              )}
-            </div>
-            
-            <div className="analytics-card">
-              <h3>Ratings Trend</h3>
-              {!loading && ratingChartData && (
-                <Line data={ratingChartData} options={chartOptions(chartTitles[2])} />
-              )}
-            </div>
-          </div>
-        )}
-
-        <div className="analytics-summary">
-          <h2>Summary</h2>
-          <div className="summary-grid">
-            <div className="summary-item">
-              <h4>Data Period</h4>
-              <p>Last 330 days</p>
-            </div>
-            <div className="summary-item">
-              <h4>Charts</h4>
-              <p>3 Interactive Charts</p>
-            </div>
-            <div className="summary-item">
-              <h4>Data Points</h4>
-              <p>Real-time updates</p>
-            </div>
-          </div>
-        </div>
+  if (loading) {
+    return (
+      <div className="charts-loading">
+        <div className="loading-spinner"></div>
+        <p>Loading analytics...</p>
       </div>
-    </Layout>
+    );
+  }
+
+  const charts = [
+    { data: genreChartData, title: chartTitles[0] },
+    { data: themeChartData, title: chartTitles[1] },
+    { data: ratingChartData, title: chartTitles[2] },
+  ];
+
+  return (
+    <div className="analytics-charts">
+      {showAll ? (
+        <div className="charts-grid-full">
+          {charts.map((chart, idx) => (
+            chart.data && (
+              <div key={idx} className="chart-card-full">
+                <Line data={chart.data} options={chartOptions(chart.title)} />
+              </div>
+            )
+          ))}
+        </div>
+      ) : (
+        <div className="charts-grid-summary">
+          {charts.slice(0, 2).map((chart, idx) => (
+            chart.data && (
+              <div key={idx} className="chart-card-summary">
+                <Line data={chart.data} options={chartOptions(chart.title)} />
+              </div>
+            )
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
 
-export default AnalyticsPage;
+export default Charts;
