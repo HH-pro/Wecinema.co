@@ -855,7 +855,19 @@ nav img {
 .custom-next {
   right: 0px;
 }
-
+.fixed-scroll-button {
+	position: fixed;
+	bottom: 1rem;
+	right: 1rem;
+	background-color: #dc6c04;
+	color: white;
+	padding: 0.3rem;
+	border-radius: 80%;
+	box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+	cursor: pointer;
+	z-index: 50;
+	transition: background-color 0.3s ease;
+  }
   
   .fixed-scroll-button:hover {
 	background-color: #dc6c04;
