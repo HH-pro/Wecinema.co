@@ -12,6 +12,7 @@ import {
   Title,
   Tooltip,
   Legend,
+  Filler,
   ChartOptions
 } from "chart.js";
 
@@ -22,7 +23,8 @@ ChartJS.register(
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 );
 
 const Charts: React.FC = () => {
@@ -30,6 +32,7 @@ const Charts: React.FC = () => {
   const [genreChartData, setGenreChartData] = useState<any>(null);
   const [themeChartData, setThemeChartData] = useState<any>(null);
   const [ratingChartData, setRatingChartData] = useState<any>(null);
+  const [activeChart, setActiveChart] = useState<number | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -56,25 +59,26 @@ const Charts: React.FC = () => {
             const firstKey = Object.keys(genreData)[0];
             const labels = Object.keys(genreData[firstKey]).reverse();
             
-            // Get top 5 genres by total count
+            // Get top 4 genres by total count
             const genreTotals = Object.keys(genreData).map(genre => ({
               genre,
               total: Object.values(genreData[genre]).reduce((sum: number, val: any) => sum + (val?.count || 0), 0)
-            })).sort((a, b) => b.total - a.total).slice(0, 5);
+            })).sort((a, b) => b.total - a.total).slice(0, 4);
 
-            const datasets = genreTotals.map(({ genre }) => ({
+            const datasets = genreTotals.map(({ genre }, index) => ({
               label: genre,
               data: labels.map((date: string) => genreData[genre][date]?.count || 0),
-              borderColor: getGenreColor(genre),
-              backgroundColor: getGenreColor(genre, true),
-              borderWidth: 2.5,
+              borderColor: getChartColor(index, 'primary'),
+              backgroundColor: getChartColor(index, 'gradient'),
+              borderWidth: 3,
               tension: 0.4,
               pointRadius: 0,
-              pointHoverRadius: 4,
+              pointHoverRadius: 6,
               pointBackgroundColor: '#ffffff',
-              pointBorderColor: getGenreColor(genre),
+              pointBorderColor: getChartColor(index, 'primary'),
               pointBorderWidth: 2,
-              fill: false,
+              fill: true,
+              fillOpacity: 0.1,
             }));
 
             setGenreChartData({ 
@@ -88,25 +92,26 @@ const Charts: React.FC = () => {
             const firstKey = Object.keys(themeData)[0];
             const labels = Object.keys(themeData[firstKey]).reverse();
             
-            // Get top 5 themes by total count
+            // Get top 4 themes by total count
             const themeTotals = Object.keys(themeData).map(theme => ({
               theme,
               total: Object.values(themeData[theme]).reduce((sum: number, val: any) => sum + (val?.count || 0), 0)
-            })).sort((a, b) => b.total - a.total).slice(0, 5);
+            })).sort((a, b) => b.total - a.total).slice(0, 4);
 
-            const datasets = themeTotals.map(({ theme }) => ({
+            const datasets = themeTotals.map(({ theme }, index) => ({
               label: theme,
               data: labels.map((date: string) => themeData[theme][date]?.count || 0),
-              borderColor: getThemeColor(theme),
-              backgroundColor: getThemeColor(theme, true),
-              borderWidth: 2.5,
+              borderColor: getChartColor(index + 4, 'primary'),
+              backgroundColor: getChartColor(index + 4, 'gradient'),
+              borderWidth: 3,
               tension: 0.4,
               pointRadius: 0,
-              pointHoverRadius: 4,
+              pointHoverRadius: 6,
               pointBackgroundColor: '#ffffff',
-              pointBorderColor: getThemeColor(theme),
+              pointBorderColor: getChartColor(index + 4, 'primary'),
               pointBorderWidth: 2,
-              fill: false,
+              fill: true,
+              fillOpacity: 0.1,
             }));
 
             setThemeChartData({ 
@@ -123,31 +128,33 @@ const Charts: React.FC = () => {
               {
                 label: "Average Rating",
                 data: labels.map((date: string) => ratingData[date]?.averageRating || 0),
-                borderColor: "#3b82f6",
-                backgroundColor: "rgba(59, 130, 246, 0.05)",
-                borderWidth: 3,
+                borderColor: "#f59e0b",
+                backgroundColor: "rgba(245, 158, 11, 0.1)",
+                borderWidth: 4,
                 tension: 0.4,
                 pointRadius: 0,
-                pointHoverRadius: 5,
+                pointHoverRadius: 7,
                 pointBackgroundColor: '#ffffff',
-                pointBorderColor: '#3b82f6',
+                pointBorderColor: '#f59e0b',
                 pointBorderWidth: 2,
-                fill: false,
+                fill: true,
+                fillOpacity: 0.05,
               },
               {
                 label: "Total Ratings",
                 data: labels.map((date: string) => ratingData[date]?.totalRatings || 0),
-                borderColor: "#10b981",
-                backgroundColor: "rgba(16, 185, 129, 0.05)",
-                borderWidth: 2,
+                borderColor: "#3b82f6",
+                backgroundColor: "rgba(59, 130, 246, 0.1)",
+                borderWidth: 3,
                 tension: 0.4,
                 pointRadius: 0,
-                pointHoverRadius: 4,
+                pointHoverRadius: 6,
                 pointBackgroundColor: '#ffffff',
-                pointBorderColor: '#10b981',
+                pointBorderColor: '#3b82f6',
                 pointBorderWidth: 2,
-                fill: false,
-                borderDash: [5, 5],
+                fill: true,
+                fillOpacity: 0.05,
+                borderDash: [6, 4],
               },
             ];
 
@@ -171,50 +178,26 @@ const Charts: React.FC = () => {
     };
   }, []);
 
-  // Color schemes for genres
-  const getGenreColor = (genre: string, transparent: boolean = false) => {
-    const colors: { [key: string]: string } = {
-      'Action': '#ef4444',
-      'Comedy': '#f59e0b',
-      'Drama': '#3b82f6',
-      'Horror': '#8b5cf6',
-      'Adventure': '#10b981',
-      'Romance': '#ec4899',
-      'Sci-Fi': '#06b6d4',
-      'Thriller': '#f97316',
-      'Fantasy': '#84cc16',
-      'Animation': '#6366f1'
-    };
+  // Modern color palette
+  const getChartColor = (index: number, type: 'primary' | 'gradient') => {
+    const colors = [
+      '#f59e0b', // Amber
+      '#3b82f6', // Blue
+      '#10b981', // Emerald
+      '#8b5cf6', // Violet
+      '#ec4899', // Pink
+      '#f97316', // Orange
+      '#06b6d4', // Cyan
+      '#84cc16', // Lime
+    ];
     
-    const color = colors[genre] || '#64748b';
-    return transparent ? color + '20' : color;
-  };
-
-  // Color schemes for themes
-  const getThemeColor = (theme: string, transparent: boolean = false) => {
-    const colors: { [key: string]: string } = {
-      'Love': '#ec4899',
-      'Redemption': '#8b5cf6',
-      'Family': '#10b981',
-      'Oppression': '#ef4444',
-      'Corruption': '#f59e0b',
-      'Survival': '#f97316',
-      'Revenge': '#dc2626',
-      'Death': '#64748b',
-      'Justice': '#3b82f6',
-      'Perseverance': '#84cc16',
-      'War': '#ef4444',
-      'Bravery': '#f59e0b',
-      'Freedom': '#06b6d4',
-      'Friendship': '#ec4899',
-      'Hope': '#84cc16',
-      'Society': '#8b5cf6',
-      'Isolation': '#64748b',
-      'Peace': '#10b981'
-    };
+    const color = colors[index % colors.length];
     
-    const color = colors[theme] || '#64748b';
-    return transparent ? color + '20' : color;
+    if (type === 'gradient') {
+      return `linear-gradient(180deg, ${color}20 0%, transparent 100%)`;
+    }
+    
+    return color;
   };
 
   // Format date for display
@@ -226,8 +209,8 @@ const Charts: React.FC = () => {
     });
   };
 
-  // Chart options
-  const chartOptions = (title: string): ChartOptions<"line"> => ({
+  // Modern chart options
+  const chartOptions = (chartIndex: number): ChartOptions<"line"> => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -236,22 +219,24 @@ const Charts: React.FC = () => {
         labels: {
           color: "#e2e8f0",
           font: { 
-            size: 10,
+            size: 11,
             family: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-            weight: '500' as const
+            weight: '600' as const
           },
           usePointStyle: true,
-          boxWidth: 6,
-          padding: 12,
+          boxWidth: 8,
+          padding: 15,
+          pointStyle: 'circle',
           generateLabels: (chart) => {
             const datasets = chart.data.datasets;
             return datasets.map((dataset, i) => ({
-              text: dataset.label?.length > 12 ? dataset.label.substring(0, 12) + '...' : dataset.label,
+              text: dataset.label?.length > 14 ? dataset.label.substring(0, 14) + '...' : dataset.label,
               fillStyle: dataset.borderColor as string,
               strokeStyle: dataset.borderColor as string,
-              lineWidth: 2,
+              lineWidth: 3,
               hidden: !chart.isDatasetVisible(i),
-              index: i
+              index: i,
+              pointStyle: 'circle'
             }));
           }
         },
@@ -272,24 +257,25 @@ const Charts: React.FC = () => {
         mode: 'index',
         intersect: false,
         backgroundColor: "rgba(15, 23, 42, 0.95)",
-        titleColor: "#d1d5db",
+        backdropColor: "rgba(0, 0, 0, 0.5)",
+        titleColor: "#fbbf24",
         bodyColor: "#f3f4f6",
         titleFont: {
+          size: 12,
+          family: "'Inter', -apple-system, sans-serif",
+          weight: '600' as const
+        },
+        bodyFont: {
           size: 11,
           family: "'Inter', -apple-system, sans-serif",
           weight: '500' as const
         },
-        bodyFont: {
-          size: 10,
-          family: "'Inter', -apple-system, sans-serif",
-          weight: '400' as const
-        },
-        padding: 10,
-        cornerRadius: 8,
-        borderColor: "rgba(59, 130, 246, 0.2)",
+        padding: 14,
+        cornerRadius: 12,
+        borderColor: "rgba(245, 158, 11, 0.3)",
         borderWidth: 1,
         displayColors: true,
-        boxPadding: 4,
+        boxPadding: 6,
         usePointStyle: true,
         callbacks: {
           label: function(context) {
@@ -298,17 +284,28 @@ const Charts: React.FC = () => {
               label += ': ';
             }
             if (context.parsed.y !== null) {
-              label += context.parsed.y.toLocaleString('en-US', {
-                minimumFractionDigits: 1,
-                maximumFractionDigits: 2
-              });
+              const value = context.parsed.y;
+              if (value >= 1000) {
+                label += (value / 1000).toFixed(1) + 'k';
+              } else {
+                label += value.toFixed(1);
+              }
             }
             return label;
+          },
+          labelColor: function(context) {
+            return {
+              borderColor: context.dataset.borderColor,
+              backgroundColor: context.dataset.borderColor,
+              borderWidth: 2,
+              borderRadius: 6,
+            };
           },
           title: function(tooltipItems) {
             const date = new Date(tooltipItems[0].label);
             return date.toLocaleDateString('en-US', {
-              month: 'long',
+              weekday: 'short',
+              month: 'short',
               day: 'numeric',
               year: 'numeric'
             });
@@ -319,23 +316,24 @@ const Charts: React.FC = () => {
     scales: {
       y: {
         grid: {
-          color: "rgba(148, 163, 184, 0.08)",
+          color: "rgba(148, 163, 184, 0.1)",
           drawBorder: false,
           drawTicks: false,
           lineWidth: 1,
+          drawOnChartArea: true,
         },
         ticks: { 
           color: "#94a3b8", 
           font: { 
-            size: 9,
+            size: 10,
             family: "'Inter', -apple-system, sans-serif",
-            weight: '400' as const
+            weight: '500' as const
           },
-          padding: 8,
+          padding: 12,
           callback: function(value) {
             const numValue = Number(value);
             if (numValue >= 1000) {
-              return (numValue / 1000).toFixed(1) + 'k';
+              return (numValue / 1000).toFixed(0) + 'k';
             }
             return numValue;
           }
@@ -351,7 +349,7 @@ const Charts: React.FC = () => {
       x: {
         reverse: true,
         grid: {
-          color: "rgba(148, 163, 184, 0.08)",
+          color: "rgba(148, 163, 184, 0.1)",
           drawBorder: false,
           drawTicks: false,
           lineWidth: 1,
@@ -359,14 +357,14 @@ const Charts: React.FC = () => {
         ticks: { 
           color: "#94a3b8", 
           font: { 
-            size: 9,
+            size: 10,
             family: "'Inter', -apple-system, sans-serif",
-            weight: '400' as const
+            weight: '500' as const
           },
           maxRotation: 0,
           autoSkip: true,
-          maxTicksLimit: 6,
-          padding: 8,
+          maxTicksLimit: 8,
+          padding: 12,
         },
         border: {
           display: false,
@@ -379,16 +377,16 @@ const Charts: React.FC = () => {
     elements: {
       line: { 
         tension: 0.4, 
-        borderWidth: 2.5,
-        fill: false,
+        borderWidth: 3,
+        fill: true,
         capBezierPoints: true,
       },
       point: { 
         radius: 0,
-        hoverRadius: 5,
+        hoverRadius: 6,
         backgroundColor: "#ffffff",
-        borderWidth: 2,
-        hoverBorderWidth: 3,
+        borderWidth: 3,
+        hoverBorderWidth: 4,
         hoverBackgroundColor: "#ffffff",
       },
     },
@@ -398,17 +396,37 @@ const Charts: React.FC = () => {
     },
     animations: {
       tension: {
-        duration: 1000,
+        duration: 1500,
         easing: 'easeInOutQuart'
+      }
+    },
+    onHover: (event, chartElements) => {
+      if (chartElements && chartElements.length > 0) {
+        setActiveChart(chartIndex);
+      } else {
+        setActiveChart(null);
       }
     },
   });
 
   if (loading) {
     return (
-      <div className="charts-loading">
-        <div className="loading-spinner"></div>
-        <p className="loading-text">Loading analytics data...</p>
+      <div className="charts-loading-modern">
+        <div className="loading-container">
+          <div className="loading-spinner-modern">
+            <div className="spinner-ring"></div>
+            <div className="spinner-dot"></div>
+          </div>
+          <div className="loading-content">
+            <h3 className="loading-title">Loading Insights</h3>
+            <p className="loading-subtitle">Fetching real-time analytics data...</p>
+            <div className="loading-progress">
+              <div className="progress-bar">
+                <div className="progress-fill"></div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -416,78 +434,109 @@ const Charts: React.FC = () => {
   const charts = [
     { 
       data: genreChartData, 
-      title: "Top Genres Trend", 
-      description: "Popularity over time" 
+      title: "Genre Popularity", 
+      description: "Top genres trending over time",
+      icon: "🎬",
+      color: "#f59e0b"
     },
     { 
       data: themeChartData, 
-      title: "Top Themes Trend", 
-      description: "Theme engagement metrics" 
+      title: "Theme Analysis", 
+      description: "Most engaging themes & patterns",
+      icon: "🎯",
+      color: "#3b82f6"
     },
     { 
       data: ratingChartData, 
-      title: "Ratings Analysis", 
-      description: "Average & total ratings" 
+      title: "Ratings Overview", 
+      description: "User ratings & engagement metrics",
+      icon: "⭐",
+      color: "#10b981"
     },
   ];
 
   return (
-    <div className="charts-grid">
+    <div className="charts-grid-modern">
       {charts.map((chart, idx) => (
-        <div key={idx} className="chart-card">
-          <div className="chart-header">
-            <div className="chart-title-wrapper">
-              <h3 className="chart-title">{chart.title}</h3>
-              <div className="chart-indicator">
-                <div 
-                  className="indicator-dot" 
-                  style={{ 
-                    backgroundColor: idx === 0 ? '#ef4444' : 
-                                   idx === 1 ? '#8b5cf6' : 
-                                   '#3b82f6' 
-                  }}
-                ></div>
-                <span className="indicator-text">Live</span>
+        <div 
+          key={idx} 
+          className={`chart-card-modern ${activeChart === idx ? 'active' : ''}`}
+          onMouseEnter={() => setActiveChart(idx)}
+          onMouseLeave={() => setActiveChart(null)}
+        >
+          <div className="chart-header-modern">
+            <div className="chart-title-section">
+              <div className="chart-icon" style={{ backgroundColor: `${chart.color}20` }}>
+                <span className="icon-text">{chart.icon}</span>
+              </div>
+              <div>
+                <h3 className="chart-title-modern">{chart.title}</h3>
+                <p className="chart-description-modern">{chart.description}</p>
               </div>
             </div>
-            <p className="chart-description">{chart.description}</p>
+            <div className="chart-actions">
+              <div className="chart-status">
+                <span className="status-dot"></span>
+                <span className="status-text">Live</span>
+              </div>
+              <button className="chart-action-btn" title="View details">
+                <svg className="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </button>
+            </div>
           </div>
           
-          <div className="chart-wrapper">
+          <div className="chart-wrapper-modern">
             {chart.data ? (
-              <div className="chart-canvas">
-                <Line data={chart.data} options={chartOptions(chart.title)} />
+              <div className="chart-canvas-modern">
+                <Line data={chart.data} options={chartOptions(idx)} />
               </div>
             ) : (
-              <div className="no-data">
-                <div className="no-data-icon">📊</div>
-                <span className="no-data-text">No data available</span>
-                <span className="no-data-subtext">Check back later for updates</span>
+              <div className="no-data-modern">
+                <div className="no-data-icon-modern">📊</div>
+                <div className="no-data-content">
+                  <h4 className="no-data-title">No Data Available</h4>
+                  <p className="no-data-subtitle">Data will appear here once available</p>
+                </div>
               </div>
             )}
           </div>
           
-          <div className="chart-footer">
-            {chart.data && (
-              <div className="data-stats">
-                <div className="stat-item">
-                  <span className="stat-label">Period</span>
-                  <span className="stat-value">11 months</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">Points</span>
-                  <span className="stat-value">
-                    {chart.data.labels.length}
-                  </span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">Trend</span>
-                  <span className={`stat-trend ${idx === 2 ? 'up' : 'stable'}`}>
-                    {idx === 2 ? '↗ Up' : '→ Stable'}
+          <div className="chart-footer-modern">
+            <div className="chart-stats">
+              <div className="stat-item-modern">
+                <span className="stat-icon">📈</span>
+                <div>
+                  <span className="stat-label-modern">Trend</span>
+                  <span className="stat-value-modern">
+                    {idx === 2 ? 'Growing' : 'Stable'}
                   </span>
                 </div>
               </div>
-            )}
+              <div className="stat-item-modern">
+                <span className="stat-icon">🕐</span>
+                <div>
+                  <span className="stat-label-modern">Period</span>
+                  <span className="stat-value-modern">330 days</span>
+                </div>
+              </div>
+              <div className="stat-item-modern">
+                <span className="stat-icon">🔢</span>
+                <div>
+                  <span className="stat-label-modern">Data Points</span>
+                  <span className="stat-value-modern">
+                    {chart.data?.labels.length || 0}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="chart-trend">
+              <span className="trend-label">Current Trend</span>
+              <span className={`trend-value ${idx === 2 ? 'up' : 'neutral'}`}>
+                {idx === 2 ? '↗ Positive' : '→ Stable'}
+              </span>
+            </div>
           </div>
         </div>
       ))}
