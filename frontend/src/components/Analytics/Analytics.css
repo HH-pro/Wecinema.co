@@ -129,7 +129,7 @@
 .stylish-bar-title {
   font-size: 1.1rem;
   font-weight: 700;
-  background:white;
+  background:black;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
