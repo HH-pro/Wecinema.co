@@ -960,3 +960,119 @@ nav img {
   border-right: none !important;
   box-shadow: none !important; /* Just in case it's a shadow instead */
 }
+/* Homepage Hero */
+.homepage-hero {
+  text-align: center;
+  padding: 40px 20px 20px;
+  background: linear-gradient(rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.7));
+}
+
+.main-heading {
+  font-size: 3rem;
+  font-weight: bold;
+  background: linear-gradient(45deg, #fbbf24, #f59e0b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 10px;
+}
+
+.sub-heading {
+  color: #cbd5e1;
+  font-size: 1.1rem;
+  max-width: 600px;
+  margin: 0 auto 20px;
+}
+
+/* Theme Bar */
+.theme-bar {
+  display: flex;
+  overflow-x: auto;
+  gap: 10px;
+  padding: 15px 20px;
+  margin: 20px 0;
+  background: rgba(30, 41, 59, 0.8);
+  border-radius: 10px;
+  scrollbar-width: thin;
+}
+
+.theme-button {
+  padding: 8px 16px;
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid #3b82f6;
+  color: #60a5fa;
+  border-radius: 20px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.theme-button:hover {
+  background: rgba(59, 130, 246, 0.4);
+  transform: translateY(-2px);
+}
+
+/* Scripts Section */
+.scripts-section {
+  margin-top: 40px;
+  padding: 20px;
+}
+
+/* Scrollbar Styling */
+.theme-bar::-webkit-scrollbar {
+  height: 6px;
+}
+
+.theme-bar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.theme-bar::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.3);
+  border-radius: 10px;
+}
+
+.theme-bar::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.5);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .homepage-hero {
+    padding: 30px 15px 15px;
+  }
+  
+  .main-heading {
+    font-size: 2.2rem;
+  }
+  
+  .sub-heading {
+    font-size: 1rem;
+    padding: 0 15px;
+  }
+  
+  .theme-bar {
+    padding: 12px 15px;
+    margin: 15px 0;
+  }
+  
+  .theme-button {
+    padding: 6px 12px;
+    font-size: 0.9rem;
+  }
+  
+  .scripts-section {
+    margin-top: 30px;
+    padding: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .main-heading {
+    font-size: 1.8rem;
+  }
+  
+  .sub-heading {
+    font-size: 0.9rem;
+  }
+}
