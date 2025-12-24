@@ -1,57 +1,55 @@
 import React, { useState } from "react";
 import Charts from "./Charts";
-import StatsSummary from "./StatsSummary";
 import "./Analytics.css";
 
 interface AnalyticsSectionProps {
   title?: string;
-  showFull?: boolean;
 }
 
 const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ 
-  title = "Analytics Dashboard", 
-  showFull = false 
+  title = "Platform Analytics" 
 }) => {
-  const [expanded, setExpanded] = useState(false);
+  const [showGraphs, setShowGraphs] = useState(true);
 
   return (
-    <div className={`analytics-section ${expanded ? 'expanded' : ''}`}>
+    <div className="analytics-section">
       <div className="analytics-header">
         <h2>{title}</h2>
         <div className="analytics-actions">
           <button 
-            className="toggle-btn"
-            onClick={() => setExpanded(!expanded)}
+            className="toggle-graphs-btn"
+            onClick={() => setShowGraphs(!showGraphs)}
           >
-            {expanded ? 'Show Less' : 'Show More'}
+            {showGraphs ? 'Hide Graphs' : 'Show Graphs'}
           </button>
-          <span className="last-updated">Updated: Just now</span>
         </div>
       </div>
       
-      <StatsSummary />
-      
-      <div className="charts-container">
-        <Charts showAll={showFull || expanded} />
-      </div>
-      
-      <div className="analytics-footer">
-        <div className="chart-legend">
-          <span className="legend-item">
-            <span className="legend-color" style={{ backgroundColor: '#3b82f6' }}></span>
-            Genres
-          </span>
-          <span className="legend-item">
-            <span className="legend-color" style={{ backgroundColor: '#10b981' }}></span>
-            Themes
-          </span>
-          <span className="legend-item">
-            <span className="legend-color" style={{ backgroundColor: '#f59e0b' }}></span>
-            Ratings
-          </span>
-        </div>
-        <div className="time-range">Last 330 days</div>
-      </div>
+      {showGraphs && (
+        <>
+          <div className="charts-container">
+            <Charts />
+          </div>
+          
+          <div className="analytics-footer">
+            <div className="chart-legend">
+              <span className="legend-item">
+                <span className="legend-color" style={{ backgroundColor: '#3b82f6' }}></span>
+                Genres Popularity
+              </span>
+              <span className="legend-item">
+                <span className="legend-color" style={{ backgroundColor: '#10b981' }}></span>
+                Themes Popularity
+              </span>
+              <span className="legend-item">
+                <span className="legend-color" style={{ backgroundColor: '#f59e0b' }}></span>
+                Ratings Trend
+              </span>
+            </div>
+            <div className="time-range">Data for last 330 days</div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
