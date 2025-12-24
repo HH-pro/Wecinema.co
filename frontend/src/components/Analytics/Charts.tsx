@@ -1,249 +1,137 @@
-import React, { useEffect, useState } from "react";
-import { getRequest } from "../../api";
-import { Line } from "react-chartjs-2";
-import "./Analytics.css";
-
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  ChartOptions
-} from "chart.js";
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend
-);
-
-const Charts: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const [genreChartData, setGenreChartData] = useState<any>(null);
-  const [themeChartData, setThemeChartData] = useState<any>(null);
-  const [ratingChartData, setRatingChartData] = useState<any>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchAllCharts = async () => {
-      try {
-        setLoading(true);
-        const today = new Date();
-        const fromDate = new Date();
-        fromDate.setDate(today.getDate() - 330);
-        const from = fromDate.toISOString().split("T")[0];
-        const to = today.toISOString().split("T")[0];
-
-        // Fetch all data in parallel for better performance
-        const [genreData, themeData, ratingData] = await Promise.all([
-          getRequest(`/video/genres/graph?from=${from}&to=${to}`, setLoading),
-          getRequest(`/video/themes/graph?from=${from}&to=${to}`, setLoading),
-          getRequest(`/video/ratings/graph?from=${from}&to=${to}`, setLoading)
-        ]);
-
-        if (isMounted) {
-          // Process Genre Chart Data
-          if (genreData && Object.keys(genreData).length > 0) {
-            const labels = Object.keys(genreData[Object.keys(genreData)[0]]);
-            const datasets = Object.keys(genreData).map((genre: string) => ({
-              label: genre,
-              data: labels.map((date: string) => genreData[genre][date]?.count || 0),
-              borderColor: getRandomColor(),
-              backgroundColor: getRandomColor(),
-              lineTension: 0.4,
-              borderWidth: 2,
-            }));
-            setGenreChartData({ labels, datasets });
-          }
-
-          // Process Theme Chart Data
-          if (themeData && Object.keys(themeData).length > 0) {
-            const labels = Object.keys(themeData[Object.keys(themeData)[0]]);
-            const datasets = Object.keys(themeData).map((theme: string) => ({
-              label: theme,
-              data: labels.map((date: string) => themeData[theme][date]?.count || 0),
-              borderColor: getRandomColor(),
-              backgroundColor: getRandomColor(),
-              lineTension: 0.4,
-              borderWidth: 2,
-            }));
-            setThemeChartData({ labels, datasets });
-          }
-
-          // Process Rating Chart Data
-          if (ratingData && Object.keys(ratingData).length > 0) {
-            const labels = Object.keys(ratingData);
-            const datasets = [
-              {
-                label: "Average Rating",
-                data: labels.map((date: string) => ratingData[date]?.averageRating || 0),
-                borderColor: "#3b82f6",
-                backgroundColor: "rgba(59, 130, 246, 0.1)",
-                lineTension: 0.4,
-                borderWidth: 2,
-              },
-              {
-                label: "Total Ratings",
-                data: labels.map((date: string) => ratingData[date]?.totalRatings || 0),
-                borderColor: "#10b981",
-                backgroundColor: "rgba(16, 185, 129, 0.1)",
-                lineTension: 0.4,
-                borderWidth: 2,
-              },
-            ];
-            setRatingChartData({ labels, datasets });
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching chart data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAllCharts();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const getRandomColor = () => {
-    const colors = [
-      "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", 
-      "#ec4899", "#14b8a6", "#f97316", "#84cc16", "#06b6d4"
-    ];
-    return colors[Math.floor(Math.random() * colors.length)];
-  };
-
-  const chartOptions = (title: string): ChartOptions<"line"> => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: "top" as const,
-        labels: {
-          color: "#e2e8f0",
-          font: { size: 10 },
-          usePointStyle: true,
-          boxWidth: 8,
-          padding: 15,
+// Existing code mein chartOptions function update karein:
+const chartOptions = (title: string): ChartOptions<"line"> => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: "top" as const,
+      labels: {
+        color: "#e2e8f0",
+        font: { 
+          size: 11,
+          family: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
         },
-      },
-      title: {
-        display: false, // We'll handle title separately
-      },
-      tooltip: {
-        enabled: true,
-        bodyFont: { size: 11 },
-        titleFont: { size: 11 },
+        usePointStyle: true,
+        boxWidth: 6,
         padding: 10,
-        backgroundColor: "rgba(15, 23, 42, 0.9)",
-        titleColor: "#cbd5e1",
-        bodyColor: "#e2e8f0",
-        borderColor: "#334155",
-        borderWidth: 1,
+        generateLabels: (chart) => {
+          const datasets = chart.data.datasets;
+          return datasets.map((dataset, i) => ({
+            text: dataset.label?.length > 15 ? dataset.label.substring(0, 15) + '...' : dataset.label,
+            fillStyle: dataset.backgroundColor as string,
+            strokeStyle: dataset.borderColor as string,
+            lineWidth: 2,
+            hidden: !chart.isDatasetVisible(i),
+            index: i
+          }));
+        }
       },
     },
-    scales: {
-      y: {
-        grid: {
-          color: "rgba(148, 163, 184, 0.1)",
-        },
-        ticks: { 
-          color: "#94a3b8", 
-          font: { size: 10 },
-          padding: 8,
-        },
-        beginAtZero: true,
-      },
-      x: {
-        reverse: true,
-        grid: {
-          color: "rgba(148, 163, 184, 0.1)",
-        },
-        ticks: { 
-          color: "#94a3b8", 
-          font: { size: 10 },
-          maxRotation: 45,
-        },
-      },
+    title: {
+      display: false,
     },
-    elements: {
-      line: { 
-        tension: 0.4, 
-        borderWidth: 2,
-      },
-      point: { 
-        radius: 3, 
-        hoverRadius: 5,
-        backgroundColor: "#ffffff",
-        borderWidth: 2,
-      },
-    },
-    interaction: {
+    tooltip: {
+      enabled: true,
+      mode: 'index',
       intersect: false,
-      mode: 'index' as const,
+      backgroundColor: "rgba(15, 23, 42, 0.95)",
+      titleColor: "#d1d5db",
+      bodyColor: "#f3f4f6",
+      titleFont: {
+        size: 12,
+        family: "'Inter', -apple-system, sans-serif"
+      },
+      bodyFont: {
+        size: 11,
+        family: "'Inter', -apple-system, sans-serif"
+      },
+      padding: 12,
+      cornerRadius: 8,
+      borderColor: "rgba(59, 130, 246, 0.3)",
+      borderWidth: 1,
+      displayColors: true,
+      callbacks: {
+        label: function(context) {
+          let label = context.dataset.label || '';
+          if (label) {
+            label += ': ';
+          }
+          if (context.parsed.y !== null) {
+            label += new Intl.NumberFormat('en-US', { 
+              maximumFractionDigits: 2 
+            }).format(context.parsed.y);
+          }
+          return label;
+        }
+      }
     },
-  });
-
-  if (loading) {
-    return (
-      <div className="charts-loading">
-        <div className="loading-spinner"></div>
-        <p>Loading analytics data...</p>
-      </div>
-    );
-  }
-
-  const charts = [
-    { 
-      data: genreChartData, 
-      title: "Genres Popularity", 
-      description: "Genre trends over time" 
+  },
+  scales: {
+    y: {
+      grid: {
+        color: "rgba(148, 163, 184, 0.08)",
+        drawBorder: false,
+        drawTicks: false,
+      },
+      ticks: { 
+        color: "#94a3b8", 
+        font: { 
+          size: 10,
+          family: "'Inter', -apple-system, sans-serif"
+        },
+        padding: 8,
+        callback: function(value) {
+          return Number(value).toLocaleString('en-US');
+        }
+      },
+      beginAtZero: true,
+      border: {
+        display: false,
+      },
     },
-    { 
-      data: themeChartData, 
-      title: "Themes Popularity", 
-      description: "Theme trends over time" 
+    x: {
+      reverse: true,
+      grid: {
+        color: "rgba(148, 163, 184, 0.08)",
+        drawBorder: false,
+        drawTicks: false,
+      },
+      ticks: { 
+        color: "#94a3b8", 
+        font: { 
+          size: 10,
+          family: "'Inter', -apple-system, sans-serif"
+        },
+        maxRotation: 45,
+      },
+      border: {
+        display: false,
+      },
     },
-    { 
-      data: ratingChartData, 
-      title: "Ratings Trend", 
-      description: "Average & total ratings" 
+  },
+  elements: {
+    line: { 
+      tension: 0.4, 
+      borderWidth: 2.5,
+      fill: true,
     },
-  ];
-
-  return (
-    <div className="charts-grid">
-      {charts.map((chart, idx) => (
-        <div key={idx} className="chart-card">
-          <div className="chart-header">
-            <h3 className="chart-title">{chart.title}</h3>
-            <p className="chart-description">{chart.description}</p>
-          </div>
-          <div className="chart-wrapper">
-            {chart.data ? (
-              <Line data={chart.data} options={chartOptions(chart.title)} />
-            ) : (
-              <div className="no-data">
-                <span>No data available</span>
-              </div>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-export default Charts;
+    point: { 
+      radius: 4, 
+      hoverRadius: 7,
+      backgroundColor: "#ffffff",
+      borderWidth: 2,
+      hoverBorderWidth: 3,
+      hoverBackgroundColor: "#ffffff",
+    },
+  },
+  interaction: {
+    intersect: false,
+    mode: 'index' as const,
+  },
+  animations: {
+    tension: {
+      duration: 1000,
+      easing: 'easeInOutQuart'
+    }
+  },
+});
