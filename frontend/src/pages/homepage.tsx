@@ -19,14 +19,10 @@ import {
   Grid,
   List,
   MoreVertical,
-  PlayCircle,
-  Clock,
   Heart,
   MessageSquare,
   Share2,
   Info,
-  ExternalLink,
-  Filter,
   ChevronRight
 } from "lucide-react";
 import "./homepage.css";
@@ -76,12 +72,10 @@ const Homepage: React.FC = () => {
   const [expandedChart, setExpandedChart] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState("30days");
   const [chartView, setChartView] = useState<"grid" | "carousel">("grid");
-  const [activeChartIndex, setActiveChartIndex] = useState(0);
   const [dataLoaded, setDataLoaded] = useState(false);
   
   // Refs
   const chartRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const swiperRef = useRef<any>(null);
 
   // Colors
   const colors = {
@@ -104,9 +98,9 @@ const Homepage: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Generate demo data if API fails
+  // Generate demo data
   const generateDemoData = (type: 'genre' | 'theme' | 'rating') => {
-    const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'];
+    const labels = ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6'];
     
     if (type === 'genre') {
       return {
@@ -114,7 +108,7 @@ const Homepage: React.FC = () => {
         datasets: [
           {
             label: "Action",
-            data: [65, 78, 90, 82, 95, 110, 98],
+            data: [65, 78, 90, 82, 95, 110],
             borderColor: "#f59e0b",
             backgroundColor: "#f59e0b20",
             tension: 0.4,
@@ -123,7 +117,7 @@ const Homepage: React.FC = () => {
           },
           {
             label: "Comedy",
-            data: [45, 62, 75, 58, 69, 85, 72],
+            data: [45, 62, 75, 58, 69, 85],
             borderColor: "#fbbf24",
             backgroundColor: "#fbbf2420",
             tension: 0.4,
@@ -132,7 +126,7 @@ const Homepage: React.FC = () => {
           },
           {
             label: "Drama",
-            data: [32, 45, 52, 48, 61, 55, 58],
+            data: [32, 45, 52, 48, 61, 55],
             borderColor: "#fcd34d",
             backgroundColor: "#fcd34d20",
             tension: 0.4,
@@ -147,7 +141,7 @@ const Homepage: React.FC = () => {
         datasets: [
           {
             label: "Love",
-            data: [85, 92, 88, 94, 96, 98, 95],
+            data: [85, 92, 88, 94, 96, 98],
             borderColor: "#3b82f6",
             backgroundColor: "#3b82f620",
             tension: 0.4,
@@ -156,7 +150,7 @@ const Homepage: React.FC = () => {
           },
           {
             label: "Justice",
-            data: [62, 68, 72, 75, 78, 82, 79],
+            data: [62, 68, 72, 75, 78, 82],
             borderColor: "#8b5cf6",
             backgroundColor: "#8b5cf620",
             tension: 0.4,
@@ -165,7 +159,7 @@ const Homepage: React.FC = () => {
           },
           {
             label: "Freedom",
-            data: [45, 52, 58, 61, 65, 70, 68],
+            data: [45, 52, 58, 61, 65, 70],
             borderColor: "#06b6d4",
             backgroundColor: "#06b6d420",
             tension: 0.4,
@@ -180,7 +174,7 @@ const Homepage: React.FC = () => {
         datasets: [
           {
             label: "Average Rating",
-            data: [4.2, 4.3, 4.5, 4.4, 4.6, 4.7, 4.8],
+            data: [4.2, 4.3, 4.5, 4.4, 4.6, 4.7],
             borderColor: colors.primary,
             backgroundColor: `${colors.primary}20`,
             tension: 0.4,
@@ -341,73 +335,10 @@ const Homepage: React.FC = () => {
 
         if (!isMounted) return;
 
-        // Process data with fallback
-        if (genreData && Object.keys(genreData).length > 0) {
-          try {
-            const firstKey = Object.keys(genreData)[0];
-            const labels = Object.keys(genreData[firstKey] || {}).reverse();
-            const datasets = Object.keys(genreData).slice(0, 4).map((genre, idx) => ({
-              label: genre,
-              data: labels.map(date => genreData[genre]?.[date]?.count || 0),
-              borderColor: ["#f59e0b", "#fbbf24", "#fcd34d", "#10b981"][idx] || "#f59e0b",
-              backgroundColor: `${["#f59e0b", "#fbbf24", "#fcd34d", "#10b981"][idx] || "#f59e0b"}20`,
-              tension: 0.4,
-              fill: true,
-              borderWidth: 2,
-            }));
-            setGenreChartData({ labels, datasets });
-          } catch (error) {
-            console.log("Using demo genre data");
-            setGenreChartData(generateDemoData('genre'));
-          }
-        } else {
-          setGenreChartData(generateDemoData('genre'));
-        }
-
-        if (themeData && Object.keys(themeData).length > 0) {
-          try {
-            const firstKey = Object.keys(themeData)[0];
-            const labels = Object.keys(themeData[firstKey] || {}).reverse();
-            const datasets = Object.keys(themeData).slice(0, 4).map((theme, idx) => ({
-              label: theme,
-              data: labels.map(date => themeData[theme]?.[date]?.count || 0),
-              borderColor: ["#3b82f6", "#8b5cf6", "#ec4899", "#06b6d4"][idx] || "#3b82f6",
-              backgroundColor: `${["#3b82f6", "#8b5cf6", "#ec4899", "#06b6d4"][idx] || "#3b82f6"}20`,
-              tension: 0.4,
-              fill: true,
-              borderWidth: 2,
-            }));
-            setThemeChartData({ labels, datasets });
-          } catch (error) {
-            console.log("Using demo theme data");
-            setThemeChartData(generateDemoData('theme'));
-          }
-        } else {
-          setThemeChartData(generateDemoData('theme'));
-        }
-
-        if (ratingData && Object.keys(ratingData).length > 0) {
-          try {
-            const labels = Object.keys(ratingData).reverse();
-            const datasets = [
-              {
-                label: "Average Rating",
-                data: labels.map(date => ratingData[date]?.averageRating || 0),
-                borderColor: colors.primary,
-                backgroundColor: `${colors.primary}20`,
-                tension: 0.4,
-                fill: true,
-                borderWidth: 2,
-              }
-            ];
-            setRatingChartData({ labels, datasets });
-          } catch (error) {
-            console.log("Using demo rating data");
-            setRatingChartData(generateDemoData('rating'));
-          }
-        } else {
-          setRatingChartData(generateDemoData('rating'));
-        }
+        // Set data or use demo data
+        setGenreChartData(genreData && Object.keys(genreData).length > 0 ? processChartData(genreData, 'genre') : generateDemoData('genre'));
+        setThemeChartData(themeData && Object.keys(themeData).length > 0 ? processChartData(themeData, 'theme') : generateDemoData('theme'));
+        setRatingChartData(ratingData && Object.keys(ratingData).length > 0 ? processRatingData(ratingData) : generateDemoData('rating'));
 
         if (scriptsData) {
           setScripts(scriptsData.map((res: any) => res.script));
@@ -424,6 +355,49 @@ const Homepage: React.FC = () => {
         setDataLoaded(true);
       } finally {
         setLoading(false);
+      }
+    };
+
+    const processChartData = (apiData: any, type: 'genre' | 'theme') => {
+      try {
+        const firstKey = Object.keys(apiData)[0];
+        const labels = Object.keys(apiData[firstKey] || {}).reverse().slice(0, 6);
+        const datasets = Object.keys(apiData).slice(0, 3).map((key, idx) => ({
+          label: key,
+          data: labels.map(date => apiData[key]?.[date]?.count || 0),
+          borderColor: type === 'genre' 
+            ? ["#f59e0b", "#fbbf24", "#fcd34d"][idx] || "#f59e0b"
+            : ["#3b82f6", "#8b5cf6", "#06b6d4"][idx] || "#3b82f6",
+          backgroundColor: type === 'genre'
+            ? `${["#f59e0b", "#fbbf24", "#fcd34d"][idx] || "#f59e0b"}20`
+            : `${["#3b82f6", "#8b5cf6", "#06b6d4"][idx] || "#3b82f6"}20`,
+          tension: 0.4,
+          fill: true,
+          borderWidth: 2,
+        }));
+        return { labels, datasets };
+      } catch (error) {
+        return generateDemoData(type);
+      }
+    };
+
+    const processRatingData = (apiData: any) => {
+      try {
+        const labels = Object.keys(apiData).reverse().slice(0, 6);
+        const datasets = [
+          {
+            label: "Average Rating",
+            data: labels.map(date => apiData[date]?.averageRating || 0),
+            borderColor: colors.primary,
+            backgroundColor: `${colors.primary}20`,
+            tension: 0.4,
+            fill: true,
+            borderWidth: 2,
+          }
+        ];
+        return { labels, datasets };
+      } catch (error) {
+        return generateDemoData('rating');
       }
     };
 
@@ -507,14 +481,7 @@ const Homepage: React.FC = () => {
     }
   };
 
-  const scrollToVideos = () => {
-    document.querySelector('.theme-bar')?.scrollIntoView({ 
-      behavior: 'smooth', 
-      block: 'start' 
-    });
-  };
-
-  // Toggle charts with loading indicator
+  // Toggle charts
   const handleToggleCharts = () => {
     if (!showCharts && !dataLoaded) {
       setLoading(true);
@@ -527,72 +494,6 @@ const Homepage: React.FC = () => {
     <Layout>
       <LoadingBar color={colors.primary} progress={progress} height={3} />
       
-      {/* Hero Section */}
-      <div className="homepage-hero">
-        <div className="hero-container">
-          <div className="hero-content">
-            <h1 className="hero-title">
-              Discover Amazing Content
-              <span className="hero-highlight"> with Smart Analytics</span>
-            </h1>
-            <p className="hero-subtitle">
-              Explore videos, track trends, and gain insights with our interactive dashboard
-            </p>
-            
-            <div className="hero-actions">
-              <button
-                onClick={handleToggleCharts}
-                className="hero-btn primary-btn"
-              >
-                {showCharts ? (
-                  <>
-                    <Eye size={20} />
-                    Hide Analytics
-                  </>
-                ) : (
-                  <>
-                    <BarChart3 size={20} />
-                    Show Analytics Dashboard
-                  </>
-                )}
-              </button>
-              
-              <button
-                onClick={scrollToVideos}
-                className="hero-btn secondary-btn"
-              >
-                <PlayCircle size={20} />
-                Browse Videos
-              </button>
-            </div>
-          </div>
-          
-          <div className="hero-stats">
-            <div className="stat-card">
-              <TrendingUp className="stat-icon" />
-              <div>
-                <h3>24.5K</h3>
-                <p>Views Today</p>
-              </div>
-            </div>
-            <div className="stat-card">
-              <Heart className="stat-icon" />
-              <div>
-                <h3>18.2K</h3>
-                <p>Engagements</p>
-              </div>
-            </div>
-            <div className="stat-card">
-              <Clock className="stat-icon" />
-              <div>
-                <h3>4.7</h3>
-                <p>Avg Watch Time</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Analytics Toggle Bar */}
       <div className="analytics-toggle-bar">
         <div className="toggle-bar-container">
@@ -789,8 +690,7 @@ const Homepage: React.FC = () => {
                   {charts.map((chart, idx) => (
                     <div
                       key={chart.id}
-                      className={`carousel-slide ${idx === activeChartIndex ? 'active' : ''}`}
-                      onClick={() => setActiveChartIndex(idx)}
+                      className="carousel-slide"
                     >
                       <div className="carousel-chart" style={{ borderColor: chart.color }}>
                         <div className="carousel-chart-header">
@@ -807,10 +707,7 @@ const Homepage: React.FC = () => {
                             </div>
                           </div>
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              downloadChart(chart.id);
-                            }}
+                            onClick={() => downloadChart(chart.id)}
                             className="carousel-download-btn"
                           >
                             <Download size={20} />
@@ -836,32 +733,14 @@ const Homepage: React.FC = () => {
                     </div>
                   ))}
                 </div>
-                
-                <div className="carousel-indicators">
-                  {charts.map((_, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setActiveChartIndex(idx)}
-                      className={`carousel-indicator ${idx === activeChartIndex ? 'active' : ''}`}
-                    />
-                  ))}
-                </div>
               </div>
             )}
 
             {/* Quick Actions */}
             <div className="analytics-quick-actions">
-              <button
-                onClick={scrollToVideos}
-                className="quick-action-btn primary-action"
-              >
-                <PlayCircle size={18} />
-                Continue to Videos
-              </button>
-              
               <div className="analytics-tips">
                 <Info size={16} />
-                <span>Tip: Expand charts for detailed analysis</span>
+                <span>Tip: Click charts to expand for detailed view</span>
               </div>
             </div>
           </div>
@@ -871,25 +750,13 @@ const Homepage: React.FC = () => {
       {/* Theme Navigation */}
       <div className="theme-bar">
         <div className="theme-bar-container">
-          <div className="theme-bar-header">
-            <h2 className="theme-bar-title">Browse Content</h2>
-            <button
-              onClick={() => nav('/themes')}
-              className="view-all-btn"
-            >
-              View All
-              <ExternalLink size={16} />
-            </button>
-          </div>
+          <h2 className="theme-bar-title">Browse Content</h2>
           <div className="theme-buttons">
             {theme.slice(0, 8).map((val, index) => (
               <button
                 key={index}
                 onClick={() => nav(`/themes/${val.toLowerCase()}`)}
                 className="theme-button"
-                style={{
-                  background: `linear-gradient(135deg, ${colors.bgCard}, ${colors.bgDark})`
-                }}
               >
                 {val}
               </button>
@@ -912,19 +779,7 @@ const Homepage: React.FC = () => {
       {/* Scripts Section */}
       {scripts.length > 0 && (
         <div className="scripts-section">
-          <div className="scripts-header">
-            <div>
-              <h2 className="scripts-title">Featured Scripts</h2>
-              <p className="scripts-subtitle">Discover stories from our community</p>
-            </div>
-            <button
-              onClick={() => nav('/scripts')}
-              className="view-all-btn"
-            >
-              View All Scripts
-              <ExternalLink size={16} />
-            </button>
-          </div>
+          <h2 className="scripts-title">Featured Scripts</h2>
           
           <div className="scripts-grid">
             {scripts?.slice(0, 3).map((script: string, index: number) => (
@@ -948,18 +803,11 @@ const Homepage: React.FC = () => {
                         <span className="script-genre">
                           {data[index]?.genre || 'Drama'}
                         </span>
-                        <span className="script-time">15 min read</span>
+                        <span>•</span>
+                        <span>15 min read</span>
                       </div>
                     </div>
-                    <button 
-                      className="script-more-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        nav(`/script/${data[index]?._id}`, {
-                          state: JSON.stringify(data[index]),
-                        });
-                      }}
-                    >
+                    <button className="script-more-btn">
                       <MoreVertical size={18} />
                     </button>
                   </div>
