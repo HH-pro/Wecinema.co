@@ -1,13 +1,18 @@
 import React, { useState } from 'react';
-import { createStripeAccount } from '../../../api';
 
 interface StripeSetupModalProps {
   show: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  stripeConnected?: boolean; // New prop to check if Stripe is already connected
 }
 
-const StripeSetupModal: React.FC<StripeSetupModalProps> = ({ show, onClose, onSuccess }) => {
+const StripeSetupModal: React.FC<StripeSetupModalProps> = ({ 
+  show, 
+  onClose, 
+  onSuccess,
+  stripeConnected = false // Default to false
+}) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -16,10 +21,26 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({ show, onClose, onSu
       setLoading(true);
       setError('');
 
-      const response = await createStripeAccount();
+      // If Stripe is already connected, don't proceed
+      if (stripeConnected) {
+        setError('Stripe is already connected to your account.');
+        setLoading(false);
+        onClose(); // Close the modal
+        return;
+      }
+
+      // Replace this with your actual API call
+      const response = await fetch('/api/marketplace/stripe/onboard-seller', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
       
-      if (response.url) {
-        window.location.href = response.url;
+      const data = await response.json();
+      
+      if (data.url) {
+        window.location.href = data.url;
       } else {
         setError('Failed to start Stripe setup - no URL returned');
       }
@@ -38,7 +59,8 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({ show, onClose, onSu
     }
   };
 
-  if (!show) return null;
+  // Don't show modal if Stripe is already connected
+  if (!show || stripeConnected) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
