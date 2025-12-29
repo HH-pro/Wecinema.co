@@ -340,66 +340,90 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ NEW: Activate/Deactivate Listing using new API endpoint
-  const handleToggleListingStatus = async (listing: Listing) => {
-    try {
-      setListingActionLoading(listing._id);
-      setError('');
+  // In SellerDashboard.tsx - UPDATED handleToggleListingStatus function
+const handleToggleListingStatus = async (listing: Listing) => {
+  try {
+    setListingActionLoading(listing._id);
+    setError('');
 
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-      if (!token) {
-        setError('Authentication required. Please log in again.');
-        setListingActionLoading(null);
-        return;
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (!token) {
+      setError('Authentication required. Please log in again.');
+      setListingActionLoading(null);
+      return;
+    }
+
+    console.log(`🔄 Toggling listing: ${listing.title} (${listing._id})`);
+
+    const response = await axios.patch(
+      `${API_BASE_URL}/marketplace/listing/${listing._id}/toggle-status`,
+      {},
+      {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 10000
       }
+    );
 
-      console.log(`🔄 Toggling listing status: ${listing._id}, current: ${listing.status}`);
+    console.log('API Response:', response.data);
 
-      // Use the new API endpoint for toggle status
-      const response = await axios.patch(
-        `${API_BASE_URL}/marketplace/listing/${listing._id}/toggle-status`,
-        {}, // Empty body as status toggle is handled by server
-        {
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 10000
-        }
-      );
-
-      if (response.data && response.data.listing) {
-        const updatedListing = response.data.listing;
-        const action = updatedListing.status === 'active' ? 'activated' : 'deactivated';
+    if (response.data.success) {
+      const action = response.data.newStatus === 'active' ? 'activated' : 'deactivated';
+      setSuccessMessage(`✅ Listing ${action} successfully!`);
+      
+      // Update the specific listing in state
+      setListingsData(prev => {
+        if (!prev) return prev;
         
-        setSuccessMessage(`✅ Listing ${action} successfully!`);
-        
-        // Update listings in state
-        setListingsData(prev => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            listings: prev.listings.map(l => 
-              l._id === listing._id 
-                ? { ...l, status: updatedListing.status, updatedAt: updatedListing.updatedAt }
-                : l
-            )
-          };
+        const updatedListings = prev.listings.map(l => {
+          if (l._id === listing._id) {
+            return {
+              ...l,
+              status: response.data.newStatus,
+              updatedAt: response.data.listing?.updatedAt || new Date().toISOString()
+            };
+          }
+          return l;
         });
         
-        // Also refresh if on listings tab
-        if (activeTab === 'listings') {
+        return {
+          ...prev,
+          listings: updatedListings
+        };
+      });
+      
+      // Also refresh the listings data to ensure consistency
+      if (activeTab === 'listings') {
+        setTimeout(() => {
           fetchListings();
-        }
+        }, 500);
       }
-    } catch (error: any) {
-      console.error('❌ Error toggling listing status:', error);
-      setError(error.response?.data?.error || 'Failed to update listing status. Please try again.');
-    } finally {
-      setListingActionLoading(null);
+    } else {
+      setError(response.data.error || 'Failed to update listing status');
     }
-  };
-
+    
+  } catch (error: any) {
+    console.error('❌ Error toggling listing status:', error);
+    
+    if (error.response) {
+      // Server responded with error
+      const errorMsg = error.response.data?.error || 
+                      error.response.data?.message || 
+                      `Server error: ${error.response.status}`;
+      setError(`❌ ${errorMsg}`);
+    } else if (error.request) {
+      // No response received
+      setError('❌ No response from server. Check your connection.');
+    } else {
+      // Request setup error
+      setError(`❌ Error: ${error.message}`);
+    }
+  } finally {
+    setListingActionLoading(null);
+  }
+};
   // ✅ NEW: Pause/Resume Order functionality
   const handlePauseResumeOrder = async (order: Order, action: 'pause' | 'resume') => {
     try {
