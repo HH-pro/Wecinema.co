@@ -342,7 +342,7 @@ const checkStripeAccountStatus = async (force = false) => {
     
     // Use simple endpoint first, then detailed if needed
     const endpoint = force 
-      ? '/api/marketplace/stripe/status' 
+      ? '/marketplace/stripe/status' 
       : '/api/marketplace/stripe/status-simple';
     
     const response = await fetch(endpoint, {
