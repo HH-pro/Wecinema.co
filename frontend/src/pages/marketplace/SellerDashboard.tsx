@@ -435,7 +435,7 @@ const SellerDashboard: React.FC = () => {
       
       // Use force endpoint if specified, otherwise simple
       const endpoint = force 
-        ? '/api/marketplace/stripe/status' 
+        ? '/marketplace/stripe/status' 
         : '/api/marketplace/stripe/status-simple';
       
       const response = await fetch(endpoint, {
