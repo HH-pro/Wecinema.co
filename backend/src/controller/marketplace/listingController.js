@@ -444,7 +444,7 @@ router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
 // ===================================================
 // ✅ TOGGLE LISTING STATUS (Active/Inactive)
 // ===================================================
-router.patch("/listing/:id/toggle-status", authenticateMiddleware, async (req, res) => {
+router.patch("/:id/toggle-status", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== TOGGLE LISTING STATUS ===");
     console.log("Listing ID:", req.params.id);
