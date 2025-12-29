@@ -200,7 +200,7 @@ export const listingsApi = {
     try {
       // Try primary route first
       try {
-        const response = await apiClient.delete(`/marketplace/listing/${listingId}`);
+        const response = await apiClient.delete(`/marketplace/listings/${listingId}`);
         return response.data;
       } catch (deleteError) {
         // Fallback to alternative route
