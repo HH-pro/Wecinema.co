@@ -22,6 +22,7 @@ import ActionCard from '../../components/marketplae/seller/ActionCard';
 import OrderWorkflowGuide from '../../components/marketplae/seller/OrderWorkflowGuide';
 import StripeAccountStatus from '../../components/marketplae/seller/StripeAccountStatus';
 import StripeSuccessAlert from '../../components/marketplae/seller/StripeSuccessAlert';
+import WithdrawBalance from '../../components/marketplae/seller/WithdrawBalance';
 
 // Import tab components
 import OffersTab from '../../components/marketplae/seller/OffersTab';
@@ -128,6 +129,7 @@ interface StripeStatus {
   country?: string;
   status?: string;
   payoutsEnabled?: boolean;
+  name?: string;
 }
 
 const SellerDashboard: React.FC = () => {
@@ -333,10 +335,11 @@ const SellerDashboard: React.FC = () => {
     };
   }, []);
 
-  // ✅ Check Stripe account status
+  // ✅ Improved: Check Stripe account status with fallback
   const checkStripeAccountStatus = async () => {
     try {
-      const response = await fetch('/api/marketplace/stripe/status', {
+      // First try the simple endpoint
+      const response = await fetch('/api/marketplace/stripe/status-simple', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -347,9 +350,24 @@ const SellerDashboard: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         setStripeStatus(data);
+      } else {
+        // Fallback: Set basic status
+        setStripeStatus({
+          connected: false,
+          chargesEnabled: false,
+          detailsSubmitted: false,
+          status: 'error'
+        });
       }
     } catch (err) {
       console.error('Error checking Stripe status:', err);
+      // Set fallback status
+      setStripeStatus({
+        connected: false,
+        chargesEnabled: false,
+        detailsSubmitted: false,
+        status: 'error'
+      });
     }
   };
 
@@ -776,6 +794,15 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
+  // ✅ Handle withdraw success
+  const handleWithdrawSuccess = () => {
+    // Refresh data after successful withdrawal
+    setTimeout(() => {
+      checkStripeAccountStatus();
+      fetchDashboardData();
+    }, 1000);
+  };
+
   // ✅ Initial data loading
   useEffect(() => {
     const loadInitialData = async () => {
@@ -836,6 +863,9 @@ const SellerDashboard: React.FC = () => {
     );
   }
 
+  // Calculate if user can withdraw (connected and charges enabled)
+  const canWithdraw = stripeStatus?.connected && stripeStatus?.chargesEnabled;
+
   return (
     <MarketplaceLayout>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8">
@@ -845,12 +875,6 @@ const SellerDashboard: React.FC = () => {
           <StripeSuccessAlert 
             show={showStripeSuccessAlert}
             onClose={() => setShowStripeSuccessAlert(false)}
-          />
-          
-          {/* ✅ Stripe Account Status */}
-          <StripeAccountStatus
-            stripeStatus={stripeStatus}
-            onSetupClick={() => setShowStripeSetup(true)}
           />
 
           {/* Header */}
@@ -862,6 +886,21 @@ const SellerDashboard: React.FC = () => {
             refreshing={refreshing}
             stripeStatus={stripeStatus}
           />
+
+          {/* ✅ Stripe Account Status */}
+          <StripeAccountStatus
+            stripeStatus={stripeStatus}
+            onSetupClick={() => setShowStripeSetup(true)}
+            isLoading={stripeStatus === null}
+          />
+
+          {/* ✅ Withdraw Balance Component - Show only when connected */}
+          {canWithdraw && (
+            <WithdrawBalance 
+              stripeStatus={stripeStatus}
+              onWithdrawSuccess={handleWithdrawSuccess}
+            />
+          )}
 
           {/* ✅ Conditional Stripe Setup Banner */}
           {!stripeStatus?.chargesEnabled && (
@@ -948,7 +987,7 @@ const SellerDashboard: React.FC = () => {
                   secondaryAction={{
                     label: '💰 Setup Payments',
                     onClick: () => setShowStripeSetup(true),
-                    visible: !(stripeStatus?.connected && stripeStatus?.chargesEnabled)
+                    visible: !canWithdraw
                   }}
                 />
 
@@ -987,14 +1026,27 @@ const SellerDashboard: React.FC = () => {
                     <div className="text-5xl mb-4 text-gray-300">📦</div>
                     <h3 className="text-lg font-medium text-gray-900">No Orders Yet</h3>
                     <p className="mt-2 text-gray-500 mb-6">
-                      You don't have any orders yet. Create listings to start receiving orders.
+                      {canWithdraw 
+                        ? 'You can accept payments. Create listings to start receiving orders!'
+                        : 'Create listings to start receiving orders.'
+                      }
                     </p>
-                    <button
-                      onClick={() => navigate('/marketplace/create')}
-                      className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 shadow-md hover:shadow"
-                    >
-                      + Create Your First Listing
-                    </button>
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                      <button
+                        onClick={() => navigate('/marketplace/create')}
+                        className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 shadow-md hover:shadow"
+                      >
+                        + Create Your First Listing
+                      </button>
+                      {!canWithdraw && (
+                        <button
+                          onClick={() => setShowStripeSetup(true)}
+                          className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow"
+                        >
+                          💰 Setup Payments
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -1080,7 +1132,7 @@ const SellerDashboard: React.FC = () => {
               show={showStripeSetup}
               onClose={() => setShowStripeSetup(false)}
               onSuccess={handleStripeSetupSuccess}
-              stripeConnected={stripeStatus?.connected && stripeStatus?.chargesEnabled}
+              stripeConnected={canWithdraw}
             />
           )}
 
