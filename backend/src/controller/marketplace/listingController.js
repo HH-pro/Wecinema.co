@@ -265,6 +265,8 @@ function isValidEmail(email) {
 // ✅ EDIT/UPDATE LISTING
 // ===================================================
 // ===================================================
+// ✅ EDIT LISTING (Only title, description, price - others optional)
+// ===================================================
 router.put("/:id", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== EDIT LISTING REQUEST ===");
@@ -283,89 +285,82 @@ router.put("/:id", authenticateMiddleware, async (req, res) => {
     });
 
     if (!existingListing) {
+      console.log("❌ Listing not found or unauthorized:", { listingId, sellerId });
       return res.status(404).json({ 
+        success: false,
         error: "Listing not found or you don't have permission to edit this listing" 
       });
     }
 
-    // Build update object with validation (like create listing)
+    // Build update object - only update provided fields
     const updateData = {};
     
-    // Required fields validation (same as create listing)
+    // Required validations only for fields that are provided
     if (title !== undefined) {
       if (!title || title.trim() === '') {
         return res.status(400).json({
-          error: "Title is required",
-          received: title
+          success: false,
+          error: "Title cannot be empty",
+          field: "title"
         });
       }
       updateData.title = title.trim();
-    } else {
-      return res.status(400).json({ 
-        error: "Title is required for update",
-        required: ["title"]
-      });
     }
     
     if (description !== undefined) {
       if (!description || description.trim() === '') {
         return res.status(400).json({
-          error: "Description is required",
-          received: description
+          success: false,
+          error: "Description cannot be empty",
+          field: "description"
         });
       }
       updateData.description = description.trim();
-    } else {
-      return res.status(400).json({ 
-        error: "Description is required for update",
-        required: ["description"]
-      });
     }
     
     if (price !== undefined) {
-      if (!price) {
+      if (price === null || price === '') {
         return res.status(400).json({
+          success: false,
           error: "Price is required",
-          received: price
+          field: "price"
         });
       }
-      if (isNaN(price) || price <= 0) {
+      
+      const priceNum = parseFloat(price);
+      if (isNaN(priceNum)) {
         return res.status(400).json({
-          error: "Price must be a positive number",
+          success: false,
+          error: "Price must be a valid number",
+          field: "price",
           received: price
         });
       }
-      updateData.price = parseFloat(price).toFixed(2);
-    } else {
-      return res.status(400).json({ 
-        error: "Price is required for update",
-        required: ["price"]
-      });
+      
+      if (priceNum <= 0) {
+        return res.status(400).json({
+          success: false,
+          error: "Price must be greater than 0",
+          field: "price",
+          received: price
+        });
+      }
+      
+      updateData.price = priceNum.toFixed(2);
     }
     
+    // Optional fields - only update if provided
     if (type !== undefined) {
-      if (!type || type.trim() === '') {
-        return res.status(400).json({
-          error: "Type is required",
-          received: type
-        });
-      }
       updateData.type = type;
-    } else {
-      return res.status(400).json({ 
-        error: "Type is required for update",
-        required: ["type"]
-      });
     }
     
-    // Optional fields
     if (category !== undefined) {
-      updateData.category = category.trim() || 'uncategorized';
+      updateData.category = category?.trim() || existingListing.category || 'uncategorized';
     }
     
     if (tags !== undefined) {
       const tagsArray = Array.isArray(tags) ? tags : (tags ? [tags] : []);
-      updateData.tags = tagsArray.map(tag => tag.trim()).filter(tag => tag);
+      updateData.tags = tagsArray.map(tag => tag?.trim()).filter(tag => tag);
     }
     
     if (mediaUrls !== undefined) {
@@ -373,18 +368,37 @@ router.put("/:id", authenticateMiddleware, async (req, res) => {
       updateData.mediaUrls = mediaArray;
     }
     
+    // Check if at least one field is being updated
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: "No fields provided for update",
+        message: "Please provide at least one field to update (title, description, or price)"
+      });
+    }
+    
     // Add updated timestamp
     updateData.updatedAt = new Date();
+
+    console.log("Updating with data:", updateData);
 
     // Update the listing
     const updatedListing = await MarketplaceListing.findByIdAndUpdate(
       listingId,
       { $set: updateData },
-      { new: true, runValidators: true }
-    ).select("title price type category tags description mediaUrls status updatedAt");
+      { 
+        new: true, 
+        runValidators: true,
+        context: 'query' // This helps with some validation scenarios
+      }
+    ).select("title price type category tags description mediaUrls status updatedAt sellerId");
 
     if (!updatedListing) {
-      return res.status(404).json({ error: "Failed to update listing" });
+      console.log("❌ Failed to update listing after findByIdAndUpdate");
+      return res.status(404).json({ 
+        success: false,
+        error: "Failed to update listing" 
+      });
     }
 
     console.log("✅ Listing updated successfully:", updatedListing._id);
@@ -411,6 +425,8 @@ router.put("/:id", authenticateMiddleware, async (req, res) => {
         errors[key] = error.errors[key].message;
       });
       
+      console.log("Validation errors:", errors);
+      
       return res.status(400).json({
         success: false,
         error: "Validation failed",
@@ -426,7 +442,8 @@ router.put("/:id", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    if (error.name === 'MongooseError' || error.message.includes('buffering timed out')) {
+    if (error.name === 'MongoNetworkError' || error.message.includes('buffering timed out') || error.name === 'MongooseError') {
+      console.error("Database connection error:", error.message);
       return res.status(503).json({
         success: false,
         error: "Database temporarily unavailable",
@@ -441,7 +458,6 @@ router.put("/:id", authenticateMiddleware, async (req, res) => {
     });
   }
 });
-// ===================================================
 // ✅ TOGGLE LISTING STATUS (Active/Inactive)
 // ===================================================
 router.patch("/:id/toggle-status", authenticateMiddleware, async (req, res) => {
