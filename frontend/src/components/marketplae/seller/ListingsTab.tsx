@@ -263,11 +263,11 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
                   <span className="mr-1">⚫</span> {inactiveCount} Inactive
                 </span>
               </div>
-              <div className="flex items-center">
+              {/* <div className="flex items-center">
                 <span className="flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
                   <span className="mr-1">📝</span> {draftCount} Draft
                 </span>
-              </div>
+              </div> */}
               <div className="flex items-center">
                 <span className="flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
                   <span className="mr-1">💰</span> {soldCount} Sold
@@ -288,7 +288,7 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
                 <option value="sold">Sold</option>
-                <option value="draft">Draft</option>
+                {/* <option value="draft">Draft</option> */}
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
