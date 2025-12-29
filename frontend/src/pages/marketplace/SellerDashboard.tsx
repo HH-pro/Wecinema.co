@@ -1,4 +1,4 @@
-// src/pages/seller/SellerDashboard.tsx - SILENT UPDATES VERSION
+// src/pages/seller/SellerDashboard.tsx - UPDATED VERSION
 import React, { useState, useEffect, useCallback } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
@@ -204,41 +204,78 @@ const SellerDashboard: React.FC = () => {
     { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders > 0 ? orderStats.activeOrders : null }
   ];
 
-  // SellerDashboard.tsx में actionCards array को update करें:
-const actionCards = [
-  {
-    title: 'Analytics Dashboard',
-    description: 'View detailed analytics and performance metrics for your listings.',
-    icon: '📊',
-    iconBg: 'from-blue-500 to-blue-600',
-    bgGradient: 'from-blue-50 to-indigo-50',
-    borderColor: 'border-blue-200',
-    actions: [
-      {
-        label: 'View Analytics',
-        onClick: () => navigate('/marketplace/analytics'),
-        variant: 'primary' as const
+  // ✅ UPDATED: Action Cards with dynamic Stripe setup button
+  const [actionCards, setActionCards] = useState([
+    {
+      title: 'Analytics Dashboard',
+      description: 'View detailed analytics and performance metrics for your listings.',
+      icon: '📊',
+      iconBg: 'from-blue-500 to-blue-600',
+      bgGradient: 'from-blue-50 to-indigo-50',
+      borderColor: 'border-blue-200',
+      actions: [
+        {
+          label: 'View Analytics',
+          onClick: () => navigate('/marketplace/analytics'),
+          variant: 'primary' as const
+        }
+      ]
+    },
+    
+    {
+      title: 'Seller Resources',
+      description: 'Access guides, tutorials, and tips to grow your business on Marketplace.',
+      icon: '📚',
+      iconBg: 'from-orange-500 to-orange-600',
+      bgGradient: 'from-orange-50 to-amber-50',
+      borderColor: 'border-orange-200',
+      actions: [
+        {
+          label: 'Learn More',
+          onClick: () => navigate('/marketplace/seller/resources'),
+          variant: 'secondary' as const
+        }
+      ]
+    }
+  ]);
+
+  // ✅ NEW: Check if Stripe is connected and update action cards
+  useEffect(() => {
+    const updateActionCards = () => {
+      const stripeConnected = stripeStatus?.connected && stripeStatus?.chargesEnabled;
+      
+      if (!stripeConnected) {
+        // Add Stripe setup card if not connected
+        if (!actionCards.some(card => card.title === 'Setup Payments')) {
+          setActionCards(prev => [
+            ...prev,
+            {
+              title: 'Setup Payments',
+              description: 'Connect your Stripe account to start accepting payments and receiving payouts.',
+              icon: '💰',
+              iconBg: 'from-green-500 to-emerald-600',
+              bgGradient: 'from-green-50 to-emerald-50',
+              borderColor: 'border-green-200',
+              actions: [
+                {
+                  label: 'Connect Stripe',
+                  onClick: () => setShowStripeSetup(true),
+                  variant: 'primary' as const
+                }
+              ]
+            }
+          ]);
+        }
+      } else {
+        // Remove Stripe setup card if already connected
+        setActionCards(prev => prev.filter(card => card.title !== 'Setup Payments'));
       }
-    ]
-  },
-  
-  {
-    title: 'Seller Resources',
-    description: 'Access guides, tutorials, and tips to grow your business on Marketplace.',
-    icon: '📚',
-    iconBg: 'from-orange-500 to-orange-600',
-    bgGradient: 'from-orange-50 to-amber-50',
-    borderColor: 'border-orange-200',
-    actions: [
-      {
-        label: 'Learn More',
-        onClick: () => navigate('/marketplace/seller/resources'),
-        variant: 'secondary' as const
-      }
-    ]
-  }
-];
-  // ✅ FIXED: Calculate order stats
+    };
+
+    updateActionCards();
+  }, [stripeStatus]);
+
+  // ✅ UPDATED: Calculate order stats
   const calculateOrderStats = useCallback((orders: Order[]): OrderStats => {
     const now = new Date();
     const thisMonth = now.getMonth();
@@ -810,8 +847,6 @@ const actionCards = [
             showStripeButton={!(stripeStatus?.connected && stripeStatus?.chargesEnabled)}
           />
 
-          {/* REMOVED ALERTS SECTION */}
-
           {/* Navigation */}
           <TabNavigation
             tabs={tabs}
@@ -823,7 +858,7 @@ const actionCards = [
           <div className="mt-2">
             {activeTab === 'overview' && (
               <div className="space-y-8">
-                {/* Welcome Card */}
+                {/* Welcome Card - UPDATED */}
                 <WelcomeCard
                   title="Welcome back, Seller! 👋"
                   subtitle="Manage your business efficiently with real-time insights and quick actions."
@@ -834,8 +869,11 @@ const actionCards = [
                   secondaryAction={{
                     label: '💰 Setup Payments',
                     onClick: () => setShowStripeSetup(true),
+                    // ✅ SHOW only if Stripe is NOT connected and payment is NOT set up
                     visible: !(stripeStatus?.connected && stripeStatus?.chargesEnabled)
                   }}
+                  stripeStatus={stripeStatus}
+                  onStripeSetup={() => setShowStripeSetup(true)}
                 />
 
                 {/* Stats Grid */}
@@ -884,27 +922,21 @@ const actionCards = [
                   </div>
                 )}
 
-              {/* Action Cards - SAFE RENDER */}
-<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-  {actionCards && Array.isArray(actionCards) ? (
-    actionCards.map((card, index) => (
-      <ActionCard
-        key={index}
-        title={card.title}
-        description={card.description}
-        icon={card.icon}
-        iconBg={card.iconBg}
-        bgGradient={card.bgGradient}
-        borderColor={card.borderColor}
-        actions={card.actions}
-      />
-    ))
-  ) : (
-    <div className="col-span-2 text-center py-8 text-gray-500">
-      No action cards available
-    </div>
-  )}
-</div>
+                {/* Action Cards - DYNAMIC BASED ON STRIPE STATUS */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {actionCards.map((card, index) => (
+                    <ActionCard
+                      key={index}
+                      title={card.title}
+                      description={card.description}
+                      icon={card.icon}
+                      iconBg={card.iconBg}
+                      bgGradient={card.bgGradient}
+                      borderColor={card.borderColor}
+                      actions={card.actions}
+                    />
+                  ))}
+                </div>
               </div>
             )}
 
