@@ -340,7 +340,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // In SellerDashboard.tsx - UPDATED handleToggleListingStatus function
+ // In SellerDashboard.tsx - UPDATED handleToggleListingStatus function
 const handleToggleListingStatus = async (listing: Listing) => {
   try {
     setListingActionLoading(listing._id);
