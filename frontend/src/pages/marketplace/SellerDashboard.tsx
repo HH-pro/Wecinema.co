@@ -339,7 +339,7 @@ const SellerDashboard: React.FC = () => {
   const checkStripeAccountStatus = async () => {
     try {
       // First try the simple endpoint
-      const response = await fetch('/api/marketplace/stripe/status-simple', {
+      const response = await fetch('/marketplace/stripe/status', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
