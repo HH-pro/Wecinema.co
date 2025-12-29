@@ -848,7 +848,26 @@ const SellerDashboard: React.FC = () => {
   };
 
   const currentLoading = getCurrentLoadingState();
-
+// Add this function
+const handleCheckStripeStatus = async () => {
+  try {
+    setRefreshing(true);
+    await checkStripeAccountStatus();
+    fetchDashboardData();
+    
+    // Show success message
+    setSuccessMessage('Stripe status checked successfully!');
+    
+    // Clear message after 3 seconds
+    setTimeout(() => {
+      setSuccessMessage('');
+    }, 3000);
+  } catch (error) {
+    console.error('Error checking Stripe status:', error);
+  } finally {
+    setRefreshing(false);
+  }
+};
   // Show loading only on initial load
   if (loading && !initialDataLoaded) {
     return (
@@ -877,15 +896,16 @@ const SellerDashboard: React.FC = () => {
             onClose={() => setShowStripeSuccessAlert(false)}
           />
 
-          {/* Header */}
           <DashboardHeader
-            title="Seller Dashboard"
-            subtitle="Manage orders, track earnings, and grow your business"
-            earnings={formatCurrency(orderStats.totalRevenue)}
-            onRefresh={handleRefresh}
-            refreshing={refreshing}
-            stripeStatus={stripeStatus}
-          />
+  title="Seller Dashboard"
+  subtitle="Manage orders, track earnings, and grow your business"
+  earnings={formatCurrency(orderStats.totalRevenue)}
+  onRefresh={handleRefresh}
+  refreshing={refreshing}
+  stripeStatus={stripeStatus}
+  onCheckStripe={handleCheckStripeStatus} // Add this
+/>
+
 
           {/* ✅ Stripe Account Status */}
           <StripeAccountStatus
