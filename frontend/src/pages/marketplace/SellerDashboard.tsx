@@ -830,7 +830,52 @@ const SellerDashboard: React.FC = () => {
       fetchSellerOrders();
     }
   }, [activeTab, ordersPage, ordersFilter]);
-
+// ✅ FIXED: Check URL params for Stripe return success
+useEffect(() => {
+  const checkStripeReturn = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const stripeStatus = urlParams.get('stripe');
+    const accountId = urlParams.get('account_id');
+    
+    console.log('🔍 Checking Stripe return params:', { stripeStatus, accountId });
+    
+    if (stripeStatus === 'success' && accountId) {
+      console.log('🎉 Stripe connected successfully! Showing alert...');
+      
+      // Show success alert
+      setShowStripeSuccessAlert(true);
+      
+      // Clear URL params
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+      
+      // Immediately update Stripe status
+      checkStripeAccountStatus();
+      
+      // Refresh dashboard data
+      fetchDashboardData();
+      
+      // Show success message
+      setSuccessMessage('Stripe account connected successfully! You can now accept payments.');
+      
+      // Force a hard refresh after 2 seconds to ensure data is loaded
+      setTimeout(() => {
+        checkStripeAccountStatus();
+        fetchDashboardData();
+      }, 2000);
+    }
+  };
+  
+  // Run on component mount
+  checkStripeReturn();
+  
+  // Also run when URL changes (in case user refreshes)
+  window.addEventListener('popstate', checkStripeReturn);
+  
+  return () => {
+    window.removeEventListener('popstate', checkStripeReturn);
+  };
+}, []);
   // ✅ Fetch offers when offers tab is active
   useEffect(() => {
     if (activeTab === 'offers') {
