@@ -158,7 +158,7 @@ export const listingsApi = {
   editListing: async (listingId, updateData) => {
     try {
       const response = await apiClient.put(
-        `/marketplace/listing/${listingId}`,
+        `/marketplace/listings/${listingId}`,
         updateData
       );
       return response.data;
