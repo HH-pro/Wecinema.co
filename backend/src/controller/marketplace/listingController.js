@@ -12,15 +12,22 @@ router.get("/listings", async (req, res) => {
   try {
     const listings = await MarketplaceListing.find({ status: "active" })
       .populate("sellerId", "username avatar sellerRating email");
-    res.status(200).json(listings);
+    res.status(200).json({
+      success: true,
+      listings
+    });
   } catch (error) {
     console.error("❌ Error fetching listings:", error);
-    res.status(500).json({ error: "Failed to fetch listings" });
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to fetch listings" 
+    });
   }
 });
 
-/// ===================================================
+// ===================================================
 // ✅ GET USER'S LISTINGS (My Listings)
+// ===================================================
 router.get("/my-listings", authenticateMiddleware, async (req, res) => {
   try {
     const sellerId = req.user._id;
@@ -44,10 +51,6 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
 
     const total = await MarketplaceListing.countDocuments(filter);
 
-    // ✅ REMOVE or modify cache headers to prevent 304
-    // Option 1: Remove cache headers entirely
-    // Option 2: Add cache-busting headers
-    
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
@@ -61,7 +64,7 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
         total,
         pages: Math.ceil(total / parseInt(limit))
       },
-      timestamp: new Date().getTime() // Add timestamp to prevent caching
+      timestamp: new Date().getTime()
     });
     
   } catch (error) {
@@ -72,18 +75,15 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
     });
   }
 });
+
 // ===================================================
 // ✅ CREATE LISTING
+// ===================================================
 router.post("/create-listing", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== CREATE LISTING REQUEST ===");
-    console.log("Full request object:", {
-      user: req.user,
-      body: req.body,
-      headers: req.headers
-    });
+    console.log("User ID:", req.user._id);
 
-    // Debug: Check if user is properly authenticated
     if (!req.user || !req.user._id) {
       console.error("❌ User not authenticated. req.user:", req.user);
       return res.status(401).json({
@@ -95,21 +95,12 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
     const { title, description, price, type, category, tags, mediaUrls } = req.body;
     const sellerId = req.user._id;
 
-    console.log("✅ Authenticated user ID:", sellerId);
-
     // Enhanced validation
     if (!title || !description || !price || !type) {
       return res.status(400).json({ 
         success: false,
-        error: "Missing required fields",
-        required: ["title", "description", "price", "type"],
-        received: {
-          title: !!title,
-          description: !!description,
-          price: !!price,
-          type: !!type,
-          category: !!category
-        }
+        error: "Missing required fields: title, description, price, type",
+        required: ["title", "description", "price", "type"]
       });
     }
 
@@ -117,8 +108,7 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
     if (isNaN(price) || price <= 0) {
       return res.status(400).json({
         success: false,
-        error: "Price must be a positive number",
-        received: price
+        error: "Price must be a positive number"
       });
     }
 
@@ -127,7 +117,7 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
     const mediaArray = Array.isArray(mediaUrls) ? mediaUrls : (mediaUrls ? [mediaUrls] : []);
     const actualCategory = category || 'uncategorized';
 
-    // Get seller email with better error handling
+    // Get seller email
     let sellerEmail = null;
     let seller = null;
     
@@ -135,11 +125,7 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
       seller = await User.findById(sellerId).select('email username').exec();
       if (seller) {
         sellerEmail = seller.email;
-        console.log("✅ Seller found:", {
-          id: seller._id,
-          email: seller.email,
-          username: seller.username
-        });
+        console.log("✅ Seller found:", seller.username);
       } else {
         console.error("❌ Seller not found in database for ID:", sellerId);
         return res.status(404).json({
@@ -151,8 +137,7 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
       console.error("❌ Error fetching seller:", emailError.message);
       return res.status(500).json({
         success: false,
-        error: "Could not retrieve user information",
-        details: emailError.message
+        error: "Could not retrieve user information"
       });
     }
 
@@ -181,17 +166,12 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
       updatedAt: new Date()
     };
 
-    console.log("📝 Creating listing with data:", listingData);
+    console.log("📝 Creating listing:", listingData.title);
 
     // Create the listing
     const listing = await MarketplaceListing.create(listingData);
 
-    console.log("✅ Listing created successfully:", {
-      id: listing._id,
-      title: listing.title,
-      sellerId: listing.sellerId,
-      sellerEmail: listing.sellerEmail
-    });
+    console.log("✅ Listing created successfully:", listing._id);
 
     res.status(201).json({ 
       success: true,
@@ -203,28 +183,20 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
         type: listing.type,
         category: listing.category,
         status: listing.status,
-        createdAt: listing.createdAt,
-        seller: {
-          id: seller._id,
-          username: seller.username,
-          email: sellerEmail ? 'email_provided' : 'no_email'
-        }
+        createdAt: listing.createdAt
       }
     });
 
   } catch (error) {
     console.error("❌ Error creating listing:", error);
     
-    // Handle duplicate key errors
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
-        error: "Listing with similar details already exists",
-        details: error.keyValue
+        error: "Listing with similar details already exists"
       });
     }
     
-    // Handle validation errors
     if (error.name === 'ValidationError') {
       const errors = {};
       Object.keys(error.errors).forEach(key => {
@@ -238,19 +210,16 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    // Handle database connection errors
     if (error.name === 'MongooseError' || error.message.includes('buffering timed out')) {
       return res.status(503).json({
         success: false,
-        error: "Database temporarily unavailable",
-        details: "Please try again in a moment"
+        error: "Database temporarily unavailable"
       });
     }
 
     res.status(500).json({ 
       success: false,
-      error: "Failed to create listing", 
-      details: error.message 
+      error: "Failed to create listing"
     });
   }
 });
@@ -264,12 +233,10 @@ function isValidEmail(email) {
 // ===================================================
 // ✅ EDIT/UPDATE LISTING
 // ===================================================
-// ===================================================
 router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== EDIT LISTING REQUEST ===");
     console.log("Listing ID:", req.params.id);
-    console.log("Update data:", req.body);
     console.log("User ID:", req.user._id);
 
     const { title, description, price, type, category, tags, mediaUrls } = req.body;
@@ -284,78 +251,59 @@ router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
 
     if (!existingListing) {
       return res.status(404).json({ 
+        success: false,
         error: "Listing not found or you don't have permission to edit this listing" 
       });
     }
 
-    // Build update object with validation (like create listing)
+    // Build update object
     const updateData = {};
     
-    // Required fields validation (same as create listing)
+    // Required fields validation
     if (title !== undefined) {
       if (!title || title.trim() === '') {
         return res.status(400).json({
-          error: "Title is required",
-          received: title
+          success: false,
+          error: "Title is required"
         });
       }
       updateData.title = title.trim();
-    } else {
-      return res.status(400).json({ 
-        error: "Title is required for update",
-        required: ["title"]
-      });
     }
     
     if (description !== undefined) {
       if (!description || description.trim() === '') {
         return res.status(400).json({
-          error: "Description is required",
-          received: description
+          success: false,
+          error: "Description is required"
         });
       }
       updateData.description = description.trim();
-    } else {
-      return res.status(400).json({ 
-        error: "Description is required for update",
-        required: ["description"]
-      });
     }
     
     if (price !== undefined) {
       if (!price) {
         return res.status(400).json({
-          error: "Price is required",
-          received: price
+          success: false,
+          error: "Price is required"
         });
       }
       if (isNaN(price) || price <= 0) {
         return res.status(400).json({
-          error: "Price must be a positive number",
-          received: price
+          success: false,
+          error: "Price must be a positive number"
         });
       }
       updateData.price = parseFloat(price).toFixed(2);
-    } else {
-      return res.status(400).json({ 
-        error: "Price is required for update",
-        required: ["price"]
-      });
     }
     
     if (type !== undefined) {
       if (!type || type.trim() === '') {
         return res.status(400).json({
-          error: "Type is required",
-          received: type
+          success: false,
+          error: "Type is required"
         });
       }
       updateData.type = type;
-    } else {
-      return res.status(400).json({ 
-        error: "Type is required for update",
-        required: ["type"]
-      });
     }
     
     // Optional fields
@@ -381,10 +329,13 @@ router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
       listingId,
       { $set: updateData },
       { new: true, runValidators: true }
-    ).select("title price type category tags description mediaUrls status updatedAt");
+    ).select("title price type category tags description mediaUrls status updatedAt createdAt views sellerId");
 
     if (!updatedListing) {
-      return res.status(404).json({ error: "Failed to update listing" });
+      return res.status(404).json({ 
+        success: false,
+        error: "Failed to update listing" 
+      });
     }
 
     console.log("✅ Listing updated successfully:", updatedListing._id);
@@ -421,32 +372,30 @@ router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
-        error: "Listing with similar details already exists",
-        details: error.keyValue
+        error: "Listing with similar details already exists"
       });
     }
 
     if (error.name === 'MongooseError' || error.message.includes('buffering timed out')) {
       return res.status(503).json({
         success: false,
-        error: "Database temporarily unavailable",
-        details: "Please try again in a moment"
+        error: "Database temporarily unavailable"
       });
     }
     
     res.status(500).json({ 
       success: false,
-      error: "Failed to update listing",
-      details: error.message 
+      error: "Failed to update listing"
     });
   }
 });
+
 // ===================================================
-// ✅ TOGGLE LISTING STATUS (Active/Inactive)
+// ✅ TOGGLE LISTING STATUS (Active/Inactive) - FIXED
 // ===================================================
 router.patch("/listing/:id/toggle-status", authenticateMiddleware, async (req, res) => {
   try {
-    console.log("=== TOGGLE LISTING STATUS ===");
+    console.log("=== TOGGLE LISTING STATUS REQUEST ===");
     console.log("Listing ID:", req.params.id);
     console.log("User ID:", req.user._id);
 
@@ -461,12 +410,31 @@ router.patch("/listing/:id/toggle-status", authenticateMiddleware, async (req, r
 
     if (!listing) {
       return res.status(404).json({ 
+        success: false,
         error: "Listing not found or you don't have permission to modify this listing" 
       });
     }
 
-    // Toggle status
-    const newStatus = listing.status === "active" ? "inactive" : "active";
+    // Toggle status only between active and inactive
+    let newStatus;
+    if (listing.status === "active") {
+      newStatus = "inactive";
+    } else if (listing.status === "inactive") {
+      newStatus = "active";
+    } else {
+      // For draft or sold listings, allow toggling to active
+      if (listing.status === "draft" || listing.status === "sold") {
+        newStatus = "active";
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: `Cannot toggle status from ${listing.status}`,
+          currentStatus: listing.status
+        });
+      }
+    }
+    
+    console.log(`🔄 Toggling status from "${listing.status}" to "${newStatus}"`);
     
     const updatedListing = await MarketplaceListing.findByIdAndUpdate(
       listingId,
@@ -477,11 +445,12 @@ router.patch("/listing/:id/toggle-status", authenticateMiddleware, async (req, r
         } 
       },
       { new: true }
-    ).select("title status updatedAt");
+    ).select("_id title status updatedAt createdAt price description category tags mediaUrls");
 
-    console.log(`✅ Listing status changed from ${listing.status} to ${newStatus}`);
+    console.log(`✅ Listing status changed to ${newStatus}`);
 
     res.status(200).json({ 
+      success: true,
       message: `Listing ${newStatus === "active" ? "activated" : "deactivated"} successfully`,
       listing: updatedListing,
       previousStatus: listing.status,
@@ -492,10 +461,16 @@ router.patch("/listing/:id/toggle-status", authenticateMiddleware, async (req, r
     console.error("❌ Error toggling listing status:", error);
     
     if (error.name === 'CastError') {
-      return res.status(400).json({ error: "Invalid listing ID format" });
+      return res.status(400).json({ 
+        success: false,
+        error: "Invalid listing ID format" 
+      });
     }
     
-    res.status(500).json({ error: "Failed to toggle listing status" });
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to toggle listing status"
+    });
   }
 });
 
@@ -511,7 +486,10 @@ router.get("/listing/:id", async (req, res) => {
       .select("title description price type category tags mediaUrls status sellerId createdAt updatedAt views");
     
     if (!listing) {
-      return res.status(404).json({ error: "Listing not found" });
+      return res.status(404).json({ 
+        success: false,
+        error: "Listing not found" 
+      });
     }
     
     // Increment view count
@@ -527,10 +505,16 @@ router.get("/listing/:id", async (req, res) => {
     console.error("❌ Error fetching listing details:", error);
     
     if (error.name === 'CastError') {
-      return res.status(400).json({ error: "Invalid listing ID format" });
+      return res.status(400).json({ 
+        success: false,
+        error: "Invalid listing ID format" 
+      });
     }
     
-    res.status(500).json({ error: "Failed to fetch listing details" });
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to fetch listing details" 
+    });
   }
 });
 
@@ -553,7 +537,10 @@ router.get("/user/:userId/listings", async (req, res) => {
     // Verify user exists
     const user = await User.findById(userId).select('username avatar sellerRating');
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ 
+        success: false,
+        error: "User not found" 
+      });
     }
 
     const listings = await MarketplaceListing.find(filter)
@@ -583,7 +570,10 @@ router.get("/user/:userId/listings", async (req, res) => {
     
   } catch (error) {
     console.error("❌ Error fetching user listings:", error);
-    res.status(500).json({ error: "Failed to fetch user listings" });
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to fetch user listings" 
+    });
   }
 });
 
@@ -604,19 +594,18 @@ router.delete("/listing/:id", authenticateMiddleware, async (req, res) => {
     });
 
     if (!listing) {
-      console.log("❌ Listing not found or user not authorized:", {
-        listingId: req.params.id,
-        userId: userId
-      });
+      console.log("❌ Listing not found or user not authorized");
       return res.status(404).json({ 
+        success: false,
         error: "Listing not found or you don't have permission to delete this listing" 
       });
     }
 
     console.log("✅ Listing deleted successfully:", listing._id);
     res.status(200).json({ 
+      success: true,
       message: "Listing deleted successfully", 
-      listing: {
+      deletedListing: {
         _id: listing._id,
         title: listing.title,
         status: listing.status
@@ -626,10 +615,16 @@ router.delete("/listing/:id", authenticateMiddleware, async (req, res) => {
     console.error("❌ Error deleting listing:", error);
     
     if (error.name === 'CastError') {
-      return res.status(400).json({ error: "Invalid listing ID format" });
+      return res.status(400).json({ 
+        success: false,
+        error: "Invalid listing ID format" 
+      });
     }
     
-    res.status(500).json({ error: "Failed to delete listing" });
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to delete listing" 
+    });
   }
 });
 
@@ -648,8 +643,8 @@ router.delete("/admin/delete-all-listings", authenticateMiddleware, async (req, 
     
     if (beforeCount === 0) {
       return res.status(404).json({ 
-        message: "No listings found to delete",
-        deletedCount: 0
+        success: false,
+        error: "No listings found to delete"
       });
     }
 
@@ -668,8 +663,8 @@ router.delete("/admin/delete-all-listings", authenticateMiddleware, async (req, 
   } catch (error) {
     console.error("❌ Error deleting all listings:", error);
     res.status(500).json({ 
-      error: "Failed to delete listings",
-      details: error.message 
+      success: false,
+      error: "Failed to delete listings"
     });
   }
 });
