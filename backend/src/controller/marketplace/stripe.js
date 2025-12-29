@@ -150,6 +150,26 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
 
     // Create new Stripe account with better configuration
     console.log('11. Creating new Stripe account...');
+    
+    // FIXED: Create a valid business URL (Stripe rejects localhost)
+    const getValidBusinessUrl = () => {
+      const frontendUrl = process.env.FRONTEND_URL || '';
+      
+      // Check if URL is valid and not localhost
+      if (frontendUrl && 
+          !frontendUrl.includes('localhost') && 
+          !frontendUrl.includes('127.0.0.1') &&
+          (frontendUrl.startsWith('http://') || frontendUrl.startsWith('https://'))) {
+        return frontendUrl;
+      }
+      
+      // Use a default production URL
+      return 'https://wecinema.co';
+    };
+    
+    const validBusinessUrl = getValidBusinessUrl();
+    console.log('11a. Using business URL:', validBusinessUrl);
+    
     const accountData = {
       type: 'express',
       country: process.env.STRIPE_DEFAULT_COUNTRY || 'US',
@@ -164,8 +184,9 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
         first_name: user.firstName || 'Test',
         last_name: user.lastName || 'User',
       },
+      // FIXED: Use only valid, non-localhost URL
       business_profile: {
-        url: process.env.FRONTEND_URL || 'https://wecinema.co',
+        url: validBusinessUrl,
         mcc: process.env.STRIPE_MCC_CODE || '5734', // Computer Software Stores
         product_description: 'Digital products and services'
       },
@@ -182,7 +203,7 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
       }
     };
 
-    console.log('11a. Account creation data:', JSON.stringify(accountData, null, 2));
+    console.log('11b. Account creation data:', JSON.stringify(accountData, null, 2));
     
     const account = await stripe.accounts.create(accountData);
     console.log('12. ✅ Stripe account created:', account.id);
@@ -199,8 +220,8 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
     console.log('15. Creating account link...');
     const accountLink = await stripe.accountLinks.create({
       account: account.id,
-      refresh_url: `${process.env.FRONTEND_URL}/marketplace/dashboard?stripe=refresh&account_id=${account.id}`,
-      return_url: `${process.env.FRONTEND_URL}/marketplace/dashboard?stripe=success&account_id=${account.id}`,
+      refresh_url: `${process.env.FRONTEND_URL || 'https://wecinema.co'}/marketplace/dashboard?stripe=refresh&account_id=${account.id}`,
+      return_url: `${process.env.FRONTEND_URL || 'https://wecinema.co'}/marketplace/dashboard?stripe=success&account_id=${account.id}`,
       type: 'account_onboarding',
     });
     console.log('16. ✅ Account link created:', accountLink.url);
@@ -236,6 +257,10 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
 
     if (error.type === 'StripeInvalidRequestError') {
       switch (error.code) {
+        case 'url_invalid':
+          userMessage = 'Invalid business URL. Please contact support.';
+          errorDetails = 'Stripe rejected the business URL. This is a configuration issue.';
+          break;
         case 'parameter_invalid':
           userMessage = 'Invalid account information. Please check your profile details.';
           break;
