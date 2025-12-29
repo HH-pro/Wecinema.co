@@ -1,13 +1,19 @@
+// components/marketplae/seller/StripeSetupModal.tsx
 import React, { useState } from 'react';
-import { createStripeAccount } from '../../../api';
 
 interface StripeSetupModalProps {
   show: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  stripeConnected?: boolean;
 }
 
-const StripeSetupModal: React.FC<StripeSetupModalProps> = ({ show, onClose, onSuccess }) => {
+const StripeSetupModal: React.FC<StripeSetupModalProps> = ({ 
+  show, 
+  onClose, 
+  onSuccess,
+  stripeConnected = false
+}) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -16,18 +22,42 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({ show, onClose, onSu
       setLoading(true);
       setError('');
 
-      const response = await createStripeAccount();
+      // If Stripe is already connected, don't proceed
+      if (stripeConnected) {
+        setError('Stripe is already connected to your account.');
+        setLoading(false);
+        onClose();
+        return;
+      }
+
+      const response = await fetch('/api/marketplace/stripe/onboard-seller', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      });
       
-      if (response.url) {
-        window.location.href = response.url;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success && data.url) {
+        // Store account ID before redirect
+        if (data.stripeAccountId) {
+          localStorage.setItem('pendingStripeAccountId', data.stripeAccountId);
+        }
+        window.location.href = data.url;
       } else {
-        setError('Failed to start Stripe setup - no URL returned');
+        setError(data.error || 'Failed to start Stripe setup');
       }
     } catch (err: any) {
       console.error('Stripe connect error:', err);
-      // Handle different error types
-      if (err.response?.data?.error) {
-        setError(err.response.data.error);
+      
+      if (err.message.includes('401') || err.message.includes('403')) {
+        setError('Please login again to setup payments.');
       } else if (err.message) {
         setError(err.message);
       } else {
@@ -38,14 +68,27 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({ show, onClose, onSu
     }
   };
 
-  if (!show) return null;
+  // Don't show modal if Stripe is already connected
+  if (!show || stripeConnected) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
         <div className="p-6 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900">Connect Stripe Account</h2>
-          <p className="text-gray-600 mt-1">Required to accept payments</p>
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Connect Stripe Account</h2>
+              <p className="text-gray-600 mt-1">Required to accept payments</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-500"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="p-6">
@@ -60,36 +103,49 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({ show, onClose, onSu
                 <h4 className="font-medium text-blue-900">Why Stripe?</h4>
                 <p className="text-blue-700 text-sm mt-1">
                   Stripe is required to securely process payments and transfer funds to your bank account.
+                  It takes only 2 minutes to set up.
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="space-y-3 text-sm text-gray-600">
+          <div className="space-y-3 text-sm text-gray-600 mb-6">
             <div className="flex items-center">
               <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              Secure payment processing
+              Secure payment processing (PCI compliant)
             </div>
             <div className="flex items-center">
               <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              Direct bank transfers
+              Direct bank transfers to your account
             </div>
             <div className="flex items-center">
               <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              Industry-leading security
+              Accept credit cards, Apple Pay, Google Pay
             </div>
             <div className="flex items-center">
               <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              Takes only 2 minutes to set up
+              Automatic tax calculation and reporting
             </div>
+          </div>
+
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+            <h4 className="font-medium text-gray-900 text-sm mb-2">You'll need to provide:</h4>
+            <ul className="text-xs text-gray-600 space-y-1">
+              <li>• Personal identification (name, email)</li>
+              <li>• Bank account details for payouts</li>
+              <li>• Business information (if applicable)</li>
+            </ul>
+            <p className="text-xs text-gray-500 mt-2">
+              Your information is securely handled by Stripe and never stored on our servers.
+            </p>
           </div>
 
           {error && (
@@ -110,7 +166,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({ show, onClose, onSu
           <button
             onClick={handleStripeConnect}
             disabled={loading}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50 flex items-center justify-center"
+            className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50 flex items-center justify-center shadow-md hover:shadow-lg"
           >
             {loading ? (
               <>
@@ -118,7 +174,12 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({ show, onClose, onSu
                 Connecting...
               </>
             ) : (
-              'Connect Stripe Account'
+              <>
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Connect Stripe Account
+              </>
             )}
           </button>
         </div>
