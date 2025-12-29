@@ -83,7 +83,7 @@ export const listingsApi = {
   // Toggle listing status (activate/deactivate)
   toggleListingStatus: async (listingId) => {
     try {
-      const response = await axios.post(
+      const response = await axios.patch(
         `${API_BASE_URL}/marketplace/listings/${listingId}/toggle-status`,
         {},
         getHeaders()
