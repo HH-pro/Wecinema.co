@@ -884,12 +884,27 @@ const actionCards = [
                   </div>
                 )}
 
-                {/* Action Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {actionCards.map((card, index) => (
-                    <ActionCard key={index} {...card} />
-                  ))}
-                </div>
+              {/* Action Cards - SAFE RENDER */}
+<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+  {actionCards && Array.isArray(actionCards) ? (
+    actionCards.map((card, index) => (
+      <ActionCard
+        key={index}
+        title={card.title}
+        description={card.description}
+        icon={card.icon}
+        iconBg={card.iconBg}
+        bgGradient={card.bgGradient}
+        borderColor={card.borderColor}
+        actions={card.actions}
+      />
+    ))
+  ) : (
+    <div className="col-span-2 text-center py-8 text-gray-500">
+      No action cards available
+    </div>
+  )}
+</div>
               </div>
             )}
 
