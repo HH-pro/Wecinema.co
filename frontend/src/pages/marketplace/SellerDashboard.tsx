@@ -367,7 +367,7 @@ const SellerDashboard: React.FC = () => {
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
       
       try {
-        const response = await fetch('/api/marketplace/stripe/status', {
+        const response = await fetch('/marketplace/stripe/status', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
