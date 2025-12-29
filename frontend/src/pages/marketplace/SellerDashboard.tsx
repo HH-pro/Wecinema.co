@@ -27,7 +27,7 @@ import EditListingModal from '../../components/marketplae/seller/EditListingModa
 import DeleteListingModal from '../../components/marketplae/seller/DeleteListingModal';
 import VideoPlayerModal from '../../components/marketplae/seller/VideoPlayerModal';
 
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = 'http://localhost:3000';
 
 interface StripeStatus {
   connected: boolean;
