@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Charts from "./Charts";
 import "./Analytics.css";
 
@@ -7,153 +7,160 @@ interface AnalyticsSectionProps {
 }
 
 const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ 
-  title = "Analytics" 
+  title = "Analytics Dashboard" 
 }) => {
-  const [showGraphs, setShowGraphs] = useState(false);
+  const [showGraphs, setShowGraphs] = useState(true);
   const [isAnimating, setIsAnimating] = useState(false);
+
+  // Check localStorage for user preference
+  useEffect(() => {
+    const userPreference = localStorage.getItem('analyticsGraphsVisible');
+    if (userPreference !== null) {
+      setShowGraphs(userPreference === 'true');
+    }
+  }, []);
 
   const handleToggle = () => {
     setIsAnimating(true);
-    setShowGraphs(!showGraphs);
+    const newState = !showGraphs;
+    setShowGraphs(newState);
+    
+    // Save user preference to localStorage
+    localStorage.setItem('analyticsGraphsVisible', newState.toString());
+    
     setTimeout(() => setIsAnimating(false), 400);
   };
 
   return (
     <div className={`analytics-wrapper ${showGraphs ? 'expanded' : 'collapsed'}`}>
       
-      {/* Stylish Compact Bar (When Collapsed) */}
+      {/* Yellow Theme Compact Bar (When Graphs Hidden) */}
       {!showGraphs && (
-        <div className="stylish-compact-bar">
-          <div className="stylish-bar-content">
-            <div className="stylish-bar-left">
-              <div className="stylish-bar-icon">
-                <div className="icon-wrapper">
-                  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <div className="yellow-compact-bar">
+          <div className="yellow-bar-content">
+            <div className="yellow-bar-left">
+              <div className="yellow-bar-icon">
+                <div className="yellow-icon-wrapper">
+                  <svg className="yellow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
-                  <div className="icon-glow"></div>
+                  <div className="yellow-icon-glow"></div>
                 </div>
               </div>
-              <div className="stylish-bar-text">
-                <span className="stylish-bar-title">
-                  <span className="title-icon">📈</span>
-                  Analytics Insights
+              <div className="yellow-bar-text">
+                <span className="yellow-bar-title">
+                  <span className="yellow-title-icon">📈</span>
+                  Analytics Dashboard
                 </span>
-                <span className="stylish-bar-subtitle">Visualize trends & patterns</span>
+                <span className="yellow-bar-subtitle">Hidden - Click to show insights</span>
               </div>
             </div>
             
             <button 
-              className="stylish-toggle-btn"
+              className="yellow-toggle-btn"
               onClick={handleToggle}
               aria-label="Show analytics graphs"
               title="Show Analytics Dashboard"
             >
-              <span className="toggle-content">
-                <span className="toggle-text">Explore</span>
-                <div className="arrow-animation">
-                  <svg className="toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <span className="yellow-toggle-content">
+                <span className="yellow-toggle-text">Show Graphs</span>
+                <div className="yellow-arrow-animation">
+                  <svg className="yellow-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                   </svg>
                 </div>
               </span>
-              <span className="btn-glow"></span>
+              <span className="yellow-btn-glow"></span>
             </button>
           </div>
           
-          {/* Mini Stats Preview */}
-          <div className="mini-preview">
-            <div className="preview-item">
-              <span className="preview-dot" style={{ backgroundColor: '#3b82f6' }}></span>
-              <span className="preview-value">3 Charts</span>
-            </div>
-            <div className="preview-divider"></div>
-            <div className="preview-item">
-              <span className="preview-dot" style={{ backgroundColor: '#10b981' }}></span>
-              <span className="preview-value">Live Data</span>
-            </div>
-            <div className="preview-divider"></div>
-            <div className="preview-item">
-              <span className="preview-dot" style={{ backgroundColor: '#f59e0b' }}></span>
-              <span className="preview-value">Interactive</span>
+          {/* Quick Stats Preview */}
+          <div className="yellow-preview">
+            <div className="yellow-preview-item">
+              <div className="yellow-preview-icon">📊</div>
+              <div className="yellow-preview-text">
+                <span className="yellow-preview-label">3 Charts Available</span>
+                <span className="yellow-preview-value">Click to view</span>
+              </div>
             </div>
           </div>
           
-          {/* Subtle Pulse Effect */}
-          <div className="pulse-effect"></div>
+          {/* Sun Rays Effect */}
+          <div className="sun-ray ray-1"></div>
+          <div className="sun-ray ray-2"></div>
+          <div className="sun-ray ray-3"></div>
         </div>
       )}
 
-      {/* Stylish Expanded Section */}
+      {/* Yellow Theme Expanded Section (Initially Visible) */}
       {showGraphs && (
-        <div className={`stylish-analytics-section ${isAnimating ? 'animating' : ''}`}>
+        <div className={`yellow-analytics-section ${isAnimating ? 'animating' : ''}`}>
           
-          {/* Elegant Header */}
-          <div className="elegant-header">
-            <div className="header-content">
-              <div className="header-icon-title">
-                <div className="elegant-icon">
-                  <div className="icon-bg"></div>
-                  <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          {/* Yellow Header */}
+          <div className="yellow-header">
+            <div className="yellow-header-content">
+              <div className="yellow-header-left">
+                <div className="yellow-header-icon">
+                  <div className="yellow-header-icon-bg"></div>
+                  <svg className="yellow-header-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
                 </div>
-                <div className="header-text">
-                  <h2 className="elegant-title">Analytics Dashboard</h2>
-                  <p className="elegant-subtitle">Real-time insights & visualization</p>
+                <div className="yellow-header-text">
+                  <h2 className="yellow-header-title">Analytics Dashboard</h2>
+                  <p className="yellow-header-subtitle">Real-time insights & visualization</p>
                 </div>
               </div>
               
               <button 
-                className="elegant-close-btn"
+                className="yellow-close-btn"
                 onClick={handleToggle}
                 aria-label="Hide analytics graphs"
-                title="Close Analytics"
+                title="Hide Analytics"
               >
-                <span className="close-content">
-                  <span className="close-text">Collapse</span>
-                  <svg className="close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <span className="yellow-close-content">
+                  <span className="yellow-close-text">Hide</span>
+                  <svg className="yellow-close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
                   </svg>
                 </span>
               </button>
             </div>
             
-            {/* Header Gradient Line */}
-            <div className="header-gradient"></div>
+            {/* Yellow Header Gradient Line */}
+            <div className="yellow-header-gradient"></div>
           </div>
 
-          {/* Compact Charts Container */}
-          <div className="compact-charts-wrapper">
-            <div className="charts-intro">
-              <h3 className="intro-title">Visual Analytics</h3>
-              <p className="intro-subtitle">Interactive charts showing trends over time</p>
+          {/* Charts Container */}
+          <div className="yellow-charts-container">
+            <div className="yellow-charts-intro">
+              <h3 className="yellow-intro-title">Visual Analytics</h3>
+              <p className="yellow-intro-subtitle">Interactive charts showing trends over time</p>
             </div>
             
             <Charts />
           </div>
 
-          {/* Stylish Footer */}
-          <div className="stylish-footer">
-            <div className="footer-left">
-              <div className="legend-container">
-                <span className="legend-title">Legend</span>
-                <div className="legend-dots">
-                  <span className="legend-dot" style={{ backgroundColor: '#3b82f6' }}></span>
-                  <span className="legend-dot" style={{ backgroundColor: '#10b981' }}></span>
-                  <span className="legend-dot" style={{ backgroundColor: '#f59e0b' }}></span>
-                  <span className="legend-dot" style={{ backgroundColor: '#8b5cf6' }}></span>
+          {/* Yellow Footer */}
+          <div className="yellow-footer">
+            <div className="yellow-footer-left">
+              <div className="yellow-legend">
+                <span className="yellow-legend-title">Live Data</span>
+                <div className="yellow-legend-dots">
+                  <span className="yellow-legend-dot" style={{ backgroundColor: '#f59e0b' }}></span>
+                  <span className="yellow-legend-dot" style={{ backgroundColor: '#fbbf24' }}></span>
+                  <span className="yellow-legend-dot" style={{ backgroundColor: '#d97706' }}></span>
                 </div>
               </div>
             </div>
             
-            <div className="footer-right">
-              <span className="data-info">
-                <span className="info-icon">⏱️</span>
-                <span className="info-text">Last 330 days</span>
+            <div className="yellow-footer-right">
+              <span className="yellow-data-info">
+                <span className="yellow-info-icon">⏱️</span>
+                <span className="yellow-info-text">Last 330 days</span>
               </span>
-              <button className="refresh-mini-btn" title="Refresh data">
-                <svg className="refresh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <button className="yellow-refresh-btn" title="Refresh data">
+                <svg className="yellow-refresh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </button>
