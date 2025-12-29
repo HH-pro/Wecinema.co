@@ -335,33 +335,40 @@ const SellerDashboard: React.FC = () => {
     };
   }, []);
 
-  // ✅ Improved: Check Stripe account status with fallback
-  const checkStripeAccountStatus = async () => {
-    try {
-      // First try the simple endpoint
-      const response = await fetch('/api/marketplace/stripe/status-simple', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include'
-      });
+  // ✅ FIXED: Check Stripe account status with force refresh
+const checkStripeAccountStatus = async (force = false) => {
+  try {
+    console.log('🔍 Checking Stripe status...', { force });
+    
+    // Use simple endpoint first, then detailed if needed
+    const endpoint = force 
+      ? '/api/marketplace/stripe/status' 
+      : '/api/marketplace/stripe/status-simple';
+    
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      cache: force ? 'no-cache' : 'default'
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('✅ Stripe status response:', data);
+      setStripeStatus(data);
       
-      if (response.ok) {
-        const data = await response.json();
-        setStripeStatus(data);
-      } else {
-        // Fallback: Set basic status
-        setStripeStatus({
-          connected: false,
-          chargesEnabled: false,
-          detailsSubmitted: false,
-          status: 'error'
-        });
+      // If connected but charges not enabled, check again after delay
+      if (data.connected && !data.chargesEnabled) {
+        setTimeout(() => {
+          checkStripeAccountStatus(true);
+        }, 3000);
       }
-    } catch (err) {
-      console.error('Error checking Stripe status:', err);
-      // Set fallback status
+      
+      return data;
+    } else {
+      console.error('❌ Stripe status check failed:', response.status);
       setStripeStatus({
         connected: false,
         chargesEnabled: false,
@@ -369,7 +376,78 @@ const SellerDashboard: React.FC = () => {
         status: 'error'
       });
     }
+  } catch (err) {
+    console.error('Error checking Stripe status:', err);
+    setStripeStatus({
+      connected: false,
+      chargesEnabled: false,
+      detailsSubmitted: false,
+      status: 'error'
+    });
+  }
+};
+
+// ✅ FIXED: Check URL params for Stripe return success
+useEffect(() => {
+  const checkStripeReturn = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const stripeStatusParam = urlParams.get('stripe');
+    const accountId = urlParams.get('account_id');
+    
+    console.log('🔍 Checking Stripe return params:', { stripeStatusParam, accountId });
+    
+    if (stripeStatusParam === 'success' && accountId) {
+      console.log('🎉 Stripe connected successfully!');
+      
+      // Store account ID
+      localStorage.setItem('stripe_account_id', accountId);
+      
+      // Clear URL params
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+      
+      // Show success alert immediately
+      setShowStripeSuccessAlert(true);
+      
+      // Force refresh Stripe status immediately
+      checkStripeAccountStatus(true);
+      
+      // Refresh dashboard data
+      fetchDashboardData();
+      
+      // Set success message
+      setSuccessMessage('Stripe account connected successfully! You can now accept payments.');
+      
+      // Check status multiple times to ensure it updates
+      const checkInterval = setInterval(() => {
+        console.log('🔄 Checking Stripe status update...');
+        checkStripeAccountStatus(true);
+      }, 2000);
+      
+      // Stop checking after 30 seconds
+      setTimeout(() => {
+        clearInterval(checkInterval);
+      }, 30000);
+    }
   };
+  
+  // Run immediately
+  checkStripeReturn();
+  
+  // Also check for account ID in localStorage (in case page was refreshed)
+  const savedAccountId = localStorage.getItem('stripe_account_id');
+  if (savedAccountId && (!stripeStatus || !stripeStatus.chargesEnabled)) {
+    console.log('🔍 Found saved Stripe account ID:', savedAccountId);
+    setTimeout(() => {
+      checkStripeAccountStatus(true);
+    }, 1000);
+  }
+  
+  return () => {
+    // Cleanup
+    localStorage.removeItem('stripe_account_id');
+  };
+}, []);
 
   // ✅ Fetch dashboard data
   const fetchDashboardData = async () => {
