@@ -1,4 +1,4 @@
-// src/pages/seller/SellerDashboard.tsx - UPDATED WITH API FILE
+// src/pages/seller/SellerDashboard.tsx - COMPLETE UPDATED VERSION
 import React, { useState, useEffect, useCallback } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
@@ -35,13 +35,98 @@ import EditListingModal from '../../components/marketplae/seller/EditListingModa
 import DeleteListingModal from '../../components/marketplae/seller/DeleteListingModal';
 import VideoPlayerModal from '../../components/marketplae/seller/VideoPlayerModal';
 
-// Interfaces (same as before)
-interface Order { /* ... same as before ... */ }
-interface Offer { /* ... same as before ... */ }
-interface Listing { /* ... same as before ... */ }
-interface ListingsData { /* ... same as before ... */ }
-interface OrderStats { /* ... same as before ... */ }
-interface StripeStatus { /* ... same as before ... */ }
+// Interfaces
+interface Order {
+  _id: string;
+  listingId: string;
+  listingTitle: string;
+  buyerId: string;
+  buyerName: string;
+  buyerEmail: string;
+  sellerId: string;
+  sellerName: string;
+  amount: number;
+  status: string;
+  paymentStatus: string;
+  createdAt: string;
+  updatedAt: string;
+  deadline?: string;
+  deliveredAt?: string;
+  cancelledAt?: string;
+  videoUrl?: string;
+  requirements?: string;
+  messages?: Array<{
+    sender: string;
+    message: string;
+    timestamp: string;
+  }>;
+}
+
+interface Offer {
+  _id: string;
+  listingId: string;
+  listingTitle: string;
+  buyerId: string;
+  buyerName: string;
+  buyerEmail: string;
+  amount: number;
+  status: string;
+  message?: string;
+  createdAt: string;
+  videoUrl?: string;
+}
+
+interface Listing {
+  _id: string;
+  title: string;
+  description: string;
+  price: number;
+  category: string;
+  tags: string[];
+  status: string;
+  sellerId: string;
+  createdAt: string;
+  updatedAt: string;
+  images?: string[];
+  videoUrl?: string;
+  deliveryTime?: number;
+  revisions?: number;
+  featured?: boolean;
+}
+
+interface ListingsData {
+  listings: Listing[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+interface OrderStats {
+  totalOrders: number;
+  activeOrders: number;
+  pendingPayment: number;
+  processing: number;
+  inProgress: number;
+  delivered: number;
+  completed: number;
+  cancelled: number;
+  totalRevenue: number;
+  pendingRevenue: number;
+  thisMonthOrders: number;
+  thisMonthRevenue: number;
+}
+
+interface StripeStatus {
+  connected: boolean;
+  chargesEnabled: boolean;
+  detailsSubmitted: boolean;
+  accountId?: string;
+  email?: string;
+  country?: string;
+}
 
 const SellerDashboard: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -119,8 +204,41 @@ const SellerDashboard: React.FC = () => {
     { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders > 0 ? orderStats.activeOrders : null }
   ];
 
-  // Action cards data (same as before)
-  const actionCards = [ /* ... same as before ... */ ];
+  // Action cards data
+  const actionCards = [
+    {
+      icon: '📊',
+      title: 'Analytics Dashboard',
+      description: 'View detailed analytics and performance metrics for your listings.',
+      buttonText: 'View Analytics',
+      buttonColor: 'bg-blue-500 hover:bg-blue-600',
+      onClick: () => navigate('/marketplace/analytics')
+    },
+    {
+      icon: '💰',
+      title: 'Payment Settings',
+      description: 'Configure payment methods and withdrawal settings for your earnings.',
+      buttonText: 'Manage Payments',
+      buttonColor: 'bg-green-500 hover:bg-green-600',
+      onClick: () => setShowStripeSetup(true)
+    },
+    {
+      icon: '⚙️',
+      title: 'Seller Settings',
+      description: 'Update your seller profile, availability, and notification preferences.',
+      buttonText: 'Settings',
+      buttonColor: 'bg-purple-500 hover:bg-purple-600',
+      onClick: () => navigate('/marketplace/seller/settings')
+    },
+    {
+      icon: '📚',
+      title: 'Seller Resources',
+      description: 'Access guides, tutorials, and tips to grow your business on Marketplace.',
+      buttonText: 'Learn More',
+      buttonColor: 'bg-orange-500 hover:bg-orange-600',
+      onClick: () => navigate('/marketplace/seller/resources')
+    }
+  ];
 
   // ✅ FIXED: Calculate order stats
   const calculateOrderStats = useCallback((orders: Order[]): OrderStats => {
@@ -158,64 +276,21 @@ const SellerDashboard: React.FC = () => {
     };
   }, []);
 
-  // ✅ USING API FILE: Handle Delete Listing
-  const handleDeleteListing = async (listing: Listing) => {
-    try {
-      console.log('🗑️ Delete listing request:', listing._id);
-      
-      if (!window.confirm(`Are you sure you want to delete "${listing.title}"? This action cannot be undone.`)) {
-        return;
-      }
-
-      setListingActionLoading(`delete-${listing._id}`);
-      setError('');
-      setSuccessMessage('');
-
-      const response = await listingsApi.deleteListing(listing._id);
-
-      console.log('📦 Delete response:', response);
-
-      if (response.success) {
-        const successMsg = `✅ Listing "${listing.title}" deleted successfully!`;
-        console.log('✅ Success:', successMsg);
-        setSuccessMessage(successMsg);
-        
-        // Remove listing from state
-        setListingsData(prev => {
-          if (!prev) return prev;
-          
-          const updatedListings = prev.listings.filter(l => l._id !== listing._id);
-          
-          return {
-            ...prev,
-            listings: updatedListings,
-            pagination: {
-              ...prev.pagination,
-              total: (prev.pagination?.total || 1) - 1
-            }
-          };
-        });
-        
-        // Refresh listings after 1 second
-        setTimeout(() => {
-          fetchListings();
-        }, 1000);
-        
-      } else {
-        const errorMsg = response.error || 'Failed to delete listing';
-        console.error('❌ Delete error:', errorMsg);
-        setError(`❌ ${errorMsg}`);
-      }
-      
-    } catch (error: any) {
-      console.error('❌ Error deleting listing:', error);
-      setError(error.response?.data?.error || 'Failed to delete listing');
-    } finally {
-      setListingActionLoading(null);
-    }
+  // ✅ Handle Edit Listing (Modal-based)
+  const handleEditListing = (listing: Listing) => {
+    setEditingListing(listing);
+    setShowEditModal(true);
+    setError('');
   };
 
-  // ✅ USING API FILE: Handle Toggle Listing Status
+  // ✅ Handle Delete Listing (Modal-based)
+  const handleDeleteListing = (listing: Listing) => {
+    setDeletingListing(listing);
+    setShowDeleteModal(true);
+    setError('');
+  };
+
+  // ✅ Handle Toggle Listing Status
   const handleToggleListingStatus = async (listing: Listing) => {
     try {
       console.log('🔄 Toggle listing status request:', listing._id);
@@ -269,89 +344,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ USING API FILE: Handle Edit Listing
-  const handleEditListing = async (listing: Listing) => {
-    try {
-      console.log('✏️ Edit listing request:', listing._id);
-      
-      // Show prompts for editing
-      const newTitle = prompt('Enter new title:', listing.title);
-      if (!newTitle || newTitle.trim() === '') {
-        alert('Title cannot be empty');
-        return;
-      }
-
-      const newDescription = prompt('Enter new description:', listing.description);
-      if (!newDescription || newDescription.trim() === '') {
-        alert('Description cannot be empty');
-        return;
-      }
-
-      const newPrice = prompt('Enter new price:', listing.price.toString());
-      if (!newPrice || isNaN(parseFloat(newPrice)) || parseFloat(newPrice) <= 0) {
-        alert('Please enter a valid price');
-        return;
-      }
-
-      setListingActionLoading(`edit-${listing._id}`);
-      setError('');
-      setSuccessMessage('');
-
-      const updateData = {
-        title: newTitle,
-        description: newDescription,
-        price: parseFloat(newPrice)
-      };
-
-      console.log('🔗 Calling edit API with:', updateData);
-
-      const response = await listingsApi.editListing(listing._id, updateData);
-
-      console.log('📦 Edit response:', response);
-
-      if (response.success) {
-        const successMsg = `✅ Listing "${newTitle}" updated successfully!`;
-        console.log('✅ Success:', successMsg);
-        setSuccessMessage(successMsg);
-        
-        // Update listing in state
-        setListingsData(prev => {
-          if (!prev) return prev;
-          
-          const updatedListings = prev.listings.map(l => {
-            if (l._id === listing._id) {
-              return {
-                ...l,
-                title: newTitle,
-                description: newDescription,
-                price: parseFloat(newPrice),
-                updatedAt: response.listing?.updatedAt || new Date().toISOString()
-              };
-            }
-            return l;
-          });
-          
-          return {
-            ...prev,
-            listings: updatedListings
-          };
-        });
-        
-      } else {
-        const errorMsg = response.error || 'Failed to update listing';
-        console.error('❌ Edit error:', errorMsg);
-        setError(`❌ ${errorMsg}`);
-      }
-      
-    } catch (error: any) {
-      console.error('❌ Error editing listing:', error);
-      setError(error.response?.data?.error || 'Failed to edit listing');
-    } finally {
-      setListingActionLoading(null);
-    }
-  };
-
-  // ✅ USING API FILE: Fetch dashboard data
+  // ✅ Fetch dashboard data
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -410,7 +403,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ USING API FILE: Fetch orders for OrdersTab
+  // ✅ Fetch orders for OrdersTab
   const fetchSellerOrders = async () => {
     try {
       setOrdersLoading(true);
@@ -446,7 +439,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ USING API FILE: Fetch listings
+  // ✅ Fetch listings
   const fetchListings = async () => {
     try {
       setListingsLoading(true);
@@ -473,7 +466,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ USING API FILE: Fetch offers
+  // ✅ Fetch offers
   const fetchOffers = async () => {
     try {
       setOffersLoading(true);
@@ -491,7 +484,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ USING API FILE: Check Stripe status
+  // ✅ Check Stripe status
   const checkStripeAccountStatus = async () => {
     try {
       const response = await stripeApi.getStripeStatus();
@@ -504,7 +497,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ USING API FILE: Order management functions
+  // ✅ Order management functions
   const handleSimpleStartProcessing = async (order: Order) => {
     try {
       setOrderActionLoading(order._id);
@@ -640,7 +633,7 @@ const SellerDashboard: React.FC = () => {
     setShowVideoModal(true);
   };
 
-  // ✅ USING API FILE: Handle offer actions
+  // ✅ Handle offer actions
   const handleOfferAction = async (offerId: string, action: 'accept' | 'reject') => {
     try {
       setOrderActionLoading(offerId);
@@ -698,6 +691,95 @@ const SellerDashboard: React.FC = () => {
         checkStripeAccountStatus();
         fetchDashboardData();
       }, 3000);
+    }
+  };
+
+  // ✅ Handle edit modal save
+  const handleEditModalSave = async (updatedData: any) => {
+    if (!editingListing) return;
+
+    try {
+      setListingActionLoading(`edit-${editingListing._id}`);
+      
+      const response = await listingsApi.editListing(editingListing._id, updatedData);
+
+      if (response.success) {
+        const successMsg = `✅ Listing "${updatedData.title}" updated successfully!`;
+        setSuccessMessage(successMsg);
+        
+        // Update listing in state
+        setListingsData(prev => {
+          if (!prev) return prev;
+          
+          const updatedListings = prev.listings.map(l => {
+            if (l._id === editingListing._id) {
+              return {
+                ...l,
+                ...updatedData,
+                updatedAt: response.listing?.updatedAt || new Date().toISOString()
+              };
+            }
+            return l;
+          });
+          
+          return {
+            ...prev,
+            listings: updatedListings
+          };
+        });
+        
+        setShowEditModal(false);
+        setEditingListing(null);
+      } else {
+        setError(response.error || 'Failed to update listing');
+      }
+    } catch (error: any) {
+      console.error('Error updating listing:', error);
+      setError(error.response?.data?.error || 'Failed to update listing');
+    } finally {
+      setListingActionLoading(null);
+    }
+  };
+
+  // ✅ Handle delete modal confirm
+  const handleDeleteModalConfirm = async () => {
+    if (!deletingListing) return;
+
+    try {
+      setListingActionLoading(`delete-${deletingListing._id}`);
+      
+      const response = await listingsApi.deleteListing(deletingListing._id);
+
+      if (response.success) {
+        const successMsg = `✅ Listing "${deletingListing.title}" deleted successfully!`;
+        setSuccessMessage(successMsg);
+        
+        // Remove listing from state
+        setListingsData(prev => {
+          if (!prev) return prev;
+          
+          const updatedListings = prev.listings.filter(l => l._id !== deletingListing._id);
+          
+          return {
+            ...prev,
+            listings: updatedListings,
+            pagination: {
+              ...prev.pagination,
+              total: (prev.pagination?.total || 1) - 1
+            }
+          };
+        });
+        
+        setShowDeleteModal(false);
+        setDeletingListing(null);
+      } else {
+        setError(response.error || 'Failed to delete listing');
+      }
+    } catch (error: any) {
+      console.error('Error deleting listing:', error);
+      setError(error.response?.data?.error || 'Failed to delete listing');
+    } finally {
+      setListingActionLoading(null);
     }
   };
 
@@ -981,12 +1063,8 @@ const SellerDashboard: React.FC = () => {
                 setShowEditModal(false);
                 setEditingListing(null);
               }}
-              onUpdate={() => {
-                setShowEditModal(false);
-                setEditingListing(null);
-                fetchListings();
-              }}
-              loading={false}
+              onSave={handleEditModalSave}
+              loading={listingActionLoading?.startsWith('edit-') || false}
             />
           )}
 
@@ -998,12 +1076,8 @@ const SellerDashboard: React.FC = () => {
                 setShowDeleteModal(false);
                 setDeletingListing(null);
               }}
-              onConfirm={() => {
-                setShowDeleteModal(false);
-                setDeletingListing(null);
-                fetchListings();
-              }}
-              loading={false}
+              onConfirm={handleDeleteModalConfirm}
+              loading={listingActionLoading?.startsWith('delete-') || false}
             />
           )}
 
