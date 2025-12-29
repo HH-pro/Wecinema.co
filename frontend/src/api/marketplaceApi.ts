@@ -69,7 +69,7 @@ export const listingsApi = {
   editListing: async (listingId, updateData) => {
     try {
       const response = await axios.put(
-        `${API_BASE_URL}/marketplace/listing/${listingId}`,
+        `${API_BASE_URL}/marketplace/listings/${listingId}`,
         updateData,
         getHeaders()
       );
@@ -84,7 +84,7 @@ export const listingsApi = {
   toggleListingStatus: async (listingId) => {
     try {
       const response = await axios.post(
-        `${API_BASE_URL}/marketplace/listing/${listingId}/toggle-status`,
+        `${API_BASE_URL}/marketplace/listings/${listingId}/toggle-status`,
         {},
         getHeaders()
       );
@@ -112,7 +112,7 @@ export const listingsApi = {
   // Get single listing details
   getListingDetails: async (listingId) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/marketplace/listing/${listingId}`);
+      const response = await axios.get(`${API_BASE_URL}/marketplace/listings/${listingId}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching listing details:', error);
