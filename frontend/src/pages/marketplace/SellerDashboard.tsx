@@ -298,8 +298,8 @@ const SellerDashboard: React.FC = () => {
       console.log('✅ Edit response:', response);
 
       if (response.success) {
-        const successMsg = `✅ Listing "${updatedData.title}" updated successfully!`;
-        setSuccessMessage(successMsg);
+        // const successMsg = `✅ Listing "${updatedData.title}" updated successfully!`;
+        // setSuccessMessage(successMsg);
         
         // ✅ REAL-TIME UPDATE: Update listing in state
         setListingsData(prev => {
@@ -363,8 +363,8 @@ const SellerDashboard: React.FC = () => {
       console.log('✅ Delete response:', response);
 
       if (response.success) {
-        const successMsg = `✅ Listing "${deletingListing.title}" deleted successfully!`;
-        setSuccessMessage(successMsg);
+        // const successMsg = `✅ Listing "${deletingListing.title}" deleted successfully!`;
+        // setSuccessMessage(successMsg);
         
         // ✅ REAL-TIME UPDATE: Remove listing from state
         setListingsData(prev => {
@@ -414,7 +414,7 @@ const SellerDashboard: React.FC = () => {
       if (response.success) {
         const newStatus = response.newStatus || (listing.status === 'active' ? 'inactive' : 'active');
         const action = newStatus === 'active' ? 'activated' : 'deactivated';
-        const successMsg = `✅ Listing "${listing.title}" ${action} successfully!`;
+        // const successMsg = `✅ Listing "${listing.title}" ${action} successfully!`;
         setSuccessMessage(successMsg);
         
         // ✅ REAL-TIME UPDATE: Update listing status in state
