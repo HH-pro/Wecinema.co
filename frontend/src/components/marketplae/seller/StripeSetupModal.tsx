@@ -1,3 +1,4 @@
+// components/marketplae/seller/StripeSetupModal.tsx
 import React, { useState } from 'react';
 import { createStripeAccount } from '../../../api';
 
@@ -5,9 +6,15 @@ interface StripeSetupModalProps {
   show: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  stripeConnected?: boolean; // New prop
 }
 
-const StripeSetupModal: React.FC<StripeSetupModalProps> = ({ show, onClose, onSuccess }) => {
+const StripeSetupModal: React.FC<StripeSetupModalProps> = ({ 
+  show, 
+  onClose, 
+  onSuccess,
+  stripeConnected = false
+}) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -16,10 +23,21 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({ show, onClose, onSu
       setLoading(true);
       setError('');
 
+      // If already connected, don't proceed
+      if (stripeConnected) {
+        setError('Stripe is already connected to your account.');
+        setTimeout(() => {
+          onClose();
+        }, 2000);
+        return;
+      }
+
       const response = await createStripeAccount();
       
       if (response.url) {
         window.location.href = response.url;
+      } else if (response.error) {
+        setError(response.error);
       } else {
         setError('Failed to start Stripe setup - no URL returned');
       }
@@ -38,7 +56,8 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({ show, onClose, onSu
     }
   };
 
-  if (!show) return null;
+  // Don't show modal if already connected
+  if (!show || stripeConnected) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
