@@ -1,4 +1,4 @@
-// src/pages/seller/SellerDashboard.tsx - UPDATED VERSION
+// src/pages/seller/SellerDashboard.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
@@ -9,19 +9,19 @@ import marketplaceApi, {
   listingsApi, 
   ordersApi, 
   offersApi, 
-  stripeApi,
   formatCurrency 
 } from '../../api/marketplaceApi';
 
 // Import components
 import DashboardHeader from '../../components/marketplae/seller/DashboardHeader';
-import AlertMessage from '../../components/marketplae/seller/AlertMessage';
 import TabNavigation from '../../components/marketplae/seller/TabNavigation';
 import StatsGrid from '../../components/marketplae/seller/StatsGrid';
 import WelcomeCard from '../../components/marketplae/seller/WelcomeCard';
 import RecentOrders from '../../components/marketplae/seller/RecentOrders';
 import ActionCard from '../../components/marketplae/seller/ActionCard';
 import OrderWorkflowGuide from '../../components/marketplae/seller/OrderWorkflowGuide';
+import StripeAccountStatus from '../../components/marketplae/seller/StripeAccountStatus';
+import StripeSuccessAlert from '../../components/marketplae/seller/StripeSuccessAlert';
 
 // Import tab components
 import OffersTab from '../../components/marketplae/seller/OffersTab';
@@ -126,6 +126,8 @@ interface StripeStatus {
   accountId?: string;
   email?: string;
   country?: string;
+  status?: string;
+  payoutsEnabled?: boolean;
 }
 
 const SellerDashboard: React.FC = () => {
@@ -138,6 +140,7 @@ const SellerDashboard: React.FC = () => {
   const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [showStripeSuccessAlert, setShowStripeSuccessAlert] = useState(false);
   const navigate = useNavigate();
   
   // Order stats
@@ -204,7 +207,7 @@ const SellerDashboard: React.FC = () => {
     { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders > 0 ? orderStats.activeOrders : null }
   ];
 
-  // ✅ UPDATED: Action Cards with dynamic Stripe setup button
+  // Action Cards
   const [actionCards, setActionCards] = useState([
     {
       title: 'Analytics Dashboard',
@@ -221,7 +224,6 @@ const SellerDashboard: React.FC = () => {
         }
       ]
     },
-    
     {
       title: 'Seller Resources',
       description: 'Access guides, tutorials, and tips to grow your business on Marketplace.',
@@ -239,43 +241,63 @@ const SellerDashboard: React.FC = () => {
     }
   ]);
 
-  // ✅ NEW: Check if Stripe is connected and update action cards
+  // ✅ Check URL params for Stripe return success
   useEffect(() => {
-    const updateActionCards = () => {
-      const stripeConnected = stripeStatus?.connected && stripeStatus?.chargesEnabled;
+    const checkStripeReturn = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const stripeStatus = urlParams.get('stripe');
+      const accountId = urlParams.get('account_id');
       
-      if (!stripeConnected) {
-        // Add Stripe setup card if not connected
-        if (!actionCards.some(card => card.title === 'Setup Payments')) {
-          setActionCards(prev => [
-            ...prev,
-            {
-              title: 'Setup Payments',
-              description: 'Connect your Stripe account to start accepting payments and receiving payouts.',
-              icon: '💰',
-              iconBg: 'from-green-500 to-emerald-600',
-              bgGradient: 'from-green-50 to-emerald-50',
-              borderColor: 'border-green-200',
-              actions: [
-                {
-                  label: 'Connect Stripe',
-                  onClick: () => setShowStripeSetup(true),
-                  variant: 'primary' as const
-                }
-              ]
-            }
-          ]);
-        }
-      } else {
-        // Remove Stripe setup card if already connected
-        setActionCards(prev => prev.filter(card => card.title !== 'Setup Payments'));
+      if (stripeStatus === 'success' && accountId) {
+        // Show success alert
+        setShowStripeSuccessAlert(true);
+        
+        // Clear URL params
+        window.history.replaceState({}, '', window.location.pathname);
+        
+        // Update Stripe status after 1 second (let Stripe process)
+        setTimeout(() => {
+          checkStripeAccountStatus();
+          fetchDashboardData();
+        }, 1000);
+        
+        // Show success message
+        setSuccessMessage('Stripe account connected successfully! You can now accept payments.');
       }
     };
+    
+    checkStripeReturn();
+  }, []);
 
-    updateActionCards();
+  // ✅ Update action cards based on Stripe status
+  useEffect(() => {
+    const stripeConnected = stripeStatus?.connected && stripeStatus?.chargesEnabled;
+    
+    if (!stripeConnected && !actionCards.some(card => card.title === 'Setup Payments')) {
+      setActionCards(prev => [
+        ...prev,
+        {
+          title: 'Setup Payments',
+          description: 'Connect your Stripe account to start accepting payments and receiving payouts.',
+          icon: '💰',
+          iconBg: 'from-green-500 to-emerald-600',
+          bgGradient: 'from-green-50 to-emerald-50',
+          borderColor: 'border-green-200',
+          actions: [
+            {
+              label: 'Connect Stripe',
+              onClick: () => setShowStripeSetup(true),
+              variant: 'primary' as const
+            }
+          ]
+        }
+      ]);
+    } else if (stripeConnected) {
+      setActionCards(prev => prev.filter(card => card.title !== 'Setup Payments'));
+    }
   }, [stripeStatus]);
 
-  // ✅ UPDATED: Calculate order stats
+  // ✅ Calculate order stats
   const calculateOrderStats = useCallback((orders: Order[]): OrderStats => {
     const now = new Date();
     const thisMonth = now.getMonth();
@@ -311,152 +333,23 @@ const SellerDashboard: React.FC = () => {
     };
   }, []);
 
-  // ✅ Handle Edit Listing - Open Modal
-  const handleEditListing = (listing: Listing) => {
-    setEditingListing(listing);
-    setShowEditModal(true);
-  };
-
-  // ✅ Handle Save Listing - Update State Real-Time (SILENT)
-  const handleEditModalSave = async (updatedData: { title: string; description: string; price: number }) => {
-    if (!editingListing) return;
-
+  // ✅ Check Stripe account status
+  const checkStripeAccountStatus = async () => {
     try {
-      setListingActionLoading(`edit-${editingListing._id}`);
+      const response = await fetch('/api/marketplace/stripe/status', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      });
       
-      const response = await listingsApi.editListing(editingListing._id, updatedData);
-
-      if (response.success) {
-        // ✅ SILENT UPDATE: Update listing in state without showing message
-        setListingsData(prev => {
-          if (!prev) return prev;
-          
-          const updatedListings = prev.listings.map(l => {
-            if (l._id === editingListing._id) {
-              return {
-                ...l,
-                title: updatedData.title,
-                description: updatedData.description,
-                price: updatedData.price,
-                updatedAt: new Date().toISOString(),
-                ...response.listing
-              };
-            }
-            return l;
-          });
-          
-          return {
-            ...prev,
-            listings: updatedListings
-          };
-        });
-        
-        // Close modal silently
-        setShowEditModal(false);
-        setEditingListing(null);
-        
-      } else {
-        // Silent error - don't show message
-        console.log('Edit failed:', response.error);
+      if (response.ok) {
+        const data = await response.json();
+        setStripeStatus(data);
       }
-    } catch (error: any) {
-      // Silent error - don't show message
-      console.error('Error updating listing:', error);
-    } finally {
-      setListingActionLoading(null);
-    }
-  };
-
-  // ✅ Handle Delete Listing - Open Modal
-  const handleDeleteListing = (listing: Listing) => {
-    setDeletingListing(listing);
-    setShowDeleteModal(true);
-  };
-
-  // ✅ Handle Delete Listing - Update State Real-Time (SILENT)
-  const handleDeleteModalConfirm = async () => {
-    if (!deletingListing) return;
-
-    try {
-      setListingActionLoading(`delete-${deletingListing._id}`);
-      
-      const response = await listingsApi.deleteListing(deletingListing._id);
-
-      if (response.success) {
-        // ✅ SILENT UPDATE: Remove listing from state
-        setListingsData(prev => {
-          if (!prev) return prev;
-          
-          const updatedListings = prev.listings.filter(l => l._id !== deletingListing._id);
-          
-          return {
-            ...prev,
-            listings: updatedListings,
-            pagination: {
-              ...prev.pagination,
-              total: (prev.pagination?.total || 1) - 1
-            }
-          };
-        });
-        
-        // Close modal silently
-        setShowDeleteModal(false);
-        setDeletingListing(null);
-        
-      } else {
-        // Silent error
-        console.log('Delete failed:', response.error);
-      }
-    } catch (error: any) {
-      // Silent error
-      console.error('Error deleting listing:', error);
-    } finally {
-      setListingActionLoading(null);
-    }
-  };
-
-  // ✅ Handle Toggle Listing Status - Update State Real-Time (SILENT)
-  const handleToggleListingStatus = async (listing: Listing) => {
-    try {
-      setListingActionLoading(`toggle-${listing._id}`);
-
-      const response = await listingsApi.toggleListingStatus(listing._id);
-
-      if (response.success) {
-        const newStatus = response.newStatus || (listing.status === 'active' ? 'inactive' : 'active');
-        
-        // ✅ SILENT UPDATE: Update listing status in state
-        setListingsData(prev => {
-          if (!prev) return prev;
-          
-          const updatedListings = prev.listings.map(l => {
-            if (l._id === listing._id) {
-              return {
-                ...l,
-                status: newStatus,
-                updatedAt: response.listing?.updatedAt || new Date().toISOString(),
-                ...response.listing
-              };
-            }
-            return l;
-          });
-          
-          return {
-            ...prev,
-            listings: updatedListings
-          };
-        });
-        
-      } else {
-        // Silent error
-        console.log('Toggle failed:', response.error);
-      }
-      
-    } catch (error: any) {
-      // Silent error
-      console.error('Error toggling listing status:', error);
-    } finally {
-      setListingActionLoading(null);
+    } catch (err) {
+      console.error('Error checking Stripe status:', err);
     }
   };
 
@@ -581,20 +474,143 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Check Stripe status
-  const checkStripeAccountStatus = async () => {
+  // ✅ Handle Edit Listing
+  const handleEditListing = (listing: Listing) => {
+    setEditingListing(listing);
+    setShowEditModal(true);
+  };
+
+  const handleEditModalSave = async (updatedData: { title: string; description: string; price: number }) => {
+    if (!editingListing) return;
+
     try {
-      const response = await stripeApi.getStripeStatus();
+      setListingActionLoading(`edit-${editingListing._id}`);
       
+      const response = await listingsApi.editListing(editingListing._id, updatedData);
+
       if (response.success) {
-        setStripeStatus(response);
+        setListingsData(prev => {
+          if (!prev) return prev;
+          
+          const updatedListings = prev.listings.map(l => {
+            if (l._id === editingListing._id) {
+              return {
+                ...l,
+                title: updatedData.title,
+                description: updatedData.description,
+                price: updatedData.price,
+                updatedAt: new Date().toISOString(),
+                ...response.listing
+              };
+            }
+            return l;
+          });
+          
+          return {
+            ...prev,
+            listings: updatedListings
+          };
+        });
+        
+        setShowEditModal(false);
+        setEditingListing(null);
+        
+      } else {
+        console.log('Edit failed:', response.error);
       }
-    } catch (err) {
-      console.error('Error checking Stripe status:', err);
+    } catch (error: any) {
+      console.error('Error updating listing:', error);
+    } finally {
+      setListingActionLoading(null);
     }
   };
 
-  // ✅ Order management functions (SILENT)
+  // ✅ Handle Delete Listing
+  const handleDeleteListing = (listing: Listing) => {
+    setDeletingListing(listing);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteModalConfirm = async () => {
+    if (!deletingListing) return;
+
+    try {
+      setListingActionLoading(`delete-${deletingListing._id}`);
+      
+      const response = await listingsApi.deleteListing(deletingListing._id);
+
+      if (response.success) {
+        setListingsData(prev => {
+          if (!prev) return prev;
+          
+          const updatedListings = prev.listings.filter(l => l._id !== deletingListing._id);
+          
+          return {
+            ...prev,
+            listings: updatedListings,
+            pagination: {
+              ...prev.pagination,
+              total: (prev.pagination?.total || 1) - 1
+            }
+          };
+        });
+        
+        setShowDeleteModal(false);
+        setDeletingListing(null);
+        
+      } else {
+        console.log('Delete failed:', response.error);
+      }
+    } catch (error: any) {
+      console.error('Error deleting listing:', error);
+    } finally {
+      setListingActionLoading(null);
+    }
+  };
+
+  // ✅ Handle Toggle Listing Status
+  const handleToggleListingStatus = async (listing: Listing) => {
+    try {
+      setListingActionLoading(`toggle-${listing._id}`);
+
+      const response = await listingsApi.toggleListingStatus(listing._id);
+
+      if (response.success) {
+        const newStatus = response.newStatus || (listing.status === 'active' ? 'inactive' : 'active');
+        
+        setListingsData(prev => {
+          if (!prev) return prev;
+          
+          const updatedListings = prev.listings.map(l => {
+            if (l._id === listing._id) {
+              return {
+                ...l,
+                status: newStatus,
+                updatedAt: response.listing?.updatedAt || new Date().toISOString(),
+                ...response.listing
+              };
+            }
+            return l;
+          });
+          
+          return {
+            ...prev,
+            listings: updatedListings
+          };
+        });
+        
+      } else {
+        console.log('Toggle failed:', response.error);
+      }
+      
+    } catch (error: any) {
+      console.error('Error toggling listing status:', error);
+    } finally {
+      setListingActionLoading(null);
+    }
+  };
+
+  // ✅ Order management functions
   const handleSimpleStartProcessing = async (order: Order) => {
     try {
       setOrderActionLoading(order._id);
@@ -717,7 +733,7 @@ const SellerDashboard: React.FC = () => {
     setShowVideoModal(true);
   };
 
-  // ✅ Handle offer actions (SILENT)
+  // ✅ Handle offer actions
   const handleOfferAction = async (offerId: string, action: 'accept' | 'reject') => {
     try {
       setOrderActionLoading(offerId);
@@ -760,25 +776,12 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  const handleStripeReturn = () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const stripeStatus = urlParams.get('stripe');
-    
-    if (stripeStatus === 'success') {
-      setTimeout(() => {
-        checkStripeAccountStatus();
-        fetchDashboardData();
-      }, 1000);
-    }
-  };
-
   // ✅ Initial data loading
   useEffect(() => {
     const loadInitialData = async () => {
       try {
         await fetchDashboardData();
         await checkStripeAccountStatus();
-        handleStripeReturn();
       } catch (error) {
         console.error('Initial data loading error:', error);
       }
@@ -808,7 +811,7 @@ const SellerDashboard: React.FC = () => {
     }
   }, [activeTab]);
 
-  // Determine loading state based on active tab
+  // Determine loading state
   const getCurrentLoadingState = () => {
     if (activeTab === 'overview') return loading && !initialDataLoaded;
     if (activeTab === 'listings') return listingsLoading;
@@ -837,6 +840,19 @@ const SellerDashboard: React.FC = () => {
     <MarketplaceLayout>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          {/* ✅ Stripe Success Alert */}
+          <StripeSuccessAlert 
+            show={showStripeSuccessAlert}
+            onClose={() => setShowStripeSuccessAlert(false)}
+          />
+          
+          {/* ✅ Stripe Account Status */}
+          <StripeAccountStatus
+            stripeStatus={stripeStatus}
+            onSetupClick={() => setShowStripeSetup(true)}
+          />
+
           {/* Header */}
           <DashboardHeader
             title="Seller Dashboard"
@@ -844,8 +860,71 @@ const SellerDashboard: React.FC = () => {
             earnings={formatCurrency(orderStats.totalRevenue)}
             onRefresh={handleRefresh}
             refreshing={refreshing}
-            showStripeButton={!(stripeStatus?.connected && stripeStatus?.chargesEnabled)}
+            stripeStatus={stripeStatus}
           />
+
+          {/* ✅ Conditional Stripe Setup Banner */}
+          {!stripeStatus?.chargesEnabled && (
+            <div className="mb-6 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-5">
+              <div className="flex flex-col md:flex-row md:items-center gap-4">
+                <div className="flex items-center">
+                  <div className="bg-yellow-100 p-3 rounded-lg mr-4">
+                    <span className="text-2xl">💰</span>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900">Setup Payments to Get Started</h3>
+                    <p className="text-gray-600 text-sm mt-1">
+                      {stripeStatus?.connected 
+                        ? 'Complete your Stripe verification to start accepting payments.'
+                        : 'Connect your Stripe account to receive payments from buyers.'
+                      }
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowStripeSetup(true)}
+                  className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-medium py-3 px-6 rounded-lg transition duration-200 shadow-md hover:shadow whitespace-nowrap"
+                >
+                  {stripeStatus?.connected ? 'Complete Verification' : 'Setup Payments Now'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ✅ Stripe Connected Success Banner */}
+          {stripeStatus?.chargesEnabled && (
+            <div className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-5">
+              <div className="flex flex-col md:flex-row md:items-center gap-4">
+                <div className="flex items-center">
+                  <div className="bg-green-100 p-3 rounded-lg mr-4">
+                    <span className="text-2xl">✅</span>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900">Payments Ready! 🎉</h3>
+                    <p className="text-gray-600 text-sm mt-1">
+                      Your Stripe account is fully verified and ready to accept payments.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <a
+                    href={`https://dashboard.stripe.com/connect/accounts/${stripeStatus.accountId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-medium py-3 px-6 rounded-lg transition duration-200 shadow-md hover:shadow whitespace-nowrap"
+                  >
+                    View Stripe Dashboard
+                  </a>
+                  <button
+                    onClick={() => setShowStripeSetup(true)}
+                    className="bg-white hover:bg-gray-50 text-green-600 border border-green-300 font-medium py-3 px-6 rounded-lg transition duration-200 whitespace-nowrap"
+                  >
+                    Update Details
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Navigation */}
           <TabNavigation
@@ -858,7 +937,7 @@ const SellerDashboard: React.FC = () => {
           <div className="mt-2">
             {activeTab === 'overview' && (
               <div className="space-y-8">
-                {/* Welcome Card - UPDATED */}
+                {/* Welcome Card */}
                 <WelcomeCard
                   title="Welcome back, Seller! 👋"
                   subtitle="Manage your business efficiently with real-time insights and quick actions."
@@ -869,11 +948,8 @@ const SellerDashboard: React.FC = () => {
                   secondaryAction={{
                     label: '💰 Setup Payments',
                     onClick: () => setShowStripeSetup(true),
-                    // ✅ SHOW only if Stripe is NOT connected and payment is NOT set up
                     visible: !(stripeStatus?.connected && stripeStatus?.chargesEnabled)
                   }}
-                  stripeStatus={stripeStatus}
-                  onStripeSetup={() => setShowStripeSetup(true)}
                 />
 
                 {/* Stats Grid */}
@@ -922,7 +998,7 @@ const SellerDashboard: React.FC = () => {
                   </div>
                 )}
 
-                {/* Action Cards - DYNAMIC BASED ON STRIPE STATUS */}
+                {/* Action Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {actionCards.map((card, index) => (
                     <ActionCard
@@ -1004,6 +1080,7 @@ const SellerDashboard: React.FC = () => {
               show={showStripeSetup}
               onClose={() => setShowStripeSetup(false)}
               onSuccess={handleStripeSetupSuccess}
+              stripeConnected={stripeStatus?.connected && stripeStatus?.chargesEnabled}
             />
           )}
 
