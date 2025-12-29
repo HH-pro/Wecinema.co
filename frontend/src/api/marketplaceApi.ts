@@ -65,20 +65,48 @@ export const listingsApi = {
     }
   },
 
-  // Edit listing
-  editListing: async (listingId, updateData) => {
-    try {
-      const response = await axios.put(
-        `${API_BASE_URL}/marketplace/listings/${listingId}`,
-        updateData,
-        getHeaders()
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error editing listing:', error);
-      throw error;
+  // Simple version - for only title, description, price updates
+editListing: async (listingId, updateData) => {
+  try {
+    // Prepare data with only the fields you want to update
+    const dataToSend = {};
+    
+    if (updateData.title) {
+      dataToSend.title = updateData.title;
     }
-  },
+    
+    if (updateData.description) {
+      dataToSend.description = updateData.description;
+    }
+    
+    if (updateData.price) {
+      dataToSend.price = updateData.price;
+    }
+    
+    // Add other fields only if they exist
+    if (updateData.type) dataToSend.type = updateData.type;
+    if (updateData.category) dataToSend.category = updateData.category;
+    if (updateData.tags) dataToSend.tags = updateData.tags;
+    if (updateData.mediaUrls) dataToSend.mediaUrls = updateData.mediaUrls;
+    
+    const response = await axios.put(
+      `${API_BASE_URL}/marketplace/listings/${listingId}`,
+      dataToSend,
+      getHeaders()
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error editing listing:', error);
+    
+    // Extract error message
+    const errorMessage = error.response?.data?.error || 
+                        error.response?.data?.message || 
+                        error.message || 
+                        'Failed to update listing';
+    
+    throw new Error(errorMessage);
+  }
+},
 
   // Toggle listing status (activate/deactivate)
   toggleListingStatus: async (listingId) => {
