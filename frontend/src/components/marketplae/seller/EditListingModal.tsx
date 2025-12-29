@@ -115,7 +115,7 @@ const EditListingModal: React.FC<EditListingModalProps> = ({
         {/* Modal content */}
         <div className="inline-block w-full max-w-md my-8 overflow-hidden text-left align-middle transition-all transform bg-white rounded-2xl shadow-xl">
           {/* Header */}
-          <div className="px-6 pt-6 pb-4 bg-gradient-to-r from-blue-50 to-indigo-50">
+          <div className="px-6 pt-12 pb-4 bg-gradient-to-r from-blue-50 to-indigo-50">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-semibold leading-6 text-gray-900">
