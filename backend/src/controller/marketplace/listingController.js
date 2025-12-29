@@ -587,32 +587,32 @@ router.get("/user/:userId/listings", async (req, res) => {
   }
 });
 
-// ===================================================
-// ✅ DELETE LISTING
-// ===================================================
 router.delete("/:id", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== DELETE LISTING REQUEST ===");
     console.log("Listing ID to delete:", req.params.id);
     console.log("User making request:", req.user._id);
 
-    const userId = req.user._id;
+    const listing = await MarketplaceListing.findById(req.params.id);
     
-    const listing = await MarketplaceListing.findOneAndDelete({
-      _id: req.params.id,
-      sellerId: userId,
-    });
-
     if (!listing) {
-      console.log("❌ Listing not found or user not authorized:", {
-        listingId: req.params.id,
-        userId: userId
-      });
+      console.log("❌ Listing not found");
       return res.status(404).json({ 
-        error: "Listing not found or you don't have permission to delete this listing" 
+        error: "Listing not found" 
       });
     }
-
+    
+    // Check ownership
+    if (!listing.sellerId.equals(req.user._id)) {
+      console.log("❌ User not authorized to delete this listing");
+      return res.status(403).json({ 
+        error: "You don't have permission to delete this listing" 
+      });
+    }
+    
+    // Now delete
+    await MarketplaceListing.findByIdAndDelete(req.params.id);
+    
     console.log("✅ Listing deleted successfully:", listing._id);
     res.status(200).json({ 
       message: "Listing deleted successfully", 
