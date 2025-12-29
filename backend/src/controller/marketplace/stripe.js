@@ -165,7 +165,7 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
         last_name: user.lastName || 'User',
       },
       business_profile: {
-        url: process.env.FRONTEND_URL || 'http://localhost:5173',
+        url: process.env.FRONTEND_URL || 'https://wecinema.co',
         mcc: process.env.STRIPE_MCC_CODE || '5734', // Computer Software Stores
         product_description: 'Digital products and services'
       },
