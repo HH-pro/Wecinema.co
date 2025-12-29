@@ -265,7 +265,7 @@ function isValidEmail(email) {
 // ✅ EDIT/UPDATE LISTING
 // ===================================================
 // ===================================================
-router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
+router.put("/:id", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== EDIT LISTING REQUEST ===");
     console.log("Listing ID:", req.params.id);
