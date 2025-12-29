@@ -1226,24 +1226,23 @@ const handleToggleListingStatus = async (listing: Listing) => {
               />
             )}
 
-            {activeTab === 'listings' && (
-              <ListingsTab
-                listingsData={listingsData}
-                loading={listingsLoading}
-                statusFilter={listingsStatusFilter}
-                currentPage={listingsPage}
-                onStatusFilterChange={setListingsStatusFilter}
-                onPageChange={setListingsPage}
-                onEditListing={handleEditListing}
-                onDeleteListing={handleDeleteListing}
-                onToggleListingStatus={handleToggleListingStatus}
-                onPlayVideo={handlePlayVideo}
-                onRefresh={fetchListings}
-                actionLoading={listingActionLoading}
-                onCreateListing={() => navigate('/marketplace/create')}
-              />
-            )}
-
+           {activeTab === 'listings' && (
+  <ListingsTab
+    listingsData={listingsData}
+    loading={listingsLoading}
+    statusFilter={listingsStatusFilter}
+    currentPage={listingsPage}
+    onStatusFilterChange={setListingsStatusFilter}
+    onPageChange={setListingsPage}
+    onEditListing={handleEditListing}
+    onDeleteListing={handleDeleteListing}
+    onToggleStatus={handleToggleListingStatus} // ✅ This line should exist
+    onPlayVideo={handlePlayVideo}
+    onRefresh={fetchListings}
+    actionLoading={listingActionLoading}
+    onCreateListing={() => navigate('/marketplace/create')}
+  />
+)}
             {activeTab === 'orders' && (
               <OrdersTab
                 orders={orders}
