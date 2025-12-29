@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 // Import API functions
 import marketplaceApi, { 
@@ -130,17 +130,6 @@ interface StripeStatus {
   status?: string;
   payoutsEnabled?: boolean;
   name?: string;
-  message?: string;
-  balance?: number;
-  availableBalance?: number;
-  pendingBalance?: number;
-}
-
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  message?: string;
-  error?: string;
 }
 
 const SellerDashboard: React.FC = () => {
@@ -155,7 +144,6 @@ const SellerDashboard: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [showStripeSuccessAlert, setShowStripeSuccessAlert] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
   
   // Order stats
   const [orderStats, setOrderStats] = useState<OrderStats>({
@@ -218,8 +206,7 @@ const SellerDashboard: React.FC = () => {
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊', badge: null },
     { id: 'listings', label: 'My Listings', icon: '🏠', badge: totalListings > 0 ? totalListings : null },
-    { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders > 0 ? orderStats.activeOrders : null },
-    { id: 'offers', label: 'Offers', icon: '💌', badge: pendingOffers > 0 ? pendingOffers : null }
+    { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders > 0 ? orderStats.activeOrders : null }
   ];
 
   // Action Cards
@@ -256,92 +243,33 @@ const SellerDashboard: React.FC = () => {
     }
   ]);
 
-  // ✅ FIXED: Check URL params for Stripe return success
+  // ✅ Check URL params for Stripe return success
   useEffect(() => {
-    console.log('🔍 Checking URL params:', location.search);
-    
     const checkStripeReturn = () => {
-      const urlParams = new URLSearchParams(location.search);
-      const stripeStatusParam = urlParams.get('stripe');
+      const urlParams = new URLSearchParams(window.location.search);
+      const stripeStatus = urlParams.get('stripe');
       const accountId = urlParams.get('account_id');
       
-      console.log('📊 URL Params found:', { stripeStatusParam, accountId });
-      
-      if (stripeStatusParam === 'success' && accountId) {
-        console.log('🎉 Stripe connected successfully via URL params!');
-        
-        // Store in localStorage to persist across refreshes
-        localStorage.setItem('stripe_redirect_success', 'true');
-        localStorage.setItem('stripe_account_id', accountId);
-        
-        // Clear URL params
-        const newUrl = location.pathname;
-        window.history.replaceState({}, '', newUrl);
-        
-        // Show success alert immediately
+      if (stripeStatus === 'success' && accountId) {
+        // Show success alert
         setShowStripeSuccessAlert(true);
         
-        // Set success message
-        setSuccessMessage('Stripe account connected successfully! Checking verification status...');
+        // Clear URL params
+        window.history.replaceState({}, '', window.location.pathname);
         
-        // Force check Stripe status immediately
+        // Update Stripe status after 1 second (let Stripe process)
         setTimeout(() => {
-          checkStripeAccountStatus(true);
-        }, 500);
+          checkStripeAccountStatus();
+          fetchDashboardData();
+        }, 1000);
         
-        // Set up polling for verification status
-        const maxAttempts = 30; // 30 attempts = 60 seconds
-        let attempts = 0;
-        
-        const checkVerification = async () => {
-          attempts++;
-          console.log(`🔄 Verification check attempt ${attempts}/${maxAttempts}`);
-          
-          const status = await checkStripeAccountStatus(true);
-          
-          if (status?.chargesEnabled) {
-            console.log('✅ Account verified! Stopping checks.');
-            setSuccessMessage('Stripe account is now verified and ready to accept payments!');
-            fetchDashboardData();
-            return;
-          }
-          
-          if (attempts < maxAttempts) {
-            setTimeout(checkVerification, 2000); // Check every 2 seconds
-          } else {
-            console.log('⏰ Max verification checks reached');
-            setSuccessMessage('Verification is taking longer than expected. Please refresh the page in a few minutes.');
-          }
-        };
-        
-        // Start checking
-        checkVerification();
+        // Show success message
+        setSuccessMessage('Stripe account connected successfully! You can now accept payments.');
       }
     };
     
-    // Run check
     checkStripeReturn();
-    
-    // Also check localStorage for previous redirect
-    const hadRedirect = localStorage.getItem('stripe_redirect_success');
-    const savedAccountId = localStorage.getItem('stripe_account_id');
-    
-    if (hadRedirect === 'true' && savedAccountId) {
-      console.log('🔍 Found previous Stripe redirect, checking status...');
-      
-      // If status is not yet verified, check again
-      if (!stripeStatus?.chargesEnabled) {
-        setTimeout(() => {
-          checkStripeAccountStatus(true);
-        }, 1000);
-      }
-      
-      // Clear localStorage after checking
-      localStorage.removeItem('stripe_redirect_success');
-      localStorage.removeItem('stripe_account_id');
-    }
-    
-  }, [location.search]);
+  }, []);
 
   // ✅ Update action cards based on Stripe status
   useEffect(() => {
@@ -370,26 +298,6 @@ const SellerDashboard: React.FC = () => {
       setActionCards(prev => prev.filter(card => card.title !== 'Setup Payments'));
     }
   }, [stripeStatus]);
-
-  // ✅ Log Stripe status changes for debugging
-  useEffect(() => {
-    console.log('🔄 Stripe Status Changed:', stripeStatus);
-    
-    if (stripeStatus?.connected && stripeStatus?.chargesEnabled) {
-      console.log('🎉 STRIPE IS ACTIVE - CHARGES ENABLED!');
-      
-      // Show success alert if not already showing
-      if (!showStripeSuccessAlert) {
-        setShowStripeSuccessAlert(true);
-      }
-      
-      // Set success message
-      setSuccessMessage('Your Stripe account is fully verified and ready to accept payments!');
-      
-      // Clear any errors
-      setError('');
-    }
-  }, [stripeStatus, showStripeSuccessAlert]);
 
   // ✅ Calculate order stats
   const calculateOrderStats = useCallback((orders: Order[]): OrderStats => {
@@ -427,87 +335,41 @@ const SellerDashboard: React.FC = () => {
     };
   }, []);
 
-  // ✅ FIXED: Check Stripe account status with force refresh
-  const checkStripeAccountStatus = async (force = false): Promise<StripeStatus | null> => {
+  // ✅ Improved: Check Stripe account status with fallback
+  const checkStripeAccountStatus = async () => {
     try {
-      console.log('🔍 Checking Stripe status...', { force });
-      setRefreshing(true);
-      
-      // Use force endpoint if specified, otherwise simple
-      const endpoint = force 
-        ? '/marketplace/stripe/status' 
-        : '/api/marketplace/stripe/status-simple';
-      
-      const response = await fetch(endpoint, {
+      // First try the simple endpoint
+      const response = await fetch('/api/marketplace/stripe/status-simple', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
-        cache: 'no-cache'
+        credentials: 'include'
       });
       
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Stripe status response:', data);
-        
-        // Update state
         setStripeStatus(data);
-        
-        // If connected but charges not enabled, log it
-        if (data.connected && !data.chargesEnabled) {
-          console.log('⚠️ Connected but charges not enabled yet');
-          setSuccessMessage('Stripe account connected. Verification in progress...');
-        }
-        
-        return data;
       } else {
-        console.error('❌ Stripe status check failed:', response.status);
-        const fallbackStatus: StripeStatus = {
+        // Fallback: Set basic status
+        setStripeStatus({
           connected: false,
           chargesEnabled: false,
           detailsSubmitted: false,
           status: 'error'
-        };
-        setStripeStatus(fallbackStatus);
-        return fallbackStatus;
+        });
       }
     } catch (err) {
       console.error('Error checking Stripe status:', err);
-      const fallbackStatus: StripeStatus = {
+      // Set fallback status
+      setStripeStatus({
         connected: false,
         chargesEnabled: false,
         detailsSubmitted: false,
         status: 'error'
-      };
-      setStripeStatus(fallbackStatus);
-      return fallbackStatus;
-    } finally {
-      setRefreshing(false);
+      });
     }
   };
-
-  // ✅ Auto-refresh Stripe status when verification is pending
-  useEffect(() => {
-    let intervalId: NodeJS.Timeout | null = null;
-    
-    // If connected but charges not enabled, check every 5 seconds
-    if (stripeStatus?.connected && !stripeStatus?.chargesEnabled) {
-      console.log('⏰ Setting up auto-refresh for Stripe verification...');
-      
-      intervalId = setInterval(() => {
-        console.log('🔄 Auto-refreshing Stripe status...');
-        checkStripeAccountStatus(true);
-      }, 5000); // Check every 5 seconds
-    }
-    
-    return () => {
-      if (intervalId) {
-        console.log('🛑 Clearing Stripe auto-refresh interval');
-        clearInterval(intervalId);
-      }
-    };
-  }, [stripeStatus]);
 
   // ✅ Fetch dashboard data
   const fetchDashboardData = async () => {
@@ -914,7 +776,7 @@ const SellerDashboard: React.FC = () => {
   const handleStripeSetupSuccess = () => {
     setShowStripeSetup(false);
     setTimeout(() => {
-      checkStripeAccountStatus(true);
+      checkStripeAccountStatus();
       fetchDashboardData();
     }, 1000);
   };
@@ -924,7 +786,7 @@ const SellerDashboard: React.FC = () => {
     
     try {
       await fetchDashboardData();
-      await checkStripeAccountStatus(true);
+      await checkStripeAccountStatus();
     } catch (error) {
       console.error('Refresh error:', error);
     } finally {
@@ -936,35 +798,15 @@ const SellerDashboard: React.FC = () => {
   const handleWithdrawSuccess = () => {
     // Refresh data after successful withdrawal
     setTimeout(() => {
-      checkStripeAccountStatus(true);
+      checkStripeAccountStatus();
       fetchDashboardData();
     }, 1000);
-  };
-
-  // ✅ Handle manual Stripe status check
-  const handleManualStripeCheck = async () => {
-    try {
-      setRefreshing(true);
-      const status = await checkStripeAccountStatus(true);
-      
-      if (status?.chargesEnabled) {
-        setSuccessMessage('✅ Stripe account is verified and ready!');
-      } else {
-        setSuccessMessage('⏳ Verification still in progress. Please wait...');
-      }
-    } catch (error) {
-      console.error('Manual check error:', error);
-      setError('Failed to check Stripe status');
-    } finally {
-      setRefreshing(false);
-    }
   };
 
   // ✅ Initial data loading
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        console.log('🚀 Loading initial dashboard data...');
         await fetchDashboardData();
         await checkStripeAccountStatus();
       } catch (error) {
@@ -1007,9 +849,6 @@ const SellerDashboard: React.FC = () => {
 
   const currentLoading = getCurrentLoadingState();
 
-  // Calculate if user can withdraw (connected and charges enabled)
-  const canWithdraw = stripeStatus?.connected && stripeStatus?.chargesEnabled;
-
   // Show loading only on initial load
   if (loading && !initialDataLoaded) {
     return (
@@ -1023,6 +862,9 @@ const SellerDashboard: React.FC = () => {
       </MarketplaceLayout>
     );
   }
+
+  // Calculate if user can withdraw (connected and charges enabled)
+  const canWithdraw = stripeStatus?.connected && stripeStatus?.chargesEnabled;
 
   return (
     <MarketplaceLayout>
@@ -1043,7 +885,6 @@ const SellerDashboard: React.FC = () => {
             onRefresh={handleRefresh}
             refreshing={refreshing}
             stripeStatus={stripeStatus}
-            onCheckStripe={handleManualStripeCheck}
           />
 
           {/* ✅ Stripe Account Status */}
@@ -1053,275 +894,290 @@ const SellerDashboard: React.FC = () => {
             isLoading={stripeStatus === null}
           />
 
-          {/* ✅ Manual Check Button for Pending Verification */}
-          {stripeStatus?.connected && !stripeStatus?.chargesEnabled && (
-            <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div className="flex items-start">
-                  <div className="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+          {/* ✅ Withdraw Balance Component - Show only when connected */}
+          {canWithdraw && (
+            <WithdrawBalance 
+              stripeStatus={stripeStatus}
+              onWithdrawSuccess={handleWithdrawSuccess}
+            />
+          )}
+
+          {/* ✅ Conditional Stripe Setup Banner */}
+          {!stripeStatus?.chargesEnabled && (
+            <div className="mb-6 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-5">
+              <div className="flex flex-col md:flex-row md:items-center gap-4">
+                <div className="flex items-center">
+                  <div className="bg-yellow-100 p-3 rounded-lg mr-4">
+                    <span className="text-2xl">💰</span>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-blue-800">
-                      Verification In Progress
-                    </h3>
-                    <p className="text-sm text-blue-700 mt-1">
-                      {stripeStatus.message || 'Your Stripe account is connected. Verification usually completes within 2-3 minutes.'}
-                    </p>
-                    <p className="text-xs text-blue-600 mt-2">
-                      Auto-checking every 5 seconds...
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900">Setup Payments to Get Started</h3>
+                    <p className="text-gray-600 text-sm mt-1">
+                      {stripeStatus?.connected 
+                        ? 'Complete your Stripe verification to start accepting payments.'
+                        : 'Connect your Stripe account to receive payments from buyers.'
+                      }
                     </p>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleManualStripeCheck}
-                    disabled={refreshing}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-200 disabled:opacity-50 flex items-center gap-2"
+                <button
+                  onClick={() => setShowStripeSetup(true)}
+                  className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-medium py-3 px-6 rounded-lg transition duration-200 shadow-md hover:shadow whitespace-nowrap"
+                >
+                  {stripeStatus?.connected ? 'Complete Verification' : 'Setup Payments Now'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ✅ Stripe Connected Success Banner */}
+          {stripeStatus?.chargesEnabled && (
+            <div className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-5">
+              <div className="flex flex-col md:flex-row md:items-center gap-4">
+                <div className="flex items-center">
+                  <div className="bg-green-100 p-3 rounded-lg mr-4">
+                    <span className="text-2xl">✅</span>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900">Payments Ready! 🎉</h3>
+                    <p className="text-gray-600 text-sm mt-1">
+                      Your Stripe account is fully verified and ready to accept payments.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <a
+                    href={`https://dashboard.stripe.com/connect/accounts/${stripeStatus.accountId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-medium py-3 px-6 rounded-lg transition duration-200 shadow-md hover:shadow whitespace-nowrap"
                   >
-                    {refreshing ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Checking...
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        Check Now
-                      </>
-                    )}
+                    View Stripe Dashboard
+                  </a>
+                  <button
+                    onClick={() => setShowStripeSetup(true)}
+                    className="bg-white hover:bg-gray-50 text-green-600 border border-green-300 font-medium py-3 px-6 rounded-lg transition duration-200 whitespace-nowrap"
+                  >
+                    Update Details
                   </button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* ✅ Success Message Display */}
-          {successMessage && (
-            <div className="mb-4 bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex items-center">
-                <div className="w-5 h-5 text-green-600 mr-3 flex-shrink-0">
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <p className="text-sm text-green-800">{successMessage}</p>
-              </div>
-            </div>
-          )}
+          {/* Navigation */}
+          <TabNavigation
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          />
 
-          {/* ✅ Error Message Display */}
-          {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex items-center">
-                <div className="w-5 h-5 text-red-600 mr-3 flex-shrink-0">
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <p className="text-sm text-red-800">{error}</p>
-              </div>
-            </div>
-          )}
+          {/* Tab Content */}
+          <div className="mt-2">
+            {activeTab === 'overview' && (
+              <div className="space-y-8">
+                {/* Welcome Card */}
+                <WelcomeCard
+                  title="Welcome back, Seller! 👋"
+                  subtitle="Manage your business efficiently with real-time insights and quick actions."
+                  primaryAction={{
+                    label: '+ Create New Listing',
+                    onClick: () => navigate('/marketplace/create')
+                  }}
+                  secondaryAction={{
+                    label: '💰 Setup Payments',
+                    onClick: () => setShowStripeSetup(true),
+                    visible: !canWithdraw
+                  }}
+                />
 
-          {/* ✅ Tab Navigation */}
-          <div className="mb-8">
-            <TabNavigation
-              tabs={tabs}
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-            />
-          </div>
+                {/* Stats Grid */}
+                <StatsGrid
+                  stats={{
+                    totalRevenue: orderStats.totalRevenue,
+                    totalOrders: orderStats.totalOrders,
+                    activeOrders: orderStats.activeOrders,
+                    pendingOffers: pendingOffers,
+                    totalListings: totalListings,
+                    activeListings: activeListings
+                  }}
+                  onTabChange={setActiveTab}
+                />
 
-          {/* ✅ Main Content based on Active Tab */}
-          {currentLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-                <p className="text-gray-600">Loading...</p>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* Overview Tab */}
-              {activeTab === 'overview' && (
-                <div className="space-y-8">
-                  {/* Welcome Card */}
-                  <WelcomeCard
-                    title="Welcome Back, Seller!"
-                    message="Here's what's happening with your business today."
-                    onViewTutorial={() => navigate('/marketplace/seller/guide')}
+                {/* Order Workflow Guide */}
+                <OrderWorkflowGuide />
+
+                {/* Recent Orders */}
+                {orders.length > 0 ? (
+                  <RecentOrders
+                    orders={orders.slice(0, 5)}
+                    onViewOrderDetails={handleViewOrderDetails}
+                    onStartProcessing={handleSimpleStartProcessing}
+                    onStartWork={handleSimpleStartWork}
+                    onDeliver={handleSimpleDeliver}
+                    onCancel={handleSimpleCancel}
+                    onCompleteRevision={handleSimpleCompleteRevision}
+                    onViewAll={() => setActiveTab('orders')}
+                    onCreateListing={() => navigate('/marketplace/create')}
+                    orderActionLoading={orderActionLoading}
                   />
-
-                  {/* Stats Grid */}
-                  <StatsGrid
-                    orderStats={orderStats}
-                    totalListings={totalListings}
-                    activeListings={activeListings}
-                    pendingOffers={pendingOffers}
-                  />
-
-                  {/* Withdraw Balance Component */}
-                  {canWithdraw && stripeStatus?.availableBalance && stripeStatus.availableBalance > 0 && (
-                    <WithdrawBalance
-                      availableBalance={stripeStatus.availableBalance}
-                      pendingBalance={stripeStatus.pendingBalance || 0}
-                      onWithdrawSuccess={handleWithdrawSuccess}
-                    />
-                  )}
-
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Left Column: Recent Orders & Order Workflow */}
-                    <div className="lg:col-span-2 space-y-8">
-                      {/* Recent Orders */}
-                      <RecentOrders
-                        orders={orders.slice(0, 5)}
-                        loading={ordersLoading}
-                        onViewOrder={handleViewOrderDetails}
-                        onStartProcessing={handleSimpleStartProcessing}
-                        onStartWork={handleSimpleStartWork}
-                        onDeliver={handleSimpleDeliver}
-                        onCancel={handleSimpleCancel}
-                        onCompleteRevision={handleSimpleCompleteRevision}
-                        orderActionLoading={orderActionLoading}
-                      />
-
-                      {/* Order Workflow Guide */}
-                      <OrderWorkflowGuide />
-                    </div>
-
-                    {/* Right Column: Action Cards */}
-                    <div className="space-y-8">
-                      {actionCards.map((card, index) => (
-                        <ActionCard
-                          key={index}
-                          title={card.title}
-                          description={card.description}
-                          icon={card.icon}
-                          iconBg={card.iconBg}
-                          bgGradient={card.bgGradient}
-                          borderColor={card.borderColor}
-                          actions={card.actions}
-                        />
-                      ))}
+                ) : (
+                  <div className="bg-white rounded-2xl shadow-sm border border-yellow-200 p-8 text-center">
+                    <div className="text-5xl mb-4 text-gray-300">📦</div>
+                    <h3 className="text-lg font-medium text-gray-900">No Orders Yet</h3>
+                    <p className="mt-2 text-gray-500 mb-6">
+                      {canWithdraw 
+                        ? 'You can accept payments. Create listings to start receiving orders!'
+                        : 'Create listings to start receiving orders.'
+                      }
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                      <button
+                        onClick={() => navigate('/marketplace/create')}
+                        className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 shadow-md hover:shadow"
+                      >
+                        + Create Your First Listing
+                      </button>
+                      {!canWithdraw && (
+                        <button
+                          onClick={() => setShowStripeSetup(true)}
+                          className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow"
+                        >
+                          💰 Setup Payments
+                        </button>
+                      )}
                     </div>
                   </div>
+                )}
+
+                {/* Action Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {actionCards.map((card, index) => (
+                    <ActionCard
+                      key={index}
+                      title={card.title}
+                      description={card.description}
+                      icon={card.icon}
+                      iconBg={card.iconBg}
+                      bgGradient={card.bgGradient}
+                      borderColor={card.borderColor}
+                      actions={card.actions}
+                    />
+                  ))}
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Listings Tab */}
-              {activeTab === 'listings' && (
-                <ListingsTab
-                  listingsData={listingsData}
-                  loading={listingsLoading}
-                  currentPage={listingsPage}
-                  pageSize={listingsLimit}
-                  statusFilter={listingsStatusFilter}
-                  actionLoading={listingActionLoading}
-                  onPageChange={setListingsPage}
-                  onStatusFilterChange={setListingsStatusFilter}
-                  onEditListing={handleEditListing}
-                  onDeleteListing={handleDeleteListing}
-                  onToggleStatus={handleToggleListingStatus}
-                  onCreateListing={() => navigate('/marketplace/create-listing')}
-                  onViewListing={(id) => navigate(`/marketplace/listing/${id}`)}
-                />
-              )}
+            {/* Offers Tab */}
+            {activeTab === 'offers' && (
+              <OffersTab
+                offers={offers}
+                loading={offersLoading}
+                onOfferAction={handleOfferAction}
+                onPlayVideo={handlePlayVideo}
+                onRefresh={() => fetchOffers()}
+                actionLoading={orderActionLoading}
+              />
+            )}
 
-              {/* Orders Tab */}
-              {activeTab === 'orders' && (
-                <OrdersTab
-                  orders={orders}
-                  loading={ordersLoading}
-                  currentPage={ordersPage}
-                  pageSize={ordersLimit}
-                  statusFilter={ordersFilter}
-                  orderActionLoading={orderActionLoading}
-                  onPageChange={setOrdersPage}
-                  onStatusFilterChange={setOrdersFilter}
-                  onViewOrderDetails={handleViewOrderDetails}
-                  onStartProcessing={handleSimpleStartProcessing}
-                  onStartWork={handleSimpleStartWork}
-                  onDeliver={handleSimpleDeliver}
-                  onCancel={handleSimpleCancel}
-                  onCompleteRevision={handleSimpleCompleteRevision}
-                  onPlayVideo={handlePlayVideo}
-                />
-              )}
+            {/* Listings Tab */}
+            {activeTab === 'listings' && (
+              <ListingsTab
+                listingsData={listingsData}
+                loading={listingsLoading}
+                statusFilter={listingsStatusFilter}
+                currentPage={listingsPage}
+                onStatusFilterChange={setListingsStatusFilter}
+                onPageChange={setListingsPage}
+                onEditListing={handleEditListing}
+                onDeleteListing={handleDeleteListing}
+                onToggleStatus={handleToggleListingStatus}
+                onPlayVideo={handlePlayVideo}
+                onRefresh={fetchListings}
+                actionLoading={listingActionLoading}
+                onCreateListing={() => navigate('/marketplace/create')}
+              />
+            )}
 
-              {/* Offers Tab */}
-              {activeTab === 'offers' && (
-                <OffersTab
-                  offers={offers}
-                  loading={offersLoading}
-                  actionLoading={orderActionLoading}
-                  onAcceptOffer={(offerId) => handleOfferAction(offerId, 'accept')}
-                  onRejectOffer={(offerId) => handleOfferAction(offerId, 'reject')}
-                  onViewListing={(listingId) => navigate(`/marketplace/listing/${listingId}`)}
-                />
-              )}
-            </>
-          )}
+            {/* Orders Tab */}
+            {activeTab === 'orders' && (
+              <OrdersTab
+                orders={orders}
+                loading={ordersLoading}
+                filter={ordersFilter}
+                onFilterChange={setOrdersFilter}
+                onViewOrderDetails={handleViewOrderDetails}
+                onPlayVideo={handlePlayVideo}
+                onRefresh={() => fetchSellerOrders()}
+                onStartProcessing={(orderId) => {
+                  const order = orders.find(o => o._id === orderId);
+                  if (order) handleSimpleStartProcessing(order);
+                }}
+                onStartWork={(orderId) => {
+                  const order = orders.find(o => o._id === orderId);
+                  if (order) handleSimpleStartWork(order);
+                }}
+                onDeliver={(order) => handleSimpleDeliver(order)}
+                onCancel={(order) => handleSimpleCancel(order)}
+                onCompleteRevision={(order) => handleSimpleCompleteRevision(order)}
+                actionLoading={orderActionLoading}
+                stats={orderStats}
+              />
+            )}
+          </div>
 
           {/* Modals */}
-          {/* Stripe Setup Modal */}
           {showStripeSetup && (
             <StripeSetupModal
+              show={showStripeSetup}
               onClose={() => setShowStripeSetup(false)}
               onSuccess={handleStripeSetupSuccess}
+              stripeConnected={canWithdraw}
             />
           )}
 
-          {/* Order Details Modal */}
-          {showOrderModal && selectedOrderId && (
+          {selectedOrderId && (
             <OrderDetailsModal
               orderId={selectedOrderId}
+              isOpen={showOrderModal}
               onClose={() => {
                 setShowOrderModal(false);
                 setSelectedOrderId(null);
               }}
-              onStatusUpdate={() => {
-                fetchSellerOrders();
-                fetchDashboardData();
-              }}
             />
           )}
 
-          {/* Edit Listing Modal */}
           {showEditModal && editingListing && (
             <EditListingModal
               listing={editingListing}
+              isOpen={showEditModal}
               onClose={() => {
                 setShowEditModal(false);
                 setEditingListing(null);
               }}
               onSave={handleEditModalSave}
-              loading={listingActionLoading === `edit-${editingListing._id}`}
+              loading={listingActionLoading?.startsWith('edit-') || false}
             />
           )}
 
-          {/* Delete Listing Modal */}
           {showDeleteModal && deletingListing && (
             <DeleteListingModal
               listing={deletingListing}
+              isOpen={showDeleteModal}
               onClose={() => {
                 setShowDeleteModal(false);
                 setDeletingListing(null);
               }}
               onConfirm={handleDeleteModalConfirm}
-              loading={listingActionLoading === `delete-${deletingListing._id}`}
+              loading={listingActionLoading?.startsWith('delete-') || false}
             />
           )}
 
-          {/* Video Player Modal */}
           {showVideoModal && (
             <VideoPlayerModal
               videoUrl={currentVideoUrl}
               title={currentVideoTitle}
+              isOpen={showVideoModal}
               onClose={() => setShowVideoModal(false)}
             />
           )}
