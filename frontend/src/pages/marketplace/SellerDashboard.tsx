@@ -119,6 +119,7 @@ interface OrderStats {
   pendingRevenue: number;
   thisMonthOrders: number;
   thisMonthRevenue: number;
+  availableBalance?: number; // Added for Stripe balance
 }
 
 interface StripeStatus {
@@ -186,7 +187,8 @@ const SellerDashboard: React.FC = () => {
     totalRevenue: 0,
     pendingRevenue: 0,
     thisMonthOrders: 0,
-    thisMonthRevenue: 0
+    thisMonthRevenue: 0,
+    availableBalance: 0
   });
   
   // Withdrawal states
@@ -237,7 +239,7 @@ const SellerDashboard: React.FC = () => {
   const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
   const totalWithdrawals = withdrawalHistory?.withdrawals?.length || 0;
 
-  // Tab configuration - ADDED WITHDRAW TAB
+  // Tab configuration
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊', badge: null },
     { id: 'listings', label: 'My Listings', icon: '🏠', badge: totalListings > 0 ? totalListings : null },
@@ -291,12 +293,25 @@ const SellerDashboard: React.FC = () => {
       connected: false,
       chargesEnabled: false,
       detailsSubmitted: false,
-      status: 'not_connected'
+      status: 'not_connected',
+      balance: 0,
+      availableBalance: 0,
+      pendingBalance: 0
     };
   };
 
   // ✅ Handle mock Stripe connection for development
   const handleMockStripeConnect = () => {
+    // Calculate total balance from completed orders
+    const completedOrdersRevenue = orders
+      .filter(order => order.status === 'completed')
+      .reduce((sum, order) => sum + (order.amount * 100), 0); // Convert to cents
+    
+    // Calculate pending balance from active orders
+    const pendingOrdersRevenue = orders
+      .filter(order => ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(order.status))
+      .reduce((sum, order) => sum + (order.amount * 100), 0);
+    
     const mockStatus: StripeStatus = {
       connected: true,
       chargesEnabled: true,
@@ -307,9 +322,9 @@ const SellerDashboard: React.FC = () => {
       country: 'US',
       payoutsEnabled: true,
       name: 'Test Seller',
-      balance: 1500,
-      availableBalance: 1000,
-      pendingBalance: 500
+      balance: completedOrdersRevenue + pendingOrdersRevenue,
+      availableBalance: completedOrdersRevenue,
+      pendingBalance: pendingOrdersRevenue
     };
     
     localStorage.setItem('stripe_status', JSON.stringify(mockStatus));
@@ -318,6 +333,12 @@ const SellerDashboard: React.FC = () => {
     setSuccessMessage('Mock Stripe account connected successfully! You can now test payment features.');
     setShowStripeSetup(false);
     setError('');
+    
+    // Update order stats with available balance
+    setOrderStats(prev => ({
+      ...prev,
+      availableBalance: completedOrdersRevenue
+    }));
   };
 
   // ✅ Check URL params for Stripe return success
@@ -390,6 +411,21 @@ const SellerDashboard: React.FC = () => {
              orderDate.getFullYear() === thisYear;
     });
 
+    // Calculate total revenue from completed orders (in dollars)
+    const totalRevenue = orders
+      .filter(order => order.status === 'completed')
+      .reduce((sum, order) => sum + order.amount, 0);
+
+    // Calculate pending revenue from active orders (in dollars)
+    const pendingRevenue = orders
+      .filter(order => ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(order.status))
+      .reduce((sum, order) => sum + order.amount, 0);
+
+    // Calculate this month revenue (in dollars)
+    const thisMonthRevenue = thisMonthOrders
+      .filter(order => order.status === 'completed')
+      .reduce((sum, order) => sum + order.amount, 0);
+
     return {
       totalOrders: orders.length,
       activeOrders: orders.filter(order => 
@@ -401,16 +437,10 @@ const SellerDashboard: React.FC = () => {
       delivered: orders.filter(order => order.status === 'delivered').length,
       completed: orders.filter(order => order.status === 'completed').length,
       cancelled: orders.filter(order => order.status === 'cancelled').length,
-      totalRevenue: orders
-        .filter(order => order.status === 'completed')
-        .reduce((sum, order) => sum + order.amount, 0),
-      pendingRevenue: orders
-        .filter(order => ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(order.status))
-        .reduce((sum, order) => sum + order.amount, 0),
+      totalRevenue,
+      pendingRevenue,
       thisMonthOrders: thisMonthOrders.length,
-      thisMonthRevenue: thisMonthOrders
-        .filter(order => order.status === 'completed')
-        .reduce((sum, order) => sum + order.amount, 0)
+      thisMonthRevenue
     };
   }, []);
 
@@ -608,131 +638,149 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ NEW: Fetch withdrawal history
+  // ✅ Fetch withdrawal history from API (not mock)
   const fetchWithdrawalHistory = async () => {
     try {
       setWithdrawalsLoading(true);
       
-      // Mock API call for withdrawals (replace with real API)
-      const mockWithdrawals: Withdrawal[] = [
-        {
-          _id: '1',
-          amount: 50000, // $500.00
-          status: 'completed',
-          stripeTransferId: 'tr_1OaBCdP3O5Z6mM8qK9pFgHjK',
-          stripePayoutId: 'po_1OaBCdP3O5Z6mM8qK9pFgHjK',
-          createdAt: '2024-01-15T10:30:00Z',
-          completedAt: '2024-01-16T09:15:00Z',
-          destination: 'Bank Account •••• 4321'
-        },
-        {
-          _id: '2',
-          amount: 75000, // $750.00
-          status: 'pending',
-          stripeTransferId: 'tr_1OaBDyP3O5Z6mM8qL0pFgHjK',
-          createdAt: '2024-01-20T14:45:00Z',
-          destination: 'Bank Account •••• 4321'
-        },
-        {
-          _id: '3',
-          amount: 30000, // $300.00
-          status: 'failed',
-          stripeTransferId: 'tr_1OaBFzP3O5Z6mM8qM1pFgHjK',
-          createdAt: '2024-01-10T11:20:00Z',
-          failedAt: '2024-01-10T11:25:00Z',
-          failureReason: 'Insufficient funds',
-          destination: 'Bank Account •••• 4321'
-        },
-        {
-          _id: '4',
-          amount: 120000, // $1,200.00
-          status: 'completed',
-          stripeTransferId: 'tr_1OaBGhP3O5Z6mM8qN2pFgHjK',
-          stripePayoutId: 'po_1OaBGhP3O5Z6mM8qN2pFgHjK',
-          createdAt: '2024-01-05T09:00:00Z',
-          completedAt: '2024-01-06T08:30:00Z',
-          destination: 'Bank Account •••• 4321'
+      // Try to fetch real withdrawal history from API
+      try {
+        const response = await marketplaceApi.getWithdrawalHistory({
+          page: withdrawalsPage,
+          limit: withdrawalsLimit
+        });
+        
+        if (response.success) {
+          setWithdrawalHistory(response);
+        } else {
+          // If API fails, create empty history
+          console.log('No withdrawal history found');
+          setWithdrawalHistory({
+            withdrawals: [],
+            pagination: {
+              page: 1,
+              limit: 10,
+              total: 0,
+              pages: 1
+            }
+          });
         }
-      ];
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setWithdrawalHistory({
-        withdrawals: mockWithdrawals,
-        pagination: {
-          page: 1,
-          limit: 10,
-          total: mockWithdrawals.length,
-          pages: 1
-        }
-      });
+      } catch (apiError) {
+        console.log('Withdrawal API not available, using empty history');
+        setWithdrawalHistory({
+          withdrawals: [],
+          pagination: {
+            page: 1,
+            limit: 10,
+            total: 0,
+            pages: 1
+          }
+        });
+      }
       
     } catch (error: any) {
       console.error('Error fetching withdrawal history:', error);
       setError('Failed to load withdrawal history. Please try again.');
+      setWithdrawalHistory({
+        withdrawals: [],
+        pagination: {
+          page: 1,
+          limit: 10,
+          total: 0,
+          pages: 1
+        }
+      });
     } finally {
       setWithdrawalsLoading(false);
     }
   };
 
-  // ✅ NEW: Handle withdrawal request
+  // ✅ Handle withdrawal request
   const handleWithdrawRequest = async (amount: number) => {
     try {
       setRefreshing(true);
       
-      // Mock withdrawal request (replace with real API)
-      console.log('Withdraw request:', amount);
+      // Convert amount to cents
+      const amountInCents = amount * 100;
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Create mock withdrawal record
-      const newWithdrawal: Withdrawal = {
-        _id: Date.now().toString(),
-        amount: amount * 100, // Convert to cents
-        status: 'pending',
-        stripeTransferId: 'tr_mock_' + Date.now(),
-        createdAt: new Date().toISOString(),
-        destination: 'Bank Account •••• 4321',
-        description: `Withdrawal of $${amount.toFixed(2)}`
-      };
-      
-      // Add to history
-      setWithdrawalHistory(prev => {
-        if (!prev) {
-          return {
-            withdrawals: [newWithdrawal],
-            pagination: { page: 1, limit: 10, total: 1, pages: 1 }
-          };
+      // Call API to process withdrawal
+      try {
+        const response = await marketplaceApi.requestWithdrawal(amountInCents);
+        
+        if (response.success) {
+          // Update Stripe balance
+          setStripeStatus(prev => {
+            if (!prev) return prev;
+            
+            return {
+              ...prev,
+              availableBalance: (prev.availableBalance || 0) - amountInCents,
+              balance: (prev.balance || 0) - amountInCents
+            };
+          });
+          
+          // Update order stats
+          setOrderStats(prev => ({
+            ...prev,
+            availableBalance: (prev.availableBalance || 0) - amountInCents
+          }));
+          
+          setSuccessMessage(`Withdrawal request of $${amount.toFixed(2)} submitted successfully! Funds will arrive in 2-3 business days.`);
+          
+          // Refresh withdrawal history
+          fetchWithdrawalHistory();
+        } else {
+          throw new Error(response.error || 'Withdrawal failed');
         }
-        
-        return {
-          ...prev,
-          withdrawals: [newWithdrawal, ...prev.withdrawals],
-          pagination: {
-            ...prev.pagination,
-            total: (prev.pagination?.total || 0) + 1
-          }
-        };
-      });
-      
-      // Update Stripe balance (mock)
-      setStripeStatus(prev => {
-        if (!prev) return prev;
-        
-        return {
-          ...prev,
-          availableBalance: (prev.availableBalance || 0) - (amount * 100),
-          balance: (prev.balance || 0) - (amount * 100)
-        };
-      });
-      
-      setSuccessMessage(`Withdrawal request of $${amount.toFixed(2)} submitted successfully! Funds will arrive in 2-3 business days.`);
-      
-      // Refresh data
-      fetchWithdrawalHistory();
-      checkStripeAccountStatus();
+      } catch (apiError) {
+        // If API fails, show mock success message for development
+        if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
+          // Create mock withdrawal record
+          const newWithdrawal: Withdrawal = {
+            _id: Date.now().toString(),
+            amount: amountInCents,
+            status: 'pending',
+            stripeTransferId: 'tr_mock_' + Date.now(),
+            createdAt: new Date().toISOString(),
+            destination: 'Bank Account •••• 4321',
+            description: `Withdrawal of $${amount.toFixed(2)}`
+          };
+          
+          // Add to history
+          setWithdrawalHistory(prev => {
+            if (!prev) {
+              return {
+                withdrawals: [newWithdrawal],
+                pagination: { page: 1, limit: 10, total: 1, pages: 1 }
+              };
+            }
+            
+            return {
+              ...prev,
+              withdrawals: [newWithdrawal, ...prev.withdrawals],
+              pagination: {
+                ...prev.pagination,
+                total: (prev.pagination?.total || 0) + 1
+              }
+            };
+          });
+          
+          // Update Stripe balance (mock)
+          setStripeStatus(prev => {
+            if (!prev) return prev;
+            
+            return {
+              ...prev,
+              availableBalance: (prev.availableBalance || 0) - amountInCents,
+              balance: (prev.balance || 0) - amountInCents
+            };
+          });
+          
+          setSuccessMessage(`Withdrawal request of $${amount.toFixed(2)} submitted successfully! Funds will arrive in 2-3 business days.`);
+        } else {
+          throw apiError;
+        }
+      }
       
     } catch (error: any) {
       console.error('Error processing withdrawal:', error);
@@ -1177,6 +1225,17 @@ const SellerDashboard: React.FC = () => {
 
   const currentLoading = getCurrentLoadingState();
 
+  // Calculate if user can withdraw (connected and charges enabled)
+  const canWithdraw = stripeStatus?.connected && stripeStatus?.chargesEnabled;
+  const availableBalance = stripeStatus?.availableBalance || 0;
+  const pendingBalance = stripeStatus?.pendingBalance || 0;
+
+  // Calculate total withdrawn amount
+  const totalWithdrawn = withdrawalHistory?.withdrawals?.reduce(
+    (sum, w) => sum + (w.status === 'completed' ? w.amount : 0), 
+    0
+  ) || 0;
+
   // Show loading only on initial load
   if (loading && !initialDataLoaded) {
     return (
@@ -1191,9 +1250,6 @@ const SellerDashboard: React.FC = () => {
       </MarketplaceLayout>
     );
   }
-
-  // Calculate if user can withdraw (connected and charges enabled)
-  const canWithdraw = stripeStatus?.connected && stripeStatus?.chargesEnabled;
 
   return (
     <MarketplaceLayout>
@@ -1210,7 +1266,7 @@ const SellerDashboard: React.FC = () => {
           <DashboardHeader
             title="Seller Dashboard"
             subtitle="Manage orders, track earnings, and grow your business"
-            earnings={formatCurrency(orderStats.totalRevenue)}
+            earnings={formatCurrency(orderStats.totalRevenue * 100)} // Convert to cents
             onRefresh={handleRefresh}
             refreshing={refreshing}
             stripeStatus={stripeStatus}
@@ -1227,7 +1283,7 @@ const SellerDashboard: React.FC = () => {
                   <div>
                     <h3 className="font-medium text-purple-800">Development Mode</h3>
                     <p className="text-sm text-purple-700">
-                      Using mock payment data. All features are testable.
+                      Using live earnings data from your orders. Mock payments available for testing.
                     </p>
                   </div>
                 </div>
@@ -1246,7 +1302,10 @@ const SellerDashboard: React.FC = () => {
                           connected: false,
                           chargesEnabled: false,
                           detailsSubmitted: false,
-                          status: 'not_connected'
+                          status: 'not_connected',
+                          balance: 0,
+                          availableBalance: 0,
+                          pendingBalance: 0
                         };
                         localStorage.setItem('stripe_status', JSON.stringify(mockStatus));
                         setStripeStatus(mockStatus);
@@ -1319,6 +1378,18 @@ const SellerDashboard: React.FC = () => {
             isLoading={stripeStatus === null}
           />
 
+          {/* ✅ Withdraw Balance Card (Shows in overview) */}
+          {canWithdraw && availableBalance > 0 && (
+            <WithdrawBalance
+              stripeStatus={stripeStatus!}
+              availableBalance={availableBalance}
+              pendingBalance={pendingBalance}
+              onWithdrawSuccess={handleWithdrawSuccess}
+              totalRevenue={orderStats.totalRevenue}
+              thisMonthRevenue={orderStats.thisMonthRevenue}
+            />
+          )}
+
           {/* ✅ Navigation */}
           <TabNavigation
             tabs={tabs}
@@ -1366,7 +1437,8 @@ const SellerDashboard: React.FC = () => {
                         activeListings: activeListings,
                         thisMonthRevenue: orderStats.thisMonthRevenue,
                         thisMonthOrders: orderStats.thisMonthOrders,
-                        availableBalance: stripeStatus?.availableBalance ? stripeStatus.availableBalance / 100 : 0
+                        availableBalance: stripeStatus?.availableBalance ? stripeStatus.availableBalance / 100 : 0,
+                        totalWithdrawn: totalWithdrawn / 100
                       }}
                       onTabChange={setActiveTab}
                     />
@@ -1496,7 +1568,7 @@ const SellerDashboard: React.FC = () => {
                   />
                 )}
 
-                {/* ✅ NEW: Withdraw Tab */}
+                {/* Withdraw Tab */}
                 {activeTab === 'withdraw' && (
                   <WithdrawTab
                     stripeStatus={stripeStatus}
@@ -1506,6 +1578,9 @@ const SellerDashboard: React.FC = () => {
                     onPageChange={setWithdrawalsPage}
                     onWithdrawRequest={handleWithdrawRequest}
                     onRefresh={() => fetchWithdrawalHistory()}
+                    totalRevenue={orderStats.totalRevenue}
+                    thisMonthRevenue={orderStats.thisMonthRevenue}
+                    pendingRevenue={orderStats.pendingRevenue}
                   />
                 )}
               </>
