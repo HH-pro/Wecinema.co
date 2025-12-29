@@ -81,15 +81,5 @@ const ActionCard: React.FC<ActionCardProps> = ({
   );
 };
 
-// ❌ Remove defaultProps - use JavaScript default parameters instead
-// ActionCard.defaultProps = {
-//   title: 'Untitled Card',
-//   description: 'No description provided',
-//   icon: '📊',
-//   iconBg: 'from-blue-500 to-blue-600',
-//   bgGradient: 'from-blue-50 to-indigo-50',
-//   borderColor: 'border-blue-200',
-//   actions: []
-// };
 
 export default ActionCard;
