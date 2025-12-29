@@ -130,7 +130,7 @@ export const listingsApi = {
   getMyListings: async (params = {}) => {
     try {
       const { page = 1, limit = 10, status = '', search = '' } = params;
-      const response = await apiClient.get('/marketplace/my-listings', {
+      const response = await apiClient.get('/marketplace/listings/my-listings', {
         params: { page, limit, status, search }
       });
       return response.data;
