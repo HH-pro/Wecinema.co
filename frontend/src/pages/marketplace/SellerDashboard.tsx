@@ -236,21 +236,7 @@ const actionCards = [
       }
     ]
   },
-  {
-    title: 'Seller Settings',
-    description: 'Update your seller profile, availability, and notification preferences.',
-    icon: '⚙️',
-    iconBg: 'from-purple-500 to-purple-600',
-    bgGradient: 'from-purple-50 to-violet-50',
-    borderColor: 'border-purple-200',
-    actions: [
-      {
-        label: 'Settings',
-        onClick: () => navigate('/marketplace/seller/settings'),
-        variant: 'secondary' as const
-      }
-    ]
-  },
+ 
   {
     title: 'Seller Resources',
     description: 'Access guides, tutorials, and tips to grow your business on Marketplace.',
