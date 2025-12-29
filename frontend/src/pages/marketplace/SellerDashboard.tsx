@@ -204,42 +204,69 @@ const SellerDashboard: React.FC = () => {
     { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders > 0 ? orderStats.activeOrders : null }
   ];
 
-  // Action cards data
-  const actionCards = [
-    {
-      icon: '📊',
-      title: 'Analytics Dashboard',
-      description: 'View detailed analytics and performance metrics for your listings.',
-      buttonText: 'View Analytics',
-      buttonColor: 'bg-blue-500 hover:bg-blue-600',
-      onClick: () => navigate('/marketplace/analytics')
-    },
-    {
-      icon: '💰',
-      title: 'Payment Settings',
-      description: 'Configure payment methods and withdrawal settings for your earnings.',
-      buttonText: 'Manage Payments',
-      buttonColor: 'bg-green-500 hover:bg-green-600',
-      onClick: () => setShowStripeSetup(true)
-    },
-    {
-      icon: '⚙️',
-      title: 'Seller Settings',
-      description: 'Update your seller profile, availability, and notification preferences.',
-      buttonText: 'Settings',
-      buttonColor: 'bg-purple-500 hover:bg-purple-600',
-      onClick: () => navigate('/marketplace/seller/settings')
-    },
-    {
-      icon: '📚',
-      title: 'Seller Resources',
-      description: 'Access guides, tutorials, and tips to grow your business on Marketplace.',
-      buttonText: 'Learn More',
-      buttonColor: 'bg-orange-500 hover:bg-orange-600',
-      onClick: () => navigate('/marketplace/seller/resources')
-    }
-  ];
-
+  // SellerDashboard.tsx में actionCards array को update करें:
+const actionCards = [
+  {
+    title: 'Analytics Dashboard',
+    description: 'View detailed analytics and performance metrics for your listings.',
+    icon: '📊',
+    iconBg: 'from-blue-500 to-blue-600',
+    bgGradient: 'from-blue-50 to-indigo-50',
+    borderColor: 'border-blue-200',
+    actions: [
+      {
+        label: 'View Analytics',
+        onClick: () => navigate('/marketplace/analytics'),
+        variant: 'primary' as const
+      }
+    ]
+  },
+  {
+    title: 'Payment Settings',
+    description: 'Configure payment methods and withdrawal settings for your earnings.',
+    icon: '💰',
+    iconBg: 'from-green-500 to-green-600',
+    bgGradient: 'from-green-50 to-emerald-50',
+    borderColor: 'border-green-200',
+    actions: [
+      {
+        label: 'Manage Payments',
+        onClick: () => setShowStripeSetup(true),
+        variant: 'primary' as const
+      }
+    ]
+  },
+  {
+    title: 'Seller Settings',
+    description: 'Update your seller profile, availability, and notification preferences.',
+    icon: '⚙️',
+    iconBg: 'from-purple-500 to-purple-600',
+    bgGradient: 'from-purple-50 to-violet-50',
+    borderColor: 'border-purple-200',
+    actions: [
+      {
+        label: 'Settings',
+        onClick: () => navigate('/marketplace/seller/settings'),
+        variant: 'secondary' as const
+      }
+    ]
+  },
+  {
+    title: 'Seller Resources',
+    description: 'Access guides, tutorials, and tips to grow your business on Marketplace.',
+    icon: '📚',
+    iconBg: 'from-orange-500 to-orange-600',
+    bgGradient: 'from-orange-50 to-amber-50',
+    borderColor: 'border-orange-200',
+    actions: [
+      {
+        label: 'Learn More',
+        onClick: () => navigate('/marketplace/seller/resources'),
+        variant: 'secondary' as const
+      }
+    ]
+  }
+];
   // ✅ FIXED: Calculate order stats
   const calculateOrderStats = useCallback((orders: Order[]): OrderStats => {
     const now = new Date();
