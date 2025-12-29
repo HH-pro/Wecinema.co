@@ -1,4 +1,4 @@
-// src/pages/seller/SellerDashboard.tsx - FINAL SOLUTION
+// src/pages/seller/SellerDashboard.tsx - UPDATED WITH ACTIVATION/DEACTIVATION
 import React, { useState, useEffect, useCallback } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
@@ -77,6 +77,7 @@ interface Order {
   deliveredAt?: string;
   completedAt?: string;
   cancelledAt?: string;
+  revisionRequestedAt?: string;
 }
 
 interface Offer {
@@ -106,7 +107,7 @@ interface Listing {
   category: string;
   tags: string[];
   mediaUrls: string[];
-  status: string;
+  status: 'active' | 'inactive' | 'draft' | 'sold';
   views?: number;
   sellerId: {
     _id: string;
@@ -339,6 +340,170 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
+  // ✅ NEW: Activate/Deactivate Listing using new API endpoint
+  const handleToggleListingStatus = async (listing: Listing) => {
+    try {
+      setListingActionLoading(listing._id);
+      setError('');
+
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        setListingActionLoading(null);
+        return;
+      }
+
+      console.log(`🔄 Toggling listing status: ${listing._id}, current: ${listing.status}`);
+
+      // Use the new API endpoint for toggle status
+      const response = await axios.patch(
+        `${API_BASE_URL}/marketplace/listing/${listing._id}/toggle-status`,
+        {}, // Empty body as status toggle is handled by server
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
+
+      if (response.data && response.data.listing) {
+        const updatedListing = response.data.listing;
+        const action = updatedListing.status === 'active' ? 'activated' : 'deactivated';
+        
+        setSuccessMessage(`✅ Listing ${action} successfully!`);
+        
+        // Update listings in state
+        setListingsData(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            listings: prev.listings.map(l => 
+              l._id === listing._id 
+                ? { ...l, status: updatedListing.status, updatedAt: updatedListing.updatedAt }
+                : l
+            )
+          };
+        });
+        
+        // Also refresh if on listings tab
+        if (activeTab === 'listings') {
+          fetchListings();
+        }
+      }
+    } catch (error: any) {
+      console.error('❌ Error toggling listing status:', error);
+      setError(error.response?.data?.error || 'Failed to update listing status. Please try again.');
+    } finally {
+      setListingActionLoading(null);
+    }
+  };
+
+  // ✅ NEW: Pause/Resume Order functionality
+  const handlePauseResumeOrder = async (order: Order, action: 'pause' | 'resume') => {
+    try {
+      setOrderActionLoading(order._id);
+      setError('');
+
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        setOrderActionLoading(null);
+        return;
+      }
+
+      console.log(`${action === 'pause' ? '⏸️' : '▶️'} ${action.charAt(0).toUpperCase() + action.slice(1)}ing order: ${order._id}`);
+
+      // Use existing status update endpoint with new status
+      const newStatus = action === 'pause' ? 'paused' : order.previousStatus || 'processing';
+      
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${order._id}/status`,
+        { 
+          status: newStatus,
+          ...(action === 'pause' ? { previousStatus: order.status } : {})
+        },
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
+
+      if (response.data.success) {
+        const actionText = action === 'pause' ? 'paused' : 'resumed';
+        setSuccessMessage(`✅ Order ${actionText} successfully!`);
+        
+        updateOrderInState(order._id, newStatus, {
+          ...(action === 'pause' ? { previousStatus: order.status } : {}),
+          updatedAt: new Date().toISOString()
+        });
+      }
+    } catch (error: any) {
+      console.error(`❌ Error ${action}ing order:`, error);
+      setError(error.response?.data?.error || `Failed to ${action} order. Please try again.`);
+    } finally {
+      setOrderActionLoading(null);
+    }
+  };
+
+  // ✅ NEW: Accept/Reject Offer with status update
+  const handleOfferStatusUpdate = async (offerId: string, action: 'accept' | 'reject' | 'hold') => {
+    try {
+      setOrderActionLoading(offerId);
+      setError('');
+
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        setOrderActionLoading(null);
+        return;
+      }
+
+      console.log(`${action === 'accept' ? '✅' : action === 'reject' ? '❌' : '⏸️'} ${action.charAt(0).toUpperCase() + action.slice(1)}ing offer: ${offerId}`);
+
+      // Determine new status based on action
+      const newStatus = action === 'accept' ? 'accepted' : action === 'reject' ? 'rejected' : 'on_hold';
+
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/offers/${offerId}/status`,
+        { status: newStatus },
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
+
+      if (response.data.success) {
+        const actionText = action === 'accept' ? 'accepted' : action === 'reject' ? 'rejected' : 'put on hold';
+        setSuccessMessage(`✅ Offer ${actionText} successfully!`);
+        
+        // Update offers in state
+        setOffers(prev => prev.map(offer => 
+          offer._id === offerId 
+            ? { ...offer, status: newStatus, updatedAt: new Date().toISOString() }
+            : offer
+        ));
+        
+        // Refresh offers if on offers tab
+        if (activeTab === 'offers') {
+          fetchOffers();
+        }
+      }
+    } catch (error: any) {
+      console.error(`❌ Error updating offer status:`, error);
+      setError(error.response?.data?.error || `Failed to ${action} offer. Please try again.`);
+    } finally {
+      setOrderActionLoading(null);
+    }
+  };
+
   // ✅ FIXED: Main data fetch function - FETCHES EVERYTHING ON INITIAL LOAD
   const fetchDashboardData = async () => {
     try {
@@ -379,8 +544,14 @@ const SellerDashboard: React.FC = () => {
           timeout: 8000
         }).catch(err => ({ data: { success: false, offers: [] } })),
         axios.get(`${API_BASE_URL}/marketplace/listings/my-listings`, {
-          params: { limit: 5 },
-          headers: { Authorization: `Bearer ${token}` },
+          params: { 
+            limit: 5,
+            _t: new Date().getTime() // Cache busting
+          },
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Cache-Control': 'no-cache'
+          },
           timeout: 8000
         }).catch(err => ({ data: { success: false } }))
       ]);
@@ -395,7 +566,7 @@ const SellerDashboard: React.FC = () => {
       // Process listings
       if (listingsResponse.status === 'fulfilled' && listingsResponse.value.data.success) {
         setListingsData(listingsResponse.value.data);
-        console.log('🏠 Listings fetched');
+        console.log('🏠 Listings fetched:', listingsResponse.value.data.listings?.length || 0);
       }
 
       // Mark initial data as loaded
@@ -458,7 +629,7 @@ const SellerDashboard: React.FC = () => {
       const params: any = {
         page: listingsPage,
         limit: listingsLimit,
-        _t: new Date().getTime()
+        _t: new Date().getTime() // Cache busting
       };
       
       if (listingsStatusFilter) {
@@ -785,14 +956,14 @@ const SellerDashboard: React.FC = () => {
     setShowDeleteModal(true);
   };
 
-  const handleOfferAction = async (offerId: string, action: 'accept' | 'reject') => {
+  const handleOfferAction = async (offerId: string, action: 'accept' | 'reject' | 'hold') => {
     try {
       setOrderActionLoading(offerId);
       const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       
       const response = await axios.put(
-        `${API_BASE_URL}/marketplace/offers/${offerId}/${action}`,
-        {},
+        `${API_BASE_URL}/marketplace/offers/${offerId}/status`,
+        { status: action === 'accept' ? 'accepted' : action === 'reject' ? 'rejected' : 'on_hold' },
         {
           headers: { Authorization: `Bearer ${token}` },
           timeout: 10000
@@ -800,7 +971,8 @@ const SellerDashboard: React.FC = () => {
       );
 
       if (response.data.success) {
-        setSuccessMessage(`✅ Offer ${action}ed successfully!`);
+        const actionText = action === 'accept' ? 'accepted' : action === 'reject' ? 'rejected' : 'put on hold';
+        setSuccessMessage(`✅ Offer ${actionText} successfully!`);
         // Update offers list
         setOffers(prev => prev.filter(offer => offer._id !== offerId));
       }
@@ -988,6 +1160,7 @@ const SellerDashboard: React.FC = () => {
                     onDeliver={handleSimpleDeliver}
                     onCancel={handleSimpleCancel}
                     onCompleteRevision={handleSimpleCompleteRevision}
+                    onPauseResume={(order, action) => handlePauseResumeOrder(order, action)}
                     onViewAll={() => setActiveTab('orders')}
                     onCreateListing={() => navigate('/marketplace/create')}
                     orderActionLoading={orderActionLoading}
@@ -1022,7 +1195,7 @@ const SellerDashboard: React.FC = () => {
               <OffersTab
                 offers={offers}
                 loading={offersLoading}
-                onOfferAction={handleOfferAction}
+                onOfferAction={handleOfferStatusUpdate}
                 onPlayVideo={handlePlayVideo}
                 onRefresh={() => fetchOffers()}
                 actionLoading={orderActionLoading}
@@ -1039,6 +1212,7 @@ const SellerDashboard: React.FC = () => {
                 onPageChange={setListingsPage}
                 onEditListing={handleEditListing}
                 onDeleteListing={handleDeleteListing}
+                onToggleListingStatus={handleToggleListingStatus}
                 onPlayVideo={handlePlayVideo}
                 onRefresh={fetchListings}
                 actionLoading={listingActionLoading}
@@ -1066,6 +1240,7 @@ const SellerDashboard: React.FC = () => {
                 onDeliver={(order) => handleSimpleDeliver(order)}
                 onCancel={(order) => handleSimpleCancel(order)}
                 onCompleteRevision={(order) => handleSimpleCompleteRevision(order)}
+                onPauseResume={(order, action) => handlePauseResumeOrder(order, action)}
                 actionLoading={orderActionLoading}
                 stats={orderStats}
               />
