@@ -18,29 +18,29 @@ const { listingsApi, ordersApi, offersApi, formatCurrency } = marketplaceApi;
 
 // ✅ CHECK ALL COMPONENT IMPORTS - FIX THE PATH TYPO
 // The error shows the path has "marketplae" instead of "marketplace"
-import DashboardHeader from '../../components/marketplace/seller/DashboardHeader';
-import TabNavigation from '../../components/marketplace/seller/TabNavigation';
-import StatsGrid from '../../components/marketplace/seller/StatsGrid';
-import WelcomeCard from '../../components/marketplace/seller/WelcomeCard';
-import RecentOrders from '../../components/marketplace/seller/RecentOrders';
-import ActionCard from '../../components/marketplace/seller/ActionCard';
-import OrderWorkflowGuide from '../../components/marketplace/seller/OrderWorkflowGuide';
-import StripeAccountStatus from '../../components/marketplace/seller/StripeAccountStatus';
-import StripeSuccessAlert from '../../components/marketplace/seller/StripeSuccessAlert';
-import WithdrawBalance from '../../components/marketplace/seller/WithdrawBalance';
+import DashboardHeader from '../../components/marketplae/seller/DashboardHeader';
+import TabNavigation from '../../components/marketplae/seller/TabNavigation';
+import StatsGrid from '../../components/marketplae/seller/StatsGrid';
+import WelcomeCard from '../../components/marketplae/seller/WelcomeCard';
+import RecentOrders from '../../components/marketplae/seller/RecentOrders';
+import ActionCard from '../../components/marketplae/seller/ActionCard';
+import OrderWorkflowGuide from '../../components/marketplae/seller/OrderWorkflowGuide';
+import StripeAccountStatus from '../../components/marketplae/seller/StripeAccountStatus';
+import StripeSuccessAlert from '../../components/marketplae/seller/StripeSuccessAlert';
+import WithdrawBalance from '../../components/marketplae/seller/WithdrawBalance';
 
 // Import tab components
-import OffersTab from '../../components/marketplace/seller/OffersTab';
-import ListingsTab from '../../components/marketplace/seller/ListingsTab';
-import OrdersTab from '../../components/marketplace/seller/OrdersTab';
-import WithdrawTab from '../../components/marketplace/seller/WithdrawTab';
+import OffersTab from '../../components/marketplae/seller/OffersTab';
+import ListingsTab from '../../components/marketplae/seller/ListingsTab';
+import OrdersTab from '../../components/marketplae/seller/OrdersTab';
+import WithdrawTab from '../../components/marketplae/seller/WithdrawTab';
 
 // Import modals
-import StripeSetupModal from '../../components/marketplace/seller/StripeSetupModal';
-import OrderDetailsModal from '../../components/marketplace/seller/OrderDetailsModal';
-import EditListingModal from '../../components/marketplace/seller/EditListingModal';
-import DeleteListingModal from '../../components/marketplace/seller/DeleteListingModal';
-import VideoPlayerModal from '../../components/marketplace/seller/VideoPlayerModal';
+import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
+import OrderDetailsModal from '../../components/marketplae/seller/OrderDetailsModal';
+import EditListingModal from '../../components/marketplae/seller/EditListingModal';
+import DeleteListingModal from '../../components/marketplae/seller/DeleteListingModal';
+import VideoPlayerModal from '../../components/marketplae/seller/VideoPlayerModal';
 
 // Interfaces
 interface Order {
