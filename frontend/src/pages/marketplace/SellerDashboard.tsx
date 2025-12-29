@@ -1,41 +1,46 @@
 // src/pages/seller/SellerDashboard.tsx
 import React, { useState, useEffect, useCallback } from 'react';
-import MarketplaceLayout from '../../components/Layout';
-import { getCurrentUserId } from '../../utilities/helperfFunction';
 import { useNavigate } from 'react-router-dom';
 
-// Import API functions
-import marketplaceApi, { 
-  listingsApi, 
-  ordersApi, 
-  offersApi, 
-  formatCurrency 
-} from '../../api/marketplaceApi';
+// Import Layout component - check if it's default or named export
+import MarketplaceLayout from '../../components/Layout';
+// Or if it's a named export:
+// import { MarketplaceLayout } from '../../components/Layout';
 
-// Import components
-import DashboardHeader from '../../components/marketplae/seller/DashboardHeader';
-import TabNavigation from '../../components/marketplae/seller/TabNavigation';
-import StatsGrid from '../../components/marketplae/seller/StatsGrid';
-import WelcomeCard from '../../components/marketplae/seller/WelcomeCard';
-import RecentOrders from '../../components/marketplae/seller/RecentOrders';
-import ActionCard from '../../components/marketplae/seller/ActionCard';
-import OrderWorkflowGuide from '../../components/marketplae/seller/OrderWorkflowGuide';
-import StripeAccountStatus from '../../components/marketplae/seller/StripeAccountStatus';
-import StripeSuccessAlert from '../../components/marketplae/seller/StripeSuccessAlert';
-import WithdrawBalance from '../../components/marketplae/seller/WithdrawBalance';
+// Import helper function
+import { getCurrentUserId } from '../../utilities/helperfFunction';
+
+// Import API - SINGLE IMPORT
+import marketplaceApi from '../../api/marketplaceApi';
+
+// Destructure API methods properly
+const { listingsApi, ordersApi, offersApi, formatCurrency } = marketplaceApi;
+
+// ✅ CHECK ALL COMPONENT IMPORTS - FIX THE PATH TYPO
+// The error shows the path has "marketplae" instead of "marketplace"
+import DashboardHeader from '../../components/marketplace/seller/DashboardHeader';
+import TabNavigation from '../../components/marketplace/seller/TabNavigation';
+import StatsGrid from '../../components/marketplace/seller/StatsGrid';
+import WelcomeCard from '../../components/marketplace/seller/WelcomeCard';
+import RecentOrders from '../../components/marketplace/seller/RecentOrders';
+import ActionCard from '../../components/marketplace/seller/ActionCard';
+import OrderWorkflowGuide from '../../components/marketplace/seller/OrderWorkflowGuide';
+import StripeAccountStatus from '../../components/marketplace/seller/StripeAccountStatus';
+import StripeSuccessAlert from '../../components/marketplace/seller/StripeSuccessAlert';
+import WithdrawBalance from '../../components/marketplace/seller/WithdrawBalance';
 
 // Import tab components
-import OffersTab from '../../components/marketplae/seller/OffersTab';
-import ListingsTab from '../../components/marketplae/seller/ListingsTab';
-import OrdersTab from '../../components/marketplae/seller/OrdersTab';
-import WithdrawTab from '../../components/marketplae/seller/WithdrawTab';
+import OffersTab from '../../components/marketplace/seller/OffersTab';
+import ListingsTab from '../../components/marketplace/seller/ListingsTab';
+import OrdersTab from '../../components/marketplace/seller/OrdersTab';
+import WithdrawTab from '../../components/marketplace/seller/WithdrawTab';
 
 // Import modals
-import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
-import OrderDetailsModal from '../../components/marketplae/seller/OrderDetailsModal';
-import EditListingModal from '../../components/marketplae/seller/EditListingModal';
-import DeleteListingModal from '../../components/marketplae/seller/DeleteListingModal';
-import VideoPlayerModal from '../../components/marketplae/seller/VideoPlayerModal';
+import StripeSetupModal from '../../components/marketplace/seller/StripeSetupModal';
+import OrderDetailsModal from '../../components/marketplace/seller/OrderDetailsModal';
+import EditListingModal from '../../components/marketplace/seller/EditListingModal';
+import DeleteListingModal from '../../components/marketplace/seller/DeleteListingModal';
+import VideoPlayerModal from '../../components/marketplace/seller/VideoPlayerModal';
 
 // Interfaces
 interface Order {
@@ -119,7 +124,7 @@ interface OrderStats {
   pendingRevenue: number;
   thisMonthOrders: number;
   thisMonthRevenue: number;
-  availableBalance?: number; // Added for Stripe balance
+  availableBalance?: number;
 }
 
 interface StripeStatus {
@@ -466,24 +471,12 @@ const SellerDashboard: React.FC = () => {
       
       // Production: Try real API
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
-        const response = await fetch('/api/marketplace/stripe/status', {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (response.ok) {
-          const data = await response.json();
-          setStripeStatus(data);
-          return data;
+        const response = await marketplaceApi.stripe.getStripeStatus();
+        if (response.success) {
+          setStripeStatus(response);
+          return response;
         } else {
-          throw new Error(`API returned ${response.status}`);
+          throw new Error('Stripe status API failed');
         }
       } catch (apiError: any) {
         console.warn('API unavailable:', apiError.message);
@@ -645,7 +638,7 @@ const SellerDashboard: React.FC = () => {
       
       // Try to fetch real withdrawal history from API
       try {
-        const response = await marketplaceApi.getWithdrawalHistory({
+        const response = await marketplaceApi.withdrawals.getWithdrawalHistory({
           page: withdrawalsPage,
           limit: withdrawalsLimit
         });
@@ -705,7 +698,7 @@ const SellerDashboard: React.FC = () => {
       
       // Call API to process withdrawal
       try {
-        const response = await marketplaceApi.requestWithdrawal(amountInCents);
+        const response = await marketplaceApi.withdrawals.requestWithdrawal(amountInCents);
         
         if (response.success) {
           // Update Stripe balance
@@ -1251,16 +1244,24 @@ const SellerDashboard: React.FC = () => {
     );
   }
 
+  // Add a safe guard for component rendering
+  if (!MarketplaceLayout) {
+    console.error('MarketplaceLayout is not imported correctly');
+    return <div>Error: Layout component not found</div>;
+  }
+
   return (
     <MarketplaceLayout>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           {/* ✅ Stripe Success Alert */}
-          <StripeSuccessAlert 
-            show={showStripeSuccessAlert}
-            onClose={() => setShowStripeSuccessAlert(false)}
-          />
+          {showStripeSuccessAlert && (
+            <StripeSuccessAlert 
+              show={showStripeSuccessAlert}
+              onClose={() => setShowStripeSuccessAlert(false)}
+            />
+          )}
 
           {/* Header */}
           <DashboardHeader
@@ -1437,8 +1438,8 @@ const SellerDashboard: React.FC = () => {
                         activeListings: activeListings,
                         thisMonthRevenue: orderStats.thisMonthRevenue,
                         thisMonthOrders: orderStats.thisMonthOrders,
-                        availableBalance: stripeStatus?.availableBalance ? stripeStatus.availableBalance / 100 : 0,
-                        totalWithdrawn: totalWithdrawn / 100
+                        availableBalance: stripeStatus?.availableBalance,
+                        totalWithdrawn: totalWithdrawn
                       }}
                       onTabChange={setActiveTab}
                     />
