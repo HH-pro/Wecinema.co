@@ -390,17 +390,28 @@ router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
   }
 });
 
+// marketplaceRoutes.js - CORRECTED VERSION
+
 // ===================================================
 // ✅ TOGGLE LISTING STATUS (Active/Inactive) - FIXED
 // ===================================================
 router.patch("/listing/:id/toggle-status", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== TOGGLE LISTING STATUS REQUEST ===");
-    console.log("Listing ID:", req.params.id);
-    console.log("User ID:", req.user._id);
+    console.log("📦 Full Request Details:", {
+      method: req.method,
+      url: req.url,
+      params: req.params,
+      user: req.user,
+      headers: req.headers,
+      body: req.body
+    });
 
     const listingId = req.params.id;
     const sellerId = req.user._id;
+
+    console.log("🔍 Checking listing:", listingId);
+    console.log("👤 User ID:", sellerId);
 
     // Check if listing exists and user owns it
     const listing = await MarketplaceListing.findOne({
@@ -409,32 +420,44 @@ router.patch("/listing/:id/toggle-status", authenticateMiddleware, async (req, r
     });
 
     if (!listing) {
+      console.log("❌ Listing not found or user not authorized");
       return res.status(404).json({ 
         success: false,
         error: "Listing not found or you don't have permission to modify this listing" 
       });
     }
 
-    // Toggle status only between active and inactive
+    console.log("✅ Listing found:", {
+      id: listing._id,
+      title: listing.title,
+      currentStatus: listing.status,
+      sellerId: listing.sellerId
+    });
+
+    // Toggle status
     let newStatus;
+    let message;
+    
     if (listing.status === "active") {
       newStatus = "inactive";
+      message = "Listing deactivated successfully";
     } else if (listing.status === "inactive") {
       newStatus = "active";
+      message = "Listing activated successfully";
+    } else if (listing.status === "draft") {
+      newStatus = "active";
+      message = "Listing published successfully";
     } else {
-      // For draft or sold listings, allow toggling to active
-      if (listing.status === "draft" || listing.status === "sold") {
-        newStatus = "active";
-      } else {
-        return res.status(400).json({
-          success: false,
-          error: `Cannot toggle status from ${listing.status}`,
-          currentStatus: listing.status
-        });
-      }
+      // For sold or other statuses
+      return res.status(400).json({
+        success: false,
+        error: `Cannot toggle status from ${listing.status}`,
+        currentStatus: listing.status,
+        allowedStatuses: ["active", "inactive", "draft"]
+      });
     }
     
-    console.log(`🔄 Toggling status from "${listing.status}" to "${newStatus}"`);
+    console.log(`🔄 Toggling from "${listing.status}" to "${newStatus}"`);
     
     const updatedListing = await MarketplaceListing.findByIdAndUpdate(
       listingId,
@@ -445,13 +468,25 @@ router.patch("/listing/:id/toggle-status", authenticateMiddleware, async (req, r
         } 
       },
       { new: true }
-    ).select("_id title status updatedAt createdAt price description category tags mediaUrls");
+    ).select("_id title status updatedAt createdAt price description category tags mediaUrls sellerId");
 
-    console.log(`✅ Listing status changed to ${newStatus}`);
+    if (!updatedListing) {
+      console.error("❌ Failed to update listing in database");
+      return res.status(500).json({
+        success: false,
+        error: "Failed to update listing status in database"
+      });
+    }
+
+    console.log("✅ Listing status updated successfully:", {
+      id: updatedListing._id,
+      newStatus: updatedListing.status,
+      updatedAt: updatedListing.updatedAt
+    });
 
     res.status(200).json({ 
       success: true,
-      message: `Listing ${newStatus === "active" ? "activated" : "deactivated"} successfully`,
+      message: message,
       listing: updatedListing,
       previousStatus: listing.status,
       newStatus: newStatus
@@ -467,13 +502,20 @@ router.patch("/listing/:id/toggle-status", authenticateMiddleware, async (req, r
       });
     }
     
+    if (error.name === 'MongoError' && error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        error: "Duplicate listing found"
+      });
+    }
+    
     res.status(500).json({ 
       success: false,
-      error: "Failed to toggle listing status"
+      error: "Failed to toggle listing status",
+      details: error.message 
     });
   }
 });
-
 // ===================================================
 // ✅ GET SINGLE LISTING DETAILS
 // ===================================================
