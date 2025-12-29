@@ -340,20 +340,29 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
- // In SellerDashboard.tsx - UPDATED handleToggleListingStatus function
+// In SellerDashboard.tsx - UPDATED with better debugging
 const handleToggleListingStatus = async (listing: Listing) => {
+  console.log('🎯 handleToggleListingStatus CALLED!', {
+    listingId: listing._id,
+    listingTitle: listing.title,
+    currentStatus: listing.status
+  });
+  
   try {
     setListingActionLoading(listing._id);
     setError('');
+    setSuccessMessage('');
 
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (!token) {
+      console.error('❌ No token found');
       setError('Authentication required. Please log in again.');
       setListingActionLoading(null);
       return;
     }
 
-    console.log(`🔄 Toggling listing: ${listing.title} (${listing._id})`);
+    console.log('🔄 Starting toggle process...');
+    console.log('🔗 API Endpoint:', `${API_BASE_URL}/marketplace/listing/${listing._id}/toggle-status`);
 
     const response = await axios.patch(
       `${API_BASE_URL}/marketplace/listing/${listing._id}/toggle-status`,
@@ -363,27 +372,32 @@ const handleToggleListingStatus = async (listing: Listing) => {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        timeout: 10000
+        timeout: 15000
       }
     );
 
-    console.log('API Response:', response.data);
+    console.log('📦 API Response:', response.data);
 
-    if (response.data.success) {
+    if (response.data && response.data.success) {
       const action = response.data.newStatus === 'active' ? 'activated' : 'deactivated';
-      setSuccessMessage(`✅ Listing ${action} successfully!`);
+      const successMsg = `✅ Listing "${listing.title}" ${action} successfully!`;
+      console.log('✅ Success:', successMsg);
+      setSuccessMessage(successMsg);
       
       // Update the specific listing in state
       setListingsData(prev => {
         if (!prev) return prev;
         
+        console.log('🔄 Updating local state...');
         const updatedListings = prev.listings.map(l => {
           if (l._id === listing._id) {
-            return {
+            const updatedListing = {
               ...l,
               status: response.data.newStatus,
               updatedAt: response.data.listing?.updatedAt || new Date().toISOString()
             };
+            console.log('🔄 Updated listing:', updatedListing);
+            return updatedListing;
           }
           return l;
         });
@@ -394,33 +408,42 @@ const handleToggleListingStatus = async (listing: Listing) => {
         };
       });
       
-      // Also refresh the listings data to ensure consistency
-      if (activeTab === 'listings') {
-        setTimeout(() => {
-          fetchListings();
-        }, 500);
-      }
+      // Refresh listings after 1 second
+      setTimeout(() => {
+        console.log('🔄 Refreshing listings data...');
+        fetchListings();
+      }, 1000);
+      
     } else {
-      setError(response.data.error || 'Failed to update listing status');
+      const errorMsg = response.data?.error || 'Failed to update listing status';
+      console.error('❌ API Error:', errorMsg);
+      setError(`❌ ${errorMsg}`);
     }
     
   } catch (error: any) {
     console.error('❌ Error toggling listing status:', error);
     
+    // Detailed error logging
     if (error.response) {
-      // Server responded with error
+      console.error('📊 Response Error Details:', {
+        status: error.response.status,
+        data: error.response.data,
+        headers: error.response.headers
+      });
+      
       const errorMsg = error.response.data?.error || 
                       error.response.data?.message || 
                       `Server error: ${error.response.status}`;
       setError(`❌ ${errorMsg}`);
     } else if (error.request) {
-      // No response received
-      setError('❌ No response from server. Check your connection.');
+      console.error('🌐 No response received:', error.request);
+      setError('❌ No response from server. Please check your network connection.');
     } else {
-      // Request setup error
-      setError(`❌ Error: ${error.message}`);
+      console.error('⚙️ Request setup error:', error.message);
+      setError(`❌ Failed to update listing: ${error.message}`);
     }
   } finally {
+    console.log('🏁 Toggle process finished');
     setListingActionLoading(null);
   }
 };
