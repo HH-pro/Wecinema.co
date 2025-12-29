@@ -593,27 +593,55 @@ router.delete("/:id", authenticateMiddleware, async (req, res) => {
     console.log("Listing ID to delete:", req.params.id);
     console.log("User making request:", req.user._id);
 
-    const listing = await MarketplaceListing.findById(req.params.id);
+    const listingId = req.params.id;
+    const userId = req.user._id;
     
-    if (!listing) {
-      console.log("❌ Listing not found");
-      return res.status(404).json({ 
-        error: "Listing not found" 
+    // First, validate the ID format
+    if (!mongoose.Types.ObjectId.isValid(listingId)) {
+      console.log("❌ Invalid listing ID format:", listingId);
+      return res.status(400).json({ 
+        error: "Invalid listing ID format" 
       });
     }
     
-    // Check ownership
-    if (!listing.sellerId.equals(req.user._id)) {
+    // Check if listing exists at all
+    const listing = await MarketplaceListing.findById(listingId);
+    
+    if (!listing) {
+      console.log("❌ Listing not found in database. ID:", listingId);
+      
+      // Optional: Check if ID might exist in a different format
+      // or if we should search differently
+      const allListings = await MarketplaceListing.find({});
+      console.log(`DEBUG: Total listings in database: ${allListings.length}`);
+      console.log("DEBUG: First few listing IDs:", allListings.slice(0, 3).map(l => l._id));
+      
+      return res.status(404).json({ 
+        error: "Listing not found",
+        details: `No listing found with ID: ${listingId}`
+      });
+    }
+    
+    // Check if user owns the listing
+    if (!listing.sellerId.equals(userId)) {
       console.log("❌ User not authorized to delete this listing");
+      console.log("Listing sellerId:", listing.sellerId);
+      console.log("Request userId:", userId);
+      
       return res.status(403).json({ 
         error: "You don't have permission to delete this listing" 
       });
     }
     
-    // Now delete
-    await MarketplaceListing.findByIdAndDelete(req.params.id);
+    // Delete the listing
+    await MarketplaceListing.findByIdAndDelete(listingId);
     
-    console.log("✅ Listing deleted successfully:", listing._id);
+    console.log("✅ Listing deleted successfully:", {
+      id: listing._id,
+      title: listing.title,
+      sellerId: listing.sellerId
+    });
+    
     res.status(200).json({ 
       message: "Listing deleted successfully", 
       listing: {
@@ -629,7 +657,10 @@ router.delete("/:id", authenticateMiddleware, async (req, res) => {
       return res.status(400).json({ error: "Invalid listing ID format" });
     }
     
-    res.status(500).json({ error: "Failed to delete listing" });
+    res.status(500).json({ 
+      error: "Failed to delete listing",
+      details: error.message 
+    });
   }
 });
 
