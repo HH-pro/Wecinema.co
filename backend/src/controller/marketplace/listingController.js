@@ -6,15 +6,375 @@ const mongoose = require('mongoose');
 const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils");
 
 // ===================================================
+// ✅ DEBUG MIDDLEWARE - सभी incoming requests log करें
+// ===================================================
+router.use((req, res, next) => {
+  console.log(`🔍 MARKETPLACE ROUTE CALLED: ${req.method} ${req.originalUrl}`);
+  console.log(`📍 Full URL: ${req.protocol}://${req.get('host')}${req.originalUrl}`);
+  next();
+});
+
+// ===================================================
+// ✅ TEST ENDPOINT - सबसे पहले ये check करें
+// ===================================================
+router.get("/test", (req, res) => {
+  console.log("✅ /marketplace/test endpoint called successfully!");
+  res.status(200).json({
+    success: true,
+    message: "🎉 Marketplace routes are working correctly!",
+    timestamp: new Date().toISOString(),
+    routes: [
+      "GET    /marketplace/listings",
+      "GET    /marketplace/my-listings",
+      "POST   /marketplace/create-listing", 
+      "PUT    /marketplace/listing/:id",
+      "POST   /marketplace/listing/:id/toggle-status",
+      "DELETE /marketplace/listing/:id",
+      "GET    /marketplace/listing/:id"
+    ]
+  });
+});
+
+// ===================================================
+// ✅ DELETE LISTING - SIMPLIFIED WORKING VERSION
+// ===================================================
+router.delete("/listing/:id", authenticateMiddleware, async (req, res) => {
+  try {
+    console.log("=== 🗑️ DELETE LISTING ENDPOINT HIT ===");
+    console.log("📦 Request Details:", {
+      method: req.method,
+      originalUrl: req.originalUrl,
+      baseUrl: req.baseUrl,
+      path: req.path,
+      params: req.params,
+      user: req.user ? req.user._id : 'No user',
+      headers: req.headers
+    });
+
+    const listingId = req.params.id;
+    const userId = req.user._id;
+
+    console.log(`🔍 Deleting listing ${listingId} for user ${userId}`);
+
+    // First, try to find the listing
+    const listing = await MarketplaceListing.findOne({
+      _id: listingId,
+      sellerId: userId
+    });
+
+    if (!listing) {
+      console.log("❌ Listing not found or user not authorized");
+      return res.status(404).json({
+        success: false,
+        error: "Listing not found or you don't have permission to delete this listing"
+      });
+    }
+
+    console.log(`✅ Found listing: ${listing.title}`);
+
+    // Delete the listing
+    const result = await MarketplaceListing.deleteOne({ _id: listingId, sellerId: userId });
+
+    if (result.deletedCount === 0) {
+      console.error("❌ Failed to delete listing from database");
+      return res.status(500).json({
+        success: false,
+        error: "Failed to delete listing from database"
+      });
+    }
+
+    console.log(`✅ Successfully deleted listing: ${listingId}`);
+    
+    res.status(200).json({
+      success: true,
+      message: "Listing deleted successfully!",
+      deletedListing: {
+        _id: listingId,
+        title: listing.title,
+        status: listing.status
+      },
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error("❌ Error in DELETE /listing/:id:", error);
+    
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid listing ID format"
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: "Failed to delete listing",
+      details: error.message
+    });
+  }
+});
+
+// ===================================================
+// ✅ TOGGLE LISTING STATUS - SIMPLIFIED WORKING VERSION  
+// ===================================================
+router.post("/listing/:id/toggle-status", authenticateMiddleware, async (req, res) => {
+  try {
+    console.log("=== 🔄 TOGGLE STATUS ENDPOINT HIT ===");
+    console.log("📦 Request Details:", {
+      method: req.method,
+      originalUrl: req.originalUrl,
+      baseUrl: req.baseUrl,
+      path: req.path,
+      params: req.params,
+      body: req.body,
+      user: req.user ? req.user._id : 'No user'
+    });
+
+    const listingId = req.params.id;
+    const userId = req.user._id;
+
+    console.log(`🔍 Toggling status for listing ${listingId}, user ${userId}`);
+
+    // Find the listing
+    const listing = await MarketplaceListing.findOne({
+      _id: listingId,
+      sellerId: userId
+    });
+
+    if (!listing) {
+      console.log("❌ Listing not found or user not authorized");
+      return res.status(404).json({
+        success: false,
+        error: "Listing not found or you don't have permission to modify this listing"
+      });
+    }
+
+    console.log(`✅ Found listing: ${listing.title}, current status: ${listing.status}`);
+
+    // Determine new status
+    let newStatus;
+    let message;
+    
+    if (listing.status === "active") {
+      newStatus = "inactive";
+      message = "Listing deactivated successfully";
+    } else if (listing.status === "inactive") {
+      newStatus = "active";
+      message = "Listing activated successfully";
+    } else if (listing.status === "draft") {
+      newStatus = "active";
+      message = "Listing published successfully";
+    } else {
+      console.log(`⚠️ Cannot toggle from status: ${listing.status}`);
+      return res.status(400).json({
+        success: false,
+        error: `Cannot toggle status from ${listing.status}`,
+        currentStatus: listing.status
+      });
+    }
+
+    console.log(`🔄 Changing status from "${listing.status}" to "${newStatus}"`);
+
+    // Update the listing
+    const updatedListing = await MarketplaceListing.findOneAndUpdate(
+      { _id: listingId, sellerId: userId },
+      { 
+        status: newStatus,
+        updatedAt: new Date()
+      },
+      { 
+        new: true,
+        runValidators: true 
+      }
+    ).select("_id title status updatedAt createdAt price description category tags mediaUrls sellerId views");
+
+    if (!updatedListing) {
+      console.error("❌ Failed to update listing in database");
+      return res.status(500).json({
+        success: false,
+        error: "Failed to update listing status in database"
+      });
+    }
+
+    console.log(`✅ Status updated successfully: ${updatedListing._id}`);
+
+    res.status(200).json({
+      success: true,
+      message: message,
+      listing: updatedListing,
+      previousStatus: listing.status,
+      newStatus: newStatus,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error("❌ Error in POST /listing/:id/toggle-status:", error);
+    
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid listing ID format"
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: "Failed to toggle listing status",
+      details: error.message
+    });
+  }
+});
+
+// ===================================================
+// ✅ EDIT LISTING - SIMPLIFIED WORKING VERSION
+// ===================================================
+router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
+  try {
+    console.log("=== ✏️ EDIT LISTING ENDPOINT HIT ===");
+    console.log("📦 Request Details:", {
+      method: req.method,
+      originalUrl: req.originalUrl,
+      baseUrl: req.baseUrl,
+      path: req.path,
+      params: req.params,
+      body: req.body,
+      user: req.user ? req.user._id : 'No user'
+    });
+
+    const { title, description, price } = req.body;
+    const listingId = req.params.id;
+    const userId = req.user._id;
+
+    console.log(`🔍 Editing listing ${listingId} for user ${userId}`);
+
+    // Check if listing exists
+    const existingListing = await MarketplaceListing.findOne({
+      _id: listingId,
+      sellerId: userId
+    });
+
+    if (!existingListing) {
+      console.log("❌ Listing not found or user not authorized");
+      return res.status(404).json({
+        success: false,
+        error: "Listing not found or you don't have permission to edit this listing"
+      });
+    }
+
+    console.log(`✅ Found listing: ${existingListing.title}`);
+
+    // Prepare update data
+    const updateData = {
+      updatedAt: new Date()
+    };
+    
+    // Update fields if provided
+    if (title !== undefined && title !== null) {
+      if (!title || title.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          error: "Title cannot be empty"
+        });
+      }
+      updateData.title = title.trim();
+    }
+    
+    if (description !== undefined && description !== null) {
+      if (!description || description.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          error: "Description cannot be empty"
+        });
+      }
+      updateData.description = description.trim();
+    }
+    
+    if (price !== undefined && price !== null) {
+      if (isNaN(price) || parseFloat(price) <= 0) {
+        return res.status(400).json({
+          success: false,
+          error: "Price must be a positive number"
+        });
+      }
+      updateData.price = parseFloat(price).toFixed(2);
+    }
+
+    console.log(`🔄 Update data:`, updateData);
+
+    // Update the listing
+    const updatedListing = await MarketplaceListing.findOneAndUpdate(
+      { _id: listingId, sellerId: userId },
+      { $set: updateData },
+      { 
+        new: true,
+        runValidators: true 
+      }
+    ).select("_id title description price type category tags mediaUrls status updatedAt createdAt views sellerId");
+
+    if (!updatedListing) {
+      console.error("❌ Failed to update listing in database");
+      return res.status(500).json({
+        success: false,
+        error: "Failed to update listing in database"
+      });
+    }
+
+    console.log(`✅ Listing updated successfully: ${updatedListing._id}`);
+
+    res.status(200).json({
+      success: true,
+      message: "Listing updated successfully!",
+      listing: updatedListing,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error("❌ Error in PUT /listing/:id:", error);
+    
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid listing ID format"
+      });
+    }
+    
+    if (error.name === 'ValidationError') {
+      const errors = {};
+      Object.keys(error.errors).forEach(key => {
+        errors[key] = error.errors[key].message;
+      });
+      
+      return res.status(400).json({
+        success: false,
+        error: "Validation failed",
+        details: errors
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: "Failed to update listing",
+      details: error.message
+    });
+  }
+});
+
+// ===================================================
 // ✅ PUBLIC ROUTE — Get all active listings
 // ===================================================
 router.get("/listings", async (req, res) => {
   try {
+    console.log("=== 📋 GET ALL LISTINGS ===");
+    
     const listings = await MarketplaceListing.find({ status: "active" })
       .populate("sellerId", "username avatar sellerRating email");
+    
+    console.log(`✅ Found ${listings.length} active listings`);
+    
     res.status(200).json({
       success: true,
-      listings
+      listings,
+      count: listings.length
     });
   } catch (error) {
     console.error("❌ Error fetching listings:", error);
@@ -30,6 +390,9 @@ router.get("/listings", async (req, res) => {
 // ===================================================
 router.get("/my-listings", authenticateMiddleware, async (req, res) => {
   try {
+    console.log("=== 🏠 MY LISTINGS ENDPOINT HIT ===");
+    console.log("User ID:", req.user._id);
+
     const sellerId = req.user._id;
     
     const { status, page = 1, limit = 10 } = req.query;
@@ -39,7 +402,7 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
-    console.log("📝 Fetching my listings for seller:", sellerId);
+    console.log(`🔍 Fetching listings with filter:`, filter);
 
     // Get listings with pagination
     const listings = await MarketplaceListing.find(filter)
@@ -51,6 +414,8 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
 
     const total = await MarketplaceListing.countDocuments(filter);
 
+    console.log(`✅ Found ${listings.length} listings out of ${total} total`);
+    
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
@@ -81,11 +446,12 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
 // ===================================================
 router.post("/create-listing", authenticateMiddleware, async (req, res) => {
   try {
-    console.log("=== CREATE LISTING REQUEST ===");
+    console.log("=== 🆕 CREATE LISTING ENDPOINT HIT ===");
     console.log("User ID:", req.user._id);
+    console.log("Request body:", req.body);
 
     if (!req.user || !req.user._id) {
-      console.error("❌ User not authenticated. req.user:", req.user);
+      console.error("❌ User not authenticated");
       return res.status(401).json({
         success: false,
         error: "User not authenticated. Please log in again."
@@ -117,7 +483,7 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
     const mediaArray = Array.isArray(mediaUrls) ? mediaUrls : (mediaUrls ? [mediaUrls] : []);
     const actualCategory = category || 'uncategorized';
 
-    // Get seller email
+    // Get seller info
     let sellerEmail = null;
     let seller = null;
     
@@ -127,7 +493,7 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
         sellerEmail = seller.email;
         console.log("✅ Seller found:", seller.username);
       } else {
-        console.error("❌ Seller not found in database for ID:", sellerId);
+        console.error("❌ Seller not found in database");
         return res.status(404).json({
           success: false,
           error: "User account not found. Please contact support."
@@ -166,7 +532,7 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
       updatedAt: new Date()
     };
 
-    console.log("📝 Creating listing:", listingData.title);
+    console.log("📝 Creating listing with data:", listingData);
 
     // Create the listing
     const listing = await MarketplaceListing.create(listingData);
@@ -231,364 +597,13 @@ function isValidEmail(email) {
 }
 
 // ===================================================
-// ✅ SIMPLE EDIT LISTING (Only title, description, price)
-// ===================================================
-router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
-  try {
-    console.log("=== ✏️ EDIT LISTING REQUEST ===");
-    console.log("Listing ID:", req.params.id);
-    console.log("User ID:", req.user._id);
-    console.log("Update data:", req.body);
-
-    const { title, description, price } = req.body;
-    const listingId = req.params.id;
-    const sellerId = req.user._id;
-
-    // Validate listing ID
-    if (!mongoose.Types.ObjectId.isValid(listingId)) {
-      return res.status(400).json({ 
-        success: false,
-        error: "Invalid listing ID format" 
-      });
-    }
-
-    // Check if listing exists and user owns it
-    const existingListing = await MarketplaceListing.findOne({
-      _id: listingId,
-      sellerId: sellerId
-    });
-
-    if (!existingListing) {
-      return res.status(404).json({ 
-        success: false,
-        error: "Listing not found or you don't have permission to edit this listing" 
-      });
-    }
-
-    // Build update object
-    const updateData = {
-      updatedAt: new Date()
-    };
-    
-    // Update title if provided
-    if (title !== undefined && title !== null) {
-      if (!title || title.trim() === '') {
-        return res.status(400).json({
-          success: false,
-          error: "Title cannot be empty"
-        });
-      }
-      updateData.title = title.trim();
-    } else {
-      updateData.title = existingListing.title;
-    }
-    
-    // Update description if provided
-    if (description !== undefined && description !== null) {
-      if (!description || description.trim() === '') {
-        return res.status(400).json({
-          success: false,
-          error: "Description cannot be empty"
-        });
-      }
-      updateData.description = description.trim();
-    } else {
-      updateData.description = existingListing.description;
-    }
-    
-    // Update price if provided
-    if (price !== undefined && price !== null) {
-      if (!price) {
-        return res.status(400).json({
-          success: false,
-          error: "Price is required"
-        });
-      }
-      if (isNaN(price) || parseFloat(price) <= 0) {
-        return res.status(400).json({
-          success: false,
-          error: "Price must be a positive number"
-        });
-      }
-      updateData.price = parseFloat(price).toFixed(2);
-    } else {
-      updateData.price = existingListing.price;
-    }
-    
-    console.log("🔄 Update data:", updateData);
-
-    // Update the listing
-    const updatedListing = await MarketplaceListing.findByIdAndUpdate(
-      listingId,
-      { $set: updateData },
-      { 
-        new: true,
-        runValidators: true 
-      }
-    ).select("_id title description price type category tags mediaUrls status updatedAt createdAt views sellerId");
-
-    if (!updatedListing) {
-      console.error("❌ Failed to update listing in database");
-      return res.status(500).json({
-        success: false,
-        error: "Failed to update listing in database"
-      });
-    }
-
-    console.log("✅ Listing updated successfully:", updatedListing._id);
-
-    res.status(200).json({ 
-      success: true,
-      message: "Listing updated successfully", 
-      listing: updatedListing 
-    });
-
-  } catch (error) {
-    console.error("❌ Error updating listing:", error);
-    
-    if (error.name === 'CastError') {
-      return res.status(400).json({ 
-        success: false,
-        error: "Invalid listing ID format" 
-      });
-    }
-    
-    if (error.name === 'ValidationError') {
-      const errors = {};
-      Object.keys(error.errors).forEach(key => {
-        errors[key] = error.errors[key].message;
-      });
-      
-      return res.status(400).json({
-        success: false,
-        error: "Validation failed",
-        details: errors
-      });
-    }
-    
-    res.status(500).json({ 
-      success: false,
-      error: "Failed to update listing",
-      details: error.message 
-    });
-  }
-});
-
-// ===================================================
-// ✅ TOGGLE LISTING STATUS - FIXED WORKING VERSION
-// ===================================================
-router.post("/listing/:id/toggle-status", authenticateMiddleware, async (req, res) => {
-  try {
-    console.log("=== 🟢 TOGGLE LISTING STATUS REQUEST ===");
-    console.log("📦 Request Details:", {
-      method: req.method,
-      url: req.originalUrl,
-      params: req.params,
-      user: req.user ? req.user._id : 'No user',
-      body: req.body
-    });
-
-    const listingId = req.params.id;
-    const sellerId = req.user._id;
-
-    // Validate listing ID
-    if (!mongoose.Types.ObjectId.isValid(listingId)) {
-      console.log("❌ Invalid listing ID format:", listingId);
-      return res.status(400).json({ 
-        success: false,
-        error: "Invalid listing ID format" 
-      });
-    }
-
-    console.log("🔍 Finding listing:", listingId, "for user:", sellerId);
-
-    // Check if listing exists and user owns it
-    const listing = await MarketplaceListing.findOne({
-      _id: listingId,
-      sellerId: sellerId
-    });
-
-    if (!listing) {
-      console.log("❌ Listing not found or user not authorized");
-      return res.status(404).json({ 
-        success: false,
-        error: "Listing not found or you don't have permission to modify this listing" 
-      });
-    }
-
-    console.log("✅ Listing found:", {
-      id: listing._id,
-      title: listing.title,
-      currentStatus: listing.status
-    });
-
-    // Toggle status
-    let newStatus;
-    let message;
-    
-    if (listing.status === "active") {
-      newStatus = "inactive";
-      message = "Listing deactivated successfully";
-    } else if (listing.status === "inactive") {
-      newStatus = "active";
-      message = "Listing activated successfully";
-    } else if (listing.status === "draft") {
-      newStatus = "active";
-      message = "Listing published successfully";
-    } else {
-      console.log("⚠️ Cannot toggle from status:", listing.status);
-      return res.status(400).json({
-        success: false,
-        error: `Cannot toggle status from ${listing.status}`,
-        currentStatus: listing.status
-      });
-    }
-    
-    console.log(`🔄 Toggling from "${listing.status}" to "${newStatus}"`);
-    
-    // Update the listing
-    const updatedListing = await MarketplaceListing.findByIdAndUpdate(
-      listingId,
-      { 
-        status: newStatus,
-        updatedAt: new Date()
-      },
-      { 
-        new: true,
-        runValidators: true 
-      }
-    ).select("_id title status updatedAt createdAt price description category tags mediaUrls sellerId views");
-
-    if (!updatedListing) {
-      console.error("❌ Database update failed");
-      return res.status(500).json({
-        success: false,
-        error: "Failed to update listing in database"
-      });
-    }
-
-    console.log("✅ Listing status updated successfully:", {
-      id: updatedListing._id,
-      newStatus: updatedListing.status,
-      updatedAt: updatedListing.updatedAt
-    });
-
-    res.status(200).json({ 
-      success: true,
-      message: message,
-      listing: updatedListing,
-      previousStatus: listing.status,
-      newStatus: newStatus
-    });
-
-  } catch (error) {
-    console.error("❌ Error toggling listing status:", error);
-    
-    if (error.name === 'CastError') {
-      return res.status(400).json({ 
-        success: false,
-        error: "Invalid listing ID format" 
-      });
-    }
-    
-    if (error.name === 'MongoError' && error.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        error: "Duplicate listing found"
-      });
-    }
-    
-    res.status(500).json({ 
-      success: false,
-      error: "Failed to toggle listing status",
-      details: error.message 
-    });
-  }
-});
-
-// ===================================================
-// ✅ DELETE LISTING - WORKING VERSION
-// ===================================================
-router.delete("/listing/:id", authenticateMiddleware, async (req, res) => {
-  try {
-    console.log("=== 🔴 DELETE LISTING REQUEST ===");
-    console.log("Listing ID:", req.params.id);
-    console.log("User ID:", req.user._id);
-
-    const userId = req.user._id;
-    const listingId = req.params.id;
-    
-    // Validate listing ID
-    if (!mongoose.Types.ObjectId.isValid(listingId)) {
-      return res.status(400).json({ 
-        success: false,
-        error: "Invalid listing ID format" 
-      });
-    }
-
-    console.log("🔍 Finding listing to delete:", listingId);
-
-    const listing = await MarketplaceListing.findOne({
-      _id: listingId,
-      sellerId: userId,
-    });
-
-    if (!listing) {
-      console.log("❌ Listing not found or user not authorized");
-      return res.status(404).json({ 
-        success: false,
-        error: "Listing not found or you don't have permission to delete this listing" 
-      });
-    }
-
-    console.log("✅ Listing found, deleting:", listing.title);
-
-    // Delete the listing
-    const deletedListing = await MarketplaceListing.findByIdAndDelete(listingId);
-
-    if (!deletedListing) {
-      console.error("❌ Failed to delete listing from database");
-      return res.status(500).json({
-        success: false,
-        error: "Failed to delete listing from database"
-      });
-    }
-
-    console.log("✅ Listing deleted successfully:", deletedListing._id);
-    
-    res.status(200).json({ 
-      success: true,
-      message: "Listing deleted successfully", 
-      deletedListing: {
-        _id: deletedListing._id,
-        title: deletedListing.title,
-        status: deletedListing.status
-      }
-    });
-    
-  } catch (error) {
-    console.error("❌ Error deleting listing:", error);
-    
-    if (error.name === 'CastError') {
-      return res.status(400).json({ 
-        success: false,
-        error: "Invalid listing ID format" 
-      });
-    }
-    
-    res.status(500).json({ 
-      success: false,
-      error: "Failed to delete listing",
-      details: error.message 
-    });
-  }
-});
-
-// ===================================================
 // ✅ GET SINGLE LISTING DETAILS
 // ===================================================
 router.get("/listing/:id", async (req, res) => {
   try {
+    console.log("=== 🔍 GET LISTING DETAILS ===");
+    console.log("Listing ID:", req.params.id);
+
     const listingId = req.params.id;
     
     const listing = await MarketplaceListing.findById(listingId)
@@ -605,6 +620,8 @@ router.get("/listing/:id", async (req, res) => {
     // Increment view count
     listing.views = (listing.views || 0) + 1;
     await listing.save();
+    
+    console.log(`✅ Listing found: ${listing.title}`);
     
     res.status(200).json({ 
       success: true,
@@ -723,25 +740,6 @@ router.delete("/admin/delete-all-listings", authenticateMiddleware, async (req, 
       error: "Failed to delete listings"
     });
   }
-});
-
-// ===================================================
-// ✅ TEST ENDPOINT
-// ===================================================
-router.get("/test", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "Marketplace API is working!",
-    endpoints: {
-      "GET /listings": "Get all active listings",
-      "GET /my-listings": "Get user's listings",
-      "POST /create-listing": "Create new listing",
-      "PUT /listing/:id": "Edit listing",
-      "POST /listing/:id/toggle-status": "Toggle listing status",
-      "DELETE /listing/:id": "Delete listing",
-      "GET /listing/:id": "Get single listing"
-    }
-  });
 });
 
 module.exports = router;
