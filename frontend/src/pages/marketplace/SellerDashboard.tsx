@@ -221,22 +221,7 @@ const actionCards = [
       }
     ]
   },
-  {
-    title: 'Payment Settings',
-    description: 'Configure payment methods and withdrawal settings for your earnings.',
-    icon: '💰',
-    iconBg: 'from-green-500 to-green-600',
-    bgGradient: 'from-green-50 to-emerald-50',
-    borderColor: 'border-green-200',
-    actions: [
-      {
-        label: 'Manage Payments',
-        onClick: () => setShowStripeSetup(true),
-        variant: 'primary' as const
-      }
-    ]
-  },
- 
+  
   {
     title: 'Seller Resources',
     description: 'Access guides, tutorials, and tips to grow your business on Marketplace.',
