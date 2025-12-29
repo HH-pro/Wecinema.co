@@ -1,4 +1,4 @@
-// src/pages/seller/SellerDashboard.tsx - COMPLETE UPDATED VERSION
+// src/pages/seller/SellerDashboard.tsx - UPDATED WITH REAL-TIME UPDATES
 import React, { useState, useEffect, useCallback } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
@@ -276,24 +276,132 @@ const SellerDashboard: React.FC = () => {
     };
   }, []);
 
-  // ✅ Handle Edit Listing (Modal-based)
+  // ✅ Handle Edit Listing - Open Modal
   const handleEditListing = (listing: Listing) => {
     setEditingListing(listing);
     setShowEditModal(true);
     setError('');
   };
 
-  // ✅ Handle Delete Listing (Modal-based)
+  // ✅ Handle Save Listing - Update State Real-Time
+  const handleEditModalSave = async (updatedData: { title: string; description: string; price: number }) => {
+    if (!editingListing) return;
+
+    try {
+      setListingActionLoading(`edit-${editingListing._id}`);
+      setError('');
+      
+      console.log('🔄 Saving listing updates:', { id: editingListing._id, ...updatedData });
+
+      const response = await listingsApi.editListing(editingListing._id, updatedData);
+
+      console.log('✅ Edit response:', response);
+
+      if (response.success) {
+        const successMsg = `✅ Listing "${updatedData.title}" updated successfully!`;
+        setSuccessMessage(successMsg);
+        
+        // ✅ REAL-TIME UPDATE: Update listing in state
+        setListingsData(prev => {
+          if (!prev) return prev;
+          
+          const updatedListings = prev.listings.map(l => {
+            if (l._id === editingListing._id) {
+              return {
+                ...l,
+                title: updatedData.title,
+                description: updatedData.description,
+                price: updatedData.price,
+                updatedAt: new Date().toISOString(),
+                ...response.listing
+              };
+            }
+            return l;
+          });
+          
+          return {
+            ...prev,
+            listings: updatedListings
+          };
+        });
+        
+        // Close modal
+        setShowEditModal(false);
+        setEditingListing(null);
+        
+      } else {
+        const errorMsg = response.error || 'Failed to update listing';
+        setError(`❌ ${errorMsg}`);
+      }
+    } catch (error: any) {
+      console.error('❌ Error updating listing:', error);
+      setError(error.message || 'Failed to update listing');
+    } finally {
+      setListingActionLoading(null);
+    }
+  };
+
+  // ✅ Handle Delete Listing - Open Modal
   const handleDeleteListing = (listing: Listing) => {
     setDeletingListing(listing);
     setShowDeleteModal(true);
     setError('');
   };
 
-  // ✅ Handle Toggle Listing Status
+  // ✅ Handle Delete Listing - Update State Real-Time
+  const handleDeleteModalConfirm = async () => {
+    if (!deletingListing) return;
+
+    try {
+      setListingActionLoading(`delete-${deletingListing._id}`);
+      setError('');
+      
+      console.log('🗑️ Deleting listing:', deletingListing._id);
+
+      const response = await listingsApi.deleteListing(deletingListing._id);
+
+      console.log('✅ Delete response:', response);
+
+      if (response.success) {
+        const successMsg = `✅ Listing "${deletingListing.title}" deleted successfully!`;
+        setSuccessMessage(successMsg);
+        
+        // ✅ REAL-TIME UPDATE: Remove listing from state
+        setListingsData(prev => {
+          if (!prev) return prev;
+          
+          const updatedListings = prev.listings.filter(l => l._id !== deletingListing._id);
+          
+          return {
+            ...prev,
+            listings: updatedListings,
+            pagination: {
+              ...prev.pagination,
+              total: (prev.pagination?.total || 1) - 1
+            }
+          };
+        });
+        
+        // Close modal
+        setShowDeleteModal(false);
+        setDeletingListing(null);
+        
+      } else {
+        const errorMsg = response.error || 'Failed to delete listing';
+        setError(`❌ ${errorMsg}`);
+      }
+    } catch (error: any) {
+      console.error('❌ Error deleting listing:', error);
+      setError(error.message || 'Failed to delete listing');
+    } finally {
+      setListingActionLoading(null);
+    }
+  };
+
+  // ✅ Handle Toggle Listing Status - Update State Real-Time
   const handleToggleListingStatus = async (listing: Listing) => {
     try {
-      console.log('🔄 Toggle listing status request:', listing._id);
+      console.log('🔄 Toggling listing status:', listing._id);
 
       setListingActionLoading(`toggle-${listing._id}`);
       setError('');
@@ -301,15 +409,15 @@ const SellerDashboard: React.FC = () => {
 
       const response = await listingsApi.toggleListingStatus(listing._id);
 
-      console.log('📦 Toggle response:', response);
+      console.log('✅ Toggle response:', response);
 
       if (response.success) {
-        const action = response.newStatus === 'active' ? 'activated' : 'deactivated';
+        const newStatus = response.newStatus || (listing.status === 'active' ? 'inactive' : 'active');
+        const action = newStatus === 'active' ? 'activated' : 'deactivated';
         const successMsg = `✅ Listing "${listing.title}" ${action} successfully!`;
-        console.log('✅ Success:', successMsg);
         setSuccessMessage(successMsg);
         
-        // Update listing in state
+        // ✅ REAL-TIME UPDATE: Update listing status in state
         setListingsData(prev => {
           if (!prev) return prev;
           
@@ -317,8 +425,9 @@ const SellerDashboard: React.FC = () => {
             if (l._id === listing._id) {
               return {
                 ...l,
-                status: response.newStatus,
-                updatedAt: response.listing?.updatedAt || new Date().toISOString()
+                status: newStatus,
+                updatedAt: response.listing?.updatedAt || new Date().toISOString(),
+                ...response.listing
               };
             }
             return l;
@@ -332,13 +441,12 @@ const SellerDashboard: React.FC = () => {
         
       } else {
         const errorMsg = response.error || 'Failed to update listing status';
-        console.error('❌ Toggle error:', errorMsg);
         setError(`❌ ${errorMsg}`);
       }
       
     } catch (error: any) {
       console.error('❌ Error toggling listing status:', error);
-      setError(error.response?.data?.error || 'Failed to toggle listing status');
+      setError(error.message || 'Failed to toggle listing status');
     } finally {
       setListingActionLoading(null);
     }
@@ -691,95 +799,6 @@ const SellerDashboard: React.FC = () => {
         checkStripeAccountStatus();
         fetchDashboardData();
       }, 3000);
-    }
-  };
-
-  // ✅ Handle edit modal save
-  const handleEditModalSave = async (updatedData: any) => {
-    if (!editingListing) return;
-
-    try {
-      setListingActionLoading(`edit-${editingListing._id}`);
-      
-      const response = await listingsApi.editListing(editingListing._id, updatedData);
-
-      if (response.success) {
-        const successMsg = `✅ Listing "${updatedData.title}" updated successfully!`;
-        setSuccessMessage(successMsg);
-        
-        // Update listing in state
-        setListingsData(prev => {
-          if (!prev) return prev;
-          
-          const updatedListings = prev.listings.map(l => {
-            if (l._id === editingListing._id) {
-              return {
-                ...l,
-                ...updatedData,
-                updatedAt: response.listing?.updatedAt || new Date().toISOString()
-              };
-            }
-            return l;
-          });
-          
-          return {
-            ...prev,
-            listings: updatedListings
-          };
-        });
-        
-        setShowEditModal(false);
-        setEditingListing(null);
-      } else {
-        setError(response.error || 'Failed to update listing');
-      }
-    } catch (error: any) {
-      console.error('Error updating listing:', error);
-      setError(error.response?.data?.error || 'Failed to update listing');
-    } finally {
-      setListingActionLoading(null);
-    }
-  };
-
-  // ✅ Handle delete modal confirm
-  const handleDeleteModalConfirm = async () => {
-    if (!deletingListing) return;
-
-    try {
-      setListingActionLoading(`delete-${deletingListing._id}`);
-      
-      const response = await listingsApi.deleteListing(deletingListing._id);
-
-      if (response.success) {
-        const successMsg = `✅ Listing "${deletingListing.title}" deleted successfully!`;
-        setSuccessMessage(successMsg);
-        
-        // Remove listing from state
-        setListingsData(prev => {
-          if (!prev) return prev;
-          
-          const updatedListings = prev.listings.filter(l => l._id !== deletingListing._id);
-          
-          return {
-            ...prev,
-            listings: updatedListings,
-            pagination: {
-              ...prev.pagination,
-              total: (prev.pagination?.total || 1) - 1
-            }
-          };
-        });
-        
-        setShowDeleteModal(false);
-        setDeletingListing(null);
-      } else {
-        setError(response.error || 'Failed to delete listing');
-      }
-    } catch (error: any) {
-      console.error('Error deleting listing:', error);
-      setError(error.response?.data?.error || 'Failed to delete listing');
-    } finally {
-      setListingActionLoading(null);
     }
   };
 
