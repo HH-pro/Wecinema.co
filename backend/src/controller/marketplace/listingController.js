@@ -590,7 +590,7 @@ router.get("/user/:userId/listings", async (req, res) => {
 // ===================================================
 // ✅ DELETE LISTING
 // ===================================================
-router.delete("/listing/:id", authenticateMiddleware, async (req, res) => {
+router.delete("/:id", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== DELETE LISTING REQUEST ===");
     console.log("Listing ID to delete:", req.params.id);
