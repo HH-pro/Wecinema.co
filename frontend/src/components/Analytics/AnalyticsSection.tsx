@@ -7,12 +7,11 @@ interface AnalyticsSectionProps {
 }
 
 const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ 
-  title = "Analytics Dashboard" 
+  title = "Analytics Insights" 
 }) => {
   const [showGraphs, setShowGraphs] = useState(true);
   const [isAnimating, setIsAnimating] = useState(false);
 
-  // Check localStorage for user preference
   useEffect(() => {
     const userPreference = localStorage.getItem('analyticsGraphsVisible');
     if (userPreference !== null) {
@@ -24,19 +23,16 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
     setIsAnimating(true);
     const newState = !showGraphs;
     setShowGraphs(newState);
-    
-    // Save user preference to localStorage
     localStorage.setItem('analyticsGraphsVisible', newState.toString());
-    
     setTimeout(() => setIsAnimating(false), 400);
   };
 
   return (
     <div className={`analytics-wrapper ${showGraphs ? 'expanded' : 'collapsed'}`}>
       
-      {/* Yellow Theme Compact Bar (When Graphs Hidden) */}
+      {/* Stylish Yellow Bar (When Hidden) */}
       {!showGraphs && (
-        <div className="yellow-compact-bar">
+        <div className="stylish-yellow-bar">
           <div className="yellow-bar-content">
             <div className="yellow-bar-left">
               <div className="yellow-bar-icon">
@@ -52,7 +48,7 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
                   <span className="yellow-title-icon">📈</span>
                   Analytics Dashboard
                 </span>
-                <span className="yellow-bar-subtitle">Hidden - Click to show insights</span>
+                <span className="yellow-bar-subtitle">Click to view insights & trends</span>
               </div>
             </div>
             
@@ -60,107 +56,92 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
               className="yellow-toggle-btn"
               onClick={handleToggle}
               aria-label="Show analytics graphs"
-              title="Show Analytics Dashboard"
+              title="Show Analytics"
             >
               <span className="yellow-toggle-content">
                 <span className="yellow-toggle-text">Show Graphs</span>
-                <div className="yellow-arrow-animation">
-                  <svg className="yellow-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                  </svg>
-                </div>
+                <svg className="yellow-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                </svg>
               </span>
-              <span className="yellow-btn-glow"></span>
             </button>
           </div>
           
-          {/* Quick Stats Preview */}
+          {/* Mini Preview Stats */}
           <div className="yellow-preview">
-            <div className="yellow-preview-item">
-              <div className="yellow-preview-icon">📊</div>
-              <div className="yellow-preview-text">
-                <span className="yellow-preview-label">3 Charts Available</span>
-                <span className="yellow-preview-value">Click to view</span>
-              </div>
+            <div className="preview-item">
+              <span className="preview-dot" style={{ backgroundColor: '#f59e0b' }}></span>
+              <span className="preview-text">3 Charts</span>
+            </div>
+            <div className="preview-divider"></div>
+            <div className="preview-item">
+              <span className="preview-dot" style={{ backgroundColor: '#fbbf24' }}></span>
+              <span className="preview-text">Live Data</span>
+            </div>
+            <div className="preview-divider"></div>
+            <div className="preview-item">
+              <span className="preview-dot" style={{ backgroundColor: '#d97706' }}></span>
+              <span className="preview-text">Interactive</span>
             </div>
           </div>
-          
-          {/* Sun Rays Effect */}
-          <div className="sun-ray ray-1"></div>
-          <div className="sun-ray ray-2"></div>
-          <div className="sun-ray ray-3"></div>
         </div>
       )}
 
-      {/* Yellow Theme Expanded Section (Initially Visible) */}
+      {/* Beautiful Expanded Section (Initially Visible) */}
       {showGraphs && (
-        <div className={`yellow-analytics-section ${isAnimating ? 'animating' : ''}`}>
+        <div className={`beautiful-analytics-section ${isAnimating ? 'animating' : ''}`}>
           
-          {/* Yellow Header */}
-          <div className="yellow-header">
-            <div className="yellow-header-content">
-              <div className="yellow-header-left">
-                <div className="yellow-header-icon">
-                  <div className="yellow-header-icon-bg"></div>
-                  <svg className="yellow-header-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          {/* Beautiful Header */}
+          <div className="beautiful-header">
+            <div className="beautiful-header-content">
+              <div className="beautiful-header-left">
+                <div className="beautiful-header-icon">
+                  <svg className="beautiful-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
                 </div>
-                <div className="yellow-header-text">
-                  <h2 className="yellow-header-title">Analytics Dashboard</h2>
-                  <p className="yellow-header-subtitle">Real-time insights & visualization</p>
+                <div className="beautiful-header-text">
+                  <h2 className="beautiful-title">Analytics Dashboard</h2>
+                  <p className="beautiful-subtitle">Visual insights & trends</p>
                 </div>
               </div>
               
               <button 
-                className="yellow-close-btn"
+                className="beautiful-close-btn"
                 onClick={handleToggle}
                 aria-label="Hide analytics graphs"
                 title="Hide Analytics"
               >
-                <span className="yellow-close-content">
-                  <span className="yellow-close-text">Hide</span>
-                  <svg className="yellow-close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
-                  </svg>
-                </span>
+                <span className="beautiful-close-text">Hide</span>
+                <svg className="beautiful-close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+                </svg>
               </button>
             </div>
             
-            {/* Yellow Header Gradient Line */}
-            <div className="yellow-header-gradient"></div>
+            {/* Gradient Line */}
+            <div className="header-gradient-line"></div>
           </div>
 
           {/* Charts Container */}
-          <div className="yellow-charts-container">
-            <div className="yellow-charts-intro">
-              <h3 className="yellow-intro-title">Visual Analytics</h3>
-              <p className="yellow-intro-subtitle">Interactive charts showing trends over time</p>
-            </div>
-            
+          <div className="beautiful-charts-container">
             <Charts />
           </div>
 
-          {/* Yellow Footer */}
-          <div className="yellow-footer">
-            <div className="yellow-footer-left">
-              <div className="yellow-legend">
-                <span className="yellow-legend-title">Live Data</span>
-                <div className="yellow-legend-dots">
-                  <span className="yellow-legend-dot" style={{ backgroundColor: '#f59e0b' }}></span>
-                  <span className="yellow-legend-dot" style={{ backgroundColor: '#fbbf24' }}></span>
-                  <span className="yellow-legend-dot" style={{ backgroundColor: '#d97706' }}></span>
-                </div>
+          {/* Beautiful Footer */}
+          <div className="beautiful-footer">
+            <div className="footer-legend">
+              <span className="legend-title">Legend</span>
+              <div className="legend-dots">
+                <span className="legend-dot" style={{ backgroundColor: '#f59e0b' }}></span>
+                <span className="legend-dot" style={{ backgroundColor: '#fbbf24' }}></span>
+                <span className="legend-dot" style={{ backgroundColor: '#d97706' }}></span>
               </div>
             </div>
-            
-            <div className="yellow-footer-right">
-              <span className="yellow-data-info">
-                <span className="yellow-info-icon">⏱️</span>
-                <span className="yellow-info-text">Last 330 days</span>
-              </span>
-              <button className="yellow-refresh-btn" title="Refresh data">
-                <svg className="yellow-refresh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <div className="footer-info">
+              <span className="info-text">Last 330 days</span>
+              <button className="refresh-btn" title="Refresh">
+                <svg className="refresh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </button>
