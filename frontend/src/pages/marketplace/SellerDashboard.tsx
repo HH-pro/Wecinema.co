@@ -206,7 +206,8 @@ const SellerDashboard: React.FC = () => {
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊', badge: null },
     { id: 'listings', label: 'My Listings', icon: '🏠', badge: totalListings > 0 ? totalListings : null },
-    { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders > 0 ? orderStats.activeOrders : null }
+    { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders > 0 ? orderStats.activeOrders : null },
+    { id: 'offers', label: 'Offers', icon: '💌', badge: pendingOffers > 0 ? pendingOffers : null }
   ];
 
   // Action Cards
@@ -243,7 +244,7 @@ const SellerDashboard: React.FC = () => {
     }
   ]);
 
-  // ✅ Check URL params for Stripe return success
+  // ✅ FIXED: Check URL params for Stripe return success
   useEffect(() => {
     const checkStripeReturn = () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -251,13 +252,14 @@ const SellerDashboard: React.FC = () => {
       const accountId = urlParams.get('account_id');
       
       if (stripeStatus === 'success' && accountId) {
+        console.log('✅ Stripe connected successfully');
         // Show success alert
         setShowStripeSuccessAlert(true);
         
         // Clear URL params
         window.history.replaceState({}, '', window.location.pathname);
         
-        // Update Stripe status after 1 second (let Stripe process)
+        // Update Stripe status after 1 second
         setTimeout(() => {
           checkStripeAccountStatus();
           fetchDashboardData();
@@ -335,39 +337,80 @@ const SellerDashboard: React.FC = () => {
     };
   }, []);
 
-  // ✅ Improved: Check Stripe account status with fallback
-  const checkStripeAccountStatus = async () => {
+  // ✅ FIXED: Check Stripe account status with proper error handling
+  const checkStripeAccountStatus = async (): Promise<StripeStatus | null> => {
     try {
-      // First try the simple endpoint
-      const response = await fetch('/marketplace/stripe/status', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include'
-      });
+      console.log('🔍 Checking Stripe status...');
       
-      if (response.ok) {
-        const data = await response.json();
-        setStripeStatus(data);
-      } else {
-        // Fallback: Set basic status
-        setStripeStatus({
-          connected: false,
-          chargesEnabled: false,
-          detailsSubmitted: false,
-          status: 'error'
+      // For development, you can use mock data if API doesn't exist
+      // Uncomment the following for development mode:
+      // if (process.env.NODE_ENV === 'development') {
+      //   console.log('🛠️ Using development mock for Stripe status');
+      //   await new Promise(resolve => setTimeout(resolve, 1000));
+      //   const mockStatus: StripeStatus = {
+      //     connected: true,
+      //     chargesEnabled: true,
+      //     detailsSubmitted: true,
+      //     status: 'active',
+      //     accountId: 'acct_dev_123',
+      //     email: 'seller@example.com',
+      //     country: 'US',
+      //     payoutsEnabled: true,
+      //     name: 'Test Seller'
+      //   };
+      //   setStripeStatus(mockStatus);
+      //   return mockStatus;
+      // }
+      
+      // Try to fetch from API with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
+      try {
+        const response = await fetch('/api/marketplace/stripe/status', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`API returned ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('✅ Stripe status API response:', data);
+        setStripeStatus(data);
+        return data;
+        
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Request timeout - API endpoint not responding');
+        }
+        throw fetchError;
       }
+      
     } catch (err) {
-      console.error('Error checking Stripe status:', err);
-      // Set fallback status
-      setStripeStatus({
+      console.warn('⚠️ Stripe status check failed:', err.message);
+      
+      // Set a default status for development/fallback
+      const fallbackStatus: StripeStatus = {
         connected: false,
         chargesEnabled: false,
         detailsSubmitted: false,
-        status: 'error'
-      });
+        status: 'not_connected'
+      };
+      
+      setStripeStatus(fallbackStatus);
+      setError('Payment service temporarily unavailable. You can continue managing your listings.');
+      
+      return fallbackStatus;
     }
   };
 
@@ -887,20 +930,37 @@ const SellerDashboard: React.FC = () => {
             stripeStatus={stripeStatus}
           />
 
+          {/* ✅ Show error if Stripe check failed */}
+          {error && (
+            <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+              <div className="flex items-start">
+                <div className="w-6 h-6 text-yellow-600 mr-3 mt-0.5 flex-shrink-0">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.998-.833-2.73 0L4.408 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-yellow-800">{error}</p>
+                  <button
+                    onClick={() => {
+                      setError('');
+                      checkStripeAccountStatus();
+                    }}
+                    className="mt-2 text-sm text-yellow-700 hover:text-yellow-800 font-medium underline"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ✅ Stripe Account Status */}
           <StripeAccountStatus
             stripeStatus={stripeStatus}
             onSetupClick={() => setShowStripeSetup(true)}
             isLoading={stripeStatus === null}
           />
-
-          {/* ✅ Withdraw Balance Component - Show only when connected */}
-          {canWithdraw && (
-            <WithdrawBalance 
-              stripeStatus={stripeStatus}
-              onWithdrawSuccess={handleWithdrawSuccess}
-            />
-          )}
 
           {/* ✅ Conditional Stripe Setup Banner */}
           {!stripeStatus?.chargesEnabled && (
@@ -926,41 +986,6 @@ const SellerDashboard: React.FC = () => {
                 >
                   {stripeStatus?.connected ? 'Complete Verification' : 'Setup Payments Now'}
                 </button>
-              </div>
-            </div>
-          )}
-
-          {/* ✅ Stripe Connected Success Banner */}
-          {stripeStatus?.chargesEnabled && (
-            <div className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-5">
-              <div className="flex flex-col md:flex-row md:items-center gap-4">
-                <div className="flex items-center">
-                  <div className="bg-green-100 p-3 rounded-lg mr-4">
-                    <span className="text-2xl">✅</span>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900">Payments Ready! 🎉</h3>
-                    <p className="text-gray-600 text-sm mt-1">
-                      Your Stripe account is fully verified and ready to accept payments.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  <a
-                    href={`https://dashboard.stripe.com/connect/accounts/${stripeStatus.accountId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-medium py-3 px-6 rounded-lg transition duration-200 shadow-md hover:shadow whitespace-nowrap"
-                  >
-                    View Stripe Dashboard
-                  </a>
-                  <button
-                    onClick={() => setShowStripeSetup(true)}
-                    className="bg-white hover:bg-gray-50 text-green-600 border border-green-300 font-medium py-3 px-6 rounded-lg transition duration-200 whitespace-nowrap"
-                  >
-                    Update Details
-                  </button>
-                </div>
               </div>
             </div>
           )}
