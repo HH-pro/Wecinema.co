@@ -1,4 +1,4 @@
-// src/pages/seller/SellerDashboard.tsx - UPDATED WITH REAL-TIME UPDATES
+// src/pages/seller/SellerDashboard.tsx - SILENT UPDATES VERSION
 import React, { useState, useEffect, useCallback } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
@@ -280,28 +280,19 @@ const SellerDashboard: React.FC = () => {
   const handleEditListing = (listing: Listing) => {
     setEditingListing(listing);
     setShowEditModal(true);
-    setError('');
   };
 
-  // ✅ Handle Save Listing - Update State Real-Time
+  // ✅ Handle Save Listing - Update State Real-Time (SILENT)
   const handleEditModalSave = async (updatedData: { title: string; description: string; price: number }) => {
     if (!editingListing) return;
 
     try {
       setListingActionLoading(`edit-${editingListing._id}`);
-      setError('');
       
-      console.log('🔄 Saving listing updates:', { id: editingListing._id, ...updatedData });
-
       const response = await listingsApi.editListing(editingListing._id, updatedData);
 
-      console.log('✅ Edit response:', response);
-
       if (response.success) {
-        // const successMsg = `✅ Listing "${updatedData.title}" updated successfully!`;
-        // setSuccessMessage(successMsg);
-        
-        // ✅ REAL-TIME UPDATE: Update listing in state
+        // ✅ SILENT UPDATE: Update listing in state without showing message
         setListingsData(prev => {
           if (!prev) return prev;
           
@@ -325,17 +316,17 @@ const SellerDashboard: React.FC = () => {
           };
         });
         
-        // Close modal
+        // Close modal silently
         setShowEditModal(false);
         setEditingListing(null);
         
       } else {
-        const errorMsg = response.error || 'Failed to update listing';
-        setError(`❌ ${errorMsg}`);
+        // Silent error - don't show message
+        console.log('Edit failed:', response.error);
       }
     } catch (error: any) {
-      console.error('❌ Error updating listing:', error);
-      setError(error.message || 'Failed to update listing');
+      // Silent error - don't show message
+      console.error('Error updating listing:', error);
     } finally {
       setListingActionLoading(null);
     }
@@ -345,28 +336,19 @@ const SellerDashboard: React.FC = () => {
   const handleDeleteListing = (listing: Listing) => {
     setDeletingListing(listing);
     setShowDeleteModal(true);
-    setError('');
   };
 
-  // ✅ Handle Delete Listing - Update State Real-Time
+  // ✅ Handle Delete Listing - Update State Real-Time (SILENT)
   const handleDeleteModalConfirm = async () => {
     if (!deletingListing) return;
 
     try {
       setListingActionLoading(`delete-${deletingListing._id}`);
-      setError('');
       
-      console.log('🗑️ Deleting listing:', deletingListing._id);
-
       const response = await listingsApi.deleteListing(deletingListing._id);
 
-      console.log('✅ Delete response:', response);
-
       if (response.success) {
-        // const successMsg = `✅ Listing "${deletingListing.title}" deleted successfully!`;
-        // setSuccessMessage(successMsg);
-        
-        // ✅ REAL-TIME UPDATE: Remove listing from state
+        // ✅ SILENT UPDATE: Remove listing from state
         setListingsData(prev => {
           if (!prev) return prev;
           
@@ -382,42 +364,33 @@ const SellerDashboard: React.FC = () => {
           };
         });
         
-        // Close modal
+        // Close modal silently
         setShowDeleteModal(false);
         setDeletingListing(null);
         
       } else {
-        const errorMsg = response.error || 'Failed to delete listing';
-        setError(`❌ ${errorMsg}`);
+        // Silent error
+        console.log('Delete failed:', response.error);
       }
     } catch (error: any) {
-      console.error('❌ Error deleting listing:', error);
-      setError(error.message || 'Failed to delete listing');
+      // Silent error
+      console.error('Error deleting listing:', error);
     } finally {
       setListingActionLoading(null);
     }
   };
 
-  // ✅ Handle Toggle Listing Status - Update State Real-Time
+  // ✅ Handle Toggle Listing Status - Update State Real-Time (SILENT)
   const handleToggleListingStatus = async (listing: Listing) => {
     try {
-      console.log('🔄 Toggling listing status:', listing._id);
-
       setListingActionLoading(`toggle-${listing._id}`);
-      setError('');
-      setSuccessMessage('');
 
       const response = await listingsApi.toggleListingStatus(listing._id);
 
-      console.log('✅ Toggle response:', response);
-
       if (response.success) {
         const newStatus = response.newStatus || (listing.status === 'active' ? 'inactive' : 'active');
-        const action = newStatus === 'active' ? 'activated' : 'deactivated';
-        // const successMsg = `✅ Listing "${listing.title}" ${action} successfully!`;
-        setSuccessMessage(successMsg);
         
-        // ✅ REAL-TIME UPDATE: Update listing status in state
+        // ✅ SILENT UPDATE: Update listing status in state
         setListingsData(prev => {
           if (!prev) return prev;
           
@@ -440,13 +413,13 @@ const SellerDashboard: React.FC = () => {
         });
         
       } else {
-        const errorMsg = response.error || 'Failed to update listing status';
-        setError(`❌ ${errorMsg}`);
+        // Silent error
+        console.log('Toggle failed:', response.error);
       }
       
     } catch (error: any) {
-      console.error('❌ Error toggling listing status:', error);
-      setError(error.message || 'Failed to toggle listing status');
+      // Silent error
+      console.error('Error toggling listing status:', error);
     } finally {
       setListingActionLoading(null);
     }
@@ -456,29 +429,20 @@ const SellerDashboard: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      setError('');
 
       const currentUserId = getCurrentUserId();
       if (!currentUserId) {
-        setError('User not authenticated. Please log in again.');
         setLoading(false);
         return;
       }
 
-      console.log('🚀 Loading dashboard data...');
-
       // Fetch orders using API file
       const ordersData = await ordersApi.getMySales();
-      console.log('📊 Orders fetched:', ordersData.length);
       
       if (ordersData.length > 0) {
         const stats = calculateOrderStats(ordersData);
-        console.log('💰 Stats calculated:', stats);
-        
         setOrders(ordersData);
         setOrderStats(stats);
-      } else {
-        console.log('⚠️ No orders found');
       }
 
       // Fetch offers and listings in parallel
@@ -491,21 +455,17 @@ const SellerDashboard: React.FC = () => {
       if (offersResponse.status === 'fulfilled' && offersResponse.value.success) {
         const offersData = offersResponse.value.offers || [];
         setOffers(offersData);
-        console.log('💼 Offers fetched:', offersData.length);
       }
 
       // Process listings
       if (listingsResponse.status === 'fulfilled' && listingsResponse.value.success) {
         setListingsData(listingsResponse.value);
-        console.log('🏠 Listings fetched:', listingsResponse.value.listings?.length || 0);
       }
 
       setInitialDataLoaded(true);
-      console.log('✅ Dashboard data loaded successfully');
 
     } catch (error) {
-      console.error('❌ Error fetching dashboard data:', error);
-      setError('Failed to load dashboard data. Please try refreshing the page.');
+      console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
     }
@@ -517,7 +477,6 @@ const SellerDashboard: React.FC = () => {
       setOrdersLoading(true);
       
       const ordersData = await ordersApi.getMySales();
-      console.log('📦 OrdersTab orders:', ordersData.length);
       
       if (ordersData.length > 0) {
         // Filter orders if needed
@@ -536,12 +495,9 @@ const SellerDashboard: React.FC = () => {
         // Calculate stats from ALL orders (not just paginated)
         const stats = calculateOrderStats(ordersData);
         setOrderStats(stats);
-        
-        console.log('📊 OrdersTab stats updated');
       }
     } catch (error: any) {
-      console.error('❌ Error fetching seller orders:', error);
-      setError('Failed to load orders. Please try again.');
+      console.error('Error fetching seller orders:', error);
     } finally {
       setOrdersLoading(false);
     }
@@ -568,7 +524,6 @@ const SellerDashboard: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Error fetching listings:', error);
-      setError('Failed to load listings. Please try again.');
     } finally {
       setListingsLoading(false);
     }
@@ -586,7 +541,6 @@ const SellerDashboard: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Error fetching offers:', error);
-      setError('Failed to load offers. Please try again.');
     } finally {
       setOffersLoading(false);
     }
@@ -605,23 +559,20 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Order management functions
+  // ✅ Order management functions (SILENT)
   const handleSimpleStartProcessing = async (order: Order) => {
     try {
       setOrderActionLoading(order._id);
-      setError('');
       
       const response = await ordersApi.updateOrderStatus(order._id, 'processing');
 
       if (response.success) {
-        setSuccessMessage('✅ Order processing started!');
         updateOrderInState(order._id, 'processing', {
           processingAt: new Date().toISOString()
         });
       }
     } catch (error: any) {
       console.error('Error starting processing:', error);
-      setError('Failed to start processing. Please try again.');
     } finally {
       setOrderActionLoading(null);
     }
@@ -630,19 +581,16 @@ const SellerDashboard: React.FC = () => {
   const handleSimpleStartWork = async (order: Order) => {
     try {
       setOrderActionLoading(order._id);
-      setError('');
       
       const response = await ordersApi.updateOrderStatus(order._id, 'in_progress');
 
       if (response.success) {
-        setSuccessMessage('✅ Work started!');
         updateOrderInState(order._id, 'in_progress', {
           startedAt: new Date().toISOString()
         });
       }
     } catch (error: any) {
       console.error('Error starting work:', error);
-      setError('Failed to start work. Please try again.');
     } finally {
       setOrderActionLoading(null);
     }
@@ -655,14 +603,12 @@ const SellerDashboard: React.FC = () => {
       const response = await ordersApi.updateOrderStatus(order._id, 'delivered');
 
       if (response.success) {
-        setSuccessMessage('✅ Order delivered successfully!');
         updateOrderInState(order._id, 'delivered', {
           deliveredAt: new Date().toISOString()
         });
       }
     } catch (error: any) {
       console.error('Error delivering order:', error);
-      setError('Failed to deliver order. Please try again.');
     }
   };
 
@@ -674,14 +620,12 @@ const SellerDashboard: React.FC = () => {
         const response = await ordersApi.updateOrderStatus(order._id, 'cancelled');
 
         if (response.success) {
-          setSuccessMessage('✅ Order cancelled successfully!');
           updateOrderInState(order._id, 'cancelled', {
             cancelledAt: new Date().toISOString()
           });
         }
       } catch (error: any) {
         console.error('Error cancelling order:', error);
-        setError('Failed to cancel order. Please try again.');
       } finally {
         setOrderActionLoading(null);
       }
@@ -691,19 +635,16 @@ const SellerDashboard: React.FC = () => {
   const handleSimpleCompleteRevision = async (order: Order) => {
     try {
       setOrderActionLoading(order._id);
-      setError('');
       
       const response = await ordersApi.updateOrderStatus(order._id, 'delivered');
 
       if (response.success) {
-        setSuccessMessage('✅ Revision completed!');
         updateOrderInState(order._id, 'delivered', {
           deliveredAt: new Date().toISOString()
         });
       }
     } catch (error: any) {
       console.error('Error completing revision:', error);
-      setError('Failed to complete revision. Please try again.');
     } finally {
       setOrderActionLoading(null);
     }
@@ -741,7 +682,7 @@ const SellerDashboard: React.FC = () => {
     setShowVideoModal(true);
   };
 
-  // ✅ Handle offer actions
+  // ✅ Handle offer actions (SILENT)
   const handleOfferAction = async (offerId: string, action: 'accept' | 'reject') => {
     try {
       setOrderActionLoading(offerId);
@@ -754,12 +695,10 @@ const SellerDashboard: React.FC = () => {
       }
 
       if (response.success) {
-        setSuccessMessage(`✅ Offer ${action}ed successfully!`);
         setOffers(prev => prev.filter(offer => offer._id !== offerId));
       }
     } catch (error: any) {
       console.error(`Error ${action}ing offer:`, error);
-      setError(`Failed to ${action} offer. Please try again.`);
     } finally {
       setOrderActionLoading(null);
     }
@@ -767,11 +706,10 @@ const SellerDashboard: React.FC = () => {
 
   const handleStripeSetupSuccess = () => {
     setShowStripeSetup(false);
-    setSuccessMessage('Stripe account connected successfully!');
     setTimeout(() => {
       checkStripeAccountStatus();
       fetchDashboardData();
-    }, 2000);
+    }, 1000);
   };
 
   const handleRefresh = async () => {
@@ -780,10 +718,8 @@ const SellerDashboard: React.FC = () => {
     try {
       await fetchDashboardData();
       await checkStripeAccountStatus();
-      setSuccessMessage('✅ Dashboard refreshed successfully!');
     } catch (error) {
       console.error('Refresh error:', error);
-      setError('Failed to refresh data. Please try again.');
     } finally {
       setRefreshing(false);
     }
@@ -794,18 +730,15 @@ const SellerDashboard: React.FC = () => {
     const stripeStatus = urlParams.get('stripe');
     
     if (stripeStatus === 'success') {
-      setSuccessMessage('Stripe account setup completed successfully!');
       setTimeout(() => {
         checkStripeAccountStatus();
         fetchDashboardData();
-      }, 3000);
+      }, 1000);
     }
   };
 
   // ✅ Initial data loading
   useEffect(() => {
-    console.log('🚀 SellerDashboard mounted - Loading initial data');
-    
     const loadInitialData = async () => {
       try {
         await fetchDashboardData();
@@ -822,7 +755,6 @@ const SellerDashboard: React.FC = () => {
   // ✅ Fetch listings when tab changes
   useEffect(() => {
     if (activeTab === 'listings') {
-      console.log('📋 Switching to Listings tab');
       fetchListings();
     }
   }, [activeTab, listingsPage, listingsStatusFilter]);
@@ -830,7 +762,6 @@ const SellerDashboard: React.FC = () => {
   // ✅ Fetch orders when orders tab is active
   useEffect(() => {
     if (activeTab === 'orders') {
-      console.log('📦 Switching to Orders tab');
       fetchSellerOrders();
     }
   }, [activeTab, ordersPage, ordersFilter]);
@@ -838,33 +769,9 @@ const SellerDashboard: React.FC = () => {
   // ✅ Fetch offers when offers tab is active
   useEffect(() => {
     if (activeTab === 'offers') {
-      console.log('💼 Switching to Offers tab');
       fetchOffers();
     }
   }, [activeTab]);
-
-  // Clear messages after 5 seconds
-  useEffect(() => {
-    const timers: NodeJS.Timeout[] = [];
-    
-    if (successMessage) {
-      const timer = setTimeout(() => {
-        setSuccessMessage('');
-      }, 5000);
-      timers.push(timer);
-    }
-    
-    if (error) {
-      const timer = setTimeout(() => {
-        setError('');
-      }, 8000);
-      timers.push(timer);
-    }
-
-    return () => {
-      timers.forEach(timer => clearTimeout(timer));
-    };
-  }, [successMessage, error]);
 
   // Determine loading state based on active tab
   const getCurrentLoadingState = () => {
@@ -905,15 +812,7 @@ const SellerDashboard: React.FC = () => {
             showStripeButton={!(stripeStatus?.connected && stripeStatus?.chargesEnabled)}
           />
 
-          {/* Alerts */}
-          <div className="mb-8 space-y-4">
-            {successMessage && (
-              <AlertMessage type="success" message={successMessage} />
-            )}
-            {error && (
-              <AlertMessage type="error" message={error} />
-            )}
-          </div>
+          {/* REMOVED ALERTS SECTION */}
 
           {/* Navigation */}
           <TabNavigation
