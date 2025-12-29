@@ -6,7 +6,7 @@ const mongoose = require('mongoose');
 const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require("../../utils");
 
 // ===================================================
-// ✅ DEBUG MIDDLEWARE - सभी incoming requests log करें
+// ✅ DEBUG MIDDLEWARE
 // ===================================================
 router.use((req, res, next) => {
   console.log(`🔍 MARKETPLACE ROUTE CALLED: ${req.method} ${req.originalUrl}`);
@@ -15,7 +15,7 @@ router.use((req, res, next) => {
 });
 
 // ===================================================
-// ✅ TEST ENDPOINT - सबसे पहले ये check करें
+// ✅ TEST ENDPOINT
 // ===================================================
 router.get("/test", (req, res) => {
   console.log("✅ /marketplace/test endpoint called successfully!");
@@ -27,28 +27,25 @@ router.get("/test", (req, res) => {
       "GET    /marketplace/listings",
       "GET    /marketplace/my-listings",
       "POST   /marketplace/create-listing", 
-      "PUT    /marketplace/listing/:id",
-      "POST   /marketplace/listing/:id/toggle-status",
-      "DELETE /marketplace/listing/:id",
-      "GET    /marketplace/listing/:id"
+      "PUT    /marketplace/listings/:id",           // UPDATED: plural
+      "POST   /marketplace/listings/:id/toggle-status", // UPDATED: plural  
+      "DELETE /marketplace/listings/:id",           // UPDATED: plural
+      "GET    /marketplace/listings/:id"           // UPDATED: plural
     ]
   });
 });
 
 // ===================================================
-// ✅ DELETE LISTING - SIMPLIFIED WORKING VERSION
+// ✅ DELETE LISTING - UPDATED TO PLURAL
 // ===================================================
-router.delete("/listing/:id", authenticateMiddleware, async (req, res) => {
+router.delete("/listings/:id", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== 🗑️ DELETE LISTING ENDPOINT HIT ===");
     console.log("📦 Request Details:", {
       method: req.method,
       originalUrl: req.originalUrl,
-      baseUrl: req.baseUrl,
-      path: req.path,
       params: req.params,
-      user: req.user ? req.user._id : 'No user',
-      headers: req.headers
+      user: req.user ? req.user._id : 'No user'
     });
 
     const listingId = req.params.id;
@@ -97,7 +94,7 @@ router.delete("/listing/:id", authenticateMiddleware, async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Error in DELETE /listing/:id:", error);
+    console.error("❌ Error in DELETE /listings/:id:", error);
     
     if (error.name === 'CastError') {
       return res.status(400).json({
@@ -115,16 +112,14 @@ router.delete("/listing/:id", authenticateMiddleware, async (req, res) => {
 });
 
 // ===================================================
-// ✅ TOGGLE LISTING STATUS - SIMPLIFIED WORKING VERSION  
+// ✅ TOGGLE LISTING STATUS - UPDATED TO PLURAL  
 // ===================================================
-router.post("/listing/:id/toggle-status", authenticateMiddleware, async (req, res) => {
+router.post("/listings/:id/toggle-status", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== 🔄 TOGGLE STATUS ENDPOINT HIT ===");
     console.log("📦 Request Details:", {
       method: req.method,
       originalUrl: req.originalUrl,
-      baseUrl: req.baseUrl,
-      path: req.path,
       params: req.params,
       body: req.body,
       user: req.user ? req.user._id : 'No user'
@@ -208,7 +203,7 @@ router.post("/listing/:id/toggle-status", authenticateMiddleware, async (req, re
     });
 
   } catch (error) {
-    console.error("❌ Error in POST /listing/:id/toggle-status:", error);
+    console.error("❌ Error in POST /listings/:id/toggle-status:", error);
     
     if (error.name === 'CastError') {
       return res.status(400).json({
@@ -226,16 +221,14 @@ router.post("/listing/:id/toggle-status", authenticateMiddleware, async (req, re
 });
 
 // ===================================================
-// ✅ EDIT LISTING - SIMPLIFIED WORKING VERSION
+// ✅ EDIT LISTING - UPDATED TO PLURAL
 // ===================================================
-router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
+router.put("/listings/:id", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== ✏️ EDIT LISTING ENDPOINT HIT ===");
     console.log("📦 Request Details:", {
       method: req.method,
       originalUrl: req.originalUrl,
-      baseUrl: req.baseUrl,
-      path: req.path,
       params: req.params,
       body: req.body,
       user: req.user ? req.user._id : 'No user'
@@ -329,7 +322,7 @@ router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Error in PUT /listing/:id:", error);
+    console.error("❌ Error in PUT /listings/:id:", error);
     
     if (error.name === 'CastError') {
       return res.status(400).json({
@@ -360,7 +353,56 @@ router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
 });
 
 // ===================================================
-// ✅ PUBLIC ROUTE — Get all active listings
+// ✅ GET SINGLE LISTING DETAILS - UPDATED TO PLURAL
+// ===================================================
+router.get("/listings/:id", async (req, res) => {
+  try {
+    console.log("=== 🔍 GET LISTING DETAILS ===");
+    console.log("Listing ID:", req.params.id);
+
+    const listingId = req.params.id;
+    
+    const listing = await MarketplaceListing.findById(listingId)
+      .populate("sellerId", "username avatar sellerRating email phone")
+      .select("title description price type category tags mediaUrls status sellerId createdAt updatedAt views");
+    
+    if (!listing) {
+      return res.status(404).json({ 
+        success: false,
+        error: "Listing not found" 
+      });
+    }
+    
+    // Increment view count
+    listing.views = (listing.views || 0) + 1;
+    await listing.save();
+    
+    console.log(`✅ Listing found: ${listing.title}`);
+    
+    res.status(200).json({ 
+      success: true,
+      listing 
+    });
+    
+  } catch (error) {
+    console.error("❌ Error fetching listing details:", error);
+    
+    if (error.name === 'CastError') {
+      return res.status(400).json({ 
+        success: false,
+        error: "Invalid listing ID format" 
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to fetch listing details" 
+    });
+  }
+});
+
+// ===================================================
+// ✅ PUBLIC ROUTE — Get all active listings (plural)
 // ===================================================
 router.get("/listings", async (req, res) => {
   try {
@@ -597,55 +639,6 @@ function isValidEmail(email) {
 }
 
 // ===================================================
-// ✅ GET SINGLE LISTING DETAILS
-// ===================================================
-router.get("/listing/:id", async (req, res) => {
-  try {
-    console.log("=== 🔍 GET LISTING DETAILS ===");
-    console.log("Listing ID:", req.params.id);
-
-    const listingId = req.params.id;
-    
-    const listing = await MarketplaceListing.findById(listingId)
-      .populate("sellerId", "username avatar sellerRating email phone")
-      .select("title description price type category tags mediaUrls status sellerId createdAt updatedAt views");
-    
-    if (!listing) {
-      return res.status(404).json({ 
-        success: false,
-        error: "Listing not found" 
-      });
-    }
-    
-    // Increment view count
-    listing.views = (listing.views || 0) + 1;
-    await listing.save();
-    
-    console.log(`✅ Listing found: ${listing.title}`);
-    
-    res.status(200).json({ 
-      success: true,
-      listing 
-    });
-    
-  } catch (error) {
-    console.error("❌ Error fetching listing details:", error);
-    
-    if (error.name === 'CastError') {
-      return res.status(400).json({ 
-        success: false,
-        error: "Invalid listing ID format" 
-      });
-    }
-    
-    res.status(500).json({ 
-      success: false,
-      error: "Failed to fetch listing details" 
-    });
-  }
-});
-
-// ===================================================
 // ✅ Get listings by specific user ID (Public route)
 // ===================================================
 router.get("/user/:userId/listings", async (req, res) => {
@@ -740,6 +733,34 @@ router.delete("/admin/delete-all-listings", authenticateMiddleware, async (req, 
       error: "Failed to delete listings"
     });
   }
+});
+
+// ===================================================
+// ✅ BACKWARD COMPATIBILITY - OLD ROUTES (Optional)
+// ===================================================
+// अगर frontend में old routes use हो रहे हैं तो ये add करें:
+router.delete("/listing/:id", authenticateMiddleware, async (req, res) => {
+  console.log("⚠️ Old DELETE /listing/:id route called, redirecting to new route");
+  req.url = req.url.replace('/listing/', '/listings/');
+  router.handle(req, res);
+});
+
+router.post("/listing/:id/toggle-status", authenticateMiddleware, async (req, res) => {
+  console.log("⚠️ Old POST /listing/:id/toggle-status route called, redirecting to new route");
+  req.url = req.url.replace('/listing/', '/listings/');
+  router.handle(req, res);
+});
+
+router.put("/listing/:id", authenticateMiddleware, async (req, res) => {
+  console.log("⚠️ Old PUT /listing/:id route called, redirecting to new route");
+  req.url = req.url.replace('/listing/', '/listings/');
+  router.handle(req, res);
+});
+
+router.get("/listing/:id", async (req, res) => {
+  console.log("⚠️ Old GET /listing/:id route called, redirecting to new route");
+  req.url = req.url.replace('/listing/', '/listings/');
+  router.handle(req, res);
 });
 
 module.exports = router;
