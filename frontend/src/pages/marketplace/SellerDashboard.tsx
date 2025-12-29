@@ -362,7 +362,7 @@ const handleToggleListingStatus = async (listing: Listing) => {
     }
 
     console.log('🔄 Starting toggle process...');
-    console.log('🔗 API Endpoint:', `${API_BASE_URL}/marketplace/listing/${listing._id}/toggle-status`);
+    console.log('🔗 API Endpoint:', `${API_BASE_URL}/api/marketplace/listing/${listing._id}/toggle-status`);
 
     const response = await axios.patch(
       `${API_BASE_URL}/marketplace/listing/${listing._id}/toggle-status`,
