@@ -8,54 +8,58 @@ const User = require('../../models/user');
 const Order = require("../../models/marketplace/order");
 
 
-// ✅ Check Stripe account status
+// backend/routes/stripeRoutes.js
 router.get('/status', authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
-    const user = await User.findById(userId);
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found'
-      });
-    }
-
-    // If no Stripe account ID, return not connected
-    if (!user.stripeAccountId) {
+    const user = await User.findById(userId).select('stripeAccountId email');
+    
+    if (!user || !user.stripeAccountId) {
       return res.json({
-        success: true,
         connected: false,
         status: 'not_connected',
-        message: 'Stripe account not connected'
+        chargesEnabled: false,
+        payoutsEnabled: false,
+        detailsSubmitted: false
       });
     }
 
-    // Check Stripe account status
+    // Retrieve Stripe account details
     const account = await stripe.accounts.retrieve(user.stripeAccountId);
-
+    
     res.json({
-      success: true,
       connected: true,
-      status: account.charges_enabled ? 'active' : 'pending',
-      stripeAccountId: user.stripeAccountId,
-      detailsSubmitted: account.details_submitted,
-      payoutsEnabled: account.payouts_enabled,
-      requirements: account.requirements,
-      account: {
-        business_type: account.business_type,
-        country: account.country,
-        email: account.email,
-        default_currency: account.default_currency
-      }
+      status: 'connected',
+      chargesEnabled: account.charges_enabled || false,
+      payoutsEnabled: account.payouts_enabled || false,
+      detailsSubmitted: account.details_submitted || false,
+      accountId: user.stripeAccountId,
+      email: account.email || user.email,
+      country: account.country || 'US'
     });
 
   } catch (error) {
-    console.error('Error checking Stripe status:', error);
+    console.error('Stripe status error:', error.message);
+    
+    // If account doesn't exist in Stripe, clear it from user
+    if (error.type === 'StripeInvalidRequestError' && error.code === 'resource_missing') {
+      const userId = req.user.id;
+      await User.findByIdAndUpdate(userId, { $unset: { stripeAccountId: 1 } });
+      
+      return res.json({
+        connected: false,
+        status: 'not_connected',
+        chargesEnabled: false,
+        payoutsEnabled: false,
+        detailsSubmitted: false,
+        error: 'Stripe account not found, removed from system'
+      });
+    }
+    
     res.status(500).json({
-      success: false,
       error: 'Failed to check Stripe status',
-      details: error.message
+      connected: false,
+      status: 'error'
     });
   }
 });
