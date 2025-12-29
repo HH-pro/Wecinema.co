@@ -99,7 +99,7 @@ export const listingsApi = {
   deleteListing: async (id) => {
     try {
       const response = await axios.delete(
-        `${API_BASE_URL}/marketplace/listing/${id}`,
+        `${API_BASE_URL}/marketplace/listings/${id}`,
         getHeaders()
       );
       return response.data;
