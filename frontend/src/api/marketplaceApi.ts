@@ -1,4 +1,4 @@
-// src/api/marketplaceApi.js - UPDATED VERSION WITH WITHDRAWAL SUPPORT
+// src/api/marketplaceApi.js - UPDATED VERSION
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:3000';
@@ -380,196 +380,6 @@ export const stripeApi = {
     } catch (error) {
       return handleApiError(error, 'Failed to create Stripe link');
     }
-  },
-
-  // ✅ NEW: Get Stripe balance
-  getStripeBalance: async () => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/stripe/balance`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error, 'Failed to fetch Stripe balance');
-    }
-  }
-};
-
-// ============================================
-// ✅ WITHDRAWAL API - NEW
-// ============================================
-
-export const withdrawalsApi = {
-  // Get withdrawal history
-  getWithdrawalHistory: async (params = {}) => {
-    try {
-      const { page = 1, limit = 10, status = '' } = params;
-      const queryParams = new URLSearchParams();
-      if (page) queryParams.append('page', page.toString());
-      if (limit) queryParams.append('limit', limit.toString());
-      if (status) queryParams.append('status', status);
-      
-      const url = `${API_BASE_URL}/marketplace/withdrawals?${queryParams}`;
-      console.log('💰 Fetching withdrawal history:', url);
-      
-      const response = await axios.get(url, getHeaders());
-      const normalized = normalizeResponse(response);
-      console.log('✅ Withdrawal history response:', normalized);
-      return normalized;
-      
-    } catch (error) {
-      console.log('⚠️ Withdrawal API not available, returning empty history');
-      // Return empty history for development
-      return {
-        success: true,
-        withdrawals: [],
-        pagination: {
-          page: 1,
-          limit: 10,
-          total: 0,
-          pages: 1
-        }
-      };
-    }
-  },
-
-  // Request withdrawal
-  requestWithdrawal: async (amount) => {
-    try {
-      console.log('💰 Requesting withdrawal:', amount);
-      
-      const response = await axios.post(
-        `${API_BASE_URL}/marketplace/withdrawals`,
-        { amount },
-        getHeaders()
-      );
-      
-      const normalized = normalizeResponse(response);
-      console.log('✅ Withdrawal request response:', normalized);
-      return normalized;
-      
-    } catch (error) {
-      // For development, return mock success
-      if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
-        console.log('🛠️ Development mode: Returning mock withdrawal success');
-        return {
-          success: true,
-          message: 'Withdrawal request submitted successfully',
-          withdrawal: {
-            _id: Date.now().toString(),
-            amount: amount,
-            status: 'pending',
-            stripeTransferId: 'tr_mock_' + Date.now(),
-            createdAt: new Date().toISOString(),
-            destination: 'Bank Account •••• 4321',
-            description: `Withdrawal of $${(amount / 100).toFixed(2)}`
-          }
-        };
-      }
-      
-      const errorResponse = handleApiError(error, 'Failed to request withdrawal');
-      console.error('❌ Withdrawal request error:', errorResponse);
-      return errorResponse;
-    }
-  },
-
-  // Get withdrawal by ID
-  getWithdrawalById: async (withdrawalId) => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/withdrawals/${withdrawalId}`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error, 'Failed to fetch withdrawal details');
-    }
-  },
-
-  // Cancel withdrawal
-  cancelWithdrawal: async (withdrawalId) => {
-    try {
-      const response = await axios.put(
-        `${API_BASE_URL}/marketplace/withdrawals/${withdrawalId}/cancel`,
-        {},
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error, 'Failed to cancel withdrawal');
-    }
-  }
-};
-
-// ============================================
-// ✅ EARNINGS API - NEW
-// ============================================
-
-export const earningsApi = {
-  // Get seller earnings summary
-  getEarningsSummary: async () => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/earnings/summary`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error, 'Failed to fetch earnings summary');
-    }
-  },
-
-  // Get earnings by period
-  getEarningsByPeriod: async (period = 'month') => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/earnings/period/${period}`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error, 'Failed to fetch earnings by period');
-    }
-  },
-
-  // Get available balance (calculated from completed orders)
-  getAvailableBalance: async () => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/earnings/available-balance`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      // For development, calculate from orders
-      if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
-        try {
-          // Get orders and calculate balance
-          const orders = await ordersApi.getMySales();
-          const completedOrders = Array.isArray(orders) ? 
-            orders.filter(order => order.status === 'completed') : [];
-          
-          const totalRevenue = completedOrders.reduce((sum, order) => 
-            sum + (order.amount || 0), 0) * 100; // Convert to cents
-          
-          return {
-            success: true,
-            availableBalance: totalRevenue,
-            currency: 'inr'
-          };
-        } catch (calcError) {
-          console.log('Using default available balance');
-          return {
-            success: true,
-            availableBalance: 0,
-            currency: 'inr'
-          };
-        }
-      }
-      
-      return handleApiError(error, 'Failed to fetch available balance');
-    }
   }
 };
 
@@ -577,43 +387,12 @@ export const earningsApi = {
 // ✅ UTILITY FUNCTIONS
 // ============================================
 
-// Format currency (updated for INR)
+// Format currency
 export const formatCurrency = (amount) => {
-  // Amount is in cents, convert to rupees
-  const amountInRupees = (amount || 0) / 100;
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(amountInRupees);
-};
-
-// Format currency without symbol (for display)
-export const formatCurrencyAmount = (amount) => {
-  const amountInRupees = (amount || 0) / 100;
-  return new Intl.NumberFormat('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(amountInRupees);
-};
-
-// Format currency short (for large amounts)
-export const formatCurrencyShort = (amount) => {
-  const amountInRupees = (amount || 0) / 100;
-  if (amountInRupees >= 10000000) {
-    return `₹${(amountInRupees / 10000000).toFixed(1)}Cr`;
-  } else if (amountInRupees >= 100000) {
-    return `₹${(amountInRupees / 100000).toFixed(1)}L`;
-  } else if (amountInRupees >= 1000) {
-    return `₹${(amountInRupees / 1000).toFixed(1)}K`;
-  }
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(amountInRupees);
+  }).format(amount || 0);
 };
 
 // Test API connectivity
@@ -640,78 +419,15 @@ export const checkAuth = () => {
   return !!token;
 };
 
-// Get current user ID from token
-export const getCurrentUserId = () => {
-  const token = getAuthToken();
-  if (!token) return null;
-  
-  try {
-    // Decode JWT token to get user ID
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload.userId || payload.id || null;
-  } catch (error) {
-    console.error('Error decoding token:', error);
-    return null;
-  }
-};
-
-// ============================================
-// ✅ MAIN API EXPORT
-// ============================================
-
 // Export all APIs
-const marketplaceApi = {
-  // Core APIs
+export default {
   listings: listingsApi,
   orders: ordersApi,
   offers: offersApi,
   stripe: stripeApi,
-  withdrawals: withdrawalsApi,
-  earnings: earningsApi,
-  
-  // Utility functions
-  formatCurrency,
-  formatCurrencyAmount,
-  formatCurrencyShort,
-  testApiConnection,
-  checkAuth,
-  getCurrentUserId,
-  getAuthToken,
-  
-  // Convenience methods
-  getWithdrawalHistory: withdrawalsApi.getWithdrawalHistory,
-  requestWithdrawal: withdrawalsApi.requestWithdrawal,
-  getEarningsSummary: earningsApi.getEarningsSummary,
-  getAvailableBalance: earningsApi.getAvailableBalance,
-  
-  // For backward compatibility
-  getAllListings: listingsApi.getAllListings,
-  getMyListings: listingsApi.getMyListings,
-  createListing: listingsApi.createListing,
-  editListing: listingsApi.editListing,
-  deleteListing: listingsApi.deleteListing,
-  getMySales: ordersApi.getMySales,
-  updateOrderStatus: ordersApi.updateOrderStatus,
-  getReceivedOffers: offersApi.getReceivedOffers,
-  acceptOffer: offersApi.acceptOffer,
-  rejectOffer: offersApi.rejectOffer,
-  getStripeStatus: stripeApi.getStripeStatus
-};
-
-export default marketplaceApi;
-
-// Named exports for all APIs
-export {
-  listingsApi,
-  ordersApi,
-  offersApi,
-  stripeApi,
-  withdrawalsApi,
-  earningsApi,
-  formatCurrency,
-  formatCurrencyAmount,
-  formatCurrencyShort,
-  testApiConnection,
-  checkAuth,
-  getCurrentUserId
+  utils: {
+    formatCurrency,
+    testApiConnection,
+    checkAuth
+  }
 };
