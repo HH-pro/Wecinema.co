@@ -1,4 +1,4 @@
-// src/pages/seller/SellerDashboard.tsx - UPDATED WITH EARNINGS SECTION
+// src/pages/seller/SellerDashboard.tsx - COMPLETE UPDATED VERSION WITH EARNINGS TAB
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -17,14 +17,7 @@ const ordersApi = marketplaceApi.orders;
 const offersApi = marketplaceApi.offers;
 const earningsApi = marketplaceApi.earnings;
 
-// For now, create a simple formatCurrency function since we commented it out
-const formatCurrency = (amount: number) => {
-  // Convert cents to rupees
-  const amountInRupees = amount / 100;
-  return `₹${amountInRupees.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
-
-// CORRECTED: Import paths - fixed 'marketplae' to 'marketplace'
+// Import components
 import DashboardHeader from '../../components/marketplae/seller/DashboardHeader';
 import TabNavigation from '../../components/marketplae/seller/TabNavigation';
 import StatsGrid from '../../components/marketplae/seller/StatsGrid';
@@ -34,13 +27,13 @@ import ActionCard from '../../components/marketplae/seller/ActionCard';
 import OrderWorkflowGuide from '../../components/marketplae/seller/OrderWorkflowGuide';
 import StripeAccountStatus from '../../components/marketplae/seller/StripeAccountStatus';
 import StripeSuccessAlert from '../../components/marketplae/seller/StripeSuccessAlert';
-import WithdrawBalance from '../../components/marketplae/seller/WithdrawBalance';
 
 // Import tab components
 import OffersTab from '../../components/marketplae/seller/OffersTab';
 import ListingsTab from '../../components/marketplae/seller/ListingsTab';
 import OrdersTab from '../../components/marketplae/seller/OrdersTab';
 import WithdrawTab from '../../components/marketplae/seller/WithdrawTab';
+import EarningsTab from '../../components/marketplae/seller/EarningsTab'; // NEW EARNINGS TAB
 
 // Import modals
 import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
@@ -49,489 +42,40 @@ import EditListingModal from '../../components/marketplae/seller/EditListingModa
 import DeleteListingModal from '../../components/marketplae/seller/DeleteListingModal';
 import VideoPlayerModal from '../../components/marketplae/seller/VideoPlayerModal';
 
-// Debug: Check component imports
-console.log('🔍 Checking component imports...');
-console.log('DashboardHeader type:', typeof DashboardHeader);
-console.log('TabNavigation type:', typeof TabNavigation);
-console.log('StatsGrid type:', typeof StatsGrid);
+// For now, create a simple formatCurrency function
+const formatCurrency = (amount: number) => {
+  // Convert cents to rupees
+  const amountInRupees = amount / 100;
+  return `₹${amountInRupees.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
 
-// Simple inline components as fallbacks
-const SimpleDashboardHeader = ({ title, subtitle, earnings, onRefresh, refreshing, stripeStatus, onCheckStripe }: any) => (
-  <div className="mb-8">
-    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">{title}</h1>
-        <p className="text-gray-600 mt-2">{subtitle}</p>
-      </div>
-      <div className="flex items-center gap-3">
-        <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-4 py-2 rounded-xl">
-          <div className="text-sm">Total Earnings</div>
-          <div className="text-xl font-bold">{earnings}</div>
-        </div>
-        <button
-          onClick={onRefresh}
-          disabled={refreshing}
-          className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-        >
-          {refreshing ? 'Refreshing...' : 'Refresh'}
-        </button>
-      </div>
-    </div>
-  </div>
-);
-
-const SimpleTabNavigation = ({ tabs, activeTab, onTabChange }: any) => (
-  <div className="mb-6">
-    <div className="flex space-x-1 border-b border-gray-200">
-      {tabs.map((tab: any) => (
-        <button
-          key={tab.id}
-          onClick={() => onTabChange(tab.id)}
-          className={`px-4 py-2 font-medium text-sm ${
-            activeTab === tab.id
-              ? 'text-yellow-600 border-b-2 border-yellow-600'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          {tab.label} {tab.badge && `(${tab.badge})`}
-        </button>
-      ))}
-    </div>
-  </div>
-);
-
-const SimpleWelcomeCard = ({ title, subtitle, primaryAction, secondaryAction }: any) => (
-  <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-2xl p-6 mb-6">
-    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">{title}</h2>
-        <p className="text-gray-600">{subtitle}</p>
-      </div>
-      <div className="flex gap-3">
-        {primaryAction && (
-          <button
-            onClick={primaryAction.onClick}
-            className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-xl hover:from-yellow-600 hover:to-yellow-700"
-          >
-            {primaryAction.label}
-          </button>
-        )}
-        {secondaryAction?.visible && (
-          <button
-            onClick={secondaryAction.onClick}
-            className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-xl hover:from-blue-600 hover:to-blue-700"
-          >
-            {secondaryAction.label}
-          </button>
-        )}
-      </div>
-    </div>
-  </div>
-);
-
-// Use the imported components if they're valid, otherwise use fallbacks
-const SafeDashboardHeader = (typeof DashboardHeader === 'function' || typeof DashboardHeader === 'object') ? DashboardHeader : SimpleDashboardHeader;
-const SafeTabNavigation = (typeof TabNavigation === 'function' || typeof TabNavigation === 'object') ? TabNavigation : SimpleTabNavigation;
-const SafeWelcomeCard = (typeof WelcomeCard === 'function' || typeof WelcomeCard === 'object') ? WelcomeCard : SimpleWelcomeCard;
-
-// Simple fallback for other components
+// Simple fallback components
 const SimpleFallback = ({ name }: { name: string }) => (
   <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
     <p className="text-gray-600">Component "{name}" is loading...</p>
   </div>
 );
 
-// Use simple checks for other components
+// Use simple checks for components
+const SafeDashboardHeader = (typeof DashboardHeader === 'function' || typeof DashboardHeader === 'object') ? DashboardHeader : () => <SimpleFallback name="DashboardHeader" />;
+const SafeTabNavigation = (typeof TabNavigation === 'function' || typeof TabNavigation === 'object') ? TabNavigation : () => <SimpleFallback name="TabNavigation" />;
+const SafeWelcomeCard = (typeof WelcomeCard === 'function' || typeof WelcomeCard === 'object') ? WelcomeCard : () => <SimpleFallback name="WelcomeCard" />;
 const SafeStatsGrid = (typeof StatsGrid === 'function' || typeof StatsGrid === 'object') ? StatsGrid : () => <SimpleFallback name="StatsGrid" />;
 const SafeRecentOrders = (typeof RecentOrders === 'function' || typeof RecentOrders === 'object') ? RecentOrders : () => <SimpleFallback name="RecentOrders" />;
 const SafeActionCard = (typeof ActionCard === 'function' || typeof ActionCard === 'object') ? ActionCard : () => <SimpleFallback name="ActionCard" />;
 const SafeOrderWorkflowGuide = (typeof OrderWorkflowGuide === 'function' || typeof OrderWorkflowGuide === 'object') ? OrderWorkflowGuide : () => <SimpleFallback name="OrderWorkflowGuide" />;
 const SafeStripeAccountStatus = (typeof StripeAccountStatus === 'function' || typeof StripeAccountStatus === 'object') ? StripeAccountStatus : () => <SimpleFallback name="StripeAccountStatus" />;
 const SafeStripeSuccessAlert = (typeof StripeSuccessAlert === 'function' || typeof StripeSuccessAlert === 'object') ? StripeSuccessAlert : () => <SimpleFallback name="StripeSuccessAlert" />;
-const SafeWithdrawBalance = (typeof WithdrawBalance === 'function' || typeof WithdrawBalance === 'object') ? WithdrawBalance : () => <SimpleFallback name="WithdrawBalance" />;
 const SafeOffersTab = (typeof OffersTab === 'function' || typeof OffersTab === 'object') ? OffersTab : () => <SimpleFallback name="OffersTab" />;
 const SafeListingsTab = (typeof ListingsTab === 'function' || typeof ListingsTab === 'object') ? ListingsTab : () => <SimpleFallback name="ListingsTab" />;
 const SafeOrdersTab = (typeof OrdersTab === 'function' || typeof OrdersTab === 'object') ? OrdersTab : () => <SimpleFallback name="OrdersTab" />;
 const SafeWithdrawTab = (typeof WithdrawTab === 'function' || typeof WithdrawTab === 'object') ? WithdrawTab : () => <SimpleFallback name="WithdrawTab" />;
+const SafeEarningsTab = (typeof EarningsTab === 'function' || typeof EarningsTab === 'object') ? EarningsTab : () => <SimpleFallback name="EarningsTab" />;
 const SafeStripeSetupModal = (typeof StripeSetupModal === 'function' || typeof StripeSetupModal === 'object') ? StripeSetupModal : () => <SimpleFallback name="StripeSetupModal" />;
 const SafeOrderDetailsModal = (typeof OrderDetailsModal === 'function' || typeof OrderDetailsModal === 'object') ? OrderDetailsModal : () => <SimpleFallback name="OrderDetailsModal" />;
 const SafeEditListingModal = (typeof EditListingModal === 'function' || typeof EditListingModal === 'object') ? EditListingModal : () => <SimpleFallback name="EditListingModal" />;
 const SafeDeleteListingModal = (typeof DeleteListingModal === 'function' || typeof DeleteListingModal === 'object') ? DeleteListingModal : () => <SimpleFallback name="DeleteListingModal" />;
 const SafeVideoPlayerModal = (typeof VideoPlayerModal === 'function' || typeof VideoPlayerModal === 'object') ? VideoPlayerModal : () => <SimpleFallback name="VideoPlayerModal" />;
-
-// ============================================
-// ✅ EARNINGS SECTION COMPONENT
-// ============================================
-
-const EarningsSection = ({ 
-  stripeStatus, 
-  orderStats, 
-  totalWithdrawn,
-  onWithdraw,
-  canWithdraw
-}: {
-  stripeStatus: any;
-  orderStats: any;
-  totalWithdrawn: number;
-  onWithdraw: (amount: number) => void;
-  canWithdraw: boolean;
-}) => {
-  const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [showWithdrawForm, setShowWithdrawForm] = useState(false);
-  const [isWithdrawing, setIsWithdrawing] = useState(false);
-  
-  const availableBalance = stripeStatus?.availableBalance || 0;
-  const pendingBalance = stripeStatus?.pendingBalance || 0;
-  const totalBalance = stripeStatus?.balance || 0;
-  
-  // Format amounts from cents to dollars/rupees
-  const formatToRupees = (amountInCents: number) => {
-    return formatCurrency(amountInCents);
-  };
-  
-  const formatToDollars = (amountInCents: number) => {
-    const amountInDollars = amountInCents / 100;
-    return `$${amountInDollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
-  
-  const handleWithdrawSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const amount = parseFloat(withdrawAmount);
-    if (isNaN(amount) || amount <= 0) {
-      alert('Please enter a valid amount');
-      return;
-    }
-    
-    if (amount < 5) {
-      alert('Minimum withdrawal amount is $5.00');
-      return;
-    }
-    
-    const amountInCents = amount * 100;
-    if (amountInCents > availableBalance) {
-      alert('Insufficient available balance');
-      return;
-    }
-    
-    setIsWithdrawing(true);
-    try {
-      await onWithdraw(amount);
-      setWithdrawAmount('');
-      setShowWithdrawForm(false);
-    } catch (error) {
-      console.error('Withdrawal error:', error);
-    } finally {
-      setIsWithdrawing(false);
-    }
-  };
-  
-  return (
-    <>
-      {/* ✅ STRIPE ACCOUNT STATUS SECTION */}
-      <div className="mb-6 bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-        <div className="p-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="flex-1">
-              <div className="flex items-center mb-2">
-                <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-                <span className="text-sm font-medium text-green-700">Payments Ready! 🎉</span>
-                <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                  Verified
-                </span>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900">
-                Your Stripe account is fully verified and ready to accept payments.
-              </h3>
-              
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="flex items-center">
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
-                    <span className="text-blue-600">💳</span>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Charges Enabled</p>
-                    <p className="text-sm font-medium text-gray-900">Yes</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center">
-                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
-                    <span className="text-green-600">💰</span>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Payouts Enabled</p>
-                    <p className="text-sm font-medium text-gray-900">Yes</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center">
-                  <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
-                    <span className="text-purple-600">👤</span>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Account</p>
-                    <p className="text-sm font-medium text-gray-900">Test Seller • US</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="border-l border-gray-200 pl-6">
-              <div className="text-center">
-                <p className="text-sm text-gray-600 mb-1">Available Balance</p>
-                <p className="text-2xl font-bold text-gray-900">{formatToDollars(availableBalance)}</p>
-                <p className="text-sm text-gray-500 mt-1">Pending: {formatToDollars(pendingBalance)}</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button
-              onClick={() => window.open('https://dashboard.stripe.com/', '_blank')}
-              className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition duration-200 flex items-center"
-            >
-              <span className="mr-2">📊</span>
-              Stripe Dashboard
-            </button>
-            <button
-              onClick={() => alert('Account ID: ' + (stripeStatus?.accountId || 'acct_...'))}
-              className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition duration-200"
-            >
-              Show Account ID
-            </button>
-            <button
-              onClick={() => alert('Update details feature would open here')}
-              className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition duration-200"
-            >
-              Update Details
-            </button>
-          </div>
-        </div>
-      </div>
-      
-      {/* ✅ EARNINGS OVERVIEW SECTION */}
-      <div className="mb-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900">💰 Your Earnings Overview</h2>
-          <div className="flex items-center space-x-2 mt-2 md:mt-0">
-            <div className="text-sm text-gray-600 flex items-center">
-              <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-              Ready to withdraw
-            </div>
-            <div className="text-sm text-gray-600 flex items-center">
-              <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
-              Pending
-            </div>
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Available to withdraw */}
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-gray-700">Available to withdraw</h3>
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <span className="text-green-600">💰</span>
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{formatToRupees(availableBalance)}</p>
-            <div className="mt-3 pt-3 border-t border-green-100">
-              <button
-                onClick={() => setShowWithdrawForm(true)}
-                disabled={!canWithdraw || availableBalance < 500} // 500 cents = $5
-                className={`w-full py-2 text-sm font-medium rounded-lg transition duration-200 ${
-                  canWithdraw && availableBalance >= 500
-                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                {canWithdraw && availableBalance >= 500 ? 'Withdraw Now' : 'Withdraw Unavailable'}
-              </button>
-            </div>
-          </div>
-          
-          {/* Pending earnings */}
-          <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-gray-700">Pending</h3>
-              <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <span className="text-yellow-600">⏳</span>
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{formatToRupees(pendingBalance)}</p>
-            <p className="text-sm text-gray-600 mt-1">Orders in progress</p>
-          </div>
-          
-          {/* Total earnings */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-gray-700">Total Earnings</h3>
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <span className="text-blue-600">📈</span>
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{formatToRupees(totalBalance)}</p>
-            <p className="text-sm text-gray-600 mt-1">All-time earnings</p>
-          </div>
-          
-          {/* This month earnings */}
-          <div className="bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-xl p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-gray-700">This Month</h3>
-              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                <span className="text-purple-600">📅</span>
-              </div>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{formatToRupees(orderStats.thisMonthRevenue * 100)}</p>
-            <p className="text-sm text-gray-600 mt-1">Monthly revenue</p>
-          </div>
-        </div>
-        
-        {/* Withdrawal info bar */}
-        <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center">
-              <div className="bg-blue-100 p-2 rounded-lg mr-3">
-                <span className="text-blue-600">ℹ️</span>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-900">Withdrawal Information</p>
-                <p className="text-sm text-gray-600">
-                  Minimum withdrawal: $5.00 • Processing time: 2-3 business days
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              {totalWithdrawn > 0 && (
-                <div className="text-sm text-gray-600">
-                  <span className="font-medium">Total Withdrawn:</span> {formatToRupees(totalWithdrawn)}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-        
-        {/* Quick Stats */}
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center mr-3">
-                <span className="text-blue-500">🔄</span>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Completed Orders</p>
-                <p className="text-lg font-semibold text-gray-900">{orderStats.completed}</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center mr-3">
-                <span className="text-green-500">📊</span>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Active Orders</p>
-                <p className="text-lg font-semibold text-gray-900">{orderStats.activeOrders}</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-purple-50 rounded-lg flex items-center justify-center mr-3">
-                <span className="text-purple-500">💸</span>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Pending Revenue</p>
-                <p className="text-lg font-semibold text-gray-900">{formatToRupees(orderStats.pendingRevenue * 100)}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Withdraw Form Modal */}
-      {showWithdrawForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Withdraw Funds</h3>
-                <button
-                  onClick={() => setShowWithdrawForm(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ✕
-                </button>
-              </div>
-              
-              <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-center mb-2">
-                  <div className="w-5 h-5 text-blue-600 mr-2">
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <p className="text-sm font-medium text-blue-800">Available Balance</p>
-                </div>
-                <p className="text-2xl font-bold text-blue-900">{formatToRupees(availableBalance)}</p>
-                <p className="text-sm text-blue-700 mt-1">
-                  Minimum withdrawal: $5.00 • Processing time: 2-3 business days
-                </p>
-              </div>
-              
-              <form onSubmit={handleWithdrawSubmit}>
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Withdrawal Amount ($)
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-gray-500">$</span>
-                    </div>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="5"
-                      max={availableBalance / 100}
-                      value={withdrawAmount}
-                      onChange={(e) => setWithdrawAmount(e.target.value)}
-                      className="pl-10 w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
-                      placeholder="Enter amount"
-                      required
-                    />
-                  </div>
-                  <p className="text-sm text-gray-500 mt-2">
-                    Enter amount between $5.00 and ${(availableBalance / 100).toFixed(2)}
-                  </p>
-                </div>
-                
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowWithdrawForm(false)}
-                    className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition duration-200"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isWithdrawing}
-                    className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium rounded-lg transition duration-200 disabled:opacity-50"
-                  >
-                    {isWithdrawing ? 'Processing...' : 'Withdraw'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-};
 
 // Interfaces
 interface Order {
@@ -697,6 +241,7 @@ const SellerDashboard: React.FC = () => {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [listingsLoading, setListingsLoading] = useState(false);
   const [offersLoading, setOffersLoading] = useState(false);
+  const [earningsLoading, setEarningsLoading] = useState(false);
   
   // Track if initial data has been loaded
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
@@ -735,13 +280,14 @@ const SellerDashboard: React.FC = () => {
   const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
   const totalWithdrawals = withdrawalHistory?.withdrawals?.length || 0;
 
-  // Tab configuration
+  // Tab configuration - WITH EARNINGS TAB
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊', badge: null },
+    { id: 'earnings', label: 'Earnings', icon: '💰', badge: null },
     { id: 'listings', label: 'My Listings', icon: '🏠', badge: totalListings > 0 ? totalListings : null },
     { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders > 0 ? orderStats.activeOrders : null },
     { id: 'offers', label: 'Offers', icon: '💌', badge: pendingOffers > 0 ? pendingOffers : null },
-    { id: 'withdraw', label: 'Withdraw', icon: '💰', badge: null }
+    { id: 'withdraw', label: 'Withdraw', icon: '💸', badge: null }
   ];
 
   // Action Cards
@@ -957,7 +503,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Fetch dashboard data - FIXED: Added error handling for undefined APIs
+  // ✅ Fetch dashboard data
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -970,7 +516,7 @@ const SellerDashboard: React.FC = () => {
         return;
       }
 
-      // ✅ FIXED: Check if ordersApi exists
+      // Check if ordersApi exists
       if (!ordersApi || typeof ordersApi.getMySales !== 'function') {
         console.error('ordersApi.getMySales is not available');
         setError('API configuration error. Please check your API setup.');
@@ -1023,22 +569,6 @@ const SellerDashboard: React.FC = () => {
         }
       } catch (fetchError) {
         console.warn('Error fetching offers/listings:', fetchError);
-      }
-
-      // Fetch earnings data
-      try {
-        if (earningsApi && typeof earningsApi.getEarningsSummary === 'function') {
-          const earningsResponse = await earningsApi.getEarningsSummary();
-          if (earningsResponse.success) {
-            // Update stats with earnings data
-            setOrderStats(prev => ({
-              ...prev,
-              availableBalance: earningsResponse.availableBalance || 0
-            }));
-          }
-        }
-      } catch (earningsError) {
-        console.warn('Error fetching earnings:', earningsError);
       }
 
       setInitialDataLoaded(true);
@@ -1150,7 +680,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Fetch withdrawal history from API (not mock)
+  // ✅ Fetch withdrawal history from API
   const fetchWithdrawalHistory = async () => {
     try {
       setWithdrawalsLoading(true);
@@ -1673,11 +1203,6 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Handle withdraw success
-  const handleWithdrawSuccess = (amount: number) => {
-    handleWithdrawRequest(amount);
-  };
-
   // ✅ Handle open Stripe setup with development check
   const handleOpenStripeSetup = () => {
     const isDevelopment = window.location.hostname === 'localhost' || 
@@ -1744,6 +1269,7 @@ const SellerDashboard: React.FC = () => {
   // Determine loading state
   const getCurrentLoadingState = () => {
     if (activeTab === 'overview') return loading && !initialDataLoaded;
+    if (activeTab === 'earnings') return false; // Earnings tab handles its own loading
     if (activeTab === 'listings') return listingsLoading;
     if (activeTab === 'orders') return ordersLoading;
     if (activeTab === 'offers') return offersLoading;
@@ -1752,11 +1278,6 @@ const SellerDashboard: React.FC = () => {
   };
 
   const currentLoading = getCurrentLoadingState();
-
-  // Calculate if user can withdraw (connected and charges enabled)
-  const canWithdraw = stripeStatus?.connected && stripeStatus?.chargesEnabled;
-  const availableBalance = stripeStatus?.availableBalance || 0;
-  const pendingBalance = stripeStatus?.pendingBalance || 0;
 
   // Calculate total withdrawn amount
   const totalWithdrawn = withdrawalHistory?.withdrawals?.reduce(
@@ -1909,35 +1430,12 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* ✅ EARNINGS SECTION - Integration Point */}
-          {stripeStatus?.chargesEnabled && (
-            <EarningsSection
-              stripeStatus={stripeStatus}
-              orderStats={orderStats}
-              totalWithdrawn={totalWithdrawn}
-              onWithdraw={handleWithdrawRequest}
-              canWithdraw={canWithdraw}
-            />
-          )}
-
           {/* ✅ Stripe Account Status (Only show if not connected) */}
           {!stripeStatus?.chargesEnabled && (
             <SafeStripeAccountStatus
               stripeStatus={stripeStatus}
               onSetupClick={handleOpenStripeSetup}
               isLoading={stripeStatus === null}
-            />
-          )}
-
-          {/* ✅ Withdraw Balance Card (Shows in overview) */}
-          {canWithdraw && availableBalance > 0 && (
-            <SafeWithdrawBalance
-              stripeStatus={stripeStatus!}
-              availableBalance={availableBalance}
-              pendingBalance={pendingBalance}
-              onWithdrawSuccess={handleWithdrawSuccess}
-              totalRevenue={orderStats.totalRevenue}
-              thisMonthRevenue={orderStats.thisMonthRevenue}
             />
           )}
 
@@ -1973,7 +1471,7 @@ const SellerDashboard: React.FC = () => {
                       secondaryAction={{
                         label: '💰 Setup Payments',
                         onClick: handleOpenStripeSetup,
-                        visible: !canWithdraw
+                        visible: !stripeStatus?.chargesEnabled
                       }}
                     />
 
@@ -2016,7 +1514,7 @@ const SellerDashboard: React.FC = () => {
                         <div className="text-5xl mb-4 text-gray-300">📦</div>
                         <h3 className="text-lg font-medium text-gray-900">No Orders Yet</h3>
                         <p className="mt-2 text-gray-500 mb-6">
-                          {canWithdraw 
+                          {stripeStatus?.chargesEnabled 
                             ? 'You can accept payments. Create listings to start receiving orders!'
                             : 'Create listings to start receiving orders.'
                           }
@@ -2028,7 +1526,7 @@ const SellerDashboard: React.FC = () => {
                           >
                             + Create Your First Listing
                           </button>
-                          {!canWithdraw && (
+                          {!stripeStatus?.chargesEnabled && (
                             <button
                               onClick={handleOpenStripeSetup}
                               className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow"
@@ -2056,6 +1554,17 @@ const SellerDashboard: React.FC = () => {
                       ))}
                     </div>
                   </div>
+                )}
+
+                {/* Earnings Tab - NEW */}
+                {activeTab === 'earnings' && (
+                  <SafeEarningsTab
+                    stripeStatus={stripeStatus}
+                    orderStats={orderStats}
+                    onWithdrawRequest={handleWithdrawRequest}
+                    loading={earningsLoading}
+                    onRefresh={checkStripeAccountStatus}
+                  />
                 )}
 
                 {/* Offers Tab */}
@@ -2144,7 +1653,7 @@ const SellerDashboard: React.FC = () => {
               show={showStripeSetup}
               onClose={() => setShowStripeSetup(false)}
               onSuccess={handleStripeSetupSuccess}
-              stripeConnected={canWithdraw}
+              stripeConnected={stripeStatus?.chargesEnabled || false}
             />
           )}
 
