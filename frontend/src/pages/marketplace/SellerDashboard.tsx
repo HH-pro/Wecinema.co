@@ -43,12 +43,13 @@ import DeleteListingModal from '../../components/marketplae/seller/DeleteListing
 import VideoPlayerModal from '../../components/marketplae/seller/VideoPlayerModal';
 
 // For now, create a simple formatCurrency function
+// Change this function at the top of your file:
+// For now, create a simple formatCurrency function
 const formatCurrency = (amount: number) => {
-  // Convert cents to rupees
-  const amountInRupees = amount / 100;
-  return `₹${amountInRupees.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  // Convert cents to dollars
+  const amountInDollars = amount / 100;
+  return `$${amountInDollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
-
 // Simple fallback components
 const SimpleFallback = ({ name }: { name: string }) => (
   <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
