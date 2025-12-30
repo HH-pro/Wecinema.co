@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { MdVerifiedUser } from "react-icons/md";
 import { BsDot } from "react-icons/bs";
 import { useNavigate } from "react-router-dom";
@@ -18,17 +18,23 @@ interface GalleryProps {
 	category?: string;
 	length?: number;
 	isFirst?: boolean;
+	className?: string;
 }
 
 const Gallery: React.FC<GalleryProps> = ({
 	title,
-	isFirst,
+	isFirst = false, // ✅ Default parameter
 	data,
 	category,
+	className = "", // ✅ Default parameter
 }) => {
 	const nav = useNavigate();
 	const [loading, setLoading] = useState<boolean>(false);
 	const [videos, setVideos] = useState<any>([]);
+	
+	// ✅ Added proper refs instead of string refs
+	const galleryRef = useRef<HTMLDivElement>(null);
+	const thumbnailContainerRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
 		let isMounted = true;
@@ -48,15 +54,22 @@ const Gallery: React.FC<GalleryProps> = ({
 		return () => {
 			isMounted = false;
 		};
-	}, [category]);
+	}, [category, data]);
+
+	// ✅ Example of using the refs
+	useEffect(() => {
+		if (galleryRef.current) {
+			console.log('Gallery mounted with width:', galleryRef.current.offsetWidth);
+		}
+	}, []);
 
 	const filteredVideo = (category?: string) => {
 		return videos.filter((v: any) =>
-			category ? v.genre.includes(category) : v
+			category ? v.genre?.includes(category) : v
 		);
 	};
 
-	const handleVideolick = (video: any) => {
+	const handleVideoClick = (video: any) => {
 		nav(video.slug ?? "/video/" + generateSlug(video._id), {
 			state: video,
 		});
@@ -68,19 +81,18 @@ const Gallery: React.FC<GalleryProps> = ({
 			<div
 				className={`${
 					isFirst ? "mt-5" : ""
-				} z-1 relative p-2 flex flex-wrap border-b overflow-hidden border-blue-200 sm:mx-4 pb-4`}
+				} z-1 relative p-2 flex flex-wrap border-b overflow-hidden border-blue-200 sm:mx-4 pb-4 ${className}`}
+				ref={galleryRef}
 			>
-				<div className="flex flex-wrap w-full ">
-					{Array(7)
-						.fill("")
-						.map((_, index: any) => (
-							<Skeleton
-								key={index}
-								width={500} // Adjust the width of the Skeleton component
-								style={{ maxWidth: "50%" }}
-								className="cursor-pointer gallery relative flex-wrap  border-gray-200  w-full   p-2 "
-							/>
-						))}
+				<div className="flex flex-wrap w-full">
+					{Array.from({ length: 4 }).map((_, index: number) => (
+						<Skeleton
+							key={index}
+							width={500}
+							style={{ maxWidth: "25%" }}
+							className="cursor-pointer gallery relative flex-wrap border-gray-200 w-full p-2"
+						/>
+					))}
 				</div>
 			</div>
 		);
@@ -88,32 +100,35 @@ const Gallery: React.FC<GalleryProps> = ({
 
 	return (
 		<div
-			className={` ${
-				isFirst ? "mt-2" : ""
-			} z-1 relative p-2 flex flex-wrap border-b  border-blue-200 sm:mx-4 pb-4`}
+			className={` ${isFirst ? "mt-2" : ""} z-1 relative p-2 flex flex-wrap border-b border-blue-200 sm:mx-4 pb-4 ${className}`}
+			ref={galleryRef} // ✅ Using ref object, not string
 		>
 			<div className="mt-1 w-full sm:px-4 py-2 flex justify-between items-center">
 				<h2 className="font-extrabold text-lg sm:text-xl">{title}</h2>
 				<a
 					href="#"
-					className="hover:bg-green-700 whitespace-nowrap hover:text-white hover:border-green-700 border border-green-700 py-1  rounded-xl px-4  cursor-pointer"
+					className="hover:bg-green-700 whitespace-nowrap hover:text-white hover:border-green-700 border border-green-700 py-1 rounded-xl px-4 cursor-pointer"
 				>
 					View all
 				</a>
 			</div>
-			<div className="flex flex-wrap w-full">
-				{filteredVideo(category).map((video: any, index: any) => (
+			
+			{/* ✅ If you were using a string ref like ref="canvas", it would be here */}
+			<div 
+				className="flex flex-wrap w-full"
+				ref={thumbnailContainerRef} // ✅ Using ref object
+			>
+				{filteredVideo(category).map((video: any, index: number) => (
 					<div
-						key={index}
-						style={{ maxWidth: "25%" }} // Adjusted maxWidth to 25%
+						key={video._id || index}
+						style={{ maxWidth: "25%" }}
 						className="cursor-pointer gallery relative flex-wrap border-gray-200 w-full p-2"
 					>
 						<div
-							onClick={() => handleVideolick(video)}
+							onClick={() => handleVideoClick(video)}
 							className="thumbnail relative overflow-hidden"
 							style={{
-								height: "250px", // Adjusted height
-								// borderRadius: "20px", // Rounded corners on top and bottom
+								height: "250px",
 								overflow: "hidden",
 							}}
 						>
@@ -122,7 +137,6 @@ const Gallery: React.FC<GalleryProps> = ({
 								className="border-gray-200 w-full h-full object-cover"
 							/>
 
-							{/* Conditionally render 'For Sale' label */}
 							{video.isForSale && (
 								<span className="absolute top-2 left-2 bg-red-500 text-white text-xs font-semibold py-1 px-2 rounded">
 									For Sale
@@ -132,7 +146,7 @@ const Gallery: React.FC<GalleryProps> = ({
 						<div
 							className="footer flex-1 block"
 							style={{
-								borderRadius: "0 0 15px 15px", // Rounded bottom corners
+								borderRadius: "0 0 15px 15px",
 								overflow: "hidden",
 							}}
 						>
@@ -141,12 +155,12 @@ const Gallery: React.FC<GalleryProps> = ({
 									{truncateText(video.title, 60)}
 								</h3>
 							</a>
-							<address className="flex items-center justify-between mt-8px">
+							<address className="flex items-center justify-between mt-2">
 								<a
 									href="#"
 									className="flex w-full overflow-hidden relative items-center"
 								>
-									<div className="relative rounded-full w-32px box-border flex-shrink-0 block">
+									<div className="relative rounded-full w-8 box-border flex-shrink-0 block">
 										<div
 											className="items-center rounded-full flex-shrink-0 justify-center bg-center bg-no-repeat bg-cover flex"
 											style={{
@@ -183,6 +197,14 @@ const Gallery: React.FC<GalleryProps> = ({
 			</div>
 		</div>
 	);
+};
+
+// ✅ Remove defaultProps and use default parameters instead
+Gallery.defaultProps = {
+	isFirst: false,
+	title: "",
+	data: null,
+	category: undefined,
 };
 
 export default Gallery;
