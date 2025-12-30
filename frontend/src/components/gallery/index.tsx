@@ -18,22 +18,20 @@ interface GalleryProps {
   category?: string;
   length?: number;
   isFirst?: boolean;
-  className?: string;
 }
 
 const Gallery: React.FC<GalleryProps> = ({
-  title = "",
-  isFirst = false,
-  data = null,
-  category = undefined,
-  className = "",
+  title,
+  isFirst,
+  data,
+  category,
 }) => {
   const nav = useNavigate();
   const [loading, setLoading] = useState<boolean>(false);
   const [videos, setVideos] = useState<any>([]);
   
-  // ✅ Create a proper ref for the canvas/container
-  const galleryCanvasRef = useRef<HTMLDivElement>(null); // Fixed!
+  // ✅ FIX: Create a proper ref (ADD THIS LINE)
+  const canvasRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -53,11 +51,11 @@ const Gallery: React.FC<GalleryProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [category, data]);
+  }, [category]);
 
   const filteredVideo = (category?: string) => {
     return videos.filter((v: any) =>
-      category ? v.genre?.includes(category) : v
+      category ? v.genre.includes(category) : v
     );
   };
 
@@ -75,7 +73,7 @@ const Gallery: React.FC<GalleryProps> = ({
           isFirst ? "mt-5" : ""
         } z-1 relative p-2 flex flex-wrap border-b overflow-hidden border-blue-200 sm:mx-4 pb-4`}
       >
-        <div className="flex flex-wrap w-full">
+        <div className="flex flex-wrap w-full ">
           {Array(7)
             .fill("")
             .map((_, index: any) => (
@@ -93,7 +91,9 @@ const Gallery: React.FC<GalleryProps> = ({
 
   return (
     <div
-      className={` ${isFirst ? "mt-2" : ""} z-1 relative p-2 flex flex-wrap border-b border-blue-200 sm:mx-4 pb-4`}
+      className={` ${
+        isFirst ? "mt-2" : ""
+      } z-1 relative p-2 flex flex-wrap border-b border-blue-200 sm:mx-4 pb-4`}
     >
       <div className="mt-1 w-full sm:px-4 py-2 flex justify-between items-center">
         <h2 className="font-extrabold text-lg sm:text-xl">{title}</h2>
@@ -105,11 +105,9 @@ const Gallery: React.FC<GalleryProps> = ({
         </a>
       </div>
       
-      {/* ✅ LINE 25: This is likely where the problematic div is */}
-      {/* OLD: <div ref="canvas" className="flex flex-wrap w-full"> */}
-      {/* NEW: Using proper ref object */}
+      {/* ✅ LINE 25: This div likely has ref="canvas" - REPLACE IT */}
       <div 
-        ref={galleryCanvasRef} // ✅ Fixed: Using ref object instead of string
+        ref={canvasRef} // ✅ CHANGED: from ref="canvas" to ref={canvasRef}
         className="flex flex-wrap w-full"
       >
         {filteredVideo(category).map((video: any, index: any) => (
