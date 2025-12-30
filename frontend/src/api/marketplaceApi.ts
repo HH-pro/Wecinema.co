@@ -1,4 +1,4 @@
-// src/api/marketplaceApi.js - CLEANED VERSION
+// src/api/marketplaceApi.js - UPDATED WITH PROPER EXPORTS
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:3000';
@@ -478,7 +478,7 @@ const earningsApi = {
 // ✅ UTILITY FUNCTIONS (PUBLIC)
 // ============================================
 
-const formatCurrency = (amount) => {
+export const formatCurrency = (amount) => {
   const amountInRupees = (amount || 0) / 100;
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
@@ -488,7 +488,7 @@ const formatCurrency = (amount) => {
   }).format(amountInRupees);
 };
 
-const formatCurrencyAmount = (amount) => {
+export const formatCurrencyAmount = (amount) => {
   const amountInRupees = (amount || 0) / 100;
   return new Intl.NumberFormat('en-IN', {
     minimumFractionDigits: 2,
@@ -496,7 +496,7 @@ const formatCurrencyAmount = (amount) => {
   }).format(amountInRupees);
 };
 
-const formatCurrencyShort = (amount) => {
+export const formatCurrencyShort = (amount) => {
   const amountInRupees = (amount || 0) / 100;
   if (amountInRupees >= 10000000) {
     return `₹${(amountInRupees / 10000000).toFixed(1)}Cr`;
@@ -513,7 +513,7 @@ const formatCurrencyShort = (amount) => {
   }).format(amountInRupees);
 };
 
-const testApiConnection = async () => {
+export const testApiConnection = async () => {
   try {
     const response = await axios.get(`${API_BASE_URL}/marketplace/test`);
     return {
@@ -530,12 +530,12 @@ const testApiConnection = async () => {
   }
 };
 
-const checkAuth = () => {
+export const checkAuth = () => {
   const token = getAuthToken();
   return !!token;
 };
 
-const getCurrentUserId = () => {
+export const getCurrentUserId = () => {
   const token = getAuthToken();
   if (!token) return null;
   
@@ -543,6 +543,7 @@ const getCurrentUserId = () => {
     const payload = JSON.parse(atob(token.split('.')[1]));
     return payload.userId || payload.id || null;
   } catch (error) {
+    console.error('Error parsing token:', error);
     return null;
   }
 };
@@ -604,4 +605,24 @@ const marketplaceApi = {
   getAvailableBalance: earningsApi.getAvailableBalance
 };
 
+// ============================================
+// ✅ EXPORT CONFIGURATION
+// ============================================
+
+// Export the full API object as default
 export default marketplaceApi;
+
+// Export all individual functions and modules
+export { marketplaceApi };
+
+// Export all individual utility functions
+
+// Export API modules (optional - for advanced usage)
+export {
+  listingsApi,
+  ordersApi,
+  offersApi,
+  stripeApi,
+  withdrawalsApi,
+  earningsApi
+};
