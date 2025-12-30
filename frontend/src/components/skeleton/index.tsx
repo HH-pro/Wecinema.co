@@ -1,6 +1,12 @@
 import React from "react";
 import styled, { keyframes } from "styled-components";
 
+// Define proper TypeScript interface
+interface SkeletonLoaderProps {
+  width?: number | string;
+  className?: string;
+}
+
 // Skeleton styles
 const skeletonAnimation = keyframes`
   0% {
@@ -15,33 +21,29 @@ const skeletonAnimation = keyframes`
 `;
 
 const SkeletonContainer = styled.div`
-	margin-bottom: 2em;
+  margin-bottom: 2em;
 `;
 
-const SkeletonImage = styled.div<any>`
-	height: 240px;
-	width:380px;
-	border-radius: 6px;
-	background: #94856799;
-	margin-top: 10px;
-	animation: ${skeletonAnimation} 1.5s infinite;
+const SkeletonImage = styled.div<{ width?: number | string }>`
+  height: 240px;
+  width: ${props => typeof props.width === 'number' ? `${props.width}px` : props.width || '380px'};
+  border-radius: 6px;
+  background: #94856799;
+  margin-top: 10px;
+  animation: ${skeletonAnimation} 1.5s infinite;
 `;
 
-
-const SkeletonLoader: React.FC<any> = ({ width }) => {
-	return (
-		<SkeletonContainer className="gallery">
-			{/* <SkeletonAvatar /> */}
-			<SkeletonImage width={width} className="llle" />
-			{/* <SkeletonAuthor /> */}
-
-			{/* <SkeletonFooter /> */}
-		</SkeletonContainer>
-	);
+const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({ 
+  width = 200, // ✅ Default parameter value instead of defaultProps
+  className = "" 
+}) => {
+  return (
+    <SkeletonContainer className={`gallery ${className}`.trim()}>
+      <SkeletonImage width={width} className="llle" />
+    </SkeletonContainer>
+  );
 };
 
-SkeletonLoader.defaultProps ={
-    width: 200,
-    
-}
+// ✅ REMOVED: SkeletonLoader.defaultProps
+
 export default SkeletonLoader;
