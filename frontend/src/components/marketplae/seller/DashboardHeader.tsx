@@ -107,7 +107,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         </div>
       </div>
 
-      {/* Stripe Setup Reminder - Only show if not connected
+      Stripe Setup Reminder - Only show if not connected
       {!stripeStatus?.connected && (
         <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -128,7 +128,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
             </button>
           </div>
         </div>
-      )} */}
+      )}
     </div>
   );
 };
