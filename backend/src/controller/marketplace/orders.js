@@ -1102,7 +1102,6 @@ router.put("/:orderId/request-revision", authenticateMiddleware, async (req, res
     });
   }
 });
-
 router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -1123,7 +1122,8 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
       buyerId: userId,
       status: 'delivered'
     }).populate('sellerId', 'username email firstName lastName stripeAccountId')
-      .populate('buyerId', 'username email firstName lastName');
+      .populate('buyerId', 'username email firstName lastName')
+      .populate('listingId', 'title');
 
     if (!order) {
       return res.status(404).json({ 
@@ -1132,19 +1132,9 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    // Check if order has been delivered for at least 24 hours (optional)
-    const deliveredTime = new Date(order.deliveredAt);
-    const currentTime = new Date();
-    const hoursSinceDelivery = (currentTime - deliveredTime) / (1000 * 60 * 60);
-
-    if (hoursSinceDelivery < 1) { // Minimum 1 hour to review
-      return res.status(400).json({
-        success: false,
-        error: 'Please review the delivery for at least 1 hour before completing',
-        hoursDelivered: Math.round(hoursSinceDelivery)
-      });
-    }
-
+    // ✅ REMOVED: 1-hour waiting period check
+    // Orders can be completed immediately after delivery
+    
     // Process payment to seller
     if (order.stripePaymentIntentId && !order.paymentReleased && order.sellerId.stripeAccountId) {
       try {
@@ -1155,10 +1145,17 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
         const platformFee = order.amount * platformFeePercent;
         const sellerAmount = order.amount - platformFee;
 
-        // Capture the payment intent
-        await stripe.paymentIntents.capture(order.stripePaymentIntentId);
+        // ✅ Capture the payment intent (if not already captured)
+        const paymentIntent = await stripe.paymentIntents.retrieve(order.stripePaymentIntentId);
+        
+        if (paymentIntent.status !== 'succeeded') {
+          await stripe.paymentIntents.capture(order.stripePaymentIntentId);
+          console.log('✅ Payment intent captured');
+        } else {
+          console.log('✅ Payment intent already captured');
+        }
 
-        // Create transfer to seller's Stripe account
+        // ✅ Create transfer to seller's Stripe account
         const transfer = await stripe.transfers.create({
           amount: Math.round(sellerAmount * 100), // Convert to cents
           currency: 'usd',
@@ -1167,7 +1164,9 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
           metadata: {
             orderId: orderId,
             buyerId: order.buyerId._id.toString(),
-            sellerId: order.sellerId._id.toString()
+            sellerId: order.sellerId._id.toString(),
+            listingTitle: order.listingId?.title || 'N/A',
+            amount: order.amount
           }
         });
 
@@ -1187,6 +1186,12 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
           stripeError: stripeError.message
         });
       }
+    } else {
+      console.log('ℹ️ Payment processing skipped:', {
+        hasPaymentIntent: !!order.stripePaymentIntentId,
+        paymentReleased: order.paymentReleased,
+        hasStripeAccount: !!order.sellerId.stripeAccountId
+      });
     }
 
     // Update order status
@@ -1206,7 +1211,8 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
     try {
       const siteName = process.env.SITE_NAME || 'WeCinema';
       const siteUrl = process.env.SITE_URL || 'http://localhost:5173';
-      const orderLink = `${siteUrl}/seller/orders/${orderId}`;
+      const sellerDashboardLink = `${siteUrl}/seller/dashboard`;
+      const earningsLink = `${siteUrl}/seller/earnings`;
 
       await emailService.sendOrderCompletionNotification(
         order.sellerId.email,
@@ -1218,21 +1224,46 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
           orderAmount: order.amount,
           sellerAmount: order.sellerAmount || (order.amount * 0.85),
           platformFee: order.platformFee || (order.amount * 0.15),
-          orderLink,
-          orderNumber: order.orderNumber || order._id.toString().slice(-8).toUpperCase()
+          sellerDashboardLink,
+          earningsLink,
+          orderNumber: order.orderNumber || order._id.toString().slice(-8).toUpperCase(),
+          completionDate: new Date().toLocaleDateString()
         }
       );
+      console.log('📧 Completion email sent to seller:', order.sellerId.email);
     } catch (emailError) {
       console.error('Email sending failed:', emailError.message);
+      // Don't fail the order completion if email fails
+    }
+
+    // Send confirmation email to buyer
+    try {
+      await emailService.sendOrderCompletionConfirmation(
+        order.buyerId.email,
+        {
+          buyerName: order.buyerId.firstName || order.buyerId.username,
+          orderTitle: order.listingId?.title || 'Order',
+          orderAmount: order.amount,
+          orderNumber: order.orderNumber || order._id.toString().slice(-8).toUpperCase(),
+          completionDate: new Date().toLocaleDateString()
+        }
+      );
+      console.log('📧 Confirmation email sent to buyer:', order.buyerId.email);
+    } catch (emailError) {
+      console.error('Buyer email sending failed:', emailError.message);
     }
 
     const updatedOrder = await Order.findById(orderId)
-      .populate('buyerId', 'username avatar')
-      .populate('sellerId', 'username avatar')
-      .populate('listingId', 'title')
+      .populate('buyerId', 'username avatar email')
+      .populate('sellerId', 'username avatar email')
+      .populate('listingId', 'title images')
       .lean();
 
-    console.log('🎉 Order completed successfully by buyer:', orderId);
+    console.log('🎉 Order completed successfully by buyer:', orderId, {
+      paymentReleased: order.paymentReleased,
+      sellerAmount: order.sellerAmount,
+      platformFee: order.platformFee
+    });
 
     res.status(200).json({ 
       success: true,
@@ -1241,18 +1272,19 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
       paymentReleased: order.paymentReleased,
       sellerAmount: order.sellerAmount,
       platformFee: order.platformFee,
-      nextSteps: 'Consider leaving a review for the seller'
+      nextSteps: 'Consider leaving a review for the seller',
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('Error completing order:', error);
+    console.error('❌ Error completing order:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to complete order',
-      details: error.message 
+      details: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 });
-
 router.put("/:orderId/cancel-by-buyer", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
