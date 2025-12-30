@@ -1396,14 +1396,14 @@ const SellerDashboard: React.FC = () => {
           )}
 
           {/* Header */}
-          <SafeDashboardHeader
+          {/* <SafeDashboardHeader
             title="Seller Dashboard"
             subtitle="Manage orders, track earnings, and grow your business"
             // earnings={safeFormatCurrency(orderStats.totalRevenue * 100)} // Convert to cents
             onRefresh={handleRefresh}
             refreshing={refreshing}
             // stripeStatus={stripeStatus}
-          />
+          /> */}
 
           {/* ✅ Development Mode Banner */}
           {(process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') && (
