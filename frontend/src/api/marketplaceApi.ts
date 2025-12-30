@@ -1,4 +1,4 @@
-// src/api/marketplaceApi.js
+// src/api/marketplaceApi.js - UPDATED VERSION
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:3000';
@@ -19,8 +19,42 @@ const getHeaders = () => {
   };
 };
 
+// Helper function to normalize API response
+const normalizeResponse = (response) => {
+  const data = response?.data || response;
+  
+  // Check different possible response structures
+  if (data.success !== undefined) {
+    return {
+      success: data.success,
+      ...data
+    };
+  }
+  
+  // If no success property, assume it's successful if we have data
+  return {
+    success: true,
+    ...data
+  };
+};
+
+// Helper function to handle API errors
+const handleApiError = (error, defaultMessage = 'API Error') => {
+  console.error('API Error:', error);
+  
+  const errorData = error.response?.data || {};
+  const errorMessage = errorData.message || errorData.error || error.message || defaultMessage;
+  
+  return {
+    success: false,
+    error: errorMessage,
+    status: error.response?.status,
+    data: errorData
+  };
+};
+
 // ============================================
-// ✅ LISTINGS API
+// ✅ LISTINGS API - UPDATED
 // ============================================
 
 export const listingsApi = {
@@ -28,10 +62,9 @@ export const listingsApi = {
   getAllListings: async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/marketplace/listings`);
-      return response.data;
+      return normalizeResponse(response);
     } catch (error) {
-      console.error('Error fetching all listings:', error);
-      throw error;
+      return handleApiError(error, 'Failed to fetch listings');
     }
   },
 
@@ -43,10 +76,9 @@ export const listingsApi = {
         params: { page, limit, status },
         ...getHeaders()
       });
-      return response.data;
+      return normalizeResponse(response);
     } catch (error) {
-      console.error('Error fetching my listings:', error);
-      throw error;
+      return handleApiError(error, 'Failed to fetch your listings');
     }
   },
 
@@ -58,65 +90,91 @@ export const listingsApi = {
         listingData,
         getHeaders()
       );
-      return response.data;
+      return normalizeResponse(response);
     } catch (error) {
-      console.error('Error creating listing:', error);
-      throw error;
+      return handleApiError(error, 'Failed to create listing');
     }
   },
 
-  // Edit listing
+  // ✅ UPDATED: Edit listing with consistent response
   editListing: async (listingId, updateData) => {
     try {
+      // Prepare data - only send what we need
+      const dataToSend = {
+        title: updateData.title,
+        description: updateData.description,
+        price: updateData.price
+      };
+      
+      console.log('📝 Edit API call:', { listingId, dataToSend });
+      
       const response = await axios.put(
-        `${API_BASE_URL}/marketplace/listing/${listingId}`,
-        updateData,
+        `${API_BASE_URL}/marketplace/listings/${listingId}`,
+        dataToSend,
         getHeaders()
       );
-      return response.data;
+      
+      const normalized = normalizeResponse(response);
+      console.log('✅ Edit API response:', normalized);
+      return normalized;
+      
     } catch (error) {
-      console.error('Error editing listing:', error);
-      throw error;
+      const errorResponse = handleApiError(error, 'Failed to update listing');
+      console.error('❌ Edit API error:', errorResponse);
+      return errorResponse;
     }
   },
 
-  // Toggle listing status (activate/deactivate)
+  // ✅ UPDATED: Toggle listing status with consistent response
   toggleListingStatus: async (listingId) => {
     try {
-      const response = await axios.post(
-        `${API_BASE_URL}/marketplace/listing/${listingId}/toggle-status`,
+      console.log('🔄 Toggle API call:', listingId);
+      
+      const response = await axios.patch(
+        `${API_BASE_URL}/marketplace/listings/${listingId}/toggle-status`,
         {},
         getHeaders()
       );
-      return response.data;
+      
+      const normalized = normalizeResponse(response);
+      console.log('✅ Toggle API response:', normalized);
+      return normalized;
+      
     } catch (error) {
-      console.error('Error toggling listing status:', error);
-      throw error;
+      const errorResponse = handleApiError(error, 'Failed to toggle listing status');
+      console.error('❌ Toggle API error:', errorResponse);
+      return errorResponse;
     }
   },
 
-  // Delete listing
+  // ✅ UPDATED: Delete listing with consistent response
   deleteListing: async (listingId) => {
     try {
+      console.log('🗑️ Delete API call:', listingId);
+      
       const response = await axios.delete(
         `${API_BASE_URL}/marketplace/listings/${listingId}`,
         getHeaders()
       );
-      return response.data;
+      
+      const normalized = normalizeResponse(response);
+      console.log('✅ Delete API response:', normalized);
+      return normalized;
+      
     } catch (error) {
-      console.error('Error deleting listing:', error);
-      throw error;
+      const errorResponse = handleApiError(error, 'Failed to delete listing');
+      console.error('❌ Delete API error:', errorResponse);
+      return errorResponse;
     }
   },
 
   // Get single listing details
   getListingDetails: async (listingId) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/marketplace/listing/${listingId}`);
-      return response.data;
+      const response = await axios.get(`${API_BASE_URL}/marketplace/listings/${listingId}`);
+      return normalizeResponse(response);
     } catch (error) {
-      console.error('Error fetching listing details:', error);
-      throw error;
+      return handleApiError(error, 'Failed to fetch listing details');
     }
   },
 
@@ -127,16 +185,15 @@ export const listingsApi = {
       const response = await axios.get(`${API_BASE_URL}/marketplace/user/${userId}/listings`, {
         params: { page, limit, status }
       });
-      return response.data;
+      return normalizeResponse(response);
     } catch (error) {
-      console.error('Error fetching user listings:', error);
-      throw error;
+      return handleApiError(error, 'Failed to fetch user listings');
     }
   }
 };
 
 // ============================================
-// ✅ ORDERS API
+// ✅ ORDERS API - UPDATED
 // ============================================
 
 export const ordersApi = {
@@ -156,33 +213,56 @@ export const ordersApi = {
             params: { limit: 100 }
           });
           
-          if (response.data.success) {
-            return response.data.sales || response.data.orders || response.data.data || [];
+          const data = response.data || response;
+          
+          // Try to extract orders from different response structures
+          const orders = data.sales || data.orders || data.data || data;
+          
+          // If we got an array, return it
+          if (Array.isArray(orders)) {
+            console.log('📊 Found orders at:', endpoint);
+            return orders;
           }
+          
+          // If response has success property
+          if (data.success && Array.isArray(data.data)) {
+            return data.data;
+          }
+          
         } catch (err) {
+          console.log(`⚠️ Endpoint ${endpoint} failed:`, err.message);
           continue;
         }
       }
       
+      console.log('⚠️ No orders found in any endpoint');
       return [];
+      
     } catch (error) {
-      console.error('Error fetching sales:', error);
-      throw error;
+      console.error('❌ Error fetching sales:', error);
+      return [];
     }
   },
 
-  // Update order status
+  // ✅ UPDATED: Update order status with consistent response
   updateOrderStatus: async (orderId, status, additionalData = {}) => {
     try {
+      console.log('📦 Update order status:', { orderId, status });
+      
       const response = await axios.put(
         `${API_BASE_URL}/marketplace/orders/${orderId}/status`,
         { status, ...additionalData },
         getHeaders()
       );
-      return response.data;
+      
+      const normalized = normalizeResponse(response);
+      console.log('✅ Order status update response:', normalized);
+      return normalized;
+      
     } catch (error) {
-      console.error('Error updating order status:', error);
-      throw error;
+      const errorResponse = handleApiError(error, 'Failed to update order status');
+      console.error('❌ Order status update error:', errorResponse);
+      return errorResponse;
     }
   },
 
@@ -193,16 +273,15 @@ export const ordersApi = {
         `${API_BASE_URL}/marketplace/orders/${orderId}`,
         getHeaders()
       );
-      return response.data;
+      return normalizeResponse(response);
     } catch (error) {
-      console.error('Error fetching order details:', error);
-      throw error;
+      return handleApiError(error, 'Failed to fetch order details');
     }
   }
 };
 
 // ============================================
-// ✅ OFFERS API
+// ✅ OFFERS API - UPDATED
 // ============================================
 
 export const offersApi = {
@@ -213,46 +292,66 @@ export const offersApi = {
         `${API_BASE_URL}/marketplace/offers/received-offers`,
         getHeaders()
       );
-      return response.data;
+      const normalized = normalizeResponse(response);
+      
+      // Ensure offers array exists
+      if (normalized.success && !normalized.offers && normalized.data) {
+        normalized.offers = normalized.data;
+      }
+      
+      return normalized;
     } catch (error) {
-      console.error('Error fetching offers:', error);
-      throw error;
+      return handleApiError(error, 'Failed to fetch offers');
     }
   },
 
-  // Accept offer
+  // ✅ UPDATED: Accept offer with consistent response
   acceptOffer: async (offerId) => {
     try {
+      console.log('✅ Accept offer API call:', offerId);
+      
       const response = await axios.put(
         `${API_BASE_URL}/marketplace/offers/${offerId}/accept`,
         {},
         getHeaders()
       );
-      return response.data;
+      
+      const normalized = normalizeResponse(response);
+      console.log('✅ Accept offer response:', normalized);
+      return normalized;
+      
     } catch (error) {
-      console.error('Error accepting offer:', error);
-      throw error;
+      const errorResponse = handleApiError(error, 'Failed to accept offer');
+      console.error('❌ Accept offer error:', errorResponse);
+      return errorResponse;
     }
   },
 
-  // Reject offer
+  // ✅ UPDATED: Reject offer with consistent response
   rejectOffer: async (offerId) => {
     try {
+      console.log('❌ Reject offer API call:', offerId);
+      
       const response = await axios.put(
         `${API_BASE_URL}/marketplace/offers/${offerId}/reject`,
         {},
         getHeaders()
       );
-      return response.data;
+      
+      const normalized = normalizeResponse(response);
+      console.log('✅ Reject offer response:', normalized);
+      return normalized;
+      
     } catch (error) {
-      console.error('Error rejecting offer:', error);
-      throw error;
+      const errorResponse = handleApiError(error, 'Failed to reject offer');
+      console.error('❌ Reject offer error:', errorResponse);
+      return errorResponse;
     }
   }
 };
 
 // ============================================
-// ✅ STRIPE API
+// ✅ STRIPE API - UPDATED
 // ============================================
 
 export const stripeApi = {
@@ -263,10 +362,9 @@ export const stripeApi = {
         `${API_BASE_URL}/marketplace/stripe/status`,
         getHeaders()
       );
-      return response.data;
+      return normalizeResponse(response);
     } catch (error) {
-      console.error('Error fetching Stripe status:', error);
-      throw error;
+      return handleApiError(error, 'Failed to fetch Stripe status');
     }
   },
 
@@ -278,10 +376,9 @@ export const stripeApi = {
         {},
         getHeaders()
       );
-      return response.data;
+      return normalizeResponse(response);
     } catch (error) {
-      console.error('Error creating Stripe link:', error);
-      throw error;
+      return handleApiError(error, 'Failed to create Stripe link');
     }
   }
 };
@@ -316,6 +413,12 @@ export const testApiConnection = async () => {
   }
 };
 
+// Check if user is authenticated
+export const checkAuth = () => {
+  const token = getAuthToken();
+  return !!token;
+};
+
 // Export all APIs
 export default {
   listings: listingsApi,
@@ -324,6 +427,7 @@ export default {
   stripe: stripeApi,
   utils: {
     formatCurrency,
-    testApiConnection
+    testApiConnection,
+    checkAuth
   }
 };
