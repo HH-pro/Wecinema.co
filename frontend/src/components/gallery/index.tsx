@@ -18,20 +18,23 @@ interface GalleryProps {
   category?: string;
   length?: number;
   isFirst?: boolean;
+  className?: string;
 }
 
 const Gallery: React.FC<GalleryProps> = ({
-  title,
-  isFirst,
-  data,
-  category,
+  title = "",
+  isFirst = false,
+  data = null,
+  category = undefined,
+  className = "",
 }) => {
   const nav = useNavigate();
   const [loading, setLoading] = useState<boolean>(false);
   const [videos, setVideos] = useState<any>([]);
   
-  // ✅ FIX: Create a proper ref (ADD THIS LINE)
-  const canvasRef = useRef<HTMLDivElement>(null);
+  // ✅ FIX 1: Create proper refs instead of string refs
+  const galleryCanvasRef = useRef<HTMLDivElement>(null);
+  const videoThumbnailRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
     let isMounted = true;
@@ -51,11 +54,16 @@ const Gallery: React.FC<GalleryProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [category]);
+  }, [category, data]);
+
+  // Initialize ref array when videos change
+  useEffect(() => {
+    videoThumbnailRefs.current = videoThumbnailRefs.current.slice(0, videos.length);
+  }, [videos]);
 
   const filteredVideo = (category?: string) => {
     return videos.filter((v: any) =>
-      category ? v.genre.includes(category) : v
+      category ? v.genre?.includes(category) : v
     );
   };
 
@@ -71,19 +79,17 @@ const Gallery: React.FC<GalleryProps> = ({
       <div
         className={`${
           isFirst ? "mt-5" : ""
-        } z-1 relative p-2 flex flex-wrap border-b overflow-hidden border-blue-200 sm:mx-4 pb-4`}
+        } z-1 relative p-2 flex flex-wrap border-b overflow-hidden border-blue-200 sm:mx-4 pb-4 ${className}`}
       >
-        <div className="flex flex-wrap w-full ">
-          {Array(7)
-            .fill("")
-            .map((_, index: any) => (
-              <Skeleton
-                key={index}
-                width={500}
-                style={{ maxWidth: "50%" }}
-                className="cursor-pointer gallery relative flex-wrap border-gray-200 w-full p-2"
-              />
-            ))}
+        <div className="flex flex-wrap w-full">
+          {Array.from({ length: 4 }).map((_, index: number) => (
+            <Skeleton
+              key={index}
+              width={500}
+              style={{ maxWidth: "25%" }}
+              className="cursor-pointer gallery relative flex-wrap border-gray-200 w-full p-2"
+            />
+          ))}
         </div>
       </div>
     );
@@ -91,9 +97,7 @@ const Gallery: React.FC<GalleryProps> = ({
 
   return (
     <div
-      className={` ${
-        isFirst ? "mt-2" : ""
-      } z-1 relative p-2 flex flex-wrap border-b border-blue-200 sm:mx-4 pb-4`}
+      className={` ${isFirst ? "mt-2" : ""} z-1 relative p-2 flex flex-wrap border-b border-blue-200 sm:mx-4 pb-4 ${className}`}
     >
       <div className="mt-1 w-full sm:px-4 py-2 flex justify-between items-center">
         <h2 className="font-extrabold text-lg sm:text-xl">{title}</h2>
@@ -105,16 +109,19 @@ const Gallery: React.FC<GalleryProps> = ({
         </a>
       </div>
       
-      {/* ✅ LINE 25: This div likely has ref="canvas" - REPLACE IT */}
+      {/* ✅ FIX 2: Line 25 - Using ref object instead of string ref */}
+      {/* OLD: <div ref="canvas" className="flex flex-wrap w-full"> */}
+      {/* NEW: */}
       <div 
-        ref={canvasRef} // ✅ CHANGED: from ref="canvas" to ref={canvasRef}
+        ref={galleryCanvasRef} 
         className="flex flex-wrap w-full"
       >
-        {filteredVideo(category).map((video: any, index: any) => (
+        {filteredVideo(category).map((video: any, index: number) => (
           <div
-            key={index}
+            key={video._id || index}
             style={{ maxWidth: "25%" }}
             className="cursor-pointer gallery relative flex-wrap border-gray-200 w-full p-2"
+            ref={el => videoThumbnailRefs.current[index] = el}
           >
             <div
               onClick={() => handleVideoClick(video)}
@@ -147,12 +154,12 @@ const Gallery: React.FC<GalleryProps> = ({
                   {truncateText(video.title, 60)}
                 </h3>
               </a>
-              <address className="flex items-center justify-between mt-8px">
+              <address className="flex items-center justify-between mt-2">
                 <a
                   href="#"
                   className="flex w-full overflow-hidden relative items-center"
                 >
-                  <div className="relative rounded-full w-32px box-border flex-shrink-0 block">
+                  <div className="relative rounded-full w-8 box-border flex-shrink-0 block">
                     <div
                       className="items-center rounded-full flex-shrink-0 justify-center bg-center bg-no-repeat bg-cover flex"
                       style={{
@@ -191,4 +198,5 @@ const Gallery: React.FC<GalleryProps> = ({
   );
 };
 
+// ✅ FIX 3: No defaultProps - using default parameters instead
 export default Gallery;
