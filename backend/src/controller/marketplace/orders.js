@@ -11,8 +11,8 @@ const Offer = require("../../models/marketplace/offer");
 const User = require("../../models/user");
 const Delivery = require("../../models/marketplace/Delivery");
 const { authenticateMiddleware } = require("../../utils");
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const emailService = require("../../../services/emailService");
+const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
 
 // ========== FILE UPLOAD CONFIGURATION ========== //
 const uploadsDir = 'uploads/deliveries/';
