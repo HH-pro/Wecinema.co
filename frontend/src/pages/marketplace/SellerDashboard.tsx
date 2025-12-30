@@ -1468,11 +1468,11 @@ const SellerDashboard: React.FC = () => {
                         label: '+ Create New Listing',
                         onClick: () => navigate('/marketplace/create')
                       }}
-                      secondaryAction={{
-                        label: '💰 Setup Payments',
-                        onClick: handleOpenStripeSetup,
-                        visible: !stripeStatus?.chargesEnabled
-                      }}
+                      // secondaryAction={{
+                      //   label: '💰 Setup Payments',
+                      //   onClick: handleOpenStripeSetup,
+                      //   visible: !stripeStatus?.chargesEnabled
+                      // }}
                     />
 
                     {/* Stats Grid */}
