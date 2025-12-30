@@ -14,19 +14,26 @@ interface WithdrawBalanceProps {
   availableBalance: number;
   pendingBalance: number;
   onWithdrawSuccess: (amount: number) => void;
+  // Add new props for live earnings
+  totalRevenue?: number;
+  thisMonthRevenue?: number;
 }
 
 const WithdrawBalance: React.FC<WithdrawBalanceProps> = ({
   stripeStatus,
   availableBalance,
   pendingBalance,
-  onWithdrawSuccess
+  onWithdrawSuccess,
+  totalRevenue = 0,
+  thisMonthRevenue = 0
 }) => {
   const [showWithdrawForm, setShowWithdrawForm] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
 
   const canWithdraw = stripeStatus?.connected && stripeStatus?.chargesEnabled;
+  const totalEarnings = totalRevenue * 100; // Convert to cents
+  const thisMonthEarnings = thisMonthRevenue * 100; // Convert to cents
 
   const handleWithdrawClick = () => {
     if (!canWithdraw) {
@@ -80,8 +87,8 @@ const WithdrawBalance: React.FC<WithdrawBalanceProps> = ({
             <span className="text-xl text-white">💰</span>
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900">Withdraw Your Earnings</h3>
-            <div className="flex items-baseline gap-4 mt-2">
+            <h3 className="font-semibold text-gray-900">Your Earnings Overview</h3>
+            <div className="flex flex-wrap items-baseline gap-6 mt-2">
               <div>
                 <p className="text-sm text-gray-600">Available to withdraw</p>
                 <p className="text-2xl font-bold text-gray-900">
@@ -93,6 +100,22 @@ const WithdrawBalance: React.FC<WithdrawBalanceProps> = ({
                   <p className="text-sm text-gray-600">Pending</p>
                   <p className="text-lg font-semibold text-yellow-600">
                     {formatCurrency(pendingBalance)}
+                  </p>
+                </div>
+              )}
+              {totalEarnings > 0 && (
+                <div className="border-l border-emerald-200 pl-4">
+                  <p className="text-sm text-gray-600">Total Earnings</p>
+                  <p className="text-lg font-semibold text-purple-600">
+                    {formatCurrency(totalEarnings)}
+                  </p>
+                </div>
+              )}
+              {thisMonthEarnings > 0 && (
+                <div className="border-l border-emerald-200 pl-4">
+                  <p className="text-sm text-gray-600">This Month</p>
+                  <p className="text-lg font-semibold text-blue-600">
+                    {formatCurrency(thisMonthEarnings)}
                   </p>
                 </div>
               )}
