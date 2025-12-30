@@ -22,19 +22,19 @@ interface GalleryProps {
 }
 
 const Gallery: React.FC<GalleryProps> = ({
-	title = "", // ✅ Default parameter
-	isFirst = false, // ✅ Default parameter
-	data = null, // ✅ Default parameter
-	category = undefined, // ✅ Default parameter
-	className = "", // ✅ Default parameter
+	title = "",
+	isFirst = false,
+	data = null,
+	category = undefined,
+	className = "",
 }) => {
 	const nav = useNavigate();
 	const [loading, setLoading] = useState<boolean>(false);
 	const [videos, setVideos] = useState<any>([]);
 	
-	// ✅ Added proper refs instead of string refs
-	const galleryRef = useRef<HTMLDivElement>(null);
-	const thumbnailContainerRef = useRef<HTMLDivElement>(null);
+	// ✅ Create proper refs for any canvas elements
+	const videoThumbnailRefs = useRef<Array<HTMLDivElement | null>>([]);
+	const galleryContainerRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
 		let isMounted = true;
@@ -56,12 +56,10 @@ const Gallery: React.FC<GalleryProps> = ({
 		};
 	}, [category, data]);
 
-	// ✅ Example of using the refs
+	// Initialize ref array for thumbnails
 	useEffect(() => {
-		if (galleryRef.current) {
-			console.log('Gallery mounted with width:', galleryRef.current.offsetWidth);
-		}
-	}, []);
+		videoThumbnailRefs.current = videoThumbnailRefs.current.slice(0, videos.length);
+	}, [videos]);
 
 	const filteredVideo = (category?: string) => {
 		return videos.filter((v: any) =>
@@ -82,7 +80,7 @@ const Gallery: React.FC<GalleryProps> = ({
 				className={`${
 					isFirst ? "mt-5" : ""
 				} z-1 relative p-2 flex flex-wrap border-b overflow-hidden border-blue-200 sm:mx-4 pb-4 ${className}`}
-				ref={galleryRef}
+				ref={galleryContainerRef}
 			>
 				<div className="flex flex-wrap w-full">
 					{Array.from({ length: 4 }).map((_, index: number) => (
@@ -101,7 +99,7 @@ const Gallery: React.FC<GalleryProps> = ({
 	return (
 		<div
 			className={` ${isFirst ? "mt-2" : ""} z-1 relative p-2 flex flex-wrap border-b border-blue-200 sm:mx-4 pb-4 ${className}`}
-			ref={galleryRef} // ✅ Using ref object, not string
+			ref={galleryContainerRef}
 		>
 			<div className="mt-1 w-full sm:px-4 py-2 flex justify-between items-center">
 				<h2 className="font-extrabold text-lg sm:text-xl">{title}</h2>
@@ -113,16 +111,13 @@ const Gallery: React.FC<GalleryProps> = ({
 				</a>
 			</div>
 			
-			{/* ✅ If you were using a string ref like ref="canvas", it would be here */}
-			<div 
-				className="flex flex-wrap w-full"
-				ref={thumbnailContainerRef} // ✅ Using ref object
-			>
+			<div className="flex flex-wrap w-full">
 				{filteredVideo(category).map((video: any, index: number) => (
 					<div
 						key={video._id || index}
 						style={{ maxWidth: "25%" }}
 						className="cursor-pointer gallery relative flex-wrap border-gray-200 w-full p-2"
+						ref={el => videoThumbnailRefs.current[index] = el} // ✅ Proper ref assignment
 					>
 						<div
 							onClick={() => handleVideoClick(video)}
@@ -132,9 +127,12 @@ const Gallery: React.FC<GalleryProps> = ({
 								overflow: "hidden",
 							}}
 						>
+							{/* ⚠️ Check if VideoThumbnail accepts ref prop correctly */}
 							<VideoThumbnail
 								videoUrl={video.file}
 								className="border-gray-200 w-full h-full object-cover"
+								// If VideoThumbnail has a ref prop, use it properly
+								// ref={thumbnailRef} - but check the library docs
 							/>
 
 							{video.isForSale && (
@@ -198,13 +196,5 @@ const Gallery: React.FC<GalleryProps> = ({
 		</div>
 	);
 };
-
-// ❌ REMOVE THIS COMPLETELY - No defaultProps!
-// Gallery.defaultProps = {
-// 	isFirst: false,
-// 	title: "",
-// 	data: null,
-// 	category: undefined,
-// };
 
 export default Gallery;
