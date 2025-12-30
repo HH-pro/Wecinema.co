@@ -37,7 +37,7 @@ const StripeSuccessAlert: React.FC<StripeSuccessAlertProps> = ({ show, onClose }
   if (!isVisible) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-50 animate-fade-in">
+    <div className="fixed top-14 right-4 z-50 animate-fade-in">
       <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 rounded-xl shadow-lg p-4 max-w-sm">
         <div className="flex items-start">
           <div className="flex-shrink-0">
