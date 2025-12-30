@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useRef } from "react";
 import styled, { keyframes } from "styled-components";
 
 // Define proper TypeScript interface
 interface SkeletonLoaderProps {
   width?: number | string;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 // Skeleton styles
@@ -20,6 +21,7 @@ const skeletonAnimation = keyframes`
   }
 `;
 
+// Use styled.div with proper typing
 const SkeletonContainer = styled.div`
   margin-bottom: 2em;
 `;
@@ -34,16 +36,27 @@ const SkeletonImage = styled.div<{ width?: number | string }>`
 `;
 
 const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({ 
-  width = 200, // ✅ Default parameter value instead of defaultProps
-  className = "" 
+  width = 200,
+  className = "",
+  style = {}
 }) => {
+  // ✅ Create proper refs for any DOM elements
+  const containerRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLDivElement>(null);
+
   return (
-    <SkeletonContainer className={`gallery ${className}`.trim()}>
-      <SkeletonImage width={width} className="llle" />
+    <SkeletonContainer 
+      className={`gallery ${className}`.trim()} 
+      style={style}
+      ref={containerRef} // ✅ Using ref object, not string
+    >
+      <SkeletonImage 
+        width={width} 
+        className="llle"
+        ref={imageRef} // ✅ Using ref object, not string
+      />
     </SkeletonContainer>
   );
 };
-
-// ✅ REMOVED: SkeletonLoader.defaultProps
 
 export default SkeletonLoader;
