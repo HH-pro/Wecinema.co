@@ -22,10 +22,10 @@ interface GalleryProps {
 }
 
 const Gallery: React.FC<GalleryProps> = ({
-	title,
+	title = "", // ✅ Default parameter
 	isFirst = false, // ✅ Default parameter
-	data,
-	category,
+	data = null, // ✅ Default parameter
+	category = undefined, // ✅ Default parameter
 	className = "", // ✅ Default parameter
 }) => {
 	const nav = useNavigate();
@@ -199,12 +199,12 @@ const Gallery: React.FC<GalleryProps> = ({
 	);
 };
 
-// ✅ Remove defaultProps and use default parameters instead
-Gallery.defaultProps = {
-	isFirst: false,
-	title: "",
-	data: null,
-	category: undefined,
-};
+// ❌ REMOVE THIS COMPLETELY - No defaultProps!
+// Gallery.defaultProps = {
+// 	isFirst: false,
+// 	title: "",
+// 	data: null,
+// 	category: undefined,
+// };
 
 export default Gallery;
