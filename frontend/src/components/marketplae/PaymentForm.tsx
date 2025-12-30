@@ -6,7 +6,7 @@ import {
   Elements,
 } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
-import { useStripePayment } from '../hooks/useStripePayment'; // ✅ Fixed import path
+import { useStripePayment } from '../../hooks/useStripe'; // ✅ Fixed import path
 
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY!);
