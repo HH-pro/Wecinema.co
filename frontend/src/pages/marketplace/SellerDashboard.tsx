@@ -1,4 +1,4 @@
-// src/pages/seller/SellerDashboard.tsx - FIXED VERSION
+// src/pages/seller/SellerDashboard.tsx - UPDATED WITH EARNINGS SECTION
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -15,6 +15,7 @@ import marketplaceApi from '../../api/marketplaceApi';
 const listingsApi = marketplaceApi.listings;
 const ordersApi = marketplaceApi.orders;
 const offersApi = marketplaceApi.offers;
+const earningsApi = marketplaceApi.earnings;
 
 // For now, create a simple formatCurrency function since we commented it out
 const formatCurrency = (amount: number) => {
@@ -157,6 +158,380 @@ const SafeOrderDetailsModal = (typeof OrderDetailsModal === 'function' || typeof
 const SafeEditListingModal = (typeof EditListingModal === 'function' || typeof EditListingModal === 'object') ? EditListingModal : () => <SimpleFallback name="EditListingModal" />;
 const SafeDeleteListingModal = (typeof DeleteListingModal === 'function' || typeof DeleteListingModal === 'object') ? DeleteListingModal : () => <SimpleFallback name="DeleteListingModal" />;
 const SafeVideoPlayerModal = (typeof VideoPlayerModal === 'function' || typeof VideoPlayerModal === 'object') ? VideoPlayerModal : () => <SimpleFallback name="VideoPlayerModal" />;
+
+// ============================================
+// ✅ EARNINGS SECTION COMPONENT
+// ============================================
+
+const EarningsSection = ({ 
+  stripeStatus, 
+  orderStats, 
+  totalWithdrawn,
+  onWithdraw,
+  canWithdraw
+}: {
+  stripeStatus: any;
+  orderStats: any;
+  totalWithdrawn: number;
+  onWithdraw: (amount: number) => void;
+  canWithdraw: boolean;
+}) => {
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [showWithdrawForm, setShowWithdrawForm] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  
+  const availableBalance = stripeStatus?.availableBalance || 0;
+  const pendingBalance = stripeStatus?.pendingBalance || 0;
+  const totalBalance = stripeStatus?.balance || 0;
+  
+  // Format amounts from cents to dollars/rupees
+  const formatToRupees = (amountInCents: number) => {
+    return formatCurrency(amountInCents);
+  };
+  
+  const formatToDollars = (amountInCents: number) => {
+    const amountInDollars = amountInCents / 100;
+    return `$${amountInDollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+  
+  const handleWithdrawSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const amount = parseFloat(withdrawAmount);
+    if (isNaN(amount) || amount <= 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
+    
+    if (amount < 5) {
+      alert('Minimum withdrawal amount is $5.00');
+      return;
+    }
+    
+    const amountInCents = amount * 100;
+    if (amountInCents > availableBalance) {
+      alert('Insufficient available balance');
+      return;
+    }
+    
+    setIsWithdrawing(true);
+    try {
+      await onWithdraw(amount);
+      setWithdrawAmount('');
+      setShowWithdrawForm(false);
+    } catch (error) {
+      console.error('Withdrawal error:', error);
+    } finally {
+      setIsWithdrawing(false);
+    }
+  };
+  
+  return (
+    <>
+      {/* ✅ STRIPE ACCOUNT STATUS SECTION */}
+      <div className="mb-6 bg-gradient-to-r from-white to-gray-50 border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+        <div className="p-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex-1">
+              <div className="flex items-center mb-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                <span className="text-sm font-medium text-green-700">Payments Ready! 🎉</span>
+                <span className="ml-2 px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                  Verified
+                </span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Your Stripe account is fully verified and ready to accept payments.
+              </h3>
+              
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                    <span className="text-blue-600">💳</span>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Charges Enabled</p>
+                    <p className="text-sm font-medium text-gray-900">Yes</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                    <span className="text-green-600">💰</span>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Payouts Enabled</p>
+                    <p className="text-sm font-medium text-gray-900">Yes</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
+                    <span className="text-purple-600">👤</span>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Account</p>
+                    <p className="text-sm font-medium text-gray-900">Test Seller • US</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="border-l border-gray-200 pl-6">
+              <div className="text-center">
+                <p className="text-sm text-gray-600 mb-1">Available Balance</p>
+                <p className="text-2xl font-bold text-gray-900">{formatToDollars(availableBalance)}</p>
+                <p className="text-sm text-gray-500 mt-1">Pending: {formatToDollars(pendingBalance)}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              onClick={() => window.open('https://dashboard.stripe.com/', '_blank')}
+              className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition duration-200 flex items-center"
+            >
+              <span className="mr-2">📊</span>
+              Stripe Dashboard
+            </button>
+            <button
+              onClick={() => alert('Account ID: ' + (stripeStatus?.accountId || 'acct_...'))}
+              className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition duration-200"
+            >
+              Show Account ID
+            </button>
+            <button
+              onClick={() => alert('Update details feature would open here')}
+              className="px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition duration-200"
+            >
+              Update Details
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      {/* ✅ EARNINGS OVERVIEW SECTION */}
+      <div className="mb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-gray-900">💰 Your Earnings Overview</h2>
+          <div className="flex items-center space-x-2 mt-2 md:mt-0">
+            <div className="text-sm text-gray-600 flex items-center">
+              <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+              Ready to withdraw
+            </div>
+            <div className="text-sm text-gray-600 flex items-center">
+              <div className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></div>
+              Pending
+            </div>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Available to withdraw */}
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-gray-700">Available to withdraw</h3>
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <span className="text-green-600">💰</span>
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{formatToRupees(availableBalance)}</p>
+            <div className="mt-3 pt-3 border-t border-green-100">
+              <button
+                onClick={() => setShowWithdrawForm(true)}
+                disabled={!canWithdraw || availableBalance < 500} // 500 cents = $5
+                className={`w-full py-2 text-sm font-medium rounded-lg transition duration-200 ${
+                  canWithdraw && availableBalance >= 500
+                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white'
+                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                {canWithdraw && availableBalance >= 500 ? 'Withdraw Now' : 'Withdraw Unavailable'}
+              </button>
+            </div>
+          </div>
+          
+          {/* Pending earnings */}
+          <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-gray-700">Pending</h3>
+              <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <span className="text-yellow-600">⏳</span>
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{formatToRupees(pendingBalance)}</p>
+            <p className="text-sm text-gray-600 mt-1">Orders in progress</p>
+          </div>
+          
+          {/* Total earnings */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-gray-700">Total Earnings</h3>
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <span className="text-blue-600">📈</span>
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{formatToRupees(totalBalance)}</p>
+            <p className="text-sm text-gray-600 mt-1">All-time earnings</p>
+          </div>
+          
+          {/* This month earnings */}
+          <div className="bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-gray-700">This Month</h3>
+              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                <span className="text-purple-600">📅</span>
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{formatToRupees(orderStats.thisMonthRevenue * 100)}</p>
+            <p className="text-sm text-gray-600 mt-1">Monthly revenue</p>
+          </div>
+        </div>
+        
+        {/* Withdrawal info bar */}
+        <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center">
+              <div className="bg-blue-100 p-2 rounded-lg mr-3">
+                <span className="text-blue-600">ℹ️</span>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-900">Withdrawal Information</p>
+                <p className="text-sm text-gray-600">
+                  Minimum withdrawal: $5.00 • Processing time: 2-3 business days
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {totalWithdrawn > 0 && (
+                <div className="text-sm text-gray-600">
+                  <span className="font-medium">Total Withdrawn:</span> {formatToRupees(totalWithdrawn)}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* Quick Stats */}
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center mr-3">
+                <span className="text-blue-500">🔄</span>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Completed Orders</p>
+                <p className="text-lg font-semibold text-gray-900">{orderStats.completed}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-green-50 rounded-lg flex items-center justify-center mr-3">
+                <span className="text-green-500">📊</span>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Active Orders</p>
+                <p className="text-lg font-semibold text-gray-900">{orderStats.activeOrders}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-purple-50 rounded-lg flex items-center justify-center mr-3">
+                <span className="text-purple-500">💸</span>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Pending Revenue</p>
+                <p className="text-lg font-semibold text-gray-900">{formatToRupees(orderStats.pendingRevenue * 100)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Withdraw Form Modal */}
+      {showWithdrawForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Withdraw Funds</h3>
+                <button
+                  onClick={() => setShowWithdrawForm(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center mb-2">
+                  <div className="w-5 h-5 text-blue-600 mr-2">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-medium text-blue-800">Available Balance</p>
+                </div>
+                <p className="text-2xl font-bold text-blue-900">{formatToRupees(availableBalance)}</p>
+                <p className="text-sm text-blue-700 mt-1">
+                  Minimum withdrawal: $5.00 • Processing time: 2-3 business days
+                </p>
+              </div>
+              
+              <form onSubmit={handleWithdrawSubmit}>
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Withdrawal Amount ($)
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span className="text-gray-500">$</span>
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="5"
+                      max={availableBalance / 100}
+                      value={withdrawAmount}
+                      onChange={(e) => setWithdrawAmount(e.target.value)}
+                      className="pl-10 w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                      placeholder="Enter amount"
+                      required
+                    />
+                  </div>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Enter amount between $5.00 and ${(availableBalance / 100).toFixed(2)}
+                  </p>
+                </div>
+                
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowWithdrawForm(false)}
+                    className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition duration-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isWithdrawing}
+                    className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium rounded-lg transition duration-200 disabled:opacity-50"
+                  >
+                    {isWithdrawing ? 'Processing...' : 'Withdraw'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
 
 // Interfaces
 interface Order {
@@ -648,6 +1023,22 @@ const SellerDashboard: React.FC = () => {
         }
       } catch (fetchError) {
         console.warn('Error fetching offers/listings:', fetchError);
+      }
+
+      // Fetch earnings data
+      try {
+        if (earningsApi && typeof earningsApi.getEarningsSummary === 'function') {
+          const earningsResponse = await earningsApi.getEarningsSummary();
+          if (earningsResponse.success) {
+            // Update stats with earnings data
+            setOrderStats(prev => ({
+              ...prev,
+              availableBalance: earningsResponse.availableBalance || 0
+            }));
+          }
+        }
+      } catch (earningsError) {
+        console.warn('Error fetching earnings:', earningsError);
       }
 
       setInitialDataLoaded(true);
@@ -1518,12 +1909,25 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* ✅ Stripe Account Status */}
-          <SafeStripeAccountStatus
-            stripeStatus={stripeStatus}
-            onSetupClick={handleOpenStripeSetup}
-            isLoading={stripeStatus === null}
-          />
+          {/* ✅ EARNINGS SECTION - Integration Point */}
+          {stripeStatus?.chargesEnabled && (
+            <EarningsSection
+              stripeStatus={stripeStatus}
+              orderStats={orderStats}
+              totalWithdrawn={totalWithdrawn}
+              onWithdraw={handleWithdrawRequest}
+              canWithdraw={canWithdraw}
+            />
+          )}
+
+          {/* ✅ Stripe Account Status (Only show if not connected) */}
+          {!stripeStatus?.chargesEnabled && (
+            <SafeStripeAccountStatus
+              stripeStatus={stripeStatus}
+              onSetupClick={handleOpenStripeSetup}
+              isLoading={stripeStatus === null}
+            />
+          )}
 
           {/* ✅ Withdraw Balance Card (Shows in overview) */}
           {canWithdraw && availableBalance > 0 && (
