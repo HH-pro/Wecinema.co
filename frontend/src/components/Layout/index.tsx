@@ -52,6 +52,7 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({
   children,
+  hasHeader = true,  // ✅ Added default value here
   hideSidebar = false,
 }) => {
   const [screenWidth, setScreenWidth] = useState(window.innerWidth);
@@ -113,20 +114,22 @@ const Layout: React.FC<LayoutProps> = ({
   return (
     <div className="text-lg md:text-sm sm:text-xs">
       <ToastContainer />
-      <Header
-        expand={expanded}
-        isMobile={isMobile}
-        toggler={() => setExpanded(!expanded)}
-        darkMode={darkMode}
-        toggleUploadModal={() => handleType("video")}
-        toggleUploadScriptModal={() => handleType("script")}
-        toggleSidebar={
-          hideSidebar
-            ? () => setViewPageSidebarVisible((prev) => !prev)
-            : undefined
-        }
-        isMarketplaceRoute={isMarketplaceRoute}
-      />
+      {hasHeader && (  // ✅ Only render Header if hasHeader is true
+        <Header
+          expand={expanded}
+          isMobile={isMobile}
+          toggler={() => setExpanded(!expanded)}
+          darkMode={darkMode}
+          toggleUploadModal={() => handleType("video")}
+          toggleUploadScriptModal={() => handleType("script")}
+          toggleSidebar={
+            hideSidebar
+              ? () => setViewPageSidebarVisible((prev) => !prev)
+              : undefined
+          }
+          isMarketplaceRoute={isMarketplaceRoute}
+        />
+      )}
 
       {/* ✅ Sidebar Overlay for Tablet + Mobile */}
       {expanded && isTabletOrMobile && isSidebarVisible && (
@@ -402,7 +405,7 @@ const Layout: React.FC<LayoutProps> = ({
         )}
 
         <main
-          className={`flex flex-col min-h-screen mt-12 ${
+          className={`flex flex-col min-h-screen ${hasHeader ? 'mt-12' : 'mt-0'} ${
             darkMode ? "body-dark text-dark" : "body-light text-light"
           } bg-gray-200 w-full transition-all duration-300`}
           style={{
@@ -442,8 +445,6 @@ const Layout: React.FC<LayoutProps> = ({
   );
 };
 
-Layout.defaultProps = {
-  hasHeader: true,
-};
+// ✅ REMOVED: Layout.defaultProps = { hasHeader: true };
 
 export default Layout;
