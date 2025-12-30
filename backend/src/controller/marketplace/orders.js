@@ -1102,78 +1102,364 @@ router.put("/:orderId/request-revision", authenticateMiddleware, async (req, res
     });
   }
 });
-// Add this route to help sellers check their Stripe account status
+router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const userId = req.user.id || req.user._id || req.user.userId;
+
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid order ID' 
+      });
+    }
+
+    console.log('✅ Buyer completing order:', orderId);
+
+    // Find order - allow completion from multiple statuses
+    const order = await Order.findOne({
+      _id: orderId,
+      buyerId: userId,
+      status: { $in: ['pending', 'processing', 'shipped', 'delivered'] }
+    })
+    .populate('sellerId', 'username email firstName lastName stripeAccountId stripeAccountStatus')
+    .populate('buyerId', 'username email firstName lastName')
+    .populate('listingId', 'title price');
+
+    if (!order) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Order not found or you are not authorized to complete it' 
+      });
+    }
+
+    let paymentSuccess = false;
+    let transferError = null;
+    let transferId = null;
+    let sellerAmount = 0;
+    let platformFee = 0;
+
+    // ✅ Process payment to seller if applicable
+    if (order.stripePaymentIntentId && !order.paymentReleased && order.sellerId.stripeAccountId) {
+      try {
+        console.log('💰 Processing payment release for order:', orderId);
+        
+        // Calculate amounts
+        const platformFeePercent = 0.15; // 15% platform fee
+        platformFee = order.amount * platformFeePercent;
+        sellerAmount = order.amount - platformFee;
+
+        // 1. Check seller's Stripe account status
+        let sellerAccount;
+        try {
+          sellerAccount = await stripe.accounts.retrieve(order.sellerId.stripeAccountId);
+          console.log('Seller Stripe Account:', {
+            id: sellerAccount.id,
+            charges_enabled: sellerAccount.charges_enabled,
+            payouts_enabled: sellerAccount.payouts_enabled,
+            capabilities: sellerAccount.capabilities
+          });
+
+          // Check transfer capabilities
+          const hasTransferCapability = 
+            sellerAccount.capabilities?.transfers === 'active' ||
+            sellerAccount.capabilities?.crypto_transfers === 'active' ||
+            sellerAccount.capabilities?.legacy_payments === 'active';
+
+          if (!hasTransferCapability) {
+            console.log('⚠️ Seller account missing transfer capability');
+            
+            // Try to request transfer capability
+            try {
+              await stripe.accounts.update(order.sellerId.stripeAccountId, {
+                capabilities: {
+                  transfers: { requested: true }
+                }
+              });
+              console.log('✅ Requested transfers capability');
+            } catch (updateError) {
+              console.error('❌ Could not request capability:', updateError.message);
+            }
+            
+            throw new Error('SELLER_ACCOUNT_NEEDS_SETUP');
+          }
+
+          // Check if account is fully ready
+          if (!sellerAccount.charges_enabled || !sellerAccount.payouts_enabled) {
+            console.log('⚠️ Seller account not fully enabled');
+            throw new Error('SELLER_ACCOUNT_INCOMPLETE');
+          }
+
+        } catch (accountError) {
+          console.error('Account check failed:', accountError.message);
+          if (accountError.message === 'SELLER_ACCOUNT_NEEDS_SETUP' || 
+              accountError.message === 'SELLER_ACCOUNT_INCOMPLETE') {
+            throw accountError;
+          }
+          throw new Error('SELLER_ACCOUNT_UNREACHABLE');
+        }
+
+        // 2. Check payment intent status
+        let paymentIntent;
+        try {
+          paymentIntent = await stripe.paymentIntents.retrieve(order.stripePaymentIntentId);
+          
+          if (paymentIntent.status !== 'succeeded') {
+            await stripe.paymentIntents.capture(order.stripePaymentIntentId);
+            console.log('✅ Payment intent captured');
+          } else {
+            console.log('✅ Payment intent already captured');
+          }
+        } catch (piError) {
+          console.error('Payment intent error:', piError.message);
+          throw new Error('PAYMENT_INTENT_ERROR');
+        }
+
+        // 3. Create transfer to seller
+        try {
+          const transfer = await stripe.transfers.create({
+            amount: Math.round(sellerAmount * 100), // Convert to cents
+            currency: 'usd',
+            destination: order.sellerId.stripeAccountId,
+            transfer_group: `ORDER_${orderId}`,
+            metadata: {
+              orderId: orderId,
+              buyerId: order.buyerId._id.toString(),
+              sellerId: order.sellerId._id.toString(),
+              listingId: order.listingId?._id.toString(),
+              amount: order.amount
+            }
+          });
+
+          paymentSuccess = true;
+          transferId = transfer.id;
+          console.log('💵 Transfer created:', transfer.id);
+
+        } catch (transferErr) {
+          console.error('Transfer creation failed:', transferErr.message);
+          transferError = transferErr.message;
+          
+          // Check specific error types
+          if (transferErr.code === 'insufficient_capabilities_for_transfer') {
+            throw new Error('SELLER_ACCOUNT_NEEDS_SETUP');
+          } else if (transferErr.code === 'account_invalid') {
+            throw new Error('SELLER_ACCOUNT_INVALID');
+          }
+          throw new Error('TRANSFER_FAILED');
+        }
+
+      } catch (stripeError) {
+        console.error('Payment processing error:', stripeError.message);
+        transferError = stripeError.message;
+        
+        // Update seller status based on error
+        if (stripeError.message.includes('SELLER_ACCOUNT')) {
+          await User.findByIdAndUpdate(order.sellerId._id, {
+            stripeAccountStatus: 'needs_setup',
+            lastStripeError: stripeError.message
+          });
+        }
+      }
+    } else {
+      console.log('ℹ️ Payment processing skipped:', {
+        hasPaymentIntent: !!order.stripePaymentIntentId,
+        paymentReleased: order.paymentReleased,
+        hasStripeAccount: !!order.sellerId.stripeAccountId
+      });
+    }
+
+    // ✅ Update order with payment results
+    order.status = 'completed';
+    order.completedAt = new Date();
+    
+    if (paymentSuccess) {
+      order.paymentReleased = true;
+      order.releaseDate = new Date();
+      order.stripeTransferId = transferId;
+      order.platformFee = platformFee;
+      order.sellerAmount = sellerAmount;
+      order.paymentStatus = 'released';
+    } else if (transferError) {
+      order.paymentStatus = 'failed';
+      order.paymentError = transferError;
+    } else {
+      order.paymentStatus = 'not_applicable';
+    }
+
+    await order.save();
+
+    // ✅ Update seller stats if payment succeeded
+    if (paymentSuccess) {
+      await User.findByIdAndUpdate(order.sellerId._id, {
+        $inc: {
+          completedOrders: 1,
+          totalEarnings: sellerAmount,
+          totalSales: order.amount
+        },
+        lastPaymentDate: new Date()
+      });
+    }
+
+    // ✅ Send notifications
+    try {
+      await sendOrderCompletionNotifications(order, paymentSuccess, transferError);
+    } catch (emailError) {
+      console.error('Email notification failed:', emailError.message);
+    }
+
+    // ✅ Prepare response
+    const response = {
+      success: true,
+      message: paymentSuccess 
+        ? 'Order completed! Payment released to seller.' 
+        : transferError 
+          ? 'Order completed. Payment release failed: ' + transferError
+          : 'Order completed successfully.',
+      order: {
+        _id: order._id,
+        orderNumber: order.orderNumber || order._id.toString().slice(-8).toUpperCase(),
+        status: order.status,
+        amount: order.amount,
+        completedAt: order.completedAt
+      },
+      payment: {
+        released: paymentSuccess,
+        success: paymentSuccess,
+        error: transferError,
+        sellerAmount: sellerAmount,
+        platformFee: platformFee
+      },
+      nextSteps: paymentSuccess 
+        ? 'Consider leaving a review for the seller'
+        : 'The seller needs to complete their Stripe setup to receive payments'
+    };
+
+    res.status(200).json(response);
+
+  } catch (error) {
+    console.error('❌ Error completing order:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to complete order',
+      details: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// ✅ Check Seller's Stripe Account Status
 router.get("/seller/account-status", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
     
     const user = await User.findById(userId);
-    if (!user || !user.stripeAccountId) {
-      return res.status(400).json({
+    if (!user) {
+      return res.status(404).json({
         success: false,
-        error: 'No Stripe account connected'
+        error: 'User not found'
       });
     }
 
-    // Retrieve Stripe account details
+    if (!user.stripeAccountId) {
+      return res.status(400).json({
+        success: false,
+        error: 'No Stripe account connected',
+        setupRequired: true
+      });
+    }
+
+    // Retrieve Stripe account
     const account = await stripe.accounts.retrieve(user.stripeAccountId);
     
-    // Check what's missing
-    const requirements = account.requirements || {};
-    const currently_due = requirements.currently_due || [];
-    const eventually_due = requirements.eventually_due || [];
-    const past_due = requirements.past_due || [];
-    
-    // Check capabilities
+    // Analyze account status
     const capabilities = account.capabilities || {};
-    const hasTransfersCapability = capabilities.transfers === 'active' || 
-                                   capabilities.crypto_transfers === 'active' || 
-                                   capabilities.legacy_payments === 'active';
+    const requirements = account.requirements || {};
+    
+    const hasTransferCapability = 
+      capabilities.transfers === 'active' ||
+      capabilities.crypto_transfers === 'active' ||
+      capabilities.legacy_payments === 'active';
+    
+    const isFullyEnabled = account.charges_enabled && account.payouts_enabled && hasTransferCapability;
+    
+    const missingRequirements = [
+      ...(requirements.currently_due || []),
+      ...(requirements.past_due || [])
+    ];
+
+    // Generate setup link if needed
+    let setupLink = null;
+    if (!isFullyEnabled) {
+      try {
+        const accountLink = await stripe.accountLinks.create({
+          account: user.stripeAccountId,
+          refresh_url: `${process.env.FRONTEND_URL}/seller/settings/stripe?refresh=true`,
+          return_url: `${process.env.FRONTEND_URL}/seller/settings/stripe?success=true`,
+          type: 'account_onboarding'
+        });
+        setupLink = accountLink.url;
+      } catch (linkError) {
+        console.error('Failed to create account link:', linkError);
+      }
+    }
+
+    // Update user status
+    user.stripeAccountStatus = isFullyEnabled ? 'active' : 'needs_setup';
+    await user.save();
 
     const response = {
       success: true,
       account: {
         id: account.id,
         business_type: account.business_type,
+        business_profile: account.business_profile,
         charges_enabled: account.charges_enabled,
         payouts_enabled: account.payouts_enabled,
         details_submitted: account.details_submitted,
         capabilities: capabilities,
         requirements: {
-          currently_due: currently_due,
-          eventually_due: eventually_due,
-          past_due: past_due
+          currently_due: requirements.currently_due || [],
+          eventually_due: requirements.eventually_due || [],
+          past_due: requirements.past_due || [],
+          disabled_reason: requirements.disabled_reason
         }
       },
-      canReceivePayments: account.charges_enabled && account.payouts_enabled && hasTransfersCapability,
-      missingRequirements: [...currently_due, ...past_due],
-      setupLink: null
+      status: {
+        canReceivePayments: isFullyEnabled,
+        missingRequirements: missingRequirements,
+        needsAction: missingRequirements.length > 0 || !isFullyEnabled,
+        isActive: isFullyEnabled
+      },
+      setupLink: setupLink,
+      message: isFullyEnabled 
+        ? 'Your account is ready to receive payments'
+        : 'Complete your Stripe account setup to receive payments'
     };
-
-    // If missing requirements, create a setup link
-    if (currently_due.length > 0 || past_due.length > 0) {
-      const setupLink = await stripe.accountLinks.create({
-        account: user.stripeAccountId,
-        refresh_url: `${process.env.FRONTEND_URL}/seller/settings?refresh=stripe`,
-        return_url: `${process.env.FRONTEND_URL}/seller/settings?success=stripe`,
-        type: 'account_onboarding'
-      });
-      
-      response.setupLink = setupLink.url;
-      response.message = 'Complete your Stripe account setup to receive payments';
-    }
-
-    // Update user's Stripe status in database
-    user.stripeAccountStatus = response.canReceivePayments ? 'active' : 'needs_setup';
-    await user.save();
 
     res.json(response);
 
   } catch (error) {
     console.error('Error checking Stripe account:', error);
+    
+    if (error.type === 'StripeInvalidRequestError' && error.code === 'resource_missing') {
+      // Account doesn't exist or was deleted
+      await User.findByIdAndUpdate(req.user.id, {
+        stripeAccountId: null,
+        stripeAccountStatus: 'disconnected'
+      });
+      
+      return res.status(404).json({
+        success: false,
+        error: 'Stripe account not found. Please reconnect.',
+        reconnectRequired: true
+      });
+    }
+
     res.status(500).json({
       success: false,
-      error: 'Failed to check Stripe account status'
+      error: 'Failed to check Stripe account status',
+      details: error.message
     });
   }
 });
