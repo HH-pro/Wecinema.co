@@ -1,41 +1,24 @@
-// src/pages/seller/SellerDashboard.tsx - FIXED VERSION
+// src/pages/seller/SellerDashboard.tsx - UPDATED WITH ACTIVATION/DEACTIVATION
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-
-// Import Layout component
 import MarketplaceLayout from '../../components/Layout';
-
-// Import helper function
 import { getCurrentUserId } from '../../utilities/helperfFunction';
-
-// Import API - FIXED IMPORT
-import marketplaceApi from '../../api/marketplaceApi';
-
-// ✅ FIXED: Access API methods correctly
-const listingsApi = marketplaceApi.listings;
-const ordersApi = marketplaceApi.orders;
-const offersApi = marketplaceApi.offers;
-
-// ✅ FIXED: Use formatCurrency from marketplaceApi
-// const formatCurrency = marketplaceApi.formatCurrency;
-
-// FIXED: Corrected import paths - changed 'marketplae' to 'marketplace'
+import { formatCurrency } from '../../api';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+// Import new components
 import DashboardHeader from '../../components/marketplae/seller/DashboardHeader';
+import AlertMessage from '../../components/marketplae/seller/AlertMessage';
 import TabNavigation from '../../components/marketplae/seller/TabNavigation';
 import StatsGrid from '../../components/marketplae/seller/StatsGrid';
 import WelcomeCard from '../../components/marketplae/seller/WelcomeCard';
 import RecentOrders from '../../components/marketplae/seller/RecentOrders';
 import ActionCard from '../../components/marketplae/seller/ActionCard';
 import OrderWorkflowGuide from '../../components/marketplae/seller/OrderWorkflowGuide';
-import StripeAccountStatus from '../../components/marketplae/seller/StripeAccountStatus';
-import StripeSuccessAlert from '../../components/marketplae/seller/StripeSuccessAlert';
-// import WithdrawBalance from '../../components/marketplae/seller/WithdrawBalance';
 
 // Import tab components
 import OffersTab from '../../components/marketplae/seller/OffersTab';
 import ListingsTab from '../../components/marketplae/seller/ListingsTab';
 import OrdersTab from '../../components/marketplae/seller/OrdersTab';
-import WithdrawTab from '../../components/marketplae/seller/WithdrawTab';
 
 // Import modals
 import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
@@ -44,143 +27,75 @@ import EditListingModal from '../../components/marketplae/seller/EditListingModa
 import DeleteListingModal from '../../components/marketplae/seller/DeleteListingModal';
 import VideoPlayerModal from '../../components/marketplae/seller/VideoPlayerModal';
 
-// Debug: Check component imports
-console.log('🔍 Checking component imports...');
-console.log('DashboardHeader:', DashboardHeader);
-console.log('TabNavigation:', TabNavigation);
-console.log('StatsGrid:', StatsGrid);
+const API_BASE_URL = 'http://localhost:3000/api';
 
-// If components are undefined, create simple fallback components
-const FallbackComponent = ({ name }: { name: string }) => (
-  <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
-    <p className="text-red-600">Component "{name}" failed to load. Please check the import path.</p>
-  </div>
-);
+interface StripeStatus {
+  connected: boolean;
+  status: string;
+  chargesEnabled?: boolean;
+  payoutsEnabled?: boolean;
+  detailsSubmitted?: boolean;
+  stripeAccountId?: string;
+}
 
-// Create fallback components
-const FallbackDashboardHeader = (props: any) => (
-  <div className="mb-8">
-    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">{props.title || 'Seller Dashboard'}</h1>
-        <p className="text-gray-600 mt-2">{props.subtitle || 'Manage your business'}</p>
-      </div>
-      <div className="flex items-center gap-3">
-        <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-4 py-2 rounded-xl">
-          <div className="text-sm">Total Earnings</div>
-          <div className="text-xl font-bold">{props.earnings || '₹0'}</div>
-        </div>
-        <button
-          onClick={props.onRefresh}
-          disabled={props.refreshing}
-          className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-        >
-          {props.refreshing ? 'Refreshing...' : 'Refresh'}
-        </button>
-      </div>
-    </div>
-  </div>
-);
-
-const FallbackTabNavigation = ({ tabs, activeTab, onTabChange }: any) => (
-  <div className="mb-6">
-    <div className="flex space-x-1 border-b border-gray-200">
-      {tabs.map((tab: any) => (
-        <button
-          key={tab.id}
-          onClick={() => onTabChange(tab.id)}
-          className={`px-4 py-2 font-medium text-sm ${
-            activeTab === tab.id
-              ? 'text-yellow-600 border-b-2 border-yellow-600'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          {tab.label} {tab.badge && `(${tab.badge})`}
-        </button>
-      ))}
-    </div>
-  </div>
-);
-
-const FallbackWelcomeCard = (props: any) => (
-  <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-2xl p-6">
-    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">{props.title || 'Welcome!'}</h2>
-        <p className="text-gray-600">{props.subtitle || 'Manage your business'}</p>
-      </div>
-      <div className="flex gap-3">
-        <button
-          onClick={props.primaryAction?.onClick}
-          className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-xl hover:from-yellow-600 hover:to-yellow-700"
-        >
-          {props.primaryAction?.label || 'Get Started'}
-        </button>
-      </div>
-    </div>
-  </div>
-);
-
-// Use fallbacks if components are undefined
-const SafeDashboardHeader = DashboardHeader || FallbackDashboardHeader;
-const SafeTabNavigation = TabNavigation || FallbackTabNavigation;
-const SafeWelcomeCard = WelcomeCard || FallbackWelcomeCard;
-const SafeStatsGrid = StatsGrid || (() => <FallbackComponent name="StatsGrid" />);
-const SafeRecentOrders = RecentOrders || (() => <FallbackComponent name="RecentOrders" />);
-const SafeActionCard = ActionCard || (() => <FallbackComponent name="ActionCard" />);
-const SafeOrderWorkflowGuide = OrderWorkflowGuide || (() => <FallbackComponent name="OrderWorkflowGuide" />);
-const SafeStripeAccountStatus = StripeAccountStatus || (() => <FallbackComponent name="StripeAccountStatus" />);
-const SafeStripeSuccessAlert = StripeSuccessAlert || (() => <FallbackComponent name="StripeSuccessAlert" />);
-// const SafeWithdrawBalance = WithdrawBalance || (() => <FallbackComponent name="WithdrawBalance" />);
-const SafeOffersTab = OffersTab || (() => <FallbackComponent name="OffersTab" />);
-const SafeListingsTab = ListingsTab || (() => <FallbackComponent name="ListingsTab" />);
-const SafeOrdersTab = OrdersTab || (() => <FallbackComponent name="OrdersTab" />);
-const SafeWithdrawTab = WithdrawTab || (() => <FallbackComponent name="WithdrawTab" />);
-const SafeStripeSetupModal = StripeSetupModal || (() => <FallbackComponent name="StripeSetupModal" />);
-const SafeOrderDetailsModal = OrderDetailsModal || (() => <FallbackComponent name="OrderDetailsModal" />);
-const SafeEditListingModal = EditListingModal || (() => <FallbackComponent name="EditListingModal" />);
-const SafeDeleteListingModal = DeleteListingModal || (() => <FallbackComponent name="DeleteListingModal" />);
-const SafeVideoPlayerModal = VideoPlayerModal || (() => <FallbackComponent name="VideoPlayerModal" />);
-
-// Interfaces (keep as before)
 interface Order {
   _id: string;
-  listingId: string;
-  listingTitle: string;
-  buyerId: string;
-  buyerName: string;
-  buyerEmail: string;
-  sellerId: string;
-  sellerName: string;
-  amount: number;
+  orderNumber: string;
   status: string;
-  paymentStatus: string;
+  amount: number;
+  buyerId: {
+    _id: string;
+    username: string;
+    email?: string;
+    avatar?: string;
+  };
+  sellerId: {
+    _id: string;
+    username: string;
+    email?: string;
+    avatar?: string;
+  };
+  listingId: {
+    _id: string;
+    title: string;
+    price?: number;
+    mediaUrls?: string[];
+    description?: string;
+    type?: string;
+  };
+  offerId?: {
+    _id: string;
+    amount: number;
+    message?: string;
+  };
   createdAt: string;
   updatedAt: string;
-  deadline?: string;
+  orderDate: string;
+  paidAt?: string;
+  processingAt?: string;
+  startedAt?: string;
   deliveredAt?: string;
+  completedAt?: string;
   cancelledAt?: string;
-  videoUrl?: string;
-  requirements?: string;
-  messages?: Array<{
-    sender: string;
-    message: string;
-    timestamp: string;
-  }>;
+  revisionRequestedAt?: string;
 }
 
 interface Offer {
   _id: string;
-  listingId: string;
-  listingTitle: string;
-  buyerId: string;
-  buyerName: string;
-  buyerEmail: string;
-  amount: number;
   status: string;
+  amount: number;
   message?: string;
   createdAt: string;
-  videoUrl?: string;
+  listingId: {
+    _id: string;
+    title: string;
+    price?: number;
+    mediaUrls?: string[];
+  };
+  buyerId: {
+    _id: string;
+    username: string;
+  };
 }
 
 interface Listing {
@@ -188,21 +103,26 @@ interface Listing {
   title: string;
   description: string;
   price: number;
+  type: string;
   category: string;
   tags: string[];
-  status: string;
-  sellerId: string;
+  mediaUrls: string[];
+  status: 'active' | 'inactive' | 'draft' | 'sold';
+  views?: number;
+  sellerId: {
+    _id: string;
+    username: string;
+  };
   createdAt: string;
   updatedAt: string;
-  images?: string[];
-  videoUrl?: string;
-  deliveryTime?: number;
-  revisions?: number;
-  featured?: boolean;
 }
 
 interface ListingsData {
   listings: Listing[];
+  user: {
+    _id: string;
+    username: string;
+  };
   pagination?: {
     page: number;
     limit: number;
@@ -224,46 +144,6 @@ interface OrderStats {
   pendingRevenue: number;
   thisMonthOrders: number;
   thisMonthRevenue: number;
-  availableBalance?: number;
-}
-
-interface StripeStatus {
-  connected: boolean;
-  chargesEnabled: boolean;
-  detailsSubmitted: boolean;
-  accountId?: string;
-  email?: string;
-  country?: string;
-  status?: string;
-  payoutsEnabled?: boolean;
-  name?: string;
-  balance?: number;
-  availableBalance?: number;
-  pendingBalance?: number;
-}
-
-interface Withdrawal {
-  _id: string;
-  amount: number;
-  status: string;
-  stripeTransferId?: string;
-  stripePayoutId?: string;
-  createdAt: string;
-  completedAt?: string;
-  failedAt?: string;
-  failureReason?: string;
-  destination?: string;
-  description?: string;
-}
-
-interface WithdrawalHistory {
-  withdrawals: Withdrawal[];
-  pagination?: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
 }
 
 const SellerDashboard: React.FC = () => {
@@ -276,7 +156,6 @@ const SellerDashboard: React.FC = () => {
   const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [showStripeSuccessAlert, setShowStripeSuccessAlert] = useState(false);
   const navigate = useNavigate();
   
   // Order stats
@@ -292,17 +171,10 @@ const SellerDashboard: React.FC = () => {
     totalRevenue: 0,
     pendingRevenue: 0,
     thisMonthOrders: 0,
-    thisMonthRevenue: 0,
-    availableBalance: 0
+    thisMonthRevenue: 0
   });
   
-  // Withdrawal states
-  const [withdrawalHistory, setWithdrawalHistory] = useState<WithdrawalHistory | null>(null);
-  const [withdrawalsLoading, setWithdrawalsLoading] = useState(false);
-  const [withdrawalsPage, setWithdrawalsPage] = useState(1);
-  const [withdrawalsLimit] = useState(10);
-  
-  // Separate loading states
+  // Separate loading states for different tabs
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [listingsLoading, setListingsLoading] = useState(false);
   const [offersLoading, setOffersLoading] = useState(false);
@@ -342,141 +214,44 @@ const SellerDashboard: React.FC = () => {
   const totalListings = listingsData?.listings?.length || 0;
   const activeListings = listingsData?.listings?.filter((listing) => listing.status === 'active').length || 0;
   const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
-  const totalWithdrawals = withdrawalHistory?.withdrawals?.length || 0;
 
   // Tab configuration
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊', badge: null },
+    // { id: 'offers', label: 'Offers', icon: '💼', badge: pendingOffers > 0 ? pendingOffers : null },
     { id: 'listings', label: 'My Listings', icon: '🏠', badge: totalListings > 0 ? totalListings : null },
-    { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders > 0 ? orderStats.activeOrders : null },
-    { id: 'offers', label: 'Offers', icon: '💌', badge: pendingOffers > 0 ? pendingOffers : null },
-    { id: 'withdraw', label: 'Withdraw', icon: '💰', badge: null }
+    { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders > 0 ? orderStats.activeOrders : null }
   ];
 
-  // Action Cards
-  const [actionCards] = useState([
+  // Action cards data
+  const actionCards = [
     {
-      title: 'Analytics Dashboard',
-      description: 'View detailed analytics and performance metrics for your listings.',
-      icon: '📊',
-      iconBg: 'from-blue-500 to-blue-600',
-      bgGradient: 'from-blue-50 to-indigo-50',
-      borderColor: 'border-blue-200',
+      title: 'Need Help with an Order?',
+      description: 'Learn how to manage orders step by step',
+      icon: '❓',
+      iconBg: 'from-yellow-500 to-yellow-600',
+      bgGradient: 'from-yellow-50 to-amber-50',
+      borderColor: 'border-yellow-200',
       actions: [
-        {
-          label: 'View Analytics',
-          onClick: () => navigate('/marketplace/analytics'),
-          variant: 'primary' as const
-        }
+        { label: 'View Tutorial', onClick: () => window.open('/help/orders', '_blank'), variant: 'secondary' as const },
+        { label: 'Contact Support', onClick: () => window.open('/help/support', '_blank'), variant: 'primary' as const }
       ]
     },
     {
-      title: 'Seller Resources',
-      description: 'Access guides, tutorials, and tips to grow your business on Marketplace.',
-      icon: '📚',
-      iconBg: 'from-orange-500 to-orange-600',
-      bgGradient: 'from-orange-50 to-amber-50',
-      borderColor: 'border-orange-200',
+      title: 'Boost Your Sales',
+      description: 'Tips to get more orders and grow your business',
+      icon: '🚀',
+      iconBg: 'from-green-500 to-green-600',
+      bgGradient: 'from-green-50 to-emerald-50',
+      borderColor: 'border-green-200',
       actions: [
-        {
-          label: 'Learn More',
-          onClick: () => navigate('/marketplace/seller/resources'),
-          variant: 'secondary' as const
-        }
+        { label: 'Optimize Listings', onClick: () => window.open('/help/optimize', '_blank'), variant: 'secondary' as const },
+        { label: 'View Analytics', onClick: () => setActiveTab('listings'), variant: 'primary' as const }
       ]
     }
-  ]);
+  ];
 
-  // ✅ Get mock Stripe status for development
-  const getMockStripeStatus = (): StripeStatus => {
-    const savedStatus = localStorage.getItem('stripe_status');
-    if (savedStatus) {
-      return JSON.parse(savedStatus);
-    }
-    
-    return {
-      connected: false,
-      chargesEnabled: false,
-      detailsSubmitted: false,
-      status: 'not_connected',
-      balance: 0,
-      availableBalance: 0,
-      pendingBalance: 0
-    };
-  };
-
-  // ✅ Handle mock Stripe connection for development
-  const handleMockStripeConnect = () => {
-    // Calculate total balance from completed orders
-    const completedOrdersRevenue = orders
-      .filter(order => order.status === 'completed')
-      .reduce((sum, order) => sum + (order.amount * 100), 0); // Convert to cents
-    
-    // Calculate pending balance from active orders
-    const pendingOrdersRevenue = orders
-      .filter(order => ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(order.status))
-      .reduce((sum, order) => sum + (order.amount * 100), 0);
-    
-    const mockStatus: StripeStatus = {
-      connected: true,
-      chargesEnabled: true,
-      detailsSubmitted: true,
-      status: 'active',
-      accountId: 'acct_mock_' + Date.now(),
-      email: 'seller@example.com',
-      country: 'US',
-      payoutsEnabled: true,
-      name: 'Test Seller',
-      balance: completedOrdersRevenue + pendingOrdersRevenue,
-      availableBalance: completedOrdersRevenue,
-      pendingBalance: pendingOrdersRevenue
-    };
-    
-    localStorage.setItem('stripe_status', JSON.stringify(mockStatus));
-    setStripeStatus(mockStatus);
-    setShowStripeSuccessAlert(true);
-    setSuccessMessage('Mock Stripe account connected successfully! You can now test payment features.');
-    setShowStripeSetup(false);
-    setError('');
-    
-    // Update order stats with available balance
-    setOrderStats(prev => ({
-      ...prev,
-      availableBalance: completedOrdersRevenue
-    }));
-  };
-
-  // ✅ Check URL params for Stripe return success
-  useEffect(() => {
-    const checkStripeReturn = () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const stripeStatus = urlParams.get('stripe');
-      const accountId = urlParams.get('account_id');
-      
-      if (stripeStatus === 'success' && accountId) {
-        console.log('✅ Stripe connected successfully via URL params');
-        
-        // Show success alert
-        setShowStripeSuccessAlert(true);
-        
-        // Clear URL params
-        window.history.replaceState({}, '', window.location.pathname);
-        
-        // Update Stripe status
-        setTimeout(() => {
-          checkStripeAccountStatus();
-          fetchDashboardData();
-        }, 1000);
-        
-        // Show success message
-        setSuccessMessage('Stripe account connected successfully! You can now accept payments.');
-      }
-    };
-    
-    checkStripeReturn();
-  }, []);
-
-  // ✅ Calculate order stats
+  // ✅ FIXED: Calculate order stats
   const calculateOrderStats = useCallback((orders: Order[]): OrderStats => {
     const now = new Date();
     const thisMonth = now.getMonth();
@@ -487,21 +262,6 @@ const SellerDashboard: React.FC = () => {
       return orderDate.getMonth() === thisMonth && 
              orderDate.getFullYear() === thisYear;
     });
-
-    // Calculate total revenue from completed orders (in dollars)
-    const totalRevenue = orders
-      .filter(order => order.status === 'completed')
-      .reduce((sum, order) => sum + order.amount, 0);
-
-    // Calculate pending revenue from active orders (in dollars)
-    const pendingRevenue = orders
-      .filter(order => ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(order.status))
-      .reduce((sum, order) => sum + order.amount, 0);
-
-    // Calculate this month revenue (in dollars)
-    const thisMonthRevenue = thisMonthOrders
-      .filter(order => order.status === 'completed')
-      .reduce((sum, order) => sum + order.amount, 0);
 
     return {
       totalOrders: orders.length,
@@ -514,59 +274,284 @@ const SellerDashboard: React.FC = () => {
       delivered: orders.filter(order => order.status === 'delivered').length,
       completed: orders.filter(order => order.status === 'completed').length,
       cancelled: orders.filter(order => order.status === 'cancelled').length,
-      totalRevenue,
-      pendingRevenue,
+      totalRevenue: orders
+        .filter(order => order.status === 'completed')
+        .reduce((sum, order) => sum + order.amount, 0),
+      pendingRevenue: orders
+        .filter(order => ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(order.status))
+        .reduce((sum, order) => sum + order.amount, 0),
       thisMonthOrders: thisMonthOrders.length,
-      thisMonthRevenue
+      thisMonthRevenue: thisMonthOrders
+        .filter(order => order.status === 'completed')
+        .reduce((sum, order) => sum + order.amount, 0)
     };
   }, []);
 
-  // ✅ Check Stripe account status with fallback to mock data
-  const checkStripeAccountStatus = async (): Promise<StripeStatus | null> => {
+  // ✅ FIXED: SINGLE SOURCE OF TRUTH - Fetch all orders with proper endpoint
+  const fetchAllOrders = async (): Promise<Order[]> => {
     try {
-      console.log('🔍 Checking Stripe status...');
-      
-      // Check if we're in development mode
-      const isDevelopment = window.location.hostname === 'localhost' || 
-                           window.location.hostname === '127.0.0.1' ||
-                           process.env.NODE_ENV === 'development';
-      
-      // Always use mock data in development for now
-      if (isDevelopment) {
-        console.log('🛠️ Development mode: Using mock Stripe data');
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        const mockStatus = getMockStripeStatus();
-        setStripeStatus(mockStatus);
-        return mockStatus;
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        console.error('No token found');
+        return [];
       }
+
+      console.log('📦 Fetching ALL orders from API...');
       
-      // Production: Try real API
-      try {
-        const response = await marketplaceApi.stripe.getStripeStatus();
-        if (response.success) {
-          setStripeStatus(response);
-          return response;
-        } else {
-          throw new Error('Stripe status API failed');
+      // Try multiple endpoints - use the one that works
+      const endpoints = [
+        `${API_BASE_URL}/marketplace/my-sales`,
+        `${API_BASE_URL}/marketplace/orders/my-sales`,
+        `${API_BASE_URL}/marketplace/seller/orders`
+      ];
+      
+      let ordersData: Order[] = [];
+      
+      for (const endpoint of endpoints) {
+        try {
+          console.log(`🔄 Trying endpoint: ${endpoint}`);
+          const response = await axios.get(endpoint, {
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Cache-Control': 'no-cache'
+            },
+            params: {
+              limit: 100,
+              _t: new Date().getTime()
+            },
+            timeout: 8000
+          });
+          
+          if (response.data.success) {
+            ordersData = response.data.sales || response.data.orders || response.data.data || [];
+            console.log(`✅ Success from ${endpoint}: ${ordersData.length} orders`);
+            break;
+          }
+        } catch (err) {
+          console.log(`❌ Failed from ${endpoint}:`, err.message);
+          continue;
         }
-      } catch (apiError: any) {
-        console.warn('API unavailable:', apiError.message);
-        // Fall back to mock data
-        const mockStatus = getMockStripeStatus();
-        setStripeStatus(mockStatus);
-        return mockStatus;
       }
       
-    } catch (err: any) {
-      console.warn('Stripe check failed:', err.message);
-      const mockStatus = getMockStripeStatus();
-      setStripeStatus(mockStatus);
-      return mockStatus;
+      return ordersData;
+    } catch (error) {
+      console.error('❌ Error fetching all orders:', error);
+      return [];
     }
   };
 
-  // ✅ Fetch dashboard data - FIXED: Added error handling for undefined APIs
+// In SellerDashboard.tsx - UPDATED with better debugging
+const handleToggleListingStatus = async (listing: Listing) => {
+  console.log('🎯 handleToggleListingStatus CALLED!', {
+    listingId: listing._id,
+    listingTitle: listing.title,
+    currentStatus: listing.status
+  });
+  
+  try {
+    setListingActionLoading(listing._id);
+    setError('');
+    setSuccessMessage('');
+
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (!token) {
+      console.error('❌ No token found');
+      setError('Authentication required. Please log in again.');
+      setListingActionLoading(null);
+      return;
+    }
+
+    console.log('🔄 Starting toggle process...');
+    console.log('🔗 API Endpoint:', `${API_BASE_URL}/marketplace/listing/${listing._id}/toggle-status`);
+
+    const response = await axios.patch(
+      `${API_BASE_URL}/marketplace/listing/${listing._id}/toggle-status`,
+      {},
+      {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 15000
+      }
+    );
+
+    console.log('📦 API Response:', response.data);
+
+    if (response.data && response.data.success) {
+      const action = response.data.newStatus === 'active' ? 'activated' : 'deactivated';
+      const successMsg = `✅ Listing "${listing.title}" ${action} successfully!`;
+      console.log('✅ Success:', successMsg);
+      setSuccessMessage(successMsg);
+      
+      // Update the specific listing in state
+      setListingsData(prev => {
+        if (!prev) return prev;
+        
+        console.log('🔄 Updating local state...');
+        const updatedListings = prev.listings.map(l => {
+          if (l._id === listing._id) {
+            const updatedListing = {
+              ...l,
+              status: response.data.newStatus,
+              updatedAt: response.data.listing?.updatedAt || new Date().toISOString()
+            };
+            console.log('🔄 Updated listing:', updatedListing);
+            return updatedListing;
+          }
+          return l;
+        });
+        
+        return {
+          ...prev,
+          listings: updatedListings
+        };
+      });
+      
+      // Refresh listings after 1 second
+      setTimeout(() => {
+        console.log('🔄 Refreshing listings data...');
+        fetchListings();
+      }, 1000);
+      
+    } else {
+      const errorMsg = response.data?.error || 'Failed to update listing status';
+      console.error('❌ API Error:', errorMsg);
+      setError(`❌ ${errorMsg}`);
+    }
+    
+  } catch (error: any) {
+    console.error('❌ Error toggling listing status:', error);
+    
+    // Detailed error logging
+    if (error.response) {
+      console.error('📊 Response Error Details:', {
+        status: error.response.status,
+        data: error.response.data,
+        headers: error.response.headers
+      });
+      
+      const errorMsg = error.response.data?.error || 
+                      error.response.data?.message || 
+                      `Server error: ${error.response.status}`;
+      setError(`❌ ${errorMsg}`);
+    } else if (error.request) {
+      console.error('🌐 No response received:', error.request);
+      setError('❌ No response from server. Please check your network connection.');
+    } else {
+      console.error('⚙️ Request setup error:', error.message);
+      setError(`❌ Failed to update listing: ${error.message}`);
+    }
+  } finally {
+    console.log('🏁 Toggle process finished');
+    setListingActionLoading(null);
+  }
+};
+  // ✅ NEW: Pause/Resume Order functionality
+  const handlePauseResumeOrder = async (order: Order, action: 'pause' | 'resume') => {
+    try {
+      setOrderActionLoading(order._id);
+      setError('');
+
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        setOrderActionLoading(null);
+        return;
+      }
+
+      console.log(`${action === 'pause' ? '⏸️' : '▶️'} ${action.charAt(0).toUpperCase() + action.slice(1)}ing order: ${order._id}`);
+
+      // Use existing status update endpoint with new status
+      const newStatus = action === 'pause' ? 'paused' : order.previousStatus || 'processing';
+      
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${order._id}/status`,
+        { 
+          status: newStatus,
+          ...(action === 'pause' ? { previousStatus: order.status } : {})
+        },
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
+
+      if (response.data.success) {
+        const actionText = action === 'pause' ? 'paused' : 'resumed';
+        setSuccessMessage(`✅ Order ${actionText} successfully!`);
+        
+        updateOrderInState(order._id, newStatus, {
+          ...(action === 'pause' ? { previousStatus: order.status } : {}),
+          updatedAt: new Date().toISOString()
+        });
+      }
+    } catch (error: any) {
+      console.error(`❌ Error ${action}ing order:`, error);
+      setError(error.response?.data?.error || `Failed to ${action} order. Please try again.`);
+    } finally {
+      setOrderActionLoading(null);
+    }
+  };
+
+  // ✅ NEW: Accept/Reject Offer with status update
+  const handleOfferStatusUpdate = async (offerId: string, action: 'accept' | 'reject' | 'hold') => {
+    try {
+      setOrderActionLoading(offerId);
+      setError('');
+
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        setOrderActionLoading(null);
+        return;
+      }
+
+      console.log(`${action === 'accept' ? '✅' : action === 'reject' ? '❌' : '⏸️'} ${action.charAt(0).toUpperCase() + action.slice(1)}ing offer: ${offerId}`);
+
+      // Determine new status based on action
+      const newStatus = action === 'accept' ? 'accepted' : action === 'reject' ? 'rejected' : 'on_hold';
+
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/offers/${offerId}/status`,
+        { status: newStatus },
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
+
+      if (response.data.success) {
+        const actionText = action === 'accept' ? 'accepted' : action === 'reject' ? 'rejected' : 'put on hold';
+        setSuccessMessage(`✅ Offer ${actionText} successfully!`);
+        
+        // Update offers in state
+        setOffers(prev => prev.map(offer => 
+          offer._id === offerId 
+            ? { ...offer, status: newStatus, updatedAt: new Date().toISOString() }
+            : offer
+        ));
+        
+        // Refresh offers if on offers tab
+        if (activeTab === 'offers') {
+          fetchOffers();
+        }
+      }
+    } catch (error: any) {
+      console.error(`❌ Error updating offer status:`, error);
+      setError(error.response?.data?.error || `Failed to ${action} offer. Please try again.`);
+    } finally {
+      setOrderActionLoading(null);
+    }
+  };
+
+  // ✅ FIXED: Main data fetch function - FETCHES EVERYTHING ON INITIAL LOAD
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -574,89 +559,84 @@ const SellerDashboard: React.FC = () => {
 
       const currentUserId = getCurrentUserId();
       if (!currentUserId) {
-        setLoading(false);
-        navigate('/login');
-        return;
-      }
-
-      // ✅ FIXED: Check if ordersApi exists
-      if (!ordersApi || typeof ordersApi.getMySales !== 'function') {
-        console.error('ordersApi.getMySales is not available');
-        setError('API configuration error. Please check your API setup.');
+        setError('User not authenticated. Please log in again.');
         setLoading(false);
         return;
       }
 
-      // Fetch orders using API file
-      const ordersData = await ordersApi.getMySales();
+      console.log('🚀 Loading dashboard data...');
+
+      // ✅ STEP 1: Fetch ALL orders FIRST - This is most important
+      const ordersData = await fetchAllOrders();
+      console.log('📊 Orders fetched:', ordersData.length);
       
-      if (ordersData && ordersData.length > 0) {
+      if (ordersData.length > 0) {
+        // Calculate stats from orders
         const stats = calculateOrderStats(ordersData);
+        console.log('💰 Stats calculated:', stats);
+        
+        // Set orders and stats
         setOrders(ordersData);
         setOrderStats(stats);
       } else {
-        setOrders([]);
-        setOrderStats({
-          totalOrders: 0,
-          activeOrders: 0,
-          pendingPayment: 0,
-          processing: 0,
-          inProgress: 0,
-          delivered: 0,
-          completed: 0,
-          cancelled: 0,
-          totalRevenue: 0,
-          pendingRevenue: 0,
-          thisMonthOrders: 0,
-          thisMonthRevenue: 0,
-          availableBalance: 0
-        });
+        console.log('⚠️ No orders found');
       }
 
-      // Fetch offers and listings in parallel with error handling
-      try {
-        const [offersResponse, listingsResponse] = await Promise.allSettled([
-          offersApi?.getReceivedOffers ? offersApi.getReceivedOffers() : Promise.resolve({ success: false, offers: [] }),
-          listingsApi?.getMyListings ? listingsApi.getMyListings({ limit: 5 }) : Promise.resolve({ success: false, listings: [] })
-        ]);
+      // ✅ STEP 2: Fetch offers and listings in parallel
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      
+      const [offersResponse, listingsResponse] = await Promise.allSettled([
+        axios.get(`${API_BASE_URL}/marketplace/offers/received-offers`, {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 8000
+        }).catch(err => ({ data: { success: false, offers: [] } })),
+        axios.get(`${API_BASE_URL}/marketplace/listings/my-listings`, {
+          params: { 
+            limit: 5,
+            _t: new Date().getTime() // Cache busting
+          },
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Cache-Control': 'no-cache'
+          },
+          timeout: 8000
+        }).catch(err => ({ data: { success: false } }))
+      ]);
 
-        // Process offers
-        if (offersResponse.status === 'fulfilled' && offersResponse.value.success) {
-          const offersData = offersResponse.value.offers || [];
-          setOffers(offersData);
-        }
-
-        // Process listings
-        if (listingsResponse.status === 'fulfilled' && listingsResponse.value.success) {
-          setListingsData(listingsResponse.value);
-        }
-      } catch (fetchError) {
-        console.warn('Error fetching offers/listings:', fetchError);
+      // Process offers
+      if (offersResponse.status === 'fulfilled' && offersResponse.value.data.success) {
+        const offersData = offersResponse.value.data.offers || [];
+        setOffers(offersData);
+        console.log('💼 Offers fetched:', offersData.length);
       }
 
+      // Process listings
+      if (listingsResponse.status === 'fulfilled' && listingsResponse.value.data.success) {
+        setListingsData(listingsResponse.value.data);
+        console.log('🏠 Listings fetched:', listingsResponse.value.data.listings?.length || 0);
+      }
+
+      // Mark initial data as loaded
       setInitialDataLoaded(true);
+      console.log('✅ Dashboard data loaded successfully');
 
-    } catch (error: any) {
-      console.error('Error fetching dashboard data:', error);
-      setError('Failed to load dashboard data. Please try refreshing.');
+    } catch (error) {
+      console.error('❌ Error fetching dashboard data:', error);
+      setError('Failed to load dashboard data. Please try refreshing the page.');
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Fetch orders for OrdersTab
+  // ✅ FIXED: Fetch orders for OrdersTab - Uses same logic
   const fetchSellerOrders = async () => {
     try {
       setOrdersLoading(true);
       
-      if (!ordersApi || typeof ordersApi.getMySales !== 'function') {
-        console.error('ordersApi.getMySales is not available');
-        return;
-      }
+      const ordersData = await fetchAllOrders();
+      console.log('📦 OrdersTab orders:', ordersData.length);
       
-      const ordersData = await ordersApi.getMySales();
-      
-      if (ordersData && ordersData.length > 0) {
+      if (ordersData.length > 0) {
         // Filter orders if needed
         let filteredOrders = ordersData;
         if (ordersFilter !== 'all') {
@@ -673,41 +653,50 @@ const SellerDashboard: React.FC = () => {
         // Calculate stats from ALL orders (not just paginated)
         const stats = calculateOrderStats(ordersData);
         setOrderStats(stats);
+        
+        console.log('📊 OrdersTab stats updated');
       }
     } catch (error: any) {
-      console.error('Error fetching seller orders:', error);
+      console.error('❌ Error fetching seller orders:', error);
       setError('Failed to load orders. Please try again.');
     } finally {
       setOrdersLoading(false);
     }
   };
 
-  // ✅ Fetch listings
   const fetchListings = async () => {
     try {
       setListingsLoading(true);
-      
-      if (!listingsApi || typeof listingsApi.getMyListings !== 'function') {
-        console.error('listingsApi.getMyListings is not available');
+      const currentUserId = getCurrentUserId();
+      if (!currentUserId) {
+        setError('User not authenticated. Please log in again.');
         return;
       }
-      
+
       const params: any = {
         page: listingsPage,
-        limit: listingsLimit
+        limit: listingsLimit,
+        _t: new Date().getTime() // Cache busting
       };
       
       if (listingsStatusFilter) {
         params.status = listingsStatusFilter;
       }
       
-      const response = await listingsApi.getMyListings(params);
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/listings/my-listings`,
+        {
+          params,
+          headers: { 
+            Authorization: `Bearer ${localStorage.getItem('token') || sessionStorage.getItem('token')}`,
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          },
+          timeout: 10000
+        }
+      );
       
-      if (response.success) {
-        setListingsData(response);
-      } else {
-        console.error('Failed to fetch listings:', response.error);
-        setError('Failed to load listings. Please try again.');
+      if (response.data.success) {
+        setListingsData(response.data);
       }
     } catch (error: any) {
       console.error('Error fetching listings:', error);
@@ -717,23 +706,24 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Fetch offers
   const fetchOffers = async () => {
     try {
       setOffersLoading(true);
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       
-      if (!offersApi || typeof offersApi.getReceivedOffers !== 'function') {
-        console.error('offersApi.getReceivedOffers is not available');
-        return;
-      }
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/offers/received-offers`,
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          },
+          timeout: 10000
+        }
+      );
       
-      const response = await offersApi.getReceivedOffers();
-      
-      if (response.success) {
-        setOffers(response.offers || []);
-      } else {
-        console.error('Failed to fetch offers:', response.error);
-        setError('Failed to load offers. Please try again.');
+      if (response.data.success) {
+        setOffers(response.data.offers || []);
       }
     } catch (error: any) {
       console.error('Error fetching offers:', error);
@@ -743,325 +733,87 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Fetch withdrawal history from API (not mock)
-  const fetchWithdrawalHistory = async () => {
+  const checkStripeAccountStatus = async () => {
     try {
-      setWithdrawalsLoading(true);
-      
-      // Try to fetch real withdrawal history from API
-      try {
-        const response = await marketplaceApi.withdrawals?.getWithdrawalHistory?.({
-          page: withdrawalsPage,
-          limit: withdrawalsLimit
-        });
-        
-        if (response && response.success) {
-          setWithdrawalHistory(response);
-        } else {
-          // If API fails, create empty history
-          console.log('No withdrawal history found');
-          setWithdrawalHistory({
-            withdrawals: [],
-            pagination: {
-              page: 1,
-              limit: 10,
-              total: 0,
-              pages: 1
-            }
-          });
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/status`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 5000
         }
-      } catch (apiError) {
-        console.log('Withdrawal API not available, using empty history');
-        setWithdrawalHistory({
-          withdrawals: [],
-          pagination: {
-            page: 1,
-            limit: 10,
-            total: 0,
-            pages: 1
-          }
-        });
+      );
+      
+      if (response.data.success) {
+        setStripeStatus(response.data);
       }
-      
-    } catch (error: any) {
-      console.error('Error fetching withdrawal history:', error);
-      setError('Failed to load withdrawal history. Please try again.');
-      setWithdrawalHistory({
-        withdrawals: [],
-        pagination: {
-          page: 1,
-          limit: 10,
-          total: 0,
-          pages: 1
-        }
-      });
-    } finally {
-      setWithdrawalsLoading(false);
+    } catch (err) {
+      console.error('Error checking Stripe status:', err);
     }
   };
 
-  // ✅ Handle withdrawal request
-  const handleWithdrawRequest = async (amount: number) => {
+  const handleStripeReturn = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const stripeStatus = urlParams.get('stripe');
+    
+    if (stripeStatus === 'success') {
+      setSuccessMessage('Stripe account setup completed successfully!');
+      setTimeout(() => {
+        checkStripeAccountStatus();
+        fetchDashboardData();
+      }, 3000);
+    }
+  };
+
+  // ✅ FIXED: Enhanced refresh function
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    
     try {
-      setRefreshing(true);
+      // Always refresh ALL data
+      await fetchDashboardData();
       
-      // Convert amount to cents
-      const amountInCents = amount * 100;
+      await checkStripeAccountStatus();
       
-      // Call API to process withdrawal
-      try {
-        const response = await marketplaceApi.withdrawals?.requestWithdrawal?.(amountInCents);
-        
-        if (response?.success) {
-          // Update Stripe balance
-          setStripeStatus(prev => {
-            if (!prev) return prev;
-            
-            return {
-              ...prev,
-              availableBalance: (prev.availableBalance || 0) - amountInCents,
-              balance: (prev.balance || 0) - amountInCents
-            };
-          });
-          
-          // Update order stats
-          setOrderStats(prev => ({
-            ...prev,
-            availableBalance: (prev.availableBalance || 0) - amountInCents
-          }));
-          
-          setSuccessMessage(`Withdrawal request of $${amount.toFixed(2)} submitted successfully! Funds will arrive in 2-3 business days.`);
-          
-          // Refresh withdrawal history
-          fetchWithdrawalHistory();
-        } else {
-          throw new Error(response?.error || 'Withdrawal failed');
-        }
-      } catch (apiError) {
-        // If API fails, show mock success message for development
-        if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
-          // Create mock withdrawal record
-          const newWithdrawal: Withdrawal = {
-            _id: Date.now().toString(),
-            amount: amountInCents,
-            status: 'pending',
-            stripeTransferId: 'tr_mock_' + Date.now(),
-            createdAt: new Date().toISOString(),
-            destination: 'Bank Account •••• 4321',
-            description: `Withdrawal of $${amount.toFixed(2)}`
-          };
-          
-          // Add to history
-          setWithdrawalHistory(prev => {
-            if (!prev) {
-              return {
-                withdrawals: [newWithdrawal],
-                pagination: { page: 1, limit: 10, total: 1, pages: 1 }
-              };
-            }
-            
-            return {
-              ...prev,
-              withdrawals: [newWithdrawal, ...prev.withdrawals],
-              pagination: {
-                ...prev.pagination,
-                total: (prev.pagination?.total || 0) + 1
-              }
-            };
-          });
-          
-          // Update Stripe balance (mock)
-          setStripeStatus(prev => {
-            if (!prev) return prev;
-            
-            return {
-              ...prev,
-              availableBalance: (prev.availableBalance || 0) - amountInCents,
-              balance: (prev.balance || 0) - amountInCents
-            };
-          });
-          
-          setSuccessMessage(`Withdrawal request of $${amount.toFixed(2)} submitted successfully! Funds will arrive in 2-3 business days.`);
-        } else {
-          throw apiError;
-        }
-      }
-      
-    } catch (error: any) {
-      console.error('Error processing withdrawal:', error);
-      setError('Failed to process withdrawal. Please try again.');
+      setSuccessMessage('✅ Dashboard refreshed successfully!');
+    } catch (error) {
+      console.error('Refresh error:', error);
+      setError('Failed to refresh data. Please try again.');
     } finally {
       setRefreshing(false);
     }
   };
 
-  // ✅ Handle Edit Listing
-  const handleEditListing = (listing: Listing) => {
-    setEditingListing(listing);
-    setShowEditModal(true);
-  };
-
-  const handleEditModalSave = async (updatedData: { title: string; description: string; price: number }) => {
-    if (!editingListing || !listingsApi || typeof listingsApi.editListing !== 'function') return;
-
-    try {
-      setListingActionLoading(`edit-${editingListing._id}`);
-      
-      const response = await listingsApi.editListing(editingListing._id, updatedData);
-
-      if (response.success) {
-        setListingsData(prev => {
-          if (!prev) return prev;
-          
-          const updatedListings = prev.listings.map(l => {
-            if (l._id === editingListing._id) {
-              return {
-                ...l,
-                title: updatedData.title,
-                description: updatedData.description,
-                price: updatedData.price,
-                updatedAt: new Date().toISOString(),
-                ...response.listing
-              };
-            }
-            return l;
-          });
-          
-          return {
-            ...prev,
-            listings: updatedListings
-          };
-        });
-        
-        setShowEditModal(false);
-        setEditingListing(null);
-        setSuccessMessage('Listing updated successfully!');
-        
-        // Refresh listings after edit
-        fetchListings();
-      } else {
-        console.log('Edit failed:', response.error);
-        setError('Failed to update listing. Please try again.');
-      }
-    } catch (error: any) {
-      console.error('Error updating listing:', error);
-      setError('Failed to update listing. Please try again.');
-    } finally {
-      setListingActionLoading(null);
-    }
-  };
-
-  // ✅ Handle Delete Listing
-  const handleDeleteListing = (listing: Listing) => {
-    setDeletingListing(listing);
-    setShowDeleteModal(true);
-  };
-
-  const handleDeleteModalConfirm = async () => {
-    if (!deletingListing || !listingsApi || typeof listingsApi.deleteListing !== 'function') return;
-
-    try {
-      setListingActionLoading(`delete-${deletingListing._id}`);
-      
-      const response = await listingsApi.deleteListing(deletingListing._id);
-
-      if (response.success) {
-        setListingsData(prev => {
-          if (!prev) return prev;
-          
-          const updatedListings = prev.listings.filter(l => l._id !== deletingListing._id);
-          
-          return {
-            ...prev,
-            listings: updatedListings,
-            pagination: {
-              ...prev.pagination,
-              total: (prev.pagination?.total || 1) - 1
-            }
-          };
-        });
-        
-        setShowDeleteModal(false);
-        setDeletingListing(null);
-        setSuccessMessage('Listing deleted successfully!');
-        
-        // Refresh listings after delete
-        fetchListings();
-      } else {
-        console.log('Delete failed:', response.error);
-        setError('Failed to delete listing. Please try again.');
-      }
-    } catch (error: any) {
-      console.error('Error deleting listing:', error);
-      setError('Failed to delete listing. Please try again.');
-    } finally {
-      setListingActionLoading(null);
-    }
-  };
-
-  // ✅ Handle Toggle Listing Status
-  const handleToggleListingStatus = async (listing: Listing) => {
-    if (!listingsApi || typeof listingsApi.toggleListingStatus !== 'function') return;
-
-    try {
-      setListingActionLoading(`toggle-${listing._id}`);
-
-      const response = await listingsApi.toggleListingStatus(listing._id);
-
-      if (response.success) {
-        const newStatus = response.newStatus || (listing.status === 'active' ? 'inactive' : 'active');
-        
-        setListingsData(prev => {
-          if (!prev) return prev;
-          
-          const updatedListings = prev.listings.map(l => {
-            if (l._id === listing._id) {
-              return {
-                ...l,
-                status: newStatus,
-                updatedAt: response.listing?.updatedAt || new Date().toISOString(),
-                ...response.listing
-              };
-            }
-            return l;
-          });
-          
-          return {
-            ...prev,
-            listings: updatedListings
-          };
-        });
-        
-        setSuccessMessage(`Listing ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully!`);
-      } else {
-        console.log('Toggle failed:', response.error);
-        setError('Failed to update listing status. Please try again.');
-      }
-      
-    } catch (error: any) {
-      console.error('Error toggling listing status:', error);
-      setError('Failed to update listing status. Please try again.');
-    } finally {
-      setListingActionLoading(null);
-    }
-  };
-
-  // ✅ Order management functions
+  // Order management functions
   const handleSimpleStartProcessing = async (order: Order) => {
-    if (!ordersApi || typeof ordersApi.updateOrderStatus !== 'function') return;
-
     try {
       setOrderActionLoading(order._id);
+      setError('');
       
-      const response = await ordersApi.updateOrderStatus(order._id, 'processing');
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        setOrderActionLoading(null);
+        return;
+      }
 
-      if (response.success) {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${order._id}/status`,
+        { status: 'processing' },
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
+
+      if (response.data.success) {
+        setSuccessMessage('✅ Order processing started!');
         updateOrderInState(order._id, 'processing', {
           processingAt: new Date().toISOString()
         });
-        setSuccessMessage('Order is now being processed!');
-      } else {
-        setError('Failed to start processing. Please try again.');
       }
     } catch (error: any) {
       console.error('Error starting processing:', error);
@@ -1072,20 +824,34 @@ const SellerDashboard: React.FC = () => {
   };
 
   const handleSimpleStartWork = async (order: Order) => {
-    if (!ordersApi || typeof ordersApi.updateOrderStatus !== 'function') return;
-
     try {
       setOrderActionLoading(order._id);
+      setError('');
       
-      const response = await ordersApi.updateOrderStatus(order._id, 'in_progress');
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        setOrderActionLoading(null);
+        return;
+      }
 
-      if (response.success) {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${order._id}/status`,
+        { status: 'in_progress' },
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
+
+      if (response.data.success) {
+        setSuccessMessage('✅ Work started!');
         updateOrderInState(order._id, 'in_progress', {
           startedAt: new Date().toISOString()
         });
-        setSuccessMessage('Work started on order!');
-      } else {
-        setError('Failed to start work. Please try again.');
       }
     } catch (error: any) {
       console.error('Error starting work:', error);
@@ -1096,46 +862,57 @@ const SellerDashboard: React.FC = () => {
   };
 
   const handleSimpleDeliver = async (order: Order) => {
-    if (!ordersApi || typeof ordersApi.updateOrderStatus !== 'function') return;
-
     try {
       setSelectedOrder(order);
-      setOrderActionLoading(order._id);
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       
-      const response = await ordersApi.updateOrderStatus(order._id, 'delivered');
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${order._id}/status`,
+        { status: 'delivered' },
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
 
-      if (response.success) {
+      if (response.data.success) {
+        setSuccessMessage('✅ Order delivered successfully!');
         updateOrderInState(order._id, 'delivered', {
           deliveredAt: new Date().toISOString()
         });
-        setSuccessMessage('Order delivered successfully!');
-      } else {
-        setError('Failed to deliver order. Please try again.');
       }
     } catch (error: any) {
       console.error('Error delivering order:', error);
       setError('Failed to deliver order. Please try again.');
-    } finally {
-      setOrderActionLoading(null);
     }
   };
 
   const handleSimpleCancel = async (order: Order) => {
-    if (!ordersApi || typeof ordersApi.updateOrderStatus !== 'function') return;
-
-    if (window.confirm('Are you sure you want to cancel this order? This action cannot be undone.')) {
+    if (window.confirm('Are you sure you want to cancel this order?')) {
       try {
         setOrderActionLoading(order._id);
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         
-        const response = await ordersApi.updateOrderStatus(order._id, 'cancelled');
+        const response = await axios.put(
+          `${API_BASE_URL}/marketplace/orders/${order._id}/status`,
+          { status: 'cancelled' },
+          {
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 10000
+          }
+        );
 
-        if (response.success) {
+        if (response.data.success) {
+          setSuccessMessage('✅ Order cancelled successfully!');
           updateOrderInState(order._id, 'cancelled', {
             cancelledAt: new Date().toISOString()
           });
-          setSuccessMessage('Order cancelled successfully!');
-        } else {
-          setError('Failed to cancel order. Please try again.');
         }
       } catch (error: any) {
         console.error('Error cancelling order:', error);
@@ -1147,20 +924,34 @@ const SellerDashboard: React.FC = () => {
   };
 
   const handleSimpleCompleteRevision = async (order: Order) => {
-    if (!ordersApi || typeof ordersApi.updateOrderStatus !== 'function') return;
-
     try {
       setOrderActionLoading(order._id);
+      setError('');
       
-      const response = await ordersApi.updateOrderStatus(order._id, 'delivered');
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      if (!token) {
+        setError('Authentication required. Please log in again.');
+        setOrderActionLoading(null);
+        return;
+      }
 
-      if (response.success) {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${order._id}/status`,
+        { status: 'delivered' },
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
+
+      if (response.data.success) {
+        setSuccessMessage('✅ Revision completed!');
         updateOrderInState(order._id, 'delivered', {
           deliveredAt: new Date().toISOString()
         });
-        setSuccessMessage('Revision completed and order delivered!');
-      } else {
-        setError('Failed to complete revision. Please try again.');
       }
     } catch (error: any) {
       console.error('Error completing revision:', error);
@@ -1202,30 +993,35 @@ const SellerDashboard: React.FC = () => {
     setShowVideoModal(true);
   };
 
-  // ✅ Handle offer actions
-  const handleOfferAction = async (offerId: string, action: 'accept' | 'reject') => {
-    if (!offersApi) return;
+  const handleEditListing = (listing: Listing) => {
+    setEditingListing(listing);
+    setShowEditModal(true);
+  };
 
+  const handleDeleteListing = (listing: Listing) => {
+    setDeletingListing(listing);
+    setShowDeleteModal(true);
+  };
+
+  const handleOfferAction = async (offerId: string, action: 'accept' | 'reject' | 'hold') => {
     try {
       setOrderActionLoading(offerId);
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       
-      let response;
-      if (action === 'accept') {
-        if (typeof offersApi.acceptOffer !== 'function') return;
-        response = await offersApi.acceptOffer(offerId);
-      } else {
-        if (typeof offersApi.rejectOffer !== 'function') return;
-        response = await offersApi.rejectOffer(offerId);
-      }
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/offers/${offerId}/status`,
+        { status: action === 'accept' ? 'accepted' : action === 'reject' ? 'rejected' : 'on_hold' },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 10000
+        }
+      );
 
-      if (response.success) {
+      if (response.data.success) {
+        const actionText = action === 'accept' ? 'accepted' : action === 'reject' ? 'rejected' : 'put on hold';
+        setSuccessMessage(`✅ Offer ${actionText} successfully!`);
+        // Update offers list
         setOffers(prev => prev.filter(offer => offer._id !== offerId));
-        setSuccessMessage(`Offer ${action}ed successfully!`);
-        
-        // Refresh offers list
-        fetchOffers();
-      } else {
-        setError(`Failed to ${action} offer. Please try again.`);
       }
     } catch (error: any) {
       console.error(`Error ${action}ing offer:`, error);
@@ -1237,125 +1033,88 @@ const SellerDashboard: React.FC = () => {
 
   const handleStripeSetupSuccess = () => {
     setShowStripeSetup(false);
-    
-    // In development, simulate successful connection
-    if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
-      handleMockStripeConnect();
-    } else {
-      setTimeout(() => {
-        checkStripeAccountStatus();
-        fetchDashboardData();
-      }, 1000);
-    }
+    setSuccessMessage('Stripe account connected successfully!');
+    setTimeout(() => {
+      checkStripeAccountStatus();
+      fetchDashboardData();
+    }, 2000);
   };
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    setError('');
-    setSuccessMessage('');
-    
-    try {
-      await fetchDashboardData();
-      await checkStripeAccountStatus();
-      setSuccessMessage('Dashboard refreshed successfully!');
-    } catch (error) {
-      console.error('Refresh error:', error);
-      setError('Failed to refresh data. Please try again.');
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  // ✅ Handle withdraw success
-  const handleWithdrawSuccess = (amount: number) => {
-    handleWithdrawRequest(amount);
-  };
-
-  // ✅ Handle open Stripe setup with development check
-  const handleOpenStripeSetup = () => {
-    const isDevelopment = window.location.hostname === 'localhost' || 
-                         window.location.hostname === '127.0.0.1';
-    
-    if (isDevelopment) {
-      const useMock = window.confirm(
-        'Development Mode: Would you like to use a mock Stripe connection for testing?\n\nClick OK for mock connection or Cancel for real setup.'
-      );
-      
-      if (useMock) {
-        handleMockStripeConnect();
-        return;
-      }
-    }
-    
-    setShowStripeSetup(true);
-  };
-
-  // ✅ Initial data loading
+  // ✅ FIXED: Initial data loading - RUNS ONLY ONCE
   useEffect(() => {
+    console.log('🚀 SellerDashboard mounted - Loading initial data');
+    
     const loadInitialData = async () => {
       try {
-        await Promise.all([
-          fetchDashboardData(),
-          checkStripeAccountStatus()
-        ]);
+        // Load ALL data including orders
+        await fetchDashboardData();
+        await checkStripeAccountStatus();
+        handleStripeReturn();
       } catch (error) {
         console.error('Initial data loading error:', error);
       }
     };
     
     loadInitialData();
-  }, []);
+  }, []); // Empty dependency array - only run once on mount
 
-  // ✅ Fetch listings when tab changes
+  // ✅ FIXED: Fetch listings when tab changes
   useEffect(() => {
     if (activeTab === 'listings') {
+      console.log('📋 Switching to Listings tab');
       fetchListings();
     }
   }, [activeTab, listingsPage, listingsStatusFilter]);
 
-  // ✅ Fetch orders when orders tab is active
+  // ✅ FIXED: Fetch orders when orders tab is active
   useEffect(() => {
     if (activeTab === 'orders') {
+      console.log('📦 Switching to Orders tab');
       fetchSellerOrders();
     }
   }, [activeTab, ordersPage, ordersFilter]);
 
-  // ✅ Fetch offers when offers tab is active
+  // ✅ FIXED: Fetch offers when offers tab is active
   useEffect(() => {
     if (activeTab === 'offers') {
+      console.log('💼 Switching to Offers tab');
       fetchOffers();
     }
   }, [activeTab]);
 
-  // ✅ Fetch withdrawal history when withdraw tab is active
+  // Clear messages after 5 seconds
   useEffect(() => {
-    if (activeTab === 'withdraw') {
-      fetchWithdrawalHistory();
+    const timers: NodeJS.Timeout[] = [];
+    
+    if (successMessage) {
+      const timer = setTimeout(() => {
+        setSuccessMessage('');
+      }, 5000);
+      timers.push(timer);
     }
-  }, [activeTab, withdrawalsPage]);
+    
+    if (error) {
+      const timer = setTimeout(() => {
+        setError('');
+      }, 8000);
+      timers.push(timer);
+    }
 
-  // Determine loading state
+    return () => {
+      timers.forEach(timer => clearTimeout(timer));
+    };
+  }, [successMessage, error]);
+
+  // Determine loading state based on active tab
   const getCurrentLoadingState = () => {
     if (activeTab === 'overview') return loading && !initialDataLoaded;
     if (activeTab === 'listings') return listingsLoading;
     if (activeTab === 'orders') return ordersLoading;
     if (activeTab === 'offers') return offersLoading;
-    if (activeTab === 'withdraw') return withdrawalsLoading;
     return loading;
   };
 
   const currentLoading = getCurrentLoadingState();
-
-  // Calculate if user can withdraw (connected and charges enabled)
-  const canWithdraw = stripeStatus?.connected && stripeStatus?.chargesEnabled;
-  const availableBalance = stripeStatus?.availableBalance || 0;
-  const pendingBalance = stripeStatus?.pendingBalance || 0;
-
-  // Calculate total withdrawn amount
-  const totalWithdrawn = withdrawalHistory?.withdrawals?.reduce(
-    (sum, w) => sum + (w.status === 'completed' ? w.amount : 0), 
-    0
-  ) || 0;
 
   // Show loading only on initial load
   if (loading && !initialDataLoaded) {
@@ -1365,155 +1124,39 @@ const SellerDashboard: React.FC = () => {
           <div className="text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
             <p className="text-lg text-gray-800 font-medium">Loading your dashboard...</p>
-            <p className="text-gray-600 mt-2">This may take a few moments</p>
           </div>
         </div>
       </MarketplaceLayout>
     );
   }
 
-  // // Add a safe guard for formatCurrency
-  // const safeFormatCurrency = (amount: number) => {
-  //   if (typeof formatCurrency === 'function') {
-  //     return formatCurrency(amount);
-  //   }
-  //   // Fallback formatting
-  //   const amountInRupees = amount / 100;
-  //   return `₹${amountInRupees.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  // };
-
   return (
     <MarketplaceLayout>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          {/* ✅ Stripe Success Alert */}
-          {showStripeSuccessAlert && (
-            <SafeStripeSuccessAlert 
-              show={showStripeSuccessAlert}
-              onClose={() => setShowStripeSuccessAlert(false)}
-            />
-          )}
-
-          {/* Header */}
-          {/* <SafeDashboardHeader
+          {/* Header - Shows REAL earnings from orderStats */}
+          <DashboardHeader
             title="Seller Dashboard"
             subtitle="Manage orders, track earnings, and grow your business"
-            // earnings={safeFormatCurrency(orderStats.totalRevenue * 100)} // Convert to cents
+            earnings={formatCurrency(orderStats.totalRevenue)}
             onRefresh={handleRefresh}
             refreshing={refreshing}
-            // stripeStatus={stripeStatus}
-          /> */}
-
-          {/* ✅ Development Mode Banner */}
-          {(process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') && (
-            <div className="mb-6 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-4">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center">
-                  <div className="bg-purple-100 p-2 rounded-lg mr-3">
-                    <span className="text-purple-600 text-xl">🛠️</span>
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-purple-800">Development Mode</h3>
-                    <p className="text-sm text-purple-700">
-                      Using live earnings data from your orders. Mock payments available for testing.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  {!stripeStatus?.chargesEnabled ? (
-                    <button
-                      onClick={handleMockStripeConnect}
-                      className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-sm font-medium rounded-lg transition duration-200 shadow-md hover:shadow"
-                    >
-                      Connect Mock Stripe
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        const mockStatus: StripeStatus = {
-                          connected: false,
-                          chargesEnabled: false,
-                          detailsSubmitted: false,
-                          status: 'not_connected',
-                          balance: 0,
-                          availableBalance: 0,
-                          pendingBalance: 0
-                        };
-                        localStorage.setItem('stripe_status', JSON.stringify(mockStatus));
-                        setStripeStatus(mockStatus);
-                        setSuccessMessage('Mock Stripe disconnected. You can reconnect anytime.');
-                      }}
-                      className="px-4 py-2 bg-white border border-purple-300 text-purple-600 hover:bg-purple-50 text-sm font-medium rounded-lg transition duration-200"
-                    >
-                      Disconnect Mock
-                    </button>
-                  )}
-                  <button
-                    onClick={checkStripeAccountStatus}
-                    className="px-4 py-2 bg-white border border-purple-300 text-purple-600 hover:bg-purple-50 text-sm font-medium rounded-lg transition duration-200"
-                  >
-                    Refresh Status
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ✅ Success Message */}
-          {successMessage && (
-            <div className="mb-6 bg-green-50 border border-green-200 rounded-xl p-4">
-              <div className="flex items-center">
-                <div className="w-5 h-5 text-green-600 mr-3 flex-shrink-0">
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <p className="text-sm text-green-800">{successMessage}</p>
-                <button
-                  onClick={() => setSuccessMessage('')}
-                  className="ml-auto text-green-600 hover:text-green-800"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ✅ Error Message */}
-          {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4">
-              <div className="flex items-center">
-                <div className="w-5 h-5 text-red-600 mr-3 flex-shrink-0">
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <p className="text-sm text-red-800">{error}</p>
-                <button
-                  onClick={() => setError('')}
-                  className="ml-auto text-red-600 hover:text-red-800"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ✅ Stripe Account Status */}
-          <SafeStripeAccountStatus
-            stripeStatus={stripeStatus}
-            onSetupClick={handleOpenStripeSetup}
-            isLoading={stripeStatus === null}
+            showStripeButton={!(stripeStatus?.connected && stripeStatus?.chargesEnabled)}
+            // onStripeSetup={() => setShowStripeSetup(true)}
           />
 
-  
-          {/* ✅ Navigation */}
-          <SafeTabNavigation
+          {/* Alerts */}
+          <div className="mb-8 space-y-4">
+            {successMessage && (
+              <AlertMessage type="success" message={successMessage} />
+            )}
+            {error && (
+              <AlertMessage type="error" message={error} />
+            )}
+          </div>
+
+          {/* Navigation */}
+          <TabNavigation
             tabs={tabs}
             activeTab={activeTab}
             onTabChange={setActiveTab}
@@ -1521,247 +1164,191 @@ const SellerDashboard: React.FC = () => {
 
           {/* Tab Content */}
           <div className="mt-2">
-            {currentLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Loading {activeTab}...</p>
-                </div>
-              </div>
-            ) : (
-              <>
-                {/* Overview Tab */}
-                {activeTab === 'overview' && (
-                  <div className="space-y-8">
-                    {/* Welcome Card */}
-                    <SafeWelcomeCard
-                      title="Welcome back, Seller! 👋"
-                      subtitle="Manage your business efficiently with real-time insights and quick actions."
-                      primaryAction={{
-                        label: '+ Create New Listing',
-                        onClick: () => navigate('/marketplace/create')
-                      }}
-                      secondaryAction={{
-                        label: '💰 Setup Payments',
-                        onClick: handleOpenStripeSetup,
-                        visible: !canWithdraw
-                      }}
-                    />
+            {activeTab === 'overview' && (
+              <div className="space-y-8">
+                {/* Welcome Card */}
+                <WelcomeCard
+                  title="Welcome back, Seller! 👋"
+                  subtitle="Manage your business efficiently with real-time insights and quick actions."
+                  primaryAction={{
+                    label: '+ Create New Listing',
+                    onClick: () => navigate('/marketplace/create')
+                  }}
+                  secondaryAction={{
+                    label: '💰 Setup Payments',
+                    onClick: () => setShowStripeSetup(true),
+                    visible: !(stripeStatus?.connected && stripeStatus?.chargesEnabled)
+                  }}
+                />
 
-                    {/* Stats Grid */}
-                    <SafeStatsGrid
-                      stats={{
-                        totalRevenue: orderStats.totalRevenue,
-                        totalOrders: orderStats.totalOrders,
-                        activeOrders: orderStats.activeOrders,
-                        pendingOffers: pendingOffers,
-                        totalListings: totalListings,
-                        activeListings: activeListings,
-                        thisMonthRevenue: orderStats.thisMonthRevenue,
-                        thisMonthOrders: orderStats.thisMonthOrders,
-                        availableBalance: stripeStatus?.availableBalance,
-                        totalWithdrawn: totalWithdrawn
-                      }}
-                      onTabChange={setActiveTab}
-                    />
+                {/* Stats Grid - Shows REAL stats from orderStats */}
+                <StatsGrid
+                  stats={{
+                    totalRevenue: orderStats.totalRevenue,
+                    totalOrders: orderStats.totalOrders,
+                    activeOrders: orderStats.activeOrders,
+                    pendingOffers: pendingOffers,
+                    totalListings: totalListings,
+                    activeListings: activeListings
+                  }}
+                  onTabChange={setActiveTab}
+                />
 
-                    {/* Order Workflow Guide */}
-                    <SafeOrderWorkflowGuide />
+                {/* Order Workflow Guide */}
+                <OrderWorkflowGuide />
 
-                    {/* Recent Orders */}
-                    {orders.length > 0 ? (
-                      <SafeRecentOrders
-                        orders={orders.slice(0, 5)}
-                        onViewOrderDetails={handleViewOrderDetails}
-                        onStartProcessing={handleSimpleStartProcessing}
-                        onStartWork={handleSimpleStartWork}
-                        onDeliver={handleSimpleDeliver}
-                        onCancel={handleSimpleCancel}
-                        onCompleteRevision={handleSimpleCompleteRevision}
-                        onViewAll={() => setActiveTab('orders')}
-                        onCreateListing={() => navigate('/marketplace/create')}
-                        orderActionLoading={orderActionLoading}
-                      />
-                    ) : (
-                      <div className="bg-white rounded-2xl shadow-sm border border-yellow-200 p-8 text-center">
-                        <div className="text-5xl mb-4 text-gray-300">📦</div>
-                        <h3 className="text-lg font-medium text-gray-900">No Orders Yet</h3>
-                        <p className="mt-2 text-gray-500 mb-6">
-                          {canWithdraw 
-                            ? 'You can accept payments. Create listings to start receiving orders!'
-                            : 'Create listings to start receiving orders.'
-                          }
-                        </p>
-                        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                          <button
-                            onClick={() => navigate('/marketplace/create')}
-                            className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 shadow-md hover:shadow"
-                          >
-                            + Create Your First Listing
-                          </button>
-                          {!canWithdraw && (
-                            <button
-                              onClick={handleOpenStripeSetup}
-                              className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow"
-                            >
-                              💰 Setup Payments
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Action Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {actionCards.map((card, index) => (
-                        <SafeActionCard
-                          key={index}
-                          title={card.title}
-                          description={card.description}
-                          icon={card.icon}
-                          iconBg={card.iconBg}
-                          bgGradient={card.bgGradient}
-                          borderColor={card.borderColor}
-                          actions={card.actions}
-                        />
-                      ))}
-                    </div>
+                {/* Recent Orders - Shows from MAIN orders state */}
+                {orders.length > 0 ? (
+                  <RecentOrders
+                    orders={orders.slice(0, 5)}
+                    onViewOrderDetails={handleViewOrderDetails}
+                    onStartProcessing={handleSimpleStartProcessing}
+                    onStartWork={handleSimpleStartWork}
+                    onDeliver={handleSimpleDeliver}
+                    onCancel={handleSimpleCancel}
+                    onCompleteRevision={handleSimpleCompleteRevision}
+                    onPauseResume={(order, action) => handlePauseResumeOrder(order, action)}
+                    onViewAll={() => setActiveTab('orders')}
+                    onCreateListing={() => navigate('/marketplace/create')}
+                    orderActionLoading={orderActionLoading}
+                  />
+                ) : (
+                  <div className="bg-white rounded-2xl shadow-sm border border-yellow-200 p-8 text-center">
+                    <div className="text-5xl mb-4 text-gray-300">📦</div>
+                    <h3 className="text-lg font-medium text-gray-900">No Orders Yet</h3>
+                    <p className="mt-2 text-gray-500 mb-6">
+                      You don't have any orders yet. Create listings to start receiving orders.
+                    </p>
+                    <button
+                      onClick={() => navigate('/marketplace/create')}
+                      className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 shadow-md hover:shadow"
+                    >
+                      + Create Your First Listing
+                    </button>
                   </div>
                 )}
 
-                {/* Offers Tab */}
-                {activeTab === 'offers' && (
-                  <SafeOffersTab
-                    offers={offers}
-                    loading={offersLoading}
-                    onOfferAction={handleOfferAction}
-                    onPlayVideo={handlePlayVideo}
-                    onRefresh={() => fetchOffers()}
-                    actionLoading={orderActionLoading}
-                    onViewListing={(listingId) => navigate(`/marketplace/listing/${listingId}`)}
-                  />
-                )}
+                {/* Action Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {actionCards.map((card, index) => (
+                    <ActionCard key={index} {...card} />
+                  ))}
+                </div>
+              </div>
+            )}
 
-                {/* Listings Tab */}
-                {activeTab === 'listings' && (
-                  <SafeListingsTab
-                    listingsData={listingsData}
-                    loading={listingsLoading}
-                    statusFilter={listingsStatusFilter}
-                    currentPage={listingsPage}
-                    onStatusFilterChange={setListingsStatusFilter}
-                    onPageChange={setListingsPage}
-                    onEditListing={handleEditListing}
-                    onDeleteListing={handleDeleteListing}
-                    onToggleStatus={handleToggleListingStatus}
-                    onPlayVideo={handlePlayVideo}
-                    onRefresh={fetchListings}
-                    actionLoading={listingActionLoading}
-                    onCreateListing={() => navigate('/marketplace/create')}
-                    onViewListing={(id) => navigate(`/marketplace/listing/${id}`)}
-                  />
-                )}
+            {/* Other Tabs */}
+            {activeTab === 'offers' && (
+              <OffersTab
+                offers={offers}
+                loading={offersLoading}
+                onOfferAction={handleOfferStatusUpdate}
+                onPlayVideo={handlePlayVideo}
+                onRefresh={() => fetchOffers()}
+                actionLoading={orderActionLoading}
+              />
+            )}
 
-                {/* Orders Tab */}
-                {activeTab === 'orders' && (
-                  <SafeOrdersTab
-                    orders={orders}
-                    loading={ordersLoading}
-                    filter={ordersFilter}
-                    onFilterChange={setOrdersFilter}
-                    onViewOrderDetails={handleViewOrderDetails}
-                    onPlayVideo={handlePlayVideo}
-                    onRefresh={() => fetchSellerOrders()}
-                    onStartProcessing={(orderId) => {
-                      const order = orders.find(o => o._id === orderId);
-                      if (order) handleSimpleStartProcessing(order);
-                    }}
-                    onStartWork={(orderId) => {
-                      const order = orders.find(o => o._id === orderId);
-                      if (order) handleSimpleStartWork(order);
-                    }}
-                    onDeliver={(order) => handleSimpleDeliver(order)}
-                    onCancel={(order) => handleSimpleCancel(order)}
-                    onCompleteRevision={(order) => handleSimpleCompleteRevision(order)}
-                    actionLoading={orderActionLoading}
-                    stats={orderStats}
-                    onPageChange={setOrdersPage}
-                    currentPage={ordersPage}
-                  />
-                )}
-
-                {/* Withdraw Tab */}
-                {activeTab === 'withdraw' && (
-                  <SafeWithdrawTab
-                    stripeStatus={stripeStatus}
-                    withdrawalHistory={withdrawalHistory}
-                    loading={withdrawalsLoading}
-                    currentPage={withdrawalsPage}
-                    onPageChange={setWithdrawalsPage}
-                    onWithdrawRequest={handleWithdrawRequest}
-                    onRefresh={() => fetchWithdrawalHistory()}
-                    totalRevenue={orderStats.totalRevenue}
-                    thisMonthRevenue={orderStats.thisMonthRevenue}
-                    pendingRevenue={orderStats.pendingRevenue}
-                  />
-                )}
-              </>
+           {activeTab === 'listings' && (
+  <ListingsTab
+    listingsData={listingsData}
+    loading={listingsLoading}
+    statusFilter={listingsStatusFilter}
+    currentPage={listingsPage}
+    onStatusFilterChange={setListingsStatusFilter}
+    onPageChange={setListingsPage}
+    onEditListing={handleEditListing}
+    onDeleteListing={handleDeleteListing}
+    onToggleStatus={handleToggleListingStatus} // ✅ This line should exist
+    onPlayVideo={handlePlayVideo}
+    onRefresh={fetchListings}
+    actionLoading={listingActionLoading}
+    onCreateListing={() => navigate('/marketplace/create')}
+  />
+)}
+            {activeTab === 'orders' && (
+              <OrdersTab
+                orders={orders}
+                loading={ordersLoading}
+                filter={ordersFilter}
+                onFilterChange={setOrdersFilter}
+                onViewOrderDetails={handleViewOrderDetails}
+                onPlayVideo={handlePlayVideo}
+                onRefresh={() => fetchSellerOrders()}
+                onStartProcessing={(orderId) => {
+                  const order = orders.find(o => o._id === orderId);
+                  if (order) handleSimpleStartProcessing(order);
+                }}
+                onStartWork={(orderId) => {
+                  const order = orders.find(o => o._id === orderId);
+                  if (order) handleSimpleStartWork(order);
+                }}
+                onDeliver={(order) => handleSimpleDeliver(order)}
+                onCancel={(order) => handleSimpleCancel(order)}
+                onCompleteRevision={(order) => handleSimpleCompleteRevision(order)}
+                onPauseResume={(order, action) => handlePauseResumeOrder(order, action)}
+                actionLoading={orderActionLoading}
+                stats={orderStats}
+              />
             )}
           </div>
 
           {/* Modals */}
           {showStripeSetup && (
-            <SafeStripeSetupModal
+            <StripeSetupModal
               show={showStripeSetup}
               onClose={() => setShowStripeSetup(false)}
               onSuccess={handleStripeSetupSuccess}
-              stripeConnected={canWithdraw}
             />
           )}
 
           {selectedOrderId && (
-            <SafeOrderDetailsModal
+            <OrderDetailsModal
               orderId={selectedOrderId}
               isOpen={showOrderModal}
               onClose={() => {
                 setShowOrderModal(false);
                 setSelectedOrderId(null);
               }}
-              onStatusUpdate={() => {
-                fetchSellerOrders();
-                fetchDashboardData();
-              }}
             />
           )}
 
           {showEditModal && editingListing && (
-            <SafeEditListingModal
+            <EditListingModal
               listing={editingListing}
               isOpen={showEditModal}
               onClose={() => {
                 setShowEditModal(false);
                 setEditingListing(null);
               }}
-              onSave={handleEditModalSave}
-              loading={listingActionLoading?.startsWith('edit-') || false}
+              onUpdate={() => {
+                setShowEditModal(false);
+                setEditingListing(null);
+                fetchListings();
+              }}
+              loading={false}
             />
           )}
 
           {showDeleteModal && deletingListing && (
-            <SafeDeleteListingModal
+            <DeleteListingModal
               listing={deletingListing}
               isOpen={showDeleteModal}
               onClose={() => {
                 setShowDeleteModal(false);
                 setDeletingListing(null);
               }}
-              onConfirm={handleDeleteModalConfirm}
-              loading={listingActionLoading?.startsWith('delete-') || false}
+              onConfirm={() => {
+                setShowDeleteModal(false);
+                setDeletingListing(null);
+                fetchListings();
+              }}
+              loading={false}
             />
           )}
 
           {showVideoModal && (
-            <SafeVideoPlayerModal
+            <VideoPlayerModal
               videoUrl={currentVideoUrl}
               title={currentVideoTitle}
               isOpen={showVideoModal}
