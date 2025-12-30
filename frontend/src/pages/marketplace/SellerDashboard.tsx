@@ -1402,7 +1402,7 @@ const SellerDashboard: React.FC = () => {
             // earnings={safeFormatCurrency(orderStats.totalRevenue * 100)} // Convert to cents
             onRefresh={handleRefresh}
             refreshing={refreshing}
-            stripeStatus={stripeStatus}
+            // stripeStatus={stripeStatus}
           />
 
           {/* ✅ Development Mode Banner */}
