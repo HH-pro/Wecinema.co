@@ -17,7 +17,7 @@ const ordersApi = marketplaceApi.orders;
 const offersApi = marketplaceApi.offers;
 
 // ✅ FIXED: Use formatCurrency from marketplaceApi
-const formatCurrency = marketplaceApi.formatCurrency;
+// const formatCurrency = marketplaceApi.formatCurrency;
 
 // FIXED: Corrected import paths - changed 'marketplae' to 'marketplace'
 import DashboardHeader from '../../components/marketplae/seller/DashboardHeader';
@@ -1372,15 +1372,15 @@ const SellerDashboard: React.FC = () => {
     );
   }
 
-  // Add a safe guard for formatCurrency
-  const safeFormatCurrency = (amount: number) => {
-    if (typeof formatCurrency === 'function') {
-      return formatCurrency(amount);
-    }
-    // Fallback formatting
-    const amountInRupees = amount / 100;
-    return `₹${amountInRupees.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
+  // // Add a safe guard for formatCurrency
+  // const safeFormatCurrency = (amount: number) => {
+  //   if (typeof formatCurrency === 'function') {
+  //     return formatCurrency(amount);
+  //   }
+  //   // Fallback formatting
+  //   const amountInRupees = amount / 100;
+  //   return `₹${amountInRupees.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  // };
 
   return (
     <MarketplaceLayout>
@@ -1399,7 +1399,7 @@ const SellerDashboard: React.FC = () => {
           <SafeDashboardHeader
             title="Seller Dashboard"
             subtitle="Manage orders, track earnings, and grow your business"
-            earnings={safeFormatCurrency(orderStats.totalRevenue * 100)} // Convert to cents
+            // earnings={safeFormatCurrency(orderStats.totalRevenue * 100)} // Convert to cents
             onRefresh={handleRefresh}
             refreshing={refreshing}
             stripeStatus={stripeStatus}
