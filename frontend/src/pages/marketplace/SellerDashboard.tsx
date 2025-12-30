@@ -18,31 +18,62 @@ const offersApi = marketplaceApi.offers;
 
 // ✅ FIXED: Use formatCurrency from marketplaceApi
 const formatCurrency = marketplaceApi.formatCurrency;
-// Import components - MAKE SURE PATHS ARE CORRECT
-import DashboardHeader from '../../components/marketplae/seller/DashboardHeader';
-import TabNavigation from '../../components/marketplae/seller/TabNavigation';
-import StatsGrid from '../../components/marketplae/seller/StatsGrid';
-import WelcomeCard from '../../components/marketplae/seller/WelcomeCard';
-import RecentOrders from '../../components/marketplae/seller/RecentOrders';
-import ActionCard from '../../components/marketplae/seller/ActionCard';
-import OrderWorkflowGuide from '../../components/marketplae/seller/OrderWorkflowGuide';
-import StripeAccountStatus from '../../components/marketplae/seller/StripeAccountStatus';
-import StripeSuccessAlert from '../../components/marketplae/seller/StripeSuccessAlert';
-import WithdrawBalance from '../../components/marketplae/seller/WithdrawBalance';
+
+// FIXED: Corrected import paths - changed 'marketplae' to 'marketplace'
+import DashboardHeader from '../../components/marketplace/seller/DashboardHeader';
+import TabNavigation from '../../components/marketplace/seller/TabNavigation';
+import StatsGrid from '../../components/marketplace/seller/StatsGrid';
+import WelcomeCard from '../../components/marketplace/seller/WelcomeCard';
+import RecentOrders from '../../components/marketplace/seller/RecentOrders';
+import ActionCard from '../../components/marketplace/seller/ActionCard';
+import OrderWorkflowGuide from '../../components/marketplace/seller/OrderWorkflowGuide';
+import StripeAccountStatus from '../../components/marketplace/seller/StripeAccountStatus';
+import StripeSuccessAlert from '../../components/marketplace/seller/StripeSuccessAlert';
+import WithdrawBalance from '../../components/marketplace/seller/WithdrawBalance';
 
 // Import tab components
-import OffersTab from '../../components/marketplae/seller/OffersTab';
-import ListingsTab from '../../components/marketplae/seller/ListingsTab';
-import OrdersTab from '../../components/marketplae/seller/OrdersTab';
-import WithdrawTab from '../../components/marketplae/seller/WithdrawTab';
+import OffersTab from '../../components/marketplace/seller/OffersTab';
+import ListingsTab from '../../components/marketplace/seller/ListingsTab';
+import OrdersTab from '../../components/marketplace/seller/OrdersTab';
+import WithdrawTab from '../../components/marketplace/seller/WithdrawTab';
 
 // Import modals
-import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
-import OrderDetailsModal from '../../components/marketplae/seller/OrderDetailsModal';
-import EditListingModal from '../../components/marketplae/seller/EditListingModal';
-import DeleteListingModal from '../../components/marketplae/seller/DeleteListingModal';
-import VideoPlayerModal from '../../components/marketplae/seller/VideoPlayerModal';
+import StripeSetupModal from '../../components/marketplace/seller/StripeSetupModal';
+import OrderDetailsModal from '../../components/marketplace/seller/OrderDetailsModal';
+import EditListingModal from '../../components/marketplace/seller/EditListingModal';
+import DeleteListingModal from '../../components/marketplace/seller/DeleteListingModal';
+import VideoPlayerModal from '../../components/marketplace/seller/VideoPlayerModal';
 
+// Check if components exist - Add this troubleshooting section
+const checkComponentImports = () => {
+  const components = {
+    DashboardHeader,
+    TabNavigation,
+    StatsGrid,
+    WelcomeCard,
+    RecentOrders,
+    ActionCard,
+    OrderWorkflowGuide,
+    StripeAccountStatus,
+    StripeSuccessAlert,
+    WithdrawBalance,
+    OffersTab,
+    ListingsTab,
+    OrdersTab,
+    WithdrawTab,
+    StripeSetupModal,
+    OrderDetailsModal,
+    EditListingModal,
+    DeleteListingModal,
+    VideoPlayerModal
+  };
+  
+  console.log('Component imports:', components);
+  return components;
+};
+
+// Optional: If you want to see what's being imported
+// checkComponentImports();
 
 // Interfaces (keep as before)
 interface Order {
@@ -1407,14 +1438,16 @@ const SellerDashboard: React.FC = () => {
           )}
 
           {/* ✅ Stripe Account Status */}
-          <StripeAccountStatus
-            stripeStatus={stripeStatus}
-            onSetupClick={handleOpenStripeSetup}
-            isLoading={stripeStatus === null}
-          />
+          {StripeAccountStatus && (
+            <StripeAccountStatus
+              stripeStatus={stripeStatus}
+              onSetupClick={handleOpenStripeSetup}
+              isLoading={stripeStatus === null}
+            />
+          )}
 
           {/* ✅ Withdraw Balance Card (Shows in overview) */}
-          {canWithdraw && availableBalance > 0 && (
+          {canWithdraw && availableBalance > 0 && WithdrawBalance && (
             <WithdrawBalance
               stripeStatus={stripeStatus!}
               availableBalance={availableBalance}
@@ -1426,11 +1459,13 @@ const SellerDashboard: React.FC = () => {
           )}
 
           {/* ✅ Navigation */}
-          <TabNavigation
-            tabs={tabs}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-          />
+          {TabNavigation && (
+            <TabNavigation
+              tabs={tabs}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+            />
+          )}
 
           {/* Tab Content */}
           <div className="mt-2">
@@ -1447,42 +1482,46 @@ const SellerDashboard: React.FC = () => {
                 {activeTab === 'overview' && (
                   <div className="space-y-8">
                     {/* Welcome Card */}
-                    <WelcomeCard
-                      title="Welcome back, Seller! 👋"
-                      subtitle="Manage your business efficiently with real-time insights and quick actions."
-                      primaryAction={{
-                        label: '+ Create New Listing',
-                        onClick: () => navigate('/marketplace/create')
-                      }}
-                      secondaryAction={{
-                        label: '💰 Setup Payments',
-                        onClick: handleOpenStripeSetup,
-                        visible: !canWithdraw
-                      }}
-                    />
+                    {WelcomeCard && (
+                      <WelcomeCard
+                        title="Welcome back, Seller! 👋"
+                        subtitle="Manage your business efficiently with real-time insights and quick actions."
+                        primaryAction={{
+                          label: '+ Create New Listing',
+                          onClick: () => navigate('/marketplace/create')
+                        }}
+                        secondaryAction={{
+                          label: '💰 Setup Payments',
+                          onClick: handleOpenStripeSetup,
+                          visible: !canWithdraw
+                        }}
+                      />
+                    )}
 
                     {/* Stats Grid */}
-                    <StatsGrid
-                      stats={{
-                        totalRevenue: orderStats.totalRevenue,
-                        totalOrders: orderStats.totalOrders,
-                        activeOrders: orderStats.activeOrders,
-                        pendingOffers: pendingOffers,
-                        totalListings: totalListings,
-                        activeListings: activeListings,
-                        thisMonthRevenue: orderStats.thisMonthRevenue,
-                        thisMonthOrders: orderStats.thisMonthOrders,
-                        availableBalance: stripeStatus?.availableBalance,
-                        totalWithdrawn: totalWithdrawn
-                      }}
-                      onTabChange={setActiveTab}
-                    />
+                    {StatsGrid && (
+                      <StatsGrid
+                        stats={{
+                          totalRevenue: orderStats.totalRevenue,
+                          totalOrders: orderStats.totalOrders,
+                          activeOrders: orderStats.activeOrders,
+                          pendingOffers: pendingOffers,
+                          totalListings: totalListings,
+                          activeListings: activeListings,
+                          thisMonthRevenue: orderStats.thisMonthRevenue,
+                          thisMonthOrders: orderStats.thisMonthOrders,
+                          availableBalance: stripeStatus?.availableBalance,
+                          totalWithdrawn: totalWithdrawn
+                        }}
+                        onTabChange={setActiveTab}
+                      />
+                    )}
 
                     {/* Order Workflow Guide */}
-                    <OrderWorkflowGuide />
+                    {OrderWorkflowGuide && <OrderWorkflowGuide />}
 
                     {/* Recent Orders */}
-                    {orders.length > 0 ? (
+                    {orders.length > 0 && RecentOrders ? (
                       <RecentOrders
                         orders={orders.slice(0, 5)}
                         onViewOrderDetails={handleViewOrderDetails}
@@ -1525,25 +1564,27 @@ const SellerDashboard: React.FC = () => {
                     )}
 
                     {/* Action Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {actionCards.map((card, index) => (
-                        <ActionCard
-                          key={index}
-                          title={card.title}
-                          description={card.description}
-                          icon={card.icon}
-                          iconBg={card.iconBg}
-                          bgGradient={card.bgGradient}
-                          borderColor={card.borderColor}
-                          actions={card.actions}
-                        />
-                      ))}
-                    </div>
+                    {ActionCard && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {actionCards.map((card, index) => (
+                          <ActionCard
+                            key={index}
+                            title={card.title}
+                            description={card.description}
+                            icon={card.icon}
+                            iconBg={card.iconBg}
+                            bgGradient={card.bgGradient}
+                            borderColor={card.borderColor}
+                            actions={card.actions}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {/* Offers Tab */}
-                {activeTab === 'offers' && (
+                {activeTab === 'offers' && OffersTab && (
                   <OffersTab
                     offers={offers}
                     loading={offersLoading}
@@ -1556,7 +1597,7 @@ const SellerDashboard: React.FC = () => {
                 )}
 
                 {/* Listings Tab */}
-                {activeTab === 'listings' && (
+                {activeTab === 'listings' && ListingsTab && (
                   <ListingsTab
                     listingsData={listingsData}
                     loading={listingsLoading}
@@ -1576,7 +1617,7 @@ const SellerDashboard: React.FC = () => {
                 )}
 
                 {/* Orders Tab */}
-                {activeTab === 'orders' && (
+                {activeTab === 'orders' && OrdersTab && (
                   <OrdersTab
                     orders={orders}
                     loading={ordersLoading}
@@ -1604,7 +1645,7 @@ const SellerDashboard: React.FC = () => {
                 )}
 
                 {/* Withdraw Tab */}
-                {activeTab === 'withdraw' && (
+                {activeTab === 'withdraw' && WithdrawTab && (
                   <WithdrawTab
                     stripeStatus={stripeStatus}
                     withdrawalHistory={withdrawalHistory}
@@ -1623,7 +1664,7 @@ const SellerDashboard: React.FC = () => {
           </div>
 
           {/* Modals */}
-          {showStripeSetup && (
+          {showStripeSetup && StripeSetupModal && (
             <StripeSetupModal
               show={showStripeSetup}
               onClose={() => setShowStripeSetup(false)}
@@ -1632,7 +1673,7 @@ const SellerDashboard: React.FC = () => {
             />
           )}
 
-          {selectedOrderId && (
+          {selectedOrderId && OrderDetailsModal && (
             <OrderDetailsModal
               orderId={selectedOrderId}
               isOpen={showOrderModal}
@@ -1647,7 +1688,7 @@ const SellerDashboard: React.FC = () => {
             />
           )}
 
-          {showEditModal && editingListing && (
+          {showEditModal && editingListing && EditListingModal && (
             <EditListingModal
               listing={editingListing}
               isOpen={showEditModal}
@@ -1660,7 +1701,7 @@ const SellerDashboard: React.FC = () => {
             />
           )}
 
-          {showDeleteModal && deletingListing && (
+          {showDeleteModal && deletingListing && DeleteListingModal && (
             <DeleteListingModal
               listing={deletingListing}
               isOpen={showDeleteModal}
@@ -1673,7 +1714,7 @@ const SellerDashboard: React.FC = () => {
             />
           )}
 
-          {showVideoModal && (
+          {showVideoModal && VideoPlayerModal && (
             <VideoPlayerModal
               videoUrl={currentVideoUrl}
               title={currentVideoTitle}
