@@ -20,6 +20,12 @@ const EarningsOverview: React.FC<EarningsOverviewProps> = ({
   const [liveEarnings, setLiveEarnings] = useState<any>(null);
   const [loadingEarnings, setLoadingEarnings] = useState(false);
   
+  // ✅ Currency formatter for dollars
+  const formatToDollars = (amountInCents: number) => {
+    const amountInDollars = amountInCents / 100;
+    return `$${amountInDollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+  
   // ✅ Function to fetch live earnings from backend
   const fetchLiveEarnings = async () => {
     if (!userId) return;
@@ -57,7 +63,7 @@ const EarningsOverview: React.FC<EarningsOverviewProps> = ({
       total: stripeStatus?.balance || 0,
       today: 0,
       thisWeek: 0,
-      thisMonth: orderStats.thisMonthRevenue || 0
+      thisMonth: (orderStats.thisMonthRevenue || 0) * 100 // Convert dollars to cents
     };
 
     // If you have liveEarnings data from API, use it
@@ -76,16 +82,6 @@ const EarningsOverview: React.FC<EarningsOverviewProps> = ({
   };
 
   const earnings = extractLiveEarnings();
-  
-  const formatToRupees = (amountInCents: number) => {
-    const amountInRupees = amountInCents / 100;
-    return `₹${amountInRupees.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
-  
-  const formatToDollars = (amountInCents: number) => {
-    const amountInDollars = amountInCents / 100;
-    return `$${amountInDollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
   
   // ✅ Handle refresh (replaces SafeDashboardHeader's onRefresh)
   const handleRefresh = async () => {
@@ -124,6 +120,12 @@ const EarningsOverview: React.FC<EarningsOverviewProps> = ({
     } finally {
       setIsWithdrawing(false);
     }
+  };
+  
+  // ✅ Calculate conversion rate
+  const calculateConversionRate = () => {
+    if (!orderStats || orderStats.totalOrders === 0) return 0;
+    return Math.round((orderStats.completed / orderStats.totalOrders) * 100);
   };
   
   return (
@@ -183,7 +185,7 @@ const EarningsOverview: React.FC<EarningsOverviewProps> = ({
               </div>
             </div>
             <p className="text-2xl font-bold text-gray-900">
-              {formatToRupees(earnings.available || 0)}
+              {formatToDollars(earnings.available || 0)}
             </p>
             <p className="text-sm text-gray-600 mt-1">Ready for withdrawal</p>
             
@@ -221,7 +223,7 @@ const EarningsOverview: React.FC<EarningsOverviewProps> = ({
               </div>
             </div>
             <p className="text-2xl font-bold text-gray-900">
-              {formatToRupees(earnings.pending || 0)}
+              {formatToDollars(earnings.pending || 0)}
             </p>
             <p className="text-sm text-gray-600 mt-1">Orders in progress</p>
           </div>
@@ -235,7 +237,7 @@ const EarningsOverview: React.FC<EarningsOverviewProps> = ({
               </div>
             </div>
             <p className="text-2xl font-bold text-gray-900">
-              {formatToRupees(earnings.today * 100 || 0)}
+              {formatToDollars(earnings.today || 0)}
             </p>
             <p className="text-sm text-gray-600 mt-1">Live earnings today</p>
             
@@ -259,7 +261,7 @@ const EarningsOverview: React.FC<EarningsOverviewProps> = ({
               </div>
             </div>
             <p className="text-2xl font-bold text-gray-900">
-              {formatToRupees((earnings.thisMonth * 100) || 0)}
+              {formatToDollars(earnings.thisMonth || 0)}
             </p>
             <p className="text-sm text-gray-600 mt-1">Monthly revenue</p>
           </div>
@@ -275,7 +277,7 @@ const EarningsOverview: React.FC<EarningsOverviewProps> = ({
               <div>
                 <p className="text-sm font-medium text-gray-900">Total Balance</p>
                 <p className="text-lg font-bold text-gray-900">
-                  {formatToRupees(earnings.total || 0)}
+                  {formatToDollars(earnings.total || 0)}
                 </p>
               </div>
             </div>
@@ -289,7 +291,7 @@ const EarningsOverview: React.FC<EarningsOverviewProps> = ({
               <div>
                 <p className="text-sm font-medium text-gray-900">This Week</p>
                 <p className="text-lg font-bold text-gray-900">
-                  {formatToRupees((earnings.thisWeek * 100) || 0)}
+                  {formatToDollars(earnings.thisWeek || 0)}
                 </p>
               </div>
             </div>
@@ -303,10 +305,30 @@ const EarningsOverview: React.FC<EarningsOverviewProps> = ({
               <div>
                 <p className="text-sm font-medium text-gray-900">Conversion Rate</p>
                 <p className="text-lg font-bold text-gray-900">
-                  {orderStats.conversionRate || 0}%
+                  {calculateConversionRate()}%
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+        
+        {/* ✅ Detailed Stats */}
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-lg p-4">
+            <p className="text-sm text-gray-600">Total Orders</p>
+            <p className="text-xl font-bold text-gray-900">{orderStats.totalOrders || 0}</p>
+          </div>
+          <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-lg p-4">
+            <p className="text-sm text-gray-600">Completed Orders</p>
+            <p className="text-xl font-bold text-gray-900">{orderStats.completed || 0}</p>
+          </div>
+          <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-lg p-4">
+            <p className="text-sm text-gray-600">Active Orders</p>
+            <p className="text-xl font-bold text-gray-900">{orderStats.activeOrders || 0}</p>
+          </div>
+          <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-lg p-4">
+            <p className="text-sm text-gray-600">This Month Orders</p>
+            <p className="text-xl font-bold text-gray-900">{orderStats.thisMonthOrders || 0}</p>
           </div>
         </div>
         
@@ -347,7 +369,7 @@ const EarningsOverview: React.FC<EarningsOverviewProps> = ({
         </div>
       </div>
       
-      {/* Withdraw Form Modal */}
+      {/* Withdraw Form Modal - UPDATED FOR DOLLARS */}
       {showWithdrawForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
@@ -372,7 +394,7 @@ const EarningsOverview: React.FC<EarningsOverviewProps> = ({
                   <p className="text-sm font-medium text-blue-800">Available Balance</p>
                 </div>
                 <p className="text-2xl font-bold text-blue-900">
-                  {formatToRupees(earnings.available || 0)}
+                  {formatToDollars(earnings.available || 0)}
                 </p>
                 <p className="text-sm text-blue-700 mt-1">
                   Minimum withdrawal: $5.00 • Processing time: 2-3 business days
@@ -403,6 +425,22 @@ const EarningsOverview: React.FC<EarningsOverviewProps> = ({
                   <p className="text-sm text-gray-500 mt-2">
                     Enter amount between $5.00 and ${((earnings.available || 0) / 100).toFixed(2)}
                   </p>
+                </div>
+                
+                <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <div className="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0">
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.998-.833-2.732 0L4.342 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-yellow-800">Important Notice</p>
+                      <p className="text-sm text-yellow-700 mt-1">
+                        Withdrawals typically take 2-3 business days to process. A small processing fee may apply.
+                      </p>
+                    </div>
+                  </div>
                 </div>
                 
                 <div className="flex gap-3">
