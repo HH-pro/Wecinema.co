@@ -1102,186 +1102,78 @@ router.put("/:orderId/request-revision", authenticateMiddleware, async (req, res
     });
   }
 });
-router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
+// Add this route to help sellers check their Stripe account status
+router.get("/seller/account-status", authenticateMiddleware, async (req, res) => {
   try {
-    const { orderId } = req.params;
     const userId = req.user.id || req.user._id || req.user.userId;
-
-    // ✅ FIXED: Check if valid ObjectId
-    if (!mongoose.Types.ObjectId.isValid(orderId)) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'Invalid order ID' 
-      });
-    }
-
-    console.log('✅ Buyer completing order:', orderId);
-
-    const order = await Order.findOne({
-      _id: orderId,
-      buyerId: userId,
-      status: 'delivered'
-    }).populate('sellerId', 'username email firstName lastName stripeAccountId')
-      .populate('buyerId', 'username email firstName lastName')
-      .populate('listingId', 'title');
-
-    if (!order) {
-      return res.status(404).json({ 
-        success: false,
-        error: 'Order not found, not delivered, or you are not the buyer' 
-      });
-    }
-
-    // ✅ REMOVED: 1-hour waiting period check
-    // Orders can be completed immediately after delivery
     
-    // Process payment to seller
-    if (order.stripePaymentIntentId && !order.paymentReleased && order.sellerId.stripeAccountId) {
-      try {
-        console.log('💰 Releasing payment to seller for order:', orderId);
-        
-        // Calculate amounts
-        const platformFeePercent = 0.15; // 15% platform fee
-        const platformFee = order.amount * platformFeePercent;
-        const sellerAmount = order.amount - platformFee;
-
-        // ✅ Capture the payment intent (if not already captured)
-        const paymentIntent = await stripe.paymentIntents.retrieve(order.stripePaymentIntentId);
-        
-        if (paymentIntent.status !== 'succeeded') {
-          await stripe.paymentIntents.capture(order.stripePaymentIntentId);
-          console.log('✅ Payment intent captured');
-        } else {
-          console.log('✅ Payment intent already captured');
-        }
-
-        // ✅ Create transfer to seller's Stripe account
-        const transfer = await stripe.transfers.create({
-          amount: Math.round(sellerAmount * 100), // Convert to cents
-          currency: 'usd',
-          destination: order.sellerId.stripeAccountId,
-          transfer_group: `ORDER_${orderId}`,
-          metadata: {
-            orderId: orderId,
-            buyerId: order.buyerId._id.toString(),
-            sellerId: order.sellerId._id.toString(),
-            listingTitle: order.listingId?.title || 'N/A',
-            amount: order.amount
-          }
-        });
-
-        // Update order with payment details
-        order.platformFee = platformFee;
-        order.sellerAmount = sellerAmount;
-        order.paymentReleased = true;
-        order.releaseDate = new Date();
-        order.stripeTransferId = transfer.id;
-
-        console.log('💵 Payment released to seller:', sellerAmount, 'Transfer ID:', transfer.id);
-      } catch (stripeError) {
-        console.error('Stripe payment release error:', stripeError);
-        return res.status(500).json({
-          success: false,
-          error: 'Payment processing failed',
-          stripeError: stripeError.message
-        });
-      }
-    } else {
-      console.log('ℹ️ Payment processing skipped:', {
-        hasPaymentIntent: !!order.stripePaymentIntentId,
-        paymentReleased: order.paymentReleased,
-        hasStripeAccount: !!order.sellerId.stripeAccountId
+    const user = await User.findById(userId);
+    if (!user || !user.stripeAccountId) {
+      return res.status(400).json({
+        success: false,
+        error: 'No Stripe account connected'
       });
     }
 
-    // Update order status
-    order.status = 'completed';
-    order.completedAt = new Date();
-    await order.save();
+    // Retrieve Stripe account details
+    const account = await stripe.accounts.retrieve(user.stripeAccountId);
+    
+    // Check what's missing
+    const requirements = account.requirements || {};
+    const currently_due = requirements.currently_due || [];
+    const eventually_due = requirements.eventually_due || [];
+    const past_due = requirements.past_due || [];
+    
+    // Check capabilities
+    const capabilities = account.capabilities || {};
+    const hasTransfersCapability = capabilities.transfers === 'active' || 
+                                   capabilities.crypto_transfers === 'active' || 
+                                   capabilities.legacy_payments === 'active';
 
-    // Update seller stats
-    await User.findByIdAndUpdate(order.sellerId._id, { 
-      $inc: { 
-        completedOrders: 1,
-        totalEarnings: order.sellerAmount || 0
-      }
-    });
-
-    // Send completion email to seller
-    try {
-      const siteName = process.env.SITE_NAME || 'WeCinema';
-      const siteUrl = process.env.SITE_URL || 'http://localhost:5173';
-      const sellerDashboardLink = `${siteUrl}/seller/dashboard`;
-      const earningsLink = `${siteUrl}/seller/earnings`;
-
-      await emailService.sendOrderCompletionNotification(
-        order.sellerId.email,
-        order.buyerId.email,
-        {
-          buyerName: order.buyerId.firstName || order.buyerId.username,
-          sellerName: order.sellerId.firstName || order.sellerId.username,
-          orderTitle: order.listingId?.title || 'Order',
-          orderAmount: order.amount,
-          sellerAmount: order.sellerAmount || (order.amount * 0.85),
-          platformFee: order.platformFee || (order.amount * 0.15),
-          sellerDashboardLink,
-          earningsLink,
-          orderNumber: order.orderNumber || order._id.toString().slice(-8).toUpperCase(),
-          completionDate: new Date().toLocaleDateString()
-        }
-      );
-      console.log('📧 Completion email sent to seller:', order.sellerId.email);
-    } catch (emailError) {
-      console.error('Email sending failed:', emailError.message);
-      // Don't fail the order completion if email fails
-    }
-
-    // Send confirmation email to buyer
-    try {
-      await emailService.sendOrderCompletionConfirmation(
-        order.buyerId.email,
-        {
-          buyerName: order.buyerId.firstName || order.buyerId.username,
-          orderTitle: order.listingId?.title || 'Order',
-          orderAmount: order.amount,
-          orderNumber: order.orderNumber || order._id.toString().slice(-8).toUpperCase(),
-          completionDate: new Date().toLocaleDateString()
-        }
-      );
-      console.log('📧 Confirmation email sent to buyer:', order.buyerId.email);
-    } catch (emailError) {
-      console.error('Buyer email sending failed:', emailError.message);
-    }
-
-    const updatedOrder = await Order.findById(orderId)
-      .populate('buyerId', 'username avatar email')
-      .populate('sellerId', 'username avatar email')
-      .populate('listingId', 'title images')
-      .lean();
-
-    console.log('🎉 Order completed successfully by buyer:', orderId, {
-      paymentReleased: order.paymentReleased,
-      sellerAmount: order.sellerAmount,
-      platformFee: order.platformFee
-    });
-
-    res.status(200).json({ 
+    const response = {
       success: true,
-      message: 'Order completed successfully! Payment has been released to the seller.', 
-      order: updatedOrder,
-      paymentReleased: order.paymentReleased,
-      sellerAmount: order.sellerAmount,
-      platformFee: order.platformFee,
-      nextSteps: 'Consider leaving a review for the seller',
-      timestamp: new Date().toISOString()
-    });
+      account: {
+        id: account.id,
+        business_type: account.business_type,
+        charges_enabled: account.charges_enabled,
+        payouts_enabled: account.payouts_enabled,
+        details_submitted: account.details_submitted,
+        capabilities: capabilities,
+        requirements: {
+          currently_due: currently_due,
+          eventually_due: eventually_due,
+          past_due: past_due
+        }
+      },
+      canReceivePayments: account.charges_enabled && account.payouts_enabled && hasTransfersCapability,
+      missingRequirements: [...currently_due, ...past_due],
+      setupLink: null
+    };
+
+    // If missing requirements, create a setup link
+    if (currently_due.length > 0 || past_due.length > 0) {
+      const setupLink = await stripe.accountLinks.create({
+        account: user.stripeAccountId,
+        refresh_url: `${process.env.FRONTEND_URL}/seller/settings?refresh=stripe`,
+        return_url: `${process.env.FRONTEND_URL}/seller/settings?success=stripe`,
+        type: 'account_onboarding'
+      });
+      
+      response.setupLink = setupLink.url;
+      response.message = 'Complete your Stripe account setup to receive payments';
+    }
+
+    // Update user's Stripe status in database
+    user.stripeAccountStatus = response.canReceivePayments ? 'active' : 'needs_setup';
+    await user.save();
+
+    res.json(response);
+
   } catch (error) {
-    console.error('❌ Error completing order:', error);
-    res.status(500).json({ 
+    console.error('Error checking Stripe account:', error);
+    res.status(500).json({
       success: false,
-      error: 'Failed to complete order',
-      details: error.message,
-      timestamp: new Date().toISOString()
+      error: 'Failed to check Stripe account status'
     });
   }
 });
