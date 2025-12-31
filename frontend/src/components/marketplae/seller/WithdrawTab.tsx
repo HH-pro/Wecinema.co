@@ -1,572 +1,485 @@
-// components/marketplace/seller/WithdrawTab.tsx
+// src/components/marketplae/seller/WithdrawTab.tsx - COMPLETE UPDATED VERSION
 import React, { useState, useEffect } from 'react';
-import marketplaceApi from '../../../api/marketplaceApi';
-import { formatCurrency } from '../../../utils/marketplace';
-
-interface StripeStatus {
-  connected: boolean;
-  chargesEnabled?: boolean;
-  payoutsEnabled?: boolean;
-  accountId?: string;
-}
-
-interface Withdrawal {
-  _id: string;
-  amount: number;
-  status: string;
-  stripeTransferId?: string;
-  stripePayoutId?: string;
-  createdAt: string;
-  completedAt?: string;
-  failedAt?: string;
-  failureReason?: string;
-  destination?: string;
-  description?: string;
-}
-
-interface WithdrawalHistory {
-  withdrawals: Withdrawal[];
-  pagination?: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
-}
+import { paymentsApi } from '../../../api/marketplace/paymentsApi'; // ✅ DIRECT IMPORT
 
 interface WithdrawTabProps {
-  stripeStatus: StripeStatus | null;
-  withdrawalHistory: WithdrawalHistory | null;
+  stripeStatus: any;
+  withdrawalHistory: any;
+  earningsBalance: any;
   loading: boolean;
   currentPage: number;
   onPageChange: (page: number) => void;
-  onWithdrawRequest: (amount: number) => void;
-  onRefresh: () => void;
-  totalRevenue?: number; // in cents
-  thisMonthRevenue?: number; // in cents
-  pendingRevenue?: number; // in cents
+  onWithdrawRequest: (amount: number) => Promise<void>;
+  onRefresh: () => Promise<void>;
+  totalRevenue: number;
+  thisMonthRevenue: number;
+  pendingRevenue: number;
+  formatCurrency?: (amount: number) => string;
+  validateWithdrawalAmount?: (amountInCents: number, availableBalance: number, minWithdrawal?: number) => any;
 }
 
 const WithdrawTab: React.FC<WithdrawTabProps> = ({
   stripeStatus,
   withdrawalHistory,
+  earningsBalance,
   loading,
   currentPage,
   onPageChange,
   onWithdrawRequest,
   onRefresh,
-  totalRevenue = 0,
-  thisMonthRevenue = 0,
-  pendingRevenue = 0
+  totalRevenue,
+  thisMonthRevenue,
+  pendingRevenue,
+  formatCurrency = paymentsApi.formatCurrency, // ✅ DEFAULT TO PAYMENTS API
+  validateWithdrawalAmount = paymentsApi.validateWithdrawalAmount // ✅ DEFAULT TO PAYMENTS API
 }) => {
-  const [withdrawAmount, setWithdrawAmount] = useState<string>('');
-  const [customAmount, setCustomAmount] = useState<string>('');
-  const [showCustomInput, setShowCustomInput] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [availableBalance, setAvailableBalance] = useState<number>(0);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [error, setError] = useState('');
+  const [availableBalance, setAvailableBalance] = useState(0);
+  const [withdrawalStats, setWithdrawalStats] = useState<any>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
 
-  // Get available balance from Stripe status
-  useEffect(() => {
-    if (stripeStatus?.availableBalance !== undefined) {
-      setAvailableBalance(stripeStatus.availableBalance);
+  // ✅ FETCH WITHDRAWAL STATS FROM PAYMENTS API
+  const fetchWithdrawalStats = async () => {
+    try {
+      setStatsLoading(true);
+      const response = await paymentsApi.getWithdrawalStats();
+      
+      if (response.success && response.data) {
+        setWithdrawalStats(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching withdrawal stats:', error);
+    } finally {
+      setStatsLoading(false);
     }
-  }, [stripeStatus]);
+  };
 
-  const pendingBalance = stripeStatus?.pendingBalance || 0;
-  const canWithdraw = stripeStatus?.connected && stripeStatus?.chargesEnabled;
-  const hasBalance = availableBalance > 0;
+  useEffect(() => {
+    // Calculate available balance from multiple sources
+    const balance = 
+      earningsBalance?.availableBalance || 
+      stripeStatus?.availableBalance || 
+      withdrawalHistory?.balance?.availableBalance || 
+      0;
+    
+    setAvailableBalance(balance);
+    
+    // Fetch withdrawal stats
+    fetchWithdrawalStats();
+  }, [earningsBalance, stripeStatus, withdrawalHistory]);
 
-  // Preset amounts in cents
-  const presetAmounts = [
-    { value: 5000, label: '$50' },
-    { value: 10000, label: '$100' },
-    { value: 25000, label: '$250' },
-    { value: 50000, label: '$500' },
-    { value: 100000, label: '$1,000' },
+  const handleWithdraw = async () => {
+    if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) {
+      setError('Please enter a valid amount');
+      return;
+    }
+
+    const amountInRupees = parseFloat(withdrawAmount);
+    const amountInCents = Math.round(amountInRupees * 100);
+    
+    // ✅ USE PAYMENTS API VALIDATION
+    const validation = validateWithdrawalAmount(amountInCents, availableBalance);
+    
+    if (!validation.valid) {
+      setError(validation.error || 'Invalid withdrawal amount');
+      return;
+    }
+
+    setError('');
+    setWithdrawing(true);
+    
+    try {
+      await onWithdrawRequest(amountInRupees);
+      setWithdrawAmount('');
+      await onRefresh(); // Refresh data
+      await fetchWithdrawalStats(); // Refresh stats
+    } catch (err: any) {
+      setError(err.message || 'Failed to process withdrawal');
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
+  // ✅ QUICK WITHDRAWAL AMOUNT BUTTONS
+  const quickAmounts = [
+    { label: '₹500', value: 500 },
+    { label: '₹1,000', value: 1000 },
+    { label: '₹2,500', value: 2500 },
+    { label: '₹5,000', value: 5000 },
+    { label: '₹10,000', value: 10000 },
+    { label: 'All', value: availableBalance / 100 }
   ];
 
-  const MIN_WITHDRAWAL = 500; // $5 in cents
+  const handleQuickAmount = (amount: number) => {
+    setWithdrawAmount(amount.toString());
+    setError('');
+  };
 
-  // Handle preset amount selection
-  const handlePresetSelect = (amountInCents: number) => {
-    if (amountInCents <= availableBalance) {
-      setWithdrawAmount((amountInCents / 100).toString());
-      setShowCustomInput(false);
+  // ✅ GET STATUS BADGE STYLE
+  const getStatusBadgeStyle = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'completed':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'processing':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'failed':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'cancelled':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
-  // Handle custom amount
-  const handleCustomAmount = () => {
-    setShowCustomInput(true);
-    setWithdrawAmount('');
-  };
-
-  // Validate and submit withdrawal
-  const handleSubmitWithdrawal = async () => {
-    if (!canWithdraw) {
-      alert('Please connect and verify your Stripe account to withdraw funds.');
-      return;
-    }
-
-    const amountInDollars = parseFloat(withdrawAmount);
-    if (!amountInDollars || amountInDollars <= 0 || isNaN(amountInDollars)) {
-      alert('Please enter a valid amount.');
-      return;
-    }
-
-    const amountInCents = Math.round(amountInDollars * 100);
-    
-    if (amountInCents > availableBalance) {
-      alert(`Cannot withdraw more than your available balance of ${formatCurrency(availableBalance)}.`);
-      return;
-    }
-
-    if (amountInCents < MIN_WITHDRAWAL) {
-      alert(`Minimum withdrawal amount is ${formatCurrency(MIN_WITHDRAWAL)}.`);
-      return;
-    }
-
-    if (window.confirm(`Are you sure you want to withdraw ${formatCurrency(amountInCents)}?`)) {
-      setIsProcessing(true);
-      try {
-        await onWithdrawRequest(amountInCents);
-        setWithdrawAmount('');
-        setCustomAmount('');
-        setShowCustomInput(false);
-      } catch (error) {
-        console.error('Withdrawal failed:', error);
-      } finally {
-        setIsProcessing(false);
-      }
-    }
-  };
-
-  // Format date
+  // ✅ FORMAT DATE
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString('en-IN', {
+      day: '2-digit',
       month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      year: 'numeric'
     });
   };
 
-  // Get status color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'failed':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  // Get status icon
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return '✅';
-      case 'pending':
-        return '⏳';
-      case 'failed':
-        return '❌';
-      default:
-        return '📝';
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading withdrawal data...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Withdraw Funds</h1>
-          <p className="text-gray-600 mt-1">Transfer your earnings to your bank account</p>
-        </div>
-        <button
-          onClick={onRefresh}
-          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition duration-200 flex items-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          Refresh
-        </button>
-      </div>
-
-      {/* Balance Summary - All in USD */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Available Balance */}
-        <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6">
+    <div className="space-y-6">
+      {/* Balance Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-gradient-to-r from-green-50 to-emerald-100 border border-green-200 rounded-2xl p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Available Balance</p>
-              <p className="text-2xl font-bold text-gray-900 mt-2">
+              <p className="text-sm font-medium text-green-800">Available to Withdraw</p>
+              <p className="text-3xl font-bold text-green-900 mt-2">
                 {formatCurrency(availableBalance)}
               </p>
-              <p className="text-xs text-gray-500 mt-1">Ready to withdraw</p>
+              <p className="text-sm text-green-700 mt-2">
+                Ready for immediate withdrawal
+              </p>
             </div>
-            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-              <span className="text-xl">💰</span>
-            </div>
+            <div className="text-4xl text-green-600">💰</div>
           </div>
         </div>
-
-        {/* Pending Balance */}
-        <div className="bg-gradient-to-br from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-6">
+        
+        <div className="bg-gradient-to-r from-blue-50 to-cyan-100 border border-blue-200 rounded-2xl p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Pending Balance</p>
-              <p className="text-2xl font-bold text-gray-900 mt-2">
-                {formatCurrency(pendingBalance)}
+              <p className="text-sm font-medium text-blue-800">Pending Clearance</p>
+              <p className="text-3xl font-bold text-blue-900 mt-2">
+                {formatCurrency(earningsBalance?.pendingBalance || stripeStatus?.pendingBalance || 0)}
               </p>
-              <p className="text-xs text-gray-500 mt-1">Processing earnings</p>
+              <p className="text-sm text-blue-700 mt-2">
+                From active orders
+              </p>
             </div>
-            <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
-              <span className="text-xl">⏳</span>
-            </div>
+            <div className="text-4xl text-blue-600">⏳</div>
           </div>
         </div>
-
-        {/* Total Earnings */}
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
+        
+        <div className="bg-gradient-to-r from-purple-50 to-violet-100 border border-purple-200 rounded-2xl p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Total Earnings</p>
-              <p className="text-2xl font-bold text-gray-900 mt-2">
-                {formatCurrency(totalRevenue)}
+              <p className="text-sm font-medium text-purple-800">Total Withdrawn</p>
+              <p className="text-3xl font-bold text-purple-900 mt-2">
+                {formatCurrency(earningsBalance?.totalWithdrawn || withdrawalHistory?.balance?.totalWithdrawn || 0)}
               </p>
-              <p className="text-xs text-gray-500 mt-1">All-time income</p>
-            </div>
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-              <span className="text-xl">📈</span>
-            </div>
-          </div>
-        </div>
-
-        {/* This Month Earnings */}
-        <div className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-xl p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 font-medium">This Month</p>
-              <p className="text-2xl font-bold text-gray-900 mt-2">
-                {formatCurrency(thisMonthRevenue)}
+              <p className="text-sm text-purple-700 mt-2">
+                All-time withdrawals
               </p>
-              <p className="text-xs text-gray-500 mt-1">Current month earnings</p>
             </div>
-            <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-              <span className="text-xl">📅</span>
-            </div>
+            <div className="text-4xl text-purple-600">💸</div>
           </div>
         </div>
       </div>
+
+      {/* Withdrawal Statistics */}
+      {withdrawalStats && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Withdrawal Statistics</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-gray-50 rounded-xl p-4">
+              <p className="text-sm font-medium text-gray-600">Total Withdrawn</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {formatCurrency(withdrawalStats.totalWithdrawn || 0)}
+              </p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-4">
+              <p className="text-sm font-medium text-gray-600">Pending Withdrawals</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {withdrawalStats.pendingWithdrawals || 0}
+              </p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-4">
+              <p className="text-sm font-medium text-gray-600">Completed</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {withdrawalStats.statsByStatus?.find((s: any) => s._id === 'completed')?.count || 0}
+              </p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-4">
+              <p className="text-sm font-medium text-gray-600">Last Withdrawal</p>
+              <p className="text-lg font-bold text-gray-900 mt-1">
+                {withdrawalStats.lastWithdrawal 
+                  ? formatCurrency(withdrawalStats.lastWithdrawal.amount)
+                  : 'None'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Withdrawal Form */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">New Withdrawal</h2>
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Request Withdrawal</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Transfer funds to your bank account
+            </p>
+          </div>
+          <button
+            onClick={onRefresh}
+            disabled={loading || statsLoading}
+            className="mt-2 md:mt-0 px-4 py-2 text-sm font-medium text-yellow-600 hover:text-yellow-700 disabled:opacity-50 flex items-center"
+          >
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {loading || statsLoading ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
         
-        {!canWithdraw ? (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-            <div className="flex items-start">
-              <div className="w-5 h-5 text-yellow-600 mr-3 mt-0.5">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.998-.833-2.73 0L4.408 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-medium text-yellow-800">Account Setup Required</h3>
-                <p className="text-sm text-yellow-700 mt-1">
-                  Please connect and verify your Stripe account to withdraw funds.
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : !hasBalance ? (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
             <div className="flex items-center">
-              <div className="w-5 h-5 text-blue-600 mr-3">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+              <svg className="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-6">
+          {/* Quick Amount Buttons */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Quick Amounts
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              {quickAmounts.map((item, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => handleQuickAmount(item.value)}
+                  className="px-4 py-3 bg-gray-50 hover:bg-gray-100 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 transition-colors duration-200"
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Amount Input */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Withdrawal Amount
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <span className="text-gray-500 sm:text-sm">₹</span>
               </div>
+              <input
+                type="number"
+                value={withdrawAmount}
+                onChange={(e) => {
+                  setWithdrawAmount(e.target.value);
+                  setError('');
+                }}
+                placeholder="Enter amount"
+                className="pl-10 pr-4 py-3 w-full border border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                min="1"
+                step="1"
+              />
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <span className="text-gray-500 sm:text-sm">.00</span>
+              </div>
+            </div>
+            <p className="text-sm text-gray-500 mt-2">
+              Available balance: <span className="font-semibold">{formatCurrency(availableBalance)}</span> • Minimum: ₹500
+            </p>
+          </div>
+
+          {/* Withdrawal Button */}
+          <div>
+            <button
+              onClick={handleWithdraw}
+              disabled={!withdrawAmount || withdrawing || loading || availableBalance < 500}
+              className="w-full px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center"
+            >
+              {withdrawing ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Processing Withdrawal...
+                </>
+              ) : (
+                'Withdraw Funds'
+              )}
+            </button>
+          </div>
+
+          {/* Additional Information */}
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+            <div className="flex">
+              <svg className="w-5 h-5 text-blue-600 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
               <div>
-                <p className="text-sm text-blue-800">
-                  Your available balance is $0. Complete more orders to start earning!
-                </p>
+                <h4 className="text-sm font-medium text-blue-800">Withdrawal Information</h4>
+                <ul className="mt-2 text-sm text-blue-700 space-y-1">
+                  <li>• Withdrawals are processed within 2-3 business days</li>
+                  <li>• Minimum withdrawal amount is ₹500</li>
+                  <li>• No withdrawal fees for sellers</li>
+                  <li>• Funds are transferred to your connected bank account</li>
+                </ul>
               </div>
             </div>
           </div>
-        ) : (
-          <>
-            {/* Preset Amounts */}
-            <div className="mb-6">
-              <p className="text-sm text-gray-600 mb-3">Quick Amounts</p>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                {presetAmounts.map((preset) => (
-                  <button
-                    key={preset.value}
-                    onClick={() => handlePresetSelect(preset.value)}
-                    disabled={preset.value > availableBalance}
-                    className={`px-4 py-3 rounded-lg border transition duration-200 ${
-                      withdrawAmount === (preset.value / 100).toString()
-                        ? 'bg-yellow-500 text-white border-yellow-500'
-                        : preset.value > availableBalance
-                        ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                        : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-300'
-                    }`}
-                  >
-                    <span className="font-medium">{preset.label}</span>
-                  </button>
-                ))}
-                <button
-                  onClick={handleCustomAmount}
-                  className={`px-4 py-3 rounded-lg border transition duration-200 ${
-                    showCustomInput
-                      ? 'bg-yellow-500 text-white border-yellow-500'
-                      : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-300'
-                  }`}
-                >
-                  <span className="font-medium">Custom</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Custom Amount Input */}
-            {showCustomInput && (
-              <div className="mb-6">
-                <label className="block text-sm text-gray-600 mb-2">
-                  Enter custom amount (Minimum: {formatCurrency(MIN_WITHDRAWAL)})
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500">$</span>
-                  </div>
-                  <input
-                    type="number"
-                    min={(MIN_WITHDRAWAL / 100).toFixed(2)}
-                    max={(availableBalance / 100).toFixed(2)}
-                    step="0.01"
-                    value={customAmount}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setCustomAmount(value);
-                      setWithdrawAmount(value);
-                    }}
-                    placeholder="0.00"
-                    className="block w-full pl-8 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none transition"
-                  />
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500">USD</span>
-                  </div>
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  Available: {formatCurrency(availableBalance)}
-                </p>
-              </div>
-            )}
-
-            {/* Selected Amount Display */}
-            {withdrawAmount && (
-              <div className="mb-6">
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Withdrawal Amount</p>
-                      <p className="text-2xl font-bold text-gray-900 mt-1">
-                        ${parseFloat(withdrawAmount).toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-600">Remaining Balance</p>
-                      <p className="text-lg font-semibold text-gray-900 mt-1">
-                        {formatCurrency(availableBalance - (parseFloat(withdrawAmount) * 100))}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Submit Button */}
-            <div className="flex justify-end">
-              <button
-                onClick={handleSubmitWithdrawal}
-                disabled={!withdrawAmount || isProcessing || parseFloat(withdrawAmount) <= 0}
-                className="px-8 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white font-medium rounded-lg transition duration-200 shadow-md hover:shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {isProcessing ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                    Request Withdrawal
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Info Box */}
-            <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-start">
-                <div className="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0">
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-blue-800">Withdrawal Information</h3>
-                  <ul className="text-xs text-blue-700 mt-1 space-y-1">
-                    <li>• Minimum withdrawal: {formatCurrency(MIN_WITHDRAWAL)}</li>
-                    <li>• Processing time: 2-3 business days</li>
-                    <li>• Funds will be transferred to your connected bank account</li>
-                    <li>• No withdrawal fees for sellers</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
+        </div>
       </div>
 
       {/* Withdrawal History */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">Withdrawal History</h2>
-          <span className="text-sm text-gray-500">
-            {withdrawalHistory?.withdrawals?.length || 0} transactions
-          </span>
-        </div>
-
-        {!withdrawalHistory?.withdrawals?.length ? (
-          <div className="text-center py-12">
-            <div className="text-5xl mb-4 text-gray-300">💰</div>
-            <h3 className="text-lg font-medium text-gray-900">No Withdrawals Yet</h3>
-            <p className="text-gray-500 mt-2 mb-6">
-              {hasBalance
-                ? 'Request your first withdrawal to transfer earnings to your bank account.'
-                : 'Complete orders to earn money and make withdrawals.'
-              }
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Withdrawal History</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Track your past withdrawal requests
             </p>
           </div>
-        ) : (
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-600">
+              Page {currentPage} of {withdrawalHistory?.pagination?.pages || 1}
+            </span>
+            <div className="flex space-x-1">
+              <button
+                onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+                disabled={currentPage <= 1 || loading}
+                className="px-3 py-1 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => onPageChange(currentPage + 1)}
+                disabled={currentPage >= (withdrawalHistory?.pagination?.pages || 1) || loading}
+                className="px-3 py-1 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading withdrawal history...</p>
+            </div>
+          </div>
+        ) : withdrawalHistory?.withdrawals?.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead>
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Amount (USD)
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Description
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Transfer ID
-                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Destination</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {withdrawalHistory.withdrawals.map((withdrawal) => (
-                  <tr key={withdrawal._id} className="hover:bg-gray-50 transition duration-150">
-                    <td className="px-4 py-4 whitespace-nowrap">
+                {withdrawalHistory.withdrawals.map((withdrawal: any) => (
+                  <tr key={withdrawal._id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{formatDate(withdrawal.createdAt)}</div>
-                      {withdrawal.completedAt && (
+                      {withdrawal.estimatedArrival && (
                         <div className="text-xs text-gray-500">
-                          Completed: {formatDate(withdrawal.completedAt)}
+                          Est: {formatDate(withdrawal.estimatedArrival)}
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="text-lg font-semibold text-gray-900">
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
                         {formatCurrency(withdrawal.amount)}
                       </div>
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(withdrawal.status)}`}>
-                        <span className="mr-1">{getStatusIcon(withdrawal.status)}</span>
-                        {withdrawal.status.charAt(0).toUpperCase() + withdrawal.status.slice(1)}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusBadgeStyle(withdrawal.status)}`}>
+                        {withdrawal.status}
                       </span>
-                      {withdrawal.failureReason && (
-                        <div className="text-xs text-red-600 mt-1">{withdrawal.failureReason}</div>
-                      )}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {withdrawal.description || 'Withdrawal to bank account'}
+                        {withdrawal.destination || 'Bank Account'}
                       </div>
-                      {withdrawal.destination && (
+                      {withdrawal.stripePayoutId && (
                         <div className="text-xs text-gray-500">
-                          To: {withdrawal.destination}
+                          ID: {withdrawal.stripePayoutId.slice(-8)}
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="text-xs text-gray-500 font-mono">
-                        {withdrawal.stripeTransferId ? (
-                          <span className="truncate max-w-[120px] inline-block">
-                            {withdrawal.stripeTransferId}
-                          </span>
-                        ) : (
-                          'Pending...'
-                        )}
+                    <td className="px-4 py-3">
+                      <div className="text-sm text-gray-900">
+                        {withdrawal.description || 'Withdrawal request'}
                       </div>
+                      {withdrawal.failureReason && (
+                        <div className="text-xs text-red-600 mt-1">
+                          {withdrawal.failureReason}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {withdrawal.status === 'pending' && (
+                        <button
+                          onClick={async () => {
+                            if (window.confirm('Are you sure you want to cancel this withdrawal?')) {
+                              try {
+                                const response = await paymentsApi.cancelWithdrawal(withdrawal._id);
+                                if (response.success) {
+                                  alert('Withdrawal cancelled successfully!');
+                                  await onRefresh();
+                                }
+                              } catch (error) {
+                                alert('Failed to cancel withdrawal');
+                              }
+                            }
+                          }}
+                          className="text-sm text-red-600 hover:text-red-800 font-medium"
+                        >
+                          Cancel
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        )}
-
-        {/* Pagination */}
-        {withdrawalHistory?.pagination && withdrawalHistory.pagination.pages > 1 && (
-          <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-200">
-            <div className="text-sm text-gray-700">
-              Showing page {currentPage} of {withdrawalHistory.pagination.pages}
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => onPageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Previous
-              </button>
-              <button
-                onClick={() => onPageChange(currentPage + 1)}
-                disabled={currentPage === withdrawalHistory.pagination.pages}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
-            </div>
+        ) : (
+          <div className="text-center py-8">
+            <div className="text-5xl mb-4 text-gray-300">💸</div>
+            <h3 className="text-lg font-medium text-gray-900">No Withdrawal History</h3>
+            <p className="mt-2 text-gray-500 mb-6">
+              You haven't made any withdrawal requests yet.
+            </p>
           </div>
         )}
       </div>
