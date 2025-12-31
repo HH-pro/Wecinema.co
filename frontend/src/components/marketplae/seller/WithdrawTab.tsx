@@ -1,7 +1,6 @@
-// src/components/marketplae/seller/WithdrawTab.tsx - USD UPDATE
+// src/components/marketplae/seller/WithdrawTab.tsx - FIXED VERSION
 import React, { useState, useEffect } from 'react';
-import paymentsApi from '../../../api/paymentsApi';
- // ✅ DIRECT IMPORT
+import { paymentsApi } from '../../../api/marketplace/paymentsApi';
 
 interface WithdrawTabProps {
   stripeStatus: any;
@@ -12,9 +11,6 @@ interface WithdrawTabProps {
   onPageChange: (page: number) => void;
   onWithdrawRequest: (amountInDollars: number) => Promise<void>;
   onRefresh: () => Promise<void>;
-  totalRevenue: number;
-  thisMonthRevenue: number;
-  pendingRevenue: number;
   formatCurrency?: (amountInCents: number) => string;
   validateWithdrawalAmount?: (amountInCents: number, availableBalance: number, minWithdrawal?: number) => any;
   dollarsToCents?: (dollars: number) => number;
@@ -30,11 +26,8 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
   onPageChange,
   onWithdrawRequest,
   onRefresh,
-  totalRevenue,
-  thisMonthRevenue,
-  pendingRevenue,
-  formatCurrency = paymentsApi.formatCurrency, // ✅ DEFAULT TO PAYMENTS API
-  validateWithdrawalAmount = paymentsApi.validateWithdrawalAmount, // ✅ DEFAULT TO PAYMENTS API
+  formatCurrency = paymentsApi.formatCurrency,
+  validateWithdrawalAmount = paymentsApi.validateWithdrawalAmount,
   dollarsToCents = paymentsApi.dollarsToCents,
   centsToDollars = paymentsApi.centsToDollars
 }) => {
@@ -62,7 +55,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
   };
 
   useEffect(() => {
-    // Calculate available balance from multiple sources
+    // Calculate available balance from payments API data
     const balance = 
       earningsBalance?.availableBalance || 
       stripeStatus?.availableBalance || 
@@ -107,7 +100,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
     }
   };
 
-  // ✅ QUICK WITHDRAWAL AMOUNT BUTTONS
+  // ✅ QUICK WITHDRAWAL AMOUNT BUTTONS (USD)
   const quickAmounts = [
     { label: '$5', value: 5 },
     { label: '$10', value: 10 },
@@ -140,7 +133,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
     }
   };
 
-  // ✅ FORMAT DATE
+  // ✅ FORMAT DATE FOR DISPLAY
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -150,10 +143,32 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
     });
   };
 
+  // ✅ CALCULATE TOTAL WITHDRAWN FROM WITHDRAWAL HISTORY
+  const calculateTotalWithdrawn = () => {
+    if (earningsBalance?.totalWithdrawn) {
+      return earningsBalance.totalWithdrawn;
+    }
+    
+    if (withdrawalHistory?.balance?.totalWithdrawn) {
+      return withdrawalHistory.balance.totalWithdrawn;
+    }
+    
+    if (withdrawalHistory?.withdrawals && withdrawalHistory.withdrawals.length > 0) {
+      return withdrawalHistory.withdrawals
+        .filter((w: any) => w.status === 'completed')
+        .reduce((sum: number, w: any) => sum + w.amount, 0);
+    }
+    
+    return 0;
+  };
+
+  const totalWithdrawn = calculateTotalWithdrawn();
+
   return (
     <div className="space-y-6">
       {/* Balance Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Available to Withdraw Card */}
         <div className="bg-gradient-to-r from-green-50 to-emerald-100 border border-green-200 rounded-2xl p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -169,6 +184,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
           </div>
         </div>
         
+        {/* Pending Clearance Card */}
         <div className="bg-gradient-to-r from-blue-50 to-cyan-100 border border-blue-200 rounded-2xl p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -184,12 +200,13 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
           </div>
         </div>
         
+        {/* Total Withdrawn Card */}
         <div className="bg-gradient-to-r from-purple-50 to-violet-100 border border-purple-200 rounded-2xl p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-purple-800">Total Withdrawn</p>
               <p className="text-3xl font-bold text-purple-900 mt-2">
-                {formatCurrency(earningsBalance?.totalWithdrawn || withdrawalHistory?.balance?.totalWithdrawn || 0)}
+                {formatCurrency(totalWithdrawn)}
               </p>
               <p className="text-sm text-purple-700 mt-2">
                 All-time withdrawals
@@ -208,19 +225,21 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
             <div className="bg-gray-50 rounded-xl p-4">
               <p className="text-sm font-medium text-gray-600">Total Withdrawn</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
-                {formatCurrency(withdrawalStats.totalWithdrawn || 0)}
+                {formatCurrency(withdrawalStats.totalWithdrawn || totalWithdrawn || 0)}
               </p>
             </div>
             <div className="bg-gray-50 rounded-xl p-4">
               <p className="text-sm font-medium text-gray-600">Pending Withdrawals</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
-                {withdrawalStats.pendingWithdrawals || 0}
+                {withdrawalStats.pendingWithdrawals || 
+                  (withdrawalHistory?.withdrawals?.filter((w: any) => w.status === 'pending').length || 0)}
               </p>
             </div>
             <div className="bg-gray-50 rounded-xl p-4">
               <p className="text-sm font-medium text-gray-600">Completed</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
-                {withdrawalStats.statsByStatus?.find((s: any) => s._id === 'completed')?.count || 0}
+                {withdrawalStats.statsByStatus?.find((s: any) => s._id === 'completed')?.count || 
+                  (withdrawalHistory?.withdrawals?.filter((w: any) => w.status === 'completed').length || 0)}
               </p>
             </div>
             <div className="bg-gray-50 rounded-xl p-4">
@@ -228,6 +247,8 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
               <p className="text-lg font-bold text-gray-900 mt-1">
                 {withdrawalStats.lastWithdrawal 
                   ? formatCurrency(withdrawalStats.lastWithdrawal.amount)
+                  : withdrawalHistory?.withdrawals?.length > 0
+                  ? formatCurrency(withdrawalHistory.withdrawals[0].amount)
                   : 'None'}
               </p>
             </div>
