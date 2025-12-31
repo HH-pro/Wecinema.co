@@ -5,7 +5,7 @@ import EarningsOverview from './EarningsOverview';
 import EarningsStats from './EarningsStats';
 import WithdrawBalance from './WithdrawBalance';
 import paymentsApi from '../../../api/paymentsApi';
-import { getCurrentUserId } from '../../../utilities/helperfFunction';
+import { getCurrentUserId } from '../../../utilities/helperFunction';
 
 interface EarningsTabProps {
   stripeStatus: any;
@@ -299,9 +299,18 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
     }
   };
   
-  // Calculate real-time metrics
+  // Calculate real-time metrics with safe defaults
   const calculateRealTimeMetrics = () => {
-    if (!liveEarnings && !balanceData) return {};
+    if (!liveEarnings && !balanceData) {
+      return {
+        monthOverMonthGrowth: 0,
+        avgOrderValue: 0,
+        completionRate: 0,
+        lifetimeRevenue: 0,
+        totalWithdrawn: totalWithdrawn || 0,
+        netEarnings: 0
+      };
+    }
     
     const data = liveEarnings || balanceData;
     
@@ -323,20 +332,20 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
       ? ((data?.thisMonthRevenue || 0) - lastMonthData.earnings) / lastMonthData.earnings * 100
       : 0;
     
-    // Calculate average order value
-    const avgOrderValue = orderStats.totalOrders > 0 
+    // Calculate average order value with safe division
+    const avgOrderValue = orderStats?.totalOrders && orderStats.totalOrders > 0 
       ? (data?.totalEarnings || 0) / orderStats.totalOrders 
       : 0;
     
-    // Calculate completion rate
-    const completionRate = orderStats.totalOrders > 0
-      ? (orderStats.completed / orderStats.totalOrders) * 100
+    // Calculate completion rate with safe division
+    const completionRate = orderStats?.totalOrders && orderStats.totalOrders > 0
+      ? ((orderStats.completed || 0) / orderStats.totalOrders) * 100
       : 0;
     
     return {
-      monthOverMonthGrowth,
-      avgOrderValue,
-      completionRate,
+      monthOverMonthGrowth: monthOverMonthGrowth || 0,
+      avgOrderValue: avgOrderValue || 0,
+      completionRate: completionRate || 0,
       lifetimeRevenue: data?.lifetimeRevenue || data?.totalEarnings || 0,
       totalWithdrawn: data?.totalWithdrawn || totalWithdrawn || 0,
       netEarnings: (data?.totalEarnings || 0) - (data?.totalWithdrawn || totalWithdrawn || 0)
@@ -464,7 +473,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
     );
   }
   
-  // Calculate this month's revenue
+  // Calculate this month's revenue with safe defaults
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
   const thisMonthData = monthlyEarnings?.find((item: any) => 
@@ -476,15 +485,15 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                           balanceData?.thisMonthRevenue || 
                           0;
   
-  // Get real-time metrics
+  // Get real-time metrics with safe defaults
   const realTimeMetrics = calculateRealTimeMetrics();
   
   // Get effective data (live earnings first, then balanceData)
   const effectiveData = liveEarnings || balanceData;
   
-  // Format currency helper
+  // Format currency helper with safe defaults
   const formatCurrency = (amountInCents: number): string => {
-    return paymentsApi.formatCurrency(amountInCents);
+    return paymentsApi.formatCurrency(amountInCents || 0);
   };
   
   return (
@@ -592,12 +601,12 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
               <span className="text-blue-600 text-xl">📈</span>
             </div>
             <div className={`text-sm font-medium px-2 py-1 rounded ${
-              realTimeMetrics.monthOverMonthGrowth > 0 
+              realTimeMetrics?.monthOverMonthGrowth && realTimeMetrics.monthOverMonthGrowth > 0 
                 ? 'text-green-600 bg-green-50' 
                 : 'text-red-600 bg-red-50'
             }`}>
-              {realTimeMetrics.monthOverMonthGrowth > 0 ? '↑' : '↓'} 
-              {Math.abs(realTimeMetrics.monthOverMonthGrowth).toFixed(1)}%
+              {realTimeMetrics?.monthOverMonthGrowth && realTimeMetrics.monthOverMonthGrowth > 0 ? '↑' : '↓'} 
+              {Math.abs(realTimeMetrics?.monthOverMonthGrowth || 0).toFixed(1)}%
             </div>
           </div>
           <p className="text-sm text-gray-500 mb-1">Your Earnings This Month</p>
@@ -616,7 +625,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
           </div>
           <p className="text-sm text-gray-500 mb-1">Your Total Withdrawn</p>
           <p className="text-2xl font-bold text-gray-900">
-            {formatCurrency(realTimeMetrics.totalWithdrawn || 0)}
+            {formatCurrency(realTimeMetrics?.totalWithdrawn || 0)}
           </p>
           <p className="text-xs text-gray-500 mt-2">Paid to your account</p>
         </div>
@@ -817,22 +826,22 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Avg Order Value</span>
                 <span className="font-medium text-gray-900">
-                  {formatCurrency(realTimeMetrics.avgOrderValue || 0)}
+                  {formatCurrency(realTimeMetrics?.avgOrderValue || 0)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Completion Rate</span>
                 <span className="font-medium text-gray-900">
-                  {realTimeMetrics.completionRate.toFixed(1)}%
+                  {(realTimeMetrics?.completionRate || 0).toFixed(1)}%
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Month Growth</span>
                 <span className={`font-medium ${
-                  realTimeMetrics.monthOverMonthGrowth > 0 ? 'text-green-600' : 'text-red-600'
+                  realTimeMetrics?.monthOverMonthGrowth && realTimeMetrics.monthOverMonthGrowth > 0 ? 'text-green-600' : 'text-red-600'
                 }`}>
-                  {realTimeMetrics.monthOverMonthGrowth > 0 ? '+' : ''}
-                  {realTimeMetrics.monthOverMonthGrowth.toFixed(1)}%
+                  {realTimeMetrics?.monthOverMonthGrowth && realTimeMetrics.monthOverMonthGrowth > 0 ? '+' : ''}
+                  {(realTimeMetrics?.monthOverMonthGrowth || 0).toFixed(1)}%
                 </span>
               </div>
             </div>
@@ -875,7 +884,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
             <h4 className="text-sm font-medium text-gray-700 mb-2">Your Net Earnings</h4>
             <div className="text-center py-4">
               <div className="text-3xl font-bold text-gray-900 mb-2">
-                {formatCurrency(realTimeMetrics.netEarnings || 0)}
+                {formatCurrency(realTimeMetrics?.netEarnings || 0)}
               </div>
               <p className="text-sm text-gray-600">After your withdrawals</p>
               <div className="mt-4 text-xs text-gray-500">
@@ -885,11 +894,11 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                 </div>
                 <div className="flex justify-between">
                   <span>You Withdrew:</span>
-                  <span>-{formatCurrency(realTimeMetrics.totalWithdrawn || 0)}</span>
+                  <span>-{formatCurrency(realTimeMetrics?.totalWithdrawn || 0)}</span>
                 </div>
                 <div className="border-t border-gray-200 mt-2 pt-2 flex justify-between font-medium">
                   <span>Your Balance:</span>
-                  <span>{formatCurrency(realTimeMetrics.netEarnings || 0)}</span>
+                  <span>{formatCurrency(realTimeMetrics?.netEarnings || 0)}</span>
                 </div>
               </div>
             </div>
@@ -914,8 +923,9 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
         <div className="h-64 flex items-end space-x-2">
           {monthlyEarnings.length > 0 ? (
             monthlyEarnings.map((month, index) => {
+              const earnings = month.earnings || 0;
               const maxEarnings = Math.max(...monthlyEarnings.map(m => m.earnings || 0));
-              const heightPercentage = maxEarnings > 0 ? (month.earnings / maxEarnings) * 100 : 0;
+              const heightPercentage = maxEarnings > 0 ? (earnings / maxEarnings) * 100 : 0;
               
               return (
                 <div key={index} className="flex-1 flex flex-col items-center">
@@ -924,10 +934,10 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                     style={{ height: `${heightPercentage}%` }}
                   ></div>
                   <div className="mt-2 text-xs text-gray-500">
-                    {month._id?.month}/{month._id?.year.toString().slice(-2)}
+                    {month._id?.month}/{month._id?.year?.toString().slice(-2) || 'N/A'}
                   </div>
                   <div className="mt-1 text-sm font-medium">
-                    {formatCurrency(month.earnings || 0)}
+                    {formatCurrency(earnings)}
                   </div>
                 </div>
               );
