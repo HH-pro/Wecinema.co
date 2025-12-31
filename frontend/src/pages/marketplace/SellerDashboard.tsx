@@ -1570,22 +1570,23 @@ const SellerDashboard: React.FC = () => {
                   </div>
                 )}
 
-                {/* Earnings Tab - USING DIRECT PAYMENTS API */}
-                {activeTab === 'earnings' && (
-                  <SafeEarningsTab
-                    earningsBalance={earningsBalance}
-                    monthlyEarnings={monthlyEarnings}
-                    earningsHistory={earningsHistory}
-                    orderStats={orderStats}
-                    onWithdrawRequest={handleWithdrawRequest}
-                    loading={earningsLoading}
-                    onRefresh={fetchEarningsData}
-                    formatCurrency={formatCurrency}
-                    formatCurrencyShort={formatCurrencyShort}
-                    dollarsToCents={dollarsToCents}
-                    centsToDollars={centsToDollars}
-                  />
-                )}
+              // SellerDashboard.tsx mein EarningsTab aur WithdrawTab usage update karen:
+
+{/* Earnings Tab - USING DIRECT PAYMENTS API */}
+{activeTab === 'earnings' && (
+  <SafeEarningsTab
+    earningsBalance={earningsBalance}
+    monthlyEarnings={monthlyEarnings}
+    earningsHistory={earningsHistory}
+    onWithdrawRequest={handleWithdrawRequest}
+    loading={earningsLoading}
+    onRefresh={fetchEarningsData}
+    formatCurrency={formatCurrency}
+    formatCurrencyShort={formatCurrencyShort}
+    dollarsToCents={dollarsToCents}
+    centsToDollars={centsToDollars}
+  />
+)}
 
                 {/* Offers Tab */}
                 {activeTab === 'offers' && (
@@ -1648,26 +1649,24 @@ const SellerDashboard: React.FC = () => {
                   />
                 )}
 
-                {/* Withdraw Tab - USING DIRECT PAYMENTS API */}
-                {activeTab === 'withdraw' && (
-                  <SafeWithdrawTab
-                    stripeStatus={stripeStatus}
-                    withdrawalHistory={withdrawalHistory}
-                    earningsBalance={earningsBalance}
-                    loading={withdrawalsLoading}
-                    currentPage={withdrawalsPage}
-                    onPageChange={setWithdrawalsPage}
-                    onWithdrawRequest={handleWithdrawRequest}
-                    onRefresh={() => Promise.all([fetchWithdrawalHistory(), fetchEarningsData()])}
-                    totalRevenue={orderStats.totalRevenue}
-                    thisMonthRevenue={orderStats.thisMonthRevenue}
-                    pendingRevenue={orderStats.pendingRevenue}
-                    formatCurrency={formatCurrency}
-                    validateWithdrawalAmount={validateWithdrawalAmount}
-                    dollarsToCents={dollarsToCents}
-                    centsToDollars={centsToDollars}
-                  />
-                )}
+              
+{/* Withdraw Tab - USING DIRECT PAYMENTS API */}
+{activeTab === 'withdraw' && (
+  <SafeWithdrawTab
+    stripeStatus={stripeStatus}
+    withdrawalHistory={withdrawalHistory}
+    earningsBalance={earningsBalance}
+    loading={withdrawalsLoading}
+    currentPage={withdrawalsPage}
+    onPageChange={setWithdrawalsPage}
+    onWithdrawRequest={handleWithdrawRequest}
+    onRefresh={() => Promise.all([fetchWithdrawalHistory(), fetchEarningsData()])}
+    formatCurrency={formatCurrency}
+    validateWithdrawalAmount={validateWithdrawalAmount}
+    dollarsToCents={dollarsToCents}
+    centsToDollars={centsToDollars}
+  />
+)}
               </>
             )}
           </div>
