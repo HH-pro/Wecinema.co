@@ -374,7 +374,7 @@ export const requestWithdrawal = async (amount: number): Promise<ApiResponse<{
  */
 export const getWithdrawalDetails = async (withdrawalId: string): Promise<ApiResponse<Withdrawal>> => {
   try {
-    const response: AxiosResponse<ApiResponse<Withdrawal>> = await apiClient.get(`/withdrawals/${withdrawalId}`);
+    const response: AxiosResponse<ApiResponse<Withdrawal>> = await apiClient.get(`/payments/withdrawals/${withdrawalId}`);
     return response.data;
   } catch (error: any) {
     console.error('Error fetching withdrawal details:', error);
