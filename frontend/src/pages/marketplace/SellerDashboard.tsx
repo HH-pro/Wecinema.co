@@ -1570,7 +1570,6 @@ const SellerDashboard: React.FC = () => {
                   </div>
                 )}
 
-              // SellerDashboard.tsx mein EarningsTab aur WithdrawTab usage update karen:
 
 {/* Earnings Tab - USING DIRECT PAYMENTS API */}
 {activeTab === 'earnings' && (
