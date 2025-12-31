@@ -1,4 +1,4 @@
-// src/pages/seller/SellerDashboard.tsx
+// src/pages/seller/SellerDashboard.tsx - COMPLETE UPDATED VERSION WITH EARNINGS TAB
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -8,16 +8,14 @@ import MarketplaceLayout from '../../components/Layout';
 // Import helper function
 import { getCurrentUserId } from '../../utilities/helperfFunction';
 
-// Import Direct Payments API
-import paymentsApi from '../../../src/api/paymentsApi';
-
-// Import other APIs
+// Import API
 import marketplaceApi from '../../api/marketplaceApi';
 
 // Access API methods
 const listingsApi = marketplaceApi.listings;
 const ordersApi = marketplaceApi.orders;
 const offersApi = marketplaceApi.offers;
+const earningsApi = marketplaceApi.earnings;
 
 // Import components
 import DashboardHeader from '../../components/marketplae/seller/DashboardHeader';
@@ -35,7 +33,7 @@ import OffersTab from '../../components/marketplae/seller/OffersTab';
 import ListingsTab from '../../components/marketplae/seller/ListingsTab';
 import OrdersTab from '../../components/marketplae/seller/OrdersTab';
 import WithdrawTab from '../../components/marketplae/seller/WithdrawTab';
-import EarningsTab from '../../components/marketplae/seller/EarningsTab';
+import EarningsTab from '../../components/marketplae/seller/EarningsTab'; // NEW EARNINGS TAB
 
 // Import modals
 import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
@@ -44,6 +42,13 @@ import EditListingModal from '../../components/marketplae/seller/EditListingModa
 import DeleteListingModal from '../../components/marketplae/seller/DeleteListingModal';
 import VideoPlayerModal from '../../components/marketplae/seller/VideoPlayerModal';
 
+// For now, create a simple formatCurrency function
+const formatCurrency = (amount: number) => {
+  // Convert cents to rupees
+  const amountInRupees = amount / 100;
+  return `₹${amountInRupees.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
 // Simple fallback components
 const SimpleFallback = ({ name }: { name: string }) => (
   <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
@@ -51,26 +56,26 @@ const SimpleFallback = ({ name }: { name: string }) => (
   </div>
 );
 
-// Safe component imports
-const SafeDashboardHeader = DashboardHeader || (() => <SimpleFallback name="DashboardHeader" />);
-const SafeTabNavigation = TabNavigation || (() => <SimpleFallback name="TabNavigation" />);
-const SafeWelcomeCard = WelcomeCard || (() => <SimpleFallback name="WelcomeCard" />);
-const SafeStatsGrid = StatsGrid || (() => <SimpleFallback name="StatsGrid" />);
-const SafeRecentOrders = RecentOrders || (() => <SimpleFallback name="RecentOrders" />);
-const SafeActionCard = ActionCard || (() => <SimpleFallback name="ActionCard" />);
-const SafeOrderWorkflowGuide = OrderWorkflowGuide || (() => <SimpleFallback name="OrderWorkflowGuide" />);
-const SafeStripeAccountStatus = StripeAccountStatus || (() => <SimpleFallback name="StripeAccountStatus" />);
-const SafeStripeSuccessAlert = StripeSuccessAlert || (() => <SimpleFallback name="StripeSuccessAlert" />);
-const SafeOffersTab = OffersTab || (() => <SimpleFallback name="OffersTab" />);
-const SafeListingsTab = ListingsTab || (() => <SimpleFallback name="ListingsTab" />);
-const SafeOrdersTab = OrdersTab || (() => <SimpleFallback name="OrdersTab" />);
-const SafeWithdrawTab = WithdrawTab || (() => <SimpleFallback name="WithdrawTab" />);
-const SafeEarningsTab = EarningsTab || (() => <SimpleFallback name="EarningsTab" />);
-const SafeStripeSetupModal = StripeSetupModal || (() => <SimpleFallback name="StripeSetupModal" />);
-const SafeOrderDetailsModal = OrderDetailsModal || (() => <SimpleFallback name="OrderDetailsModal" />);
-const SafeEditListingModal = EditListingModal || (() => <SimpleFallback name="EditListingModal" />);
-const SafeDeleteListingModal = DeleteListingModal || (() => <SimpleFallback name="DeleteListingModal" />);
-const SafeVideoPlayerModal = VideoPlayerModal || (() => <SimpleFallback name="VideoPlayerModal" />);
+// Use simple checks for components
+const SafeDashboardHeader = (typeof DashboardHeader === 'function' || typeof DashboardHeader === 'object') ? DashboardHeader : () => <SimpleFallback name="DashboardHeader" />;
+const SafeTabNavigation = (typeof TabNavigation === 'function' || typeof TabNavigation === 'object') ? TabNavigation : () => <SimpleFallback name="TabNavigation" />;
+const SafeWelcomeCard = (typeof WelcomeCard === 'function' || typeof WelcomeCard === 'object') ? WelcomeCard : () => <SimpleFallback name="WelcomeCard" />;
+const SafeStatsGrid = (typeof StatsGrid === 'function' || typeof StatsGrid === 'object') ? StatsGrid : () => <SimpleFallback name="StatsGrid" />;
+const SafeRecentOrders = (typeof RecentOrders === 'function' || typeof RecentOrders === 'object') ? RecentOrders : () => <SimpleFallback name="RecentOrders" />;
+const SafeActionCard = (typeof ActionCard === 'function' || typeof ActionCard === 'object') ? ActionCard : () => <SimpleFallback name="ActionCard" />;
+const SafeOrderWorkflowGuide = (typeof OrderWorkflowGuide === 'function' || typeof OrderWorkflowGuide === 'object') ? OrderWorkflowGuide : () => <SimpleFallback name="OrderWorkflowGuide" />;
+const SafeStripeAccountStatus = (typeof StripeAccountStatus === 'function' || typeof StripeAccountStatus === 'object') ? StripeAccountStatus : () => <SimpleFallback name="StripeAccountStatus" />;
+const SafeStripeSuccessAlert = (typeof StripeSuccessAlert === 'function' || typeof StripeSuccessAlert === 'object') ? StripeSuccessAlert : () => <SimpleFallback name="StripeSuccessAlert" />;
+const SafeOffersTab = (typeof OffersTab === 'function' || typeof OffersTab === 'object') ? OffersTab : () => <SimpleFallback name="OffersTab" />;
+const SafeListingsTab = (typeof ListingsTab === 'function' || typeof ListingsTab === 'object') ? ListingsTab : () => <SimpleFallback name="ListingsTab" />;
+const SafeOrdersTab = (typeof OrdersTab === 'function' || typeof OrdersTab === 'object') ? OrdersTab : () => <SimpleFallback name="OrdersTab" />;
+const SafeWithdrawTab = (typeof WithdrawTab === 'function' || typeof WithdrawTab === 'object') ? WithdrawTab : () => <SimpleFallback name="WithdrawTab" />;
+const SafeEarningsTab = (typeof EarningsTab === 'function' || typeof EarningsTab === 'object') ? EarningsTab : () => <SimpleFallback name="EarningsTab" />;
+const SafeStripeSetupModal = (typeof StripeSetupModal === 'function' || typeof StripeSetupModal === 'object') ? StripeSetupModal : () => <SimpleFallback name="StripeSetupModal" />;
+const SafeOrderDetailsModal = (typeof OrderDetailsModal === 'function' || typeof OrderDetailsModal === 'object') ? OrderDetailsModal : () => <SimpleFallback name="OrderDetailsModal" />;
+const SafeEditListingModal = (typeof EditListingModal === 'function' || typeof EditListingModal === 'object') ? EditListingModal : () => <SimpleFallback name="EditListingModal" />;
+const SafeDeleteListingModal = (typeof DeleteListingModal === 'function' || typeof DeleteListingModal === 'object') ? DeleteListingModal : () => <SimpleFallback name="DeleteListingModal" />;
+const SafeVideoPlayerModal = (typeof VideoPlayerModal === 'function' || typeof VideoPlayerModal === 'object') ? VideoPlayerModal : () => <SimpleFallback name="VideoPlayerModal" />;
 
 // Interfaces
 interface Order {
@@ -82,7 +87,7 @@ interface Order {
   buyerEmail: string;
   sellerId: string;
   sellerName: string;
-  amount: number; // in dollars
+  amount: number;
   status: string;
   paymentStatus: string;
   createdAt: string;
@@ -150,10 +155,11 @@ interface OrderStats {
   delivered: number;
   completed: number;
   cancelled: number;
-  totalRevenue: number; // in cents
-  pendingRevenue: number; // in cents
+  totalRevenue: number;
+  pendingRevenue: number;
   thisMonthOrders: number;
-  thisMonthRevenue: number; // in cents
+  thisMonthRevenue: number;
+  availableBalance?: number;
 }
 
 interface StripeStatus {
@@ -166,14 +172,14 @@ interface StripeStatus {
   status?: string;
   payoutsEnabled?: boolean;
   name?: string;
-  balance?: number; // in cents
-  availableBalance?: number; // in cents
-  pendingBalance?: number; // in cents
+  balance?: number;
+  availableBalance?: number;
+  pendingBalance?: number;
 }
 
 interface Withdrawal {
   _id: string;
-  amount: number; // in cents
+  amount: number;
   status: string;
   stripeTransferId?: string;
   stripePayoutId?: string;
@@ -193,23 +199,6 @@ interface WithdrawalHistory {
     total: number;
     pages: number;
   };
-  balance?: {
-    availableBalance: number; // in cents
-    pendingBalance: number; // in cents
-    totalEarnings: number; // in cents
-    totalWithdrawn: number; // in cents
-  };
-}
-
-interface EarningsData {
-  availableBalance: number; // in cents
-  pendingBalance: number; // in cents
-  totalEarnings: number; // in cents
-  totalWithdrawn: number; // in cents
-  thisMonthRevenue: number; // in cents
-  lastWithdrawal: string | null;
-  nextPayoutDate: string;
-  lifetimeRevenue?: number; // in cents
 }
 
 const SellerDashboard: React.FC = () => {
@@ -225,7 +214,7 @@ const SellerDashboard: React.FC = () => {
   const [showStripeSuccessAlert, setShowStripeSuccessAlert] = useState(false);
   const navigate = useNavigate();
   
-  // Order stats - only for order counts, NOT earnings
+  // Order stats
   const [orderStats, setOrderStats] = useState<OrderStats>({
     totalOrders: 0,
     activeOrders: 0,
@@ -238,13 +227,9 @@ const SellerDashboard: React.FC = () => {
     totalRevenue: 0,
     pendingRevenue: 0,
     thisMonthOrders: 0,
-    thisMonthRevenue: 0
+    thisMonthRevenue: 0,
+    availableBalance: 0
   });
-  
-  // Earnings data - ALL earnings calculations here
-  const [earningsData, setEarningsData] = useState<EarningsData | null>(null);
-  const [monthlyEarnings, setMonthlyEarnings] = useState<any[]>([]);
-  const [earningsHistory, setEarningsHistory] = useState<any[]>([]);
   
   // Withdrawal states
   const [withdrawalHistory, setWithdrawalHistory] = useState<WithdrawalHistory | null>(null);
@@ -293,18 +278,12 @@ const SellerDashboard: React.FC = () => {
   const totalListings = listingsData?.listings?.length || 0;
   const activeListings = listingsData?.listings?.filter((listing) => listing.status === 'active').length || 0;
   const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
+  const totalWithdrawals = withdrawalHistory?.withdrawals?.length || 0;
 
   // Tab configuration - WITH EARNINGS TAB
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊', badge: null },
-    { 
-      id: 'earnings', 
-      label: 'Earnings', 
-      icon: '💰', 
-      badge: earningsData?.availableBalance && earningsData.availableBalance > 0 ? 
-        paymentsApi.formatCurrency(earningsData.availableBalance).replace('$', '') : 
-        null 
-    },
+    { id: 'earnings', label: 'Earnings', icon: '💰', badge: null },
     { id: 'listings', label: 'My Listings', icon: '🏠', badge: totalListings > 0 ? totalListings : null },
     { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders > 0 ? orderStats.activeOrders : null },
     { id: 'offers', label: 'Offers', icon: '💌', badge: pendingOffers > 0 ? pendingOffers : null },
@@ -363,57 +342,17 @@ const SellerDashboard: React.FC = () => {
     };
   };
 
-  // ✅ Calculate earnings from orders for development/testing
-  const calculateEarningsFromOrders = (orders: Order[]): {
-    availableBalance: number;
-    pendingBalance: number;
-    totalEarnings: number;
-    thisMonthRevenue: number;
-    lifetimeRevenue: number;
-  } => {
-    const now = new Date();
-    const thisMonth = now.getMonth();
-    const thisYear = now.getFullYear();
-    
-    // Available balance: Completed orders (in cents)
-    const availableBalance = orders
-      .filter(order => order.status === 'completed')
-      .reduce((sum, order) => sum + (order.amount * 100), 0);
-    
-    // Pending balance: Active orders that are paid but not completed (in cents)
-    const pendingBalance = orders
-      .filter(order => ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(order.status))
-      .reduce((sum, order) => sum + (order.amount * 100), 0);
-    
-    // Total earnings: Sum of all completed orders (in cents)
-    const totalEarnings = availableBalance;
-    
-    // This month revenue: Completed orders in current month (in cents)
-    const thisMonthRevenue = orders
-      .filter(order => {
-        const orderDate = new Date(order.createdAt);
-        return orderDate.getMonth() === thisMonth && 
-               orderDate.getFullYear() === thisYear &&
-               order.status === 'completed';
-      })
-      .reduce((sum, order) => sum + (order.amount * 100), 0);
-    
-    // Lifetime revenue: All orders regardless of status (in cents)
-    const lifetimeRevenue = orders
-      .reduce((sum, order) => sum + (order.amount * 100), 0);
-    
-    return {
-      availableBalance,
-      pendingBalance,
-      totalEarnings,
-      thisMonthRevenue,
-      lifetimeRevenue
-    };
-  };
-
   // ✅ Handle mock Stripe connection for development
   const handleMockStripeConnect = () => {
-    const earnings = calculateEarningsFromOrders(orders);
+    // Calculate total balance from completed orders
+    const completedOrdersRevenue = orders
+      .filter(order => order.status === 'completed')
+      .reduce((sum, order) => sum + (order.amount * 100), 0); // Convert to cents
+    
+    // Calculate pending balance from active orders
+    const pendingOrdersRevenue = orders
+      .filter(order => ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(order.status))
+      .reduce((sum, order) => sum + (order.amount * 100), 0);
     
     const mockStatus: StripeStatus = {
       connected: true,
@@ -425,33 +364,56 @@ const SellerDashboard: React.FC = () => {
       country: 'US',
       payoutsEnabled: true,
       name: 'Test Seller',
-      balance: earnings.totalEarnings,
-      availableBalance: earnings.availableBalance,
-      pendingBalance: earnings.pendingBalance
+      balance: completedOrdersRevenue + pendingOrdersRevenue,
+      availableBalance: completedOrdersRevenue,
+      pendingBalance: pendingOrdersRevenue
     };
     
     localStorage.setItem('stripe_status', JSON.stringify(mockStatus));
     setStripeStatus(mockStatus);
-    
-    // Update earnings data with calculated values
-    setEarningsData({
-      availableBalance: earnings.availableBalance,
-      pendingBalance: earnings.pendingBalance,
-      totalEarnings: earnings.totalEarnings,
-      totalWithdrawn: 0,
-      thisMonthRevenue: earnings.thisMonthRevenue,
-      lastWithdrawal: null,
-      nextPayoutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      lifetimeRevenue: earnings.lifetimeRevenue
-    });
-    
     setShowStripeSuccessAlert(true);
     setSuccessMessage('Mock Stripe account connected successfully! You can now test payment features.');
     setShowStripeSetup(false);
     setError('');
+    
+    // Update order stats with available balance
+    setOrderStats(prev => ({
+      ...prev,
+      availableBalance: completedOrdersRevenue
+    }));
   };
 
-  // ✅ Calculate order stats (counts only)
+  // ✅ Check URL params for Stripe return success
+  useEffect(() => {
+    const checkStripeReturn = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const stripeStatus = urlParams.get('stripe');
+      const accountId = urlParams.get('account_id');
+      
+      if (stripeStatus === 'success' && accountId) {
+        console.log('✅ Stripe connected successfully via URL params');
+        
+        // Show success alert
+        setShowStripeSuccessAlert(true);
+        
+        // Clear URL params
+        window.history.replaceState({}, '', window.location.pathname);
+        
+        // Update Stripe status
+        setTimeout(() => {
+          checkStripeAccountStatus();
+          fetchDashboardData();
+        }, 1000);
+        
+        // Show success message
+        setSuccessMessage('Stripe account connected successfully! You can now accept payments.');
+      }
+    };
+    
+    checkStripeReturn();
+  }, []);
+
+  // ✅ Calculate order stats
   const calculateOrderStats = useCallback((orders: Order[]): OrderStats => {
     const now = new Date();
     const thisMonth = now.getMonth();
@@ -463,20 +425,20 @@ const SellerDashboard: React.FC = () => {
              orderDate.getFullYear() === thisYear;
     });
 
-    // Calculate revenue from completed orders (in cents)
+    // Calculate total revenue from completed orders (in dollars)
     const totalRevenue = orders
       .filter(order => order.status === 'completed')
-      .reduce((sum, order) => sum + (order.amount * 100), 0);
+      .reduce((sum, order) => sum + order.amount, 0);
 
-    // Calculate pending revenue from active orders (in cents)
+    // Calculate pending revenue from active orders (in dollars)
     const pendingRevenue = orders
       .filter(order => ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(order.status))
-      .reduce((sum, order) => sum + (order.amount * 100), 0);
+      .reduce((sum, order) => sum + order.amount, 0);
 
-    // Calculate this month revenue from completed orders (in cents)
+    // Calculate this month revenue (in dollars)
     const thisMonthRevenue = thisMonthOrders
       .filter(order => order.status === 'completed')
-      .reduce((sum, order) => sum + (order.amount * 100), 0);
+      .reduce((sum, order) => sum + order.amount, 0);
 
     return {
       totalOrders: orders.length,
@@ -541,90 +503,6 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Fetch earnings data from paymentsApi
-  const fetchEarningsData = async () => {
-    try {
-      setEarningsLoading(true);
-      
-      // Use paymentsApi to fetch all earnings data
-      const [balanceResponse, monthlyResponse, historyResponse] = await Promise.all([
-        paymentsApi.getEarningsBalance(),
-        paymentsApi.getMonthlyEarnings({ months: 6 }),
-        paymentsApi.getEarningsHistory({ limit: 10 })
-      ]);
-      
-      let earningsBalanceData: EarningsData | null = null;
-      
-      // Process balance data
-      if (balanceResponse.success && balanceResponse.data) {
-        earningsBalanceData = {
-          availableBalance: balanceResponse.data.availableBalance || 0,
-          pendingBalance: balanceResponse.data.pendingBalance || 0,
-          totalEarnings: balanceResponse.data.totalEarnings || 0,
-          totalWithdrawn: balanceResponse.data.totalWithdrawn || 0,
-          thisMonthRevenue: balanceResponse.data.thisMonthRevenue || 0,
-          lastWithdrawal: balanceResponse.data.lastWithdrawal || null,
-          nextPayoutDate: balanceResponse.data.nextPayoutDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          lifetimeRevenue: balanceResponse.data.lifetimeRevenue || balanceResponse.data.totalEarnings || 0
-        };
-      } else {
-        // Fallback: Calculate from orders if API fails
-        console.log('Using fallback earnings calculation from orders');
-        const earningsFromOrders = calculateEarningsFromOrders(orders);
-        earningsBalanceData = {
-          availableBalance: earningsFromOrders.availableBalance,
-          pendingBalance: earningsFromOrders.pendingBalance,
-          totalEarnings: earningsFromOrders.totalEarnings,
-          totalWithdrawn: withdrawalHistory?.balance?.totalWithdrawn || 0,
-          thisMonthRevenue: earningsFromOrders.thisMonthRevenue,
-          lastWithdrawal: withdrawalHistory?.withdrawals?.find(w => w.status === 'completed')?.completedAt || null,
-          nextPayoutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          lifetimeRevenue: earningsFromOrders.lifetimeRevenue
-        };
-      }
-      
-      setEarningsData(earningsBalanceData);
-      
-      // Update Stripe status with earnings data
-      if (stripeStatus) {
-        setStripeStatus(prev => ({
-          ...prev!,
-          availableBalance: earningsBalanceData!.availableBalance,
-          pendingBalance: earningsBalanceData!.pendingBalance,
-          balance: earningsBalanceData!.totalEarnings
-        }));
-      }
-      
-      // Process monthly earnings
-      if (monthlyResponse.success && monthlyResponse.data) {
-        setMonthlyEarnings(monthlyResponse.data);
-      }
-      
-      // Process earnings history
-      if (historyResponse.success && historyResponse.data) {
-        setEarningsHistory(historyResponse.data.earnings || []);
-      }
-      
-    } catch (error) {
-      console.error('Error fetching earnings data:', error);
-      
-      // Fallback to calculation from orders
-      const earningsFromOrders = calculateEarningsFromOrders(orders);
-      setEarningsData({
-        availableBalance: earningsFromOrders.availableBalance,
-        pendingBalance: earningsFromOrders.pendingBalance,
-        totalEarnings: earningsFromOrders.totalEarnings,
-        totalWithdrawn: withdrawalHistory?.balance?.totalWithdrawn || 0,
-        thisMonthRevenue: earningsFromOrders.thisMonthRevenue,
-        lastWithdrawal: withdrawalHistory?.withdrawals?.find(w => w.status === 'completed')?.completedAt || null,
-        nextPayoutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        lifetimeRevenue: earningsFromOrders.lifetimeRevenue
-      });
-    } finally {
-      setEarningsLoading(false);
-    }
-  };
-
   // ✅ Fetch dashboard data
   const fetchDashboardData = async () => {
     try {
@@ -653,9 +531,6 @@ const SellerDashboard: React.FC = () => {
         const stats = calculateOrderStats(ordersData);
         setOrders(ordersData);
         setOrderStats(stats);
-        
-        // Always fetch earnings data when orders are loaded
-        await fetchEarningsData();
       } else {
         setOrders([]);
         setOrderStats({
@@ -670,19 +545,8 @@ const SellerDashboard: React.FC = () => {
           totalRevenue: 0,
           pendingRevenue: 0,
           thisMonthOrders: 0,
-          thisMonthRevenue: 0
-        });
-        
-        // Set empty earnings data
-        setEarningsData({
-          availableBalance: 0,
-          pendingBalance: 0,
-          totalEarnings: 0,
-          totalWithdrawn: 0,
           thisMonthRevenue: 0,
-          lastWithdrawal: null,
-          nextPayoutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          lifetimeRevenue: 0
+          availableBalance: 0
         });
       }
 
@@ -717,12 +581,6 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Handle "Go to Withdrawals" navigation
-  const handleGoToWithdraw = () => {
-    setActiveTab('withdraw');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
   // ✅ Fetch orders for OrdersTab
   const fetchSellerOrders = async () => {
     try {
@@ -752,9 +610,6 @@ const SellerDashboard: React.FC = () => {
         // Calculate stats from ALL orders (not just paginated)
         const stats = calculateOrderStats(ordersData);
         setOrderStats(stats);
-        
-        // Update earnings data when orders are fetched
-        await fetchEarningsData();
       }
     } catch (error: any) {
       console.error('Error fetching seller orders:', error);
@@ -825,23 +680,35 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Fetch withdrawal history using paymentsApi
+  // ✅ Fetch withdrawal history from API
   const fetchWithdrawalHistory = async () => {
     try {
       setWithdrawalsLoading(true);
       
-      const response = await paymentsApi.getWithdrawalHistory({
-        page: withdrawalsPage,
-        limit: withdrawalsLimit
-      });
-      
-      if (response.success && response.data) {
-        setWithdrawalHistory(response.data);
+      // Try to fetch real withdrawal history from API
+      try {
+        const response = await marketplaceApi.withdrawals?.getWithdrawalHistory?.({
+          page: withdrawalsPage,
+          limit: withdrawalsLimit
+        });
         
-        // Also fetch fresh earnings data to keep balance in sync
-        await fetchEarningsData();
-      } else {
-        console.log('No withdrawal history found');
+        if (response && response.success) {
+          setWithdrawalHistory(response);
+        } else {
+          // If API fails, create empty history
+          console.log('No withdrawal history found');
+          setWithdrawalHistory({
+            withdrawals: [],
+            pagination: {
+              page: 1,
+              limit: 10,
+              total: 0,
+              pages: 1
+            }
+          });
+        }
+      } catch (apiError) {
+        console.log('Withdrawal API not available, using empty history');
         setWithdrawalHistory({
           withdrawals: [],
           pagination: {
@@ -870,53 +737,93 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Handle withdrawal request using paymentsApi
-  const handleWithdrawRequest = async (amountInCents: number) => {
+  // ✅ Handle withdrawal request
+  const handleWithdrawRequest = async (amount: number) => {
     try {
       setRefreshing(true);
-      setError('');
       
-      // Validate amount
-      if (amountInCents <= 0) {
-        setError('Withdrawal amount must be greater than zero');
-        setRefreshing(false);
-        return;
+      // Convert amount to cents
+      const amountInCents = amount * 100;
+      
+      // Call API to process withdrawal
+      try {
+        const response = await marketplaceApi.withdrawals?.requestWithdrawal?.(amountInCents);
+        
+        if (response?.success) {
+          // Update Stripe balance
+          setStripeStatus(prev => {
+            if (!prev) return prev;
+            
+            return {
+              ...prev,
+              availableBalance: (prev.availableBalance || 0) - amountInCents,
+              balance: (prev.balance || 0) - amountInCents
+            };
+          });
+          
+          // Update order stats
+          setOrderStats(prev => ({
+            ...prev,
+            availableBalance: (prev.availableBalance || 0) - amountInCents
+          }));
+          
+          setSuccessMessage(`Withdrawal request of $${amount.toFixed(2)} submitted successfully! Funds will arrive in 2-3 business days.`);
+          
+          // Refresh withdrawal history
+          fetchWithdrawalHistory();
+        } else {
+          throw new Error(response?.error || 'Withdrawal failed');
+        }
+      } catch (apiError) {
+        // If API fails, show mock success message for development
+        if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
+          // Create mock withdrawal record
+          const newWithdrawal: Withdrawal = {
+            _id: Date.now().toString(),
+            amount: amountInCents,
+            status: 'pending',
+            stripeTransferId: 'tr_mock_' + Date.now(),
+            createdAt: new Date().toISOString(),
+            destination: 'Bank Account •••• 4321',
+            description: `Withdrawal of $${amount.toFixed(2)}`
+          };
+          
+          // Add to history
+          setWithdrawalHistory(prev => {
+            if (!prev) {
+              return {
+                withdrawals: [newWithdrawal],
+                pagination: { page: 1, limit: 10, total: 1, pages: 1 }
+              };
+            }
+            
+            return {
+              ...prev,
+              withdrawals: [newWithdrawal, ...prev.withdrawals],
+              pagination: {
+                ...prev.pagination,
+                total: (prev.pagination?.total || 0) + 1
+              }
+            };
+          });
+          
+          // Update Stripe balance (mock)
+          setStripeStatus(prev => {
+            if (!prev) return prev;
+            
+            return {
+              ...prev,
+              availableBalance: (prev.availableBalance || 0) - amountInCents,
+              balance: (prev.balance || 0) - amountInCents
+            };
+          });
+          
+          setSuccessMessage(`Withdrawal request of $${amount.toFixed(2)} submitted successfully! Funds will arrive in 2-3 business days.`);
+        } else {
+          throw apiError;
+        }
       }
       
-      // Check if available balance is sufficient
-      const availableBalance = earningsData?.availableBalance || 0;
-      if (amountInCents > availableBalance) {
-        setError(`Insufficient balance. Available: ${paymentsApi.formatCurrency(availableBalance)}`);
-        setRefreshing(false);
-        return;
-      }
-      
-      const response = await paymentsApi.requestWithdrawal(amountInCents);
-      
-      if (response.success) {
-        // Update earnings data
-        setEarningsData(prev => prev ? {
-          ...prev,
-          availableBalance: prev.availableBalance - amountInCents,
-          totalWithdrawn: prev.totalWithdrawn + amountInCents,
-          lastWithdrawal: new Date().toISOString()
-        } : null);
-        
-        // Update Stripe status
-        setStripeStatus(prev => prev ? {
-          ...prev,
-          availableBalance: (prev.availableBalance || 0) - amountInCents,
-          balance: (prev.balance || 0) - amountInCents
-        } : prev);
-        
-        setSuccessMessage(`Withdrawal request of ${paymentsApi.formatCurrency(amountInCents)} submitted successfully! Funds will arrive in 2-3 business days.`);
-        
-        // Refresh withdrawal history
-        await fetchWithdrawalHistory();
-        await fetchEarningsData();
-      } else {
-        setError(response.error || 'Failed to process withdrawal');
-      }
     } catch (error: any) {
       console.error('Error processing withdrawal:', error);
       setError('Failed to process withdrawal. Please try again.');
@@ -1219,9 +1126,6 @@ const SellerDashboard: React.FC = () => {
     );
     const updatedStats = calculateOrderStats(updatedOrders);
     setOrderStats(updatedStats);
-    
-    // Refresh earnings data when order status changes
-    fetchEarningsData();
   };
 
   const handleViewOrderDetails = (orderId: string) => {
@@ -1334,25 +1238,38 @@ const SellerDashboard: React.FC = () => {
     loadInitialData();
   }, []);
 
-  // ✅ Fetch data when tab changes
+  // ✅ Fetch listings when tab changes
   useEffect(() => {
     if (activeTab === 'listings') {
       fetchListings();
-    } else if (activeTab === 'orders') {
-      fetchSellerOrders();
-    } else if (activeTab === 'offers') {
-      fetchOffers();
-    } else if (activeTab === 'withdraw') {
-      fetchWithdrawalHistory();
-    } else if (activeTab === 'earnings') {
-      fetchEarningsData();
     }
-  }, [activeTab, listingsPage, listingsStatusFilter, ordersPage, ordersFilter, withdrawalsPage]);
+  }, [activeTab, listingsPage, listingsStatusFilter]);
+
+  // ✅ Fetch orders when orders tab is active
+  useEffect(() => {
+    if (activeTab === 'orders') {
+      fetchSellerOrders();
+    }
+  }, [activeTab, ordersPage, ordersFilter]);
+
+  // ✅ Fetch offers when offers tab is active
+  useEffect(() => {
+    if (activeTab === 'offers') {
+      fetchOffers();
+    }
+  }, [activeTab]);
+
+  // ✅ Fetch withdrawal history when withdraw tab is active
+  useEffect(() => {
+    if (activeTab === 'withdraw') {
+      fetchWithdrawalHistory();
+    }
+  }, [activeTab, withdrawalsPage]);
 
   // Determine loading state
   const getCurrentLoadingState = () => {
     if (activeTab === 'overview') return loading && !initialDataLoaded;
-    if (activeTab === 'earnings') return earningsLoading;
+    if (activeTab === 'earnings') return false; // Earnings tab handles its own loading
     if (activeTab === 'listings') return listingsLoading;
     if (activeTab === 'orders') return ordersLoading;
     if (activeTab === 'offers') return offersLoading;
@@ -1362,18 +1279,11 @@ const SellerDashboard: React.FC = () => {
 
   const currentLoading = getCurrentLoadingState();
 
-  // Calculate total withdrawn amount in cents from withdrawal history
-  const totalWithdrawn = withdrawalHistory?.balance?.totalWithdrawn || 
-    withdrawalHistory?.withdrawals?.reduce(
-      (sum, w) => sum + (w.status === 'completed' ? w.amount : 0), 
-      0
-    ) || 0;
-
-  // Convert dollars to cents for display - these are for stats display only
-  const totalRevenueInCents = earningsData?.totalEarnings || orderStats.totalRevenue;
-  const thisMonthRevenueInCents = earningsData?.thisMonthRevenue || orderStats.thisMonthRevenue;
-  const pendingRevenueInCents = earningsData?.pendingBalance || orderStats.pendingRevenue;
-  const availableBalanceInCents = earningsData?.availableBalance || 0;
+  // Calculate total withdrawn amount
+  const totalWithdrawn = withdrawalHistory?.withdrawals?.reduce(
+    (sum, w) => sum + (w.status === 'completed' ? w.amount : 0), 
+    0
+  ) || 0;
 
   // Show loading only on initial load
   if (loading && !initialDataLoaded) {
@@ -1389,6 +1299,13 @@ const SellerDashboard: React.FC = () => {
       </MarketplaceLayout>
     );
   }
+
+  // Safe currency formatting function
+  const safeFormatCurrency = (amount: number) => {
+    // Convert dollars to cents for formatting
+    const amountInCents = amount * 100;
+    return formatCurrency(amountInCents);
+  };
 
   return (
     <MarketplaceLayout>
@@ -1407,7 +1324,7 @@ const SellerDashboard: React.FC = () => {
           <SafeDashboardHeader
             title="Seller Dashboard"
             subtitle="Manage orders, track earnings, and grow your business"
-            earnings={earningsData?.availableBalance ? paymentsApi.formatCurrency(earningsData.availableBalance) : '$0.00'}
+            earnings={safeFormatCurrency(orderStats.totalRevenue)}
             onRefresh={handleRefresh}
             refreshing={refreshing}
             stripeStatus={stripeStatus}
@@ -1425,7 +1342,7 @@ const SellerDashboard: React.FC = () => {
                   <div>
                     <h3 className="font-medium text-purple-800">Development Mode</h3>
                     <p className="text-sm text-purple-700">
-                      Using paymentsApi for withdrawals and earnings. Mock data available for testing.
+                      Using live earnings data from your orders. Mock payments available for testing.
                     </p>
                   </div>
                 </div>
@@ -1451,16 +1368,6 @@ const SellerDashboard: React.FC = () => {
                         };
                         localStorage.setItem('stripe_status', JSON.stringify(mockStatus));
                         setStripeStatus(mockStatus);
-                        setEarningsData({
-                          availableBalance: 0,
-                          pendingBalance: 0,
-                          totalEarnings: 0,
-                          totalWithdrawn: totalWithdrawn,
-                          thisMonthRevenue: 0,
-                          lastWithdrawal: withdrawalHistory?.withdrawals?.find(w => w.status === 'completed')?.completedAt || null,
-                          nextPayoutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-                          lifetimeRevenue: 0
-                        });
                         setSuccessMessage('Mock Stripe disconnected. You can reconnect anytime.');
                       }}
                       className="px-4 py-2 bg-white border border-purple-300 text-purple-600 hover:bg-purple-50 text-sm font-medium rounded-lg transition duration-200"
@@ -1561,24 +1468,28 @@ const SellerDashboard: React.FC = () => {
                         label: '+ Create New Listing',
                         onClick: () => navigate('/marketplace/create')
                       }}
+                      // secondaryAction={{
+                      //   label: '💰 Setup Payments',
+                      //   onClick: handleOpenStripeSetup,
+                      //   visible: !stripeStatus?.chargesEnabled
+                      // }}
                     />
 
-                    {/* Stats Grid - Using earningsData for all money values */}
+                    {/* Stats Grid */}
                     <SafeStatsGrid
                       stats={{
-                        totalRevenue: totalRevenueInCents,
+                        totalRevenue: orderStats.totalRevenue,
                         totalOrders: orderStats.totalOrders,
                         activeOrders: orderStats.activeOrders,
                         pendingOffers: pendingOffers,
                         totalListings: totalListings,
                         activeListings: activeListings,
-                        thisMonthRevenue: thisMonthRevenueInCents,
+                        thisMonthRevenue: orderStats.thisMonthRevenue,
                         thisMonthOrders: orderStats.thisMonthOrders,
-                        availableBalance: availableBalanceInCents,
+                        availableBalance: stripeStatus?.availableBalance,
                         totalWithdrawn: totalWithdrawn
                       }}
                       onTabChange={setActiveTab}
-                      formatCurrency={paymentsApi.formatCurrency}
                     />
 
                     {/* Order Workflow Guide */}
@@ -1645,23 +1556,14 @@ const SellerDashboard: React.FC = () => {
                   </div>
                 )}
 
-                {/* Earnings Tab */}
+                {/* Earnings Tab - NEW */}
                 {activeTab === 'earnings' && (
                   <SafeEarningsTab
                     stripeStatus={stripeStatus}
                     orderStats={orderStats}
-                    balanceData={earningsData}
-                    monthlyEarnings={monthlyEarnings}
-                    earningsHistory={earningsHistory}
-                    onWithdrawSuccess={handleWithdrawRequest}
+                    onWithdrawRequest={handleWithdrawRequest}
                     loading={earningsLoading}
-                    onRefresh={() => {
-                      fetchEarningsData();
-                      checkStripeAccountStatus();
-                    }}
-                    onGoToWithdraw={handleGoToWithdraw}
-                    formatCurrency={paymentsApi.formatCurrency}
-                    totalWithdrawn={totalWithdrawn}
+                    onRefresh={checkStripeAccountStatus}
                   />
                 )}
 
@@ -1723,7 +1625,6 @@ const SellerDashboard: React.FC = () => {
                     stats={orderStats}
                     onPageChange={setOrdersPage}
                     currentPage={ordersPage}
-                    formatCurrency={paymentsApi.formatCurrency}
                   />
                 )}
 
@@ -1737,12 +1638,9 @@ const SellerDashboard: React.FC = () => {
                     onPageChange={setWithdrawalsPage}
                     onWithdrawRequest={handleWithdrawRequest}
                     onRefresh={() => fetchWithdrawalHistory()}
-                    totalRevenue={totalRevenueInCents}
-                    thisMonthRevenue={thisMonthRevenueInCents}
-                    pendingRevenue={pendingRevenueInCents}
-                    availableBalance={availableBalanceInCents}
-                    totalWithdrawn={totalWithdrawn}
-                    formatCurrency={paymentsApi.formatCurrency}
+                    totalRevenue={orderStats.totalRevenue}
+                    thisMonthRevenue={orderStats.thisMonthRevenue}
+                    pendingRevenue={orderStats.pendingRevenue}
                   />
                 )}
               </>
