@@ -5,7 +5,7 @@ import EarningsOverview from './EarningsOverview';
 import EarningsStats from './EarningsStats';
 import WithdrawBalance from './WithdrawBalance';
 import paymentsApi from '../../../api/paymentsApi';
-import { getCurrentUserId } from '../../../utilities/helperFunction';
+import { getCurrentUserId } from '../../../utilities/helperfFunction';
 
 interface EarningsTabProps {
   stripeStatus: any;
