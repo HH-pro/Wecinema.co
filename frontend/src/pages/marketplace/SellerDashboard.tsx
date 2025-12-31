@@ -9,7 +9,7 @@ import MarketplaceLayout from '../../components/Layout';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
 
 // Import API - USE PAYMENTS API DIRECTLY
-import paymentsApi from '../../api/marketplace/paymentsApi';
+import paymentsApi from '../../api/paymentsApi';
 import marketplaceApi from '../../api/marketplaceApi';
 
 // Access API methods
