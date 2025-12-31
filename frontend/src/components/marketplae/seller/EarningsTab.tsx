@@ -1,4 +1,4 @@
-// src/components/marketplae/seller/EarningsTab.tsx - FIXED VERSION
+// src/components/marketplae/seller/EarningsTab.tsx - SIMPLIFIED WORKING VERSION
 import React, { useState, useEffect } from 'react';
 import marketplaceApi from '../../../api/marketplaceApi';
 
@@ -31,126 +31,122 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   const [withdrawing, setWithdrawing] = useState(false);
   const [error, setError] = useState('');
   const [activeChart, setActiveChart] = useState('monthly');
-  const [detailedEarnings, setDetailedEarnings] = useState<any>(null);
-  const [detailedLoading, setDetailedLoading] = useState(false);
-  const [transactions, setTransactions] = useState<any[]>([]);
-  
-  // ✅ FIXED: Parse earnings balance from props
-  const parseEarningsBalance = () => {
-    if (!earningsBalance) {
-      return {
-        availableBalance: 0,
-        pendingBalance: 0,
-        totalEarnings: 0,
-        totalWithdrawn: 0,
-        walletBalance: 0,
-        lastWithdrawal: null,
-        nextPayoutDate: null,
-        currency: 'usd'
-      };
-    }
-    
-    // If earningsBalance is the full API response
-    if (earningsBalance.data) {
-      return earningsBalance.data;
-    }
-    
-    // If earningsBalance is already the data object
-    return earningsBalance;
-  };
-  
-  const balanceData = parseEarningsBalance();
-  
-  // ✅ FIXED: Parse monthly earnings
-  const parseMonthlyEarnings = () => {
-    if (!monthlyEarnings || monthlyEarnings.length === 0) {
-      return [];
-    }
-    
-    // If monthlyEarnings is the full API response
-    if (monthlyEarnings.data) {
-      return monthlyEarnings.data;
-    }
-    
-    // If monthlyEarnings is already the data array
-    return monthlyEarnings;
-  };
-  
-  const monthlyData = parseMonthlyEarnings();
-  
-  // ✅ FIXED: Parse earnings history
-  const parseEarningsHistory = () => {
-    if (!earningsHistory || earningsHistory.length === 0) {
-      return [];
-    }
-    
-    // If earningsHistory is the full API response
-    if (earningsHistory.data?.earnings) {
-      return earningsHistory.data.earnings;
-    }
-    
-    if (earningsHistory.data) {
-      return earningsHistory.data;
-    }
-    
-    // If earningsHistory is already the data array
-    return earningsHistory;
-  };
-  
-  const historyData = parseEarningsHistory();
+  const [localBalance, setLocalBalance] = useState<any>(null);
+  const [localMonthly, setLocalMonthly] = useState<any[]>([]);
+  const [localTransactions, setLocalTransactions] = useState<any[]>([]);
+  const [fetching, setFetching] = useState(false);
 
-  // ✅ FETCH DETAILED EARNINGS FROM MARKETPLACE API
-  const fetchDetailedEarnings = async () => {
+  // ✅ Get balance data - with fallbacks
+  const getBalanceData = () => {
+    // First try props
+    if (earningsBalance) {
+      if (earningsBalance.data) return earningsBalance.data;
+      return earningsBalance;
+    }
+    
+    // Then try local state
+    if (localBalance) return localBalance;
+    
+    // Default fallback
+    return {
+      availableBalance: 0,
+      pendingBalance: 0,
+      totalEarnings: 0,
+      totalWithdrawn: 0,
+      walletBalance: 0,
+      lastWithdrawal: null,
+      nextPayoutDate: null,
+      currency: 'usd'
+    };
+  };
+
+  // ✅ Get monthly data - with fallbacks
+  const getMonthlyData = () => {
+    if (monthlyEarnings && monthlyEarnings.length > 0) {
+      if (monthlyEarnings.data) return monthlyEarnings.data;
+      return monthlyEarnings;
+    }
+    
+    if (localMonthly.length > 0) return localMonthly;
+    
+    return [];
+  };
+
+  // ✅ Get transactions - with fallbacks
+  const getTransactions = () => {
+    if (earningsHistory && earningsHistory.length > 0) {
+      if (earningsHistory.data?.earnings) return earningsHistory.data.earnings;
+      if (earningsHistory.data) return earningsHistory.data;
+      return earningsHistory;
+    }
+    
+    if (localTransactions.length > 0) return localTransactions;
+    
+    return [];
+  };
+
+  // ✅ Fetch data directly
+  const fetchDataDirectly = async () => {
     try {
-      setDetailedLoading(true);
+      setFetching(true);
+      console.log('🔄 Fetching earnings data...');
       
-      // Fetch earnings data directly
-      const summaryResponse = await marketplaceApi.earnings.getEarningsSummary();
-      const monthlyResponse = await marketplaceApi.earnings.getEarningsByPeriod('month');
-      
-      const detailedData: any = {};
-      
-      if (summaryResponse.success) {
-        detailedData.summary = summaryResponse.data || summaryResponse;
+      // Try to fetch balance
+      try {
+        const balanceRes = await marketplaceApi.earnings.getEarningsSummary();
+        if (balanceRes.success) {
+          console.log('✅ Got balance:', balanceRes);
+          setLocalBalance(balanceRes.data || balanceRes);
+        }
+      } catch (balanceErr) {
+        console.warn('⚠️ Could not fetch balance:', balanceErr.message);
       }
       
-      if (monthlyResponse.success) {
-        detailedData.monthly = monthlyResponse.data || monthlyResponse;
+      // Try to fetch monthly
+      try {
+        const monthlyRes = await marketplaceApi.earnings.getEarningsByPeriod('month');
+        if (monthlyRes.success) {
+          console.log('✅ Got monthly:', monthlyRes);
+          setLocalMonthly(monthlyRes.data || monthlyRes);
+        }
+      } catch (monthlyErr) {
+        console.warn('⚠️ Could not fetch monthly:', monthlyErr.message);
       }
       
-      setDetailedEarnings(detailedData);
-      
-      // Fetch transactions from orders
-      const orders = await marketplaceApi.orders.getMySales();
-      const transactionsList = [];
-      
-      if (Array.isArray(orders)) {
-        // Add completed orders as earnings
-        orders.forEach(order => {
-          if (order.status === 'completed' && order.paymentReleased) {
-            transactionsList.push({
+      // Try to fetch orders and create transactions
+      try {
+        const orders = await marketplaceApi.orders.getMySales();
+        console.log('📊 Orders received:', orders?.length || 0);
+        
+        if (Array.isArray(orders) && orders.length > 0) {
+          const transactions = orders
+            .filter(order => order.status === 'completed' && order.paymentReleased)
+            .map(order => ({
               _id: order._id,
               type: 'earning',
               status: 'completed',
-              amount: order.sellerAmount || order.amount,
+              amount: order.sellerAmount || order.amount || 0,
               description: `Order: ${order.listingId?.title || 'Completed Order'}`,
-              date: order.completedAt || order.createdAt
-            });
-          }
-        });
+              date: order.completedAt || order.createdAt,
+              listingTitle: order.listingId?.title
+            }));
+          
+          console.log('💰 Transactions created:', transactions.length);
+          setLocalTransactions(transactions);
+        }
+      } catch (ordersErr) {
+        console.warn('⚠️ Could not fetch orders:', ordersErr.message);
       }
       
-      setTransactions(transactionsList);
-      
     } catch (error) {
-      console.error('Error fetching detailed earnings:', error);
+      console.error('❌ Error fetching data:', error);
     } finally {
-      setDetailedLoading(false);
+      setFetching(false);
     }
   };
 
   useEffect(() => {
-    fetchDetailedEarnings();
+    fetchDataDirectly();
   }, []);
 
   const handleWithdraw = async () => {
@@ -167,22 +163,12 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
       return;
     }
     
-    // Check available balance
-    const availableBalanceInCents = balanceData.availableBalance || 0;
-    const availableBalanceInDollars = centsToDollars(availableBalanceInCents);
-    const requestedAmountInCents = dollarsToCents(amountInDollars);
-    
-    if (requestedAmountInCents > availableBalanceInCents) {
-      setError(`Insufficient balance. Available: ${formatCurrency(availableBalanceInCents)}`);
-      return;
-    }
-    
     setWithdrawing(true);
     try {
       await onWithdrawRequest(amountInDollars);
       setWithdrawAmount('');
       setError('');
-      await Promise.all([onRefresh(), fetchDetailedEarnings()]);
+      await fetchDataDirectly(); // Refresh data after withdrawal
     } catch (err: any) {
       setError(err.message || 'Failed to process withdrawal');
     } finally {
@@ -190,44 +176,39 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
     }
   };
 
-  // ✅ CALCULATE EARNINGS GROWTH FROM MONTHLY EARNINGS
+  const balanceData = getBalanceData();
+  const monthlyData = getMonthlyData();
+  const transactions = getTransactions();
+
+  // ✅ Calculate growth
   const calculateGrowth = () => {
     if (!monthlyData || monthlyData.length < 2) return { percent: 0, amount: 0 };
     
-    // Sort by date to get correct current and previous month
-    const sortedEarnings = [...monthlyData].sort((a, b) => {
-      const dateA = a._id ? new Date(a._id.year || 0, (a._id.month || 1) - 1) : new Date();
-      const dateB = b._id ? new Date(b._id.year || 0, (b._id.month || 1) - 1) : new Date();
-      return dateA.getTime() - dateB.getTime();
-    });
-    
-    const currentMonth = sortedEarnings[sortedEarnings.length - 1]?.earnings || 
-                        sortedEarnings[sortedEarnings.length - 1]?.total || 0;
-    const previousMonth = sortedEarnings[sortedEarnings.length - 2]?.earnings || 
-                         sortedEarnings[sortedEarnings.length - 2]?.total || 0;
-    
-    if (previousMonth === 0) return { percent: 100, amount: currentMonth };
-    
-    const growthPercent = ((currentMonth - previousMonth) / previousMonth) * 100;
-    const growthAmount = currentMonth - previousMonth;
-    
-    return {
-      percent: Math.round(growthPercent),
-      amount: growthAmount
-    };
+    try {
+      const sorted = [...monthlyData].sort((a, b) => {
+        const dateA = a._id ? new Date(a._id.year || 0, (a._id.month || 1) - 1) : new Date();
+        const dateB = b._id ? new Date(b._id.year || 0, (b._id.month || 1) - 1) : new Date();
+        return dateA.getTime() - dateB.getTime();
+      });
+      
+      const current = sorted[sorted.length - 1]?.earnings || sorted[sorted.length - 1]?.total || 0;
+      const previous = sorted[sorted.length - 2]?.earnings || sorted[sorted.length - 2]?.total || 0;
+      
+      if (previous === 0) return { percent: 100, amount: current };
+      
+      const percent = ((current - previous) / previous) * 100;
+      return {
+        percent: Math.round(percent),
+        amount: current - previous
+      };
+    } catch (e) {
+      return { percent: 0, amount: 0 };
+    }
   };
 
   const growth = calculateGrowth();
 
-  // ✅ GET MONTH NAME FROM MONTH INDEX
-  const getMonthName = (monthIndex: number) => {
-    if (monthIndex === undefined || monthIndex === null) return 'Unknown';
-    const date = new Date();
-    date.setMonth(monthIndex - 1); // Adjust for 1-indexed months
-    return date.toLocaleString('default', { month: 'short' });
-  };
-
-  // ✅ FORMAT DATE FOR DISPLAY
+  // ✅ Format date
   const formatDate = (dateString: string) => {
     if (!dateString) return 'Unknown date';
     try {
@@ -235,116 +216,79 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
       return date.toLocaleDateString('en-US', {
         day: '2-digit',
         month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+        year: 'numeric'
       });
     } catch (e) {
       return 'Invalid date';
     }
   };
 
-  // ✅ GET TRANSACTION ICON BASED ON TYPE
-  const getTransactionIcon = (type: string, status: string) => {
-    if (type === 'earning' || type === 'sale') {
-      return status === 'completed' ? '💰' : '⏳';
-    } else if (type === 'withdrawal') {
-      return status === 'completed' ? '💸' : '⏳';
-    } else if (type === 'refund') {
-      return '↩️';
-    }
+  // ✅ Get month name
+  const getMonthName = (monthIndex: number) => {
+    if (!monthIndex) return 'Unknown';
+    const date = new Date();
+    date.setMonth(monthIndex - 1);
+    return date.toLocaleString('default', { month: 'short' });
+  };
+
+  // ✅ Get transaction icon
+  const getTransactionIcon = (type: string) => {
+    if (type === 'earning') return '💰';
+    if (type === 'withdrawal') return '💸';
     return '📊';
   };
 
-  // ✅ GET TRANSACTION COLOR
+  // ✅ Get transaction color
   const getTransactionColor = (type: string) => {
-    if (type === 'earning' || type === 'sale') return 'text-green-600';
+    if (type === 'earning') return 'text-green-600';
     if (type === 'withdrawal') return 'text-blue-600';
-    if (type === 'refund') return 'text-red-600';
     return 'text-gray-600';
   };
 
-  // ✅ GET TRANSACTION SIGN
+  // ✅ Get transaction sign
   const getTransactionSign = (type: string) => {
-    if (type === 'earning' || type === 'sale') return '+';
-    if (type === 'withdrawal' || type === 'refund') return '-';
+    if (type === 'earning') return '+';
+    if (type === 'withdrawal') return '-';
     return '';
   };
 
-  // ✅ FORMAT MONTHLY EARNINGS DATA FOR CHART
-  const getChartData = () => {
-    if (!monthlyData || monthlyData.length === 0) {
-      // If no data, try to use transactions to create chart data
-      if (transactions.length > 0) {
-        const monthlyMap = new Map();
-        
-        transactions.forEach(transaction => {
-          if (transaction.type === 'earning' && transaction.status === 'completed') {
-            const date = new Date(transaction.date);
-            const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            
-            if (!monthlyMap.has(monthYear)) {
-              monthlyMap.set(monthYear, {
-                _id: { month: date.getMonth() + 1, year: date.getFullYear() },
-                earnings: 0,
-                orders: 0
-              });
-            }
-            
-            const monthData = monthlyMap.get(monthYear);
-            monthData.earnings += transaction.amount || 0;
-            monthData.orders += 1;
-          }
-        });
-        
-        return Array.from(monthlyMap.values()).sort((a, b) => {
-          if (a._id.year !== b._id.year) return a._id.year - b._id.year;
-          return a._id.month - b._id.month;
-        });
-      }
-      
-      // Return empty array if no data
-      return [];
-    }
-    
-    return monthlyData;
-  };
+  // ✅ Calculate available balance in dollars
+  const availableBalanceInCents = balanceData.availableBalance || 0;
+  const availableBalanceInDollars = centsToDollars(availableBalanceInCents);
 
-  const chartData = getChartData();
-
-  // ✅ GET TRANSACTION DESCRIPTION
-  const getTransactionDescription = (transaction: any) => {
-    if (transaction.description) return transaction.description;
-    if (transaction.listingTitle) return `Sale: ${transaction.listingTitle}`;
-    if (transaction.type === 'withdrawal') return 'Withdrawal to bank account';
-    if (transaction.type === 'earning') return 'Order completed';
-    return 'Transaction';
-  };
-
-  // ✅ CALCULATE TOTAL EARNINGS
-  const getTotalEarnings = () => {
-    return balanceData.totalEarnings || 0;
-  };
-
-  const totalEarnings = getTotalEarnings();
-
-  // ✅ GET DISPLAY TRANSACTIONS
-  const getDisplayTransactions = () => {
-    if (historyData && historyData.length > 0) {
-      return historyData;
-    }
-    
-    if (transactions.length > 0) {
-      return transactions;
-    }
-    
-    return [];
-  };
-
-  const displayTransactions = getDisplayTransactions();
+  // ✅ Debug logging
+  console.log('EarningsTab debug:', {
+    balanceData,
+    monthlyDataLength: monthlyData?.length,
+    transactionsLength: transactions?.length,
+    availableBalance: availableBalanceInCents,
+    formatCurrency: formatCurrency(availableBalanceInCents)
+  });
 
   return (
     <div className="space-y-6">
+      {/* Debug info */}
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <div className="flex items-center">
+          <div className="text-yellow-600 mr-2">🔍</div>
+          <div>
+            <p className="text-sm font-medium text-yellow-800">Debug Info</p>
+            <p className="text-xs text-yellow-700">
+              Balance: {availableBalanceInCents} cents • 
+              Monthly Data: {monthlyData?.length || 0} items • 
+              Transactions: {transactions?.length || 0}
+            </p>
+          </div>
+          <button
+            onClick={fetchDataDirectly}
+            disabled={fetching}
+            className="ml-auto text-xs bg-yellow-100 hover:bg-yellow-200 px-2 py-1 rounded"
+          >
+            {fetching ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
+      </div>
+
       {/* Earnings Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Available Balance Card */}
@@ -353,7 +297,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
             <div>
               <p className="text-sm font-medium text-green-800">Available Balance</p>
               <p className="text-3xl font-bold text-green-900 mt-2">
-                {formatCurrency(balanceData.availableBalance || 0)}
+                {formatCurrency(availableBalanceInCents)}
               </p>
               <p className="text-sm text-green-700 mt-2">
                 Ready to withdraw
@@ -385,7 +329,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
             <div>
               <p className="text-sm font-medium text-purple-800">Total Earnings</p>
               <p className="text-3xl font-bold text-purple-900 mt-2">
-                {formatCurrency(totalEarnings)}
+                {formatCurrency(balanceData.totalEarnings || 0)}
               </p>
               <p className="text-sm text-purple-700 mt-2">
                 All-time earnings
@@ -449,15 +393,13 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
 
         {activeChart === 'monthly' ? (
           <div className="space-y-4">
-            {/* Monthly Earnings Chart */}
-            {chartData && chartData.length > 0 ? (
+            {monthlyData && monthlyData.length > 0 ? (
               <>
                 <div className="h-64 flex items-end space-x-2 md:space-x-4">
-                  {chartData.map((monthData, index) => {
+                  {monthlyData.map((monthData, index) => {
                     const earnings = monthData.earnings || monthData.total || 0;
-                    const maxEarnings = Math.max(...chartData.map(m => m.earnings || m.total || 0), 1);
-                    const height = maxEarnings > 0 ? (earnings / maxEarnings) * 100 : 0;
-                    const orders = monthData.orders || monthData.orderCount || 0;
+                    const maxEarnings = Math.max(...monthlyData.map(m => m.earnings || m.total || 0), 1);
+                    const height = (earnings / maxEarnings) * 100;
                     
                     return (
                       <div key={index} className="flex flex-col items-center flex-1">
@@ -474,24 +416,15 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                           <p className="text-xs text-gray-500">
                             {formatCurrencyShort(earnings)}
                           </p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            {orders} {orders === 1 ? 'order' : 'orders'}
-                          </p>
                         </div>
                       </div>
                     );
                   })}
                 </div>
-
-                {/* Chart Legend */}
-                <div className="flex items-center justify-center space-x-6 pt-4 border-t border-gray-100">
+                <div className="flex items-center justify-center pt-4 border-t border-gray-100">
                   <div className="flex items-center">
                     <div className="w-3 h-3 bg-gradient-to-t from-yellow-400 to-yellow-500 rounded mr-2"></div>
                     <span className="text-sm text-gray-600">Monthly Earnings</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-gradient-to-t from-blue-400 to-blue-500 rounded mr-2"></div>
-                    <span className="text-sm text-gray-600">Order Count</span>
                   </div>
                 </div>
               </>
@@ -499,15 +432,16 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
               <div className="h-64 flex items-center justify-center">
                 <div className="text-center">
                   <div className="text-5xl mb-4 text-gray-300">📊</div>
-                  <p className="text-gray-500">No monthly earnings data available</p>
-                  <p className="text-sm text-gray-400 mt-2">Complete orders to see earnings trends</p>
+                  <p className="text-gray-500">No earnings data yet</p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    Complete your first order to see earnings
+                  </p>
                 </div>
               </div>
             )}
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Earnings Breakdown */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-green-50 border border-green-200 rounded-xl p-4">
                 <div className="flex items-center">
@@ -517,7 +451,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                   <div>
                     <p className="text-sm font-medium text-green-800">Completed Earnings</p>
                     <p className="text-xl font-bold text-green-900 mt-1">
-                      {formatCurrency(totalEarnings)}
+                      {formatCurrency(balanceData.totalEarnings || 0)}
                     </p>
                   </div>
                 </div>
@@ -597,7 +531,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
               </div>
               <button
                 onClick={handleWithdraw}
-                disabled={!withdrawAmount || withdrawing || loading || (balanceData.availableBalance || 0) < 100}
+                disabled={!withdrawAmount || withdrawing || loading || availableBalanceInCents < 100}
                 className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-xl hover:from-yellow-600 hover:to-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow"
               >
                 {withdrawing ? (
@@ -614,7 +548,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
               </button>
             </div>
             <p className="text-sm text-gray-500 mt-2">
-              Available: {formatCurrency(balanceData.availableBalance || 0)} • Minimum: $1.00
+              Available: {formatCurrency(availableBalanceInCents)} • Minimum: $1.00
             </p>
           </div>
           
@@ -633,8 +567,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
             <button
               type="button"
               onClick={() => {
-                const availableInDollars = centsToDollars(balanceData.availableBalance || 0);
-                setWithdrawAmount(availableInDollars.toFixed(2));
+                setWithdrawAmount(availableBalanceInDollars.toFixed(2));
               }}
               className="px-4 py-2 bg-yellow-100 hover:bg-yellow-200 border border-yellow-300 rounded-lg text-sm font-medium text-yellow-700 transition-colors duration-200"
             >
@@ -644,7 +577,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
         </div>
       </div>
 
-      {/* Earnings History */}
+      {/* Transactions History */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
         <div className="flex justify-between items-center mb-6">
           <div>
@@ -654,57 +587,49 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
             </p>
           </div>
           <button
-            onClick={() => Promise.all([onRefresh(), fetchDetailedEarnings()])}
-            disabled={loading || detailedLoading}
+            onClick={fetchDataDirectly}
+            disabled={fetching}
             className="px-4 py-2 text-sm font-medium text-yellow-600 hover:text-yellow-700 disabled:opacity-50 flex items-center"
           >
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            {loading || detailedLoading ? 'Refreshing...' : 'Refresh'}
+            {fetching ? 'Refreshing...' : 'Refresh'}
           </button>
         </div>
 
-        {detailedLoading ? (
+        {fetching ? (
           <div className="flex items-center justify-center py-8">
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading earnings history...</p>
+              <p className="text-gray-600">Loading transactions...</p>
             </div>
           </div>
-        ) : displayTransactions.length > 0 ? (
+        ) : transactions.length > 0 ? (
           <div className="space-y-4">
-            {displayTransactions.slice(0, 10).map((transaction: any, index: number) => (
-              <div key={transaction._id || transaction.id || `transaction-${index}`} className="flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:bg-gray-50">
+            {transactions.slice(0, 10).map((transaction, index) => (
+              <div key={transaction._id || `transaction-${index}`} className="flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:bg-gray-50">
                 <div className="flex items-center flex-1">
                   <div className="flex-shrink-0">
                     <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-xl">
-                      {getTransactionIcon(transaction.type || transaction.transactionType, transaction.status)}
+                      {getTransactionIcon(transaction.type)}
                     </div>
                   </div>
                   <div className="ml-4 flex-1">
                     <p className="font-medium text-gray-900">
-                      {getTransactionDescription(transaction)}
+                      {transaction.description || 'Transaction'}
                     </p>
                     <p className="text-sm text-gray-500 mt-1">
-                      {formatDate(transaction.date || transaction.createdAt || transaction.timestamp)}
+                      {formatDate(transaction.date)}
                     </p>
                   </div>
                 </div>
-                <div className={`text-lg font-semibold ${getTransactionColor(transaction.type || transaction.transactionType)}`}>
-                  {getTransactionSign(transaction.type || transaction.transactionType)}
+                <div className={`text-lg font-semibold ${getTransactionColor(transaction.type)}`}>
+                  {getTransactionSign(transaction.type)}
                   {formatCurrency(transaction.amount || 0)}
                 </div>
               </div>
             ))}
-            
-            {displayTransactions.length > 10 && (
-              <div className="text-center pt-4">
-                <button className="text-sm text-yellow-600 hover:text-yellow-700 font-medium">
-                  View All Transactions ({displayTransactions.length})
-                </button>
-              </div>
-            )}
           </div>
         ) : (
           <div className="text-center py-8">
@@ -714,63 +639,13 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
               Complete orders to start earning!
             </p>
             <button
-              onClick={onRefresh}
+              onClick={fetchDataDirectly}
               className="px-6 py-2 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200"
             >
               Check for New Earnings
             </button>
           </div>
         )}
-      </div>
-
-      {/* Earnings Summary */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Earnings Summary</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h4 className="text-sm font-medium text-gray-700 mb-3">Payout Schedule</h4>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Next Payout Date</span>
-                <span className="font-medium text-gray-900">
-                  {balanceData.nextPayoutDate 
-                    ? new Date(balanceData.nextPayoutDate).toLocaleDateString('en-US', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric'
-                      })
-                    : 'Weekly on Fridays'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Payout Frequency</span>
-                <span className="font-medium text-gray-900">Weekly</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Processing Time</span>
-                <span className="font-medium text-gray-900">2-3 business days</span>
-              </div>
-            </div>
-          </div>
-          
-          <div>
-            <h4 className="text-sm font-medium text-gray-700 mb-3">Platform Fees</h4>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Service Fee</span>
-                <span className="font-medium text-gray-900">10% per order</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Withdrawal Fee</span>
-                <span className="font-medium text-gray-900">Free</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Payment Processing</span>
-                <span className="font-medium text-gray-900">2.9% + $0.30</span>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
