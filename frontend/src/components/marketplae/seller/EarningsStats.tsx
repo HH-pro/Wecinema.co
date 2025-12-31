@@ -1,6 +1,6 @@
 // components/marketplace/seller/EarningsStats.tsx
 import React from 'react';
-import { formatCurrency } from '../../../utils/formatters';
+import { formatCurrency } from '../../../utils/marketplace';
 
 interface EarningsStatsProps {
   orderStats: any;
