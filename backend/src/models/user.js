@@ -31,25 +31,7 @@ const userSchema = new Schema({
         type: String,
         required: true,
     },
-   // In User model
-stripeAccountId: String,
-stripeAccountStatus: {
-  type: String,
-  enum: ['not_connected', 'pending', 'active', 'suspended', 'needs_setup', 'disconnected'],
-  default: 'not_connected'
-},
-totalEarnings: {
-  type: Number,
-  default: 0
-},
-totalWithdrawn: {
-  type: Number,
-  default: 0
-},
-completedOrders: {
-  type: Number,
-  default: 0
-},
+   
     hasPaid: { type: Boolean, default: false },
     lastPayment: { type: Date },
     subscriptionType: { type: String },
