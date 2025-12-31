@@ -4,10 +4,10 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const { authenticateMiddleware } = require("../../utils");
 
-const Order = require('../../models/Order');
-const SellerEarning = require('../../models/SellerEarning');
-const PaymentHistory = require('../../models/PaymentHistory');
-const WithdrawalRequest = require('../../models/WithdrawalRequest');
+const Order = require("../../models/marketplace/order");
+const SellerEarning = require('../../models/marketplace/SellerEarning');
+const PaymentHistory = require('../../models/marketplace/PaymentHistory');
+const WithdrawalRequest = require('../../models/marketplace/WithdrawalRequest');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // ========== SELLER EARNINGS DASHBOARD ========== //
