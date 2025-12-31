@@ -795,7 +795,13 @@ export const formatCurrency = (amountInCents: number, currency: string = 'USD') 
   }).format(amountInDollars);
 };
 
-
+export const formatCurrencyAmount = (amount) => {
+  const amountInRupees = (amount || 0) / 100;
+  return new Intl.NumberFormat('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amountInRupees);
+};
 export const formatCurrencyShort = (amountInCents: number, currency: string = 'USD') => {
   const amountInDollars = amountInCents / 100;
   
