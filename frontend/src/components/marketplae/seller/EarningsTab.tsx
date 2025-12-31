@@ -1,6 +1,7 @@
 // src/components/marketplae/seller/EarningsTab.tsx - COMPLETE UPDATED VERSION
 import React, { useState, useEffect } from 'react';
-import { paymentsApi } from '../../../api/marketplace/paymentsApi'; // ✅ DIRECT IMPORT
+import paymentsApi from '../../../api/paymentsApi';
+
 
 interface EarningsTabProps {
   earningsBalance: any;
