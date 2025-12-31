@@ -4,8 +4,7 @@ import StripeStatusCard from './StripeStatusCard';
 import EarningsOverview from './EarningsOverview';
 import EarningsStats from './EarningsStats';
 import WithdrawBalance from './WithdrawBalance';
-import marketplaceApi from '../../../api/marketplaceApi';
-import { formatCurrency } from '../../../utils/marketplace';
+import paymentsApi from '../../../api/paymentsApi';
 
 interface EarningsTabProps {
   stripeStatus: any;
@@ -26,7 +25,6 @@ interface EarningsTabProps {
   loading: boolean;
   onRefresh: () => void;
   onGoToWithdraw?: () => void;
-  formatCurrency?: (amountInCents: number) => string;
   totalWithdrawn?: number; // in cents
 }
 
@@ -34,35 +32,35 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   stripeStatus,
   orderStats,
   balanceData,
-  monthlyEarnings = [],
-  earningsHistory = [],
+  monthlyEarnings: initialMonthlyEarnings = [],
+  earningsHistory: initialEarningsHistory = [],
   onWithdrawSuccess,
   loading,
   onRefresh,
   onGoToWithdraw,
-  formatCurrency: formatCurrencyProp,
   totalWithdrawn = 0
 }) => {
-  // Use passed formatCurrency or default
-  const formatCurrencyFunc = formatCurrencyProp || formatCurrency;
-  
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [withdrawalsLoading, setWithdrawalsLoading] = useState(false);
   const [liveEarnings, setLiveEarnings] = useState<any>(null);
   const [liveLoading, setLiveLoading] = useState(false);
+  const [monthlyEarnings, setMonthlyEarnings] = useState<any[]>(initialMonthlyEarnings);
+  const [earningsHistory, setEarningsHistory] = useState<any[]>(initialEarningsHistory);
+  const [realTimeUpdate, setRealTimeUpdate] = useState(0);
   
-  // Fetch live earnings data
+  // Fetch live earnings data using paymentsApi
   const fetchLiveEarnings = async () => {
     try {
       setLiveLoading(true);
       
-      // Try to get earnings from marketplace API
-      if (marketplaceApi.earnings && typeof marketplaceApi.earnings.getEarningsBalance === 'function') {
-        const response = await marketplaceApi.earnings.getEarningsBalance();
-        if (response.success && response.data) {
-          setLiveEarnings(response.data);
-          return response.data;
-        }
+      // Get earnings balance from paymentsApi
+      const balanceResponse = await paymentsApi.getEarningsBalance();
+      
+      if (balanceResponse.success && balanceResponse.data) {
+        setLiveEarnings(balanceResponse.data);
+        
+        // Update state with live data
+        return balanceResponse.data;
       }
       
       // Fallback to balanceData if API fails
@@ -84,22 +82,17 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
     }
   };
   
-  // Fetch withdrawals
+  // Fetch withdrawals using paymentsApi
   const fetchWithdrawals = async () => {
     try {
       setWithdrawalsLoading(true);
       
-      // Try to get withdrawals from API
-      if (marketplaceApi.earnings && typeof marketplaceApi.earnings.getHistory === 'function') {
-        const response = await marketplaceApi.earnings.getHistory({ 
-          limit: 5, 
-          type: 'withdrawal' 
-        });
-        
-        if (response.success && response.data?.earnings) {
-          setWithdrawals(response.data.earnings);
-          return;
-        }
+      // Get withdrawal history from paymentsApi
+      const response = await paymentsApi.getWithdrawalHistory({ limit: 5 });
+      
+      if (response.success && response.data?.withdrawals) {
+        setWithdrawals(response.data.withdrawals);
+        return;
       }
       
       // Fallback: If we have balanceData with withdrawals, use that
@@ -135,24 +128,36 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
     }
   };
   
-  // Fetch earnings history
+  // Fetch earnings history using paymentsApi
   const fetchEarningsHistory = async () => {
     try {
-      if (marketplaceApi.earnings && typeof marketplaceApi.earnings.getHistory === 'function') {
-        const response = await marketplaceApi.earnings.getHistory({
-          limit: 10,
-          type: 'earning'
-        });
-        
-        if (response.success && response.data?.earnings) {
-          // Return the fetched history
-          return response.data.earnings;
-        }
+      const response = await paymentsApi.getEarningsHistory({ limit: 10 });
+      
+      if (response.success && response.data?.earnings) {
+        setEarningsHistory(response.data.earnings);
+        return response.data.earnings;
       }
       
       return [];
     } catch (error) {
       console.error('Error fetching earnings history:', error);
+      return [];
+    }
+  };
+  
+  // Fetch monthly earnings using paymentsApi
+  const fetchMonthlyEarnings = async () => {
+    try {
+      const response = await paymentsApi.getMonthlyEarnings({ months: 6 });
+      
+      if (response.success && response.data) {
+        setMonthlyEarnings(response.data);
+        return response.data;
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Error fetching monthly earnings:', error);
       return [];
     }
   };
@@ -201,23 +206,63 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
     };
   };
   
+  // Initial data fetch
   useEffect(() => {
     if (stripeStatus?.chargesEnabled) {
-      fetchLiveEarnings();
-      fetchWithdrawals();
+      fetchAllEarningsData();
     }
   }, [stripeStatus]);
+  
+  // Fetch all earnings data
+  const fetchAllEarningsData = async () => {
+    try {
+      await Promise.all([
+        fetchLiveEarnings(),
+        fetchWithdrawals(),
+        fetchEarningsHistory(),
+        fetchMonthlyEarnings()
+      ]);
+    } catch (error) {
+      console.error('Error fetching earnings data:', error);
+    }
+  };
   
   // Refresh data periodically (every 30 seconds)
   useEffect(() => {
     if (stripeStatus?.chargesEnabled) {
       const interval = setInterval(() => {
         fetchLiveEarnings();
+        setRealTimeUpdate(prev => prev + 1);
       }, 30000); // 30 seconds
       
       return () => clearInterval(interval);
     }
   }, [stripeStatus]);
+  
+  // Handle manual refresh
+  const handleManualRefresh = async () => {
+    try {
+      await fetchAllEarningsData();
+      onRefresh(); // Call parent refresh if needed
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    }
+  };
+  
+  // Handle withdrawal request
+  const handleWithdrawRequest = async (amountInCents: number) => {
+    try {
+      // Call parent handler
+      onWithdrawSuccess(amountInCents);
+      
+      // Refresh data after withdrawal
+      setTimeout(() => {
+        fetchAllEarningsData();
+      }, 1000);
+    } catch (error) {
+      console.error('Error handling withdrawal:', error);
+    }
+  };
   
   if (loading || liveLoading) {
     return (
@@ -267,6 +312,11 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   // Get effective data (live earnings first, then balanceData)
   const effectiveData = liveEarnings || balanceData;
   
+  // Format currency helper
+  const formatCurrency = (amountInCents: number): string => {
+    return paymentsApi.formatCurrency(amountInCents);
+  };
+  
   return (
     <div className="space-y-8">
       {/* Real-time Update Indicator */}
@@ -276,13 +326,12 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
             <div className="w-3 h-3 bg-green-500 rounded-full animate-ping absolute"></div>
             <div className="w-3 h-3 bg-green-600 rounded-full relative"></div>
           </div>
-          <span className="ml-3 text-sm font-medium text-gray-700">Live Earnings Tracking</span>
+          <span className="ml-3 text-sm font-medium text-gray-700">
+            Live Earnings Tracking • Updated {realTimeUpdate === 0 ? 'just now' : `${realTimeUpdate * 30} seconds ago`}
+          </span>
         </div>
         <button
-          onClick={() => {
-            fetchLiveEarnings();
-            fetchWithdrawals();
-          }}
+          onClick={handleManualRefresh}
           className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-2"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -302,8 +351,8 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
         pendingBalance={effectiveData?.pendingBalance || 0}
         totalEarnings={effectiveData?.totalEarnings || 0}
         thisMonthEarnings={thisMonthRevenue}
-        onWithdrawSuccess={onWithdrawSuccess}
-        formatCurrency={formatCurrencyFunc}
+        onWithdrawSuccess={handleWithdrawRequest}
+        formatCurrency={formatCurrency}
       />
       
       {/* Earnings Overview - Updated with Real-time Data */}
@@ -313,7 +362,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
         balanceData={effectiveData}
         thisMonthRevenue={thisMonthRevenue}
         realTimeMetrics={realTimeMetrics}
-        formatCurrency={formatCurrencyFunc}
+        formatCurrency={formatCurrency}
       />
       
       {/* Earnings Stats - Updated with Live Data */}
@@ -322,7 +371,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
         stripeStatus={stripeStatus}
         monthlyEarnings={monthlyEarnings}
         realTimeMetrics={realTimeMetrics}
-        formatCurrency={formatCurrencyFunc}
+        formatCurrency={formatCurrency}
       />
       
       {/* Real-time Earnings Dashboard */}
@@ -339,7 +388,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
           </div>
           <p className="text-sm text-gray-500 mb-1">Available Balance</p>
           <p className="text-2xl font-bold text-gray-900">
-            {formatCurrencyFunc(effectiveData?.availableBalance || 0)}
+            {formatCurrency(effectiveData?.availableBalance || 0)}
           </p>
           <p className="text-xs text-gray-500 mt-2">Ready for withdrawal</p>
         </div>
@@ -353,7 +402,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
           </div>
           <p className="text-sm text-gray-500 mb-1">Pending Balance</p>
           <p className="text-2xl font-bold text-gray-900">
-            {formatCurrencyFunc(effectiveData?.pendingBalance || 0)}
+            {formatCurrency(effectiveData?.pendingBalance || 0)}
           </p>
           <p className="text-xs text-gray-500 mt-2">From active orders</p>
         </div>
@@ -375,7 +424,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
           </div>
           <p className="text-sm text-gray-500 mb-1">This Month</p>
           <p className="text-2xl font-bold text-gray-900">
-            {formatCurrencyFunc(thisMonthRevenue)}
+            {formatCurrency(thisMonthRevenue)}
           </p>
           <p className="text-xs text-gray-500 mt-2">Month-over-month growth</p>
         </div>
@@ -389,7 +438,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
           </div>
           <p className="text-sm text-gray-500 mb-1">Total Withdrawn</p>
           <p className="text-2xl font-bold text-gray-900">
-            {formatCurrencyFunc(realTimeMetrics.totalWithdrawn || 0)}
+            {formatCurrency(realTimeMetrics.totalWithdrawn || 0)}
           </p>
           <p className="text-xs text-gray-500 mt-2">Paid to your account</p>
         </div>
@@ -404,9 +453,12 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
               <h3 className="text-lg font-semibold text-gray-900">Recent Earnings</h3>
               <p className="text-sm text-gray-500 mt-1">Your latest income transactions</p>
             </div>
-            <div className="text-sm text-gray-500">
-              Updated just now
-            </div>
+            <button
+              onClick={fetchEarningsHistory}
+              className="text-sm text-blue-600 hover:text-blue-800"
+            >
+              Refresh
+            </button>
           </div>
           <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
             {earningsHistory && earningsHistory.length > 0 ? (
@@ -423,7 +475,9 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                          transaction.type === 'withdrawal' ? '💳' : '🔄'}
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900">{transaction.description}</p>
+                        <p className="font-medium text-gray-900">
+                          {transaction.description || 'Earnings Transaction'}
+                        </p>
                         <p className="text-sm text-gray-500">
                           {new Date(transaction.date || transaction.createdAt).toLocaleDateString()} • 
                           {transaction.status === 'completed' ? '✅ Completed' :
@@ -436,11 +490,11 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                       transaction.type === 'withdrawal' ? 'text-blue-600' : 'text-red-600'
                     }`}>
                       <p className="font-medium">
-                        {transaction.type === 'earning' ? '+' : '-'}{formatCurrencyFunc(transaction.amount || 0)}
+                        {transaction.type === 'earning' ? '+' : '-'}{formatCurrency(transaction.amount || 0)}
                       </p>
                       {transaction.balanceAfter && (
                         <p className="text-sm text-gray-500">
-                          Balance: {formatCurrencyFunc(transaction.balanceAfter)}
+                          Balance: {formatCurrency(transaction.balanceAfter)}
                         </p>
                       )}
                     </div>
@@ -452,15 +506,18 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                 <div className="text-3xl mb-2">📊</div>
                 <p>No earnings transactions yet</p>
                 <p className="text-sm mt-1">Complete orders to see your earnings here</p>
+                <button
+                  onClick={fetchEarningsHistory}
+                  className="mt-4 px-4 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200"
+                >
+                  Load Transactions
+                </button>
               </div>
             )}
           </div>
           <div className="p-4 border-t border-gray-200 text-center">
             <button
-              onClick={() => {
-                // Fetch more earnings history
-                fetchEarningsHistory();
-              }}
+              onClick={fetchEarningsHistory}
               className="text-blue-600 hover:text-blue-800 text-sm font-medium hover:underline"
             >
               Load more transactions →
@@ -510,7 +567,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                       withdrawal.status === 'pending' ? 'text-yellow-600' : 'text-red-600'
                     }`}>
                       <p className="font-medium">
-                        -{formatCurrencyFunc(withdrawal.amount || 0)}
+                        -{formatCurrency(withdrawal.amount || 0)}
                       </p>
                       <p className="text-sm text-gray-500 capitalize">
                         {withdrawal.status}
@@ -524,6 +581,12 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                 <div className="text-3xl mb-2">💳</div>
                 <p>No withdrawals yet</p>
                 <p className="text-sm mt-1">Withdraw your earnings when you're ready</p>
+                <button
+                  onClick={fetchWithdrawals}
+                  className="mt-4 px-4 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200"
+                >
+                  Load Withdrawals
+                </button>
               </div>
             )}
           </div>
@@ -573,7 +636,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Avg Order Value</span>
                 <span className="font-medium text-gray-900">
-                  {formatCurrencyFunc(realTimeMetrics.avgOrderValue || 0)}
+                  {formatCurrency(realTimeMetrics.avgOrderValue || 0)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -603,7 +666,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                   <span className="text-sm text-gray-700">Available</span>
                 </div>
                 <span className="font-medium text-gray-900">
-                  {formatCurrencyFunc(effectiveData?.availableBalance || 0)}
+                  {formatCurrency(effectiveData?.availableBalance || 0)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -612,7 +675,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                   <span className="text-sm text-gray-700">Pending</span>
                 </div>
                 <span className="font-medium text-gray-900">
-                  {formatCurrencyFunc(effectiveData?.pendingBalance || 0)}
+                  {formatCurrency(effectiveData?.pendingBalance || 0)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -621,7 +684,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                   <span className="text-sm text-gray-700">Total</span>
                 </div>
                 <span className="font-medium text-gray-900">
-                  {formatCurrencyFunc(effectiveData?.totalEarnings || 0)}
+                  {formatCurrency(effectiveData?.totalEarnings || 0)}
                 </span>
               </div>
             </div>
@@ -631,25 +694,75 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
             <h4 className="text-sm font-medium text-gray-700 mb-2">Net Earnings</h4>
             <div className="text-center py-4">
               <div className="text-3xl font-bold text-gray-900 mb-2">
-                {formatCurrencyFunc(realTimeMetrics.netEarnings || 0)}
+                {formatCurrency(realTimeMetrics.netEarnings || 0)}
               </div>
               <p className="text-sm text-gray-600">After withdrawals</p>
               <div className="mt-4 text-xs text-gray-500">
                 <div className="flex justify-between mb-1">
                   <span>Total Earned:</span>
-                  <span>{formatCurrencyFunc(effectiveData?.totalEarnings || 0)}</span>
+                  <span>{formatCurrency(effectiveData?.totalEarnings || 0)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Total Withdrawn:</span>
-                  <span>-{formatCurrencyFunc(realTimeMetrics.totalWithdrawn || 0)}</span>
+                  <span>-{formatCurrency(realTimeMetrics.totalWithdrawn || 0)}</span>
                 </div>
                 <div className="border-t border-gray-200 mt-2 pt-2 flex justify-between font-medium">
                   <span>Net Balance:</span>
-                  <span>{formatCurrencyFunc(realTimeMetrics.netEarnings || 0)}</span>
+                  <span>{formatCurrency(realTimeMetrics.netEarnings || 0)}</span>
                 </div>
               </div>
             </div>
           </div>
+        </div>
+      </div>
+      
+      {/* Monthly Earnings Chart */}
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Monthly Earnings Trend</h3>
+            <p className="text-sm text-gray-500 mt-1">Last 6 months earnings overview</p>
+          </div>
+          <button
+            onClick={fetchMonthlyEarnings}
+            className="text-sm text-blue-600 hover:text-blue-800"
+          >
+            Refresh Chart
+          </button>
+        </div>
+        <div className="h-64 flex items-end space-x-2">
+          {monthlyEarnings.length > 0 ? (
+            monthlyEarnings.map((month, index) => {
+              const maxEarnings = Math.max(...monthlyEarnings.map(m => m.earnings || 0));
+              const heightPercentage = maxEarnings > 0 ? (month.earnings / maxEarnings) * 100 : 0;
+              
+              return (
+                <div key={index} className="flex-1 flex flex-col items-center">
+                  <div 
+                    className="w-full bg-gradient-to-t from-blue-500 to-blue-600 rounded-t-lg"
+                    style={{ height: `${heightPercentage}%` }}
+                  ></div>
+                  <div className="mt-2 text-xs text-gray-500">
+                    {month._id?.month}/{month._id?.year.toString().slice(-2)}
+                  </div>
+                  <div className="mt-1 text-sm font-medium">
+                    {formatCurrency(month.earnings || 0)}
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="w-full text-center py-12 text-gray-500">
+              <div className="text-3xl mb-2">📊</div>
+              <p>No monthly earnings data available</p>
+              <button
+                onClick={fetchMonthlyEarnings}
+                className="mt-4 px-4 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200"
+              >
+                Load Monthly Data
+              </button>
+            </div>
+          )}
         </div>
       </div>
       
@@ -663,13 +776,13 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
         </div>
         <div className="flex flex-col sm:flex-row gap-4">
           <button
-            onClick={onRefresh}
+            onClick={handleManualRefresh}
             className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition duration-200 flex items-center gap-2 justify-center"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            Refresh Data
+            Refresh All Data
           </button>
           <button
             onClick={onGoToWithdraw}
