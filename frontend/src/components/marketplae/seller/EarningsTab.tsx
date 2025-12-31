@@ -1,8 +1,15 @@
+// components/marketplace/seller/EarningsTab.tsx - UPDATED WITH $ CURRENCY
 import React, { useState, useEffect } from 'react';
 import StripeStatusCard from './StripeStatusCard';
 import EarningsOverview from './EarningsOverview';
 import EarningsStats from './EarningsStats';
 import marketplaceApi from '../../../api/marketplaceApi';
+
+// Format currency function - CHANGED TO $
+const formatCurrency = (amount: number) => {
+  const amountInDollars = amount / 100;
+  return `$${amountInDollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
 
 interface EarningsTabProps {
   stripeStatus: any;
@@ -11,12 +18,6 @@ interface EarningsTabProps {
   loading: boolean;
   onRefresh: () => void;
 }
-
-// Format currency function (amount in cents)
-const formatCurrency = (amount: number) => {
-  const amountInRupees = amount / 100;
-  return `₹${amountInRupees.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
 
 const EarningsTab: React.FC<EarningsTabProps> = ({
   stripeStatus,
@@ -31,14 +32,14 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   
   // Calculate earnings metrics from orderStats
   const calculateEarningsMetrics = () => {
-    // Note: orderStats amounts are now in cents (after the fix)
+    // Note: orderStats amounts are in cents
     const totalEarnings = orderStats?.totalRevenue || 0; // in cents
     const availableBalance = stripeStatus?.availableBalance || orderStats?.totalRevenue || 0; // in cents
     const pendingBalance = orderStats?.pendingRevenue || 0; // in cents
     const thisMonthEarnings = orderStats?.thisMonthRevenue || 0; // in cents
     
     // Calculate potential earnings from active listings (estimated)
-    const potentialEarnings = (orderStats?.activeOrders || 0) * 5000; // 5000 cents = ₹50 average
+    const potentialEarnings = (orderStats?.activeOrders || 0) * 5000; // 5000 cents = $50 average
     
     return {
       totalEarnings,
@@ -137,7 +138,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
         type: 'order',
         description: 'Custom Web Design',
         status: 'completed',
-        amount: 7000, // 7000 cents = ₹70
+        amount: 7000, // 7000 cents = $70
         date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
         customer: 'John Doe'
       },
@@ -146,7 +147,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
         type: 'order',
         description: 'Logo Design Package',
         status: 'in_progress',
-        amount: 5000, // 5000 cents = ₹50
+        amount: 5000, // 5000 cents = $50
         date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
         customer: 'Jane Smith'
       },
@@ -155,7 +156,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
         type: 'order',
         description: 'Social Media Graphics',
         status: 'completed',
-        amount: 3000, // 3000 cents = ₹30
+        amount: 3000, // 3000 cents = $30
         date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago
         customer: 'Robert Johnson'
       },
@@ -164,7 +165,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
         type: 'withdrawal',
         description: 'Bank Transfer',
         status: 'completed',
-        amount: -15000, // 15000 cents = ₹150 (negative for withdrawal)
+        amount: -15000, // 15000 cents = $150 (negative for withdrawal)
         date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
         destination: 'Bank Account •••• 4321'
       }
@@ -219,7 +220,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
       today.setDate(today.getDate() + 1);
     }
     
-    return today.toLocaleDateString('en-IN', { 
+    return today.toLocaleDateString('en-US', { 
       weekday: 'long', 
       day: 'numeric', 
       month: 'long',
@@ -337,7 +338,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                         {transaction.amount < 0 ? '-' : '+'}{formatCurrency(Math.abs(transaction.amount))}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
-                        {new Date(transaction.date).toLocaleDateString('en-IN', {
+                        {new Date(transaction.date).toLocaleDateString('en-US', {
                           day: 'numeric',
                           month: 'short'
                         })}
@@ -424,7 +425,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                   <div className="bg-gradient-to-r from-yellow-500 to-orange-500 h-2 rounded-full" style={{ width: '25%' }}></div>
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  ₹25,000 monthly goal • {formatCurrency(earningsMetrics.thisMonthEarnings)} earned
+                  $250 monthly goal • {formatCurrency(earningsMetrics.thisMonthEarnings)} earned
                 </p>
               </div>
             </div>
