@@ -2554,10 +2554,13 @@ router.put("/:orderId/status", authenticateMiddleware, async (req, res) => {
 // ========== EARNINGS & WITHDRAWAL ROUTES ==========
 // ======================================================
 
-// ✅ GET EARNINGS SUMMARY
+// Fix the GET EARNINGS SUMMARY route:
 router.get("/earnings/summary", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
+    
+    // ✅ FIXED: Use new ObjectId() properly
+    const userIdObj = new mongoose.Types.ObjectId(userId);
 
     // Get all completed orders for this seller
     const completedOrders = await Order.find({
@@ -2567,10 +2570,22 @@ router.get("/earnings/summary", authenticateMiddleware, async (req, res) => {
     }).select('amount platformFee sellerAmount completedAt');
 
     // Calculate totals
-    const totalEarnings = completedOrders.reduce((sum, order) => sum + (order.sellerAmount || order.amount), 0);
+    const totalEarnings = completedOrders.reduce((sum, order) => 
+      sum + (order.sellerAmount || order.amount || 0), 0);
+    
     const totalWithdrawn = await Withdrawal.aggregate([
-      { $match: { sellerId: mongoose.Types.ObjectId(userId), status: 'completed' } },
-      { $group: { _id: null, total: { $sum: '$amount' } } }
+      { 
+        $match: { 
+          sellerId: userIdObj,
+          status: 'completed' 
+        } 
+      },
+      { 
+        $group: { 
+          _id: null, 
+          total: { $sum: '$amount' } 
+        } 
+      }
     ]).then(result => result[0]?.total || 0);
 
     // Get pending orders (delivered but not completed)
@@ -2579,14 +2594,16 @@ router.get("/earnings/summary", authenticateMiddleware, async (req, res) => {
       status: { $in: ['delivered', 'in_progress', 'in_revision'] }
     }).select('amount');
 
-    const pendingBalance = pendingOrders.reduce((sum, order) => sum + order.amount, 0);
-    const availableBalance = totalEarnings - totalWithdrawn;
+    const pendingBalance = pendingOrders.reduce((sum, order) => 
+      sum + (order.amount || 0), 0);
+    
+    const availableBalance = Math.max(0, totalEarnings - totalWithdrawn);
 
     // Get this month's earnings
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     const thisMonthEarnings = completedOrders
       .filter(order => new Date(order.completedAt) >= startOfMonth)
-      .reduce((sum, order) => sum + (order.sellerAmount || order.amount), 0);
+      .reduce((sum, order) => sum + (order.sellerAmount || order.amount || 0), 0);
 
     // Get last withdrawal
     const lastWithdrawal = await Withdrawal.findOne({ 
@@ -2597,17 +2614,18 @@ router.get("/earnings/summary", authenticateMiddleware, async (req, res) => {
     // Calculate next payout date (assuming weekly payouts on Fridays)
     const today = new Date();
     const nextFriday = new Date(today);
-    nextFriday.setDate(today.getDate() + ((5 - today.getDay() + 7) % 7));
+    const daysUntilFriday = (5 - today.getDay() + 7) % 7;
+    nextFriday.setDate(today.getDate() + (daysUntilFriday === 0 ? 7 : daysUntilFriday));
     nextFriday.setHours(0, 0, 0, 0);
 
     res.status(200).json({
       success: true,
       data: {
-        availableBalance,
-        pendingBalance,
-        totalEarnings,
-        totalWithdrawn,
-        walletBalance: availableBalance,
+        availableBalance: availableBalance * 100, // Convert to cents
+        pendingBalance: pendingBalance * 100, // Convert to cents
+        totalEarnings: totalEarnings * 100, // Convert to cents
+        totalWithdrawn: totalWithdrawn * 100, // Convert to cents
+        walletBalance: availableBalance * 100, // Convert to cents
         lastWithdrawal: lastWithdrawal ? {
           amount: lastWithdrawal.amount,
           date: lastWithdrawal.completedAt || lastWithdrawal.createdAt,
@@ -2615,7 +2633,7 @@ router.get("/earnings/summary", authenticateMiddleware, async (req, res) => {
         } : null,
         nextPayoutDate: nextFriday.toISOString(),
         currency: 'inr',
-        thisMonthEarnings,
+        thisMonthEarnings: thisMonthEarnings * 100, // Convert to cents
         completedOrdersCount: completedOrders.length,
         pendingOrdersCount: pendingOrders.length
       }
@@ -2629,8 +2647,7 @@ router.get("/earnings/summary", authenticateMiddleware, async (req, res) => {
     });
   }
 });
-
-// ✅ GET EARNINGS BY PERIOD
+// In your backend routes/order.js file, fix this route:
 router.get("/earnings/period/:period", authenticateMiddleware, async (req, res) => {
   try {
     const { period } = req.params; // month, week, year
@@ -2657,11 +2674,14 @@ router.get("/earnings/period/:period", authenticateMiddleware, async (req, res) 
         });
     }
 
+    // ✅ FIXED: Use new ObjectId() properly
+    const userIdObj = new mongoose.Types.ObjectId(userId);
+
     // Get earnings for the period
     const earnings = await Order.aggregate([
       {
         $match: {
-          sellerId: mongoose.Types.ObjectId(userId),
+          sellerId: userIdObj, // Use the ObjectId here
           status: 'completed',
           paymentReleased: true,
           completedAt: { $gte: startDate, $lte: endDate }
@@ -2707,17 +2727,19 @@ router.get("/earnings/period/:period", authenticateMiddleware, async (req, res) 
     });
   }
 });
-
-// ✅ GET AVAILABLE BALANCE
+// Also fix the GET AVAILABLE BALANCE route:
 router.get("/earnings/available-balance", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
+
+    // ✅ FIXED: Use new ObjectId() properly
+    const userIdObj = new mongoose.Types.ObjectId(userId);
 
     // Get completed orders total
     const completedEarnings = await Order.aggregate([
       {
         $match: {
-          sellerId: mongoose.Types.ObjectId(userId),
+          sellerId: userIdObj, // Use the ObjectId here
           status: 'completed',
           paymentReleased: true
         }
@@ -2734,8 +2756,7 @@ router.get("/earnings/available-balance", authenticateMiddleware, async (req, re
     const totalWithdrawn = await Withdrawal.aggregate([
       {
         $match: {
-          sellerId: mongoose.Types.ObjectId(userId),
-          status: 'completed'
+          sellerId: userIdObj // Use the ObjectId here
         }
       },
       {
@@ -2750,7 +2771,7 @@ router.get("/earnings/available-balance", authenticateMiddleware, async (req, re
     const pendingBalance = await Order.aggregate([
       {
         $match: {
-          sellerId: mongoose.Types.ObjectId(userId),
+          sellerId: userIdObj, // Use the ObjectId here
           status: { $in: ['delivered', 'in_progress', 'in_revision'] }
         }
       },
