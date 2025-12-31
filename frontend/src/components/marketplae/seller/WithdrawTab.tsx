@@ -1,6 +1,7 @@
 // src/components/marketplae/seller/WithdrawTab.tsx - COMPLETE UPDATED VERSION
 import React, { useState, useEffect } from 'react';
-import { paymentsApi } from '../../../api/paymentsApi'; // ✅ DIRECT IMPORT
+import paymentsApi from '../../../api/paymentsApi';
+
 
 interface WithdrawTabProps {
   stripeStatus: any;
