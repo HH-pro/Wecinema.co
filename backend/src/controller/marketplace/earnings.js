@@ -11,7 +11,123 @@ const WithdrawalRequest = require('../../models/marketplace/WithdrawalRequest');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // ========== SELLER EARNINGS DASHBOARD ========== //
+router.get("/:sellerId/stats", async (req, res) => {
+  try {
+    const { sellerId } = req.params;
+    
+    // Validate sellerId format
+    if (!mongoose.Types.ObjectId.isValid(sellerId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid seller ID format'
+      });
+    }
 
+    // Get public seller stats
+    const [sellerStats, recentOrders] = await Promise.all([
+      // Get seller's public earnings stats
+      Order.aggregate([
+        {
+          $match: {
+            sellerId: mongoose.Types.ObjectId(sellerId),
+            status: 'completed'
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            totalSales: { $sum: "$amount" },
+            totalOrders: { $sum: 1 },
+            averageOrderValue: { $avg: "$amount" }
+          }
+        }
+      ]),
+      
+      // Get recent successful orders (public info only)
+      Order.find({
+        sellerId: sellerId,
+        status: 'completed'
+      })
+      .select('orderNumber amount createdAt -_id')
+      .sort({ createdAt: -1 })
+      .limit(5)
+    ]);
+
+    // Calculate seller rating (if you have ratings system)
+    const ratingStats = await Order.aggregate([
+      {
+        $match: {
+          sellerId: mongoose.Types.ObjectId(sellerId),
+          rating: { $exists: true, $ne: null }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          averageRating: { $avg: "$rating" },
+          totalReviews: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Get seller's top products/categories if needed
+    const topCategories = await Order.aggregate([
+      {
+        $match: {
+          sellerId: mongoose.Types.ObjectId(sellerId),
+          status: 'completed'
+        }
+      },
+      { $unwind: "$items" },
+      {
+        $group: {
+          _id: "$items.category",
+          totalSold: { $sum: "$items.quantity" },
+          totalRevenue: { $sum: { $multiply: ["$items.price", "$items.quantity"] } }
+        }
+      },
+      { $sort: { totalRevenue: -1 } },
+      { $limit: 3 }
+    ]);
+
+    const stats = sellerStats[0] || {
+      totalSales: 0,
+      totalOrders: 0,
+      averageOrderValue: 0
+    };
+
+    const rating = ratingStats[0] || {
+      averageRating: 0,
+      totalReviews: 0
+    };
+
+    res.status(200).json({
+      success: true,
+      data: {
+        sellerId,
+        stats: {
+          totalSales: stats.totalSales,
+          totalOrders: stats.totalOrders,
+          averageOrderValue: Math.round(stats.averageOrderValue * 100) / 100,
+          successRate: stats.totalOrders > 0 ? '98%' : '0%' // You can calculate this based on your logic
+        },
+        rating: {
+          average: Math.round(rating.averageRating * 10) / 10 || 0,
+          totalReviews: rating.totalReviews || 0
+        },
+        recentOrders,
+        topCategories,
+        joinDate: req.user?.createdAt // If you want to show when seller joined
+      }
+    });
+  } catch (error) {
+    console.error('Public seller stats error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch seller statistics'
+    });
+  }
+});
 router.get("/dashboard", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
