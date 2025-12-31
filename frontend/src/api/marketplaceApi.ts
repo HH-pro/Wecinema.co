@@ -887,17 +887,7 @@ export default marketplaceApi;
 export { marketplaceApi };
 
 // Export all individual utility functions
-export {
-  formatCurrency,
-  formatCurrencyAmount,
-  formatCurrencyShort,
-  validateWithdrawalAmount,
-  dollarsToCents,
-  centsToDollars,
-  testApiConnection,
-  checkAuth,
-  getCurrentUserId
-};
+
 
 // Export API modules (optional - for advanced usage)
 export {
