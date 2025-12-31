@@ -1,4 +1,4 @@
-// src/pages/seller/SellerDashboard.tsx - USD UPDATE
+// src/pages/seller/SellerDashboard.tsx - CLEAN VERSION
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -8,29 +8,25 @@ import MarketplaceLayout from '../../components/Layout';
 // Import helper function
 import { getCurrentUserId } from '../../utilities/helperfFunction';
 
-// Import API - USE PAYMENTS API DIRECTLY
-import paymentsApi from '../../api/paymentsApi';
+// Import API - USE MARKETPLACE API FOR EVERYTHING
 import marketplaceApi from '../../api/marketplaceApi';
 
-// Access API methods
-const listingsApi = marketplaceApi.listings;
-const ordersApi = marketplaceApi.orders;
-const offersApi = marketplaceApi.offers;
-
-// ✅ USE PAYMENTS API DIRECTLY FOR ALL PAYMENT/PAYOUT ROUTES
+// Access API methods directly
 const {
-  getEarningsBalance,
-  getMonthlyEarnings,
-  getEarningsHistory,
-  getWithdrawalHistory,
-  requestWithdrawal,
+  listings,
+  orders,
+  offers,
+  stripe,
+  withdrawals,
+  earnings,
+  payments,
   formatCurrency,
-  formatCurrencyAmount,
   formatCurrencyShort,
   validateWithdrawalAmount,
   dollarsToCents,
-  centsToDollars
-} = paymentsApi;
+  centsToDollars,
+  getCurrentUserId: apiGetCurrentUserId
+} = marketplaceApi;
 
 // Import components
 import DashboardHeader from '../../components/marketplae/seller/DashboardHeader';
@@ -95,7 +91,7 @@ interface Order {
   buyerEmail: string;
   sellerId: string;
   sellerName: string;
-  amount: number; // USD amount (e.g., 50.00 = $50)
+  amount: number; // USD amount in dollars (e.g., 50.00 = $50)
   status: string;
   paymentStatus: string;
   createdAt: string;
@@ -119,7 +115,7 @@ interface Offer {
   buyerId: string;
   buyerName: string;
   buyerEmail: string;
-  amount: number; // USD amount
+  amount: number; // USD amount in dollars
   status: string;
   message?: string;
   createdAt: string;
@@ -130,7 +126,7 @@ interface Listing {
   _id: string;
   title: string;
   description: string;
-  price: number; // USD amount
+  price: number; // USD amount in dollars
   category: string;
   tags: string[];
   status: string;
@@ -163,10 +159,10 @@ interface OrderStats {
   delivered: number;
   completed: number;
   cancelled: number;
-  totalRevenue: number; // USD amount (e.g., 500.00 = $500)
-  pendingRevenue: number; // USD amount
+  totalRevenue: number; // USD amount in dollars
+  pendingRevenue: number; // USD amount in dollars
   thisMonthOrders: number;
-  thisMonthRevenue: number; // USD amount
+  thisMonthRevenue: number; // USD amount in dollars
   availableBalance?: number; // in cents
 }
 
@@ -239,7 +235,7 @@ const SellerDashboard: React.FC = () => {
   const [showStripeSuccessAlert, setShowStripeSuccessAlert] = useState(false);
   const navigate = useNavigate();
   
-  // Order stats - USD AMOUNTS
+  // Order stats
   const [orderStats, setOrderStats] = useState<OrderStats>({
     totalOrders: 0,
     activeOrders: 0,
@@ -249,14 +245,14 @@ const SellerDashboard: React.FC = () => {
     delivered: 0,
     completed: 0,
     cancelled: 0,
-    totalRevenue: 0, // USD
-    pendingRevenue: 0, // USD
+    totalRevenue: 0,
+    pendingRevenue: 0,
     thisMonthOrders: 0,
-    thisMonthRevenue: 0, // USD
-    availableBalance: 0 // in cents
+    thisMonthRevenue: 0,
+    availableBalance: 0
   });
   
-  // Earnings and Withdrawal states - USING PAYMENTS API DIRECTLY
+  // Earnings and Withdrawal states
   const [earningsBalance, setEarningsBalance] = useState<EarningsBalance | null>(null);
   const [withdrawalHistory, setWithdrawalHistory] = useState<WithdrawalHistory | null>(null);
   const [monthlyEarnings, setMonthlyEarnings] = useState<any[]>([]);
@@ -309,7 +305,7 @@ const SellerDashboard: React.FC = () => {
   const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
   const totalWithdrawals = withdrawalHistory?.withdrawals?.length || 0;
 
-  // Tab configuration - WITH EARNINGS TAB
+  // Tab configuration
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊', badge: null },
     { id: 'earnings', label: 'Earnings', icon: '💰', badge: null },
@@ -365,9 +361,9 @@ const SellerDashboard: React.FC = () => {
       chargesEnabled: false,
       detailsSubmitted: false,
       status: 'not_connected',
-      balance: 0, // in cents
-      availableBalance: 0, // in cents
-      pendingBalance: 0 // in cents
+      balance: 0,
+      availableBalance: 0,
+      pendingBalance: 0
     };
   };
 
@@ -383,9 +379,9 @@ const SellerDashboard: React.FC = () => {
       country: 'US',
       payoutsEnabled: true,
       name: 'Test Seller',
-      balance: 150000, // $1,500.00 in cents
-      availableBalance: 150000, // $1,500.00 in cents
-      pendingBalance: 50000 // $500.00 in cents
+      balance: 150000,
+      availableBalance: 150000,
+      pendingBalance: 50000
     };
     
     localStorage.setItem('stripe_status', JSON.stringify(mockStatus));
@@ -398,7 +394,7 @@ const SellerDashboard: React.FC = () => {
     // Update order stats with available balance
     setOrderStats(prev => ({
       ...prev,
-      availableBalance: 150000 // $1,500.00 in cents
+      availableBalance: 150000
     }));
   };
 
@@ -493,7 +489,7 @@ const SellerDashboard: React.FC = () => {
       
       // Production: Try real API
       try {
-        const response = await marketplaceApi.stripe.getStripeStatus();
+        const response = await stripe.getStripeStatus();
         if (response.success) {
           setStripeStatus(response);
           return response;
@@ -515,13 +511,13 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ FETCH EARNINGS DATA USING PAYMENTS API DIRECTLY
+  // ✅ FETCH EARNINGS DATA USING MARKETPLACE API
   const fetchEarningsData = async () => {
     try {
       setEarningsLoading(true);
       
-      // ✅ DIRECT PAYMENTS API CALL - EARNINGS BALANCE
-      const balanceResponse = await getEarningsBalance();
+      // ✅ USE MARKETPLACE API PAYMENTS MODULE
+      const balanceResponse = await payments.getEarningsBalance();
       
       if (balanceResponse.success && balanceResponse.data) {
         setEarningsBalance(balanceResponse.data);
@@ -545,15 +541,15 @@ const SellerDashboard: React.FC = () => {
         }));
       }
       
-      // ✅ DIRECT PAYMENTS API CALL - MONTHLY EARNINGS
-      const monthlyResponse = await getMonthlyEarnings({ months: 6 });
+      // ✅ USE MARKETPLACE API PAYMENTS MODULE
+      const monthlyResponse = await payments.getMonthlyEarnings({ months: 6 });
       
       if (monthlyResponse.success && monthlyResponse.data) {
         setMonthlyEarnings(monthlyResponse.data);
       }
       
-      // ✅ DIRECT PAYMENTS API CALL - EARNINGS HISTORY
-      const historyResponse = await getEarningsHistory({ page: 1, limit: 10 });
+      // ✅ USE MARKETPLACE API PAYMENTS MODULE
+      const historyResponse = await payments.getEarningsHistory({ page: 1, limit: 10 });
       
       if (historyResponse.success && historyResponse.data) {
         setEarningsHistory(historyResponse.data.earnings || []);
@@ -566,13 +562,13 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ FETCH WITHDRAWAL HISTORY USING PAYMENTS API DIRECTLY
+  // ✅ FETCH WITHDRAWAL HISTORY USING MARKETPLACE API
   const fetchWithdrawalHistory = async () => {
     try {
       setWithdrawalsLoading(true);
       
-      // ✅ DIRECT PAYMENTS API CALL - WITHDRAWAL HISTORY
-      const response = await getWithdrawalHistory({
+      // ✅ USE MARKETPLACE API WITHDRAWALS MODULE
+      const response = await withdrawals.getWithdrawalHistory({
         page: withdrawalsPage,
         limit: withdrawalsLimit
       });
@@ -611,15 +607,15 @@ const SellerDashboard: React.FC = () => {
         return;
       }
 
-      if (!ordersApi || typeof ordersApi.getMySales !== 'function') {
-        console.error('ordersApi.getMySales is not available');
+      if (!orders || typeof orders.getMySales !== 'function') {
+        console.error('orders.getMySales is not available');
         setError('API configuration error. Please check your API setup.');
         setLoading(false);
         return;
       }
 
-      // Fetch orders using API file
-      const ordersData = await ordersApi.getMySales();
+      // Fetch orders using marketplace API
+      const ordersData = await orders.getMySales();
       
       if (ordersData && ordersData.length > 0) {
         const stats = calculateOrderStats(ordersData);
@@ -647,8 +643,8 @@ const SellerDashboard: React.FC = () => {
       // Fetch offers and listings in parallel with error handling
       try {
         const [offersResponse, listingsResponse] = await Promise.allSettled([
-          offersApi?.getReceivedOffers ? offersApi.getReceivedOffers() : Promise.resolve({ success: false, offers: [] }),
-          listingsApi?.getMyListings ? listingsApi.getMyListings({ limit: 5 }) : Promise.resolve({ success: false, listings: [] })
+          offers?.getReceivedOffers ? offers.getReceivedOffers() : Promise.resolve({ success: false, offers: [] }),
+          listings?.getMyListings ? listings.getMyListings({ limit: 5 }) : Promise.resolve({ success: false, listings: [] })
         ]);
 
         // Process offers
@@ -680,12 +676,12 @@ const SellerDashboard: React.FC = () => {
     try {
       setOrdersLoading(true);
       
-      if (!ordersApi || typeof ordersApi.getMySales !== 'function') {
-        console.error('ordersApi.getMySales is not available');
+      if (!orders || typeof orders.getMySales !== 'function') {
+        console.error('orders.getMySales is not available');
         return;
       }
       
-      const ordersData = await ordersApi.getMySales();
+      const ordersData = await orders.getMySales();
       
       if (ordersData && ordersData.length > 0) {
         let filteredOrders = ordersData;
@@ -714,8 +710,8 @@ const SellerDashboard: React.FC = () => {
     try {
       setListingsLoading(true);
       
-      if (!listingsApi || typeof listingsApi.getMyListings !== 'function') {
-        console.error('listingsApi.getMyListings is not available');
+      if (!listings || typeof listings.getMyListings !== 'function') {
+        console.error('listings.getMyListings is not available');
         return;
       }
       
@@ -728,7 +724,7 @@ const SellerDashboard: React.FC = () => {
         params.status = listingsStatusFilter;
       }
       
-      const response = await listingsApi.getMyListings(params);
+      const response = await listings.getMyListings(params);
       
       if (response.success) {
         setListingsData(response);
@@ -749,12 +745,12 @@ const SellerDashboard: React.FC = () => {
     try {
       setOffersLoading(true);
       
-      if (!offersApi || typeof offersApi.getReceivedOffers !== 'function') {
-        console.error('offersApi.getReceivedOffers is not available');
+      if (!offers || typeof offers.getReceivedOffers !== 'function') {
+        console.error('offers.getReceivedOffers is not available');
         return;
       }
       
-      const response = await offersApi.getReceivedOffers();
+      const response = await offers.getReceivedOffers();
       
       if (response.success) {
         setOffers(response.offers || []);
@@ -770,7 +766,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ HANDLE WITHDRAWAL REQUEST USING PAYMENTS API DIRECTLY
+  // ✅ HANDLE WITHDRAWAL REQUEST USING MARKETPLACE API
   const handleWithdrawRequest = async (amountInDollars: number) => {
     try {
       setRefreshing(true);
@@ -779,7 +775,7 @@ const SellerDashboard: React.FC = () => {
       const amountInCents = dollarsToCents(amountInDollars);
       const availableBalance = earningsBalance?.availableBalance || stripeStatus?.availableBalance || 0;
       
-      // ✅ USE PAYMENTS API VALIDATION
+      // ✅ USE MARKETPLACE API VALIDATION
       const validation = validateWithdrawalAmount(amountInCents, availableBalance);
       
       if (!validation.valid) {
@@ -788,8 +784,8 @@ const SellerDashboard: React.FC = () => {
         return;
       }
       
-      // ✅ DIRECT PAYMENTS API CALL - REQUEST WITHDRAWAL
-      const response = await requestWithdrawal(amountInCents);
+      // ✅ USE MARKETPLACE API WITHDRAWALS MODULE
+      const response = await withdrawals.requestWithdrawal(amountInCents);
       
       if (response?.success) {
         // Update earnings balance
@@ -844,12 +840,12 @@ const SellerDashboard: React.FC = () => {
   };
 
   const handleEditModalSave = async (updatedData: { title: string; description: string; price: number }) => {
-    if (!editingListing || !listingsApi || typeof listingsApi.editListing !== 'function') return;
+    if (!editingListing || !listings || typeof listings.editListing !== 'function') return;
 
     try {
       setListingActionLoading(`edit-${editingListing._id}`);
       
-      const response = await listingsApi.editListing(editingListing._id, updatedData);
+      const response = await listings.editListing(editingListing._id, updatedData);
 
       if (response.success) {
         setListingsData(prev => {
@@ -899,12 +895,12 @@ const SellerDashboard: React.FC = () => {
   };
 
   const handleDeleteModalConfirm = async () => {
-    if (!deletingListing || !listingsApi || typeof listingsApi.deleteListing !== 'function') return;
+    if (!deletingListing || !listings || typeof listings.deleteListing !== 'function') return;
 
     try {
       setListingActionLoading(`delete-${deletingListing._id}`);
       
-      const response = await listingsApi.deleteListing(deletingListing._id);
+      const response = await listings.deleteListing(deletingListing._id);
 
       if (response.success) {
         setListingsData(prev => {
@@ -941,12 +937,12 @@ const SellerDashboard: React.FC = () => {
 
   // ✅ HANDLE TOGGLE LISTING STATUS
   const handleToggleListingStatus = async (listing: Listing) => {
-    if (!listingsApi || typeof listingsApi.toggleListingStatus !== 'function') return;
+    if (!listings || typeof listings.toggleListingStatus !== 'function') return;
 
     try {
       setListingActionLoading(`toggle-${listing._id}`);
 
-      const response = await listingsApi.toggleListingStatus(listing._id);
+      const response = await listings.toggleListingStatus(listing._id);
 
       if (response.success) {
         const newStatus = response.newStatus || (listing.status === 'active' ? 'inactive' : 'active');
@@ -988,12 +984,12 @@ const SellerDashboard: React.FC = () => {
 
   // ✅ ORDER MANAGEMENT FUNCTIONS
   const handleSimpleStartProcessing = async (order: Order) => {
-    if (!ordersApi || typeof ordersApi.updateOrderStatus !== 'function') return;
+    if (!orders || typeof orders.updateOrderStatus !== 'function') return;
 
     try {
       setOrderActionLoading(order._id);
       
-      const response = await ordersApi.updateOrderStatus(order._id, 'processing');
+      const response = await orders.updateOrderStatus(order._id, 'processing');
 
       if (response.success) {
         updateOrderInState(order._id, 'processing', {
@@ -1012,12 +1008,12 @@ const SellerDashboard: React.FC = () => {
   };
 
   const handleSimpleStartWork = async (order: Order) => {
-    if (!ordersApi || typeof ordersApi.updateOrderStatus !== 'function') return;
+    if (!orders || typeof orders.updateOrderStatus !== 'function') return;
 
     try {
       setOrderActionLoading(order._id);
       
-      const response = await ordersApi.updateOrderStatus(order._id, 'in_progress');
+      const response = await orders.updateOrderStatus(order._id, 'in_progress');
 
       if (response.success) {
         updateOrderInState(order._id, 'in_progress', {
@@ -1036,13 +1032,13 @@ const SellerDashboard: React.FC = () => {
   };
 
   const handleSimpleDeliver = async (order: Order) => {
-    if (!ordersApi || typeof ordersApi.updateOrderStatus !== 'function') return;
+    if (!orders || typeof orders.updateOrderStatus !== 'function') return;
 
     try {
       setSelectedOrder(order);
       setOrderActionLoading(order._id);
       
-      const response = await ordersApi.updateOrderStatus(order._id, 'delivered');
+      const response = await orders.updateOrderStatus(order._id, 'delivered');
 
       if (response.success) {
         updateOrderInState(order._id, 'delivered', {
@@ -1061,13 +1057,13 @@ const SellerDashboard: React.FC = () => {
   };
 
   const handleSimpleCancel = async (order: Order) => {
-    if (!ordersApi || typeof ordersApi.updateOrderStatus !== 'function') return;
+    if (!orders || typeof orders.updateOrderStatus !== 'function') return;
 
     if (window.confirm('Are you sure you want to cancel this order? This action cannot be undone.')) {
       try {
         setOrderActionLoading(order._id);
         
-        const response = await ordersApi.updateOrderStatus(order._id, 'cancelled');
+        const response = await orders.updateOrderStatus(order._id, 'cancelled');
 
         if (response.success) {
           updateOrderInState(order._id, 'cancelled', {
@@ -1087,12 +1083,12 @@ const SellerDashboard: React.FC = () => {
   };
 
   const handleSimpleCompleteRevision = async (order: Order) => {
-    if (!ordersApi || typeof ordersApi.updateOrderStatus !== 'function') return;
+    if (!orders || typeof orders.updateOrderStatus !== 'function') return;
 
     try {
       setOrderActionLoading(order._id);
       
-      const response = await ordersApi.updateOrderStatus(order._id, 'delivered');
+      const response = await orders.updateOrderStatus(order._id, 'delivered');
 
       if (response.success) {
         updateOrderInState(order._id, 'delivered', {
@@ -1143,18 +1139,18 @@ const SellerDashboard: React.FC = () => {
 
   // ✅ HANDLE OFFER ACTIONS
   const handleOfferAction = async (offerId: string, action: 'accept' | 'reject') => {
-    if (!offersApi) return;
+    if (!offers) return;
 
     try {
       setOrderActionLoading(offerId);
       
       let response;
       if (action === 'accept') {
-        if (typeof offersApi.acceptOffer !== 'function') return;
-        response = await offersApi.acceptOffer(offerId);
+        if (typeof offers.acceptOffer !== 'function') return;
+        response = await offers.acceptOffer(offerId);
       } else {
-        if (typeof offersApi.rejectOffer !== 'function') return;
-        response = await offersApi.rejectOffer(offerId);
+        if (typeof offers.rejectOffer !== 'function') return;
+        response = await offers.rejectOffer(offerId);
       }
 
       if (response.success) {
@@ -1356,7 +1352,7 @@ const SellerDashboard: React.FC = () => {
                   <div>
                     <h3 className="font-medium text-purple-800">Development Mode</h3>
                     <p className="text-sm text-purple-700">
-                      Using paymentsApi for all earnings and withdrawal routes. All amounts in USD.
+                      Using marketplaceApi for all earnings and withdrawal routes. All amounts in USD.
                     </p>
                   </div>
                 </div>
@@ -1570,22 +1566,21 @@ const SellerDashboard: React.FC = () => {
                   </div>
                 )}
 
-
-{/* Earnings Tab - USING DIRECT PAYMENTS API */}
-{activeTab === 'earnings' && (
-  <SafeEarningsTab
-    earningsBalance={earningsBalance}
-    monthlyEarnings={monthlyEarnings}
-    earningsHistory={earningsHistory}
-    onWithdrawRequest={handleWithdrawRequest}
-    loading={earningsLoading}
-    onRefresh={fetchEarningsData}
-    formatCurrency={formatCurrency}
-    formatCurrencyShort={formatCurrencyShort}
-    dollarsToCents={dollarsToCents}
-    centsToDollars={centsToDollars}
-  />
-)}
+                {/* Earnings Tab */}
+                {activeTab === 'earnings' && (
+                  <SafeEarningsTab
+                    earningsBalance={earningsBalance}
+                    monthlyEarnings={monthlyEarnings}
+                    earningsHistory={earningsHistory}
+                    onWithdrawRequest={handleWithdrawRequest}
+                    loading={earningsLoading}
+                    onRefresh={fetchEarningsData}
+                    formatCurrency={formatCurrency}
+                    formatCurrencyShort={formatCurrencyShort}
+                    dollarsToCents={dollarsToCents}
+                    centsToDollars={centsToDollars}
+                  />
+                )}
 
                 {/* Offers Tab */}
                 {activeTab === 'offers' && (
@@ -1648,24 +1643,23 @@ const SellerDashboard: React.FC = () => {
                   />
                 )}
 
-              
-{/* Withdraw Tab - USING DIRECT PAYMENTS API */}
-{activeTab === 'withdraw' && (
-  <SafeWithdrawTab
-    stripeStatus={stripeStatus}
-    withdrawalHistory={withdrawalHistory}
-    earningsBalance={earningsBalance}
-    loading={withdrawalsLoading}
-    currentPage={withdrawalsPage}
-    onPageChange={setWithdrawalsPage}
-    onWithdrawRequest={handleWithdrawRequest}
-    onRefresh={() => Promise.all([fetchWithdrawalHistory(), fetchEarningsData()])}
-    formatCurrency={formatCurrency}
-    validateWithdrawalAmount={validateWithdrawalAmount}
-    dollarsToCents={dollarsToCents}
-    centsToDollars={centsToDollars}
-  />
-)}
+                {/* Withdraw Tab */}
+                {activeTab === 'withdraw' && (
+                  <SafeWithdrawTab
+                    stripeStatus={stripeStatus}
+                    withdrawalHistory={withdrawalHistory}
+                    earningsBalance={earningsBalance}
+                    loading={withdrawalsLoading}
+                    currentPage={withdrawalsPage}
+                    onPageChange={setWithdrawalsPage}
+                    onWithdrawRequest={handleWithdrawRequest}
+                    onRefresh={() => Promise.all([fetchWithdrawalHistory(), fetchEarningsData()])}
+                    formatCurrency={formatCurrency}
+                    validateWithdrawalAmount={validateWithdrawalAmount}
+                    dollarsToCents={dollarsToCents}
+                    centsToDollars={centsToDollars}
+                  />
+                )}
               </>
             )}
           </div>
