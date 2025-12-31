@@ -1574,7 +1574,6 @@ const SellerDashboard: React.FC = () => {
 {/* Earnings Tab - USING DIRECT PAYMENTS API */}
 {activeTab === 'earnings' && (
   <SafeEarningsTab
-    earningsBalance={earningsBalance}
     monthlyEarnings={monthlyEarnings}
     earningsHistory={earningsHistory}
     onWithdrawRequest={handleWithdrawRequest}
