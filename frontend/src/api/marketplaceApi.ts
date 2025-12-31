@@ -1,4 +1,4 @@
-// src/api/marketplaceApi.js - UPDATED WITH PAYMENTS API FUNCTIONS
+// src/api/marketplaceApi.js - UPDATED WITH CORRECT ROUTES
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:3000';
@@ -49,217 +49,6 @@ const handleApiError = (error, defaultMessage = 'API Error') => {
     status: error.response?.status,
     data: errorData
   };
-};
-
-// ============================================
-// ✅ PAYMENTS API FUNCTIONS (ADDED)
-// ============================================
-
-const paymentsApi = {
-  getEarningsBalance: async () => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/earnings/balance`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      // For development, return mock data
-      if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
-        return {
-          success: true,
-          data: {
-            availableBalance: 150000, // $1,500 in cents
-            pendingBalance: 50000,    // $500 in cents
-            totalEarnings: 200000,    // $2,000 in cents
-            totalWithdrawn: 50000,    // $500 in cents
-            walletBalance: 150000,    // $1,500 in cents
-            lastWithdrawal: null,
-            nextPayoutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-            currency: 'usd'
-          }
-        };
-      }
-      return handleApiError(error, 'Failed to fetch earnings balance');
-    }
-  },
-
-  getMonthlyEarnings: async (params = {}) => {
-    try {
-      const { months = 6 } = params;
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/earnings/monthly`,
-        {
-          params: { months },
-          ...getHeaders()
-        }
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      // For development, return mock data
-      if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
-        const monthlyData = [];
-        const now = new Date();
-        for (let i = 0; i < months; i++) {
-          const month = new Date(now.getFullYear(), now.getMonth() - i, 1);
-          monthlyData.push({
-            _id: {
-              year: month.getFullYear(),
-              month: month.getMonth() + 1
-            },
-            earnings: Math.floor(Math.random() * 100000) + 50000, // $500-$1500
-            orders: Math.floor(Math.random() * 10) + 1
-          });
-        }
-        return {
-          success: true,
-          data: monthlyData.reverse()
-        };
-      }
-      return handleApiError(error, 'Failed to fetch monthly earnings');
-    }
-  },
-
-  getEarningsHistory: async (params = {}) => {
-    try {
-      const { page = 1, limit = 50 } = params;
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/earnings/history`,
-        {
-          params: { page, limit },
-          ...getHeaders()
-        }
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      // For development, return mock data
-      if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
-        const earningsHistory = [];
-        for (let i = 0; i < 15; i++) {
-          const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-          earningsHistory.push({
-            _id: `earning_${i}`,
-            date: date.toISOString(),
-            amount: Math.floor(Math.random() * 5000) + 1000, // $10-$60
-            type: 'earning',
-            status: i % 3 === 0 ? 'pending' : 'completed',
-            description: `Order #${1000 + i}`,
-            balanceAfter: Math.floor(Math.random() * 200000) + 50000 // $500-$2500
-          });
-        }
-        return {
-          success: true,
-          data: {
-            earnings: earningsHistory,
-            pagination: {
-              page: 1,
-              limit: 50,
-              total: 15,
-              pages: 1
-            }
-          }
-        };
-      }
-      return handleApiError(error, 'Failed to fetch earnings history');
-    }
-  },
-
-  getWithdrawalStats: async () => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/withdrawals/stats`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      // For development, return mock data
-      if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
-        return {
-          success: true,
-          data: {
-            totalWithdrawn: 50000, // $500 in cents
-            pendingWithdrawals: 1,
-            statsByStatus: [
-              { _id: 'completed', count: 2 },
-              { _id: 'pending', count: 1 },
-              { _id: 'failed', count: 0 }
-            ],
-            lastWithdrawal: {
-              amount: 25000, // $250 in cents
-              status: 'completed',
-              createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString()
-            }
-          }
-        };
-      }
-      return handleApiError(error, 'Failed to fetch withdrawal stats');
-    }
-  },
-
-  cancelWithdrawal: async (withdrawalId) => {
-    try {
-      const response = await axios.put(
-        `${API_BASE_URL}/marketplace/withdrawals/${withdrawalId}/cancel`,
-        {},
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error, 'Failed to cancel withdrawal');
-    }
-  },
-
-  // UTILITY FUNCTIONS
-  formatCurrency: (amount) => {
-    const amountInDollars = (amount || 0) / 100;
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(amountInDollars);
-  },
-
-  formatCurrencyShort: (amount) => {
-    const amountInDollars = (amount || 0) / 100;
-    if (amountInDollars >= 1000000) {
-      return `$${(amountInDollars / 1000000).toFixed(1)}M`;
-    } else if (amountInDollars >= 1000) {
-      return `$${(amountInDollars / 1000).toFixed(1)}K`;
-    }
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amountInDollars);
-  },
-
-  dollarsToCents: (dollars) => {
-    return Math.round(dollars * 100);
-  },
-
-  centsToDollars: (cents) => {
-    return cents / 100;
-  },
-
-  validateWithdrawalAmount: (amountInCents, availableBalance, minWithdrawal = 500) => {
-    if (amountInCents < minWithdrawal) {
-      return {
-        valid: false,
-        error: `Minimum withdrawal amount is $${(minWithdrawal / 100).toFixed(2)}`
-      };
-    }
-    
-    if (amountInCents > availableBalance) {
-      return {
-        valid: false,
-        error: 'Insufficient available balance'
-      };
-    }
-    
-    return { valid: true };
-  }
 };
 
 // ============================================
@@ -376,32 +165,16 @@ const listingsApi = {
 const ordersApi = {
   getMySales: async () => {
     try {
-      const endpoints = [
-        `${API_BASE_URL}/marketplace/my-sales`,
+      const response = await axios.get(
         `${API_BASE_URL}/marketplace/orders/my-sales`,
-        `${API_BASE_URL}/marketplace/seller/orders`
-      ];
-      
-      for (const endpoint of endpoints) {
-        try {
-          const response = await axios.get(endpoint, {
-            ...getHeaders(),
-            params: { limit: 100 }
-          });
-          
-          const data = response.data || response;
-          const orders = data.sales || data.orders || data.data || data;
-          
-          if (Array.isArray(orders)) {
-            return orders;
-          }
-          
-          if (data.success && Array.isArray(data.data)) {
-            return data.data;
-          }
-        } catch (err) {
-          continue;
+        {
+          ...getHeaders(),
+          params: { limit: 100 }
         }
+      );
+      
+      if (response.data?.success && Array.isArray(response.data.sales)) {
+        return response.data.sales;
       }
       
       return [];
@@ -433,6 +206,445 @@ const ordersApi = {
       return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error, 'Failed to fetch order details');
+    }
+  },
+
+  // ✅ ADDED: Get buyer orders
+  getMyOrders: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/my-orders`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch your orders');
+    }
+  },
+
+  // ✅ ADDED: Start processing order (seller)
+  startProcessing: async (orderId) => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/start-processing`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to start processing order');
+    }
+  },
+
+  // ✅ ADDED: Start work on order (seller)
+  startWork: async (orderId) => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/start-work`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to start work on order');
+    }
+  },
+
+  // ✅ ADDED: Deliver order (seller)
+  deliverOrder: async (orderId, deliveryData) => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/deliver-with-email`,
+        deliveryData,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to deliver order');
+    }
+  },
+
+  // ✅ ADDED: Complete revision (seller)
+  completeRevision: async (orderId, deliveryData) => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/complete-revision`,
+        deliveryData,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to complete revision');
+    }
+  },
+
+  // ✅ ADDED: Complete order (buyer)
+  completeOrder: async (orderId) => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/complete`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to complete order');
+    }
+  },
+
+  // ✅ ADDED: Request revision (buyer)
+  requestRevision: async (orderId, revisionNotes) => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/request-revision`,
+        { revisionNotes },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to request revision');
+    }
+  },
+
+  // ✅ ADDED: Cancel order by buyer
+  cancelByBuyer: async (orderId, cancelReason) => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/cancel-by-buyer`,
+        { cancelReason },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to cancel order');
+    }
+  },
+
+  // ✅ ADDED: Cancel order by seller
+  cancelBySeller: async (orderId, cancelReason) => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/cancel-by-seller`,
+        { cancelReason },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to cancel order');
+    }
+  },
+
+  // ✅ ADDED: Get order deliveries
+  getDeliveries: async (orderId) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/deliveries`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch deliveries');
+    }
+  },
+
+  // ✅ ADDED: Get delivery details
+  getDeliveryDetails: async (deliveryId) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/deliveries/${deliveryId}`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch delivery details');
+    }
+  },
+
+  // ✅ ADDED: Download files
+  downloadFiles: async (orderId) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/download-files`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch download files');
+    }
+  },
+
+  // ✅ ADDED: Get order summary
+  getOrderSummary: async (orderId) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/summary`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch order summary');
+    }
+  },
+
+  // ✅ ADDED: Get order timeline
+  getOrderTimeline: async (orderId) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/timeline`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch order timeline');
+    }
+  },
+
+  // ✅ ADDED: Get seller statistics
+  getSellerStats: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/stats/seller`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch seller statistics');
+    }
+  },
+
+  // ✅ ADDED: Get buyer statistics
+  getBuyerStats: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/stats/buyer`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch buyer statistics');
+    }
+  }
+};
+
+// ============================================
+// ✅ EARNINGS API (UPDATED ROUTES)
+// ============================================
+
+const earningsApi = {
+  getEarningsSummary: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/earnings/summary`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch earnings summary');
+    }
+  },
+
+  getEarningsByPeriod: async (period = 'month') => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/earnings/period/${period}`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch earnings by period');
+    }
+  },
+
+  getAvailableBalance: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/earnings/available-balance`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      // For development, calculate from orders
+      if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
+        try {
+          const orders = await ordersApi.getMySales();
+          const completedOrders = Array.isArray(orders) ? 
+            orders.filter(order => order.status === 'completed' && order.paymentReleased) : [];
+          
+          const totalRevenue = completedOrders.reduce((sum, order) => 
+            sum + (order.sellerAmount || order.amount || 0), 0);
+          
+          return {
+            success: true,
+            data: {
+              availableBalance: totalRevenue * 100, // Convert to cents
+              pendingBalance: 0,
+              totalEarnings: totalRevenue * 100,
+              totalWithdrawn: 0,
+              currency: 'inr'
+            }
+          };
+        } catch (calcError) {
+          return {
+            success: true,
+            data: {
+              availableBalance: 0,
+              pendingBalance: 0,
+              totalEarnings: 0,
+              totalWithdrawn: 0,
+              currency: 'inr'
+            }
+          };
+        }
+      }
+      
+      return handleApiError(error, 'Failed to fetch available balance');
+    }
+  }
+};
+
+// ============================================
+// ✅ WITHDRAWAL API (UPDATED ROUTES)
+// ============================================
+
+const withdrawalsApi = {
+  getWithdrawalHistory: async (params = {}) => {
+    try {
+      const { page = 1, limit = 10, status = '' } = params;
+      const queryParams = new URLSearchParams();
+      if (page) queryParams.append('page', page.toString());
+      if (limit) queryParams.append('limit', limit.toString());
+      if (status) queryParams.append('status', status);
+      
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/payments/withdrawals?${queryParams}`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      // Return empty history for development
+      return {
+        success: true,
+        data: {
+          withdrawals: [],
+          pagination: {
+            page: 1,
+            limit: 10,
+            total: 0,
+            pages: 1
+          }
+        }
+      };
+    }
+  },
+
+  requestWithdrawal: async (amount) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/orders/withdrawals`,
+        { amount },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      // For development, return mock success
+      if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
+        return {
+          success: true,
+          message: 'Withdrawal request submitted successfully',
+          withdrawal: {
+            _id: Date.now().toString(),
+            amount: amount,
+            status: 'pending',
+            stripeTransferId: 'tr_mock_' + Date.now(),
+            createdAt: new Date().toISOString(),
+            destination: 'Bank Account •••• 4321',
+            description: `Withdrawal of $${(amount / 100).toFixed(2)}`
+          }
+        };
+      }
+      
+      return handleApiError(error, 'Failed to request withdrawal');
+    }
+  },
+
+  getWithdrawalById: async (withdrawalId) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/withdrawals/${withdrawalId}`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch withdrawal details');
+    }
+  },
+
+  cancelWithdrawal: async (withdrawalId) => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/withdrawals/${withdrawalId}/cancel`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to cancel withdrawal');
+    }
+  }
+};
+
+// ============================================
+// ✅ STRIPE API (UPDATED ROUTES)
+// ============================================
+
+const stripeApi = {
+  getStripeStatus: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/stripe/status`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch Stripe status');
+    }
+  },
+
+  createStripeAccountLink: async () => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/orders/stripe/create-account-link`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to create Stripe link');
+    }
+  },
+
+  getStripeBalance: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/stripe/balance`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch Stripe balance');
+    }
+  },
+
+  // ✅ ADDED: Check seller account status
+  getSellerAccountStatus: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/seller/account-status`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch seller account status');
     }
   }
 };
@@ -484,227 +696,59 @@ const offersApi = {
     } catch (error) {
       return handleApiError(error, 'Failed to reject offer');
     }
-  }
-};
-
-// ============================================
-// ✅ STRIPE API
-// ============================================
-
-const stripeApi = {
-  getStripeStatus: async () => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/stripe/status`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error, 'Failed to fetch Stripe status');
-    }
   },
 
-  createStripeAccountLink: async () => {
+  // ✅ ADDED: Create order from offer
+  createOrderFromOffer: async (offerData) => {
     try {
       const response = await axios.post(
-        `${API_BASE_URL}/marketplace/stripe/create-account-link`,
-        {},
+        `${API_BASE_URL}/marketplace/orders/create`,
+        offerData,
         getHeaders()
       );
       return normalizeResponse(response);
     } catch (error) {
-      return handleApiError(error, 'Failed to create Stripe link');
-    }
-  },
-
-  getStripeBalance: async () => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/stripe/balance`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error, 'Failed to fetch Stripe balance');
+      return handleApiError(error, 'Failed to create order from offer');
     }
   }
 };
 
 // ============================================
-// ✅ WITHDRAWAL API
+// ✅ FILE UPLOAD API
 // ============================================
 
-const withdrawalsApi = {
-  getWithdrawalHistory: async (params = {}) => {
+const uploadApi = {
+  uploadDeliveryFiles: async (files) => {
     try {
-      const { page = 1, limit = 10, status = '' } = params;
-      const queryParams = new URLSearchParams();
-      if (page) queryParams.append('page', page.toString());
-      if (limit) queryParams.append('limit', limit.toString());
-      if (status) queryParams.append('status', status);
-      
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/payments/withdrawals?${queryParams}`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      // Return mock history for development
-      if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
-        const withdrawals = [];
-        for (let i = 0; i < 8; i++) {
-          const date = new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000);
-          withdrawals.push({
-            _id: `withdrawal_${i}`,
-            amount: [10000, 15000, 25000, 5000, 30000][i % 5], // $100-$300
-            status: i === 0 ? 'pending' : i === 1 ? 'processing' : 'completed',
-            stripeTransferId: `tr_${Date.now()}_${i}`,
-            stripePayoutId: i > 1 ? `po_${Date.now()}_${i}` : undefined,
-            createdAt: date.toISOString(),
-            completedAt: i > 1 ? new Date(date.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString() : undefined,
-            destination: 'Bank Account •••• 4321',
-            description: `Withdrawal #${100 + i}`
-          });
-        }
-        return {
-          success: true,
-          withdrawals,
-          pagination: {
-            page: 1,
-            limit: 10,
-            total: 8,
-            pages: 1
-          },
-          balance: {
-            availableBalance: 150000,
-            pendingBalance: 50000,
-            totalEarnings: 200000,
-            totalWithdrawn: 75000
-          }
-        };
-      }
-      return handleApiError(error, 'Failed to fetch withdrawal history');
-    }
-  },
+      const formData = new FormData();
+      files.forEach((file, index) => {
+        formData.append('files', file);
+      });
 
-  requestWithdrawal: async (amount) => {
-    try {
       const response = await axios.post(
-        `${API_BASE_URL}/marketplace/withdrawals`,
-        { amount },
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      // For development, return mock success
-      if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
-        return {
-          success: true,
-          message: 'Withdrawal request submitted successfully',
-          withdrawal: {
-            _id: Date.now().toString(),
-            amount: amount,
-            status: 'pending',
-            stripeTransferId: 'tr_mock_' + Date.now(),
-            createdAt: new Date().toISOString(),
-            destination: 'Bank Account •••• 4321',
-            description: `Withdrawal of $${(amount / 100).toFixed(2)}`
+        `${API_BASE_URL}/marketplace/orders/upload/delivery`,
+        formData,
+        {
+          headers: {
+            'Authorization': `Bearer ${getAuthToken()}`,
+            'Content-Type': 'multipart/form-data'
           }
-        };
-      }
-      
-      return handleApiError(error, 'Failed to request withdrawal');
-    }
-  },
-
-  getWithdrawalById: async (withdrawalId) => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/withdrawals/${withdrawalId}`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error, 'Failed to fetch withdrawal details');
-    }
-  },
-
-  cancelWithdrawal: async (withdrawalId) => {
-    try {
-      const response = await axios.put(
-        `${API_BASE_URL}/marketplace/withdrawals/${withdrawalId}/cancel`,
-        {},
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error, 'Failed to cancel withdrawal');
-    }
-  }
-};
-
-// ============================================
-// ✅ EARNINGS API
-// ============================================
-
-const earningsApi = {
-  getEarningsSummary: async () => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/earnings/summary`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error, 'Failed to fetch earnings summary');
-    }
-  },
-
-  getEarningsByPeriod: async (period = 'month') => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/earnings/period/${period}`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error, 'Failed to fetch earnings by period');
-    }
-  },
-
-  getAvailableBalance: async () => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/earnings/available-balance`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      // For development, calculate from orders
-      if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
-        try {
-          const orders = await ordersApi.getMySales();
-          const completedOrders = Array.isArray(orders) ? 
-            orders.filter(order => order.status === 'completed') : [];
-          
-          const totalRevenue = completedOrders.reduce((sum, order) => 
-            sum + (order.amount || 0), 0) * 100;
-          
-          return {
-            success: true,
-            availableBalance: totalRevenue,
-            currency: 'usd'
-          };
-        } catch (calcError) {
-          return {
-            success: true,
-            availableBalance: 0,
-            currency: 'usd'
-          };
         }
-      }
-      
-      return handleApiError(error, 'Failed to fetch available balance');
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to upload files');
+    }
+  },
+
+  getUploadedFile: async (filename) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/upload/delivery/${filename}`
+      );
+      return response;
+    } catch (error) {
+      return handleApiError(error, 'Failed to get uploaded file');
     }
   }
 };
@@ -713,70 +757,44 @@ const earningsApi = {
 // ✅ UTILITY FUNCTIONS (PUBLIC)
 // ============================================
 
-// ✅ CURRENCY FORMATTING FUNCTIONS (USD)
 export const formatCurrency = (amount) => {
-  const amountInDollars = (amount || 0) / 100;
-  return new Intl.NumberFormat('en-US', {
+  const amountInRupees = (amount || 0) / 100;
+  return new Intl.NumberFormat('en-IN', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'INR',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  }).format(amountInDollars);
+  }).format(amountInRupees);
 };
 
 export const formatCurrencyAmount = (amount) => {
-  const amountInDollars = (amount || 0) / 100;
-  return new Intl.NumberFormat('en-US', {
+  const amountInRupees = (amount || 0) / 100;
+  return new Intl.NumberFormat('en-IN', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  }).format(amountInDollars);
+  }).format(amountInRupees);
 };
 
 export const formatCurrencyShort = (amount) => {
-  const amountInDollars = (amount || 0) / 100;
-  if (amountInDollars >= 1000000) {
-    return `$${(amountInDollars / 1000000).toFixed(1)}M`;
-  } else if (amountInDollars >= 1000) {
-    return `$${(amountInDollars / 1000).toFixed(1)}K`;
+  const amountInRupees = (amount || 0) / 100;
+  if (amountInRupees >= 10000000) {
+    return `₹${(amountInRupees / 10000000).toFixed(1)}Cr`;
+  } else if (amountInRupees >= 100000) {
+    return `₹${(amountInRupees / 100000).toFixed(1)}L`;
+  } else if (amountInRupees >= 1000) {
+    return `₹${(amountInRupees / 1000).toFixed(1)}K`;
   }
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat('en-IN', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'INR',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
-  }).format(amountInDollars);
-};
-
-// ✅ VALIDATION FUNCTIONS
-export const validateWithdrawalAmount = (amountInCents, availableBalance, minWithdrawal = 500) => {
-  if (amountInCents < minWithdrawal) {
-    return {
-      valid: false,
-      error: `Minimum withdrawal amount is $${(minWithdrawal / 100).toFixed(2)}`
-    };
-  }
-  
-  if (amountInCents > availableBalance) {
-    return {
-      valid: false,
-      error: 'Insufficient available balance'
-    };
-  }
-  
-  return { valid: true };
-};
-
-export const dollarsToCents = (dollars) => {
-  return Math.round(dollars * 100);
-};
-
-export const centsToDollars = (cents) => {
-  return cents / 100;
+  }).format(amountInRupees);
 };
 
 export const testApiConnection = async () => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/marketplace/test`);
+    const response = await axios.get(`${API_BASE_URL}/marketplace/orders/test`);
     return {
       success: true,
       message: 'API connection successful',
@@ -809,6 +827,32 @@ export const getCurrentUserId = () => {
   }
 };
 
+// ✅ ADDED: Currency conversion helpers
+export const dollarsToCents = (dollars) => {
+  return Math.round(dollars * 100);
+};
+
+export const centsToDollars = (cents) => {
+  return cents / 100;
+};
+
+// ✅ ADDED: Validate withdrawal amount
+export const validateWithdrawalAmount = (amountInCents, availableBalance) => {
+  if (amountInCents <= 0) {
+    return { valid: false, error: 'Amount must be greater than zero' };
+  }
+  
+  if (amountInCents < 100) { // Minimum $1.00
+    return { valid: false, error: 'Minimum withdrawal amount is $1.00 (100 cents)' };
+  }
+  
+  if (amountInCents > availableBalance) {
+    return { valid: false, error: 'Insufficient balance for withdrawal' };
+  }
+  
+  return { valid: true };
+};
+
 // ============================================
 // ✅ MAIN API EXPORT (SINGLE EXPORT OBJECT)
 // ============================================
@@ -821,15 +865,15 @@ const marketplaceApi = {
   stripe: stripeApi,
   withdrawals: withdrawalsApi,
   earnings: earningsApi,
-  payments: paymentsApi, // ✅ ADDED PAYMENTS API
+  upload: uploadApi,
   
   // Utility Functions
   formatCurrency,
   formatCurrencyAmount,
   formatCurrencyShort,
-  validateWithdrawalAmount,
   dollarsToCents,
   centsToDollars,
+  validateWithdrawalAmount,
   testApiConnection,
   checkAuth,
   getCurrentUserId,
@@ -845,16 +889,34 @@ const marketplaceApi = {
   
   // Orders
   getMySales: ordersApi.getMySales,
+  getMyOrders: ordersApi.getMyOrders,
   updateOrderStatus: ordersApi.updateOrderStatus,
   getOrderDetails: ordersApi.getOrderDetails,
+  startProcessing: ordersApi.startProcessing,
+  startWork: ordersApi.startWork,
+  deliverOrder: ordersApi.deliverOrder,
+  completeRevision: ordersApi.completeRevision,
+  completeOrder: ordersApi.completeOrder,
+  requestRevision: ordersApi.requestRevision,
+  cancelByBuyer: ordersApi.cancelByBuyer,
+  cancelBySeller: ordersApi.cancelBySeller,
+  getDeliveries: ordersApi.getDeliveries,
+  getDeliveryDetails: ordersApi.getDeliveryDetails,
+  downloadFiles: ordersApi.downloadFiles,
+  getOrderSummary: ordersApi.getOrderSummary,
+  getOrderTimeline: ordersApi.getOrderTimeline,
+  getSellerStats: ordersApi.getSellerStats,
+  getBuyerStats: ordersApi.getBuyerStats,
   
   // Offers
   getReceivedOffers: offersApi.getReceivedOffers,
   acceptOffer: offersApi.acceptOffer,
   rejectOffer: offersApi.rejectOffer,
+  createOrderFromOffer: offersApi.createOrderFromOffer,
   
   // Stripe
   getStripeStatus: stripeApi.getStripeStatus,
+  getSellerAccountStatus: stripeApi.getSellerAccountStatus,
   createStripeAccountLink: stripeApi.createStripeAccountLink,
   getStripeBalance: stripeApi.getStripeBalance,
   
@@ -869,11 +931,9 @@ const marketplaceApi = {
   getEarningsByPeriod: earningsApi.getEarningsByPeriod,
   getAvailableBalance: earningsApi.getAvailableBalance,
   
-  // ✅ ADDED PAYMENTS API METHODS
-  getEarningsBalance: paymentsApi.getEarningsBalance,
-  getMonthlyEarnings: paymentsApi.getMonthlyEarnings,
-  getEarningsHistory: paymentsApi.getEarningsHistory,
-  getWithdrawalStats: paymentsApi.getWithdrawalStats
+  // Upload
+  uploadDeliveryFiles: uploadApi.uploadDeliveryFiles,
+  getUploadedFile: uploadApi.getUploadedFile
 };
 
 // ============================================
@@ -886,9 +946,6 @@ export default marketplaceApi;
 // Export all individual functions and modules
 export { marketplaceApi };
 
-// Export all individual utility functions
-
-
 // Export API modules (optional - for advanced usage)
 export {
   listingsApi,
@@ -897,5 +954,5 @@ export {
   stripeApi,
   withdrawalsApi,
   earningsApi,
-  paymentsApi
+  uploadApi
 };
