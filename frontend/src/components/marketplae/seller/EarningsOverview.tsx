@@ -1,6 +1,6 @@
 // components/marketplace/seller/EarningsOverview.tsx
 import React from 'react';
-import { formatCurrency } from '../../../utils/formatters';
+import { formatCurrency } from '../../../utils/marketplace';
 
 interface EarningsOverviewProps {
   stripeStatus: any;
