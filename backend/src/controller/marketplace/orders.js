@@ -2548,5 +2548,1008 @@ router.put("/:orderId/status", authenticateMiddleware, async (req, res) => {
     });
   }
 });
+// Add these routes to routes/order.js - EARNINGS AND WITHDRAWAL ROUTES
+
+// ======================================================
+// ========== EARNINGS & WITHDRAWAL ROUTES ==========
+// ======================================================
+
+// ✅ GET EARNINGS SUMMARY
+router.get("/earnings/summary", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+
+    // Get all completed orders for this seller
+    const completedOrders = await Order.find({
+      sellerId: userId,
+      status: 'completed',
+      paymentReleased: true
+    }).select('amount platformFee sellerAmount completedAt');
+
+    // Calculate totals
+    const totalEarnings = completedOrders.reduce((sum, order) => sum + (order.sellerAmount || order.amount), 0);
+    const totalWithdrawn = await Withdrawal.aggregate([
+      { $match: { sellerId: mongoose.Types.ObjectId(userId), status: 'completed' } },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]).then(result => result[0]?.total || 0);
+
+    // Get pending orders (delivered but not completed)
+    const pendingOrders = await Order.find({
+      sellerId: userId,
+      status: { $in: ['delivered', 'in_progress', 'in_revision'] }
+    }).select('amount');
+
+    const pendingBalance = pendingOrders.reduce((sum, order) => sum + order.amount, 0);
+    const availableBalance = totalEarnings - totalWithdrawn;
+
+    // Get this month's earnings
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const thisMonthEarnings = completedOrders
+      .filter(order => new Date(order.completedAt) >= startOfMonth)
+      .reduce((sum, order) => sum + (order.sellerAmount || order.amount), 0);
+
+    // Get last withdrawal
+    const lastWithdrawal = await Withdrawal.findOne({ 
+      sellerId: userId, 
+      status: 'completed' 
+    }).sort({ createdAt: -1 });
+
+    // Calculate next payout date (assuming weekly payouts on Fridays)
+    const today = new Date();
+    const nextFriday = new Date(today);
+    nextFriday.setDate(today.getDate() + ((5 - today.getDay() + 7) % 7));
+    nextFriday.setHours(0, 0, 0, 0);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        availableBalance,
+        pendingBalance,
+        totalEarnings,
+        totalWithdrawn,
+        walletBalance: availableBalance,
+        lastWithdrawal: lastWithdrawal ? {
+          amount: lastWithdrawal.amount,
+          date: lastWithdrawal.completedAt || lastWithdrawal.createdAt,
+          status: lastWithdrawal.status
+        } : null,
+        nextPayoutDate: nextFriday.toISOString(),
+        currency: 'inr',
+        thisMonthEarnings,
+        completedOrdersCount: completedOrders.length,
+        pendingOrdersCount: pendingOrders.length
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching earnings summary:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch earnings summary',
+      details: error.message
+    });
+  }
+});
+
+// ✅ GET EARNINGS BY PERIOD
+router.get("/earnings/period/:period", authenticateMiddleware, async (req, res) => {
+  try {
+    const { period } = req.params; // month, week, year
+    const userId = req.user.id || req.user._id || req.user.userId;
+
+    let startDate;
+    const endDate = new Date();
+    
+    switch (period) {
+      case 'month':
+        startDate = new Date(endDate.getFullYear(), endDate.getMonth() - 1, 1);
+        break;
+      case 'week':
+        startDate = new Date(endDate);
+        startDate.setDate(endDate.getDate() - 7);
+        break;
+      case 'year':
+        startDate = new Date(endDate.getFullYear() - 1, 0, 1);
+        break;
+      default:
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid period. Use: month, week, or year'
+        });
+    }
+
+    // Get earnings for the period
+    const earnings = await Order.aggregate([
+      {
+        $match: {
+          sellerId: mongoose.Types.ObjectId(userId),
+          status: 'completed',
+          paymentReleased: true,
+          completedAt: { $gte: startDate, $lte: endDate }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            month: { $month: "$completedAt" },
+            year: { $year: "$completedAt" }
+          },
+          earnings: { $sum: "$sellerAmount" },
+          orders: { $sum: 1 },
+          averageOrder: { $avg: "$sellerAmount" }
+        }
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } }
+    ]);
+
+    // Format response
+    const formattedEarnings = earnings.map(item => ({
+      period: `${item._id.year}-${item._id.month.toString().padStart(2, '0')}`,
+      earnings: item.earnings,
+      orders: item.orders,
+      averageOrder: item.averageOrder
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: formattedEarnings,
+      period,
+      startDate,
+      endDate,
+      total: formattedEarnings.reduce((sum, item) => sum + item.earnings, 0),
+      totalOrders: formattedEarnings.reduce((sum, item) => sum + item.orders, 0)
+    });
+  } catch (error) {
+    console.error('Error fetching earnings by period:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch earnings data',
+      details: error.message
+    });
+  }
+});
+
+// ✅ GET AVAILABLE BALANCE
+router.get("/earnings/available-balance", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+
+    // Get completed orders total
+    const completedEarnings = await Order.aggregate([
+      {
+        $match: {
+          sellerId: mongoose.Types.ObjectId(userId),
+          status: 'completed',
+          paymentReleased: true
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: "$sellerAmount" }
+        }
+      }
+    ]).then(result => result[0]?.total || 0);
+
+    // Get total withdrawn
+    const totalWithdrawn = await Withdrawal.aggregate([
+      {
+        $match: {
+          sellerId: mongoose.Types.ObjectId(userId),
+          status: 'completed'
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: "$amount" }
+        }
+      }
+    ]).then(result => result[0]?.total || 0);
+
+    // Get pending balance (from active orders)
+    const pendingBalance = await Order.aggregate([
+      {
+        $match: {
+          sellerId: mongoose.Types.ObjectId(userId),
+          status: { $in: ['delivered', 'in_progress', 'in_revision'] }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: "$amount" }
+        }
+      }
+    ]).then(result => result[0]?.total || 0);
+
+    const availableBalance = completedEarnings - totalWithdrawn;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        availableBalance,
+        pendingBalance,
+        totalEarnings: completedEarnings,
+        totalWithdrawn,
+        currency: 'inr'
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching available balance:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch available balance',
+      details: error.message
+    });
+  }
+});
+
+// ======================================================
+// ========== WITHDRAWAL ROUTES ==========
+// ======================================================
+
+// ✅ GET WITHDRAWAL HISTORY
+router.get("/payments/withdrawals", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+    const { page = 1, limit = 10, status } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Build query
+    const query = { sellerId: userId };
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    // Get withdrawals with pagination
+    const withdrawals = await Withdrawal.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    const total = await Withdrawal.countDocuments(query);
+
+    // Get balance info
+    const completedEarnings = await Order.aggregate([
+      {
+        $match: {
+          sellerId: mongoose.Types.ObjectId(userId),
+          status: 'completed',
+          paymentReleased: true
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: "$sellerAmount" }
+        }
+      }
+    ]).then(result => result[0]?.total || 0);
+
+    const totalWithdrawn = await Withdrawal.aggregate([
+      {
+        $match: {
+          sellerId: mongoose.Types.ObjectId(userId),
+          status: 'completed'
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: "$amount" }
+        }
+      }
+    ]).then(result => result[0]?.total || 0);
+
+    const availableBalance = completedEarnings - totalWithdrawn;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        withdrawals,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / parseInt(limit))
+        },
+        balance: {
+          availableBalance,
+          pendingBalance: 0, // You might want to calculate this
+          totalEarnings: completedEarnings,
+          totalWithdrawn
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching withdrawal history:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch withdrawal history',
+      details: error.message
+    });
+  }
+});
+
+// ✅ REQUEST WITHDRAWAL
+router.post("/withdrawals", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+    const { amount } = req.body;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid withdrawal amount is required'
+      });
+    }
+
+    // Get user's stripe account
+    const user = await User.findById(userId);
+    if (!user || !user.stripeAccountId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Stripe account not connected',
+        stripeSetupRequired: true
+      });
+    }
+
+    // Check if stripe account is active
+    if (user.stripeAccountStatus !== 'active') {
+      return res.status(400).json({
+        success: false,
+        error: 'Stripe account is not active. Please complete your setup.',
+        stripeSetupRequired: true
+      });
+    }
+
+    // Calculate available balance
+    const completedEarnings = await Order.aggregate([
+      {
+        $match: {
+          sellerId: mongoose.Types.ObjectId(userId),
+          status: 'completed',
+          paymentReleased: true
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: "$sellerAmount" }
+        }
+      }
+    ]).then(result => result[0]?.total || 0);
+
+    const totalWithdrawn = await Withdrawal.aggregate([
+      {
+        $match: {
+          sellerId: mongoose.Types.ObjectId(userId),
+          status: 'completed'
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: "$amount" }
+        }
+      }
+    ]).then(result => result[0]?.total || 0);
+
+    const availableBalance = completedEarnings - totalWithdrawn;
+
+    // Check if sufficient balance
+    if (amount > availableBalance) {
+      return res.status(400).json({
+        success: false,
+        error: 'Insufficient balance for withdrawal',
+        availableBalance,
+        requestedAmount: amount
+      });
+    }
+
+    // Check minimum withdrawal amount (500 cents = $5.00)
+    if (amount < 500) {
+      return res.status(400).json({
+        success: false,
+        error: 'Minimum withdrawal amount is $5.00 (500 cents)',
+        minimumAmount: 500
+      });
+    }
+
+    // Check for pending withdrawals
+    const pendingWithdrawals = await Withdrawal.countDocuments({
+      sellerId: userId,
+      status: { $in: ['pending', 'processing'] }
+    });
+
+    if (pendingWithdrawals > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'You have pending withdrawals. Please wait for them to process.',
+        pendingCount: pendingWithdrawals
+      });
+    }
+
+    // Create withdrawal record
+    const withdrawal = new Withdrawal({
+      sellerId: userId,
+      amount,
+      status: 'pending',
+      stripeAccountId: user.stripeAccountId,
+      currency: 'inr',
+      description: `Withdrawal of ₹${(amount / 100).toFixed(2)}`
+    });
+
+    await withdrawal.save();
+
+    // For development/testing, you might want to auto-complete
+    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+      // Auto-complete for testing
+      setTimeout(async () => {
+        try {
+          withdrawal.status = 'completed';
+          withdrawal.completedAt = new Date();
+          withdrawal.stripeTransferId = `tr_mock_${Date.now()}`;
+          withdrawal.stripePayoutId = `po_mock_${Date.now()}`;
+          await withdrawal.save();
+        } catch (err) {
+          console.error('Auto-complete error:', err);
+        }
+      }, 2000);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Withdrawal request submitted successfully',
+      withdrawal: {
+        _id: withdrawal._id,
+        amount: withdrawal.amount,
+        status: withdrawal.status,
+        createdAt: withdrawal.createdAt,
+        description: withdrawal.description
+      },
+      newBalance: availableBalance - amount
+    });
+
+  } catch (error) {
+    console.error('Error creating withdrawal:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to process withdrawal request',
+      details: error.message
+    });
+  }
+});
+
+// ✅ GET SPECIFIC WITHDRAWAL
+router.get("/withdrawals/:withdrawalId", authenticateMiddleware, async (req, res) => {
+  try {
+    const { withdrawalId } = req.params;
+    const userId = req.user.id || req.user._id || req.user.userId;
+
+    // Check if valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(withdrawalId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid withdrawal ID'
+      });
+    }
+
+    const withdrawal = await Withdrawal.findOne({
+      _id: withdrawalId,
+      sellerId: userId
+    }).lean();
+
+    if (!withdrawal) {
+      return res.status(404).json({
+        success: false,
+        error: 'Withdrawal not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: withdrawal
+    });
+  } catch (error) {
+    console.error('Error fetching withdrawal:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch withdrawal details',
+      details: error.message
+    });
+  }
+});
+
+// ✅ CANCEL WITHDRAWAL
+router.put("/withdrawals/:withdrawalId/cancel", authenticateMiddleware, async (req, res) => {
+  try {
+    const { withdrawalId } = req.params;
+    const userId = req.user.id || req.user._id || req.user.userId;
+
+    // Check if valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(withdrawalId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid withdrawal ID'
+      });
+    }
+
+    const withdrawal = await Withdrawal.findOne({
+      _id: withdrawalId,
+      sellerId: userId,
+      status: 'pending'
+    });
+
+    if (!withdrawal) {
+      return res.status(404).json({
+        success: false,
+        error: 'Withdrawal not found or cannot be cancelled'
+      });
+    }
+
+    // Only allow cancellation if not already processing/completed
+    if (!['pending', 'created'].includes(withdrawal.status)) {
+      return res.status(400).json({
+        success: false,
+        error: `Cannot cancel withdrawal in ${withdrawal.status} status`
+      });
+    }
+
+    withdrawal.status = 'cancelled';
+    withdrawal.cancelledAt = new Date();
+    withdrawal.cancelledBy = 'seller';
+    await withdrawal.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Withdrawal cancelled successfully',
+      withdrawal: {
+        _id: withdrawal._id,
+        amount: withdrawal.amount,
+        status: withdrawal.status,
+        cancelledAt: withdrawal.cancelledAt
+      }
+    });
+  } catch (error) {
+    console.error('Error cancelling withdrawal:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to cancel withdrawal',
+      details: error.message
+    });
+  }
+});
+
+// ======================================================
+// ========== STRIPE ROUTES ==========
+// ======================================================
+
+// ✅ GET STRIPE STATUS
+router.get("/stripe/status", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    let stripeStatus = {
+      connected: !!user.stripeAccountId,
+      chargesEnabled: false,
+      detailsSubmitted: false,
+      status: 'not_connected',
+      accountId: user.stripeAccountId,
+      name: user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : user.username,
+      email: user.email
+    };
+
+    // If stripe account exists, get details
+    if (user.stripeAccountId) {
+      try {
+        const account = await stripe.accounts.retrieve(user.stripeAccountId);
+        
+        stripeStatus = {
+          ...stripeStatus,
+          chargesEnabled: account.charges_enabled || false,
+          detailsSubmitted: account.details_submitted || false,
+          payoutsEnabled: account.payouts_enabled || false,
+          status: account.charges_enabled && account.payouts_enabled ? 'active' : 'pending',
+          country: account.country || 'US',
+          capabilities: account.capabilities || {}
+        };
+
+        // Get balance if account is active
+        if (account.charges_enabled && account.payouts_enabled) {
+          try {
+            const balance = await stripe.balance.retrieve({
+              stripeAccount: user.stripeAccountId
+            });
+
+            const availableBalance = balance.available.reduce((sum, item) => sum + item.amount, 0);
+            const pendingBalance = balance.pending.reduce((sum, item) => sum + item.amount, 0);
+
+            stripeStatus.balance = availableBalance + pendingBalance;
+            stripeStatus.availableBalance = availableBalance;
+            stripeStatus.pendingBalance = pendingBalance;
+          } catch (balanceError) {
+            console.warn('Could not fetch balance:', balanceError.message);
+          }
+        }
+
+      } catch (stripeError) {
+        console.error('Stripe account retrieval error:', stripeError.message);
+        
+        // If account doesn't exist on Stripe, reset user's stripe info
+        if (stripeError.code === 'resource_missing') {
+          user.stripeAccountId = null;
+          user.stripeAccountStatus = 'disconnected';
+          await user.save();
+          
+          stripeStatus.connected = false;
+          stripeStatus.status = 'not_connected';
+        }
+      }
+    }
+
+    // Update user's stripe status
+    if (user.stripeAccountStatus !== stripeStatus.status) {
+      user.stripeAccountStatus = stripeStatus.status;
+      await user.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      ...stripeStatus
+    });
+
+  } catch (error) {
+    console.error('Error checking Stripe status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to check Stripe status',
+      details: error.message
+    });
+  }
+});
+
+// ✅ CREATE STRIPE ACCOUNT LINK
+router.post("/stripe/create-account-link", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    let stripeAccountId = user.stripeAccountId;
+
+    // Create new Stripe account if not exists
+    if (!stripeAccountId) {
+      const account = await stripe.accounts.create({
+        type: 'express',
+        country: 'US',
+        email: user.email,
+        capabilities: {
+          card_payments: { requested: true },
+          transfers: { requested: true }
+        },
+        business_type: 'individual',
+        individual: {
+          email: user.email,
+          first_name: user.firstName || user.username,
+          last_name: user.lastName || '',
+          phone: user.phone || '',
+          address: {
+            line1: user.address?.street || '',
+            city: user.address?.city || '',
+            state: user.address?.state || '',
+            postal_code: user.address?.zipCode || '',
+            country: 'US'
+          }
+        },
+        settings: {
+          payouts: {
+            schedule: {
+              interval: 'manual'
+            }
+          }
+        }
+      });
+
+      stripeAccountId = account.id;
+      
+      // Update user with new Stripe account ID
+      user.stripeAccountId = stripeAccountId;
+      user.stripeAccountStatus = 'pending';
+      await user.save();
+    }
+
+    // Create account link for onboarding
+    const accountLink = await stripe.accountLinks.create({
+      account: stripeAccountId,
+      refresh_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/seller/settings/stripe?refresh=true`,
+      return_url: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/seller/dashboard?stripe=success`,
+      type: 'account_onboarding',
+      collect: 'eventually_due'
+    });
+
+    res.status(200).json({
+      success: true,
+      url: accountLink.url,
+      accountId: stripeAccountId,
+      expires_at: accountLink.expires_at,
+      message: 'Account link created successfully'
+    });
+
+  } catch (error) {
+    console.error('Error creating Stripe account link:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create Stripe account link',
+      details: error.message
+    });
+  }
+});
+
+// ✅ GET STRIPE BALANCE
+router.get("/stripe/balance", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+
+    const user = await User.findById(userId);
+    if (!user || !user.stripeAccountId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Stripe account not connected',
+        stripeSetupRequired: true
+      });
+    }
+
+    // Check if account is active
+    if (user.stripeAccountStatus !== 'active') {
+      return res.status(400).json({
+        success: false,
+        error: 'Stripe account is not active',
+        stripeSetupRequired: true
+      });
+    }
+
+    // Get balance from Stripe
+    const balance = await stripe.balance.retrieve({
+      stripeAccount: user.stripeAccountId
+    });
+
+    // Calculate totals
+    const available = balance.available.reduce((sum, item) => sum + item.amount, 0);
+    const pending = balance.pending.reduce((sum, item) => sum + item.amount, 0);
+    const total = available + pending;
+
+    res.status(200).json({
+      success: true,
+      balance: {
+        available,
+        pending,
+        total,
+        currency: 'usd',
+        breakdown: {
+          available: balance.available,
+          pending: balance.pending
+        }
+      },
+      accountStatus: user.stripeAccountStatus
+    });
+
+  } catch (error) {
+    console.error('Error fetching Stripe balance:', error);
+    
+    if (error.code === 'account_invalid') {
+      return res.status(400).json({
+        success: false,
+        error: 'Stripe account is invalid. Please reconnect.',
+        reconnectRequired: true
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch Stripe balance',
+      details: error.message
+    });
+  }
+});
+
+// ======================================================
+// ========== HELPER FUNCTIONS ==========
+// ======================================================
+
+// Helper function for order completion notifications
+async function sendOrderCompletionNotifications(order, paymentSuccess, paymentError) {
+  try {
+    const siteName = process.env.SITE_NAME || 'WeCinema';
+    const siteUrl = process.env.SITE_URL || 'http://localhost:5173';
+    const orderLink = `${siteUrl}/orders/${order._id}`;
+
+    // Prepare email content for buyer
+    const buyerEmailContent = {
+      buyerName: order.buyerId.firstName || order.buyerId.username,
+      sellerName: order.sellerId.firstName || order.sellerId.username,
+      orderTitle: order.listingId?.title || 'Your Order',
+      orderAmount: order.amount,
+      orderLink,
+      paymentStatus: paymentSuccess ? 'completed' : 'failed',
+      paymentError: paymentError,
+      orderNumber: order.orderNumber || order._id.toString().slice(-8).toUpperCase()
+    };
+
+    // Prepare email content for seller
+    const sellerEmailContent = {
+      ...buyerEmailContent,
+      sellerPayout: paymentSuccess ? order.sellerAmount : 0,
+      platformFee: order.platformFee || 0,
+      netAmount: order.sellerAmount || 0
+    };
+
+    // Send emails
+    await Promise.all([
+      emailService.sendOrderCompletionNotification(
+        order.buyerId.email,
+        buyerEmailContent
+      ),
+      emailService.sendSellerPayoutNotification(
+        order.sellerId.email,
+        sellerEmailContent
+      )
+    ]);
+
+    return true;
+  } catch (error) {
+    console.error('Order completion email error:', error);
+    return false;
+  }
+}
+
+// ======================================================
+// ========== ADDITIONAL ROUTES FROM API ==========
+// ======================================================
+
+// ✅ TEST API CONNECTION
+router.get("/test", async (req, res) => {
+  try {
+    const orderCount = await Order.countDocuments();
+    const withdrawalCount = await Withdrawal.countDocuments();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Marketplace API is working',
+      timestamp: new Date().toISOString(),
+      database: {
+        orders: orderCount,
+        withdrawals: withdrawalCount,
+        connected: mongoose.connection.readyState === 1
+      },
+      endpoints: {
+        earnings: ['/earnings/summary', '/earnings/period/:period', '/earnings/available-balance'],
+        withdrawals: ['/payments/withdrawals', '/withdrawals', '/withdrawals/:id', '/withdrawals/:id/cancel'],
+        stripe: ['/stripe/status', '/stripe/create-account-link', '/stripe/balance'],
+        orders: ['/my-orders', '/my-sales', '/:id', '/:id/complete', '/:id/request-revision', '/:id/deliver']
+      }
+    });
+  } catch (error) {
+    console.error('Test endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'API test failed',
+      details: error.message
+    });
+  }
+});
+
+// ✅ CHECK AUTH STATUS (simplified)
+router.get("/check-auth", authenticateMiddleware, (req, res) => {
+  res.status(200).json({
+    success: true,
+    authenticated: true,
+    user: {
+      id: req.user.id || req.user._id || req.user.userId,
+      role: req.user.role || 'user',
+      email: req.user.email
+    }
+  });
+});
+
+// ======================================================
+// ========== MARKETPLACE API ROUTES ==========
+// ======================================================
+
+// ✅ Get all listings (public)
+router.get("/marketplace/listings", async (req, res) => {
+  try {
+    const { page = 1, limit = 20, category, status = 'active' } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const query = { status };
+    if (category) query.category = category;
+
+    const listings = await MarketplaceListing.find(query)
+      .populate('sellerId', 'username avatar sellerRating totalOrders')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    const total = await MarketplaceListing.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      data: listings,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching marketplace listings:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch listings',
+      details: error.message
+    });
+  }
+});
+
+// ✅ Get my listings (seller)
+router.get("/marketplace/listings/my-listings", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+    const { page = 1, limit = 10, status } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const query = { sellerId: userId };
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    const listings = await MarketplaceListing.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    const total = await MarketplaceListing.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      data: listings,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching my listings:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch your listings',
+      details: error.message
+    });
+  }
+});
+
+// Add this to the top of the file with other imports
+// const Withdrawal = require("../../models/marketplace/Withdrawal");
 
 module.exports = router;
