@@ -1,4 +1,4 @@
-// src/pages/seller/SellerDashboard.tsx - FIXED VERSION
+// src/pages/seller/SellerDashboard.tsx - COMPLETE UPDATED VERSION WITH EARNINGS TAB
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -8,17 +8,16 @@ import MarketplaceLayout from '../../components/Layout';
 // Import helper function
 import { getCurrentUserId } from '../../utilities/helperfFunction';
 
-// Import API - FIXED IMPORT
+// Import API
 import marketplaceApi from '../../api/marketplaceApi';
 
-// ✅ FIXED: Access API methods correctly
+// Access API methods
 const listingsApi = marketplaceApi.listings;
 const ordersApi = marketplaceApi.orders;
 const offersApi = marketplaceApi.offers;
+const earningsApi = marketplaceApi.earnings;
 
-// ✅ FIXED: Use formatCurrency from marketplaceApi
-const formatCurrency = marketplaceApi.formatCurrency;
-// Import components - MAKE SURE PATHS ARE CORRECT
+// Import components
 import DashboardHeader from '../../components/marketplae/seller/DashboardHeader';
 import TabNavigation from '../../components/marketplae/seller/TabNavigation';
 import StatsGrid from '../../components/marketplae/seller/StatsGrid';
@@ -28,13 +27,13 @@ import ActionCard from '../../components/marketplae/seller/ActionCard';
 import OrderWorkflowGuide from '../../components/marketplae/seller/OrderWorkflowGuide';
 import StripeAccountStatus from '../../components/marketplae/seller/StripeAccountStatus';
 import StripeSuccessAlert from '../../components/marketplae/seller/StripeSuccessAlert';
-import WithdrawBalance from '../../components/marketplae/seller/WithdrawBalance';
 
 // Import tab components
 import OffersTab from '../../components/marketplae/seller/OffersTab';
 import ListingsTab from '../../components/marketplae/seller/ListingsTab';
 import OrdersTab from '../../components/marketplae/seller/OrdersTab';
 import WithdrawTab from '../../components/marketplae/seller/WithdrawTab';
+import EarningsTab from '../../components/marketplae/seller/EarningsTab'; // NEW EARNINGS TAB
 
 // Import modals
 import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
@@ -43,8 +42,42 @@ import EditListingModal from '../../components/marketplae/seller/EditListingModa
 import DeleteListingModal from '../../components/marketplae/seller/DeleteListingModal';
 import VideoPlayerModal from '../../components/marketplae/seller/VideoPlayerModal';
 
+// For now, create a simple formatCurrency function
+const formatCurrency = (amount: number) => {
+  // Convert cents to rupees
+  const amountInRupees = amount / 100;
+  return `₹${amountInRupees.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
 
-// Interfaces (keep as before)
+// Simple fallback components
+const SimpleFallback = ({ name }: { name: string }) => (
+  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+    <p className="text-gray-600">Component "{name}" is loading...</p>
+  </div>
+);
+
+// Use simple checks for components
+const SafeDashboardHeader = (typeof DashboardHeader === 'function' || typeof DashboardHeader === 'object') ? DashboardHeader : () => <SimpleFallback name="DashboardHeader" />;
+const SafeTabNavigation = (typeof TabNavigation === 'function' || typeof TabNavigation === 'object') ? TabNavigation : () => <SimpleFallback name="TabNavigation" />;
+const SafeWelcomeCard = (typeof WelcomeCard === 'function' || typeof WelcomeCard === 'object') ? WelcomeCard : () => <SimpleFallback name="WelcomeCard" />;
+const SafeStatsGrid = (typeof StatsGrid === 'function' || typeof StatsGrid === 'object') ? StatsGrid : () => <SimpleFallback name="StatsGrid" />;
+const SafeRecentOrders = (typeof RecentOrders === 'function' || typeof RecentOrders === 'object') ? RecentOrders : () => <SimpleFallback name="RecentOrders" />;
+const SafeActionCard = (typeof ActionCard === 'function' || typeof ActionCard === 'object') ? ActionCard : () => <SimpleFallback name="ActionCard" />;
+const SafeOrderWorkflowGuide = (typeof OrderWorkflowGuide === 'function' || typeof OrderWorkflowGuide === 'object') ? OrderWorkflowGuide : () => <SimpleFallback name="OrderWorkflowGuide" />;
+const SafeStripeAccountStatus = (typeof StripeAccountStatus === 'function' || typeof StripeAccountStatus === 'object') ? StripeAccountStatus : () => <SimpleFallback name="StripeAccountStatus" />;
+const SafeStripeSuccessAlert = (typeof StripeSuccessAlert === 'function' || typeof StripeSuccessAlert === 'object') ? StripeSuccessAlert : () => <SimpleFallback name="StripeSuccessAlert" />;
+const SafeOffersTab = (typeof OffersTab === 'function' || typeof OffersTab === 'object') ? OffersTab : () => <SimpleFallback name="OffersTab" />;
+const SafeListingsTab = (typeof ListingsTab === 'function' || typeof ListingsTab === 'object') ? ListingsTab : () => <SimpleFallback name="ListingsTab" />;
+const SafeOrdersTab = (typeof OrdersTab === 'function' || typeof OrdersTab === 'object') ? OrdersTab : () => <SimpleFallback name="OrdersTab" />;
+const SafeWithdrawTab = (typeof WithdrawTab === 'function' || typeof WithdrawTab === 'object') ? WithdrawTab : () => <SimpleFallback name="WithdrawTab" />;
+const SafeEarningsTab = (typeof EarningsTab === 'function' || typeof EarningsTab === 'object') ? EarningsTab : () => <SimpleFallback name="EarningsTab" />;
+const SafeStripeSetupModal = (typeof StripeSetupModal === 'function' || typeof StripeSetupModal === 'object') ? StripeSetupModal : () => <SimpleFallback name="StripeSetupModal" />;
+const SafeOrderDetailsModal = (typeof OrderDetailsModal === 'function' || typeof OrderDetailsModal === 'object') ? OrderDetailsModal : () => <SimpleFallback name="OrderDetailsModal" />;
+const SafeEditListingModal = (typeof EditListingModal === 'function' || typeof EditListingModal === 'object') ? EditListingModal : () => <SimpleFallback name="EditListingModal" />;
+const SafeDeleteListingModal = (typeof DeleteListingModal === 'function' || typeof DeleteListingModal === 'object') ? DeleteListingModal : () => <SimpleFallback name="DeleteListingModal" />;
+const SafeVideoPlayerModal = (typeof VideoPlayerModal === 'function' || typeof VideoPlayerModal === 'object') ? VideoPlayerModal : () => <SimpleFallback name="VideoPlayerModal" />;
+
+// Interfaces
 interface Order {
   _id: string;
   listingId: string;
@@ -208,6 +241,7 @@ const SellerDashboard: React.FC = () => {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [listingsLoading, setListingsLoading] = useState(false);
   const [offersLoading, setOffersLoading] = useState(false);
+  const [earningsLoading, setEarningsLoading] = useState(false);
   
   // Track if initial data has been loaded
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
@@ -246,13 +280,14 @@ const SellerDashboard: React.FC = () => {
   const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
   const totalWithdrawals = withdrawalHistory?.withdrawals?.length || 0;
 
-  // Tab configuration
+  // Tab configuration - WITH EARNINGS TAB
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊', badge: null },
+    { id: 'earnings', label: 'Earnings', icon: '💰', badge: null },
     { id: 'listings', label: 'My Listings', icon: '🏠', badge: totalListings > 0 ? totalListings : null },
     { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders > 0 ? orderStats.activeOrders : null },
     { id: 'offers', label: 'Offers', icon: '💌', badge: pendingOffers > 0 ? pendingOffers : null },
-    { id: 'withdraw', label: 'Withdraw', icon: '💰', badge: null }
+    { id: 'withdraw', label: 'Withdraw', icon: '💸', badge: null }
   ];
 
   // Action Cards
@@ -468,7 +503,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Fetch dashboard data - FIXED: Added error handling for undefined APIs
+  // ✅ Fetch dashboard data
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -481,7 +516,7 @@ const SellerDashboard: React.FC = () => {
         return;
       }
 
-      // ✅ FIXED: Check if ordersApi exists
+      // Check if ordersApi exists
       if (!ordersApi || typeof ordersApi.getMySales !== 'function') {
         console.error('ordersApi.getMySales is not available');
         setError('API configuration error. Please check your API setup.');
@@ -645,7 +680,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Fetch withdrawal history from API (not mock)
+  // ✅ Fetch withdrawal history from API
   const fetchWithdrawalHistory = async () => {
     try {
       setWithdrawalsLoading(true);
@@ -1168,11 +1203,6 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Handle withdraw success
-  const handleWithdrawSuccess = (amount: number) => {
-    handleWithdrawRequest(amount);
-  };
-
   // ✅ Handle open Stripe setup with development check
   const handleOpenStripeSetup = () => {
     const isDevelopment = window.location.hostname === 'localhost' || 
@@ -1239,6 +1269,7 @@ const SellerDashboard: React.FC = () => {
   // Determine loading state
   const getCurrentLoadingState = () => {
     if (activeTab === 'overview') return loading && !initialDataLoaded;
+    if (activeTab === 'earnings') return false; // Earnings tab handles its own loading
     if (activeTab === 'listings') return listingsLoading;
     if (activeTab === 'orders') return ordersLoading;
     if (activeTab === 'offers') return offersLoading;
@@ -1247,11 +1278,6 @@ const SellerDashboard: React.FC = () => {
   };
 
   const currentLoading = getCurrentLoadingState();
-
-  // Calculate if user can withdraw (connected and charges enabled)
-  const canWithdraw = stripeStatus?.connected && stripeStatus?.chargesEnabled;
-  const availableBalance = stripeStatus?.availableBalance || 0;
-  const pendingBalance = stripeStatus?.pendingBalance || 0;
 
   // Calculate total withdrawn amount
   const totalWithdrawn = withdrawalHistory?.withdrawals?.reduce(
@@ -1274,14 +1300,11 @@ const SellerDashboard: React.FC = () => {
     );
   }
 
-  // Add a safe guard for formatCurrency
+  // Safe currency formatting function
   const safeFormatCurrency = (amount: number) => {
-    if (typeof formatCurrency === 'function') {
-      return formatCurrency(amount);
-    }
-    // Fallback formatting
-    const amountInRupees = amount / 100;
-    return `₹${amountInRupees.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    // Convert dollars to cents for formatting
+    const amountInCents = amount * 100;
+    return formatCurrency(amountInCents);
   };
 
   return (
@@ -1291,20 +1314,21 @@ const SellerDashboard: React.FC = () => {
           
           {/* ✅ Stripe Success Alert */}
           {showStripeSuccessAlert && (
-            <StripeSuccessAlert 
+            <SafeStripeSuccessAlert 
               show={showStripeSuccessAlert}
               onClose={() => setShowStripeSuccessAlert(false)}
             />
           )}
 
           {/* Header */}
-          <DashboardHeader
+          <SafeDashboardHeader
             title="Seller Dashboard"
             subtitle="Manage orders, track earnings, and grow your business"
-            earnings={safeFormatCurrency(orderStats.totalRevenue * 100)} // Convert to cents
+            earnings={safeFormatCurrency(orderStats.totalRevenue)}
             onRefresh={handleRefresh}
             refreshing={refreshing}
             stripeStatus={stripeStatus}
+            onCheckStripe={checkStripeAccountStatus}
           />
 
           {/* ✅ Development Mode Banner */}
@@ -1406,27 +1430,17 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* ✅ Stripe Account Status */}
-          <StripeAccountStatus
-            stripeStatus={stripeStatus}
-            onSetupClick={handleOpenStripeSetup}
-            isLoading={stripeStatus === null}
-          />
-
-          {/* ✅ Withdraw Balance Card (Shows in overview) */}
-          {canWithdraw && availableBalance > 0 && (
-            <WithdrawBalance
-              stripeStatus={stripeStatus!}
-              availableBalance={availableBalance}
-              pendingBalance={pendingBalance}
-              onWithdrawSuccess={handleWithdrawSuccess}
-              totalRevenue={orderStats.totalRevenue}
-              thisMonthRevenue={orderStats.thisMonthRevenue}
+          {/* ✅ Stripe Account Status (Only show if not connected) */}
+          {!stripeStatus?.chargesEnabled && (
+            <SafeStripeAccountStatus
+              stripeStatus={stripeStatus}
+              onSetupClick={handleOpenStripeSetup}
+              isLoading={stripeStatus === null}
             />
           )}
 
           {/* ✅ Navigation */}
-          <TabNavigation
+          <SafeTabNavigation
             tabs={tabs}
             activeTab={activeTab}
             onTabChange={setActiveTab}
@@ -1447,7 +1461,7 @@ const SellerDashboard: React.FC = () => {
                 {activeTab === 'overview' && (
                   <div className="space-y-8">
                     {/* Welcome Card */}
-                    <WelcomeCard
+                    <SafeWelcomeCard
                       title="Welcome back, Seller! 👋"
                       subtitle="Manage your business efficiently with real-time insights and quick actions."
                       primaryAction={{
@@ -1457,12 +1471,12 @@ const SellerDashboard: React.FC = () => {
                       secondaryAction={{
                         label: '💰 Setup Payments',
                         onClick: handleOpenStripeSetup,
-                        visible: !canWithdraw
+                        visible: !stripeStatus?.chargesEnabled
                       }}
                     />
 
                     {/* Stats Grid */}
-                    <StatsGrid
+                    <SafeStatsGrid
                       stats={{
                         totalRevenue: orderStats.totalRevenue,
                         totalOrders: orderStats.totalOrders,
@@ -1479,11 +1493,11 @@ const SellerDashboard: React.FC = () => {
                     />
 
                     {/* Order Workflow Guide */}
-                    <OrderWorkflowGuide />
+                    <SafeOrderWorkflowGuide />
 
                     {/* Recent Orders */}
                     {orders.length > 0 ? (
-                      <RecentOrders
+                      <SafeRecentOrders
                         orders={orders.slice(0, 5)}
                         onViewOrderDetails={handleViewOrderDetails}
                         onStartProcessing={handleSimpleStartProcessing}
@@ -1500,7 +1514,7 @@ const SellerDashboard: React.FC = () => {
                         <div className="text-5xl mb-4 text-gray-300">📦</div>
                         <h3 className="text-lg font-medium text-gray-900">No Orders Yet</h3>
                         <p className="mt-2 text-gray-500 mb-6">
-                          {canWithdraw 
+                          {stripeStatus?.chargesEnabled 
                             ? 'You can accept payments. Create listings to start receiving orders!'
                             : 'Create listings to start receiving orders.'
                           }
@@ -1512,7 +1526,7 @@ const SellerDashboard: React.FC = () => {
                           >
                             + Create Your First Listing
                           </button>
-                          {!canWithdraw && (
+                          {!stripeStatus?.chargesEnabled && (
                             <button
                               onClick={handleOpenStripeSetup}
                               className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow"
@@ -1527,7 +1541,7 @@ const SellerDashboard: React.FC = () => {
                     {/* Action Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {actionCards.map((card, index) => (
-                        <ActionCard
+                        <SafeActionCard
                           key={index}
                           title={card.title}
                           description={card.description}
@@ -1542,9 +1556,20 @@ const SellerDashboard: React.FC = () => {
                   </div>
                 )}
 
+                {/* Earnings Tab - NEW */}
+                {activeTab === 'earnings' && (
+                  <SafeEarningsTab
+                    stripeStatus={stripeStatus}
+                    orderStats={orderStats}
+                    onWithdrawRequest={handleWithdrawRequest}
+                    loading={earningsLoading}
+                    onRefresh={checkStripeAccountStatus}
+                  />
+                )}
+
                 {/* Offers Tab */}
                 {activeTab === 'offers' && (
-                  <OffersTab
+                  <SafeOffersTab
                     offers={offers}
                     loading={offersLoading}
                     onOfferAction={handleOfferAction}
@@ -1557,7 +1582,7 @@ const SellerDashboard: React.FC = () => {
 
                 {/* Listings Tab */}
                 {activeTab === 'listings' && (
-                  <ListingsTab
+                  <SafeListingsTab
                     listingsData={listingsData}
                     loading={listingsLoading}
                     statusFilter={listingsStatusFilter}
@@ -1577,7 +1602,7 @@ const SellerDashboard: React.FC = () => {
 
                 {/* Orders Tab */}
                 {activeTab === 'orders' && (
-                  <OrdersTab
+                  <SafeOrdersTab
                     orders={orders}
                     loading={ordersLoading}
                     filter={ordersFilter}
@@ -1605,7 +1630,7 @@ const SellerDashboard: React.FC = () => {
 
                 {/* Withdraw Tab */}
                 {activeTab === 'withdraw' && (
-                  <WithdrawTab
+                  <SafeWithdrawTab
                     stripeStatus={stripeStatus}
                     withdrawalHistory={withdrawalHistory}
                     loading={withdrawalsLoading}
@@ -1624,16 +1649,16 @@ const SellerDashboard: React.FC = () => {
 
           {/* Modals */}
           {showStripeSetup && (
-            <StripeSetupModal
+            <SafeStripeSetupModal
               show={showStripeSetup}
               onClose={() => setShowStripeSetup(false)}
               onSuccess={handleStripeSetupSuccess}
-              stripeConnected={canWithdraw}
+              stripeConnected={stripeStatus?.chargesEnabled || false}
             />
           )}
 
           {selectedOrderId && (
-            <OrderDetailsModal
+            <SafeOrderDetailsModal
               orderId={selectedOrderId}
               isOpen={showOrderModal}
               onClose={() => {
@@ -1648,7 +1673,7 @@ const SellerDashboard: React.FC = () => {
           )}
 
           {showEditModal && editingListing && (
-            <EditListingModal
+            <SafeEditListingModal
               listing={editingListing}
               isOpen={showEditModal}
               onClose={() => {
@@ -1661,7 +1686,7 @@ const SellerDashboard: React.FC = () => {
           )}
 
           {showDeleteModal && deletingListing && (
-            <DeleteListingModal
+            <SafeDeleteListingModal
               listing={deletingListing}
               isOpen={showDeleteModal}
               onClose={() => {
@@ -1674,7 +1699,7 @@ const SellerDashboard: React.FC = () => {
           )}
 
           {showVideoModal && (
-            <VideoPlayerModal
+            <SafeVideoPlayerModal
               videoUrl={currentVideoUrl}
               title={currentVideoTitle}
               isOpen={showVideoModal}
