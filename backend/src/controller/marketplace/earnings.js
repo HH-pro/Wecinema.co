@@ -10,6 +10,191 @@ const WithdrawalRequest = require('../../models/WithdrawalRequest');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // ========== SELLER EARNINGS DASHBOARD ========== //
+
+// ========== GET ALL SELLERS EARNINGS (ADMIN) ========== //
+router.get("/all-sellers",  async (req, res) => {
+  try {
+    const { page = 1, limit = 20, search = '', sortBy = 'totalEarnings', sortOrder = -1 } = req.query;
+    
+    const skip = (page - 1) * limit;
+    
+    // Build search query
+    const searchQuery = {
+      role: 'seller' // Only get sellers
+    };
+    
+    if (search) {
+      searchQuery.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { businessName: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Get sellers with pagination
+    const sellers = await User.find(searchQuery)
+      .select('_id name email phone businessName stripeAccountId createdAt')
+      .sort({ [sortBy]: sortOrder })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    // Get seller IDs
+    const sellerIds = sellers.map(seller => seller._id);
+
+    // Get earnings data for all sellers
+    const earningsData = await SellerEarning.find({ 
+      sellerId: { $in: sellerIds } 
+    });
+
+    // Get order statistics for all sellers
+    const orderStats = await Order.aggregate([
+      {
+        $match: {
+          sellerId: { $in: sellerIds }
+        }
+      },
+      {
+        $group: {
+          _id: '$sellerId',
+          totalOrders: { $sum: 1 },
+          completedOrders: {
+            $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] }
+          },
+          pendingOrders: {
+            $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] }
+          },
+          cancelledOrders: {
+            $sum: { $cond: [{ $eq: ['$status', 'cancelled'] }, 1, 0] }
+          },
+          totalSales: { $sum: '$amount' },
+          totalCommission: { $sum: '$commission' },
+          pendingEarnings: {
+            $sum: {
+              $cond: [
+                { 
+                  $and: [
+                    { $eq: ['$status', 'completed'] },
+                    { $ne: ['$isPaidToSeller', true] }
+                  ]
+                },
+                { $subtract: ['$amount', '$commission'] },
+                0
+              ]
+            }
+          }
+        }
+      }
+    ]);
+
+    // Create a map of order stats by sellerId
+    const orderStatsMap = orderStats.reduce((map, stat) => {
+      map[stat._id] = stat;
+      return map;
+    }, {});
+
+    // Combine seller info with earnings and order stats
+    const sellersWithStats = sellers.map(seller => {
+      const earning = earningsData.find(e => e.sellerId.toString() === seller._id.toString());
+      const orders = orderStatsMap[seller._id] || {
+        totalOrders: 0,
+        completedOrders: 0,
+        pendingOrders: 0,
+        cancelledOrders: 0,
+        totalSales: 0,
+        totalCommission: 0,
+        pendingEarnings: 0
+      };
+
+      return {
+        _id: seller._id,
+        name: seller.name,
+        email: seller.email,
+        phone: seller.phone,
+        businessName: seller.businessName,
+        stripeAccountId: seller.stripeAccountId,
+        joinedAt: seller.createdAt,
+        earnings: {
+          availableBalance: earning?.availableBalance || 0,
+          pendingBalance: earning?.pendingBalance || 0,
+          totalEarnings: earning?.totalEarnings || 0,
+          totalWithdrawn: earning?.totalWithdrawn || 0
+        },
+        orders: {
+          total: orders.totalOrders,
+          completed: orders.completedOrders,
+          pending: orders.pendingOrders,
+          cancelled: orders.cancelledOrders,
+          completionRate: orders.totalOrders > 0 
+            ? (orders.completedOrders / orders.totalOrders) * 100 
+            : 0
+        },
+        sales: {
+          total: orders.totalSales,
+          commission: orders.totalCommission,
+          net: orders.totalSales - orders.totalCommission,
+          pending: orders.pendingEarnings
+        },
+        performance: {
+          averageOrderValue: orders.totalOrders > 0 
+            ? orders.totalSales / orders.totalOrders 
+            : 0,
+          commissionRate: orders.totalSales > 0 
+            ? (orders.totalCommission / orders.totalSales) * 100 
+            : 0
+        }
+      };
+    });
+
+    // Get totals for all sellers
+    const totals = sellersWithStats.reduce((acc, seller) => ({
+      totalSellers: acc.totalSellers + 1,
+      totalBalance: acc.totalBalance + seller.earnings.availableBalance,
+      totalPending: acc.totalPending + seller.earnings.pendingBalance,
+      totalEarnings: acc.totalEarnings + seller.earnings.totalEarnings,
+      totalWithdrawn: acc.totalWithdrawn + seller.earnings.totalWithdrawn,
+      totalOrders: acc.totalOrders + seller.orders.total,
+      totalSales: acc.totalSales + seller.sales.total,
+      totalCommission: acc.totalCommission + seller.sales.commission,
+      totalNet: acc.totalNet + seller.sales.net,
+      totalPendingEarnings: acc.totalPendingEarnings + seller.sales.pending
+    }), {
+      totalSellers: 0,
+      totalBalance: 0,
+      totalPending: 0,
+      totalEarnings: 0,
+      totalWithdrawn: 0,
+      totalOrders: 0,
+      totalSales: 0,
+      totalCommission: 0,
+      totalNet: 0,
+      totalPendingEarnings: 0
+    });
+
+    // Get count for pagination
+    const totalSellers = await User.countDocuments(searchQuery);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        sellers: sellersWithStats,
+        totals,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: totalSellers,
+          pages: Math.ceil(totalSellers / limit)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get all sellers earnings error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch sellers earnings data',
+      message: error.message
+    });
+  }
+});
 router.get("/dashboard", auth, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
