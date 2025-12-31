@@ -33,7 +33,7 @@ const EarningsOverview: React.FC<EarningsOverviewProps> = ({
     {
       title: 'Total Earnings (USD)',
       value: formatCurrency(totalRevenue),
-      description: 'All-time income from orders',
+      description: 'All-time incomes',
       icon: '💰',
       color: 'from-purple-500 to-pink-500'
     },
