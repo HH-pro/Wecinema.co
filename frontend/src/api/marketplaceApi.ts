@@ -785,14 +785,15 @@ const uploadApi = {
 // ✅ UTILITY FUNCTIONS (PUBLIC)
 // ============================================
 
-export const formatCurrency = (amount) => {
-  const amountInRupees = (amount || 0) / 100;
-  return new Intl.NumberFormat('en-IN', {
+export const formatCurrency = (amountInCents: number, currency: string = 'USD') => {
+  // اگر API پہلے سے ڈالرز میں ڈیٹا بھیج رہی ہے تو پھر کچھ کرنے کی ضرورت نہیں
+  const amountInDollars = amountInCents / 100;
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'INR',
+    currency: currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  }).format(amountInRupees);
+  }).format(amountInDollars);
 };
 
 export const formatCurrencyAmount = (amount) => {
@@ -802,24 +803,25 @@ export const formatCurrencyAmount = (amount) => {
     maximumFractionDigits: 2
   }).format(amountInRupees);
 };
-
-export const formatCurrencyShort = (amount) => {
-  const amountInRupees = (amount || 0) / 100;
-  if (amountInRupees >= 10000000) {
-    return `₹${(amountInRupees / 10000000).toFixed(1)}Cr`;
-  } else if (amountInRupees >= 100000) {
-    return `₹${(amountInRupees / 100000).toFixed(1)}L`;
-  } else if (amountInRupees >= 1000) {
-    return `₹${(amountInRupees / 1000).toFixed(1)}K`;
+export const formatCurrencyShort = (amountInCents: number, currency: string = 'USD') => {
+  const amountInDollars = amountInCents / 100;
+  
+  if (amountInDollars >= 1000) {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amountInDollars);
   }
-  return new Intl.NumberFormat('en-IN', {
+  
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(amountInRupees);
+    currency: currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amountInDollars);
 };
-
 export const testApiConnection = async () => {
   try {
     const response = await axios.get(`${API_BASE_URL}/marketplace/orders/test`);
