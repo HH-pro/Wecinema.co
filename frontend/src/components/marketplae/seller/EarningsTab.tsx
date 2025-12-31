@@ -1,18 +1,19 @@
-// src/components/marketplae/seller/EarningsTab.tsx - COMPLETE UPDATED VERSION
+// src/components/marketplae/seller/EarningsTab.tsx - USD UPDATE
 import React, { useState, useEffect } from 'react';
-import paymentsApi from '../../../api/paymentsApi';
-
+import { paymentsApi } from '../../../api/marketplace/paymentsApi'; // ✅ DIRECT IMPORT
 
 interface EarningsTabProps {
   earningsBalance: any;
   monthlyEarnings: any[];
   earningsHistory: any[];
   orderStats: any;
-  onWithdrawRequest: (amount: number) => Promise<void>;
+  onWithdrawRequest: (amountInDollars: number) => Promise<void>;
   loading: boolean;
   onRefresh: () => Promise<void>;
-  formatCurrency?: (amount: number) => string;
-  formatCurrencyShort?: (amount: number) => string;
+  formatCurrency?: (amountInCents: number) => string;
+  formatCurrencyShort?: (amountInCents: number) => string;
+  dollarsToCents?: (dollars: number) => number;
+  centsToDollars?: (cents: number) => number;
 }
 
 const EarningsTab: React.FC<EarningsTabProps> = ({
@@ -24,7 +25,9 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   loading,
   onRefresh,
   formatCurrency = paymentsApi.formatCurrency, // ✅ DEFAULT TO PAYMENTS API
-  formatCurrencyShort = paymentsApi.formatCurrencyShort // ✅ DEFAULT TO PAYMENTS API
+  formatCurrencyShort = paymentsApi.formatCurrencyShort, // ✅ DEFAULT TO PAYMENTS API
+  dollarsToCents = paymentsApi.dollarsToCents,
+  centsToDollars = paymentsApi.centsToDollars
 }) => {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
@@ -59,9 +62,10 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
       return;
     }
     
+    const amountInDollars = parseFloat(withdrawAmount);
     setWithdrawing(true);
     try {
-      await onWithdrawRequest(parseFloat(withdrawAmount));
+      await onWithdrawRequest(amountInDollars);
       setWithdrawAmount('');
       setError('');
       await Promise.all([onRefresh(), fetchDetailedEarnings()]);
@@ -123,7 +127,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   // ✅ FORMAT DATE
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', {
+    return date.toLocaleDateString('en-US', {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
@@ -195,7 +199,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
             <div>
               <p className="text-sm font-medium text-purple-800">Total Earnings</p>
               <p className="text-3xl font-bold text-purple-900 mt-2">
-                {formatCurrency(earningsBalance?.totalEarnings || orderStats.totalRevenue * 100 || 0)}
+                {formatCurrency(earningsBalance?.totalEarnings || 0)}
               </p>
               <p className="text-sm text-purple-700 mt-2">
                 All-time earnings
@@ -374,7 +378,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
               <div className="flex-1">
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500 sm:text-sm">₹</span>
+                    <span className="text-gray-500 sm:text-sm">$</span>
                   </div>
                   <input
                     type="number"
@@ -386,7 +390,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                     placeholder="Enter amount"
                     className="pl-10 pr-4 py-3 w-full border border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                     min="1"
-                    step="1"
+                    step="0.01"
                   />
                 </div>
               </div>
@@ -409,25 +413,28 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
               </button>
             </div>
             <p className="text-sm text-gray-500 mt-2">
-              Available: {formatCurrency(earningsBalance?.availableBalance || 0)} • Minimum: ₹500
+              Available: {formatCurrency(earningsBalance?.availableBalance || 0)} • Minimum: $5.00
             </p>
           </div>
           
           {/* Quick Amount Buttons */}
           <div className="flex flex-wrap gap-2">
-            {[500, 1000, 2500, 5000, 10000].map((amount) => (
+            {[5, 10, 25, 50, 100].map((amount) => (
               <button
                 key={amount}
                 type="button"
                 onClick={() => setWithdrawAmount(amount.toString())}
                 className="px-4 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 transition-colors duration-200"
               >
-                ₹{amount.toLocaleString()}
+                ${amount}
               </button>
             ))}
             <button
               type="button"
-              onClick={() => setWithdrawAmount(((earningsBalance?.availableBalance || 0) / 100).toString())}
+              onClick={() => {
+                const availableInDollars = centsToDollars(earningsBalance?.availableBalance || 0);
+                setWithdrawAmount(availableInDollars.toFixed(2));
+              }}
               className="px-4 py-2 bg-yellow-100 hover:bg-yellow-200 border border-yellow-300 rounded-lg text-sm font-medium text-yellow-700 transition-colors duration-200"
             >
               Withdraw All
@@ -528,7 +535,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                 <span className="text-sm text-gray-600">Next Payout Date</span>
                 <span className="font-medium text-gray-900">
                   {earningsBalance?.nextPayoutDate 
-                    ? new Date(earningsBalance.nextPayoutDate).toLocaleDateString('en-IN', {
+                    ? new Date(earningsBalance.nextPayoutDate).toLocaleDateString('en-US', {
                         day: 'numeric',
                         month: 'short',
                         year: 'numeric'
@@ -560,7 +567,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Payment Processing</span>
-                <span className="font-medium text-gray-900">2.9% + ₹3</span>
+                <span className="font-medium text-gray-900">2.9% + $0.30</span>
               </div>
             </div>
           </div>
