@@ -1,7 +1,6 @@
-// src/components/marketplae/seller/WithdrawTab.tsx - FIXED VERSION
+// src/components/marketplae/seller/WithdrawTab.tsx - UPDATED VERSION
 import React, { useState, useEffect } from 'react';
-import paymentsApi from '../../../api/paymentsApi';
-
+import marketplaceApi from '../../../api/marketplaceApi';
 
 interface WithdrawTabProps {
   stripeStatus: any;
@@ -27,10 +26,10 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
   onPageChange,
   onWithdrawRequest,
   onRefresh,
-  formatCurrency = paymentsApi.formatCurrency,
-  validateWithdrawalAmount = paymentsApi.validateWithdrawalAmount,
-  dollarsToCents = paymentsApi.dollarsToCents,
-  centsToDollars = paymentsApi.centsToDollars
+  formatCurrency = marketplaceApi.formatCurrency,
+  validateWithdrawalAmount = marketplaceApi.validateWithdrawalAmount,
+  dollarsToCents = marketplaceApi.dollarsToCents,
+  centsToDollars = marketplaceApi.centsToDollars
 }) => {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
@@ -39,11 +38,11 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
   const [withdrawalStats, setWithdrawalStats] = useState<any>(null);
   const [statsLoading, setStatsLoading] = useState(false);
 
-  // ✅ FETCH WITHDRAWAL STATS FROM PAYMENTS API
+  // ✅ FETCH WITHDRAWAL STATS FROM MARKETPLACE API
   const fetchWithdrawalStats = async () => {
     try {
       setStatsLoading(true);
-      const response = await paymentsApi.getWithdrawalStats();
+      const response = await marketplaceApi.payments.getWithdrawalStats();
       
       if (response.success && response.data) {
         setWithdrawalStats(response.data);
@@ -78,7 +77,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
     const amountInDollars = parseFloat(withdrawAmount);
     const amountInCents = dollarsToCents(amountInDollars);
     
-    // ✅ USE PAYMENTS API VALIDATION
+    // ✅ USE MARKETPLACE API VALIDATION
     const validation = validateWithdrawalAmount(amountInCents, availableBalance);
     
     if (!validation.valid) {
@@ -144,7 +143,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
     });
   };
 
-  // ✅ CALCULATE TOTAL WITHDRAWN FROM WITHDRAWAL HISTORY
+  // ✅ CALCULATE TOTAL WITHDRAWN
   const calculateTotalWithdrawn = () => {
     if (earningsBalance?.totalWithdrawn) {
       return earningsBalance.totalWithdrawn;
@@ -479,7 +478,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                           onClick={async () => {
                             if (window.confirm('Are you sure you want to cancel this withdrawal?')) {
                               try {
-                                const response = await paymentsApi.cancelWithdrawal(withdrawal._id);
+                                const response = await marketplaceApi.withdrawals.cancelWithdrawal(withdrawal._id);
                                 if (response.success) {
                                   alert('Withdrawal cancelled successfully!');
                                   await onRefresh();
