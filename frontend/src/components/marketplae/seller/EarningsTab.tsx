@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import StripeStatusCard from './StripeStatusCard';
 import EarningsOverview from './EarningsOverview';
 import EarningsStats from './EarningsStats';
-import WithdrawModal from './WithdrawModal';
+import WithdrawModal from './WithdrawTab';
 import marketplaceApi from '../../../api/marketplaceApi';
 
 interface EarningsTabProps {
