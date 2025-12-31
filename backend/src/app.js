@@ -10,6 +10,7 @@ const {
   orderRoutes, 
   offerRoutes,
   chatRoutes,  // ✅ This is what you imported
+  paymentRoutes,
   stripeRoutes,
 } = require("./controller");
 
@@ -118,6 +119,7 @@ app.use("/marketplace/listings", listingRoutes);        // 🆕 API prefix add k
 app.use("/marketplace/orders", orderRoutes);           // 🆕 API prefix add karein  
 app.use("/marketplace/offers", offerRoutes);           // 🆕 API prefix add karein
 app.use("/marketplace/chat", chatRoutes);             // ✅ FIXED: Changed messageRoutes to chatRoutes
+app.use("/marketplace/payments", paymentRoutes);      
 app.use("/marketplace/stripe", stripeRoutes);         // 🆕 API prefix add karein
 
 // 🆕 STRIPE WEBHOOK ROUTE (Raw body parser ke baath)
