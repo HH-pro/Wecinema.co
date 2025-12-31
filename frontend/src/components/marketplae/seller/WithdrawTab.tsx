@@ -1,24 +1,19 @@
-// components/marketplace/seller/WithdrawTab.tsx - UPDATED WITH $ CURRENCY
+// components/marketplace/seller/WithdrawTab.tsx
 import React, { useState, useEffect } from 'react';
-
-// Format currency function - CHANGED TO $
-const formatCurrency = (amount: number) => {
-  const amountInDollars = amount / 100;
-  return `$${amountInDollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-};
+import { formatCurrency } from '../../../api/marketplaceApi';
 
 interface StripeStatus {
   connected: boolean;
   chargesEnabled?: boolean;
   payoutsEnabled?: boolean;
-  availableBalance?: number; // in cents
-  pendingBalance?: number; // in cents
+  availableBalance?: number;
+  pendingBalance?: number;
   accountId?: string;
 }
 
 interface Withdrawal {
   _id: string;
-  amount: number; // in cents
+  amount: number;
   status: string;
   stripeTransferId?: string;
   stripePayoutId?: string;
@@ -46,11 +41,8 @@ interface WithdrawTabProps {
   loading: boolean;
   currentPage: number;
   onPageChange: (page: number) => void;
-  onWithdrawRequest: (amount: number) => void; // amount in dollars
+  onWithdrawRequest: (amount: number) => void;
   onRefresh: () => void;
-  totalRevenue?: number; // in cents
-  thisMonthRevenue?: number; // in cents
-  pendingRevenue?: number; // in cents
 }
 
 const WithdrawTab: React.FC<WithdrawTabProps> = ({
@@ -60,27 +52,19 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
   currentPage,
   onPageChange,
   onWithdrawRequest,
-  onRefresh,
-  totalRevenue = 0,
-  thisMonthRevenue = 0,
-  pendingRevenue = 0
+  onRefresh
 }) => {
   const [withdrawAmount, setWithdrawAmount] = useState<string>('');
   const [customAmount, setCustomAmount] = useState<string>('');
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // All amounts are in cents
-  const availableBalance = stripeStatus?.availableBalance || 0; // in cents
-  const pendingBalance = stripeStatus?.pendingBalance || 0; // in cents
+  const availableBalance = stripeStatus?.availableBalance || 0;
+  const pendingBalance = stripeStatus?.pendingBalance || 0;
   const canWithdraw = stripeStatus?.connected && stripeStatus?.chargesEnabled;
   const hasBalance = availableBalance > 0;
 
-  // Convert cents to dollars for display and input
-  const availableBalanceInDollars = availableBalance / 100;
-  const pendingBalanceInDollars = pendingBalance / 100;
-
-  // Preset amounts in dollars
+  // Preset amounts
   const presetAmounts = [
     { value: 50, label: '$50' },
     { value: 100, label: '$100' },
@@ -90,9 +74,9 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
   ];
 
   // Handle preset amount selection
-  const handlePresetSelect = (amountInDollars: number) => {
-    if (amountInDollars <= availableBalanceInDollars) {
-      setWithdrawAmount(amountInDollars.toString());
+  const handlePresetSelect = (amount: number) => {
+    if (amount <= availableBalance / 100) {
+      setWithdrawAmount(amount.toString());
       setShowCustomInput(false);
     }
   };
@@ -110,39 +94,38 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
       return;
     }
 
-    const amountInDollars = parseFloat(withdrawAmount);
-    if (!amountInDollars || amountInDollars <= 0) {
+    const amount = parseFloat(withdrawAmount);
+    if (!amount || amount <= 0) {
       alert('Please enter a valid amount.');
       return;
     }
 
-    if (amountInDollars > availableBalanceInDollars) {
+    if (amount > availableBalance / 100) {
       alert(`Cannot withdraw more than your available balance of ${formatCurrency(availableBalance)}.`);
       return;
     }
 
-    if (amountInDollars < 5) {
+    if (amount < 5) {
       alert('Minimum withdrawal amount is $5.00.');
       return;
     }
 
-    if (window.confirm(`Are you sure you want to withdraw $${amountInDollars.toFixed(2)}?`)) {
+    if (window.confirm(`Are you sure you want to withdraw $${amount.toFixed(2)}?`)) {
       setIsProcessing(true);
       try {
-        await onWithdrawRequest(amountInDollars);
+        await onWithdrawRequest(amount);
         setWithdrawAmount('');
         setCustomAmount('');
         setShowCustomInput(false);
       } catch (error) {
         console.error('Withdrawal failed:', error);
-        alert('Withdrawal failed. Please try again.');
       } finally {
         setIsProcessing(false);
       }
     }
   };
 
-  // Format date in US format
+  // Format date
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -158,13 +141,13 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'bg-green-100 text-green-800 border border-green-200';
+        return 'bg-green-100 text-green-800';
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800 border border-yellow-200';
+        return 'bg-yellow-100 text-yellow-800';
       case 'failed':
-        return 'bg-red-100 text-red-800 border border-red-200';
+        return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800 border border-gray-200';
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -181,27 +164,6 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
         return '📝';
     }
   };
-
-  // Calculate total withdrawn amount
-  const calculateTotalWithdrawn = () => {
-    if (!withdrawalHistory?.withdrawals) return 0;
-    
-    return withdrawalHistory.withdrawals
-      .filter(w => w.status === 'completed')
-      .reduce((sum, w) => sum + w.amount, 0); // amount in cents
-  };
-
-  // Calculate success rate
-  const calculateSuccessRate = () => {
-    if (!withdrawalHistory?.withdrawals?.length) return 100;
-    
-    const total = withdrawalHistory.withdrawals.length;
-    const successful = withdrawalHistory.withdrawals.filter(w => w.status === 'completed').length;
-    
-    return Math.round((successful / total) * 100);
-  };
-
-  const totalWithdrawn = calculateTotalWithdrawn();
 
   if (loading) {
     return (
@@ -267,62 +229,18 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
           </div>
         </div>
 
-        {/* Total Withdrawn */}
+        {/* Quick Stats */}
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">Total Withdrawn</p>
+              <p className="text-sm text-gray-600 font-medium">Total Withdrawals</p>
               <p className="text-3xl font-bold text-gray-900 mt-2">
-                {formatCurrency(totalWithdrawn)}
+                {withdrawalHistory?.withdrawals?.length || 0}
               </p>
-              <div className="flex items-center gap-2 mt-1">
-                <p className="text-xs text-gray-500">{withdrawalHistory?.withdrawals?.length || 0} transactions</p>
-                <span className="text-xs font-medium text-green-600">
-                  {calculateSuccessRate()}% success rate
-                </span>
-              </div>
+              <p className="text-xs text-gray-500 mt-1">All-time transactions</p>
             </div>
             <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
               <span className="text-2xl">📊</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Earnings Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <span className="text-lg text-purple-600">💰</span>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Earnings</p>
-              <p className="text-lg font-bold text-gray-900">{formatCurrency(totalRevenue)}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <span className="text-lg text-green-600">📈</span>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">This Month Earnings</p>
-              <p className="text-lg font-bold text-gray-900">{formatCurrency(thisMonthRevenue)}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <span className="text-lg text-yellow-600">⏳</span>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Processing</p>
-              <p className="text-lg font-bold text-gray-900">{formatCurrency(pendingRevenue)}</p>
             </div>
           </div>
         </div>
@@ -373,11 +291,11 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                   <button
                     key={preset.value}
                     onClick={() => handlePresetSelect(preset.value)}
-                    disabled={preset.value > availableBalanceInDollars}
+                    disabled={preset.value > availableBalance / 100}
                     className={`px-4 py-3 rounded-lg border transition duration-200 ${
                       withdrawAmount === preset.value.toString()
                         ? 'bg-yellow-500 text-white border-yellow-500'
-                        : preset.value > availableBalanceInDollars
+                        : preset.value > availableBalance / 100
                         ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
                         : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-300'
                     }`}
@@ -411,13 +329,12 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                   <input
                     type="number"
                     min="5"
-                    max={availableBalanceInDollars}
+                    max={availableBalance / 100}
                     step="0.01"
                     value={customAmount}
                     onChange={(e) => {
-                      const value = e.target.value;
-                      setCustomAmount(value);
-                      setWithdrawAmount(value);
+                      setCustomAmount(e.target.value);
+                      setWithdrawAmount(e.target.value);
                     }}
                     placeholder="0.00"
                     className="block w-full pl-8 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none transition"
@@ -435,17 +352,17 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
             {/* Selected Amount Display */}
             {withdrawAmount && (
               <div className="mb-6">
-                <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-5">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-gray-600">Withdrawal Amount</p>
-                      <p className="text-3xl font-bold text-gray-900 mt-1">
+                      <p className="text-2xl font-bold text-gray-900 mt-1">
                         ${parseFloat(withdrawAmount).toFixed(2)}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-gray-600">Balance After Withdrawal</p>
-                      <p className="text-2xl font-bold text-green-700 mt-1">
+                      <p className="text-sm text-gray-600">Available After</p>
+                      <p className="text-lg font-semibold text-gray-900 mt-1">
                         {formatCurrency(availableBalance - (parseFloat(withdrawAmount) * 100))}
                       </p>
                     </div>
@@ -492,7 +409,6 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                     <li>• Processing time: 2-3 business days</li>
                     <li>• Funds will be transferred to your connected bank account</li>
                     <li>• No withdrawal fees for sellers</li>
-                    <li>• Withdrawals processed Monday to Friday only</li>
                   </ul>
                 </div>
               </div>
@@ -505,14 +421,9 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-semibold text-gray-900">Withdrawal History</h2>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-500">
-              {withdrawalHistory?.withdrawals?.length || 0} transactions
-            </span>
-            <div className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded-full">
-              {calculateSuccessRate()}% success rate
-            </div>
-          </div>
+          <span className="text-sm text-gray-500">
+            {withdrawalHistory?.withdrawals?.length || 0} transactions
+          </span>
         </div>
 
         {!withdrawalHistory?.withdrawals?.length ? (
@@ -527,116 +438,80 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
             </p>
           </div>
         ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Amount
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Destination
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Transfer ID
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {withdrawalHistory.withdrawals.map((withdrawal) => (
-                    <tr key={withdrawal._id} className="hover:bg-gray-50 transition duration-150">
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{formatDate(withdrawal.createdAt)}</div>
-                        {withdrawal.completedAt && (
-                          <div className="text-xs text-gray-500">
-                            Completed: {formatDate(withdrawal.completedAt)}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className={`text-lg font-semibold ${
-                          withdrawal.status === 'completed' ? 'text-green-700' : 'text-gray-900'
-                        }`}>
-                          {formatCurrency(withdrawal.amount)}
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Amount
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Destination
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Transfer ID
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {withdrawalHistory.withdrawals.map((withdrawal) => (
+                  <tr key={withdrawal._id} className="hover:bg-gray-50 transition duration-150">
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{formatDate(withdrawal.createdAt)}</div>
+                      {withdrawal.completedAt && (
+                        <div className="text-xs text-gray-500">
+                          Completed: {formatDate(withdrawal.completedAt)}
                         </div>
-                        {withdrawal.description && (
-                          <div className="text-xs text-gray-500">{withdrawal.description}</div>
-                        )}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="flex flex-col gap-2">
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(withdrawal.status)}`}>
-                            <span className="mr-1">{getStatusIcon(withdrawal.status)}</span>
-                            {withdrawal.status === 'completed' ? 'Completed' :
-                             withdrawal.status === 'pending' ? 'Pending' :
-                             withdrawal.status === 'failed' ? 'Failed' : withdrawal.status}
+                      )}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="text-lg font-semibold text-gray-900">
+                        {formatCurrency(withdrawal.amount)}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(withdrawal.status)}`}>
+                        <span className="mr-1">{getStatusIcon(withdrawal.status)}</span>
+                        {withdrawal.status.charAt(0).toUpperCase() + withdrawal.status.slice(1)}
+                      </span>
+                      {withdrawal.failureReason && (
+                        <div className="text-xs text-red-600 mt-1">{withdrawal.failureReason}</div>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {withdrawal.destination || 'Bank Account'}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="text-xs text-gray-500 font-mono">
+                        {withdrawal.stripeTransferId ? (
+                          <span className="truncate max-w-[120px] inline-block">
+                            {withdrawal.stripeTransferId}
                           </span>
-                          {withdrawal.failureReason && (
-                            <div className="text-xs text-red-600">{withdrawal.failureReason}</div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {withdrawal.destination || 'Bank Account'}
-                        </div>
-                        {withdrawal.stripePayoutId && (
-                          <div className="text-xs text-gray-500">Payout ID: {withdrawal.stripePayoutId}</div>
+                        ) : (
+                          'Pending...'
                         )}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="text-xs text-gray-500 font-mono">
-                          {withdrawal.stripeTransferId ? (
-                            <span className="truncate max-w-[120px] inline-block bg-gray-100 px-2 py-1 rounded">
-                              {withdrawal.stripeTransferId}
-                            </span>
-                          ) : (
-                            'Pending...'
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Summary Footer */}
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="text-sm text-gray-700">
-                  <span className="font-medium">Total Withdrawn:</span>{' '}
-                  <span className="text-lg font-bold text-green-700 ml-2">
-                    {formatCurrency(totalWithdrawn)}
-                  </span>
-                </div>
-                <div className="flex items-center gap-4 text-sm text-gray-600">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                    <span>Completed: {withdrawalHistory.withdrawals.filter(w => w.status === 'completed').length}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                    <span>Pending: {withdrawalHistory.withdrawals.filter(w => w.status === 'pending').length}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
 
         {/* Pagination */}
         {withdrawalHistory?.pagination && withdrawalHistory.pagination.pages > 1 && (
           <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-200">
             <div className="text-sm text-gray-700">
-              Page {currentPage} of {withdrawalHistory.pagination.pages}
+              Showing page {currentPage} of {withdrawalHistory.pagination.pages}
             </div>
             <div className="flex gap-2">
               <button
