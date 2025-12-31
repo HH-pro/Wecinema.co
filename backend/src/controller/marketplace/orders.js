@@ -2249,31 +2249,153 @@ router.get("/stats/seller", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
 
-    const stats = await Order.aggregate([
-      { $match: { sellerId: mongoose.Types.ObjectId(userId) } },
-      { $group: { _id: "$status", count: { $sum: 1 }, totalAmount: { $sum: "$amount" } } }
+    // Define all possible order statuses
+    const allStatuses = [
+      'pending', 'paid', 'processing', 'in_progress', 
+      'delivered', 'completed', 'cancelled', 'refunded',
+      'in_revision', 'disputed'
+    ];
+
+    // Get counts and totals for each status
+    const statsByStatus = await Order.aggregate([
+      { 
+        $match: { 
+          sellerId: mongoose.Types.ObjectId(userId) 
+        } 
+      },
+      { 
+        $group: { 
+          _id: "$status", 
+          count: { $sum: 1 }, 
+          totalAmount: { $sum: "$amount" } 
+        } 
+      },
+      {
+        $sort: { count: -1 } // Sort by highest count first
+      }
     ]);
 
-    const totalStats = {
-      totalOrders: await Order.countDocuments({ sellerId: userId }),
-      totalRevenue: await Order.aggregate([
-        { $match: { sellerId: mongoose.Types.ObjectId(userId), status: 'completed' } },
-        { $group: { _id: null, total: { $sum: "$amount" } } }
-      ]).then(result => result[0]?.total || 0),
-      pendingRevenue: await Order.aggregate([
-        { $match: { 
-          sellerId: mongoose.Types.ObjectId(userId), 
-          status: { $in: ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'] }
-        } },
-        { $group: { _id: null, total: { $sum: "$amount" } } }
-      ]).then(result => result[0]?.total || 0)
+    // Ensure all statuses are included (even with zero count)
+    const completeStats = allStatuses.map(status => {
+      const found = statsByStatus.find(s => s._id === status);
+      return found || {
+        _id: status,
+        count: 0,
+        totalAmount: 0
+      };
+    });
+
+    // Calculate total statistics
+    const totalStats = await Order.aggregate([
+      { 
+        $match: { 
+          sellerId: mongoose.Types.ObjectId(userId) 
+        } 
+      },
+      {
+        $facet: {
+          // Total summary
+          totalSummary: [
+            {
+              $group: {
+                _id: null,
+                totalOrders: { $sum: 1 },
+                totalAmount: { $sum: "$amount" },
+                avgOrderValue: { $avg: "$amount" }
+              }
+            }
+          ],
+          // Revenue breakdown by status categories
+          revenueBreakdown: [
+            {
+              $group: {
+                _id: "$status",
+                totalAmount: { $sum: "$amount" }
+              }
+            }
+          ],
+          // Completed orders revenue
+          completedRevenue: [
+            { 
+              $match: { 
+                status: 'completed' 
+              } 
+            },
+            { 
+              $group: { 
+                _id: null, 
+                total: { $sum: "$amount" },
+                count: { $sum: 1 }
+              } 
+            }
+          ],
+          // Pending/active orders revenue (orders not completed/cancelled/refunded)
+          pendingRevenue: [
+            { 
+              $match: { 
+                status: { 
+                  $in: ['pending', 'paid', 'processing', 'in_progress', 
+                       'delivered', 'in_revision', 'disputed'] 
+                }
+              } 
+            },
+            { 
+              $group: { 
+                _id: null, 
+                total: { $sum: "$amount" },
+                count: { $sum: 1 }
+              } 
+            }
+          ],
+          // This month's revenue
+          thisMonthRevenue: [
+            { 
+              $match: { 
+                status: 'completed',
+                createdAt: { 
+                  $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+                }
+              } 
+            },
+            { 
+              $group: { 
+                _id: null, 
+                total: { $sum: "$amount" },
+                count: { $sum: 1 }
+              } 
+            }
+          ]
+        }
+      }
+    ]);
+
+    const summary = totalStats[0];
+    
+    // Prepare final response
+    const response = {
+      success: true,
+      statsByStatus: completeStats,
+      totals: {
+        totalOrders: summary.totalSummary[0]?.totalOrders || 0,
+        totalRevenue: summary.totalSummary[0]?.totalAmount || 0,
+        averageOrderValue: summary.totalSummary[0]?.avgOrderValue || 0,
+        completedOrders: {
+          count: summary.completedRevenue[0]?.count || 0,
+          revenue: summary.completedRevenue[0]?.total || 0
+        },
+        pendingOrders: {
+          count: summary.pendingRevenue[0]?.count || 0,
+          revenue: summary.pendingRevenue[0]?.total || 0
+        },
+        thisMonthRevenue: summary.thisMonthRevenue[0]?.total || 0
+      },
+      breakdown: summary.revenueBreakdown.reduce((acc, item) => {
+        acc[item._id] = item.totalAmount;
+        return acc;
+      }, {})
     };
 
-    res.status(200).json({
-      success: true,
-      stats,
-      totals: totalStats
-    });
+    res.status(200).json(response);
   } catch (error) {
     console.error('Error fetching seller stats:', error);
     res.status(500).json({ 
