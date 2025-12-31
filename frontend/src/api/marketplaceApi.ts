@@ -1,4 +1,4 @@
-// src/api/marketplaceApi.js - UPDATED WITH EARNINGS/WITHDRAWAL ROUTES
+// src/api/marketplaceApi.js - UPDATED WITH CORRECT ENDPOINT PATHS
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:3000';
@@ -60,7 +60,7 @@ const earningsApi = {
   getEarningsDashboard: async () => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/marketplace/earnings/dashboard`,
+        `${API_BASE_URL}/api/marketplace/earnings/dashboard`,
         getHeaders()
       );
       return normalizeResponse(response);
@@ -73,7 +73,7 @@ const earningsApi = {
   processPayout: async (amount, paymentMethod, accountDetails) => {
     try {
       const response = await axios.post(
-        `${API_BASE_URL}/marketplace/earnings/process-payout`,
+        `${API_BASE_URL}/api/marketplace/earnings/process-payout`,
         { amount, paymentMethod, accountDetails },
         getHeaders()
       );
@@ -88,7 +88,7 @@ const earningsApi = {
     try {
       const { page = 1, limit = 20, type, status } = params;
       const response = await axios.get(
-        `${API_BASE_URL}/marketplace/earnings/payment-history`,
+        `${API_BASE_URL}/api/marketplace/earnings/payment-history`,
         {
           params: { page, limit, type, status },
           ...getHeaders()
@@ -105,7 +105,7 @@ const earningsApi = {
     try {
       const { status } = params;
       const response = await axios.get(
-        `${API_BASE_URL}/marketplace/earnings/withdrawal-history`,
+        `${API_BASE_URL}/api/marketplace/earnings/withdrawal-history`,
         {
           params: { status },
           ...getHeaders()
@@ -121,7 +121,7 @@ const earningsApi = {
   releasePayment: async (orderId) => {
     try {
       const response = await axios.post(
-        `${API_BASE_URL}/marketplace/earnings/release-payment/${orderId}`,
+        `${API_BASE_URL}/api/marketplace/earnings/release-payment/${orderId}`,
         {},
         getHeaders()
       );
@@ -139,7 +139,7 @@ const earningsApi = {
 const listingsApi = {
   getAllListings: async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/marketplace/listings`);
+      const response = await axios.get(`${API_BASE_URL}/api/marketplace/listings`);
       return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error, 'Failed to fetch listings');
@@ -149,7 +149,7 @@ const listingsApi = {
   getMyListings: async (params = {}) => {
     try {
       const { page = 1, limit = 10, status = '' } = params;
-      const response = await axios.get(`${API_BASE_URL}/marketplace/listings/my-listings`, {
+      const response = await axios.get(`${API_BASE_URL}/api/marketplace/listings/my-listings`, {
         params: { page, limit, status },
         ...getHeaders()
       });
@@ -162,7 +162,7 @@ const listingsApi = {
   createListing: async (listingData) => {
     try {
       const response = await axios.post(
-        `${API_BASE_URL}/marketplace/listings/create-listing`,
+        `${API_BASE_URL}/api/marketplace/listings/create-listing`,
         listingData,
         getHeaders()
       );
@@ -181,7 +181,7 @@ const listingsApi = {
       };
       
       const response = await axios.put(
-        `${API_BASE_URL}/marketplace/listings/${listingId}`,
+        `${API_BASE_URL}/api/marketplace/listings/${listingId}`,
         dataToSend,
         getHeaders()
       );
@@ -195,7 +195,7 @@ const listingsApi = {
   toggleListingStatus: async (listingId) => {
     try {
       const response = await axios.patch(
-        `${API_BASE_URL}/marketplace/listings/${listingId}/toggle-status`,
+        `${API_BASE_URL}/api/marketplace/listings/${listingId}/toggle-status`,
         {},
         getHeaders()
       );
@@ -208,7 +208,7 @@ const listingsApi = {
   deleteListing: async (listingId) => {
     try {
       const response = await axios.delete(
-        `${API_BASE_URL}/marketplace/listings/${listingId}`,
+        `${API_BASE_URL}/api/marketplace/listings/${listingId}`,
         getHeaders()
       );
       return normalizeResponse(response);
@@ -219,7 +219,7 @@ const listingsApi = {
 
   getListingDetails: async (listingId) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/marketplace/listings/${listingId}`);
+      const response = await axios.get(`${API_BASE_URL}/api/marketplace/listings/${listingId}`);
       return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error, 'Failed to fetch listing details');
@@ -229,7 +229,7 @@ const listingsApi = {
   getUserListings: async (userId, params = {}) => {
     try {
       const { page = 1, limit = 20, status = '' } = params;
-      const response = await axios.get(`${API_BASE_URL}/marketplace/user/${userId}/listings`, {
+      const response = await axios.get(`${API_BASE_URL}/api/marketplace/user/${userId}/listings`, {
         params: { page, limit, status }
       });
       return normalizeResponse(response);
@@ -247,9 +247,9 @@ const ordersApi = {
   getMySales: async () => {
     try {
       const endpoints = [
-        `${API_BASE_URL}/marketplace/my-sales`,
-        `${API_BASE_URL}/marketplace/orders/my-sales`,
-        `${API_BASE_URL}/marketplace/seller/orders`
+        `${API_BASE_URL}/api/marketplace/my-sales`,
+        `${API_BASE_URL}/api/marketplace/orders/my-sales`,
+        `${API_BASE_URL}/api/marketplace/seller/orders`
       ];
       
       for (const endpoint of endpoints) {
@@ -284,7 +284,7 @@ const ordersApi = {
   updateOrderStatus: async (orderId, status, additionalData = {}) => {
     try {
       const response = await axios.put(
-        `${API_BASE_URL}/marketplace/orders/${orderId}/status`,
+        `${API_BASE_URL}/api/marketplace/orders/${orderId}/status`,
         { status, ...additionalData },
         getHeaders()
       );
@@ -297,7 +297,7 @@ const ordersApi = {
   getOrderDetails: async (orderId) => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/marketplace/orders/${orderId}`,
+        `${API_BASE_URL}/api/marketplace/orders/${orderId}`,
         getHeaders()
       );
       return normalizeResponse(response);
@@ -315,7 +315,7 @@ const offersApi = {
   getReceivedOffers: async () => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/marketplace/offers/received-offers`,
+        `${API_BASE_URL}/api/marketplace/offers/received-offers`,
         getHeaders()
       );
       const normalized = normalizeResponse(response);
@@ -333,7 +333,7 @@ const offersApi = {
   acceptOffer: async (offerId) => {
     try {
       const response = await axios.put(
-        `${API_BASE_URL}/marketplace/offers/${offerId}/accept`,
+        `${API_BASE_URL}/api/marketplace/offers/${offerId}/accept`,
         {},
         getHeaders()
       );
@@ -346,7 +346,7 @@ const offersApi = {
   rejectOffer: async (offerId) => {
     try {
       const response = await axios.put(
-        `${API_BASE_URL}/marketplace/offers/${offerId}/reject`,
+        `${API_BASE_URL}/api/marketplace/offers/${offerId}/reject`,
         {},
         getHeaders()
       );
@@ -365,7 +365,7 @@ const stripeApi = {
   getStripeStatus: async () => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/marketplace/stripe/status`,
+        `${API_BASE_URL}/api/marketplace/stripe/status`,
         getHeaders()
       );
       return normalizeResponse(response);
@@ -374,28 +374,142 @@ const stripeApi = {
     }
   },
 
-  createStripeAccountLink: async () => {
+  getStripeStatusSimple: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/api/marketplace/stripe/status-simple`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch Stripe status');
+    }
+  },
+
+  onboardSeller: async () => {
     try {
       const response = await axios.post(
-        `${API_BASE_URL}/marketplace/stripe/create-account-link`,
+        `${API_BASE_URL}/api/marketplace/stripe/onboard-seller`,
         {},
         getHeaders()
       );
       return normalizeResponse(response);
     } catch (error) {
-      return handleApiError(error, 'Failed to create Stripe link');
+      return handleApiError(error, 'Failed to onboard seller');
+    }
+  },
+
+  completeOnboarding: async () => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/marketplace/stripe/complete-onboarding`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to complete onboarding');
+    }
+  },
+
+  createStripeAccountLink: async () => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/marketplace/stripe/create-account-link`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to create Stripe account link');
+    }
+  },
+
+  createLoginLink: async () => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/marketplace/stripe/create-login-link`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to create Stripe login link');
     }
   },
 
   getStripeBalance: async () => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/marketplace/stripe/balance`,
+        `${API_BASE_URL}/api/marketplace/stripe/balance`,
         getHeaders()
       );
       return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error, 'Failed to fetch Stripe balance');
+    }
+  },
+
+  getPayouts: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/api/marketplace/stripe/payouts`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch payouts');
+    }
+  },
+
+  createPayout: async (amount) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/marketplace/stripe/create-payout`,
+        { amount },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to create payout');
+    }
+  },
+
+  getStripePayouts: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/api/marketplace/stripe/stripe-payouts`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch Stripe payouts');
+    }
+  },
+
+  createPaymentIntent: async (orderId) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/marketplace/stripe/create-payment-intent`,
+        { orderId },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to create payment intent');
+    }
+  },
+
+  confirmPayment: async (paymentIntentId) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/marketplace/stripe/confirm-payment`,
+        { paymentIntentId },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to confirm payment');
     }
   }
 };
@@ -441,7 +555,7 @@ export const formatCurrencyShort = (amount) => {
 
 export const testApiConnection = async () => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/marketplace/test`);
+    const response = await axios.get(`${API_BASE_URL}/api/marketplace/test`);
     return {
       success: true,
       message: 'API connection successful',
@@ -520,6 +634,77 @@ export const getPaymentMethodIcon = (method) => {
 };
 
 // ============================================
+// ✅ DASHBOARD API (Combined data for dashboard)
+// ============================================
+
+const dashboardApi = {
+  // Get complete dashboard data
+  getDashboardData: async () => {
+    try {
+      // Fetch all data in parallel
+      const [
+        earningsResponse,
+        stripeStatusResponse,
+        listingsResponse,
+        salesResponse,
+        offersResponse
+      ] = await Promise.allSettled([
+        earningsApi.getEarningsDashboard(),
+        stripeApi.getStripeStatusSimple(),
+        listingsApi.getMyListings({ page: 1, limit: 5 }),
+        ordersApi.getMySales(),
+        offersApi.getReceivedOffers()
+      ]);
+
+      // Process responses
+      const earnings = earningsResponse.status === 'fulfilled' ? earningsResponse.value : { success: false, data: null };
+      const stripeStatus = stripeStatusResponse.status === 'fulfilled' ? stripeStatusResponse.value : { success: false, data: null };
+      const listings = listingsResponse.status === 'fulfilled' ? listingsResponse.value : { success: false, data: [] };
+      const sales = salesResponse.status === 'fulfilled' ? salesResponse.value : [];
+      const offers = offersResponse.status === 'fulfilled' ? offersResponse.value : { success: false, data: [] };
+
+      // Calculate order stats
+      const orderStats = {
+        totalOrders: sales.length,
+        completed: sales.filter(order => order.status === 'completed').length,
+        pending: sales.filter(order => ['pending', 'in_progress'].includes(order.status)).length,
+        cancelled: sales.filter(order => order.status === 'cancelled').length,
+        totalRevenue: sales.reduce((sum, order) => sum + (order.totalAmount || 0), 0)
+      };
+
+      return {
+        success: true,
+        data: {
+          earnings: earnings.success ? earnings.data : null,
+          stripeStatus: stripeStatus.success ? stripeStatus.data : null,
+          listings: listings.success ? listings.data : [],
+          sales: Array.isArray(sales) ? sales : [],
+          offers: offers.success ? offers.data : [],
+          orderStats,
+          lastUpdated: new Date().toISOString()
+        }
+      };
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch dashboard data');
+    }
+  },
+
+  // Quick refresh for dashboard
+  refreshDashboard: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/api/marketplace/dashboard/refresh`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      // Fallback to individual API calls
+      return dashboardApi.getDashboardData();
+    }
+  }
+};
+
+// ============================================
 // ✅ MAIN API EXPORT (SINGLE EXPORT OBJECT)
 // ============================================
 
@@ -530,6 +715,7 @@ const marketplaceApi = {
   offers: offersApi,
   stripe: stripeApi,
   earnings: earningsApi,
+  dashboard: dashboardApi,
   
   // Utility Functions
   formatCurrency,
@@ -563,15 +749,28 @@ const marketplaceApi = {
   
   // Stripe
   getStripeStatus: stripeApi.getStripeStatus,
+  getStripeStatusSimple: stripeApi.getStripeStatusSimple,
+  onboardSeller: stripeApi.onboardSeller,
+  completeOnboarding: stripeApi.completeOnboarding,
   createStripeAccountLink: stripeApi.createStripeAccountLink,
+  createLoginLink: stripeApi.createLoginLink,
   getStripeBalance: stripeApi.getStripeBalance,
+  getPayouts: stripeApi.getPayouts,
+  createPayout: stripeApi.createPayout,
+  getStripePayouts: stripeApi.getStripePayouts,
+  createPaymentIntent: stripeApi.createPaymentIntent,
+  confirmPayment: stripeApi.confirmPayment,
   
   // Earnings
   getEarningsDashboard: earningsApi.getEarningsDashboard,
   processPayout: earningsApi.processPayout,
   getPaymentHistory: earningsApi.getPaymentHistory,
   getWithdrawalHistory: earningsApi.getWithdrawalHistory,
-  releasePayment: earningsApi.releasePayment
+  releasePayment: earningsApi.releasePayment,
+  
+  // Dashboard
+  getDashboardData: dashboardApi.getDashboardData,
+  refreshDashboard: dashboardApi.refreshDashboard
 };
 
 // ============================================
@@ -590,6 +789,6 @@ export {
   ordersApi,
   offersApi,
   stripeApi,
-  earningsApi
+  earningsApi,
+  dashboardApi
 };
-
