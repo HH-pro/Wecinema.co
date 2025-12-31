@@ -786,7 +786,6 @@ const uploadApi = {
 // ============================================
 
 export const formatCurrency = (amountInCents: number, currency: string = 'USD') => {
-  // اگر API پہلے سے ڈالرز میں ڈیٹا بھیج رہی ہے تو پھر کچھ کرنے کی ضرورت نہیں
   const amountInDollars = amountInCents / 100;
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
