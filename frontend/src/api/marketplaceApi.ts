@@ -1,4 +1,4 @@
-// src/api/marketplaceApi.js - UPDATED WITH PROPER EXPORTS
+// src/api/marketplaceApi.js - UPDATED WITH PAYMENTS API FUNCTIONS
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:3000';
@@ -49,6 +49,217 @@ const handleApiError = (error, defaultMessage = 'API Error') => {
     status: error.response?.status,
     data: errorData
   };
+};
+
+// ============================================
+// ✅ PAYMENTS API FUNCTIONS (ADDED)
+// ============================================
+
+const paymentsApi = {
+  getEarningsBalance: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/earnings/balance`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      // For development, return mock data
+      if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
+        return {
+          success: true,
+          data: {
+            availableBalance: 150000, // $1,500 in cents
+            pendingBalance: 50000,    // $500 in cents
+            totalEarnings: 200000,    // $2,000 in cents
+            totalWithdrawn: 50000,    // $500 in cents
+            walletBalance: 150000,    // $1,500 in cents
+            lastWithdrawal: null,
+            nextPayoutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            currency: 'usd'
+          }
+        };
+      }
+      return handleApiError(error, 'Failed to fetch earnings balance');
+    }
+  },
+
+  getMonthlyEarnings: async (params = {}) => {
+    try {
+      const { months = 6 } = params;
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/earnings/monthly`,
+        {
+          params: { months },
+          ...getHeaders()
+        }
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      // For development, return mock data
+      if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
+        const monthlyData = [];
+        const now = new Date();
+        for (let i = 0; i < months; i++) {
+          const month = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          monthlyData.push({
+            _id: {
+              year: month.getFullYear(),
+              month: month.getMonth() + 1
+            },
+            earnings: Math.floor(Math.random() * 100000) + 50000, // $500-$1500
+            orders: Math.floor(Math.random() * 10) + 1
+          });
+        }
+        return {
+          success: true,
+          data: monthlyData.reverse()
+        };
+      }
+      return handleApiError(error, 'Failed to fetch monthly earnings');
+    }
+  },
+
+  getEarningsHistory: async (params = {}) => {
+    try {
+      const { page = 1, limit = 50 } = params;
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/earnings/history`,
+        {
+          params: { page, limit },
+          ...getHeaders()
+        }
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      // For development, return mock data
+      if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
+        const earningsHistory = [];
+        for (let i = 0; i < 15; i++) {
+          const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+          earningsHistory.push({
+            _id: `earning_${i}`,
+            date: date.toISOString(),
+            amount: Math.floor(Math.random() * 5000) + 1000, // $10-$60
+            type: 'earning',
+            status: i % 3 === 0 ? 'pending' : 'completed',
+            description: `Order #${1000 + i}`,
+            balanceAfter: Math.floor(Math.random() * 200000) + 50000 // $500-$2500
+          });
+        }
+        return {
+          success: true,
+          data: {
+            earnings: earningsHistory,
+            pagination: {
+              page: 1,
+              limit: 50,
+              total: 15,
+              pages: 1
+            }
+          }
+        };
+      }
+      return handleApiError(error, 'Failed to fetch earnings history');
+    }
+  },
+
+  getWithdrawalStats: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/withdrawals/stats`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      // For development, return mock data
+      if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
+        return {
+          success: true,
+          data: {
+            totalWithdrawn: 50000, // $500 in cents
+            pendingWithdrawals: 1,
+            statsByStatus: [
+              { _id: 'completed', count: 2 },
+              { _id: 'pending', count: 1 },
+              { _id: 'failed', count: 0 }
+            ],
+            lastWithdrawal: {
+              amount: 25000, // $250 in cents
+              status: 'completed',
+              createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString()
+            }
+          }
+        };
+      }
+      return handleApiError(error, 'Failed to fetch withdrawal stats');
+    }
+  },
+
+  cancelWithdrawal: async (withdrawalId) => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/withdrawals/${withdrawalId}/cancel`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to cancel withdrawal');
+    }
+  },
+
+  // UTILITY FUNCTIONS
+  formatCurrency: (amount) => {
+    const amountInDollars = (amount || 0) / 100;
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amountInDollars);
+  },
+
+  formatCurrencyShort: (amount) => {
+    const amountInDollars = (amount || 0) / 100;
+    if (amountInDollars >= 1000000) {
+      return `$${(amountInDollars / 1000000).toFixed(1)}M`;
+    } else if (amountInDollars >= 1000) {
+      return `$${(amountInDollars / 1000).toFixed(1)}K`;
+    }
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amountInDollars);
+  },
+
+  dollarsToCents: (dollars) => {
+    return Math.round(dollars * 100);
+  },
+
+  centsToDollars: (cents) => {
+    return cents / 100;
+  },
+
+  validateWithdrawalAmount: (amountInCents, availableBalance, minWithdrawal = 500) => {
+    if (amountInCents < minWithdrawal) {
+      return {
+        valid: false,
+        error: `Minimum withdrawal amount is $${(minWithdrawal / 100).toFixed(2)}`
+      };
+    }
+    
+    if (amountInCents > availableBalance) {
+      return {
+        valid: false,
+        error: 'Insufficient available balance'
+      };
+    }
+    
+    return { valid: true };
+  }
 };
 
 // ============================================
@@ -338,17 +549,41 @@ const withdrawalsApi = {
       );
       return normalizeResponse(response);
     } catch (error) {
-      // Return empty history for development
-      return {
-        success: true,
-        withdrawals: [],
-        pagination: {
-          page: 1,
-          limit: 10,
-          total: 0,
-          pages: 1
+      // Return mock history for development
+      if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
+        const withdrawals = [];
+        for (let i = 0; i < 8; i++) {
+          const date = new Date(Date.now() - i * 7 * 24 * 60 * 60 * 1000);
+          withdrawals.push({
+            _id: `withdrawal_${i}`,
+            amount: [10000, 15000, 25000, 5000, 30000][i % 5], // $100-$300
+            status: i === 0 ? 'pending' : i === 1 ? 'processing' : 'completed',
+            stripeTransferId: `tr_${Date.now()}_${i}`,
+            stripePayoutId: i > 1 ? `po_${Date.now()}_${i}` : undefined,
+            createdAt: date.toISOString(),
+            completedAt: i > 1 ? new Date(date.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString() : undefined,
+            destination: 'Bank Account •••• 4321',
+            description: `Withdrawal #${100 + i}`
+          });
         }
-      };
+        return {
+          success: true,
+          withdrawals,
+          pagination: {
+            page: 1,
+            limit: 10,
+            total: 8,
+            pages: 1
+          },
+          balance: {
+            availableBalance: 150000,
+            pendingBalance: 50000,
+            totalEarnings: 200000,
+            totalWithdrawn: 75000
+          }
+        };
+      }
+      return handleApiError(error, 'Failed to fetch withdrawal history');
     }
   },
 
@@ -458,13 +693,13 @@ const earningsApi = {
           return {
             success: true,
             availableBalance: totalRevenue,
-            currency: 'inr'
+            currency: 'usd'
           };
         } catch (calcError) {
           return {
             success: true,
             availableBalance: 0,
-            currency: 'inr'
+            currency: 'usd'
           };
         }
       }
@@ -478,39 +713,65 @@ const earningsApi = {
 // ✅ UTILITY FUNCTIONS (PUBLIC)
 // ============================================
 
+// ✅ CURRENCY FORMATTING FUNCTIONS (USD)
 export const formatCurrency = (amount) => {
-  const amountInRupees = (amount || 0) / 100;
-  return new Intl.NumberFormat('en-IN', {
+  const amountInDollars = (amount || 0) / 100;
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'INR',
+    currency: 'USD',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  }).format(amountInRupees);
+  }).format(amountInDollars);
 };
 
 export const formatCurrencyAmount = (amount) => {
-  const amountInRupees = (amount || 0) / 100;
-  return new Intl.NumberFormat('en-IN', {
+  const amountInDollars = (amount || 0) / 100;
+  return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  }).format(amountInRupees);
+  }).format(amountInDollars);
 };
 
 export const formatCurrencyShort = (amount) => {
-  const amountInRupees = (amount || 0) / 100;
-  if (amountInRupees >= 10000000) {
-    return `₹${(amountInRupees / 10000000).toFixed(1)}Cr`;
-  } else if (amountInRupees >= 100000) {
-    return `₹${(amountInRupees / 100000).toFixed(1)}L`;
-  } else if (amountInRupees >= 1000) {
-    return `₹${(amountInRupees / 1000).toFixed(1)}K`;
+  const amountInDollars = (amount || 0) / 100;
+  if (amountInDollars >= 1000000) {
+    return `$${(amountInDollars / 1000000).toFixed(1)}M`;
+  } else if (amountInDollars >= 1000) {
+    return `$${(amountInDollars / 1000).toFixed(1)}K`;
   }
-  return new Intl.NumberFormat('en-IN', {
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'INR',
+    currency: 'USD',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
-  }).format(amountInRupees);
+  }).format(amountInDollars);
+};
+
+// ✅ VALIDATION FUNCTIONS
+export const validateWithdrawalAmount = (amountInCents, availableBalance, minWithdrawal = 500) => {
+  if (amountInCents < minWithdrawal) {
+    return {
+      valid: false,
+      error: `Minimum withdrawal amount is $${(minWithdrawal / 100).toFixed(2)}`
+    };
+  }
+  
+  if (amountInCents > availableBalance) {
+    return {
+      valid: false,
+      error: 'Insufficient available balance'
+    };
+  }
+  
+  return { valid: true };
+};
+
+export const dollarsToCents = (dollars) => {
+  return Math.round(dollars * 100);
+};
+
+export const centsToDollars = (cents) => {
+  return cents / 100;
 };
 
 export const testApiConnection = async () => {
@@ -560,11 +821,15 @@ const marketplaceApi = {
   stripe: stripeApi,
   withdrawals: withdrawalsApi,
   earnings: earningsApi,
+  payments: paymentsApi, // ✅ ADDED PAYMENTS API
   
   // Utility Functions
   formatCurrency,
   formatCurrencyAmount,
   formatCurrencyShort,
+  validateWithdrawalAmount,
+  dollarsToCents,
+  centsToDollars,
   testApiConnection,
   checkAuth,
   getCurrentUserId,
@@ -602,7 +867,13 @@ const marketplaceApi = {
   // Earnings
   getEarningsSummary: earningsApi.getEarningsSummary,
   getEarningsByPeriod: earningsApi.getEarningsByPeriod,
-  getAvailableBalance: earningsApi.getAvailableBalance
+  getAvailableBalance: earningsApi.getAvailableBalance,
+  
+  // ✅ ADDED PAYMENTS API METHODS
+  getEarningsBalance: paymentsApi.getEarningsBalance,
+  getMonthlyEarnings: paymentsApi.getMonthlyEarnings,
+  getEarningsHistory: paymentsApi.getEarningsHistory,
+  getWithdrawalStats: paymentsApi.getWithdrawalStats
 };
 
 // ============================================
@@ -616,6 +887,17 @@ export default marketplaceApi;
 export { marketplaceApi };
 
 // Export all individual utility functions
+export {
+  formatCurrency,
+  formatCurrencyAmount,
+  formatCurrencyShort,
+  validateWithdrawalAmount,
+  dollarsToCents,
+  centsToDollars,
+  testApiConnection,
+  checkAuth,
+  getCurrentUserId
+};
 
 // Export API modules (optional - for advanced usage)
 export {
@@ -624,5 +906,6 @@ export {
   offersApi,
   stripeApi,
   withdrawalsApi,
-  earningsApi
+  earningsApi,
+  paymentsApi
 };
