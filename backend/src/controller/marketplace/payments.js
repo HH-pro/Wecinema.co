@@ -2,7 +2,12 @@ const express = require("express");
 const router = express.Router();
 const Order = require("../../models/marketplace/order");
 const User = require("../../models/user");
-const stripeConfig = require("../../config/stripe"); // 🆕 Updated import
+const stripeConfig = require("../../config/stripe");
+const mongoose = require("mongoose");
+const Withdrawal = require("../../models/Withdrawal"); // Add this import
+const Seller = require("../../models/Seller"); // Add this import
+
+// ========== PAYMENT ROUTES ========== //
 
 // 1. Create Payment Intent (Escrow mein funds hold karein)
 router.post("/create-payment-intent", async (req, res) => {
@@ -248,12 +253,385 @@ router.post("/request-refund", async (req, res) => {
   }
 });
 
+// ========== WITHDRAWAL ROUTES ========== //
+
+// 7. Get Withdrawal History
+router.get("/withdrawals", async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+    const { page = 1, limit = 10, status } = req.query;
+
+    const query = { sellerId: mongoose.Types.ObjectId(userId) };
+    
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    // Calculate pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Get withdrawals with pagination
+    const withdrawals = await Withdrawal.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    const total = await Withdrawal.countDocuments(query);
+
+    // Get seller's current balance
+    const seller = await Seller.findOne({ userId: mongoose.Types.ObjectId(userId) });
+    const earningsSummary = await Order.aggregate([
+      { 
+        $match: { 
+          sellerId: mongoose.Types.ObjectId(userId),
+          status: 'completed'
+        } 
+      },
+      {
+        $group: {
+          _id: null,
+          totalEarnings: { $sum: "$amount" }
+        }
+      }
+    ]);
+
+    const totalEarnings = earningsSummary[0]?.totalEarnings || 0;
+    const availableBalance = totalEarnings - (seller?.totalWithdrawn || 0);
+    const pendingBalance = seller?.pendingBalance || 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        withdrawals,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / parseInt(limit))
+        },
+        balance: {
+          availableBalance,
+          pendingBalance,
+          totalEarnings,
+          totalWithdrawn: seller?.totalWithdrawn || 0
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching withdrawal history:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch withdrawal history',
+      details: error.message 
+    });
+  }
+});
+
+// 8. Request Withdrawal
+router.post("/withdrawals", async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+    const { amount } = req.body;
+
+    // Validate amount
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid withdrawal amount'
+      });
+    }
+
+    // Convert amount to number (it comes in cents)
+    const amountInCents = parseInt(amount);
+
+    // Get seller
+    const seller = await Seller.findOne({ userId: mongoose.Types.ObjectId(userId) });
+    
+    if (!seller) {
+      return res.status(404).json({
+        success: false,
+        error: 'Seller not found'
+      });
+    }
+
+    // Calculate available balance from completed orders
+    const earningsSummary = await Order.aggregate([
+      { 
+        $match: { 
+          sellerId: mongoose.Types.ObjectId(userId),
+          status: 'completed'
+        } 
+      },
+      {
+        $group: {
+          _id: null,
+          totalEarnings: { $sum: "$amount" }
+        }
+      }
+    ]);
+
+    const totalEarnings = earningsSummary[0]?.totalEarnings || 0;
+    const availableBalance = totalEarnings - (seller.totalWithdrawn || 0);
+
+    // Check if withdrawal amount is valid
+    if (amountInCents > availableBalance) {
+      return res.status(400).json({
+        success: false,
+        error: 'Insufficient balance',
+        availableBalance,
+        totalEarnings,
+        totalWithdrawn: seller.totalWithdrawn || 0
+      });
+    }
+
+    // Check minimum withdrawal amount ($5 = 500 cents)
+    const MIN_WITHDRAWAL = 500;
+    if (amountInCents < MIN_WITHDRAWAL) {
+      return res.status(400).json({
+        success: false,
+        error: `Minimum withdrawal amount is $${(MIN_WITHDRAWAL / 100).toFixed(2)}`
+      });
+    }
+
+    // Create withdrawal request
+    const withdrawal = new Withdrawal({
+      sellerId: userId,
+      amount: amountInCents,
+      status: 'pending',
+      requestDate: new Date(),
+      description: `Withdrawal of $${(amountInCents / 100).toFixed(2)}`,
+      destination: seller.stripeAccountId ? 'Stripe Account' : 'Bank Account',
+      estimatedArrival: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) // 3 days
+    });
+
+    await withdrawal.save();
+
+    // Update seller's withdrawal stats
+    seller.totalWithdrawn = (seller.totalWithdrawn || 0) + amountInCents;
+    seller.pendingBalance = (seller.pendingBalance || 0) + amountInCents;
+    seller.lastWithdrawal = new Date();
+    await seller.save();
+
+    // If Stripe is connected, create Stripe transfer
+    if (seller.stripeAccountId) {
+      try {
+        const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+        
+        const transfer = await stripe.transfers.create({
+          amount: amountInCents,
+          currency: 'usd',
+          destination: seller.stripeAccountId,
+          description: `Withdrawal for seller ${seller._id}`
+        });
+
+        // Update withdrawal with Stripe info
+        withdrawal.stripeTransferId = transfer.id;
+        withdrawal.status = 'processing';
+        await withdrawal.save();
+
+      } catch (stripeError) {
+        console.error('Stripe transfer error:', stripeError);
+        // Continue even if Stripe fails - manual review needed
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Withdrawal request submitted successfully',
+      data: {
+        withdrawalId: withdrawal._id,
+        amount: amountInCents,
+        status: withdrawal.status,
+        estimatedArrival: withdrawal.estimatedArrival,
+        newBalance: availableBalance - amountInCents,
+        availableBalance: availableBalance - amountInCents
+      }
+    });
+
+  } catch (error) {
+    console.error('Error processing withdrawal:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to process withdrawal',
+      details: error.message 
+    });
+  }
+});
+
+// 9. Get Withdrawal Details
+router.get("/withdrawals/:withdrawalId", async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+    const { withdrawalId } = req.params;
+
+    const withdrawal = await Withdrawal.findOne({
+      _id: withdrawalId,
+      sellerId: userId
+    });
+
+    if (!withdrawal) {
+      return res.status(404).json({
+        success: false,
+        error: 'Withdrawal not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: withdrawal
+    });
+
+  } catch (error) {
+    console.error('Error fetching withdrawal details:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch withdrawal details',
+      details: error.message 
+    });
+  }
+});
+
+// 10. Cancel Withdrawal
+router.post("/withdrawals/:withdrawalId/cancel", async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+    const { withdrawalId } = req.params;
+
+    const withdrawal = await Withdrawal.findOne({
+      _id: withdrawalId,
+      sellerId: userId
+    });
+
+    if (!withdrawal) {
+      return res.status(404).json({
+        success: false,
+        error: 'Withdrawal not found'
+      });
+    }
+
+    // Only pending withdrawals can be cancelled
+    if (withdrawal.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        error: `Cannot cancel withdrawal with status: ${withdrawal.status}`
+      });
+    }
+
+    // Update withdrawal status
+    withdrawal.status = 'cancelled';
+    withdrawal.cancelledAt = new Date();
+    await withdrawal.save();
+
+    // Update seller's balance
+    const seller = await Seller.findOne({ userId: mongoose.Types.ObjectId(userId) });
+    if (seller) {
+      seller.totalWithdrawn = Math.max(0, (seller.totalWithdrawn || 0) - withdrawal.amount);
+      seller.pendingBalance = Math.max(0, (seller.pendingBalance || 0) - withdrawal.amount);
+      await seller.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Withdrawal cancelled successfully',
+      data: withdrawal
+    });
+
+  } catch (error) {
+    console.error('Error cancelling withdrawal:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to cancel withdrawal',
+      details: error.message 
+    });
+  }
+});
+
+// 11. Get Withdrawal Stats
+router.get("/withdrawals/stats/summary", async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+
+    // Get withdrawal stats
+    const withdrawalStats = await Withdrawal.aggregate([
+      {
+        $match: { sellerId: mongoose.Types.ObjectId(userId) }
+      },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+          totalAmount: { $sum: '$amount' }
+        }
+      }
+    ]);
+
+    // Get total withdrawn
+    const totalWithdrawn = await Withdrawal.aggregate([
+      {
+        $match: { 
+          sellerId: mongoose.Types.ObjectId(userId),
+          status: 'completed'
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$amount' }
+        }
+      }
+    ]);
+
+    // Get pending withdrawals
+    const pendingWithdrawals = await Withdrawal.aggregate([
+      {
+        $match: { 
+          sellerId: mongoose.Types.ObjectId(userId),
+          status: { $in: ['pending', 'processing'] }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$amount' }
+        }
+      }
+    ]);
+
+    // Get latest withdrawal
+    const lastWithdrawal = await Withdrawal.findOne({
+      sellerId: userId,
+      status: 'completed'
+    }).sort({ completedAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        statsByStatus: withdrawalStats,
+        totalWithdrawn: totalWithdrawn[0]?.total || 0,
+        pendingWithdrawals: pendingWithdrawals[0]?.total || 0,
+        lastWithdrawal: lastWithdrawal
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching withdrawal stats:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch withdrawal stats',
+      details: error.message 
+    });
+  }
+});
+
+// ========== STRIPE WEBHOOK ========== //
+
 router.post("/stripe-webhook", express.raw({type: 'application/json'}), async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event;
 
   try {
-   
     event = stripeConfig.verifyWebhook(req.body, sig);
   } catch (err) {
     console.error('Webhook signature verification failed.', err.message);
@@ -291,6 +669,35 @@ router.post("/stripe-webhook", express.raw({type: 'application/json'}), async (r
     case 'charge.refunded':
       const chargeRefunded = event.data.object;
       console.log('Charge was refunded!');
+      break;
+
+    case 'transfer.paid':
+      const transferPaid = event.data.object;
+      console.log('Transfer was paid to seller!');
+      
+      // Update withdrawal status
+      await Withdrawal.findOneAndUpdate(
+        { stripeTransferId: transferPaid.id },
+        { 
+          status: 'completed',
+          completedAt: new Date()
+        }
+      );
+      break;
+
+    case 'transfer.failed':
+      const transferFailed = event.data.object;
+      console.log('Transfer failed:', transferFailed.failure_message);
+      
+      // Update withdrawal status
+      await Withdrawal.findOneAndUpdate(
+        { stripeTransferId: transferFailed.id },
+        { 
+          status: 'failed',
+          failedAt: new Date(),
+          failureReason: transferFailed.failure_message
+        }
+      );
       break;
 
     default:
