@@ -1,7 +1,6 @@
-// src/components/marketplae/seller/WithdrawTab.tsx - COMPLETE UPDATED VERSION
+// src/components/marketplae/seller/WithdrawTab.tsx - USD UPDATE
 import React, { useState, useEffect } from 'react';
-import paymentsApi from '../../../api/paymentsApi';
-
+import { paymentsApi } from '../../../api/marketplace/paymentsApi'; // ✅ DIRECT IMPORT
 
 interface WithdrawTabProps {
   stripeStatus: any;
@@ -10,13 +9,15 @@ interface WithdrawTabProps {
   loading: boolean;
   currentPage: number;
   onPageChange: (page: number) => void;
-  onWithdrawRequest: (amount: number) => Promise<void>;
+  onWithdrawRequest: (amountInDollars: number) => Promise<void>;
   onRefresh: () => Promise<void>;
   totalRevenue: number;
   thisMonthRevenue: number;
   pendingRevenue: number;
-  formatCurrency?: (amount: number) => string;
+  formatCurrency?: (amountInCents: number) => string;
   validateWithdrawalAmount?: (amountInCents: number, availableBalance: number, minWithdrawal?: number) => any;
+  dollarsToCents?: (dollars: number) => number;
+  centsToDollars?: (cents: number) => number;
 }
 
 const WithdrawTab: React.FC<WithdrawTabProps> = ({
@@ -32,7 +33,9 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
   thisMonthRevenue,
   pendingRevenue,
   formatCurrency = paymentsApi.formatCurrency, // ✅ DEFAULT TO PAYMENTS API
-  validateWithdrawalAmount = paymentsApi.validateWithdrawalAmount // ✅ DEFAULT TO PAYMENTS API
+  validateWithdrawalAmount = paymentsApi.validateWithdrawalAmount, // ✅ DEFAULT TO PAYMENTS API
+  dollarsToCents = paymentsApi.dollarsToCents,
+  centsToDollars = paymentsApi.centsToDollars
 }) => {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
@@ -77,8 +80,8 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
       return;
     }
 
-    const amountInRupees = parseFloat(withdrawAmount);
-    const amountInCents = Math.round(amountInRupees * 100);
+    const amountInDollars = parseFloat(withdrawAmount);
+    const amountInCents = dollarsToCents(amountInDollars);
     
     // ✅ USE PAYMENTS API VALIDATION
     const validation = validateWithdrawalAmount(amountInCents, availableBalance);
@@ -92,7 +95,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
     setWithdrawing(true);
     
     try {
-      await onWithdrawRequest(amountInRupees);
+      await onWithdrawRequest(amountInDollars);
       setWithdrawAmount('');
       await onRefresh(); // Refresh data
       await fetchWithdrawalStats(); // Refresh stats
@@ -105,12 +108,12 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
 
   // ✅ QUICK WITHDRAWAL AMOUNT BUTTONS
   const quickAmounts = [
-    { label: '₹500', value: 500 },
-    { label: '₹1,000', value: 1000 },
-    { label: '₹2,500', value: 2500 },
-    { label: '₹5,000', value: 5000 },
-    { label: '₹10,000', value: 10000 },
-    { label: 'All', value: availableBalance / 100 }
+    { label: '$5', value: 5 },
+    { label: '$10', value: 10 },
+    { label: '$25', value: 25 },
+    { label: '$50', value: 50 },
+    { label: '$100', value: 100 },
+    { label: 'All', value: centsToDollars(availableBalance) }
   ];
 
   const handleQuickAmount = (amount: number) => {
@@ -139,7 +142,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
   // ✅ FORMAT DATE
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', {
+    return date.toLocaleDateString('en-US', {
       day: '2-digit',
       month: 'short',
       year: 'numeric'
@@ -290,7 +293,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <span className="text-gray-500 sm:text-sm">₹</span>
+                <span className="text-gray-500 sm:text-sm">$</span>
               </div>
               <input
                 type="number"
@@ -302,14 +305,14 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                 placeholder="Enter amount"
                 className="pl-10 pr-4 py-3 w-full border border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                 min="1"
-                step="1"
+                step="0.01"
               />
               <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                 <span className="text-gray-500 sm:text-sm">.00</span>
               </div>
             </div>
             <p className="text-sm text-gray-500 mt-2">
-              Available balance: <span className="font-semibold">{formatCurrency(availableBalance)}</span> • Minimum: ₹500
+              Available balance: <span className="font-semibold">{formatCurrency(availableBalance)}</span> • Minimum: $5.00
             </p>
           </div>
 
@@ -344,7 +347,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                 <h4 className="text-sm font-medium text-blue-800">Withdrawal Information</h4>
                 <ul className="mt-2 text-sm text-blue-700 space-y-1">
                   <li>• Withdrawals are processed within 2-3 business days</li>
-                  <li>• Minimum withdrawal amount is ₹500</li>
+                  <li>• Minimum withdrawal amount is $5.00</li>
                   <li>• No withdrawal fees for sellers</li>
                   <li>• Funds are transferred to your connected bank account</li>
                 </ul>
