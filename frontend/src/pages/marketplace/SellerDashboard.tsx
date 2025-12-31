@@ -1,4 +1,4 @@
-// src/pages/seller/SellerDashboard.tsx - COMPLETE UPDATED VERSION WITH DIRECT PAYMENTS API USAGE
+// src/pages/seller/SellerDashboard.tsx - USD UPDATE
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -9,7 +9,7 @@ import MarketplaceLayout from '../../components/Layout';
 import { getCurrentUserId } from '../../utilities/helperfFunction';
 
 // Import API - USE PAYMENTS API DIRECTLY
-import paymentsApi from '../../api/paymentsApi';
+import paymentsApi from '../../api/marketplace/paymentsApi';
 import marketplaceApi from '../../api/marketplaceApi';
 
 // Access API methods
@@ -27,7 +27,9 @@ const {
   formatCurrency,
   formatCurrencyAmount,
   formatCurrencyShort,
-  validateWithdrawalAmount
+  validateWithdrawalAmount,
+  dollarsToCents,
+  centsToDollars
 } = paymentsApi;
 
 // Import components
@@ -93,7 +95,7 @@ interface Order {
   buyerEmail: string;
   sellerId: string;
   sellerName: string;
-  amount: number;
+  amount: number; // USD amount (e.g., 50.00 = $50)
   status: string;
   paymentStatus: string;
   createdAt: string;
@@ -117,7 +119,7 @@ interface Offer {
   buyerId: string;
   buyerName: string;
   buyerEmail: string;
-  amount: number;
+  amount: number; // USD amount
   status: string;
   message?: string;
   createdAt: string;
@@ -128,7 +130,7 @@ interface Listing {
   _id: string;
   title: string;
   description: string;
-  price: number;
+  price: number; // USD amount
   category: string;
   tags: string[];
   status: string;
@@ -161,11 +163,11 @@ interface OrderStats {
   delivered: number;
   completed: number;
   cancelled: number;
-  totalRevenue: number;
-  pendingRevenue: number;
+  totalRevenue: number; // USD amount (e.g., 500.00 = $500)
+  pendingRevenue: number; // USD amount
   thisMonthOrders: number;
-  thisMonthRevenue: number;
-  availableBalance?: number;
+  thisMonthRevenue: number; // USD amount
+  availableBalance?: number; // in cents
 }
 
 interface StripeStatus {
@@ -178,14 +180,14 @@ interface StripeStatus {
   status?: string;
   payoutsEnabled?: boolean;
   name?: string;
-  balance?: number;
-  availableBalance?: number;
-  pendingBalance?: number;
+  balance?: number; // in cents
+  availableBalance?: number; // in cents
+  pendingBalance?: number; // in cents
 }
 
 interface Withdrawal {
   _id: string;
-  amount: number;
+  amount: number; // in cents
   status: string;
   stripeTransferId?: string;
   stripePayoutId?: string;
@@ -206,21 +208,22 @@ interface WithdrawalHistory {
     pages: number;
   };
   balance?: {
-    availableBalance: number;
-    pendingBalance: number;
-    totalEarnings: number;
-    totalWithdrawn: number;
+    availableBalance: number; // in cents
+    pendingBalance: number; // in cents
+    totalEarnings: number; // in cents
+    totalWithdrawn: number; // in cents
   };
 }
 
 interface EarningsBalance {
-  availableBalance: number;
-  pendingBalance: number;
-  totalEarnings: number;
-  totalWithdrawn: number;
-  walletBalance: number;
+  availableBalance: number; // in cents
+  pendingBalance: number; // in cents
+  totalEarnings: number; // in cents
+  totalWithdrawn: number; // in cents
+  walletBalance: number; // in cents
   lastWithdrawal: string | null;
   nextPayoutDate: string;
+  currency: string;
 }
 
 const SellerDashboard: React.FC = () => {
@@ -236,7 +239,7 @@ const SellerDashboard: React.FC = () => {
   const [showStripeSuccessAlert, setShowStripeSuccessAlert] = useState(false);
   const navigate = useNavigate();
   
-  // Order stats
+  // Order stats - USD AMOUNTS
   const [orderStats, setOrderStats] = useState<OrderStats>({
     totalOrders: 0,
     activeOrders: 0,
@@ -246,11 +249,11 @@ const SellerDashboard: React.FC = () => {
     delivered: 0,
     completed: 0,
     cancelled: 0,
-    totalRevenue: 0,
-    pendingRevenue: 0,
+    totalRevenue: 0, // USD
+    pendingRevenue: 0, // USD
     thisMonthOrders: 0,
-    thisMonthRevenue: 0,
-    availableBalance: 0
+    thisMonthRevenue: 0, // USD
+    availableBalance: 0 // in cents
   });
   
   // Earnings and Withdrawal states - USING PAYMENTS API DIRECTLY
@@ -362,9 +365,9 @@ const SellerDashboard: React.FC = () => {
       chargesEnabled: false,
       detailsSubmitted: false,
       status: 'not_connected',
-      balance: 0,
-      availableBalance: 0,
-      pendingBalance: 0
+      balance: 0, // in cents
+      availableBalance: 0, // in cents
+      pendingBalance: 0 // in cents
     };
   };
 
@@ -380,9 +383,9 @@ const SellerDashboard: React.FC = () => {
       country: 'US',
       payoutsEnabled: true,
       name: 'Test Seller',
-      balance: 150000,
-      availableBalance: 150000,
-      pendingBalance: 50000
+      balance: 150000, // $1,500.00 in cents
+      availableBalance: 150000, // $1,500.00 in cents
+      pendingBalance: 50000 // $500.00 in cents
     };
     
     localStorage.setItem('stripe_status', JSON.stringify(mockStatus));
@@ -395,7 +398,7 @@ const SellerDashboard: React.FC = () => {
     // Update order stats with available balance
     setOrderStats(prev => ({
       ...prev,
-      availableBalance: 150000
+      availableBalance: 150000 // $1,500.00 in cents
     }));
   };
 
@@ -424,7 +427,7 @@ const SellerDashboard: React.FC = () => {
     checkStripeReturn();
   }, []);
 
-  // ✅ Calculate order stats
+  // ✅ Calculate order stats (USD amounts)
   const calculateOrderStats = useCallback((orders: Order[]): OrderStats => {
     const now = new Date();
     const thisMonth = now.getMonth();
@@ -436,17 +439,17 @@ const SellerDashboard: React.FC = () => {
              orderDate.getFullYear() === thisYear;
     });
 
-    // Calculate total revenue from completed orders (in rupees)
+    // Calculate total revenue from completed orders (USD dollars)
     const totalRevenue = orders
       .filter(order => order.status === 'completed')
       .reduce((sum, order) => sum + order.amount, 0);
 
-    // Calculate pending revenue from active orders (in rupees)
+    // Calculate pending revenue from active orders (USD dollars)
     const pendingRevenue = orders
       .filter(order => ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(order.status))
       .reduce((sum, order) => sum + order.amount, 0);
 
-    // Calculate this month revenue (in rupees)
+    // Calculate this month revenue (USD dollars)
     const thisMonthRevenue = thisMonthOrders
       .filter(order => order.status === 'completed')
       .reduce((sum, order) => sum + order.amount, 0);
@@ -768,12 +771,12 @@ const SellerDashboard: React.FC = () => {
   };
 
   // ✅ HANDLE WITHDRAWAL REQUEST USING PAYMENTS API DIRECTLY
-  const handleWithdrawRequest = async (amount: number) => {
+  const handleWithdrawRequest = async (amountInDollars: number) => {
     try {
       setRefreshing(true);
       
-      // Convert amount to cents
-      const amountInCents = Math.round(amount * 100);
+      // Convert dollars to cents
+      const amountInCents = dollarsToCents(amountInDollars);
       const availableBalance = earningsBalance?.availableBalance || stripeStatus?.availableBalance || 0;
       
       // ✅ USE PAYMENTS API VALIDATION
@@ -1313,7 +1316,8 @@ const SellerDashboard: React.FC = () => {
 
   // Safe currency formatting function
   const safeFormatCurrency = (amount: number) => {
-    const amountInCents = amount * 100;
+    // Convert dollars to cents for formatting
+    const amountInCents = dollarsToCents(amount);
     return formatCurrency(amountInCents);
   };
 
@@ -1352,7 +1356,7 @@ const SellerDashboard: React.FC = () => {
                   <div>
                     <h3 className="font-medium text-purple-800">Development Mode</h3>
                     <p className="text-sm text-purple-700">
-                      Using paymentsApi for all earnings and withdrawal routes.
+                      Using paymentsApi for all earnings and withdrawal routes. All amounts in USD.
                     </p>
                   </div>
                 </div>
@@ -1578,6 +1582,8 @@ const SellerDashboard: React.FC = () => {
                     onRefresh={fetchEarningsData}
                     formatCurrency={formatCurrency}
                     formatCurrencyShort={formatCurrencyShort}
+                    dollarsToCents={dollarsToCents}
+                    centsToDollars={centsToDollars}
                   />
                 )}
 
@@ -1658,6 +1664,8 @@ const SellerDashboard: React.FC = () => {
                     pendingRevenue={orderStats.pendingRevenue}
                     formatCurrency={formatCurrency}
                     validateWithdrawalAmount={validateWithdrawalAmount}
+                    dollarsToCents={dollarsToCents}
+                    centsToDollars={centsToDollars}
                   />
                 )}
               </>
