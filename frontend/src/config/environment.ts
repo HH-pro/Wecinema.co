@@ -21,7 +21,7 @@ export interface EnvironmentConfig {
 
 const environment: EnvironmentConfig = {
   // API Configuration
-  apiBaseUrl: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
+  apiBaseUrl: process.env.REACT_APP_API_URL || 'http://localhost:5173/api',
   
   // Stripe Configuration
   stripePublicKey: process.env.REACT_APP_STRIPE_PUBLIC_KEY || 'pk_test_your_stripe_key',
