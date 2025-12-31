@@ -1,16 +1,17 @@
+// routes/payments.js
 const express = require("express");
 const router = express.Router();
-const Order = require("../../models/marketplace/order");
-const User = require("../../models/user");
-const stripeConfig = require("../../config/stripe");
 const mongoose = require("mongoose");
-const Withdrawal = require("../../models/marketplace/Withdrawal"); // Add this import
-const Seller = require("../../models/marketplace/Withdrawal"); // Add this import
+const authenticateMiddleware = require("../middleware/auth");
+const Order = require("../models/marketplace/order");
+const User = require("../models/user");
+const Seller = require("../models/Seller");
+const Withdrawal = require("../models/Withdrawal");
+const stripeConfig = require("../config/stripe");
 
 // ========== PAYMENT ROUTES ========== //
 
-// 1. Create Payment Intent (Escrow mein funds hold karein)
-router.post("/create-payment-intent", async (req, res) => {
+router.post("/create-payment-intent", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.body;
 
@@ -18,101 +19,120 @@ router.post("/create-payment-intent", async (req, res) => {
       .populate('listingId', 'title');
     
     if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
+      return res.status(404).json({ 
+        success: false,
+        error: 'Order not found' 
+      });
     }
 
-    // Check if user owns this order
     if (order.buyerId.toString() !== req.user.id) {
-      return res.status(403).json({ error: 'Access denied' });
+      return res.status(403).json({ 
+        success: false,
+        error: 'Access denied' 
+      });
     }
 
-    // Check if already paid
     if (order.status !== 'pending_payment') {
-      return res.status(400).json({ error: 'Order already paid or cancelled' });
+      return res.status(400).json({ 
+        success: false,
+        error: 'Order already paid or cancelled' 
+      });
     }
 
-    // 🆕 Use stripeConfig for payment intent creation
     const paymentIntent = await stripeConfig.createPaymentIntent(order.amount, {
       orderId: orderId.toString(),
       userId: req.user.id.toString(),
       type: 'marketplace_escrow'
     });
 
-    // Update order with payment intent ID
     order.stripePaymentIntentId = paymentIntent.id;
     await order.save();
 
     res.status(200).json({
-      clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id,
-      amount: order.amount
+      success: true,
+      data: {
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        amount: order.amount,
+        orderId: order._id
+      }
     });
   } catch (error) {
     console.error('Error creating payment intent:', error);
-    res.status(500).json({ error: error.message || 'Failed to create payment intent' });
+    res.status(500).json({ 
+      success: false,
+      error: error.message || 'Failed to create payment intent' 
+    });
   }
 });
 
-// 2. Confirm Payment Success (Frontend se call karein)
-router.post("/confirm-payment", async (req, res) => {
+router.post("/confirm-payment", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId, paymentIntentId } = req.body;
 
     const order = await Order.findById(orderId);
     
     if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
+      return res.status(404).json({ 
+        success: false,
+        error: 'Order not found' 
+      });
     }
 
-    // Verify payment intent
     if (order.stripePaymentIntentId !== paymentIntentId) {
-      return res.status(400).json({ error: 'Invalid payment intent' });
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid payment intent' 
+      });
     }
 
-    // Update order status to PAID
     order.status = 'paid';
     order.paidAt = new Date();
     await order.save();
 
     res.status(200).json({ 
+      success: true,
       message: 'Payment confirmed successfully', 
-      order,
-      nextStep: 'seller_will_start_work'
+      data: order
     });
   } catch (error) {
     console.error('Error confirming payment:', error);
-    res.status(500).json({ error: 'Failed to confirm payment' });
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to confirm payment' 
+    });
   }
 });
 
-// 3. Capture Payment (Funds release to seller)
-router.post("/capture-payment", async (req, res) => {
+router.post("/capture-payment", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.body;
 
     const order = await Order.findOne({
       _id: orderId,
       buyerId: req.user.id,
-      status: 'delivered' // Only capture if delivered
+      status: 'delivered'
     });
 
     if (!order) {
-      return res.status(404).json({ error: 'Order not found or not delivered' });
+      return res.status(404).json({ 
+        success: false,
+        error: 'Order not found or not delivered' 
+      });
     }
 
     if (!order.stripePaymentIntentId) {
-      return res.status(400).json({ error: 'No payment intent found' });
+      return res.status(400).json({ 
+        success: false,
+        error: 'No payment intent found' 
+      });
     }
 
-    // 🆕 Use stripeConfig for payment capture
     const paymentIntent = await stripeConfig.capturePayment(order.stripePaymentIntentId);
-
-    // 🆕 Use stripeConfig for fee calculation
     const fees = stripeConfig.calculateFees(order.amount);
     const platformFee = fees.platformFee;
     const sellerAmount = fees.sellerAmount;
 
-    // Update seller balance
     await User.findByIdAndUpdate(order.sellerId, {
       $inc: { 
         balance: sellerAmount,
@@ -120,7 +140,6 @@ router.post("/capture-payment", async (req, res) => {
       }
     });
 
-    // Update order status
     order.status = 'completed';
     order.paymentReleased = true;
     order.releaseDate = new Date();
@@ -131,20 +150,25 @@ router.post("/capture-payment", async (req, res) => {
     await order.save();
 
     res.status(200).json({ 
+      success: true,
       message: 'Payment captured and funds released to seller', 
-      order,
-      sellerAmount: sellerAmount,
-      platformFee: platformFee,
-      platformFeePercent: fees.platformFeePercent
+      data: {
+        order,
+        sellerAmount,
+        platformFee,
+        platformFeePercent: fees.platformFeePercent
+      }
     });
   } catch (error) {
     console.error('Error capturing payment:', error);
-    res.status(500).json({ error: error.message || 'Failed to capture payment' });
+    res.status(500).json({ 
+      success: false,
+      error: error.message || 'Failed to capture payment' 
+    });
   }
 });
 
-// 4. Cancel Payment Intent (Agar order cancel ho)
-router.post("/cancel-payment", async (req, res) => {
+router.post("/cancel-payment", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.body;
 
@@ -155,108 +179,126 @@ router.post("/cancel-payment", async (req, res) => {
     });
 
     if (!order) {
-      return res.status(404).json({ error: 'Order not found or already processed' });
+      return res.status(404).json({ 
+        success: false,
+        error: 'Order not found or already processed' 
+      });
     }
 
     if (order.stripePaymentIntentId) {
-      // 🆕 Use stripeConfig for payment cancellation
       await stripeConfig.cancelPayment(order.stripePaymentIntentId);
     }
 
-    // Update order status
     order.status = 'cancelled';
     await order.save();
 
     res.status(200).json({ 
+      success: true,
       message: 'Payment cancelled successfully', 
-      order 
+      data: order 
     });
   } catch (error) {
     console.error('Error cancelling payment:', error);
-    res.status(500).json({ error: error.message || 'Failed to cancel payment' });
+    res.status(500).json({ 
+      success: false,
+      error: error.message || 'Failed to cancel payment' 
+    });
   }
 });
 
-// 5. Get Payment Status
-router.get("/payment-status/:orderId", async (req, res) => {
+router.get("/payment-status/:orderId", authenticateMiddleware, async (req, res) => {
   try {
     const order = await Order.findById(req.params.orderId);
 
     if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
+      return res.status(404).json({ 
+        success: false,
+        error: 'Order not found' 
+      });
     }
 
-    // Check access
     if (order.buyerId.toString() !== req.user.id && order.sellerId.toString() !== req.user.id) {
-      return res.status(403).json({ error: 'Access denied' });
+      return res.status(403).json({ 
+        success: false,
+        error: 'Access denied' 
+      });
     }
 
     let paymentIntent = null;
     if (order.stripePaymentIntentId) {
-      // 🆕 Use stripeConfig for payment status
       paymentIntent = await stripeConfig.getPaymentStatus(order.stripePaymentIntentId);
     }
 
-    // 🆕 Calculate fees for display
     const fees = stripeConfig.calculateFees(order.amount);
 
     res.status(200).json({
-      orderStatus: order.status,
-      paymentIntent: paymentIntent ? {
-        status: paymentIntent.status,
-        amount: paymentIntent.amount / 100,
-        currency: paymentIntent.currency,
-        created: paymentIntent.created
-      } : null,
-      paymentReleased: order.paymentReleased,
-      releaseDate: order.releaseDate,
-      fees: fees // 🆕 Include fee breakdown
+      success: true,
+      data: {
+        orderStatus: order.status,
+        paymentIntent: paymentIntent ? {
+          status: paymentIntent.status,
+          amount: paymentIntent.amount / 100,
+          currency: paymentIntent.currency,
+          created: paymentIntent.created
+        } : null,
+        paymentReleased: order.paymentReleased,
+        releaseDate: order.releaseDate,
+        fees
+      }
     });
   } catch (error) {
     console.error('Error fetching payment status:', error);
-    res.status(500).json({ error: error.message || 'Failed to fetch payment status' });
+    res.status(500).json({ 
+      success: false,
+      error: error.message || 'Failed to fetch payment status' 
+    });
   }
 });
 
-// 6. Request Refund
-router.post("/request-refund", async (req, res) => {
+router.post("/request-refund", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId, reason } = req.body;
 
     const order = await Order.findOne({
       _id: orderId,
       buyerId: req.user.id,
-      status: 'paid' // Only refund if paid but not delivered
+      status: 'paid'
     });
 
     if (!order) {
-      return res.status(404).json({ error: 'Order not found or not eligible for refund' });
+      return res.status(404).json({ 
+        success: false,
+        error: 'Order not found or not eligible for refund' 
+      });
     }
 
-    // 🆕 Create refund using stripeConfig
     const refund = await stripeConfig.createRefund(order.stripePaymentIntentId);
 
-    // Update order status
     order.status = 'cancelled';
     order.refundReason = reason;
     order.refundedAt = new Date();
     await order.save();
 
     res.status(200).json({ 
+      success: true,
       message: 'Refund processed successfully', 
-      refundId: refund.id,
-      order 
+      data: {
+        refundId: refund.id,
+        order 
+      }
     });
   } catch (error) {
     console.error('Error processing refund:', error);
-    res.status(500).json({ error: error.message || 'Failed to process refund' });
+    res.status(500).json({ 
+      success: false,
+      error: error.message || 'Failed to process refund' 
+    });
   }
 });
 
 // ========== WITHDRAWAL ROUTES ========== //
 
-// 7. Get Withdrawal History
-router.get("/withdrawals", async (req, res) => {
+router.get("/withdrawals", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
     const { page = 1, limit = 10, status } = req.query;
@@ -267,10 +309,8 @@ router.get("/withdrawals", async (req, res) => {
       query.status = status;
     }
 
-    // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Get withdrawals with pagination
     const withdrawals = await Withdrawal.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -279,7 +319,6 @@ router.get("/withdrawals", async (req, res) => {
 
     const total = await Withdrawal.countDocuments(query);
 
-    // Get seller's current balance
     const seller = await Seller.findOne({ userId: mongoose.Types.ObjectId(userId) });
     const earningsSummary = await Order.aggregate([
       { 
@@ -329,13 +368,11 @@ router.get("/withdrawals", async (req, res) => {
   }
 });
 
-// 8. Request Withdrawal
-router.post("/withdrawals", async (req, res) => {
+router.post("/withdrawals", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
     const { amount } = req.body;
 
-    // Validate amount
     if (!amount || amount <= 0) {
       return res.status(400).json({
         success: false,
@@ -343,10 +380,7 @@ router.post("/withdrawals", async (req, res) => {
       });
     }
 
-    // Convert amount to number (it comes in cents)
     const amountInCents = parseInt(amount);
-
-    // Get seller
     const seller = await Seller.findOne({ userId: mongoose.Types.ObjectId(userId) });
     
     if (!seller) {
@@ -356,7 +390,6 @@ router.post("/withdrawals", async (req, res) => {
       });
     }
 
-    // Calculate available balance from completed orders
     const earningsSummary = await Order.aggregate([
       { 
         $match: { 
@@ -375,7 +408,6 @@ router.post("/withdrawals", async (req, res) => {
     const totalEarnings = earningsSummary[0]?.totalEarnings || 0;
     const availableBalance = totalEarnings - (seller.totalWithdrawn || 0);
 
-    // Check if withdrawal amount is valid
     if (amountInCents > availableBalance) {
       return res.status(400).json({
         success: false,
@@ -386,7 +418,6 @@ router.post("/withdrawals", async (req, res) => {
       });
     }
 
-    // Check minimum withdrawal amount ($5 = 500 cents)
     const MIN_WITHDRAWAL = 500;
     if (amountInCents < MIN_WITHDRAWAL) {
       return res.status(400).json({
@@ -395,7 +426,6 @@ router.post("/withdrawals", async (req, res) => {
       });
     }
 
-    // Create withdrawal request
     const withdrawal = new Withdrawal({
       sellerId: userId,
       amount: amountInCents,
@@ -403,18 +433,16 @@ router.post("/withdrawals", async (req, res) => {
       requestDate: new Date(),
       description: `Withdrawal of $${(amountInCents / 100).toFixed(2)}`,
       destination: seller.stripeAccountId ? 'Stripe Account' : 'Bank Account',
-      estimatedArrival: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) // 3 days
+      estimatedArrival: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
     });
 
     await withdrawal.save();
 
-    // Update seller's withdrawal stats
     seller.totalWithdrawn = (seller.totalWithdrawn || 0) + amountInCents;
     seller.pendingBalance = (seller.pendingBalance || 0) + amountInCents;
     seller.lastWithdrawal = new Date();
     await seller.save();
 
-    // If Stripe is connected, create Stripe transfer
     if (seller.stripeAccountId) {
       try {
         const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -426,14 +454,12 @@ router.post("/withdrawals", async (req, res) => {
           description: `Withdrawal for seller ${seller._id}`
         });
 
-        // Update withdrawal with Stripe info
         withdrawal.stripeTransferId = transfer.id;
         withdrawal.status = 'processing';
         await withdrawal.save();
 
       } catch (stripeError) {
         console.error('Stripe transfer error:', stripeError);
-        // Continue even if Stripe fails - manual review needed
       }
     }
 
@@ -460,8 +486,7 @@ router.post("/withdrawals", async (req, res) => {
   }
 });
 
-// 9. Get Withdrawal Details
-router.get("/withdrawals/:withdrawalId", async (req, res) => {
+router.get("/withdrawals/:withdrawalId", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
     const { withdrawalId } = req.params;
@@ -493,8 +518,7 @@ router.get("/withdrawals/:withdrawalId", async (req, res) => {
   }
 });
 
-// 10. Cancel Withdrawal
-router.post("/withdrawals/:withdrawalId/cancel", async (req, res) => {
+router.post("/withdrawals/:withdrawalId/cancel", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
     const { withdrawalId } = req.params;
@@ -511,7 +535,6 @@ router.post("/withdrawals/:withdrawalId/cancel", async (req, res) => {
       });
     }
 
-    // Only pending withdrawals can be cancelled
     if (withdrawal.status !== 'pending') {
       return res.status(400).json({
         success: false,
@@ -519,12 +542,10 @@ router.post("/withdrawals/:withdrawalId/cancel", async (req, res) => {
       });
     }
 
-    // Update withdrawal status
     withdrawal.status = 'cancelled';
     withdrawal.cancelledAt = new Date();
     await withdrawal.save();
 
-    // Update seller's balance
     const seller = await Seller.findOne({ userId: mongoose.Types.ObjectId(userId) });
     if (seller) {
       seller.totalWithdrawn = Math.max(0, (seller.totalWithdrawn || 0) - withdrawal.amount);
@@ -548,12 +569,10 @@ router.post("/withdrawals/:withdrawalId/cancel", async (req, res) => {
   }
 });
 
-// 11. Get Withdrawal Stats
-router.get("/withdrawals/stats/summary", async (req, res) => {
+router.get("/withdrawals/stats/summary", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
 
-    // Get withdrawal stats
     const withdrawalStats = await Withdrawal.aggregate([
       {
         $match: { sellerId: mongoose.Types.ObjectId(userId) }
@@ -567,7 +586,6 @@ router.get("/withdrawals/stats/summary", async (req, res) => {
       }
     ]);
 
-    // Get total withdrawn
     const totalWithdrawn = await Withdrawal.aggregate([
       {
         $match: { 
@@ -583,7 +601,6 @@ router.get("/withdrawals/stats/summary", async (req, res) => {
       }
     ]);
 
-    // Get pending withdrawals
     const pendingWithdrawals = await Withdrawal.aggregate([
       {
         $match: { 
@@ -599,7 +616,6 @@ router.get("/withdrawals/stats/summary", async (req, res) => {
       }
     ]);
 
-    // Get latest withdrawal
     const lastWithdrawal = await Withdrawal.findOne({
       sellerId: userId,
       status: 'completed'
@@ -625,6 +641,168 @@ router.get("/withdrawals/stats/summary", async (req, res) => {
   }
 });
 
+// ========== EARNINGS ROUTES ========== //
+
+router.get("/earnings/balance", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+
+    const seller = await Seller.findOne({ userId: mongoose.Types.ObjectId(userId) });
+    
+    if (!seller) {
+      return res.status(404).json({
+        success: false,
+        error: 'Seller not found'
+      });
+    }
+
+    const earningsSummary = await Order.aggregate([
+      { 
+        $match: { 
+          sellerId: mongoose.Types.ObjectId(userId),
+          status: 'completed'
+        } 
+      },
+      {
+        $group: {
+          _id: null,
+          totalEarnings: { $sum: "$amount" },
+          totalOrders: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const totalEarnings = earningsSummary[0]?.totalEarnings || 0;
+    const availableBalance = totalEarnings - (seller.totalWithdrawn || 0);
+    const pendingBalance = seller.pendingBalance || 0;
+
+    const thisMonthEarnings = await Order.aggregate([
+      { 
+        $match: { 
+          sellerId: mongoose.Types.ObjectId(userId),
+          status: 'completed',
+          createdAt: {
+            $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+          }
+        } 
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: "$amount" }
+        }
+      }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        availableBalance,
+        pendingBalance,
+        totalEarnings,
+        totalWithdrawn: seller.totalWithdrawn || 0,
+        walletBalance: seller.walletBalance || 0,
+        currency: 'USD',
+        lastWithdrawal: seller.lastWithdrawal || null,
+        nextPayoutDate: seller.nextPayoutDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        thisMonthRevenue: thisMonthEarnings[0]?.total || 0
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching earnings balance:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch earnings balance',
+      details: error.message 
+    });
+  }
+});
+
+router.get("/earnings/monthly", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+    const { months = 6 } = req.query;
+
+    const monthlyEarnings = await Order.aggregate([
+      {
+        $match: {
+          sellerId: mongoose.Types.ObjectId(userId),
+          status: 'completed',
+          completedAt: {
+            $gte: new Date(new Date().setMonth(new Date().getMonth() - parseInt(months)))
+          }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$completedAt" },
+            month: { $month: "$completedAt" }
+          },
+          earnings: { $sum: "$amount" },
+          orders: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { "_id.year": -1, "_id.month": -1 }
+      }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: monthlyEarnings
+    });
+  } catch (error) {
+    console.error('Error fetching monthly earnings:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch monthly earnings',
+      details: error.message 
+    });
+  }
+});
+
+router.get("/earnings/history", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+    const { page = 1, limit = 20, type = 'all' } = req.query;
+
+    const query = { sellerId: mongoose.Types.ObjectId(userId) };
+    
+    if (type !== 'all') {
+      query.type = type;
+    }
+
+    const earnings = await Withdrawal.find(query)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit))
+      .lean();
+
+    const total = await Withdrawal.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        earnings,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching earnings history:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch earnings history',
+      details: error.message 
+    });
+  }
+});
+
 // ========== STRIPE WEBHOOK ========== //
 
 router.post("/stripe-webhook", express.raw({type: 'application/json'}), async (req, res) => {
@@ -640,13 +818,11 @@ router.post("/stripe-webhook", express.raw({type: 'application/json'}), async (r
 
   console.log('Stripe Webhook Received:', event.type);
 
-  // Handle the event
   switch (event.type) {
     case 'payment_intent.succeeded':
       const paymentIntentSucceeded = event.data.object;
       console.log('PaymentIntent was successful!');
       
-      // Update order status if needed
       await Order.findOneAndUpdate(
         { stripePaymentIntentId: paymentIntentSucceeded.id },
         { 
@@ -675,7 +851,6 @@ router.post("/stripe-webhook", express.raw({type: 'application/json'}), async (r
       const transferPaid = event.data.object;
       console.log('Transfer was paid to seller!');
       
-      // Update withdrawal status
       await Withdrawal.findOneAndUpdate(
         { stripeTransferId: transferPaid.id },
         { 
@@ -689,7 +864,6 @@ router.post("/stripe-webhook", express.raw({type: 'application/json'}), async (r
       const transferFailed = event.data.object;
       console.log('Transfer failed:', transferFailed.failure_message);
       
-      // Update withdrawal status
       await Withdrawal.findOneAndUpdate(
         { stripeTransferId: transferFailed.id },
         { 
