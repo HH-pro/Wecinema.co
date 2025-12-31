@@ -785,16 +785,15 @@ const uploadApi = {
 // ✅ UTILITY FUNCTIONS (PUBLIC)
 // ============================================
 
-export const formatCurrency = (amountInCents: number, currency: string = 'USD') => {
-  const amountInDollars = amountInCents / 100;
+export const formatCurrencyAmount = (amount) => {
+  const amountInDollars = (amount || 0) / 100;
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: currency,
+    currency: 'USD',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(amountInDollars);
 };
-
 
 export const formatCurrencyShort = (amountInCents: number, currency: string = 'USD') => {
   const amountInDollars = amountInCents / 100;
