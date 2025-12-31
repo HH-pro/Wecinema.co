@@ -6,10 +6,10 @@ import { useNavigate } from 'react-router-dom';
 import MarketplaceLayout from '../../components/Layout';
 
 // Import helper function
-import { getCurrentUserId } from '../../utilities/helperFunction';
+import { getCurrentUserId } from '../../utilities/helperfFunction';
 
 // Import Direct Payments API
-import paymentsApi from '../../api/marketplace/paymentsApi';
+import paymentsApi from '../../../src/api/paymentsApi';
 
 // Import other APIs
 import marketplaceApi from '../../api/marketplaceApi';
