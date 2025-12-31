@@ -9,8 +9,8 @@ const listingRoutes = require("./marketplace/listingController");
 const orderRoutes = require("./marketplace/orders");
 const offerRoutes = require("./marketplace/offers");
 const chatRoutes = require("./marketplace/chat");
+const paymentRoutes = require("./marketplace/payments");
 const stripeRoutes = require("./marketplace/stripe");
-const earningRoutes = require("./marketplace/earnings");
 
 
 
@@ -25,6 +25,6 @@ module.exports = {
   orderRoutes, 
   offerRoutes,
   chatRoutes,
-  earningRoutes,
+  paymentRoutes,
   stripeRoutes,
 };
