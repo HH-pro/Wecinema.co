@@ -4,8 +4,8 @@ const Order = require("../../models/marketplace/order");
 const User = require("../../models/user");
 const stripeConfig = require("../../config/stripe");
 const mongoose = require("mongoose");
-const Withdrawal = require("../../models/Withdrawal"); // Add this import
-const Seller = require("../../models/Seller"); // Add this import
+const Withdrawal = require("../../models/marketplace/Withdrawal"); // Add this import
+const Seller = require("../../models/marketplace/Withdrawal"); // Add this import
 
 // ========== PAYMENT ROUTES ========== //
 
