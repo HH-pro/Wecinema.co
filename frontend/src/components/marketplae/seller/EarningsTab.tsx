@@ -1,9 +1,11 @@
+// components/marketplace/seller/EarningsTab.tsx
 import React, { useState, useEffect } from 'react';
 import StripeStatusCard from './StripeStatusCard';
 import EarningsOverview from './EarningsOverview';
 import EarningsStats from './EarningsStats';
-import WithdrawModal from './WithdrawTab';
+import WithdrawBalance from './WithdrawBalance'; // Import WithdrawBalance
 import marketplaceApi from '../../../api/marketplaceApi';
+import { formatCurrency } from '../../../utils/formatters';
 
 interface EarningsTabProps {
   stripeStatus: any;
@@ -19,35 +21,84 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   onRefresh
 }) => {
   const [earningsData, setEarningsData] = useState<any>(null);
-  const [balanceData, setBalanceData] = useState<any>(null);
-  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
-  const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [balanceData, setBalanceData] = useState<{
+    availableBalance: number; // in cents
+    pendingBalance: number; // in cents
+    totalEarnings: number; // in cents
+    totalWithdrawn: number; // in cents
+    thisMonthRevenue: number; // in cents
+    lastWithdrawal: string | null;
+    nextPayoutDate: string;
+  } | null>(null);
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [earningsHistory, setEarningsHistory] = useState<any[]>([]);
+  const [monthlyEarnings, setMonthlyEarnings] = useState<any[]>([]);
   const [earningsLoading, setEarningsLoading] = useState(false);
   
   const fetchEarningsData = async () => {
     try {
       setEarningsLoading(true);
       
-      // Fetch balance and earnings data
-      const [balanceResponse, monthlyResponse, historyResponse] = await Promise.allSettled([
+      // Fetch all earnings data in parallel
+      const [
+        balanceResponse, 
+        historyResponse, 
+        monthlyResponse,
+        withdrawalsResponse
+      ] = await Promise.allSettled([
         marketplaceApi.earnings.getBalance(),
-        marketplaceApi.earnings.getMonthlySummary(),
-        marketplaceApi.earnings.getHistory({ limit: 10 })
+        marketplaceApi.earnings.getHistory({ limit: 5 }),
+        marketplaceApi.earnings.getMonthlySummary({ months: 6 }),
+        marketplaceApi.earnings.getHistory({ 
+          limit: 5, 
+          type: 'withdrawal' 
+        })
       ]);
       
       const earningsData: any = {};
       
+      // Balance data
       if (balanceResponse.status === 'fulfilled' && balanceResponse.value.success) {
-        setBalanceData(balanceResponse.value.data);
+        const balance = balanceResponse.value.data;
+        setBalanceData({
+          availableBalance: balance.availableBalance || 0,
+          pendingBalance: balance.pendingBalance || 0,
+          totalEarnings: balance.totalEarnings || 0,
+          totalWithdrawn: balance.totalWithdrawn || 0,
+          thisMonthRevenue: 0, // Will calculate from monthly data
+          lastWithdrawal: balance.lastWithdrawal,
+          nextPayoutDate: balance.nextPayoutDate
+        });
       }
       
-      if (monthlyResponse.status === 'fulfilled' && monthlyResponse.value.success) {
-        earningsData.monthly = monthlyResponse.value.data;
-      }
-      
+      // Earnings history
       if (historyResponse.status === 'fulfilled' && historyResponse.value.success) {
-        setEarningsHistory(historyResponse.value.data.earnings);
+        setEarningsHistory(historyResponse.value.data?.earnings || []);
+      }
+      
+      // Monthly earnings
+      if (monthlyResponse.status === 'fulfilled' && monthlyResponse.value.success) {
+        const monthly = monthlyResponse.value.data || [];
+        setMonthlyEarnings(monthly);
+        
+        // Calculate this month's revenue
+        const currentMonth = new Date().getMonth() + 1;
+        const currentYear = new Date().getFullYear();
+        const thisMonth = monthly.find((item: any) => 
+          item._id?.month === currentMonth && item._id?.year === currentYear
+        );
+        
+        if (thisMonth && balanceData) {
+          setBalanceData(prev => ({
+            ...prev!,
+            thisMonthRevenue: thisMonth.earnings || 0
+          }));
+        }
+      }
+      
+      // Withdrawals
+      if (withdrawalsResponse.status === 'fulfilled' && withdrawalsResponse.value.success) {
+        setWithdrawals(withdrawalsResponse.value.data?.earnings || []);
       }
       
       setEarningsData(earningsData);
@@ -58,24 +109,13 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
     }
   };
   
-  const handleWithdrawRequest = async (amount: number) => {
+  const handleWithdrawSuccess = async (amount: number) => {
     try {
-      setWithdrawLoading(true);
-      const response = await marketplaceApi.earnings.withdraw({ amount });
-      
-      if (response.success) {
-        alert('Withdrawal request submitted successfully!');
-        setWithdrawModalOpen(false);
-        // Refresh balance data
-        fetchEarningsData();
-      } else {
-        alert(`Withdrawal failed: ${response.error}`);
-      }
+      // Refresh data after successful withdrawal
+      fetchEarningsData();
+      onRefresh(); // Refresh parent component data if needed
     } catch (error) {
-      console.error('Withdrawal error:', error);
-      alert('Failed to process withdrawal request');
-    } finally {
-      setWithdrawLoading(false);
+      console.error('Error refreshing after withdrawal:', error);
     }
   };
   
@@ -116,126 +156,244 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   
   return (
     <div className="space-y-8">
-      {/* Withdraw Modal */}
-      <WithdrawModal
-        isOpen={withdrawModalOpen}
-        onClose={() => setWithdrawModalOpen(false)}
-        onWithdraw={handleWithdrawRequest}
-        availableBalance={balanceData?.availableBalance || 0}
-        isLoading={withdrawLoading}
-      />
-      
       {/* Stripe Status Card */}
       <StripeStatusCard stripeStatus={stripeStatus} />
       
-      {/* Balance Overview */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6">
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <h3 className="text-sm font-medium text-blue-700 mb-1">Available Balance</h3>
-            <p className="text-3xl font-bold text-gray-900">
-              ₹{balanceData?.availableBalance?.toFixed(2) || '0.00'}
-            </p>
-            <p className="text-sm text-gray-600 mt-2">
-              Pending withdrawal: ₹{balanceData?.pendingBalance?.toFixed(2) || '0.00'}
-            </p>
+      {/* Withdraw Balance Component */}
+      {balanceData && (
+        <WithdrawBalance
+          stripeStatus={stripeStatus}
+          availableBalance={balanceData.availableBalance}
+          pendingBalance={balanceData.pendingBalance}
+          totalEarnings={balanceData.totalEarnings}
+          thisMonthEarnings={balanceData.thisMonthRevenue}
+          onWithdrawSuccess={handleWithdrawSuccess}
+        />
+      )}
+      
+      {/* Earnings Overview */}
+      <EarningsOverview
+        stripeStatus={stripeStatus}
+        orderStats={orderStats}
+        balanceData={balanceData}
+      />
+      
+      {/* Earnings Stats */}
+      <EarningsStats
+        orderStats={orderStats}
+        stripeStatus={stripeStatus}
+        monthlyEarnings={monthlyEarnings}
+      />
+      
+      {/* Recent Transactions Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Recent Earnings */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="p-6 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">Recent Earnings</h3>
+            <p className="text-sm text-gray-500 mt-1">Your latest income transactions</p>
           </div>
-          <button
-            onClick={() => setWithdrawModalOpen(true)}
-            disabled={(balanceData?.availableBalance || 0) < 500}
-            className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 ${
-              (balanceData?.availableBalance || 0) >= 500
-                ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 shadow-md hover:shadow'
-                : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-            }`}
-          >
-            💳 Withdraw Funds
-          </button>
+          <div className="divide-y divide-gray-100">
+            {earningsHistory.length > 0 ? (
+              earningsHistory.map((transaction, index) => (
+                <div key={index} className="p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className={`p-2 rounded-lg ${
+                        transaction.type === 'earning' ? 'bg-green-100 text-green-600' :
+                        transaction.type === 'withdrawal' ? 'bg-blue-100 text-blue-600' :
+                        'bg-red-100 text-red-600'
+                      }`}>
+                        {transaction.type === 'earning' ? '💰' :
+                         transaction.type === 'withdrawal' ? '💳' : '🔄'}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{transaction.description}</p>
+                        <p className="text-sm text-gray-500">
+                          {new Date(transaction.date).toLocaleDateString()} • 
+                          {transaction.status === 'completed' ? '✅ Completed' :
+                           transaction.status === 'pending' ? '⏳ Pending' : '❌ Failed'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className={`text-right ${
+                      transaction.type === 'earning' ? 'text-green-600' :
+                      transaction.type === 'withdrawal' ? 'text-blue-600' : 'text-red-600'
+                    }`}>
+                      <p className="font-medium">
+                        {transaction.type === 'earning' ? '+' : '-'}{formatCurrency(transaction.amount || 0)}
+                      </p>
+                      {transaction.balanceAfter && (
+                        <p className="text-sm text-gray-500">
+                          Balance: {formatCurrency(transaction.balanceAfter)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-8 text-center text-gray-500">
+                <div className="text-3xl mb-2">📊</div>
+                <p>No earnings transactions yet</p>
+                <p className="text-sm mt-1">Complete orders to see your earnings here</p>
+              </div>
+            )}
+          </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-xl p-4 border border-gray-200">
-            <p className="text-sm text-gray-600">Total Earnings</p>
-            <p className="text-lg font-semibold text-gray-900">
-              ₹{balanceData?.totalEarnings?.toFixed(2) || '0.00'}
-            </p>
+        {/* Recent Withdrawals */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="p-6 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">Recent Withdrawals</h3>
+            <p className="text-sm text-gray-500 mt-1">Your withdrawal requests</p>
           </div>
-          <div className="bg-white rounded-xl p-4 border border-gray-200">
-            <p className="text-sm text-gray-600">Total Withdrawn</p>
-            <p className="text-lg font-semibold text-gray-900">
-              ₹{balanceData?.totalWithdrawn?.toFixed(2) || '0.00'}
-            </p>
-          </div>
-          <div className="bg-white rounded-xl p-4 border border-gray-200">
-            <p className="text-sm text-gray-600">Next Payout</p>
-            <p className="text-lg font-semibold text-gray-900">
-              {balanceData?.nextPayoutDate 
-                ? new Date(balanceData.nextPayoutDate).toLocaleDateString()
-                : 'Not scheduled'}
-            </p>
-          </div>
-        </div>
-      </div>
-      
-      {/* Recent Earnings History */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Recent Transactions</h3>
-        </div>
-        <div className="divide-y divide-gray-100">
-          {earningsHistory.length > 0 ? (
-            earningsHistory.map((transaction, index) => (
-              <div key={index} className="p-4 hover:bg-gray-50 transition-colors">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className={`p-2 rounded-lg ${
-                      transaction.type === 'earning' ? 'bg-green-100 text-green-600' :
-                      transaction.type === 'withdrawal' ? 'bg-blue-100 text-blue-600' :
-                      'bg-red-100 text-red-600'
-                    }`}>
-                      {transaction.type === 'earning' ? '💰' :
-                       transaction.type === 'withdrawal' ? '💳' : '🔄'}
+          <div className="divide-y divide-gray-100">
+            {withdrawals.length > 0 ? (
+              withdrawals.map((withdrawal, index) => (
+                <div key={index} className="p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className={`p-2 rounded-lg ${
+                        withdrawal.status === 'completed' ? 'bg-green-100 text-green-600' :
+                        withdrawal.status === 'pending' ? 'bg-yellow-100 text-yellow-600' :
+                        'bg-red-100 text-red-600'
+                      }`}>
+                        {withdrawal.status === 'completed' ? '✅' :
+                         withdrawal.status === 'pending' ? '⏳' : '❌'}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">Withdrawal Request</p>
+                        <p className="text-sm text-gray-500">
+                          {new Date(withdrawal.createdAt || withdrawal.date).toLocaleDateString()} • 
+                          ID: {withdrawal._id?.substring(0, 8)}...
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{transaction.description}</p>
-                      <p className="text-sm text-gray-500">
-                        {new Date(transaction.date).toLocaleDateString()} • 
-                        {transaction.status === 'completed' ? '✅ Completed' :
-                         transaction.status === 'pending' ? '⏳ Pending' : '❌ Failed'}
+                    <div className={`text-right ${
+                      withdrawal.status === 'completed' ? 'text-green-600' :
+                      withdrawal.status === 'pending' ? 'text-yellow-600' : 'text-red-600'
+                    }`}>
+                      <p className="font-medium">
+                        -{formatCurrency(withdrawal.amount || 0)}
+                      </p>
+                      <p className="text-sm text-gray-500 capitalize">
+                        {withdrawal.status}
                       </p>
                     </div>
                   </div>
-                  <div className={`text-right ${
-                    transaction.type === 'earning' ? 'text-green-600' :
-                    transaction.type === 'withdrawal' ? 'text-blue-600' : 'text-red-600'
-                  }`}>
-                    <p className="font-medium">
-                      {transaction.type === 'earning' ? '+' : '-'}₹{transaction.amount?.toFixed(2)}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Balance: ₹{transaction.balanceAfter?.toFixed(2)}
-                    </p>
-                  </div>
                 </div>
+              ))
+            ) : (
+              <div className="p-8 text-center text-gray-500">
+                <div className="text-3xl mb-2">💳</div>
+                <p>No withdrawals yet</p>
+                <p className="text-sm mt-1">Withdraw your earnings when you're ready</p>
               </div>
-            ))
-          ) : (
-            <div className="p-8 text-center text-gray-500">
-              No transactions yet
+            )}
+          </div>
+          {withdrawals.length > 0 && (
+            <div className="p-4 border-t border-gray-200 text-center">
+              <a 
+                href="/seller/withdraw" 
+                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+              >
+                View all withdrawals →
+              </a>
             </div>
           )}
         </div>
       </div>
       
-      {/* Withdrawal Info */}
-      <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-6">
-        <h4 className="text-sm font-medium text-yellow-800 mb-2">💡 Withdrawal Information</h4>
-        <ul className="text-sm text-yellow-700 space-y-1">
-          <li>• Minimum withdrawal amount: ₹500</li>
-          <li>• Withdrawals are processed within 3-5 business days</li>
-          <li>• Funds will be transferred to your connected Stripe account</li>
-          <li>• A small processing fee may apply (usually 2.9% + ₹3)</li>
-        </ul>
+      {/* Earnings Insights */}
+      <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-xl p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">💰 Earnings Insights</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h4 className="text-sm font-medium text-gray-700 mb-2">Payout Schedule</h4>
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm text-gray-600">Next Payout</span>
+                <span className="text-sm font-medium text-green-600">
+                  {balanceData?.nextPayoutDate 
+                    ? new Date(balanceData.nextPayoutDate).toLocaleDateString()
+                    : 'Not scheduled'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Last Withdrawal</span>
+                <span className="text-sm text-gray-900">
+                  {balanceData?.lastWithdrawal 
+                    ? new Date(balanceData.lastWithdrawal).toLocaleDateString()
+                    : 'Never'}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-3">
+                Funds are typically available 2-3 business days after withdrawal request.
+              </p>
+            </div>
+          </div>
+          <div>
+            <h4 className="text-sm font-medium text-gray-700 mb-2">Earnings Summary</h4>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                  <span className="text-sm text-gray-700">Available Balance</span>
+                </div>
+                <span className="font-medium text-gray-900">
+                  {formatCurrency(balanceData?.availableBalance || 0)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+                  <span className="text-sm text-gray-700">Pending Balance</span>
+                </div>
+                <span className="font-medium text-gray-900">
+                  {formatCurrency(balanceData?.pendingBalance || 0)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                  <span className="text-sm text-gray-700">Total Earnings</span>
+                </div>
+                <span className="font-medium text-gray-900">
+                  {formatCurrency(balanceData?.totalEarnings || 0)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-purple-500 mr-2"></div>
+                  <span className="text-sm text-gray-700">This Month</span>
+                </div>
+                <span className="font-medium text-gray-900">
+                  {formatCurrency(balanceData?.thisMonthRevenue || 0)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Quick Actions */}
+      <div className="flex flex-col sm:flex-row gap-4 justify-end">
+        <button
+          onClick={fetchEarningsData}
+          className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition duration-200 flex items-center gap-2 justify-center"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Refresh Data
+        </button>
+        <a
+          href="/seller/withdraw"
+          className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow text-center"
+        >
+          💳 Go to Withdrawals
+        </a>
       </div>
     </div>
   );
