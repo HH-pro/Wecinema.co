@@ -90,8 +90,17 @@ export interface ApiResponse<T = any> {
   message?: string;
 }
 
-// API Configuration
-const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+// Environment Configuration - Safe for browser
+const getApiBaseUrl = () => {
+  // Check if we're in development mode
+  const isDevelopment = window.location.hostname === 'localhost' || 
+                       window.location.hostname === '127.0.0.1';
+  
+  // Return appropriate API URL
+  return isDevelopment ? 'http://localhost:5000/api' : '/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 const PAYMENTS_API_URL = `${API_BASE_URL}/payments`;
 
 // Create axios instance with auth header
@@ -104,12 +113,27 @@ const apiClient = axios.create({
 
 // Add auth token to requests
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('token') || 
+                localStorage.getItem('authToken') || 
+                sessionStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
+
+// Handle response errors
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // Token expired or invalid
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
 
 // ========== PAYMENT METHODS ========== //
 
@@ -242,8 +266,13 @@ export const getWithdrawalHistory = async (
     return response.data;
   } catch (error: any) {
     console.error('Error fetching withdrawal history:', error);
+    
+    // Check if we're in development mode
+    const isDevelopment = window.location.hostname === 'localhost' || 
+                         window.location.hostname === '127.0.0.1';
+    
     // Mock data for development
-    if (process.env.NODE_ENV === 'development') {
+    if (isDevelopment) {
       return {
         success: true,
         data: {
@@ -256,7 +285,8 @@ export const getWithdrawalHistory = async (
               destination: 'Bank Account •••• 4321',
               createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
               completedAt: new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString(),
-              updatedAt: new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString()
+              updatedAt: new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString(),
+              requestDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
             },
             {
               _id: 'mock_2',
@@ -265,7 +295,8 @@ export const getWithdrawalHistory = async (
               description: 'Withdrawal request',
               destination: 'Stripe Account',
               createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-              updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+              updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+              requestDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
             }
           ],
           pagination: {
@@ -310,8 +341,13 @@ export const requestWithdrawal = async (amount: number): Promise<ApiResponse<{
     return response.data;
   } catch (error: any) {
     console.error('Error requesting withdrawal:', error);
+    
+    // Check if we're in development mode
+    const isDevelopment = window.location.hostname === 'localhost' || 
+                         window.location.hostname === '127.0.0.1';
+    
     // Mock success for development
-    if (process.env.NODE_ENV === 'development') {
+    if (isDevelopment) {
       return {
         success: true,
         message: 'Withdrawal request submitted successfully',
@@ -415,8 +451,12 @@ export const getEarningsBalance = async (): Promise<ApiResponse<EarningsBalance>
   } catch (error: any) {
     console.error('Error fetching earnings balance:', error);
     
+    // Check if we're in development mode
+    const isDevelopment = window.location.hostname === 'localhost' || 
+                         window.location.hostname === '127.0.0.1';
+    
     // Mock data for development
-    if (process.env.NODE_ENV === 'development') {
+    if (isDevelopment) {
       return {
         success: true,
         data: {
@@ -455,8 +495,12 @@ export const getMonthlyEarnings = async (params: { months?: number } = {}): Prom
   } catch (error: any) {
     console.error('Error fetching monthly earnings:', error);
     
+    // Check if we're in development mode
+    const isDevelopment = window.location.hostname === 'localhost' || 
+                         window.location.hostname === '127.0.0.1';
+    
     // Mock data for development
-    if (process.env.NODE_ENV === 'development') {
+    if (isDevelopment) {
       const now = new Date();
       const mockData = [
         { _id: { year: now.getFullYear(), month: now.getMonth() - 5 }, earnings: 120000, orders: 3 },
@@ -503,8 +547,12 @@ export const getEarningsHistory = async (params: {
   } catch (error: any) {
     console.error('Error fetching earnings history:', error);
     
+    // Check if we're in development mode
+    const isDevelopment = window.location.hostname === 'localhost' || 
+                         window.location.hostname === '127.0.0.1';
+    
     // Mock data for development
-    if (process.env.NODE_ENV === 'development') {
+    if (isDevelopment) {
       const mockData = {
         earnings: [
           {
