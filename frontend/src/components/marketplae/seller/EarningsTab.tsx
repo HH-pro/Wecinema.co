@@ -5,6 +5,7 @@ import EarningsOverview from './EarningsOverview';
 import EarningsStats from './EarningsStats';
 import WithdrawBalance from './WithdrawBalance';
 import paymentsApi from '../../../api/paymentsApi';
+import { getCurrentUserId } from '../../../utilities/helperFunction';
 
 interface EarningsTabProps {
   stripeStatus: any;
@@ -47,11 +48,24 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   const [monthlyEarnings, setMonthlyEarnings] = useState<any[]>(initialMonthlyEarnings);
   const [earningsHistory, setEarningsHistory] = useState<any[]>(initialEarningsHistory);
   const [realTimeUpdate, setRealTimeUpdate] = useState(0);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  
+  // Get current user ID on component mount
+  useEffect(() => {
+    const userId = getCurrentUserId();
+    setCurrentUserId(userId);
+  }, []);
   
   // Fetch live earnings data using paymentsApi
   const fetchLiveEarnings = async () => {
     try {
       setLiveLoading(true);
+      
+      // Check if user is logged in
+      if (!currentUserId) {
+        console.warn('No user ID found, cannot fetch earnings');
+        return null;
+      }
       
       // Get earnings balance from paymentsApi
       const balanceResponse = await paymentsApi.getEarningsBalance();
@@ -59,8 +73,21 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
       if (balanceResponse.success && balanceResponse.data) {
         setLiveEarnings(balanceResponse.data);
         
-        // Update state with live data
+        // Store user-specific earnings in localStorage
+        localStorage.setItem(`earnings_${currentUserId}`, JSON.stringify({
+          ...balanceResponse.data,
+          lastUpdated: Date.now()
+        }));
+        
         return balanceResponse.data;
+      }
+      
+      // Try to get from localStorage as fallback
+      const savedEarnings = localStorage.getItem(`earnings_${currentUserId}`);
+      if (savedEarnings) {
+        const parsed = JSON.parse(savedEarnings);
+        setLiveEarnings(parsed);
+        return parsed;
       }
       
       // Fallback to balanceData if API fails
@@ -72,6 +99,17 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
       return null;
     } catch (error) {
       console.error('Error fetching live earnings:', error);
+      
+      // Try localStorage fallback
+      if (currentUserId) {
+        const savedEarnings = localStorage.getItem(`earnings_${currentUserId}`);
+        if (savedEarnings) {
+          const parsed = JSON.parse(savedEarnings);
+          setLiveEarnings(parsed);
+          return parsed;
+        }
+      }
+      
       // Use balanceData as fallback
       if (balanceData) {
         setLiveEarnings(balanceData);
@@ -87,34 +125,49 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
     try {
       setWithdrawalsLoading(true);
       
+      // Check if user is logged in
+      if (!currentUserId) {
+        console.warn('No user ID found, cannot fetch withdrawals');
+        return;
+      }
+      
       // Get withdrawal history from paymentsApi
       const response = await paymentsApi.getWithdrawalHistory({ limit: 5 });
       
       if (response.success && response.data?.withdrawals) {
-        setWithdrawals(response.data.withdrawals);
+        // Filter withdrawals for current user (should be done by backend, but double-check)
+        const userWithdrawals = response.data.withdrawals.filter((w: any) => 
+          w.userId === currentUserId || !w.userId // Include if no userId (backward compatibility)
+        );
+        
+        setWithdrawals(userWithdrawals);
+        
+        // Store user-specific withdrawals
+        localStorage.setItem(`withdrawals_${currentUserId}`, JSON.stringify({
+          withdrawals: userWithdrawals,
+          lastUpdated: Date.now()
+        }));
+        
+        return;
+      }
+      
+      // Try localStorage fallback
+      const savedWithdrawals = localStorage.getItem(`withdrawals_${currentUserId}`);
+      if (savedWithdrawals) {
+        const parsed = JSON.parse(savedWithdrawals);
+        setWithdrawals(parsed.withdrawals || []);
         return;
       }
       
       // Fallback: If we have balanceData with withdrawals, use that
-      if (balanceData?.totalWithdrawn) {
+      if (balanceData?.totalWithdrawn && currentUserId) {
         // Create mock withdrawals based on total withdrawn
         setWithdrawals([
           {
             _id: '1',
+            userId: currentUserId,
             type: 'withdrawal',
             amount: Math.min(balanceData.totalWithdrawn, 50000),
-            status: 'completed',
-            description: 'Withdrawal to bank',
-            createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-          }
-        ]);
-      } else {
-        // Default mock data
-        setWithdrawals([
-          {
-            _id: '1',
-            type: 'withdrawal',
-            amount: 50000,
             status: 'completed',
             description: 'Withdrawal to bank',
             createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
@@ -123,6 +176,16 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
       }
     } catch (error) {
       console.error('Error fetching withdrawals:', error);
+      
+      // Try localStorage fallback
+      if (currentUserId) {
+        const savedWithdrawals = localStorage.getItem(`withdrawals_${currentUserId}`);
+        if (savedWithdrawals) {
+          const parsed = JSON.parse(savedWithdrawals);
+          setWithdrawals(parsed.withdrawals || []);
+          return;
+        }
+      }
     } finally {
       setWithdrawalsLoading(false);
     }
@@ -131,16 +194,53 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   // Fetch earnings history using paymentsApi
   const fetchEarningsHistory = async () => {
     try {
+      // Check if user is logged in
+      if (!currentUserId) {
+        console.warn('No user ID found, cannot fetch earnings history');
+        return [];
+      }
+      
       const response = await paymentsApi.getEarningsHistory({ limit: 10 });
       
       if (response.success && response.data?.earnings) {
-        setEarningsHistory(response.data.earnings);
-        return response.data.earnings;
+        // Filter earnings for current user
+        const userEarnings = response.data.earnings.filter((e: any) => 
+          e.userId === currentUserId || !e.userId // Include if no userId (backward compatibility)
+        );
+        
+        setEarningsHistory(userEarnings);
+        
+        // Store user-specific earnings history
+        localStorage.setItem(`earnings_history_${currentUserId}`, JSON.stringify({
+          earnings: userEarnings,
+          lastUpdated: Date.now()
+        }));
+        
+        return userEarnings;
+      }
+      
+      // Try localStorage fallback
+      const savedHistory = localStorage.getItem(`earnings_history_${currentUserId}`);
+      if (savedHistory) {
+        const parsed = JSON.parse(savedHistory);
+        setEarningsHistory(parsed.earnings || []);
+        return parsed.earnings || [];
       }
       
       return [];
     } catch (error) {
       console.error('Error fetching earnings history:', error);
+      
+      // Try localStorage fallback
+      if (currentUserId) {
+        const savedHistory = localStorage.getItem(`earnings_history_${currentUserId}`);
+        if (savedHistory) {
+          const parsed = JSON.parse(savedHistory);
+          setEarningsHistory(parsed.earnings || []);
+          return parsed.earnings || [];
+        }
+      }
+      
       return [];
     }
   };
@@ -148,16 +248,53 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   // Fetch monthly earnings using paymentsApi
   const fetchMonthlyEarnings = async () => {
     try {
+      // Check if user is logged in
+      if (!currentUserId) {
+        console.warn('No user ID found, cannot fetch monthly earnings');
+        return [];
+      }
+      
       const response = await paymentsApi.getMonthlyEarnings({ months: 6 });
       
       if (response.success && response.data) {
-        setMonthlyEarnings(response.data);
-        return response.data;
+        // Filter monthly earnings for current user
+        const userMonthlyEarnings = response.data.filter((item: any) => 
+          item.userId === currentUserId || !item.userId // Include if no userId (backward compatibility)
+        );
+        
+        setMonthlyEarnings(userMonthlyEarnings);
+        
+        // Store user-specific monthly earnings
+        localStorage.setItem(`monthly_earnings_${currentUserId}`, JSON.stringify({
+          earnings: userMonthlyEarnings,
+          lastUpdated: Date.now()
+        }));
+        
+        return userMonthlyEarnings;
+      }
+      
+      // Try localStorage fallback
+      const savedMonthly = localStorage.getItem(`monthly_earnings_${currentUserId}`);
+      if (savedMonthly) {
+        const parsed = JSON.parse(savedMonthly);
+        setMonthlyEarnings(parsed.earnings || []);
+        return parsed.earnings || [];
       }
       
       return [];
     } catch (error) {
       console.error('Error fetching monthly earnings:', error);
+      
+      // Try localStorage fallback
+      if (currentUserId) {
+        const savedMonthly = localStorage.getItem(`monthly_earnings_${currentUserId}`);
+        if (savedMonthly) {
+          const parsed = JSON.parse(savedMonthly);
+          setMonthlyEarnings(parsed.earnings || []);
+          return parsed.earnings || [];
+        }
+      }
+      
       return [];
     }
   };
@@ -208,14 +345,19 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   
   // Initial data fetch
   useEffect(() => {
-    if (stripeStatus?.chargesEnabled) {
+    if (stripeStatus?.chargesEnabled && currentUserId) {
       fetchAllEarningsData();
     }
-  }, [stripeStatus]);
+  }, [stripeStatus, currentUserId]);
   
   // Fetch all earnings data
   const fetchAllEarningsData = async () => {
     try {
+      if (!currentUserId) {
+        console.warn('Cannot fetch data: No user ID');
+        return;
+      }
+      
       await Promise.all([
         fetchLiveEarnings(),
         fetchWithdrawals(),
@@ -229,7 +371,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   
   // Refresh data periodically (every 30 seconds)
   useEffect(() => {
-    if (stripeStatus?.chargesEnabled) {
+    if (stripeStatus?.chargesEnabled && currentUserId) {
       const interval = setInterval(() => {
         fetchLiveEarnings();
         setRealTimeUpdate(prev => prev + 1);
@@ -237,11 +379,16 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
       
       return () => clearInterval(interval);
     }
-  }, [stripeStatus]);
+  }, [stripeStatus, currentUserId]);
   
   // Handle manual refresh
   const handleManualRefresh = async () => {
     try {
+      if (!currentUserId) {
+        console.warn('Cannot refresh: No user ID');
+        return;
+      }
+      
       await fetchAllEarningsData();
       onRefresh(); // Call parent refresh if needed
     } catch (error) {
@@ -252,6 +399,11 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   // Handle withdrawal request
   const handleWithdrawRequest = async (amountInCents: number) => {
     try {
+      if (!currentUserId) {
+        console.error('Cannot withdraw: No user ID');
+        return;
+      }
+      
       // Call parent handler
       onWithdrawSuccess(amountInCents);
       
@@ -269,7 +421,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading live earnings data...</p>
+          <p className="text-gray-600">Loading your earnings data...</p>
           <p className="text-sm text-gray-500 mt-1">Updating in real-time</p>
         </div>
       </div>
@@ -289,6 +441,24 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
           className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow"
         >
           💰 Setup Payments
+        </button>
+      </div>
+    );
+  }
+  
+  if (!currentUserId) {
+    return (
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">
+        <div className="text-5xl mb-4 text-gray-300">🔒</div>
+        <h3 className="text-lg font-medium text-gray-900">Authentication Required</h3>
+        <p className="mt-2 text-gray-500 mb-6">
+          Please log in to view your earnings.
+        </p>
+        <button
+          onClick={() => window.location.href = '/login'}
+          className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 shadow-md hover:shadow"
+        >
+          Go to Login
         </button>
       </div>
     );
@@ -319,7 +489,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   
   return (
     <div className="space-y-8">
-      {/* Real-time Update Indicator */}
+      {/* User-specific header */}
       <div className="flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
         <div className="flex items-center">
           <div className="relative">
@@ -327,24 +497,29 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
             <div className="w-3 h-3 bg-green-600 rounded-full relative"></div>
           </div>
           <span className="ml-3 text-sm font-medium text-gray-700">
-            Live Earnings Tracking • Updated {realTimeUpdate === 0 ? 'just now' : `${realTimeUpdate * 30} seconds ago`}
+            Your Earnings Dashboard • User: {currentUserId?.slice(-6)}...
           </span>
         </div>
-        <button
-          onClick={handleManualRefresh}
-          className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          Refresh Now
-        </button>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500">
+            Updated {realTimeUpdate === 0 ? 'just now' : `${realTimeUpdate * 30} seconds ago`}
+          </span>
+          <button
+            onClick={handleManualRefresh}
+            className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+          </button>
+        </div>
       </div>
       
       {/* Stripe Status Card */}
       <StripeStatusCard stripeStatus={stripeStatus} />
       
-      {/* Withdraw Balance Component - With Real-time Data */}
+      {/* Withdraw Balance Component - With User-specific Data */}
       <WithdrawBalance
         stripeStatus={stripeStatus}
         availableBalance={effectiveData?.availableBalance || 0}
@@ -353,9 +528,10 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
         thisMonthEarnings={thisMonthRevenue}
         onWithdrawSuccess={handleWithdrawRequest}
         formatCurrency={formatCurrency}
+        userId={currentUserId}
       />
       
-      {/* Earnings Overview - Updated with Real-time Data */}
+      {/* Earnings Overview - Updated with User-specific Data */}
       <EarningsOverview
         stripeStatus={stripeStatus}
         orderStats={orderStats}
@@ -363,18 +539,20 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
         thisMonthRevenue={thisMonthRevenue}
         realTimeMetrics={realTimeMetrics}
         formatCurrency={formatCurrency}
+        userId={currentUserId}
       />
       
-      {/* Earnings Stats - Updated with Live Data */}
+      {/* Earnings Stats - Updated with User-specific Data */}
       <EarningsStats
         orderStats={orderStats}
         stripeStatus={stripeStatus}
         monthlyEarnings={monthlyEarnings}
         realTimeMetrics={realTimeMetrics}
         formatCurrency={formatCurrency}
+        userId={currentUserId}
       />
       
-      {/* Real-time Earnings Dashboard */}
+      {/* User-specific Earnings Dashboard */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Available Balance */}
         <div className="bg-white border border-green-200 rounded-xl p-6 shadow-sm">
@@ -382,8 +560,8 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
             <div className="p-2 bg-green-100 rounded-lg">
               <span className="text-green-600 text-xl">💰</span>
             </div>
-            <div className="text-sm font-medium text-green-600 bg-green-50 px-2 py-1 rounded">
-              LIVE
+            <div className="text-xs font-medium text-gray-500">
+              Your Balance
             </div>
           </div>
           <p className="text-sm text-gray-500 mb-1">Available Balance</p>
@@ -404,7 +582,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
           <p className="text-2xl font-bold text-gray-900">
             {formatCurrency(effectiveData?.pendingBalance || 0)}
           </p>
-          <p className="text-xs text-gray-500 mt-2">From active orders</p>
+          <p className="text-xs text-gray-500 mt-2">From your active orders</p>
         </div>
         
         {/* This Month */}
@@ -422,11 +600,11 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
               {Math.abs(realTimeMetrics.monthOverMonthGrowth).toFixed(1)}%
             </div>
           </div>
-          <p className="text-sm text-gray-500 mb-1">This Month</p>
+          <p className="text-sm text-gray-500 mb-1">Your Earnings This Month</p>
           <p className="text-2xl font-bold text-gray-900">
             {formatCurrency(thisMonthRevenue)}
           </p>
-          <p className="text-xs text-gray-500 mt-2">Month-over-month growth</p>
+          <p className="text-xs text-gray-500 mt-2">Your month-over-month growth</p>
         </div>
         
         {/* Total Withdrawn */}
@@ -436,7 +614,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
               <span className="text-purple-600 text-xl">💳</span>
             </div>
           </div>
-          <p className="text-sm text-gray-500 mb-1">Total Withdrawn</p>
+          <p className="text-sm text-gray-500 mb-1">Your Total Withdrawn</p>
           <p className="text-2xl font-bold text-gray-900">
             {formatCurrency(realTimeMetrics.totalWithdrawn || 0)}
           </p>
@@ -450,7 +628,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <div className="p-6 border-b border-gray-200 flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Recent Earnings</h3>
+              <h3 className="text-lg font-semibold text-gray-900">Your Recent Earnings</h3>
               <p className="text-sm text-gray-500 mt-1">Your latest income transactions</p>
             </div>
             <button
@@ -529,7 +707,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <div className="p-6 border-b border-gray-200 flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Recent Withdrawals</h3>
+              <h3 className="text-lg font-semibold text-gray-900">Your Recent Withdrawals</h3>
               <p className="text-sm text-gray-500 mt-1">Your withdrawal requests</p>
             </div>
             <button
@@ -601,9 +779,12 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
         </div>
       </div>
       
-      {/* Earnings Insights */}
-      <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-xl p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">💰 Earnings Insights</h3>
+      {/* User Earnings Insights */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">💰 Your Earnings Insights</h3>
+          <span className="text-xs text-gray-500">User ID: {currentUserId?.slice(-8)}</span>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <h4 className="text-sm font-medium text-gray-700 mb-2">Payout Schedule</h4>
@@ -631,7 +812,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
           </div>
           
           <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Performance Metrics</h4>
+            <h4 className="text-sm font-medium text-gray-700 mb-2">Your Performance</h4>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Avg Order Value</span>
@@ -658,7 +839,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
           </div>
           
           <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Earnings Summary (USD)</h4>
+            <h4 className="text-sm font-medium text-gray-700 mb-2">Your Earnings (USD)</h4>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
@@ -691,23 +872,23 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
           </div>
           
           <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Net Earnings</h4>
+            <h4 className="text-sm font-medium text-gray-700 mb-2">Your Net Earnings</h4>
             <div className="text-center py-4">
               <div className="text-3xl font-bold text-gray-900 mb-2">
                 {formatCurrency(realTimeMetrics.netEarnings || 0)}
               </div>
-              <p className="text-sm text-gray-600">After withdrawals</p>
+              <p className="text-sm text-gray-600">After your withdrawals</p>
               <div className="mt-4 text-xs text-gray-500">
                 <div className="flex justify-between mb-1">
                   <span>Total Earned:</span>
                   <span>{formatCurrency(effectiveData?.totalEarnings || 0)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Total Withdrawn:</span>
+                  <span>You Withdrew:</span>
                   <span>-{formatCurrency(realTimeMetrics.totalWithdrawn || 0)}</span>
                 </div>
                 <div className="border-t border-gray-200 mt-2 pt-2 flex justify-between font-medium">
-                  <span>Net Balance:</span>
+                  <span>Your Balance:</span>
                   <span>{formatCurrency(realTimeMetrics.netEarnings || 0)}</span>
                 </div>
               </div>
@@ -716,12 +897,12 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
         </div>
       </div>
       
-      {/* Monthly Earnings Chart */}
+      {/* Your Monthly Earnings Chart */}
       <div className="bg-white border border-gray-200 rounded-xl p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Monthly Earnings Trend</h3>
-            <p className="text-sm text-gray-500 mt-1">Last 6 months earnings overview</p>
+            <h3 className="text-lg font-semibold text-gray-900">Your Monthly Earnings Trend</h3>
+            <p className="text-sm text-gray-500 mt-1">Your last 6 months earnings</p>
           </div>
           <button
             onClick={fetchMonthlyEarnings}
@@ -759,7 +940,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                 onClick={fetchMonthlyEarnings}
                 className="mt-4 px-4 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200"
               >
-                Load Monthly Data
+                Load Your Monthly Data
               </button>
             </div>
           )}
@@ -771,7 +952,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
         <div className="text-sm text-gray-500">
           <span className="flex items-center">
             <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-            Live data updates every 30 seconds
+            Your live data • User: {currentUserId?.slice(-6)}...
           </span>
         </div>
         <div className="flex flex-col sm:flex-row gap-4">
@@ -782,13 +963,13 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            Refresh All Data
+            Refresh Your Data
           </button>
           <button
             onClick={onGoToWithdraw}
             className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow text-center"
           >
-            💳 Go to Withdrawals
+            💳 Withdraw Your Earnings
           </button>
         </div>
       </div>
