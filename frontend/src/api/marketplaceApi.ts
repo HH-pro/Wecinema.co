@@ -1,4 +1,4 @@
-// src/api/marketplaceApi.js - UPDATED WITH PROPER EXPORTS
+// src/api/marketplaceApi.js - UPDATED WITHOUT EARNINGS/WITHDRAWAL ROUTES
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:3000';
@@ -320,161 +320,6 @@ const stripeApi = {
 };
 
 // ============================================
-// ✅ WITHDRAWAL API
-// ============================================
-
-const withdrawalsApi = {
-  getWithdrawalHistory: async (params = {}) => {
-    try {
-      const { page = 1, limit = 10, status = '' } = params;
-      const queryParams = new URLSearchParams();
-      if (page) queryParams.append('page', page.toString());
-      if (limit) queryParams.append('limit', limit.toString());
-      if (status) queryParams.append('status', status);
-      
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/withdrawals?${queryParams}`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      // Return empty history for development
-      return {
-        success: true,
-        withdrawals: [],
-        pagination: {
-          page: 1,
-          limit: 10,
-          total: 0,
-          pages: 1
-        }
-      };
-    }
-  },
-
-  requestWithdrawal: async (amount) => {
-    try {
-      const response = await axios.post(
-        `${API_BASE_URL}/marketplace/withdrawals`,
-        { amount },
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      // For development, return mock success
-      if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
-        return {
-          success: true,
-          message: 'Withdrawal request submitted successfully',
-          withdrawal: {
-            _id: Date.now().toString(),
-            amount: amount,
-            status: 'pending',
-            stripeTransferId: 'tr_mock_' + Date.now(),
-            createdAt: new Date().toISOString(),
-            destination: 'Bank Account •••• 4321',
-            description: `Withdrawal of $${(amount / 100).toFixed(2)}`
-          }
-        };
-      }
-      
-      return handleApiError(error, 'Failed to request withdrawal');
-    }
-  },
-
-  getWithdrawalById: async (withdrawalId) => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/withdrawals/${withdrawalId}`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error, 'Failed to fetch withdrawal details');
-    }
-  },
-
-  cancelWithdrawal: async (withdrawalId) => {
-    try {
-      const response = await axios.put(
-        `${API_BASE_URL}/marketplace/withdrawals/${withdrawalId}/cancel`,
-        {},
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error, 'Failed to cancel withdrawal');
-    }
-  }
-};
-
-// ============================================
-// ✅ EARNINGS API
-// ============================================
-
-const earningsApi = {
-  getEarningsSummary: async () => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/earnings/summary`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error, 'Failed to fetch earnings summary');
-    }
-  },
-
-  getEarningsByPeriod: async (period = 'month') => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/earnings/period/${period}`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error, 'Failed to fetch earnings by period');
-    }
-  },
-
-  getAvailableBalance: async () => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/earnings/available-balance`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      // For development, calculate from orders
-      if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
-        try {
-          const orders = await ordersApi.getMySales();
-          const completedOrders = Array.isArray(orders) ? 
-            orders.filter(order => order.status === 'completed') : [];
-          
-          const totalRevenue = completedOrders.reduce((sum, order) => 
-            sum + (order.amount || 0), 0) * 100;
-          
-          return {
-            success: true,
-            availableBalance: totalRevenue,
-            currency: 'inr'
-          };
-        } catch (calcError) {
-          return {
-            success: true,
-            availableBalance: 0,
-            currency: 'inr'
-          };
-        }
-      }
-      
-      return handleApiError(error, 'Failed to fetch available balance');
-    }
-  }
-};
-
-// ============================================
 // ✅ UTILITY FUNCTIONS (PUBLIC)
 // ============================================
 
@@ -558,8 +403,6 @@ const marketplaceApi = {
   orders: ordersApi,
   offers: offersApi,
   stripe: stripeApi,
-  withdrawals: withdrawalsApi,
-  earnings: earningsApi,
   
   // Utility Functions
   formatCurrency,
@@ -591,18 +434,7 @@ const marketplaceApi = {
   // Stripe
   getStripeStatus: stripeApi.getStripeStatus,
   createStripeAccountLink: stripeApi.createStripeAccountLink,
-  getStripeBalance: stripeApi.getStripeBalance,
-  
-  // Withdrawals
-  getWithdrawalHistory: withdrawalsApi.getWithdrawalHistory,
-  requestWithdrawal: withdrawalsApi.requestWithdrawal,
-  getWithdrawalById: withdrawalsApi.getWithdrawalById,
-  cancelWithdrawal: withdrawalsApi.cancelWithdrawal,
-  
-  // Earnings
-  getEarningsSummary: earningsApi.getEarningsSummary,
-  getEarningsByPeriod: earningsApi.getEarningsByPeriod,
-  getAvailableBalance: earningsApi.getAvailableBalance
+  getStripeBalance: stripeApi.getStripeBalance
 };
 
 // ============================================
@@ -615,14 +447,10 @@ export default marketplaceApi;
 // Export all individual functions and modules
 export { marketplaceApi };
 
-// Export all individual utility functions
-
 // Export API modules (optional - for advanced usage)
 export {
   listingsApi,
   ordersApi,
   offersApi,
-  stripeApi,
-  withdrawalsApi,
-  earningsApi
+  stripeApi
 };
