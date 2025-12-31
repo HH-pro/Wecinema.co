@@ -7,7 +7,7 @@ const Order = require("../../models/marketplace/order");
 const User = require("../../models/user");
 const Seller = require("../../models/marketplace/Seller");
 const Withdrawal = require("../../models/marketplace/Withdrawal");
-const stripeConfig = require("../config/stripe");
+const stripeConfig = require("../../config/stripe");
 
 // ========== PAYMENT ROUTES ========== //
 
