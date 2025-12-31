@@ -2,7 +2,8 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
-const auth = require('../../middleware/auth');
+const { authenticateMiddleware } = require("../../utils");
+
 const Order = require('../../models/Order');
 const SellerEarning = require('../../models/SellerEarning');
 const PaymentHistory = require('../../models/PaymentHistory');
