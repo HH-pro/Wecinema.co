@@ -1,7 +1,7 @@
 // components/marketplace/seller/WithdrawTab.tsx
 import React, { useState, useEffect } from 'react';
 import marketplaceApi from '../../../api/marketplaceApi';
-import { formatCurrency } from '../../../utils/formatters';
+import { formatCurrency } from '../../../utils/marketplace';
 
 interface StripeStatus {
   connected: boolean;
