@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import MarketplaceLayout from '../../components/Layout';
 
 // Import helper function
-import { getCurrentUserId } from '../../utilities/helperFunction';
+import { getCurrentUserId } from '../../utilities/helperfFunction';
 
 // Import Direct Payments API
 import paymentsApi from '../../../src/api/paymentsApi';
@@ -20,29 +20,29 @@ const ordersApi = marketplaceApi.orders;
 const offersApi = marketplaceApi.offers;
 
 // Import components
-import DashboardHeader from '../../components/marketplace/seller/DashboardHeader';
-import TabNavigation from '../../components/marketplace/seller/TabNavigation';
-import StatsGrid from '../../components/marketplace/seller/StatsGrid';
-import WelcomeCard from '../../components/marketplace/seller/WelcomeCard';
-import RecentOrders from '../../components/marketplace/seller/RecentOrders';
-import ActionCard from '../../components/marketplace/seller/ActionCard';
-import OrderWorkflowGuide from '../../components/marketplace/seller/OrderWorkflowGuide';
-import StripeAccountStatus from '../../components/marketplace/seller/StripeAccountStatus';
-import StripeSuccessAlert from '../../components/marketplace/seller/StripeSuccessAlert';
+import DashboardHeader from '../../components/marketplae/seller/DashboardHeader';
+import TabNavigation from '../../components/marketplae/seller/TabNavigation';
+import StatsGrid from '../../components/marketplae/seller/StatsGrid';
+import WelcomeCard from '../../components/marketplae/seller/WelcomeCard';
+import RecentOrders from '../../components/marketplae/seller/RecentOrders';
+import ActionCard from '../../components/marketplae/seller/ActionCard';
+import OrderWorkflowGuide from '../../components/marketplae/seller/OrderWorkflowGuide';
+import StripeAccountStatus from '../../components/marketplae/seller/StripeAccountStatus';
+import StripeSuccessAlert from '../../components/marketplae/seller/StripeSuccessAlert';
 
 // Import tab components
-import OffersTab from '../../components/marketplace/seller/OffersTab';
-import ListingsTab from '../../components/marketplace/seller/ListingsTab';
-import OrdersTab from '../../components/marketplace/seller/OrdersTab';
-import WithdrawTab from '../../components/marketplace/seller/WithdrawTab';
-import EarningsTab from '../../components/marketplace/seller/EarningsTab';
+import OffersTab from '../../components/marketplae/seller/OffersTab';
+import ListingsTab from '../../components/marketplae/seller/ListingsTab';
+import OrdersTab from '../../components/marketplae/seller/OrdersTab';
+import WithdrawTab from '../../components/marketplae/seller/WithdrawTab';
+import EarningsTab from '../../components/marketplae/seller/EarningsTab';
 
 // Import modals
-import StripeSetupModal from '../../components/marketplace/seller/StripeSetupModal';
-import OrderDetailsModal from '../../components/marketplace/seller/OrderDetailsModal';
-import EditListingModal from '../../components/marketplace/seller/EditListingModal';
-import DeleteListingModal from '../../components/marketplace/seller/DeleteListingModal';
-import VideoPlayerModal from '../../components/marketplace/seller/VideoPlayerModal';
+import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
+import OrderDetailsModal from '../../components/marketplae/seller/OrderDetailsModal';
+import EditListingModal from '../../components/marketplae/seller/EditListingModal';
+import DeleteListingModal from '../../components/marketplae/seller/DeleteListingModal';
+import VideoPlayerModal from '../../components/marketplae/seller/VideoPlayerModal';
 
 // Simple fallback components
 const SimpleFallback = ({ name }: { name: string }) => (
