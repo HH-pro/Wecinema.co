@@ -429,7 +429,7 @@ const ordersApi = {
 // ============================================
 // ✅ EARNINGS API (UPDATED ROUTES)
 // ============================================
-
+// In src/api/marketplaceApi.js, update getEarningsSummary:
 const earningsApi = {
   getEarningsSummary: async () => {
     try {
@@ -439,9 +439,37 @@ const earningsApi = {
       );
       return normalizeResponse(response);
     } catch (error) {
+      console.error('❌ Earnings summary API error:', error.response?.data || error.message);
+      
+      // Return mock data for development
+      if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
+        console.log('🛠️ Using mock earnings data for development');
+        return {
+          success: true,
+          data: {
+            availableBalance: 150000, // $1,500.00 in cents
+            pendingBalance: 50000, // $500.00 in cents
+            totalEarnings: 250000, // $2,500.00 in cents
+            totalWithdrawn: 100000, // $1,000.00 in cents
+            walletBalance: 150000,
+            lastWithdrawal: {
+              amount: 50000,
+              date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+              status: 'completed'
+            },
+            nextPayoutDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+            currency: 'inr',
+            thisMonthEarnings: 75000,
+            completedOrdersCount: 5,
+            pendingOrdersCount: 2
+          }
+        };
+      }
+      
       return handleApiError(error, 'Failed to fetch earnings summary');
     }
   },
+ 
 
   getEarningsByPeriod: async (period = 'month') => {
     try {
