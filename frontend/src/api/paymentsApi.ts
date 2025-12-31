@@ -1,4 +1,4 @@
-// api/marketplace/paymentsApi.ts
+// src/api/marketplace/paymentsApi.ts
 import axios, { AxiosResponse } from 'axios';
 
 // Types
@@ -92,20 +92,17 @@ export interface ApiResponse<T = any> {
 
 // Environment Configuration - Safe for browser
 const getApiBaseUrl = () => {
-  // Check if we're in development mode
   const isDevelopment = window.location.hostname === 'localhost' || 
                        window.location.hostname === '127.0.0.1';
   
-  // Return appropriate API URL
-  return isDevelopment ? 'http://localhost:5000/api' : '/api';
+  return isDevelopment ? 'http://localhost:3000' : '/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();
-const PAYMENTS_API_URL = `${API_BASE_URL}/payments`;
 
 // Create axios instance with auth header
 const apiClient = axios.create({
-  baseURL: PAYMENTS_API_URL,
+  baseURL: `${API_BASE_URL}/marketplace`,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -127,7 +124,6 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      // Token expired or invalid
       localStorage.removeItem('token');
       window.location.href = '/login';
     }
@@ -137,12 +133,9 @@ apiClient.interceptors.response.use(
 
 // ========== PAYMENT METHODS ========== //
 
-/**
- * Create payment intent for an order
- */
 export const createPaymentIntent = async (orderId: string): Promise<ApiResponse<PaymentIntentData>> => {
   try {
-    const response: AxiosResponse<ApiResponse<PaymentIntentData>> = await apiClient.post('/create-payment-intent', { orderId });
+    const response: AxiosResponse<ApiResponse<PaymentIntentData>> = await apiClient.post('/payments/create-payment-intent', { orderId });
     return response.data;
   } catch (error: any) {
     console.error('Error creating payment intent:', error);
@@ -153,12 +146,9 @@ export const createPaymentIntent = async (orderId: string): Promise<ApiResponse<
   }
 };
 
-/**
- * Confirm payment success
- */
 export const confirmPayment = async (orderId: string, paymentIntentId: string): Promise<ApiResponse> => {
   try {
-    const response: AxiosResponse<ApiResponse> = await apiClient.post('/confirm-payment', { 
+    const response: AxiosResponse<ApiResponse> = await apiClient.post('/payments/confirm-payment', { 
       orderId, 
       paymentIntentId 
     });
@@ -172,9 +162,6 @@ export const confirmPayment = async (orderId: string, paymentIntentId: string): 
   }
 };
 
-/**
- * Capture payment and release funds to seller
- */
 export const capturePayment = async (orderId: string): Promise<ApiResponse<{
   order: any;
   sellerAmount: number;
@@ -182,7 +169,7 @@ export const capturePayment = async (orderId: string): Promise<ApiResponse<{
   platformFeePercent: number;
 }>> => {
   try {
-    const response: AxiosResponse<ApiResponse> = await apiClient.post('/capture-payment', { orderId });
+    const response: AxiosResponse<ApiResponse> = await apiClient.post('/payments/capture-payment', { orderId });
     return response.data;
   } catch (error: any) {
     console.error('Error capturing payment:', error);
@@ -193,12 +180,9 @@ export const capturePayment = async (orderId: string): Promise<ApiResponse<{
   }
 };
 
-/**
- * Cancel payment intent
- */
 export const cancelPayment = async (orderId: string): Promise<ApiResponse> => {
   try {
-    const response: AxiosResponse<ApiResponse> = await apiClient.post('/cancel-payment', { orderId });
+    const response: AxiosResponse<ApiResponse> = await apiClient.post('/payments/cancel-payment', { orderId });
     return response.data;
   } catch (error: any) {
     console.error('Error cancelling payment:', error);
@@ -209,12 +193,9 @@ export const cancelPayment = async (orderId: string): Promise<ApiResponse> => {
   }
 };
 
-/**
- * Get payment status for an order
- */
 export const getPaymentStatus = async (orderId: string): Promise<ApiResponse<PaymentStatus>> => {
   try {
-    const response: AxiosResponse<ApiResponse<PaymentStatus>> = await apiClient.get(`/payment-status/${orderId}`);
+    const response: AxiosResponse<ApiResponse<PaymentStatus>> = await apiClient.get(`/payments/payment-status/${orderId}`);
     return response.data;
   } catch (error: any) {
     console.error('Error fetching payment status:', error);
@@ -225,12 +206,9 @@ export const getPaymentStatus = async (orderId: string): Promise<ApiResponse<Pay
   }
 };
 
-/**
- * Request refund for an order
- */
 export const requestRefund = async (orderId: string, reason: string): Promise<ApiResponse> => {
   try {
-    const response: AxiosResponse<ApiResponse> = await apiClient.post('/request-refund', { 
+    const response: AxiosResponse<ApiResponse> = await apiClient.post('/payments/request-refund', { 
       orderId, 
       reason 
     });
@@ -246,9 +224,6 @@ export const requestRefund = async (orderId: string, reason: string): Promise<Ap
 
 // ========== WITHDRAWAL METHODS ========== //
 
-/**
- * Get withdrawal history with pagination
- */
 export const getWithdrawalHistory = async (
   params: {
     page?: number;
@@ -262,7 +237,7 @@ export const getWithdrawalHistory = async (
     if (params.limit) queryParams.append('limit', params.limit.toString());
     if (params.status) queryParams.append('status', params.status);
     
-    const response: AxiosResponse<ApiResponse<WithdrawalHistory>> = await apiClient.get(`/withdrawals?${queryParams}`);
+    const response: AxiosResponse<ApiResponse<WithdrawalHistory>> = await apiClient.get(`/payments/withdrawals?${queryParams}`);
     return response.data;
   } catch (error: any) {
     console.error('Error fetching withdrawal history:', error);
@@ -322,10 +297,6 @@ export const getWithdrawalHistory = async (
   }
 };
 
-/**
- * Request withdrawal
- * @param amount Amount in cents (e.g., 5000 = $50.00)
- */
 export const requestWithdrawal = async (amount: number): Promise<ApiResponse<{
   withdrawalId: string;
   amount: number;
@@ -335,7 +306,7 @@ export const requestWithdrawal = async (amount: number): Promise<ApiResponse<{
   availableBalance: number;
 }>> => {
   try {
-    const response: AxiosResponse<ApiResponse> = await apiClient.post('/payments/withdrawals', { 
+    const response: AxiosResponse<ApiResponse> = await apiClient.post('/payments/withdrawals/request', { 
       amount 
     });
     return response.data;
@@ -369,12 +340,9 @@ export const requestWithdrawal = async (amount: number): Promise<ApiResponse<{
   }
 };
 
-/**
- * Get withdrawal details
- */
 export const getWithdrawalDetails = async (withdrawalId: string): Promise<ApiResponse<Withdrawal>> => {
   try {
-    const response: AxiosResponse<ApiResponse<Withdrawal>> = await apiClient.get(`/withdrawals/${withdrawalId}`);
+    const response: AxiosResponse<ApiResponse<Withdrawal>> = await apiClient.get(`/payments/withdrawals/${withdrawalId}`);
     return response.data;
   } catch (error: any) {
     console.error('Error fetching withdrawal details:', error);
@@ -385,12 +353,9 @@ export const getWithdrawalDetails = async (withdrawalId: string): Promise<ApiRes
   }
 };
 
-/**
- * Cancel a pending withdrawal
- */
 export const cancelWithdrawal = async (withdrawalId: string): Promise<ApiResponse<Withdrawal>> => {
   try {
-    const response: AxiosResponse<ApiResponse<Withdrawal>> = await apiClient.post(`/withdrawals/${withdrawalId}/cancel`);
+    const response: AxiosResponse<ApiResponse<Withdrawal>> = await apiClient.post(`/payments/withdrawals/${withdrawalId}/cancel`);
     return response.data;
   } catch (error: any) {
     console.error('Error cancelling withdrawal:', error);
@@ -401,12 +366,9 @@ export const cancelWithdrawal = async (withdrawalId: string): Promise<ApiRespons
   }
 };
 
-/**
- * Get withdrawal statistics
- */
 export const getWithdrawalStats = async (): Promise<ApiResponse<WithdrawalStats>> => {
   try {
-    const response: AxiosResponse<ApiResponse<WithdrawalStats>> = await apiClient.get('/withdrawals/stats/summary');
+    const response: AxiosResponse<ApiResponse<WithdrawalStats>> = await apiClient.get('/payments/withdrawals/stats/summary');
     return response.data;
   } catch (error: any) {
     console.error('Error fetching withdrawal stats:', error);
@@ -419,35 +381,10 @@ export const getWithdrawalStats = async (): Promise<ApiResponse<WithdrawalStats>
 
 // ========== EARNINGS METHODS ========== //
 
-/**
- * Get seller earnings balance
- */
 export const getEarningsBalance = async (): Promise<ApiResponse<EarningsBalance>> => {
   try {
-    // Try to get from payments API first
-    const response = await getWithdrawalHistory({ page: 1, limit: 1 });
-    if (response.success && response.data?.balance) {
-      return {
-        success: true,
-        data: {
-          availableBalance: response.data.balance.availableBalance,
-          pendingBalance: response.data.balance.pendingBalance,
-          totalEarnings: response.data.balance.totalEarnings,
-          totalWithdrawn: response.data.balance.totalWithdrawn,
-          walletBalance: response.data.balance.availableBalance,
-          lastWithdrawal: response.data.withdrawals[0]?.createdAt || null,
-          nextPayoutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-        }
-      };
-    }
-    
-    // Fallback to direct API call
-    const earningsResponse = await axios.get(`${API_BASE_URL}/earnings/balance`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('token')}`
-      }
-    });
-    return earningsResponse.data;
+    const response = await apiClient.get('/payments/earnings/balance');
+    return response.data;
   } catch (error: any) {
     console.error('Error fetching earnings balance:', error);
     
@@ -460,11 +397,11 @@ export const getEarningsBalance = async (): Promise<ApiResponse<EarningsBalance>
       return {
         success: true,
         data: {
-          availableBalance: 150000, // $1500.00 in cents
-          pendingBalance: 50000, // $500.00 in cents
-          totalEarnings: 200000, // $2000.00 in cents
-          totalWithdrawn: 50000, // $500.00 in cents
-          walletBalance: 150000, // $1500.00 in cents
+          availableBalance: 150000,
+          pendingBalance: 50000,
+          totalEarnings: 200000,
+          totalWithdrawn: 50000,
+          walletBalance: 150000,
           lastWithdrawal: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
           nextPayoutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
         }
@@ -478,19 +415,12 @@ export const getEarningsBalance = async (): Promise<ApiResponse<EarningsBalance>
   }
 };
 
-/**
- * Get monthly earnings summary
- */
 export const getMonthlyEarnings = async (params: { months?: number } = {}): Promise<ApiResponse<any[]>> => {
   try {
     const queryParams = new URLSearchParams();
     if (params.months) queryParams.append('months', params.months.toString());
     
-    const response = await axios.get(`${API_BASE_URL}/earnings/monthly?${queryParams}`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('token')}`
-      }
-    });
+    const response = await apiClient.get(`/payments/earnings/monthly?${queryParams}`);
     return response.data;
   } catch (error: any) {
     console.error('Error fetching monthly earnings:', error);
@@ -524,9 +454,6 @@ export const getMonthlyEarnings = async (params: { months?: number } = {}): Prom
   }
 };
 
-/**
- * Get earnings history
- */
 export const getEarningsHistory = async (params: {
   page?: number;
   limit?: number;
@@ -538,11 +465,7 @@ export const getEarningsHistory = async (params: {
     if (params.limit) queryParams.append('limit', params.limit.toString());
     if (params.type) queryParams.append('type', params.type);
     
-    const response = await axios.get(`${API_BASE_URL}/earnings/history?${queryParams}`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('token')}`
-      }
-    });
+    const response = await apiClient.get(`/payments/earnings/history?${queryParams}`);
     return response.data;
   } catch (error: any) {
     console.error('Error fetching earnings history:', error);
@@ -606,40 +529,52 @@ export const getEarningsHistory = async (params: {
 
 // ========== HELPER FUNCTIONS ========== //
 
-/**
- * Format currency from cents to dollars
- */
 export const formatCurrency = (amountInCents: number): string => {
-  const dollars = amountInCents / 100;
-  return new Intl.NumberFormat('en-US', {
+  const rupees = amountInCents / 100;
+  return new Intl.NumberFormat('en-IN', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'INR',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  }).format(dollars);
+  }).format(rupees);
 };
 
-/**
- * Convert dollars to cents
- */
+export const formatCurrencyAmount = (amountInCents: number): string => {
+  const rupees = amountInCents / 100;
+  return new Intl.NumberFormat('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(rupees);
+};
+
+export const formatCurrencyShort = (amountInCents: number): string => {
+  const rupees = amountInCents / 100;
+  if (rupees >= 10000000) {
+    return `₹${(rupees / 10000000).toFixed(1)}Cr`;
+  } else if (rupees >= 100000) {
+    return `₹${(rupees / 100000).toFixed(1)}L`;
+  } else if (rupees >= 1000) {
+    return `₹${(rupees / 1000).toFixed(1)}K`;
+  }
+  return `₹${rupees.toFixed(0)}`;
+};
+
 export const dollarsToCents = (dollars: number): number => {
   return Math.round(dollars * 100);
 };
 
-/**
- * Convert cents to dollars
- */
-export const centsToDollars = (cents: number): number => {
+export const rupeesToCents = (rupees: number): number => {
+  return Math.round(rupees * 100);
+};
+
+export const centsToRupees = (cents: number): number => {
   return cents / 100;
 };
 
-/**
- * Validate withdrawal amount
- */
 export const validateWithdrawalAmount = (
   amountInCents: number,
   availableBalance: number,
-  minWithdrawal = 500 // $5.00 minimum
+  minWithdrawal = 500 // ₹5.00 minimum
 ): { valid: boolean; error?: string } => {
   if (!amountInCents || amountInCents <= 0) {
     return { valid: false, error: 'Please enter a valid amount' };
@@ -687,8 +622,10 @@ const paymentsApi = {
   
   // Helper functions
   formatCurrency,
-  dollarsToCents,
-  centsToDollars,
+  formatCurrencyAmount,
+  formatCurrencyShort,
+  rupeesToCents,
+  centsToRupees,
   validateWithdrawalAmount
 };
 
