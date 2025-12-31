@@ -12,7 +12,6 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // ========== SELLER EARNINGS DASHBOARD ========== //
 
-// ========== GET ALL SELLERS EARNINGS (PUBLIC/NO AUTH) ========== //
 router.get("/all-sellers", async (req, res) => {
   try {
     const { 
