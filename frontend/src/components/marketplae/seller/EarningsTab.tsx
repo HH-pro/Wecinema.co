@@ -1,13 +1,12 @@
-// src/components/marketplae/seller/EarningsTab.tsx - USD UPDATE
+// src/components/marketplae/seller/EarningsTab.tsx - FIXED VERSION
 import React, { useState, useEffect } from 'react';
 import paymentsApi from '../../../api/paymentsApi';
-// ✅ DIRECT IMPORT
+
 
 interface EarningsTabProps {
   earningsBalance: any;
   monthlyEarnings: any[];
   earningsHistory: any[];
-  orderStats: any;
   onWithdrawRequest: (amountInDollars: number) => Promise<void>;
   loading: boolean;
   onRefresh: () => Promise<void>;
@@ -21,12 +20,11 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   earningsBalance,
   monthlyEarnings,
   earningsHistory,
-  orderStats,
   onWithdrawRequest,
   loading,
   onRefresh,
-  formatCurrency = paymentsApi.formatCurrency, // ✅ DEFAULT TO PAYMENTS API
-  formatCurrencyShort = paymentsApi.formatCurrencyShort, // ✅ DEFAULT TO PAYMENTS API
+  formatCurrency = paymentsApi.formatCurrency,
+  formatCurrencyShort = paymentsApi.formatCurrencyShort,
   dollarsToCents = paymentsApi.dollarsToCents,
   centsToDollars = paymentsApi.centsToDollars
 }) => {
@@ -77,12 +75,19 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
     }
   };
 
-  // ✅ CALCULATE EARNINGS GROWTH
+  // ✅ CALCULATE EARNINGS GROWTH FROM MONTHLY EARNINGS
   const calculateGrowth = () => {
     if (!monthlyEarnings || monthlyEarnings.length < 2) return { percent: 0, amount: 0 };
     
-    const currentMonth = monthlyEarnings[monthlyEarnings.length - 1]?.earnings || 0;
-    const previousMonth = monthlyEarnings[monthlyEarnings.length - 2]?.earnings || 0;
+    // Sort by date to get correct current and previous month
+    const sortedEarnings = [...monthlyEarnings].sort((a, b) => {
+      const dateA = new Date(a._id.year, a._id.month);
+      const dateB = new Date(b._id.year, b._id.month);
+      return dateA.getTime() - dateB.getTime();
+    });
+    
+    const currentMonth = sortedEarnings[sortedEarnings.length - 1]?.earnings || 0;
+    const previousMonth = sortedEarnings[sortedEarnings.length - 2]?.earnings || 0;
     
     if (previousMonth === 0) return { percent: 100, amount: currentMonth };
     
@@ -97,26 +102,32 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
 
   const growth = calculateGrowth();
 
-  // ✅ GET MONTH NAME
+  // ✅ GET MONTH NAME FROM MONTH INDEX
   const getMonthName = (monthIndex: number) => {
     const date = new Date();
     date.setMonth(monthIndex);
     return date.toLocaleString('default', { month: 'short' });
   };
 
-  // ✅ GET EARNINGS BY TYPE
+  // ✅ CALCULATE EARNINGS BY TYPE FROM EARNINGS HISTORY
   const getEarningsByType = () => {
-    if (!detailedEarnings?.earnings) return { completed: 0, pending: 0, withdrawn: 0 };
+    if (!earningsHistory || earningsHistory.length === 0) {
+      return { 
+        completed: earningsBalance?.totalEarnings || 0, 
+        pending: earningsBalance?.pendingBalance || 0, 
+        withdrawn: earningsBalance?.totalWithdrawn || 0 
+      };
+    }
     
-    const completed = detailedEarnings.earnings
+    const completed = earningsHistory
       .filter((item: any) => item.type === 'earning' && item.status === 'completed')
       .reduce((sum: number, item: any) => sum + item.amount, 0);
     
-    const pending = detailedEarnings.earnings
+    const pending = earningsHistory
       .filter((item: any) => item.type === 'earning' && item.status === 'pending')
       .reduce((sum: number, item: any) => sum + item.amount, 0);
     
-    const withdrawn = detailedEarnings.earnings
+    const withdrawn = earningsHistory
       .filter((item: any) => item.type === 'withdrawal' && item.status === 'completed')
       .reduce((sum: number, item: any) => sum + item.amount, 0);
     
@@ -125,7 +136,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
 
   const earningsByType = getEarningsByType();
 
-  // ✅ FORMAT DATE
+  // ✅ FORMAT DATE FOR DISPLAY
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -137,12 +148,14 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
     });
   };
 
-  // ✅ GET TRANSACTION ICON
+  // ✅ GET TRANSACTION ICON BASED ON TYPE
   const getTransactionIcon = (type: string, status: string) => {
     if (type === 'earning') {
       return status === 'completed' ? '💰' : '⏳';
     } else if (type === 'withdrawal') {
       return status === 'completed' ? '💸' : '⏳';
+    } else if (type === 'refund') {
+      return '↩️';
     }
     return '📊';
   };
@@ -151,20 +164,41 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   const getTransactionColor = (type: string) => {
     if (type === 'earning') return 'text-green-600';
     if (type === 'withdrawal') return 'text-blue-600';
+    if (type === 'refund') return 'text-red-600';
     return 'text-gray-600';
   };
 
   // ✅ GET TRANSACTION SIGN
   const getTransactionSign = (type: string) => {
     if (type === 'earning') return '+';
-    if (type === 'withdrawal') return '-';
+    if (type === 'withdrawal' || type === 'refund') return '-';
     return '';
   };
+
+  // ✅ CALCULATE TOTAL EARNINGS FROM PAYMENTS API DATA
+  const getTotalEarnings = () => {
+    // Use earningsBalance.totalEarnings if available
+    if (earningsBalance?.totalEarnings) {
+      return earningsBalance.totalEarnings;
+    }
+    
+    // Fallback to sum of completed earnings from history
+    if (earningsHistory && earningsHistory.length > 0) {
+      return earningsHistory
+        .filter((item: any) => item.type === 'earning' && item.status === 'completed')
+        .reduce((sum: number, item: any) => sum + item.amount, 0);
+    }
+    
+    return 0;
+  };
+
+  const totalEarnings = getTotalEarnings();
 
   return (
     <div className="space-y-6">
       {/* Earnings Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Available Balance Card */}
         <div className="bg-gradient-to-r from-green-50 to-emerald-100 border border-green-200 rounded-2xl p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -180,12 +214,13 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
           </div>
         </div>
 
+        {/* Pending Balance Card */}
         <div className="bg-gradient-to-r from-blue-50 to-cyan-100 border border-blue-200 rounded-2xl p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-blue-800">Pending Balance</p>
               <p className="text-3xl font-bold text-blue-900 mt-2">
-                {formatCurrency(earningsBalance?.pendingBalance || 0)}
+                {formatCurrency(earningsBalance?.pendingBalance || earningsByType.pending || 0)}
               </p>
               <p className="text-sm text-blue-700 mt-2">
                 From active orders
@@ -195,12 +230,13 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
           </div>
         </div>
 
+        {/* Total Earnings Card */}
         <div className="bg-gradient-to-r from-purple-50 to-violet-100 border border-purple-200 rounded-2xl p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-purple-800">Total Earnings</p>
               <p className="text-3xl font-bold text-purple-900 mt-2">
-                {formatCurrency(earningsBalance?.totalEarnings || 0)}
+                {formatCurrency(totalEarnings)}
               </p>
               <p className="text-sm text-purple-700 mt-2">
                 All-time earnings
@@ -210,6 +246,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
           </div>
         </div>
 
+        {/* Monthly Growth Card */}
         <div className="bg-gradient-to-r from-amber-50 to-orange-100 border border-amber-200 rounded-2xl p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -264,46 +301,58 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
         {activeChart === 'monthly' ? (
           <div className="space-y-4">
             {/* Monthly Earnings Chart */}
-            <div className="h-64 flex items-end space-x-2 md:space-x-4">
-              {monthlyEarnings.map((monthData, index) => {
-                const maxEarnings = Math.max(...monthlyEarnings.map(m => m.earnings || 0));
-                const height = maxEarnings > 0 ? (monthData.earnings / maxEarnings) * 100 : 0;
-                
-                return (
-                  <div key={index} className="flex flex-col items-center flex-1">
-                    <div className="w-full max-w-20 mx-auto">
-                      <div 
-                        className="bg-gradient-to-t from-yellow-400 to-yellow-500 rounded-t-lg transition-all duration-300"
-                        style={{ height: `${Math.max(10, height)}%` }}
-                      />
-                    </div>
-                    <div className="mt-2 text-center">
-                      <p className="text-xs font-medium text-gray-700">
-                        {getMonthName(monthData._id.month)}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {formatCurrencyShort(monthData.earnings || 0)}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        {monthData.orders || 0} orders
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            {monthlyEarnings && monthlyEarnings.length > 0 ? (
+              <>
+                <div className="h-64 flex items-end space-x-2 md:space-x-4">
+                  {monthlyEarnings.map((monthData, index) => {
+                    const maxEarnings = Math.max(...monthlyEarnings.map(m => m.earnings || 0));
+                    const height = maxEarnings > 0 ? (monthData.earnings / maxEarnings) * 100 : 0;
+                    
+                    return (
+                      <div key={index} className="flex flex-col items-center flex-1">
+                        <div className="w-full max-w-20 mx-auto">
+                          <div 
+                            className="bg-gradient-to-t from-yellow-400 to-yellow-500 rounded-t-lg transition-all duration-300"
+                            style={{ height: `${Math.max(10, height)}%` }}
+                          />
+                        </div>
+                        <div className="mt-2 text-center">
+                          <p className="text-xs font-medium text-gray-700">
+                            {getMonthName(monthData._id.month)}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {formatCurrencyShort(monthData.earnings || 0)}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {monthData.orders || 0} orders
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
 
-            {/* Chart Legend */}
-            <div className="flex items-center justify-center space-x-6 pt-4 border-t border-gray-100">
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-gradient-to-t from-yellow-400 to-yellow-500 rounded mr-2"></div>
-                <span className="text-sm text-gray-600">Monthly Earnings</span>
+                {/* Chart Legend */}
+                <div className="flex items-center justify-center space-x-6 pt-4 border-t border-gray-100">
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-gradient-to-t from-yellow-400 to-yellow-500 rounded mr-2"></div>
+                    <span className="text-sm text-gray-600">Monthly Earnings</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-gradient-to-t from-blue-400 to-blue-500 rounded mr-2"></div>
+                    <span className="text-sm text-gray-600">Order Count</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="h-64 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="text-5xl mb-4 text-gray-300">📊</div>
+                  <p className="text-gray-500">No monthly earnings data available</p>
+                  <p className="text-sm text-gray-400 mt-2">Complete orders to see earnings trends</p>
+                </div>
               </div>
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-gradient-to-t from-blue-400 to-blue-500 rounded mr-2"></div>
-                <span className="text-sm text-gray-600">Order Count</span>
-              </div>
-            </div>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
@@ -345,7 +394,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                   <div>
                     <p className="text-sm font-medium text-purple-800">Total Withdrawn</p>
                     <p className="text-xl font-bold text-purple-900 mt-1">
-                      {formatCurrency(earningsByType.withdrawn)}
+                      {formatCurrency(earningsBalance?.totalWithdrawn || earningsByType.withdrawn || 0)}
                     </p>
                   </div>
                 </div>
@@ -472,9 +521,9 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
               <p className="text-gray-600">Loading earnings history...</p>
             </div>
           </div>
-        ) : detailedEarnings?.earnings?.length > 0 ? (
+        ) : earningsHistory && earningsHistory.length > 0 ? (
           <div className="space-y-4">
-            {detailedEarnings.earnings.slice(0, 10).map((transaction: any) => (
+            {earningsHistory.slice(0, 10).map((transaction: any) => (
               <div key={transaction._id} className="flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:bg-gray-50">
                 <div className="flex items-center flex-1">
                   <div className="flex-shrink-0">
@@ -500,10 +549,10 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
               </div>
             ))}
             
-            {detailedEarnings.pagination?.total > 10 && (
+            {earningsHistory.length > 10 && (
               <div className="text-center pt-4">
                 <button className="text-sm text-yellow-600 hover:text-yellow-700 font-medium">
-                  View All Transactions ({detailedEarnings.pagination.total})
+                  View All Transactions ({earningsHistory.length})
                 </button>
               </div>
             )}
