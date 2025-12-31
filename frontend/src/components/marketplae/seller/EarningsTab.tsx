@@ -1,7 +1,6 @@
-// src/components/marketplae/seller/EarningsTab.tsx - FIXED VERSION
+// src/components/marketplae/seller/EarningsTab.tsx - UPDATED VERSION
 import React, { useState, useEffect } from 'react';
-import paymentsApi from '../../../api/paymentsApi';
-
+import marketplaceApi from '../../../api/marketplaceApi';
 
 interface EarningsTabProps {
   earningsBalance: any;
@@ -23,10 +22,10 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   onWithdrawRequest,
   loading,
   onRefresh,
-  formatCurrency = paymentsApi.formatCurrency,
-  formatCurrencyShort = paymentsApi.formatCurrencyShort,
-  dollarsToCents = paymentsApi.dollarsToCents,
-  centsToDollars = paymentsApi.centsToDollars
+  formatCurrency = marketplaceApi.formatCurrency,
+  formatCurrencyShort = marketplaceApi.formatCurrencyShort,
+  dollarsToCents = marketplaceApi.dollarsToCents,
+  centsToDollars = marketplaceApi.centsToDollars
 }) => {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
@@ -35,11 +34,11 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   const [detailedEarnings, setDetailedEarnings] = useState<any>(null);
   const [detailedLoading, setDetailedLoading] = useState(false);
 
-  // ✅ FETCH DETAILED EARNINGS FROM PAYMENTS API
+  // ✅ FETCH DETAILED EARNINGS FROM MARKETPLACE API
   const fetchDetailedEarnings = async () => {
     try {
       setDetailedLoading(true);
-      const response = await paymentsApi.getEarningsHistory({ page: 1, limit: 50 });
+      const response = await marketplaceApi.payments.getEarningsHistory({ page: 1, limit: 50 });
       
       if (response.success && response.data) {
         setDetailedEarnings(response.data);
@@ -175,7 +174,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
     return '';
   };
 
-  // ✅ CALCULATE TOTAL EARNINGS FROM PAYMENTS API DATA
+  // ✅ CALCULATE TOTAL EARNINGS
   const getTotalEarnings = () => {
     // Use earningsBalance.totalEarnings if available
     if (earningsBalance?.totalEarnings) {
