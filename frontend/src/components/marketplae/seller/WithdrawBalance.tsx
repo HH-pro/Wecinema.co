@@ -1,6 +1,5 @@
 // components/marketplace/seller/WithdrawBalance.tsx
 import React, { useState, useEffect, useRef } from 'react';
-import paymentsApi from '../../../api/paymentsApi';
 
 interface StripeStatus {
   connected?: boolean;
