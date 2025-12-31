@@ -305,6 +305,7 @@ const WithdrawBalance: React.FC<WithdrawBalanceProps> = ({
           <p className="text-sm text-gray-500">
             Complete orders to start earning. Pending balance becomes available after order completion.
           </p>
+          {/* FIXED LINE 201: Changed pendingBalance to livePendingBalance */}
           {livePendingBalance > 0 && (
             <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-sm font-medium text-yellow-800">
