@@ -5,7 +5,7 @@ import EarningsOverview from './EarningsOverview';
 import EarningsStats from './EarningsStats';
 import WithdrawBalance from './WithdrawBalance';
 import marketplaceApi from '../../../api/marketplaceApi';
-import { formatCurrency } from '../../../utils/formatters';
+import { formatCurrency } from '../../../utils/marketplace';
 
 interface EarningsTabProps {
   stripeStatus: any;
