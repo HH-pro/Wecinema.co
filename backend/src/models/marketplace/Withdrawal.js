@@ -1,4 +1,3 @@
-// models/Withdrawal.js
 const mongoose = require('mongoose');
 
 const withdrawalSchema = new mongoose.Schema({
@@ -8,9 +7,9 @@ const withdrawalSchema = new mongoose.Schema({
     required: true
   },
   amount: {
-    type: Number, // stored in cents
+    type: Number,
     required: true,
-    min: 0
+    min: 500 // Minimum 500 cents ($5.00)
   },
   status: {
     type: String,
@@ -19,22 +18,20 @@ const withdrawalSchema = new mongoose.Schema({
   },
   stripeTransferId: String,
   stripePayoutId: String,
-  description: String,
-  destination: {
+  stripeAccountId: String,
+  currency: {
     type: String,
-    default: 'Bank Account'
+    default: 'inr'
   },
+  description: String,
   failureReason: String,
-  requestDate: {
-    type: Date,
-    default: Date.now
-  },
-  processedAt: Date,
   completedAt: Date,
   failedAt: Date,
   cancelledAt: Date,
-  estimatedArrival: Date,
-  notes: String
+  cancelledBy: {
+    type: String,
+    enum: ['seller', 'admin', 'system']
+  }
 }, {
   timestamps: true
 });
