@@ -9,6 +9,7 @@ const SellerEarning = require('../../models/marketplace/SellerEarning');
 const PaymentHistory = require('../../models/marketplace/PaymentHistory');
 const WithdrawalRequest = require('../../models/marketplace/WithdrawalRequest');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const User = require("../../models/user");
 
 // ========== SELLER EARNINGS DASHBOARD ========== //
 
