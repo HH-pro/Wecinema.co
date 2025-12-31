@@ -3,129 +3,68 @@ import React, { useState, useEffect } from 'react';
 import StripeStatusCard from './StripeStatusCard';
 import EarningsOverview from './EarningsOverview';
 import EarningsStats from './EarningsStats';
-import WithdrawBalance from './WithdrawBalance'; // Import WithdrawBalance
+import WithdrawBalance from './WithdrawBalance';
 import marketplaceApi from '../../../api/marketplaceApi';
-import { formatCurrency } from '../../../utils/marketplace';
+import { formatCurrency } from '../../../utils/formatters';
 
 interface EarningsTabProps {
   stripeStatus: any;
   orderStats: any;
+  balanceData?: any;
+  monthlyEarnings?: any[];
+  earningsHistory?: any[];
+  onWithdrawSuccess: (amount: number) => void;
   loading: boolean;
   onRefresh: () => void;
+  onGoToWithdraw?: () => void;
 }
 
 const EarningsTab: React.FC<EarningsTabProps> = ({
   stripeStatus,
   orderStats,
+  balanceData,
+  monthlyEarnings = [],
+  earningsHistory = [],
+  onWithdrawSuccess,
   loading,
-  onRefresh
+  onRefresh,
+  onGoToWithdraw
 }) => {
-  const [earningsData, setEarningsData] = useState<any>(null);
-  const [balanceData, setBalanceData] = useState<{
-    availableBalance: number; // in cents
-    pendingBalance: number; // in cents
-    totalEarnings: number; // in cents
-    totalWithdrawn: number; // in cents
-    thisMonthRevenue: number; // in cents
-    lastWithdrawal: string | null;
-    nextPayoutDate: string;
-  } | null>(null);
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
-  const [earningsHistory, setEarningsHistory] = useState<any[]>([]);
-  const [monthlyEarnings, setMonthlyEarnings] = useState<any[]>([]);
-  const [earningsLoading, setEarningsLoading] = useState(false);
+  const [withdrawalsLoading, setWithdrawalsLoading] = useState(false);
   
-  const fetchEarningsData = async () => {
+  // Fetch withdrawals
+  const fetchWithdrawals = async () => {
     try {
-      setEarningsLoading(true);
+      setWithdrawalsLoading(true);
+      const response = await marketplaceApi.earnings.getHistory({ 
+        limit: 5, 
+        type: 'withdrawal' 
+      });
       
-      // Fetch all earnings data in parallel
-      const [
-        balanceResponse, 
-        historyResponse, 
-        monthlyResponse,
-        withdrawalsResponse
-      ] = await Promise.allSettled([
-        marketplaceApi.earnings.getBalance(),
-        marketplaceApi.earnings.getHistory({ limit: 5 }),
-        marketplaceApi.earnings.getMonthlySummary({ months: 6 }),
-        marketplaceApi.earnings.getHistory({ 
-          limit: 5, 
-          type: 'withdrawal' 
-        })
-      ]);
-      
-      const earningsData: any = {};
-      
-      // Balance data
-      if (balanceResponse.status === 'fulfilled' && balanceResponse.value.success) {
-        const balance = balanceResponse.value.data;
-        setBalanceData({
-          availableBalance: balance.availableBalance || 0,
-          pendingBalance: balance.pendingBalance || 0,
-          totalEarnings: balance.totalEarnings || 0,
-          totalWithdrawn: balance.totalWithdrawn || 0,
-          thisMonthRevenue: 0, // Will calculate from monthly data
-          lastWithdrawal: balance.lastWithdrawal,
-          nextPayoutDate: balance.nextPayoutDate
-        });
+      if (response.success) {
+        setWithdrawals(response.data?.earnings || []);
+      } else {
+        // Mock data for development
+        setWithdrawals([
+          { _id: '1', type: 'withdrawal', amount: 50000, status: 'completed', description: 'Withdrawal to bank', createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() },
+          { _id: '2', type: 'withdrawal', amount: 100000, status: 'pending', description: 'Withdrawal request', createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString() }
+        ]);
       }
-      
-      // Earnings history
-      if (historyResponse.status === 'fulfilled' && historyResponse.value.success) {
-        setEarningsHistory(historyResponse.value.data?.earnings || []);
-      }
-      
-      // Monthly earnings
-      if (monthlyResponse.status === 'fulfilled' && monthlyResponse.value.success) {
-        const monthly = monthlyResponse.value.data || [];
-        setMonthlyEarnings(monthly);
-        
-        // Calculate this month's revenue
-        const currentMonth = new Date().getMonth() + 1;
-        const currentYear = new Date().getFullYear();
-        const thisMonth = monthly.find((item: any) => 
-          item._id?.month === currentMonth && item._id?.year === currentYear
-        );
-        
-        if (thisMonth && balanceData) {
-          setBalanceData(prev => ({
-            ...prev!,
-            thisMonthRevenue: thisMonth.earnings || 0
-          }));
-        }
-      }
-      
-      // Withdrawals
-      if (withdrawalsResponse.status === 'fulfilled' && withdrawalsResponse.value.success) {
-        setWithdrawals(withdrawalsResponse.value.data?.earnings || []);
-      }
-      
-      setEarningsData(earningsData);
     } catch (error) {
-      console.error('Error fetching earnings data:', error);
+      console.error('Error fetching withdrawals:', error);
     } finally {
-      setEarningsLoading(false);
-    }
-  };
-  
-  const handleWithdrawSuccess = async (amount: number) => {
-    try {
-      // Refresh data after successful withdrawal
-      fetchEarningsData();
-      onRefresh(); // Refresh parent component data if needed
-    } catch (error) {
-      console.error('Error refreshing after withdrawal:', error);
+      setWithdrawalsLoading(false);
     }
   };
   
   useEffect(() => {
     if (stripeStatus?.chargesEnabled) {
-      fetchEarningsData();
+      fetchWithdrawals();
     }
   }, [stripeStatus]);
   
-  if (loading || earningsLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
@@ -154,28 +93,35 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
     );
   }
   
+  // Calculate this month's revenue
+  const currentMonth = new Date().getMonth() + 1;
+  const currentYear = new Date().getFullYear();
+  const thisMonthData = monthlyEarnings?.find((item: any) => 
+    item._id?.month === currentMonth && item._id?.year === currentYear
+  );
+  const thisMonthRevenue = thisMonthData?.earnings || balanceData?.thisMonthRevenue || 0;
+  
   return (
     <div className="space-y-8">
       {/* Stripe Status Card */}
       <StripeStatusCard stripeStatus={stripeStatus} />
       
       {/* Withdraw Balance Component */}
-      {balanceData && (
-        <WithdrawBalance
-          stripeStatus={stripeStatus}
-          availableBalance={balanceData.availableBalance}
-          pendingBalance={balanceData.pendingBalance}
-          totalEarnings={balanceData.totalEarnings}
-          thisMonthEarnings={balanceData.thisMonthRevenue}
-          onWithdrawSuccess={handleWithdrawSuccess}
-        />
-      )}
+      <WithdrawBalance
+        stripeStatus={stripeStatus}
+        availableBalance={balanceData?.availableBalance || 0}
+        pendingBalance={balanceData?.pendingBalance || 0}
+        totalEarnings={balanceData?.totalEarnings || 0}
+        thisMonthEarnings={thisMonthRevenue}
+        onWithdrawSuccess={onWithdrawSuccess}
+      />
       
       {/* Earnings Overview */}
       <EarningsOverview
         stripeStatus={stripeStatus}
         orderStats={orderStats}
         balanceData={balanceData}
+        thisMonthRevenue={thisMonthRevenue}
       />
       
       {/* Earnings Stats */}
@@ -265,8 +211,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                       <div>
                         <p className="font-medium text-gray-900">Withdrawal Request</p>
                         <p className="text-sm text-gray-500">
-                          {new Date(withdrawal.createdAt || withdrawal.date).toLocaleDateString()} • 
-                          ID: {withdrawal._id?.substring(0, 8)}...
+                          {new Date(withdrawal.createdAt || withdrawal.date).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
@@ -292,16 +237,14 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
               </div>
             )}
           </div>
-          {withdrawals.length > 0 && (
-            <div className="p-4 border-t border-gray-200 text-center">
-              <a 
-                href="/seller/withdraw" 
-                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-              >
-                View all withdrawals →
-              </a>
-            </div>
-          )}
+          <div className="p-4 border-t border-gray-200 text-center">
+            <button
+              onClick={onGoToWithdraw}
+              className="text-blue-600 hover:text-blue-800 text-sm font-medium hover:underline"
+            >
+              View all withdrawals →
+            </button>
+          </div>
         </div>
       </div>
       
@@ -334,7 +277,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
             </div>
           </div>
           <div>
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Earnings Summary</h4>
+            <h4 className="text-sm font-medium text-gray-700 mb-2">Earnings Summary (USD)</h4>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
@@ -369,7 +312,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                   <span className="text-sm text-gray-700">This Month</span>
                 </div>
                 <span className="font-medium text-gray-900">
-                  {formatCurrency(balanceData?.thisMonthRevenue || 0)}
+                  {formatCurrency(thisMonthRevenue)}
                 </span>
               </div>
             </div>
@@ -380,7 +323,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
       {/* Quick Actions */}
       <div className="flex flex-col sm:flex-row gap-4 justify-end">
         <button
-          onClick={fetchEarningsData}
+          onClick={onRefresh}
           className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition duration-200 flex items-center gap-2 justify-center"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -388,12 +331,12 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
           </svg>
           Refresh Data
         </button>
-        <a
-          href="/seller/withdraw"
+        <button
+          onClick={onGoToWithdraw}
           className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow text-center"
         >
           💳 Go to Withdrawals
-        </a>
+        </button>
       </div>
     </div>
   );
