@@ -1,10 +1,10 @@
-// components/marketplace/seller/WithdrawTab.tsx
+// components/marketplace/seller/WithdrawTab.tsx - UPDATED WITH $ CURRENCY
 import React, { useState, useEffect } from 'react';
 
-// Format currency function (amount in cents)
+// Format currency function - CHANGED TO $
 const formatCurrency = (amount: number) => {
-  const amountInRupees = amount / 100;
-  return `₹${amountInRupees.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const amountInDollars = amount / 100;
+  return `$${amountInDollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 interface StripeStatus {
@@ -46,7 +46,7 @@ interface WithdrawTabProps {
   loading: boolean;
   currentPage: number;
   onPageChange: (page: number) => void;
-  onWithdrawRequest: (amount: number) => void; // amount in rupees
+  onWithdrawRequest: (amount: number) => void; // amount in dollars
   onRefresh: () => void;
   totalRevenue?: number; // in cents
   thisMonthRevenue?: number; // in cents
@@ -76,23 +76,23 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
   const canWithdraw = stripeStatus?.connected && stripeStatus?.chargesEnabled;
   const hasBalance = availableBalance > 0;
 
-  // Convert cents to rupees for display and input
-  const availableBalanceInRupees = availableBalance / 100;
-  const pendingBalanceInRupees = pendingBalance / 100;
+  // Convert cents to dollars for display and input
+  const availableBalanceInDollars = availableBalance / 100;
+  const pendingBalanceInDollars = pendingBalance / 100;
 
-  // Preset amounts in rupees
+  // Preset amounts in dollars
   const presetAmounts = [
-    { value: 500, label: '₹500' },
-    { value: 1000, label: '₹1,000' },
-    { value: 2500, label: '₹2,500' },
-    { value: 5000, label: '₹5,000' },
-    { value: 10000, label: '₹10,000' },
+    { value: 50, label: '$50' },
+    { value: 100, label: '$100' },
+    { value: 250, label: '$250' },
+    { value: 500, label: '$500' },
+    { value: 1000, label: '$1,000' },
   ];
 
   // Handle preset amount selection
-  const handlePresetSelect = (amountInRupees: number) => {
-    if (amountInRupees <= availableBalanceInRupees) {
-      setWithdrawAmount(amountInRupees.toString());
+  const handlePresetSelect = (amountInDollars: number) => {
+    if (amountInDollars <= availableBalanceInDollars) {
+      setWithdrawAmount(amountInDollars.toString());
       setShowCustomInput(false);
     }
   };
@@ -106,48 +106,48 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
   // Validate and submit withdrawal
   const handleSubmitWithdrawal = async () => {
     if (!canWithdraw) {
-      alert('कृपया फंड निकालने के लिए अपना Stripe खाता कनेक्ट और वेरीफाई करें।');
+      alert('Please connect and verify your Stripe account to withdraw funds.');
       return;
     }
 
-    const amountInRupees = parseFloat(withdrawAmount);
-    if (!amountInRupees || amountInRupees <= 0) {
-      alert('कृपया एक वैध राशि दर्ज करें।');
+    const amountInDollars = parseFloat(withdrawAmount);
+    if (!amountInDollars || amountInDollars <= 0) {
+      alert('Please enter a valid amount.');
       return;
     }
 
-    if (amountInRupees > availableBalanceInRupees) {
-      alert(`आपके उपलब्ध बैलेंस ${formatCurrency(availableBalance)} से अधिक राशि नहीं निकाल सकते।`);
+    if (amountInDollars > availableBalanceInDollars) {
+      alert(`Cannot withdraw more than your available balance of ${formatCurrency(availableBalance)}.`);
       return;
     }
 
-    if (amountInRupees < 100) {
-      alert('न्यूनतम निकासी राशि ₹100 है।');
+    if (amountInDollars < 5) {
+      alert('Minimum withdrawal amount is $5.00.');
       return;
     }
 
-    if (window.confirm(`क्या आप वाकई ₹${amountInRupees.toLocaleString('en-IN')} निकालना चाहते हैं?`)) {
+    if (window.confirm(`Are you sure you want to withdraw $${amountInDollars.toFixed(2)}?`)) {
       setIsProcessing(true);
       try {
-        await onWithdrawRequest(amountInRupees);
+        await onWithdrawRequest(amountInDollars);
         setWithdrawAmount('');
         setCustomAmount('');
         setShowCustomInput(false);
       } catch (error) {
         console.error('Withdrawal failed:', error);
-        alert('निकासी विफल। कृपया पुनः प्रयास करें।');
+        alert('Withdrawal failed. Please try again.');
       } finally {
         setIsProcessing(false);
       }
     }
   };
 
-  // Format date in Indian format
+  // Format date in US format
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', {
-      day: 'numeric',
+    return date.toLocaleDateString('en-US', {
       month: 'short',
+      day: 'numeric',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
@@ -208,7 +208,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">निकासी इतिहास लोड हो रहा है...</p>
+          <p className="text-gray-600">Loading withdrawal history...</p>
         </div>
       </div>
     );
@@ -219,8 +219,8 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">फंड निकालें</h1>
-          <p className="text-gray-600 mt-1">अपनी कमाई को अपने बैंक खाते में ट्रांसफर करें</p>
+          <h1 className="text-2xl font-bold text-gray-900">Withdraw Funds</h1>
+          <p className="text-gray-600 mt-1">Transfer your earnings to your bank account</p>
         </div>
         <button
           onClick={onRefresh}
@@ -229,7 +229,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
-          रिफ्रेश करें
+          Refresh
         </button>
       </div>
 
@@ -239,11 +239,11 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
         <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-xl p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">उपलब्ध बैलेंस</p>
+              <p className="text-sm text-gray-600 font-medium">Available Balance</p>
               <p className="text-3xl font-bold text-gray-900 mt-2">
                 {formatCurrency(availableBalance)}
               </p>
-              <p className="text-xs text-gray-500 mt-1">निकासी के लिए तैयार</p>
+              <p className="text-xs text-gray-500 mt-1">Ready to withdraw</p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
               <span className="text-2xl">💰</span>
@@ -255,11 +255,11 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
         <div className="bg-gradient-to-br from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">लंबित बैलेंस</p>
+              <p className="text-sm text-gray-600 font-medium">Pending Balance</p>
               <p className="text-3xl font-bold text-gray-900 mt-2">
                 {formatCurrency(pendingBalance)}
               </p>
-              <p className="text-xs text-gray-500 mt-1">प्रोसेसिंग कमाई</p>
+              <p className="text-xs text-gray-500 mt-1">Processing earnings</p>
             </div>
             <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
               <span className="text-2xl">⏳</span>
@@ -271,14 +271,14 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 font-medium">कुल निकासी</p>
+              <p className="text-sm text-gray-600 font-medium">Total Withdrawn</p>
               <p className="text-3xl font-bold text-gray-900 mt-2">
                 {formatCurrency(totalWithdrawn)}
               </p>
               <div className="flex items-center gap-2 mt-1">
-                <p className="text-xs text-gray-500">{withdrawalHistory?.withdrawals?.length || 0} लेनदेन</p>
+                <p className="text-xs text-gray-500">{withdrawalHistory?.withdrawals?.length || 0} transactions</p>
                 <span className="text-xs font-medium text-green-600">
-                  {calculateSuccessRate()}% सफलता दर
+                  {calculateSuccessRate()}% success rate
                 </span>
               </div>
             </div>
@@ -297,7 +297,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
               <span className="text-lg text-purple-600">💰</span>
             </div>
             <div>
-              <p className="text-sm text-gray-600">कुल कमाई</p>
+              <p className="text-sm text-gray-600">Total Earnings</p>
               <p className="text-lg font-bold text-gray-900">{formatCurrency(totalRevenue)}</p>
             </div>
           </div>
@@ -309,7 +309,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
               <span className="text-lg text-green-600">📈</span>
             </div>
             <div>
-              <p className="text-sm text-gray-600">इस महीने की कमाई</p>
+              <p className="text-sm text-gray-600">This Month Earnings</p>
               <p className="text-lg font-bold text-gray-900">{formatCurrency(thisMonthRevenue)}</p>
             </div>
           </div>
@@ -321,7 +321,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
               <span className="text-lg text-yellow-600">⏳</span>
             </div>
             <div>
-              <p className="text-sm text-gray-600">प्रोसेसिंग में</p>
+              <p className="text-sm text-gray-600">Processing</p>
               <p className="text-lg font-bold text-gray-900">{formatCurrency(pendingRevenue)}</p>
             </div>
           </div>
@@ -330,7 +330,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
 
       {/* Withdrawal Form */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">नई निकासी</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">New Withdrawal</h2>
         
         {!canWithdraw ? (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
@@ -341,9 +341,9 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                 </svg>
               </div>
               <div>
-                <h3 className="font-medium text-yellow-800">खाता सेटअप आवश्यक</h3>
+                <h3 className="font-medium text-yellow-800">Account Setup Required</h3>
                 <p className="text-sm text-yellow-700 mt-1">
-                  कृपया फंड निकालने के लिए अपना Stripe खाता कनेक्ट और वेरीफाई करें।
+                  Please connect and verify your Stripe account to withdraw funds.
                 </p>
               </div>
             </div>
@@ -358,7 +358,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
               </div>
               <div>
                 <p className="text-sm text-blue-800">
-                  आपका उपलब्ध बैलेंस ₹0 है। अधिक ऑर्डर पूरा करके कमाई शुरू करें!
+                  Your available balance is $0. Complete more orders to start earning!
                 </p>
               </div>
             </div>
@@ -367,17 +367,17 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
           <>
             {/* Preset Amounts */}
             <div className="mb-6">
-              <p className="text-sm text-gray-600 mb-3">त्वरित राशि चुनें</p>
+              <p className="text-sm text-gray-600 mb-3">Quick Amounts</p>
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                 {presetAmounts.map((preset) => (
                   <button
                     key={preset.value}
                     onClick={() => handlePresetSelect(preset.value)}
-                    disabled={preset.value > availableBalanceInRupees}
+                    disabled={preset.value > availableBalanceInDollars}
                     className={`px-4 py-3 rounded-lg border transition duration-200 ${
                       withdrawAmount === preset.value.toString()
                         ? 'bg-yellow-500 text-white border-yellow-500'
-                        : preset.value > availableBalanceInRupees
+                        : preset.value > availableBalanceInDollars
                         ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
                         : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-300'
                     }`}
@@ -393,7 +393,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                       : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-300'
                   }`}
                 >
-                  <span className="font-medium">कस्टम</span>
+                  <span className="font-medium">Custom</span>
                 </button>
               </div>
             </div>
@@ -402,32 +402,32 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
             {showCustomInput && (
               <div className="mb-6">
                 <label className="block text-sm text-gray-600 mb-2">
-                  कस्टम राशि दर्ज करें (न्यूनतम: ₹100)
+                  Enter custom amount (Minimum: $5.00)
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500">₹</span>
+                    <span className="text-gray-500">$</span>
                   </div>
                   <input
                     type="number"
-                    min="100"
-                    max={availableBalanceInRupees}
-                    step="100"
+                    min="5"
+                    max={availableBalanceInDollars}
+                    step="0.01"
                     value={customAmount}
                     onChange={(e) => {
                       const value = e.target.value;
                       setCustomAmount(value);
                       setWithdrawAmount(value);
                     }}
-                    placeholder="0"
+                    placeholder="0.00"
                     className="block w-full pl-8 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none transition"
                   />
                   <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500">INR</span>
+                    <span className="text-gray-500">USD</span>
                   </div>
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  उपलब्ध: {formatCurrency(availableBalance)}
+                  Available: {formatCurrency(availableBalance)}
                 </p>
               </div>
             )}
@@ -438,13 +438,13 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                 <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-5">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                      <p className="text-sm text-gray-600">निकासी राशि</p>
+                      <p className="text-sm text-gray-600">Withdrawal Amount</p>
                       <p className="text-3xl font-bold text-gray-900 mt-1">
-                        ₹{parseFloat(withdrawAmount).toLocaleString('en-IN')}
+                        ${parseFloat(withdrawAmount).toFixed(2)}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-gray-600">निकासी के बाद बची राशि</p>
+                      <p className="text-sm text-gray-600">Balance After Withdrawal</p>
                       <p className="text-2xl font-bold text-green-700 mt-1">
                         {formatCurrency(availableBalance - (parseFloat(withdrawAmount) * 100))}
                       </p>
@@ -464,14 +464,14 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                 {isProcessing ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    प्रोसेसिंग...
+                    Processing...
                   </>
                 ) : (
                   <>
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
-                    निकासी अनुरोध करें
+                    Request Withdrawal
                   </>
                 )}
               </button>
@@ -486,13 +486,13 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-blue-800">निकासी जानकारी</h3>
+                  <h3 className="text-sm font-medium text-blue-800">Withdrawal Information</h3>
                   <ul className="text-xs text-blue-700 mt-1 space-y-1">
-                    <li>• न्यूनतम निकासी: ₹100</li>
-                    <li>• प्रोसेसिंग समय: 2-3 व्यावसायिक दिन</li>
-                    <li>• फंड आपके कनेक्टेड बैंक खाते में ट्रांसफर किए जाएंगे</li>
-                    <li>• विक्रेताओं के लिए कोई निकासी शुल्क नहीं</li>
-                    <li>• निकासी केवल सोमवार से शुक्रवार तक प्रोसेस की जाती है</li>
+                    <li>• Minimum withdrawal: $5.00</li>
+                    <li>• Processing time: 2-3 business days</li>
+                    <li>• Funds will be transferred to your connected bank account</li>
+                    <li>• No withdrawal fees for sellers</li>
+                    <li>• Withdrawals processed Monday to Friday only</li>
                   </ul>
                 </div>
               </div>
@@ -504,13 +504,13 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
       {/* Withdrawal History */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">निकासी इतिहास</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Withdrawal History</h2>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-500">
-              {withdrawalHistory?.withdrawals?.length || 0} लेनदेन
+              {withdrawalHistory?.withdrawals?.length || 0} transactions
             </span>
             <div className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded-full">
-              {calculateSuccessRate()}% सफल
+              {calculateSuccessRate()}% success rate
             </div>
           </div>
         </div>
@@ -518,11 +518,11 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
         {!withdrawalHistory?.withdrawals?.length ? (
           <div className="text-center py-12">
             <div className="text-5xl mb-4 text-gray-300">💰</div>
-            <h3 className="text-lg font-medium text-gray-900">अभी तक कोई निकासी नहीं</h3>
+            <h3 className="text-lg font-medium text-gray-900">No Withdrawals Yet</h3>
             <p className="text-gray-500 mt-2 mb-6">
               {hasBalance
-                ? 'अपनी कमाई को बैंक खाते में ट्रांसफर करने के लिए अपनी पहली निकासी का अनुरोध करें।'
-                : 'पैसा कमाने और निकासी करने के लिए ऑर्डर पूरा करें।'
+                ? 'Request your first withdrawal to transfer earnings to your bank account.'
+                : 'Complete orders to earn money and make withdrawals.'
               }
             </p>
           </div>
@@ -533,19 +533,19 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                 <thead>
                   <tr className="bg-gray-50">
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      तारीख
+                      Date
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      राशि
+                      Amount
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      स्थिति
+                      Status
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      गंतव्य
+                      Destination
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ट्रांसफर ID
+                      Transfer ID
                     </th>
                   </tr>
                 </thead>
@@ -556,7 +556,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                         <div className="text-sm text-gray-900">{formatDate(withdrawal.createdAt)}</div>
                         {withdrawal.completedAt && (
                           <div className="text-xs text-gray-500">
-                            पूरा हुआ: {formatDate(withdrawal.completedAt)}
+                            Completed: {formatDate(withdrawal.completedAt)}
                           </div>
                         )}
                       </td>
@@ -574,9 +574,9 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                         <div className="flex flex-col gap-2">
                           <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(withdrawal.status)}`}>
                             <span className="mr-1">{getStatusIcon(withdrawal.status)}</span>
-                            {withdrawal.status === 'completed' ? 'पूरा हुआ' :
-                             withdrawal.status === 'pending' ? 'लंबित' :
-                             withdrawal.status === 'failed' ? 'विफल' : withdrawal.status}
+                            {withdrawal.status === 'completed' ? 'Completed' :
+                             withdrawal.status === 'pending' ? 'Pending' :
+                             withdrawal.status === 'failed' ? 'Failed' : withdrawal.status}
                           </span>
                           {withdrawal.failureReason && (
                             <div className="text-xs text-red-600">{withdrawal.failureReason}</div>
@@ -585,7 +585,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
-                          {withdrawal.destination || 'बैंक खाता'}
+                          {withdrawal.destination || 'Bank Account'}
                         </div>
                         {withdrawal.stripePayoutId && (
                           <div className="text-xs text-gray-500">Payout ID: {withdrawal.stripePayoutId}</div>
@@ -598,7 +598,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                               {withdrawal.stripeTransferId}
                             </span>
                           ) : (
-                            'लंबित...'
+                            'Pending...'
                           )}
                         </div>
                       </td>
@@ -612,7 +612,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
             <div className="mt-6 pt-6 border-t border-gray-200">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="text-sm text-gray-700">
-                  <span className="font-medium">कुल निकासी:</span>{' '}
+                  <span className="font-medium">Total Withdrawn:</span>{' '}
                   <span className="text-lg font-bold text-green-700 ml-2">
                     {formatCurrency(totalWithdrawn)}
                   </span>
@@ -620,11 +620,11 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                 <div className="flex items-center gap-4 text-sm text-gray-600">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                    <span>पूरा हुआ: {withdrawalHistory.withdrawals.filter(w => w.status === 'completed').length}</span>
+                    <span>Completed: {withdrawalHistory.withdrawals.filter(w => w.status === 'completed').length}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                    <span>लंबित: {withdrawalHistory.withdrawals.filter(w => w.status === 'pending').length}</span>
+                    <span>Pending: {withdrawalHistory.withdrawals.filter(w => w.status === 'pending').length}</span>
                   </div>
                 </div>
               </div>
@@ -636,7 +636,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
         {withdrawalHistory?.pagination && withdrawalHistory.pagination.pages > 1 && (
           <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-200">
             <div className="text-sm text-gray-700">
-              पेज {currentPage} दिखाया जा रहा है, कुल {withdrawalHistory.pagination.pages} पेज
+              Page {currentPage} of {withdrawalHistory.pagination.pages}
             </div>
             <div className="flex gap-2">
               <button
@@ -644,14 +644,14 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                 disabled={currentPage === 1}
                 className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                पिछला
+                Previous
               </button>
               <button
                 onClick={() => onPageChange(currentPage + 1)}
                 disabled={currentPage === withdrawalHistory.pagination.pages}
                 className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                अगला
+                Next
               </button>
             </div>
           </div>
