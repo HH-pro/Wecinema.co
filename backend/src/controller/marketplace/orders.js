@@ -2554,29 +2554,39 @@ router.put("/:orderId/status", authenticateMiddleware, async (req, res) => {
 // ========== EARNINGS & WITHDRAWAL ROUTES ==========
 // ======================================================
 
-// Fix the GET EARNINGS SUMMARY route:
 router.get("/earnings/summary", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
     
-    // ✅ FIXED: Use new ObjectId() properly
-    const userIdObj = new mongoose.Types.ObjectId(userId);
+    console.log('🔍 Fetching earnings summary for user:', userId);
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID is required'
+      });
+    }
 
     // Get all completed orders for this seller
     const completedOrders = await Order.find({
       sellerId: userId,
       status: 'completed',
       paymentReleased: true
-    }).select('amount platformFee sellerAmount completedAt');
+    }).select('amount platformFee sellerAmount completedAt listingId');
+
+    console.log('✅ Found completed orders:', completedOrders.length);
 
     // Calculate totals
     const totalEarnings = completedOrders.reduce((sum, order) => 
       sum + (order.sellerAmount || order.amount || 0), 0);
     
-    const totalWithdrawn = await Withdrawal.aggregate([
+    console.log('💰 Total earnings:', totalEarnings);
+
+    // Get total withdrawn
+    const totalWithdrawnResult = await Withdrawal.aggregate([
       { 
         $match: { 
-          sellerId: userIdObj,
+          sellerId: new mongoose.Types.ObjectId(userId),
           status: 'completed' 
         } 
       },
@@ -2586,7 +2596,10 @@ router.get("/earnings/summary", authenticateMiddleware, async (req, res) => {
           total: { $sum: '$amount' } 
         } 
       }
-    ]).then(result => result[0]?.total || 0);
+    ]);
+    
+    const totalWithdrawn = totalWithdrawnResult[0]?.total || 0;
+    console.log('💸 Total withdrawn:', totalWithdrawn);
 
     // Get pending orders (delivered but not completed)
     const pendingOrders = await Order.find({
@@ -2594,22 +2607,34 @@ router.get("/earnings/summary", authenticateMiddleware, async (req, res) => {
       status: { $in: ['delivered', 'in_progress', 'in_revision'] }
     }).select('amount');
 
+    console.log('⏳ Pending orders:', pendingOrders.length);
+
     const pendingBalance = pendingOrders.reduce((sum, order) => 
       sum + (order.amount || 0), 0);
     
+    console.log('📊 Pending balance:', pendingBalance);
+
     const availableBalance = Math.max(0, totalEarnings - totalWithdrawn);
+    console.log('✅ Available balance:', availableBalance);
 
     // Get this month's earnings
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
     const thisMonthEarnings = completedOrders
-      .filter(order => new Date(order.completedAt) >= startOfMonth)
+      .filter(order => {
+        const completedDate = new Date(order.completedAt);
+        return completedDate >= startOfMonth;
+      })
       .reduce((sum, order) => sum + (order.sellerAmount || order.amount || 0), 0);
+
+    console.log('📅 This month earnings:', thisMonthEarnings);
 
     // Get last withdrawal
     const lastWithdrawal = await Withdrawal.findOne({ 
       sellerId: userId, 
       status: 'completed' 
     }).sort({ createdAt: -1 });
+
+    console.log('🕒 Last withdrawal:', lastWithdrawal ? 'Found' : 'None');
 
     // Calculate next payout date (assuming weekly payouts on Fridays)
     const today = new Date();
@@ -2618,14 +2643,16 @@ router.get("/earnings/summary", authenticateMiddleware, async (req, res) => {
     nextFriday.setDate(today.getDate() + (daysUntilFriday === 0 ? 7 : daysUntilFriday));
     nextFriday.setHours(0, 0, 0, 0);
 
-    res.status(200).json({
+    console.log('📅 Next payout date:', nextFriday);
+
+    const response = {
       success: true,
       data: {
-        availableBalance: availableBalance * 100, // Convert to cents
-        pendingBalance: pendingBalance * 100, // Convert to cents
-        totalEarnings: totalEarnings * 100, // Convert to cents
-        totalWithdrawn: totalWithdrawn * 100, // Convert to cents
-        walletBalance: availableBalance * 100, // Convert to cents
+        availableBalance: Math.round(availableBalance * 100), // Convert to cents
+        pendingBalance: Math.round(pendingBalance * 100), // Convert to cents
+        totalEarnings: Math.round(totalEarnings * 100), // Convert to cents
+        totalWithdrawn: Math.round(totalWithdrawn * 100), // Convert to cents
+        walletBalance: Math.round(availableBalance * 100), // Convert to cents
         lastWithdrawal: lastWithdrawal ? {
           amount: lastWithdrawal.amount,
           date: lastWithdrawal.completedAt || lastWithdrawal.createdAt,
@@ -2633,17 +2660,25 @@ router.get("/earnings/summary", authenticateMiddleware, async (req, res) => {
         } : null,
         nextPayoutDate: nextFriday.toISOString(),
         currency: 'inr',
-        thisMonthEarnings: thisMonthEarnings * 100, // Convert to cents
+        thisMonthEarnings: Math.round(thisMonthEarnings * 100), // Convert to cents
         completedOrdersCount: completedOrders.length,
         pendingOrdersCount: pendingOrders.length
       }
-    });
+    };
+
+    console.log('📤 Sending response:', JSON.stringify(response).substring(0, 200) + '...');
+    
+    res.status(200).json(response);
+    
   } catch (error) {
-    console.error('Error fetching earnings summary:', error);
+    console.error('❌ Error fetching earnings summary:', error);
+    console.error('Stack trace:', error.stack);
+    
     res.status(500).json({
       success: false,
       error: 'Failed to fetch earnings summary',
-      details: error.message
+      details: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 });
