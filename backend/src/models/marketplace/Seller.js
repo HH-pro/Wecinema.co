@@ -1,4 +1,6 @@
 // models/Seller.js (or add to existing)
+const mongoose = require('mongoose');
+
 const sellerSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
