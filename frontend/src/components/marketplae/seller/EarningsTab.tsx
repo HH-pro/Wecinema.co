@@ -1,14 +1,14 @@
-// src/components/marketplace/seller/EarningsTab.tsx
+// src/components/marketplace/seller/EarningsTab.tsx - UPDATED FIXED VERSION
 import React, { useState, useEffect } from 'react';
 import marketplaceApi from '../../../api/marketplaceApi';
 
 interface EarningsTabProps {
-  earningsBalance: any;
-  monthlyEarnings: any[];
-  earningsHistory: any[];
+  earningsBalance?: any;
+  monthlyEarnings?: any[];
+  earningsHistory?: any[];
   onWithdrawRequest: (amountInDollars: number) => Promise<void>;
   loading: boolean;
-  onRefresh: () => Promise<void>;
+  onRefresh?: () => Promise<void>;
   formatCurrency?: (amountInCents: number) => string;
   formatCurrencyShort?: (amountInCents: number) => string;
   dollarsToCents?: (dollars: number) => number;
@@ -31,10 +31,9 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   const [withdrawing, setWithdrawing] = useState(false);
   const [error, setError] = useState('');
   const [activeChart, setActiveChart] = useState('monthly');
-  const [balanceData, setBalanceData] = useState<any>(null);
-  const [monthlyData, setMonthlyData] = useState<any[]>([]);
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [fetching, setFetching] = useState(false);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [apiError, setApiError] = useState('');
 
   // ✅ ڈالر میں فارمیٹ کرنے کا فنکشن
   const formatInUSD = (amountInCents: number): string => {
@@ -72,144 +71,149 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
     }).format(amountInDollars);
   };
 
-  // ✅ Order Stats سے ڈیٹا حاصل کریں (SellerDashboard کی طرح)
-  const fetchOrderStats = async () => {
+  // ✅ آرڈرز سے ڈیٹا اکٹھا کریں
+  const fetchOrders = async () => {
     try {
-      setFetching(true);
-      console.log('🔄 Fetching order stats...');
+      setIsLoading(true);
+      setApiError('');
+      console.log('🔄 Fetching orders for earnings calculation...');
       
-      // SellerDashboard کی طرح orders stats حاصل کریں
-      const ordersRes = await marketplaceApi.orders.getMySales();
-      console.log('📊 Orders from API:', ordersRes?.length || 0);
+      const ordersData = await marketplaceApi.orders.getMySales();
+      console.log('📊 Orders received:', ordersData?.length || 0);
       
-      if (Array.isArray(ordersRes)) {
-        // ✅ حقیقی حساب کتاب (SellerDashboard کی طرح)
-        const completedOrders = ordersRes.filter(order => 
-          order.status === 'completed' && order.paymentReleased
-        );
-        
-        const pendingOrders = ordersRes.filter(order => 
-          order.status === 'in_progress' || 
-          order.status === 'pending' ||
-          (order.status === 'completed' && !order.paymentReleased)
-        );
-        
-        // ✅ Total Revenue حساب کریں (تمام مکمل آرڈرز کا مجموعہ)
-        const totalRevenue = completedOrders.reduce((sum, order) => {
-          return sum + (order.sellerAmount || order.amount || 0);
-        }, 0);
-        
-        // ✅ Available Balance (پے ریلیز ہو چکے آرڈرز)
-        const availableBalance = completedOrders
-          .filter(order => order.paymentReleased)
-          .reduce((sum, order) => sum + (order.sellerAmount || order.amount || 0), 0);
-        
-        // ✅ Pending Balance (کام جاری آرڈرز)
-        const pendingBalance = pendingOrders.reduce((sum, order) => {
-          return sum + (order.sellerAmount || order.amount || 0);
-        }, 0);
-        
-        // ✅ Total Withdrawn (تاریخ سے حاصل کریں یا الگ API)
-        const totalWithdrawn = 0; // یہ withdrawal history سے آئے گا
-        
-        // ✅ Monthly data تیار کریں
-        const monthlyEarningsMap = new Map();
-        
-        completedOrders.forEach(order => {
-          const date = new Date(order.completedAt || order.createdAt);
-          const monthKey = `${date.getFullYear()}-${date.getMonth() + 1}`;
-          
-          const existing = monthlyEarningsMap.get(monthKey) || { 
-            earnings: 0, 
-            orders: 0,
-            month: date.getMonth() + 1,
-            year: date.getFullYear()
-          };
-          
-          monthlyEarningsMap.set(monthKey, {
-            ...existing,
-            earnings: existing.earnings + (order.sellerAmount || order.amount || 0),
-            orders: existing.orders + 1,
-            _id: { month: date.getMonth() + 1, year: date.getFullYear() }
-          });
-        });
-        
-        const monthlyDataArray = Array.from(monthlyEarningsMap.values())
-          .sort((a, b) => {
-            if (a.year !== b.year) return b.year - a.year;
-            return b.month - a.month;
-          })
-          .slice(0, 6); // آخری 6 ماہ
-        
-        // ✅ Balance data تیار کریں
-        const balanceData = {
-          availableBalance,
-          pendingBalance,
-          totalEarnings: totalRevenue,
-          totalWithdrawn,
-          walletBalance: availableBalance,
-          lastWithdrawal: null,
-          nextPayoutDate: null,
-          currency: 'usd',
-          thisMonthEarnings: monthlyDataArray[0]?.earnings || 0,
-          completedOrdersCount: completedOrders.length,
-          pendingOrdersCount: pendingOrders.length
-        };
-        
-        // ✅ Transactions تیار کریں
-        const transactionsData = completedOrders.map(order => ({
-          _id: order._id,
-          type: 'earning',
-          status: 'completed',
-          amount: order.sellerAmount || order.amount || 0,
-          description: `Order: ${order.listingId?.title || 'Completed Order'}`,
-          date: order.completedAt || order.createdAt,
-          listingTitle: order.listingId?.title
-        })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        
-        console.log('✅ Calculated Stats:', {
-          totalRevenue: formatInUSD(totalRevenue),
-          availableBalance: formatInUSD(availableBalance),
-          pendingBalance: formatInUSD(pendingBalance),
-          completedOrders: completedOrders.length,
-          pendingOrders: pendingOrders.length,
-          monthlyData: monthlyDataArray.length
-        });
-        
-        setBalanceData(balanceData);
-        setMonthlyData(monthlyDataArray);
-        setTransactions(transactionsData);
-        
-      } else {
-        console.warn('⚠️ Orders API did not return array');
+      if (!Array.isArray(ordersData)) {
+        throw new Error('Invalid orders data received');
       }
       
-    } catch (error) {
-      console.error('❌ Error fetching order stats:', error);
+      setOrders(ordersData || []);
       
-      // Fallback demo data
-      const fallbackData = {
-        availableBalance: 150000,
-        pendingBalance: 50000,
-        totalEarnings: 250000,
-        totalWithdrawn: 100000,
-        walletBalance: 150000,
-        lastWithdrawal: null,
-        nextPayoutDate: null,
-        currency: 'usd'
-      };
-      
-      setBalanceData(fallbackData);
-      setMonthlyData([]);
-      setTransactions([]);
+    } catch (error: any) {
+      console.error('❌ Error fetching orders:', error);
+      setApiError(error.message || 'Failed to fetch orders data');
+      setOrders([]);
     } finally {
-      setFetching(false);
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchOrderStats();
+    fetchOrders();
   }, []);
+
+  // ✅ حساب کتاب والے فنکشنز
+  const calculateEarnings = () => {
+    if (!orders || orders.length === 0) {
+      return {
+        totalEarnings: 0,
+        availableBalance: 0,
+        pendingBalance: 0,
+        completedOrdersCount: 0,
+        pendingOrdersCount: 0,
+        activeOrdersCount: 0
+      };
+    }
+
+    // مکمل آرڈرز (paymentReleased = true)
+    const completedOrders = orders.filter(order => 
+      order.status === 'completed' && order.paymentReleased === true
+    );
+
+    // جاری آرڈرز (کام چل رہا ہے)
+    const activeOrders = orders.filter(order => 
+      order.status === 'in_progress' || 
+      order.status === 'pending' ||
+      order.status === 'delivered' ||
+      order.status === 'revision_requested'
+    );
+
+    // pending آرڈرز (paymentReleased = false)
+    const pendingOrders = orders.filter(order => 
+      order.status === 'completed' && order.paymentReleased === false
+    );
+
+    // Total revenue تمام مکمل آرڈرز سے
+    const totalEarnings = completedOrders.reduce((sum, order) => {
+      return sum + (order.sellerAmount || order.amount || 0);
+    }, 0);
+
+    // Available balance (جو withdraw ہو سکتی ہے)
+    const availableBalance = completedOrders.reduce((sum, order) => {
+      return sum + (order.sellerAmount || order.amount || 0);
+    }, 0);
+
+    // Pending balance (active orders سے)
+    const pendingBalance = activeOrders.reduce((sum, order) => {
+      return sum + (order.sellerAmount || order.amount || 0);
+    }, 0);
+
+    return {
+      totalEarnings,
+      availableBalance,
+      pendingBalance,
+      completedOrdersCount: completedOrders.length,
+      pendingOrdersCount: pendingOrders.length,
+      activeOrdersCount: activeOrders.length
+    };
+  };
+
+  // ✅ Monthly earnings calculate کریں
+  const calculateMonthlyEarnings = () => {
+    if (!orders || orders.length === 0) return [];
+
+    const completedOrders = orders.filter(order => 
+      order.status === 'completed' && order.paymentReleased === true
+    );
+
+    const monthlyMap = new Map();
+
+    completedOrders.forEach(order => {
+      const date = new Date(order.completedAt || order.createdAt || order.updatedAt);
+      const month = date.getMonth() + 1;
+      const year = date.getFullYear();
+      const monthYear = `${year}-${month.toString().padStart(2, '0')}`;
+      
+      const current = monthlyMap.get(monthYear) || { 
+        earnings: 0, 
+        orders: 0,
+        month,
+        year,
+        monthYear
+      };
+      
+      monthlyMap.set(monthYear, {
+        ...current,
+        earnings: current.earnings + (order.sellerAmount || order.amount || 0),
+        orders: current.orders + 1,
+        _id: { month, year }
+      });
+    });
+
+    return Array.from(monthlyMap.values())
+      .sort((a, b) => {
+        if (a.year !== b.year) return b.year - a.year;
+        return b.month - a.month;
+      })
+      .slice(0, 6); // آخری 6 ماہ
+  };
+
+  // ✅ Transactions list بنائیں
+  const getTransactions = () => {
+    if (!orders || orders.length === 0) return [];
+
+    const completedOrders = orders.filter(order => 
+      order.status === 'completed' && order.paymentReleased === true
+    );
+
+    return completedOrders.map(order => ({
+      _id: order._id || order.id,
+      type: 'earning',
+      status: 'completed',
+      amount: order.sellerAmount || order.amount || 0,
+      description: `Order: ${order.listingId?.title || 'Completed Order'}`,
+      date: order.completedAt || order.createdAt || order.updatedAt,
+      orderNumber: order.orderNumber || order._id?.slice(-6) || 'N/A'
+    })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  };
 
   const handleWithdraw = async () => {
     if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) {
@@ -225,7 +229,8 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
       return;
     }
     
-    const availableBalanceInCents = balanceData?.availableBalance || 0;
+    const earnings = calculateEarnings();
+    const availableBalanceInCents = earnings.availableBalance;
     const requestedAmountInCents = dollarsToCents(amountInDollars);
     
     if (requestedAmountInCents > availableBalanceInCents) {
@@ -239,40 +244,13 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
       setWithdrawAmount('');
       setError('');
       // Refresh data after successful withdrawal
-      await fetchOrderStats();
+      await fetchOrders();
     } catch (err: any) {
       setError(err.message || 'Failed to process withdrawal');
     } finally {
       setWithdrawing(false);
     }
   };
-
-  // ✅ Calculate growth
-  const calculateGrowth = () => {
-    if (!monthlyData || monthlyData.length < 2) return { percent: 0, amount: 0 };
-    
-    try {
-      const sorted = [...monthlyData].sort((a, b) => {
-        if (a.year !== b.year) return a.year - b.year;
-        return a.month - b.month;
-      });
-      
-      const current = sorted[sorted.length - 1]?.earnings || 0;
-      const previous = sorted[sorted.length - 2]?.earnings || 0;
-      
-      if (previous === 0) return { percent: 100, amount: current };
-      
-      const percent = ((current - previous) / previous) * 100;
-      return {
-        percent: Math.round(percent),
-        amount: current - previous
-      };
-    } catch (e) {
-      return { percent: 0, amount: 0 };
-    }
-  };
-
-  const growth = calculateGrowth();
 
   // ✅ Format date
   const formatDate = (dateString: string) => {
@@ -318,12 +296,44 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
     return '';
   };
 
+  // ✅ Calculate data
+  const earnings = calculateEarnings();
+  const monthlyData = calculateMonthlyEarnings();
+  const transactions = getTransactions();
+
+  // ✅ Calculate growth
+  const calculateGrowth = () => {
+    if (!monthlyData || monthlyData.length < 2) return { percent: 0, amount: 0 };
+    
+    try {
+      const sorted = [...monthlyData].sort((a, b) => {
+        if (a.year !== b.year) return a.year - b.year;
+        return a.month - b.month;
+      });
+      
+      const current = sorted[sorted.length - 1]?.earnings || 0;
+      const previous = sorted[sorted.length - 2]?.earnings || 0;
+      
+      if (previous === 0) return { percent: 100, amount: current };
+      
+      const percent = ((current - previous) / previous) * 100;
+      return {
+        percent: Math.round(percent),
+        amount: current - previous
+      };
+    } catch (e) {
+      return { percent: 0, amount: 0 };
+    }
+  };
+
+  const growth = calculateGrowth();
+
   // ✅ Calculate available balance in dollars
-  const availableBalanceInCents = balanceData?.availableBalance || 0;
+  const availableBalanceInCents = earnings.availableBalance || 0;
   const availableBalanceInDollars = centsToDollars(availableBalanceInCents);
 
   // Loading state
-  if (fetching && !balanceData) {
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -337,7 +347,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
         </div>
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading earnings data...</p>
+          <p className="text-gray-600">Loading earnings data from orders...</p>
         </div>
       </div>
     );
@@ -345,6 +355,44 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Error Message */}
+      {apiError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <div className="text-red-600 mr-2">⚠️</div>
+            <div>
+              <p className="text-sm font-medium text-red-800">API Error</p>
+              <p className="text-sm text-red-700 mt-1">{apiError}</p>
+              <p className="text-sm text-red-600 mt-2">
+                Showing calculated data from your orders
+              </p>
+            </div>
+            <button
+              onClick={fetchOrders}
+              disabled={isLoading}
+              className="ml-auto text-sm bg-red-100 hover:bg-red-200 px-3 py-1 rounded border border-red-300"
+            >
+              {isLoading ? 'Refreshing...' : 'Retry'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Info Banner */}
+      {orders.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <div className="text-blue-600 mr-2">ℹ️</div>
+            <div>
+              <p className="text-sm font-medium text-blue-800">Data Source</p>
+              <p className="text-sm text-blue-700">
+                Earnings calculated from {orders.length} orders. This matches Seller Dashboard data.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Earnings Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Available Balance Card */}
@@ -353,7 +401,7 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
             <div>
               <p className="text-sm font-medium text-green-800">Available Balance</p>
               <p className="text-3xl font-bold text-green-900 mt-2">
-                {formatInUSD(availableBalanceInCents)}
+                {formatInUSD(earnings.availableBalance)}
               </p>
               <p className="text-sm text-green-700 mt-2">
                 Ready to withdraw
@@ -369,26 +417,26 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
             <div>
               <p className="text-sm font-medium text-blue-800">Pending Balance</p>
               <p className="text-3xl font-bold text-blue-900 mt-2">
-                {formatInUSD(balanceData?.pendingBalance || 0)}
+                {formatInUSD(earnings.pendingBalance)}
               </p>
               <p className="text-sm text-blue-700 mt-2">
-                From active orders
+                {earnings.activeOrdersCount} active orders
               </p>
             </div>
             <div className="text-4xl text-blue-600">⏳</div>
           </div>
         </div>
 
-        {/* Total Earnings Card - SellerDashboard کی طرح */}
+        {/* Total Earnings Card */}
         <div className="bg-gradient-to-r from-purple-50 to-violet-100 border border-purple-200 rounded-2xl p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-purple-800">Total Earnings</p>
               <p className="text-3xl font-bold text-purple-900 mt-2">
-                {formatInUSD(balanceData?.totalEarnings || 0)}
+                {formatInUSD(earnings.totalEarnings)}
               </p>
               <p className="text-sm text-purple-700 mt-2">
-                All completed orders
+                {earnings.completedOrdersCount} completed orders
               </p>
             </div>
             <div className="text-4xl text-purple-600">📈</div>
@@ -449,13 +497,13 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
 
         {activeChart === 'monthly' ? (
           <div className="space-y-4">
-            {monthlyData && monthlyData.length > 0 ? (
+            {monthlyData.length > 0 ? (
               <>
                 <div className="h-64 flex items-end space-x-2 md:space-x-4">
                   {monthlyData.map((monthData, index) => {
-                    const earnings = monthData.earnings || 0;
+                    const earningsAmount = monthData.earnings || 0;
                     const maxEarnings = Math.max(...monthlyData.map(m => m.earnings || 0), 1);
-                    const height = (earnings / maxEarnings) * 100;
+                    const height = (earningsAmount / maxEarnings) * 100;
                     
                     return (
                       <div key={index} className="flex flex-col items-center flex-1">
@@ -467,11 +515,10 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                         </div>
                         <div className="mt-2 text-center">
                           <p className="text-xs font-medium text-gray-700">
-                            {getMonthName(monthData.month || monthData._id?.month)}
-                            {monthData.year ? ` ${monthData.year}` : ''}
+                            {getMonthName(monthData.month)}
                           </p>
                           <p className="text-xs text-gray-500">
-                            {formatInUSDShort(earnings)}
+                            {formatInUSDShort(earningsAmount)}
                           </p>
                           <p className="text-xs text-gray-400 mt-1">
                             {monthData.orders || 0} orders
@@ -492,9 +539,9 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
               <div className="h-64 flex items-center justify-center">
                 <div className="text-center">
                   <div className="text-5xl mb-4 text-gray-300">📊</div>
-                  <p className="text-gray-500">No earnings data yet</p>
+                  <p className="text-gray-500">No monthly earnings data yet</p>
                   <p className="text-sm text-gray-400 mt-2">
-                    Complete your first order to see earnings
+                    Complete orders to see monthly earnings breakdown
                   </p>
                 </div>
               </div>
@@ -506,12 +553,12 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
               <div className="bg-green-50 border border-green-200 rounded-xl p-4">
                 <div className="flex items-center">
                   <div className="bg-green-100 p-2 rounded-lg mr-3">
-                    <span className="text-green-600">💰</span>
+                    <span className="text-green-600">📦</span>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-green-800">Completed Orders</p>
                     <p className="text-xl font-bold text-green-900 mt-1">
-                      {balanceData?.completedOrdersCount || 0}
+                      {earnings.completedOrdersCount}
                     </p>
                   </div>
                 </div>
@@ -523,9 +570,9 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
                     <span className="text-blue-600">⏳</span>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-blue-800">Pending Orders</p>
+                    <p className="text-sm font-medium text-blue-800">Active Orders</p>
                     <p className="text-xl font-bold text-blue-900 mt-1">
-                      {balanceData?.pendingOrdersCount || 0}
+                      {earnings.activeOrdersCount}
                     </p>
                   </div>
                 </div>
@@ -534,12 +581,12 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
               <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
                 <div className="flex items-center">
                   <div className="bg-purple-100 p-2 rounded-lg mr-3">
-                    <span className="text-purple-600">📦</span>
+                    <span className="text-purple-600">💵</span>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-purple-800">Total Orders</p>
+                    <p className="text-sm font-medium text-purple-800">This Month</p>
                     <p className="text-xl font-bold text-purple-900 mt-1">
-                      {(balanceData?.completedOrdersCount || 0) + (balanceData?.pendingOrdersCount || 0)}
+                      {monthlyData.length > 0 ? formatInUSDShort(monthlyData[0].earnings) : '$0.00'}
                     </p>
                   </div>
                 </div>
@@ -549,12 +596,15 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
             <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
               <div className="flex items-center">
                 <div className="bg-yellow-100 p-2 rounded-lg mr-3">
-                  <span className="text-yellow-600">💵</span>
+                  <span className="text-yellow-600">💰</span>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-yellow-800">This Month Earnings</p>
+                  <p className="text-sm font-medium text-yellow-800">Average Order Value</p>
                   <p className="text-xl font-bold text-yellow-900 mt-1">
-                    {formatInUSD(balanceData?.thisMonthEarnings || 0)}
+                    {earnings.completedOrdersCount > 0 
+                      ? formatInUSD(earnings.totalEarnings / earnings.completedOrdersCount)
+                      : '$0.00'
+                    }
                   </p>
                 </div>
               </div>
@@ -661,18 +711,18 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
             </p>
           </div>
           <button
-            onClick={fetchOrderStats}
-            disabled={fetching}
+            onClick={fetchOrders}
+            disabled={isLoading}
             className="px-4 py-2 text-sm font-medium text-yellow-600 hover:text-yellow-700 disabled:opacity-50 flex items-center"
           >
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            {fetching ? 'Refreshing...' : 'Refresh'}
+            {isLoading ? 'Refreshing...' : 'Refresh'}
           </button>
         </div>
 
-        {fetching ? (
+        {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <div className="text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
@@ -710,32 +760,33 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
             <div className="text-5xl mb-4 text-gray-300">💰</div>
             <h3 className="text-lg font-medium text-gray-900">No Transactions Yet</h3>
             <p className="mt-2 text-gray-500 mb-6">
-              Complete orders to start earning!
+              You haven't completed any orders yet
             </p>
             <button
-              onClick={fetchOrderStats}
+              onClick={fetchOrders}
               className="px-6 py-2 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200"
             >
-              Check for New Earnings
+              Check for New Orders
             </button>
           </div>
         )}
       </div>
 
-      {/* Info Box */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-        <div className="flex items-start">
-          <div className="text-blue-600 mr-3 mt-1">ℹ️</div>
-          <div>
-            <p className="text-sm font-medium text-blue-800">Data Source Information</p>
-            <p className="text-sm text-blue-700 mt-1">
-              Earnings data is calculated directly from your completed orders, 
-              matching the total revenue shown on your Seller Dashboard.
-            </p>
-            <p className="text-xs text-blue-600 mt-2">
-              Total Earnings: {formatInUSD(balanceData?.totalEarnings || 0)} • 
-              Available: {formatInUSD(balanceData?.availableBalance || 0)} • 
-              Pending: {formatInUSD(balanceData?.pendingBalance || 0)}
+      {/* Summary Section */}
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="text-center">
+            <p className="text-sm font-medium text-gray-700">Total Orders</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{orders.length}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-medium text-gray-700">Data Source</p>
+            <p className="text-sm text-gray-600 mt-1">Orders API</p>
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-medium text-gray-700">Last Updated</p>
+            <p className="text-sm text-gray-600 mt-1">
+              {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
             </p>
           </div>
         </div>
