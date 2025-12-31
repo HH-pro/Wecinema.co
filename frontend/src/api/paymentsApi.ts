@@ -335,7 +335,7 @@ export const requestWithdrawal = async (amount: number): Promise<ApiResponse<{
   availableBalance: number;
 }>> => {
   try {
-    const response: AxiosResponse<ApiResponse> = await apiClient.post('/withdrawals', { 
+    const response: AxiosResponse<ApiResponse> = await apiClient.post('/payments/withdrawals', { 
       amount 
     });
     return response.data;
