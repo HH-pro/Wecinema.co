@@ -1,4 +1,4 @@
-// src/api/marketplaceApi.js - UPDATED WITHOUT EARNINGS/WITHDRAWAL ROUTES
+// src/api/marketplaceApi.js - UPDATED WITH EARNINGS/WITHDRAWAL ROUTES
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:3000';
@@ -49,6 +49,87 @@ const handleApiError = (error, defaultMessage = 'API Error') => {
     status: error.response?.status,
     data: errorData
   };
+};
+
+// ============================================
+// ✅ EARNINGS API
+// ============================================
+
+const earningsApi = {
+  // GET EARNINGS DASHBOARD
+  getEarningsDashboard: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/earnings/dashboard`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch earnings dashboard');
+    }
+  },
+
+  // PROCESS PAYOUT/WITHDRAWAL
+  processPayout: async (amount, paymentMethod, accountDetails) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/earnings/process-payout`,
+        { amount, paymentMethod, accountDetails },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to process payout');
+    }
+  },
+
+  // GET PAYMENT HISTORY
+  getPaymentHistory: async (params = {}) => {
+    try {
+      const { page = 1, limit = 20, type, status } = params;
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/earnings/payment-history`,
+        {
+          params: { page, limit, type, status },
+          ...getHeaders()
+        }
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch payment history');
+    }
+  },
+
+  // GET WITHDRAWAL HISTORY
+  getWithdrawalHistory: async (params = {}) => {
+    try {
+      const { status } = params;
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/earnings/withdrawal-history`,
+        {
+          params: { status },
+          ...getHeaders()
+        }
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch withdrawal history');
+    }
+  },
+
+  // RELEASE PENDING PAYMENT
+  releasePayment: async (orderId) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/earnings/release-payment/${orderId}`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to release payment');
+    }
+  }
 };
 
 // ============================================
@@ -394,6 +475,51 @@ export const getCurrentUserId = () => {
 };
 
 // ============================================
+// ✅ HELPER FUNCTIONS FOR EARNINGS
+// ============================================
+
+export const calculateSellerEarnings = (orderAmount, commissionPercentage = 10) => {
+  const commission = (orderAmount * commissionPercentage) / 100;
+  const sellerEarnings = orderAmount - commission;
+  return {
+    totalAmount: orderAmount,
+    commission,
+    sellerEarnings,
+    commissionPercentage
+  };
+};
+
+export const getPayoutStatusColor = (status) => {
+  switch (status?.toLowerCase()) {
+    case 'completed':
+      return 'success';
+    case 'processing':
+      return 'warning';
+    case 'pending':
+      return 'info';
+    case 'failed':
+      return 'error';
+    default:
+      return 'default';
+  }
+};
+
+export const getPaymentMethodIcon = (method) => {
+  switch (method?.toLowerCase()) {
+    case 'stripe':
+      return 'credit_card';
+    case 'bank_transfer':
+      return 'account_balance';
+    case 'paypal':
+      return 'paypal';
+    case 'cash':
+      return 'money';
+    default:
+      return 'payment';
+  }
+};
+
+// ============================================
 // ✅ MAIN API EXPORT (SINGLE EXPORT OBJECT)
 // ============================================
 
@@ -403,6 +529,7 @@ const marketplaceApi = {
   orders: ordersApi,
   offers: offersApi,
   stripe: stripeApi,
+  earnings: earningsApi,
   
   // Utility Functions
   formatCurrency,
@@ -411,6 +538,9 @@ const marketplaceApi = {
   testApiConnection,
   checkAuth,
   getCurrentUserId,
+  calculateSellerEarnings,
+  getPayoutStatusColor,
+  getPaymentMethodIcon,
   
   // Direct API Methods (for convenience)
   // Listings
@@ -434,7 +564,14 @@ const marketplaceApi = {
   // Stripe
   getStripeStatus: stripeApi.getStripeStatus,
   createStripeAccountLink: stripeApi.createStripeAccountLink,
-  getStripeBalance: stripeApi.getStripeBalance
+  getStripeBalance: stripeApi.getStripeBalance,
+  
+  // Earnings
+  getEarningsDashboard: earningsApi.getEarningsDashboard,
+  processPayout: earningsApi.processPayout,
+  getPaymentHistory: earningsApi.getPaymentHistory,
+  getWithdrawalHistory: earningsApi.getWithdrawalHistory,
+  releasePayment: earningsApi.releasePayment
 };
 
 // ============================================
@@ -452,5 +589,7 @@ export {
   listingsApi,
   ordersApi,
   offersApi,
-  stripeApi
+  stripeApi,
+  earningsApi
 };
+
