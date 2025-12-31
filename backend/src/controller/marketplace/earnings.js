@@ -12,16 +12,23 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // ========== SELLER EARNINGS DASHBOARD ========== //
 
-// ========== GET ALL SELLERS EARNINGS (ADMIN) ========== //
-router.get("/all-sellers",  async (req, res) => {
+// ========== GET ALL SELLERS EARNINGS (PUBLIC/NO AUTH) ========== //
+router.get("/all-sellers", async (req, res) => {
   try {
-    const { page = 1, limit = 20, search = '', sortBy = 'totalEarnings', sortOrder = -1 } = req.query;
+    const { 
+      page = 1, 
+      limit = 20, 
+      search = '', 
+      sortBy = 'totalEarnings', 
+      sortOrder = -1,
+      export: exportData = false 
+    } = req.query;
     
     const skip = (page - 1) * limit;
     
-    // Build search query
+    // Build search query - ONLY GET SELLERS
     const searchQuery = {
-      role: 'seller' // Only get sellers
+      role: 'seller'
     };
     
     if (search) {
@@ -51,7 +58,8 @@ router.get("/all-sellers",  async (req, res) => {
     const orderStats = await Order.aggregate([
       {
         $match: {
-          sellerId: { $in: sellerIds }
+          sellerId: { $in: sellerIds },
+          status: { $in: ['completed', 'pending', 'cancelled'] } // Only these statuses
         }
       },
       {
@@ -68,7 +76,7 @@ router.get("/all-sellers",  async (req, res) => {
             $sum: { $cond: [{ $eq: ['$status', 'cancelled'] }, 1, 0] }
           },
           totalSales: { $sum: '$amount' },
-          totalCommission: { $sum: '$commission' },
+          totalCommission: { $sum: { $ifNull: ['$commission', 0] } },
           pendingEarnings: {
             $sum: {
               $cond: [
@@ -78,7 +86,12 @@ router.get("/all-sellers",  async (req, res) => {
                     { $ne: ['$isPaidToSeller', true] }
                   ]
                 },
-                { $subtract: ['$amount', '$commission'] },
+                { 
+                  $subtract: [
+                    '$amount', 
+                    { $ifNull: ['$commission', 0] }
+                  ] 
+                },
                 0
               ]
             }
@@ -95,7 +108,7 @@ router.get("/all-sellers",  async (req, res) => {
 
     // Combine seller info with earnings and order stats
     const sellersWithStats = sellers.map(seller => {
-      const earning = earningsData.find(e => e.sellerId.toString() === seller._id.toString());
+      const earning = earningsData.find(e => e.sellerId && e.sellerId.toString() === seller._id.toString());
       const orders = orderStatsMap[seller._id] || {
         totalOrders: 0,
         completedOrders: 0,
@@ -106,18 +119,21 @@ router.get("/all-sellers",  async (req, res) => {
         pendingEarnings: 0
       };
 
+      const netEarnings = orders.totalSales - orders.totalCommission;
+      const totalEarningsValue = earning?.totalEarnings || 0;
+      
       return {
         _id: seller._id,
-        name: seller.name,
-        email: seller.email,
-        phone: seller.phone,
-        businessName: seller.businessName,
-        stripeAccountId: seller.stripeAccountId,
-        joinedAt: seller.createdAt,
+        name: seller.name || 'Unknown',
+        email: seller.email || 'N/A',
+        phone: seller.phone || 'N/A',
+        businessName: seller.businessName || 'N/A',
+        stripeAccountId: seller.stripeAccountId || null,
+        joinedAt: seller.createdAt || new Date(),
         earnings: {
           availableBalance: earning?.availableBalance || 0,
           pendingBalance: earning?.pendingBalance || 0,
-          totalEarnings: earning?.totalEarnings || 0,
+          totalEarnings: totalEarningsValue,
           totalWithdrawn: earning?.totalWithdrawn || 0
         },
         orders: {
@@ -126,21 +142,24 @@ router.get("/all-sellers",  async (req, res) => {
           pending: orders.pendingOrders,
           cancelled: orders.cancelledOrders,
           completionRate: orders.totalOrders > 0 
-            ? (orders.completedOrders / orders.totalOrders) * 100 
+            ? parseFloat(((orders.completedOrders / orders.totalOrders) * 100).toFixed(2))
             : 0
         },
         sales: {
-          total: orders.totalSales,
-          commission: orders.totalCommission,
-          net: orders.totalSales - orders.totalCommission,
-          pending: orders.pendingEarnings
+          total: parseFloat(orders.totalSales.toFixed(2)),
+          commission: parseFloat(orders.totalCommission.toFixed(2)),
+          net: parseFloat(netEarnings.toFixed(2)),
+          pending: parseFloat(orders.pendingEarnings.toFixed(2))
         },
         performance: {
           averageOrderValue: orders.totalOrders > 0 
-            ? orders.totalSales / orders.totalOrders 
+            ? parseFloat((orders.totalSales / orders.totalOrders).toFixed(2))
             : 0,
           commissionRate: orders.totalSales > 0 
-            ? (orders.totalCommission / orders.totalSales) * 100 
+            ? parseFloat(((orders.totalCommission / orders.totalSales) * 100).toFixed(2))
+            : 0,
+          earningsPerOrder: orders.totalOrders > 0 
+            ? parseFloat((totalEarningsValue / orders.totalOrders).toFixed(2))
             : 0
         }
       };
@@ -149,15 +168,15 @@ router.get("/all-sellers",  async (req, res) => {
     // Get totals for all sellers
     const totals = sellersWithStats.reduce((acc, seller) => ({
       totalSellers: acc.totalSellers + 1,
-      totalBalance: acc.totalBalance + seller.earnings.availableBalance,
-      totalPending: acc.totalPending + seller.earnings.pendingBalance,
-      totalEarnings: acc.totalEarnings + seller.earnings.totalEarnings,
-      totalWithdrawn: acc.totalWithdrawn + seller.earnings.totalWithdrawn,
-      totalOrders: acc.totalOrders + seller.orders.total,
-      totalSales: acc.totalSales + seller.sales.total,
-      totalCommission: acc.totalCommission + seller.sales.commission,
-      totalNet: acc.totalNet + seller.sales.net,
-      totalPendingEarnings: acc.totalPendingEarnings + seller.sales.pending
+      totalBalance: acc.totalBalance + (seller.earnings.availableBalance || 0),
+      totalPending: acc.totalPending + (seller.earnings.pendingBalance || 0),
+      totalEarnings: acc.totalEarnings + (seller.earnings.totalEarnings || 0),
+      totalWithdrawn: acc.totalWithdrawn + (seller.earnings.totalWithdrawn || 0),
+      totalOrders: acc.totalOrders + (seller.orders.total || 0),
+      totalSales: acc.totalSales + (seller.sales.total || 0),
+      totalCommission: acc.totalCommission + (seller.sales.commission || 0),
+      totalNet: acc.totalNet + (seller.sales.net || 0),
+      totalPendingEarnings: acc.totalPendingEarnings + (seller.sales.pending || 0)
     }), {
       totalSellers: 0,
       totalBalance: 0,
@@ -171,19 +190,110 @@ router.get("/all-sellers",  async (req, res) => {
       totalPendingEarnings: 0
     });
 
+    // Format totals
+    const formattedTotals = {
+      totalSellers: totals.totalSellers,
+      totalBalance: parseFloat(totals.totalBalance.toFixed(2)),
+      totalPending: parseFloat(totals.totalPending.toFixed(2)),
+      totalEarnings: parseFloat(totals.totalEarnings.toFixed(2)),
+      totalWithdrawn: parseFloat(totals.totalWithdrawn.toFixed(2)),
+      totalOrders: totals.totalOrders,
+      totalSales: parseFloat(totals.totalSales.toFixed(2)),
+      totalCommission: parseFloat(totals.totalCommission.toFixed(2)),
+      totalNet: parseFloat(totals.totalNet.toFixed(2)),
+      totalPendingEarnings: parseFloat(totals.totalPendingEarnings.toFixed(2)),
+      averageStats: {
+        avgEarningsPerSeller: totals.totalSellers > 0 ? parseFloat((totals.totalEarnings / totals.totalSellers).toFixed(2)) : 0,
+        avgOrdersPerSeller: totals.totalSellers > 0 ? parseFloat((totals.totalOrders / totals.totalSellers).toFixed(2)) : 0,
+        avgSalesPerSeller: totals.totalSellers > 0 ? parseFloat((totals.totalSales / totals.totalSellers).toFixed(2)) : 0,
+        overallCommissionRate: totals.totalSales > 0 ? parseFloat(((totals.totalCommission / totals.totalSales) * 100).toFixed(2)) : 0
+      }
+    };
+
     // Get count for pagination
     const totalSellers = await User.countDocuments(searchQuery);
 
+    // Check if export is requested
+    if (exportData === 'true' || exportData === 'csv') {
+      // Generate CSV data
+      const headers = [
+        'Seller ID', 'Name', 'Email', 'Business Name', 'Joined Date',
+        'Total Orders', 'Completed Orders', 'Pending Orders', 'Cancelled Orders',
+        'Total Sales ($)', 'Total Commission ($)', 'Net Earnings ($)', 
+        'Pending Earnings ($)', 'Available Balance ($)', 'Total Withdrawn ($)',
+        'Completion Rate (%)', 'Avg Order Value ($)', 'Commission Rate (%)'
+      ];
+
+      const csvRows = sellersWithStats.map(seller => [
+        seller._id,
+        seller.name,
+        seller.email,
+        seller.businessName,
+        new Date(seller.joinedAt).toISOString().split('T')[0],
+        seller.orders.total,
+        seller.orders.completed,
+        seller.orders.pending,
+        seller.orders.cancelled,
+        seller.sales.total,
+        seller.sales.commission,
+        seller.sales.net,
+        seller.sales.pending,
+        seller.earnings.availableBalance,
+        seller.earnings.totalWithdrawn,
+        seller.orders.completionRate,
+        seller.performance.averageOrderValue,
+        seller.performance.commissionRate
+      ]);
+
+      // Create CSV content
+      const csvContent = [
+        headers.join(','),
+        ...csvRows.map(row => row.map(cell => 
+          typeof cell === 'string' && cell.includes(',') ? `"${cell}"` : cell
+        ).join(','))
+      ].join('\n');
+
+      // Set response headers for CSV download
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=sellers-earnings-${Date.now()}.csv`);
+      return res.send(csvContent);
+    }
+
+    if (exportData === 'json') {
+      // Return JSON export
+      return res.status(200).json({
+        success: true,
+        type: 'export',
+        exportedAt: new Date().toISOString(),
+        data: {
+          sellers: sellersWithStats,
+          totals: formattedTotals,
+          summary: {
+            totalSellers: formattedTotals.totalSellers,
+            totalEarnings: formattedTotals.totalEarnings,
+            totalOrders: formattedTotals.totalOrders,
+            totalSales: formattedTotals.totalSales
+          }
+        }
+      });
+    }
+
+    // Normal API response
     res.status(200).json({
       success: true,
       data: {
         sellers: sellersWithStats,
-        totals,
+        totals: formattedTotals,
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
           total: totalSellers,
           pages: Math.ceil(totalSellers / limit)
+        },
+        filters: {
+          search,
+          sortBy,
+          sortOrder: parseInt(sortOrder)
         }
       }
     });
@@ -192,7 +302,8 @@ router.get("/all-sellers",  async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to fetch sellers earnings data',
-      message: error.message
+      message: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 });
