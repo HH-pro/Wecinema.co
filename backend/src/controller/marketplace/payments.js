@@ -1,13 +1,240 @@
-// routes/payments.js
 const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
-const { authenticateMiddleware } = require("../../utils");
+const { authenticateMiddleware, optionalAuthenticateMiddleware } = require("../../utils");
 const Order = require("../../models/marketplace/order");
 const User = require("../../models/user");
 const Seller = require("../../models/marketplace/Seller");
 const Withdrawal = require("../../models/marketplace/Withdrawal");
 const stripeConfig = require("../../config/stripe");
+
+// ========== PUBLIC ROUTES ========== //
+
+// Public route to get all users' total earnings (for leaderboard/stats)
+router.get("/public/earnings-leaderboard", async (req, res) => {
+  try {
+    const { limit = 20, page = 1 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Get top sellers by earnings
+    const topSellers = await Order.aggregate([
+      {
+        $match: {
+          status: 'completed',
+          paymentReleased: true
+        }
+      },
+      {
+        $group: {
+          _id: "$sellerId",
+          totalEarnings: { $sum: { $ifNull: ["$sellerAmount", 0] } },
+          totalOrders: { $sum: 1 },
+          totalRevenue: { $sum: "$amount" }
+        }
+      },
+      {
+        $lookup: {
+          from: "users",
+          localField: "_id",
+          foreignField: "_id",
+          as: "user"
+        }
+      },
+      {
+        $unwind: {
+          path: "$user",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $lookup: {
+          from: "sellers",
+          localField: "_id",
+          foreignField: "userId",
+          as: "seller"
+        }
+      },
+      {
+        $unwind: {
+          path: "$seller",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $project: {
+          userId: "$_id",
+          name: "$user.name",
+          username: "$user.username",
+          avatar: "$user.avatar",
+          totalEarnings: 1,
+          totalOrders: 1,
+          totalRevenue: 1,
+          sellerRating: "$seller.rating",
+          sellerSince: "$seller.createdAt"
+        }
+      },
+      {
+        $sort: { totalEarnings: -1 }
+      },
+      {
+        $skip: skip
+      },
+      {
+        $limit: parseInt(limit)
+      }
+    ]);
+
+    // Get total count for pagination
+    const totalSellers = await Order.aggregate([
+      {
+        $match: {
+          status: 'completed',
+          paymentReleased: true
+        }
+      },
+      {
+        $group: {
+          _id: "$sellerId"
+        }
+      },
+      {
+        $count: "total"
+      }
+    ]);
+
+    // Get platform total statistics
+    const platformStats = await Order.aggregate([
+      {
+        $match: {
+          status: 'completed',
+          paymentReleased: true
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalPlatformEarnings: { $sum: { $ifNull: ["$platformFee", 0] } },
+          totalSellerEarnings: { $sum: { $ifNull: ["$sellerAmount", 0] } },
+          totalTransactions: { $sum: "$amount" },
+          totalOrders: { $sum: 1 },
+          averageOrderValue: { $avg: "$amount" }
+        }
+      }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        leaderboard: topSellers,
+        platformStats: platformStats[0] || {
+          totalPlatformEarnings: 0,
+          totalSellerEarnings: 0,
+          totalTransactions: 0,
+          totalOrders: 0,
+          averageOrderValue: 0
+        },
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: totalSellers[0]?.total || 0,
+          pages: Math.ceil((totalSellers[0]?.total || 0) / parseInt(limit))
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching earnings leaderboard:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch earnings leaderboard',
+      details: error.message
+    });
+  }
+});
+
+// Public route to get user's public earnings stats (for profile pages)
+router.get("/public/user-earnings/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Validate user exists
+    const user = await User.findById(userId).select('name username avatar');
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    // Get user's earnings stats
+    const earningsStats = await Order.aggregate([
+      {
+        $match: {
+          sellerId: mongoose.Types.ObjectId(userId),
+          status: 'completed',
+          paymentReleased: true
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalEarnings: { $sum: { $ifNull: ["$sellerAmount", 0] } },
+          totalOrders: { $sum: 1 },
+          totalRevenue: { $sum: "$amount" },
+          avgOrderValue: { $avg: "$amount" }
+        }
+      }
+    ]);
+
+    // Get seller info if exists
+    const seller = await Seller.findOne({ userId }).select('rating totalSales createdAt');
+
+    // Get recent completed orders (public info only)
+    const recentOrders = await Order.find({
+      sellerId: userId,
+      status: 'completed'
+    })
+      .select('listingId amount status createdAt')
+      .populate('listingId', 'title images category')
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        user: {
+          _id: user._id,
+          name: user.name,
+          username: user.username,
+          avatar: user.avatar
+        },
+        earnings: earningsStats[0] || {
+          totalEarnings: 0,
+          totalOrders: 0,
+          totalRevenue: 0,
+          avgOrderValue: 0
+        },
+        sellerProfile: seller || null,
+        recentOrders: recentOrders.map(order => ({
+          _id: order._id,
+          title: order.listingId?.title,
+          category: order.listingId?.category,
+          amount: order.amount,
+          status: order.status,
+          createdAt: order.createdAt
+        })),
+        isSeller: !!seller
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching user earnings:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch user earnings',
+      details: error.message
+    });
+  }
+});
 
 // ========== PAYMENT ROUTES ========== //
 
@@ -90,6 +317,24 @@ router.post("/confirm-payment", authenticateMiddleware, async (req, res) => {
     order.paidAt = new Date();
     await order.save();
 
+    // Update seller's pending balance
+    const fees = stripeConfig.calculateFees(order.amount);
+    await Seller.findOneAndUpdate(
+      { userId: order.sellerId },
+      { 
+        $inc: { 
+          pendingBalance: fees.sellerAmount,
+          totalSales: 1 
+        },
+        $setOnInsert: {
+          userId: order.sellerId,
+          rating: 5.0,
+          totalWithdrawn: 0
+        }
+      },
+      { upsert: true, new: true }
+    );
+
     res.status(200).json({ 
       success: true,
       message: 'Payment confirmed successfully', 
@@ -133,19 +378,38 @@ router.post("/capture-payment", authenticateMiddleware, async (req, res) => {
     const platformFee = fees.platformFee;
     const sellerAmount = fees.sellerAmount;
 
+    // Update seller's earnings
+    await Seller.findOneAndUpdate(
+      { userId: order.sellerId },
+      { 
+        $inc: { 
+          balance: sellerAmount,
+          pendingBalance: -sellerAmount,
+          totalSales: 1 
+        }
+      }
+    );
+
+    // Update user's balance
     await User.findByIdAndUpdate(order.sellerId, {
       $inc: { 
-        balance: sellerAmount,
-        totalSales: 1 
+        balance: sellerAmount
       }
     });
 
+    // Update order with detailed payment info
     order.status = 'completed';
     order.paymentReleased = true;
     order.releaseDate = new Date();
     order.completedAt = new Date();
     order.platformFee = platformFee;
     order.sellerAmount = sellerAmount;
+    order.paymentDetails = {
+      captured: true,
+      captureDate: new Date(),
+      stripePaymentIntentId: paymentIntent.id,
+      stripeChargeId: paymentIntent.latest_charge
+    };
     
     await order.save();
 
@@ -153,7 +417,14 @@ router.post("/capture-payment", authenticateMiddleware, async (req, res) => {
       success: true,
       message: 'Payment captured and funds released to seller', 
       data: {
-        order,
+        order: {
+          _id: order._id,
+          status: order.status,
+          amount: order.amount,
+          sellerAmount,
+          platformFee,
+          paymentReleased: order.paymentReleased
+        },
         sellerAmount,
         platformFee,
         platformFeePercent: fees.platformFeePercent
@@ -190,10 +461,11 @@ router.post("/cancel-payment", authenticateMiddleware, async (req, res) => {
     }
 
     order.status = 'cancelled';
+    order.cancelledAt = new Date();
     await order.save();
 
     res.status(200).json({ 
-      success: true,
+      success: false,
       message: 'Payment cancelled successfully', 
       data: order 
     });
@@ -234,15 +506,22 @@ router.get("/payment-status/:orderId", authenticateMiddleware, async (req, res) 
     res.status(200).json({
       success: true,
       data: {
-        orderStatus: order.status,
+        order: {
+          status: order.status,
+          amount: order.amount,
+          sellerAmount: order.sellerAmount,
+          platformFee: order.platformFee,
+          paymentReleased: order.paymentReleased,
+          releaseDate: order.releaseDate,
+          paidAt: order.paidAt,
+          completedAt: order.completedAt
+        },
         paymentIntent: paymentIntent ? {
           status: paymentIntent.status,
           amount: paymentIntent.amount / 100,
           currency: paymentIntent.currency,
           created: paymentIntent.created
         } : null,
-        paymentReleased: order.paymentReleased,
-        releaseDate: order.releaseDate,
         fees
       }
     });
@@ -274,9 +553,23 @@ router.post("/request-refund", authenticateMiddleware, async (req, res) => {
 
     const refund = await stripeConfig.createRefund(order.stripePaymentIntentId);
 
-    order.status = 'cancelled';
+    order.status = 'refunded';
     order.refundReason = reason;
     order.refundedAt = new Date();
+    order.refundId = refund.id;
+    
+    // Deduct from seller's pending balance if not released yet
+    if (!order.paymentReleased && order.sellerAmount) {
+      await Seller.findOneAndUpdate(
+        { userId: order.sellerId },
+        { 
+          $inc: { 
+            pendingBalance: -order.sellerAmount
+          }
+        }
+      );
+    }
+    
     await order.save();
 
     res.status(200).json({ 
@@ -320,23 +613,31 @@ router.get("/withdrawals", authenticateMiddleware, async (req, res) => {
     const total = await Withdrawal.countDocuments(query);
 
     const seller = await Seller.findOne({ userId: mongoose.Types.ObjectId(userId) });
+    
+    // CORRECTED EARNINGS CALCULATION
     const earningsSummary = await Order.aggregate([
       { 
         $match: { 
           sellerId: mongoose.Types.ObjectId(userId),
-          status: 'completed'
+          status: 'completed',
+          paymentReleased: true
         } 
       },
       {
         $group: {
           _id: null,
-          totalEarnings: { $sum: "$amount" }
+          totalSellerEarnings: { 
+            $sum: { 
+              $ifNull: ["$sellerAmount", { $subtract: ["$amount", { $multiply: ["$amount", 0.10] }] }]
+            } 
+          },
+          totalOrders: { $sum: 1 }
         }
       }
     ]);
 
-    const totalEarnings = earningsSummary[0]?.totalEarnings || 0;
-    const availableBalance = totalEarnings - (seller?.totalWithdrawn || 0);
+    const totalSellerEarnings = earningsSummary[0]?.totalSellerEarnings || 0;
+    const availableBalance = Math.max(0, totalSellerEarnings - (seller?.totalWithdrawn || 0));
     const pendingBalance = seller?.pendingBalance || 0;
 
     res.status(200).json({
@@ -352,8 +653,9 @@ router.get("/withdrawals", authenticateMiddleware, async (req, res) => {
         balance: {
           availableBalance,
           pendingBalance,
-          totalEarnings,
-          totalWithdrawn: seller?.totalWithdrawn || 0
+          totalSellerEarnings,
+          totalWithdrawn: seller?.totalWithdrawn || 0,
+          walletBalance: seller?.balance || 0
         }
       }
     });
@@ -390,35 +692,41 @@ router.post("/withdrawals", authenticateMiddleware, async (req, res) => {
       });
     }
 
+    // CORRECTED BALANCE CALCULATION
     const earningsSummary = await Order.aggregate([
       { 
         $match: { 
           sellerId: mongoose.Types.ObjectId(userId),
-          status: 'completed'
+          status: 'completed',
+          paymentReleased: true
         } 
       },
       {
         $group: {
           _id: null,
-          totalEarnings: { $sum: "$amount" }
+          totalSellerEarnings: { 
+            $sum: { 
+              $ifNull: ["$sellerAmount", { $subtract: ["$amount", { $multiply: ["$amount", 0.10] }] }]
+            } 
+          }
         }
       }
     ]);
 
-    const totalEarnings = earningsSummary[0]?.totalEarnings || 0;
-    const availableBalance = totalEarnings - (seller.totalWithdrawn || 0);
+    const totalSellerEarnings = earningsSummary[0]?.totalSellerEarnings || 0;
+    const availableBalance = Math.max(0, totalSellerEarnings - (seller.totalWithdrawn || 0));
 
     if (amountInCents > availableBalance) {
       return res.status(400).json({
         success: false,
         error: 'Insufficient balance',
         availableBalance,
-        totalEarnings,
+        totalSellerEarnings,
         totalWithdrawn: seller.totalWithdrawn || 0
       });
     }
 
-    const MIN_WITHDRAWAL = 500;
+    const MIN_WITHDRAWAL = 500; // $5.00
     if (amountInCents < MIN_WITHDRAWAL) {
       return res.status(400).json({
         success: false,
@@ -439,9 +747,16 @@ router.post("/withdrawals", authenticateMiddleware, async (req, res) => {
     await withdrawal.save();
 
     seller.totalWithdrawn = (seller.totalWithdrawn || 0) + amountInCents;
-    seller.pendingBalance = (seller.pendingBalance || 0) + amountInCents;
+    seller.balance = Math.max(0, (seller.balance || 0) - amountInCents);
     seller.lastWithdrawal = new Date();
     await seller.save();
+
+    // Also update user balance
+    await User.findByIdAndUpdate(userId, {
+      $inc: { 
+        balance: -amountInCents
+      }
+    });
 
     if (seller.stripeAccountId) {
       try {
@@ -460,6 +775,9 @@ router.post("/withdrawals", authenticateMiddleware, async (req, res) => {
 
       } catch (stripeError) {
         console.error('Stripe transfer error:', stripeError);
+        withdrawal.status = 'failed';
+        withdrawal.failureReason = stripeError.message;
+        await withdrawal.save();
       }
     }
 
@@ -471,8 +789,8 @@ router.post("/withdrawals", authenticateMiddleware, async (req, res) => {
         amount: amountInCents,
         status: withdrawal.status,
         estimatedArrival: withdrawal.estimatedArrival,
-        newBalance: availableBalance - amountInCents,
-        availableBalance: availableBalance - amountInCents
+        newAvailableBalance: availableBalance - amountInCents,
+        newWalletBalance: (seller.balance || 0) - amountInCents
       }
     });
 
@@ -535,7 +853,7 @@ router.post("/withdrawals/:withdrawalId/cancel", authenticateMiddleware, async (
       });
     }
 
-    if (withdrawal.status !== 'pending') {
+    if (!['pending', 'processing'].includes(withdrawal.status)) {
       return res.status(400).json({
         success: false,
         error: `Cannot cancel withdrawal with status: ${withdrawal.status}`
@@ -549,9 +867,16 @@ router.post("/withdrawals/:withdrawalId/cancel", authenticateMiddleware, async (
     const seller = await Seller.findOne({ userId: mongoose.Types.ObjectId(userId) });
     if (seller) {
       seller.totalWithdrawn = Math.max(0, (seller.totalWithdrawn || 0) - withdrawal.amount);
-      seller.pendingBalance = Math.max(0, (seller.pendingBalance || 0) - withdrawal.amount);
+      seller.balance = (seller.balance || 0) + withdrawal.amount;
       await seller.save();
     }
+
+    // Also update user balance
+    await User.findByIdAndUpdate(userId, {
+      $inc: { 
+        balance: withdrawal.amount
+      }
+    });
 
     res.status(200).json({
       success: true,
@@ -650,30 +975,45 @@ router.get("/earnings/balance", authenticateMiddleware, async (req, res) => {
     const seller = await Seller.findOne({ userId: mongoose.Types.ObjectId(userId) });
     
     if (!seller) {
-      return res.status(404).json({
-        success: false,
-        error: 'Seller not found'
+      return res.status(200).json({
+        success: true,
+        data: {
+          availableBalance: 0,
+          pendingBalance: 0,
+          totalEarnings: 0,
+          totalWithdrawn: 0,
+          walletBalance: 0,
+          currency: 'USD',
+          isSeller: false
+        }
       });
     }
 
+    // CORRECTED EARNINGS CALCULATION
     const earningsSummary = await Order.aggregate([
       { 
         $match: { 
           sellerId: mongoose.Types.ObjectId(userId),
-          status: 'completed'
+          status: 'completed',
+          paymentReleased: true
         } 
       },
       {
         $group: {
           _id: null,
-          totalEarnings: { $sum: "$amount" },
-          totalOrders: { $sum: 1 }
+          totalSellerEarnings: { 
+            $sum: { 
+              $ifNull: ["$sellerAmount", { $subtract: ["$amount", { $multiply: ["$amount", 0.10] }] }]
+            } 
+          },
+          totalOrders: { $sum: 1 },
+          totalRevenue: { $sum: "$amount" }
         }
       }
     ]);
 
-    const totalEarnings = earningsSummary[0]?.totalEarnings || 0;
-    const availableBalance = totalEarnings - (seller.totalWithdrawn || 0);
+    const totalSellerEarnings = earningsSummary[0]?.totalSellerEarnings || 0;
+    const availableBalance = Math.max(0, totalSellerEarnings - (seller.totalWithdrawn || 0));
     const pendingBalance = seller.pendingBalance || 0;
 
     const thisMonthEarnings = await Order.aggregate([
@@ -681,7 +1021,8 @@ router.get("/earnings/balance", authenticateMiddleware, async (req, res) => {
         $match: { 
           sellerId: mongoose.Types.ObjectId(userId),
           status: 'completed',
-          createdAt: {
+          paymentReleased: true,
+          completedAt: {
             $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
           }
         } 
@@ -689,7 +1030,29 @@ router.get("/earnings/balance", authenticateMiddleware, async (req, res) => {
       {
         $group: {
           _id: null,
-          total: { $sum: "$amount" }
+          total: { 
+            $sum: { 
+              $ifNull: ["$sellerAmount", { $subtract: ["$amount", { $multiply: ["$amount", 0.10] }] }]
+            } 
+          },
+          orders: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Platform fees earned from this seller
+    const platformFees = await Order.aggregate([
+      { 
+        $match: { 
+          sellerId: mongoose.Types.ObjectId(userId),
+          status: 'completed',
+          paymentReleased: true
+        } 
+      },
+      {
+        $group: {
+          _id: null,
+          totalPlatformFees: { $sum: { $ifNull: ["$platformFee", { $multiply: ["$amount", 0.10] }] } }
         }
       }
     ]);
@@ -699,13 +1062,18 @@ router.get("/earnings/balance", authenticateMiddleware, async (req, res) => {
       data: {
         availableBalance,
         pendingBalance,
-        totalEarnings,
+        totalSellerEarnings,
         totalWithdrawn: seller.totalWithdrawn || 0,
-        walletBalance: seller.walletBalance || 0,
+        walletBalance: seller.balance || 0,
         currency: 'USD',
         lastWithdrawal: seller.lastWithdrawal || null,
         nextPayoutDate: seller.nextPayoutDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        thisMonthRevenue: thisMonthEarnings[0]?.total || 0
+        thisMonthEarnings: thisMonthEarnings[0]?.total || 0,
+        thisMonthOrders: thisMonthEarnings[0]?.orders || 0,
+        totalOrders: earningsSummary[0]?.totalOrders || 0,
+        totalRevenue: earningsSummary[0]?.totalRevenue || 0,
+        platformFees: platformFees[0]?.totalPlatformFees || 0,
+        isSeller: true
       }
     });
   } catch (error) {
@@ -728,6 +1096,7 @@ router.get("/earnings/monthly", authenticateMiddleware, async (req, res) => {
         $match: {
           sellerId: mongoose.Types.ObjectId(userId),
           status: 'completed',
+          paymentReleased: true,
           completedAt: {
             $gte: new Date(new Date().setMonth(new Date().getMonth() - parseInt(months)))
           }
@@ -739,12 +1108,29 @@ router.get("/earnings/monthly", authenticateMiddleware, async (req, res) => {
             year: { $year: "$completedAt" },
             month: { $month: "$completedAt" }
           },
-          earnings: { $sum: "$amount" },
-          orders: { $sum: 1 }
+          earnings: { 
+            $sum: { 
+              $ifNull: ["$sellerAmount", { $subtract: ["$amount", { $multiply: ["$amount", 0.10] }] }]
+            } 
+          },
+          orders: { $sum: 1 },
+          revenue: { $sum: "$amount" },
+          platformFees: { $sum: { $ifNull: ["$platformFee", { $multiply: ["$amount", 0.10] }] } }
         }
       },
       {
         $sort: { "_id.year": -1, "_id.month": -1 }
+      },
+      {
+        $project: {
+          year: "$_id.year",
+          month: "$_id.month",
+          earnings: 1,
+          orders: 1,
+          revenue: 1,
+          platformFees: 1,
+          netEarnings: "$earnings"
+        }
       }
     ]);
 
@@ -767,29 +1153,89 @@ router.get("/earnings/history", authenticateMiddleware, async (req, res) => {
     const userId = req.user.id || req.user._id;
     const { page = 1, limit = 20, type = 'all' } = req.query;
 
-    const query = { sellerId: mongoose.Types.ObjectId(userId) };
+    const skip = (parseInt(page) - 1) * parseInt(limit);
     
-    if (type !== 'all') {
-      query.type = type;
-    }
+    // Get completed orders (earnings)
+    const earningsQuery = { 
+      sellerId: mongoose.Types.ObjectId(userId),
+      status: 'completed',
+      paymentReleased: true
+    };
 
-    const earnings = await Withdrawal.find(query)
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
+    const earnings = await Order.find(earningsQuery)
+      .select('listingId amount sellerAmount platformFee status completedAt')
+      .populate('listingId', 'title')
+      .sort({ completedAt: -1 })
+      .skip(skip)
       .limit(parseInt(limit))
       .lean();
 
-    const total = await Withdrawal.countDocuments(query);
+    const totalEarnings = await Order.countDocuments(earningsQuery);
+
+    // Get withdrawals
+    const withdrawals = await Withdrawal.find({ sellerId: userId })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    const totalWithdrawals = await Withdrawal.countDocuments({ sellerId: userId });
+
+    let combinedHistory = [];
+    
+    if (type === 'all' || type === 'earnings') {
+      combinedHistory = combinedHistory.concat(
+        earnings.map(e => ({
+          type: 'earning',
+          _id: e._id,
+          amount: e.sellerAmount || (e.amount * 0.9),
+          description: e.listingId?.title || 'Order',
+          date: e.completedAt,
+          status: 'completed',
+          details: {
+            orderAmount: e.amount,
+            platformFee: e.platformFee,
+            netAmount: e.sellerAmount || (e.amount * 0.9)
+          }
+        }))
+      );
+    }
+    
+    if (type === 'all' || type === 'withdrawals') {
+      combinedHistory = combinedHistory.concat(
+        withdrawals.map(w => ({
+          type: 'withdrawal',
+          _id: w._id,
+          amount: -w.amount,
+          description: w.description || 'Withdrawal',
+          date: w.createdAt,
+          status: w.status,
+          details: {
+            withdrawalId: w._id,
+            estimatedArrival: w.estimatedArrival
+          }
+        }))
+      );
+    }
+
+    // Sort by date
+    combinedHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
 
     res.status(200).json({
       success: true,
       data: {
-        earnings,
-        pagination: {
+        history: combinedHistory.slice(0, parseInt(limit)),
+        earnings: {
+          total: totalEarnings,
           page: parseInt(page),
           limit: parseInt(limit),
-          total,
-          pages: Math.ceil(total / limit)
+          pages: Math.ceil(totalEarnings / parseInt(limit))
+        },
+        withdrawals: {
+          total: totalWithdrawals,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          pages: Math.ceil(totalWithdrawals / parseInt(limit))
         }
       }
     });
@@ -800,6 +1246,51 @@ router.get("/earnings/history", authenticateMiddleware, async (req, res) => {
       error: 'Failed to fetch earnings history',
       details: error.message 
     });
+  }
+});
+
+// Debug route for checking earnings calculation
+router.get("/earnings/debug", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+    
+    const orders = await Order.find({ 
+      sellerId: userId,
+      status: 'completed' 
+    })
+    .select('amount platformFee sellerAmount paymentReleased status createdAt completedAt')
+    .sort({ createdAt: -1 })
+    .lean();
+
+    const totalAmount = orders.reduce((sum, o) => sum + o.amount, 0);
+    const totalSellerAmount = orders.reduce((sum, o) => sum + (o.sellerAmount || o.amount * 0.9), 0);
+    const totalPlatformFee = orders.reduce((sum, o) => sum + (o.platformFee || o.amount * 0.1), 0);
+
+    const seller = await Seller.findOne({ userId }).select('balance totalWithdrawn pendingBalance');
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalOrders: orders.length,
+        totalAmount,
+        calculatedSellerAmount: totalSellerAmount,
+        calculatedPlatformFee: totalPlatformFee,
+        sellerData: seller,
+        orders: orders.map(o => ({
+          amount: o.amount,
+          sellerAmount: o.sellerAmount,
+          platformFee: o.platformFee,
+          calculatedSellerAmount: o.sellerAmount || o.amount * 0.9,
+          calculatedPlatformFee: o.platformFee || o.amount * 0.1,
+          paymentReleased: o.paymentReleased,
+          status: o.status,
+          createdAt: o.createdAt
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Debug error:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -835,16 +1326,53 @@ router.post("/stripe-webhook", express.raw({type: 'application/json'}), async (r
     case 'payment_intent.payment_failed':
       const paymentIntentFailed = event.data.object;
       console.log('Payment failed:', paymentIntentFailed.last_payment_error?.message);
+      
+      await Order.findOneAndUpdate(
+        { stripePaymentIntentId: paymentIntentFailed.id },
+        { 
+          status: 'payment_failed',
+          paymentError: paymentIntentFailed.last_payment_error?.message
+        }
+      );
       break;
 
     case 'payment_intent.canceled':
       const paymentIntentCanceled = event.data.object;
       console.log('PaymentIntent was canceled!');
+      
+      await Order.findOneAndUpdate(
+        { stripePaymentIntentId: paymentIntentCanceled.id },
+        { 
+          status: 'cancelled',
+          cancelledAt: new Date()
+        }
+      );
       break;
 
     case 'charge.refunded':
       const chargeRefunded = event.data.object;
       console.log('Charge was refunded!');
+      
+      const order = await Order.findOne({ stripePaymentIntentId: chargeRefunded.payment_intent });
+      if (order) {
+        order.status = 'refunded';
+        order.refundedAt = new Date();
+        order.refundId = chargeRefunded.id;
+        
+        // Deduct from seller's pending balance
+        if (!order.paymentReleased && order.sellerAmount) {
+          await Seller.findOneAndUpdate(
+            { userId: order.sellerId },
+            { 
+              $inc: { 
+                pendingBalance: -order.sellerAmount
+              }
+            }
+          );
+        }
+        
+        await order.save();
+      }
       break;
 
     case 'transfer.paid':
