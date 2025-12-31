@@ -504,54 +504,7 @@ router.post("/release-payment/:orderId", auth, async (req, res) => {
   }
 });
 
-// ========== CONNECT STRIPE ACCOUNT ========== //
-router.post("/connect-stripe", auth, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    
-    // Check if already connected
-    if (req.user.stripeAccountId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Stripe account already connected'
-      });
-    }
 
-    // Create Stripe Connect account
-    const account = await stripe.accounts.create({
-      type: 'express',
-      country: 'US', // Change based on your sellers' location
-      email: req.user.email,
-      capabilities: {
-        transfers: { requested: true }
-      }
-    });
-
-    // Create account link for onboarding
-    const accountLink = await stripe.accountLinks.create({
-      account: account.id,
-      refresh_url: `${process.env.FRONTEND_URL}/seller/earnings`,
-      return_url: `${process.env.FRONTEND_URL}/seller/earnings?stripe=success`,
-      type: 'account_onboarding'
-    });
-
-    // Save Stripe account ID to user
-    req.user.stripeAccountId = account.id;
-    await req.user.save();
-
-    res.status(200).json({
-      success: true,
-      url: accountLink.url,
-      accountId: account.id
-    });
-  } catch (error) {
-    console.error('Stripe connect error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to connect Stripe account'
-    });
-  }
-});
 
 // Helper function to calculate next payout date
 function calculateNextPayoutDate() {
