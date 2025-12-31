@@ -1212,5 +1212,248 @@ async function handlePayoutPaid(payout) {
     console.error('Error handling payout:', error);
   }
 }
+// ========== SELLER EARNINGS & BALANCE ========== //
+router.get("/earnings/balance", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id || req.user.userId;
 
+    // Get seller's balance from Seller model or separate Earnings model
+    const seller = await Seller.findOne({ userId: mongoose.Types.ObjectId(userId) });
+    
+    if (!seller) {
+      return res.status(404).json({
+        success: false,
+        error: 'Seller not found'
+      });
+    }
+
+    // Calculate available balance (completed earnings - withdrawn)
+    const earningsSummary = await Order.aggregate([
+      { 
+        $match: { 
+          sellerId: mongoose.Types.ObjectId(userId),
+          status: 'completed'
+        } 
+      },
+      {
+        $group: {
+          _id: null,
+          totalEarnings: { $sum: "$amount" },
+          totalOrders: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const totalEarnings = earningsSummary[0]?.totalEarnings || 0;
+    const availableBalance = totalEarnings - (seller.totalWithdrawn || 0);
+    const pendingBalance = seller.pendingBalance || 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        availableBalance,
+        pendingBalance,
+        totalEarnings,
+        totalWithdrawn: seller.totalWithdrawn || 0,
+        walletBalance: seller.walletBalance || 0,
+        currency: '₹',
+        lastWithdrawal: seller.lastWithdrawal || null,
+        nextPayoutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days from now
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching earnings balance:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch earnings balance',
+      details: error.message 
+    });
+  }
+});
+
+// ========== WITHDRAWAL REQUEST ========== //
+router.post("/earnings/withdraw", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+    const { amount } = req.body;
+
+    // Validate amount
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid withdrawal amount'
+      });
+    }
+
+    const seller = await Seller.findOne({ userId: mongoose.Types.ObjectId(userId) });
+    
+    if (!seller) {
+      return res.status(404).json({
+        success: false,
+        error: 'Seller not found'
+      });
+    }
+
+    // Calculate available balance
+    const earningsSummary = await Order.aggregate([
+      { 
+        $match: { 
+          sellerId: mongoose.Types.ObjectId(userId),
+          status: 'completed'
+        } 
+      },
+      {
+        $group: {
+          _id: null,
+          totalEarnings: { $sum: "$amount" }
+        }
+      }
+    ]);
+
+    const totalEarnings = earningsSummary[0]?.totalEarnings || 0;
+    const availableBalance = totalEarnings - (seller.totalWithdrawn || 0);
+
+    // Check if withdrawal amount is valid
+    if (amount > availableBalance) {
+      return res.status(400).json({
+        success: false,
+        error: 'Insufficient balance',
+        availableBalance
+      });
+    }
+
+    // Check minimum withdrawal amount (e.g., ₹500)
+    const MIN_WITHDRAWAL = 500;
+    if (amount < MIN_WITHDRAWAL) {
+      return res.status(400).json({
+        success: false,
+        error: `Minimum withdrawal amount is ₹${MIN_WITHDRAWAL}`
+      });
+    }
+
+    // Create withdrawal request
+    const withdrawal = new Withdrawal({
+      sellerId: userId,
+      amount,
+      status: 'pending', // pending, processing, completed, failed
+      requestDate: new Date(),
+      stripePayoutId: null
+    });
+
+    await withdrawal.save();
+
+    // Update seller's withdrawal stats
+    seller.totalWithdrawn = (seller.totalWithdrawn || 0) + amount;
+    seller.pendingBalance = (seller.pendingBalance || 0) + amount;
+    seller.lastWithdrawal = new Date();
+    await seller.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Withdrawal request submitted successfully',
+      data: {
+        withdrawalId: withdrawal._id,
+        amount,
+        status: 'pending',
+        estimatedArrival: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days
+        newBalance: availableBalance - amount
+      }
+    });
+
+  } catch (error) {
+    console.error('Error processing withdrawal:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to process withdrawal',
+      details: error.message 
+    });
+  }
+});
+
+// ========== EARNINGS HISTORY ========== //
+router.get("/earnings/history", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+    const { page = 1, limit = 20, type = 'all' } = req.query;
+
+    const query = { sellerId: mongoose.Types.ObjectId(userId) };
+    
+    if (type !== 'all') {
+      query.type = type; // earning, withdrawal, refund, etc.
+    }
+
+    const earnings = await Earning.find(query)
+      .sort({ date: -1 })
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit))
+      .lean();
+
+    const total = await Earning.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        earnings,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching earnings history:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch earnings history',
+      details: error.message 
+    });
+  }
+});
+
+// ========== MONTHLY EARNINGS SUMMARY ========== //
+router.get("/earnings/monthly", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+    const { months = 6 } = req.query;
+
+    const monthlyEarnings = await Order.aggregate([
+      {
+        $match: {
+          sellerId: mongoose.Types.ObjectId(userId),
+          status: 'completed',
+          completedAt: {
+            $gte: new Date(new Date().setMonth(new Date().getMonth() - parseInt(months)))
+          }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$completedAt" },
+            month: { $month: "$completedAt" }
+          },
+          earnings: { $sum: "$amount" },
+          orders: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { "_id.year": -1, "_id.month": -1 }
+      }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: monthlyEarnings
+    });
+  } catch (error) {
+    console.error('Error fetching monthly earnings:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch monthly earnings',
+      details: error.message 
+    });
+  }
+});
 module.exports = router;
