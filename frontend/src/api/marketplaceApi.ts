@@ -333,7 +333,7 @@ const withdrawalsApi = {
       if (status) queryParams.append('status', status);
       
       const response = await axios.get(
-        `${API_BASE_URL}/marketplace/withdrawals?${queryParams}`,
+        `${API_BASE_URL}/marketplace/payments/withdrawals?${queryParams}`,
         getHeaders()
       );
       return normalizeResponse(response);
