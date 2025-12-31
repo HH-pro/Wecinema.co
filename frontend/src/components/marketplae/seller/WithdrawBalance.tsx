@@ -1,7 +1,7 @@
 // components/marketplace/seller/WithdrawBalance.tsx
 import React, { useState } from 'react';
 import marketplaceApi from '../../../api/marketplaceApi';
-import { formatCurrency } from '../../../utils/formatters';
+import { formatCurrency } from '../../../utils/marketplace';
 
 interface StripeStatus {
   connected?: boolean;
