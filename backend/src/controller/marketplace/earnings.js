@@ -11,123 +11,84 @@ const WithdrawalRequest = require('../../models/marketplace/WithdrawalRequest');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 // ========== SELLER EARNINGS DASHBOARD ========== //
-router.get("/:sellerId/stats", async (req, res) => {
+router.get("/top-sellers", async (req, res) => {
   try {
-    const { sellerId } = req.params;
+    const { limit = 10, period = 'all' } = req.query;
     
-    // Validate sellerId format
-    if (!mongoose.Types.ObjectId.isValid(sellerId)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid seller ID format'
-      });
+    // Calculate date based on period
+    let dateFilter = {};
+    if (period === 'monthly') {
+      dateFilter.createdAt = { $gte: new Date(new Date().setMonth(new Date().getMonth() - 1)) };
+    } else if (period === 'weekly') {
+      dateFilter.createdAt = { $gte: new Date(new Date().setDate(new Date().getDate() - 7)) };
     }
 
-    // Get public seller stats
-    const [sellerStats, recentOrders] = await Promise.all([
-      // Get seller's public earnings stats
-      Order.aggregate([
-        {
-          $match: {
-            sellerId: mongoose.Types.ObjectId(sellerId),
-            status: 'completed'
-          }
-        },
-        {
-          $group: {
-            _id: null,
-            totalSales: { $sum: "$amount" },
-            totalOrders: { $sum: 1 },
-            averageOrderValue: { $avg: "$amount" }
-          }
-        }
-      ]),
-      
-      // Get recent successful orders (public info only)
-      Order.find({
-        sellerId: sellerId,
-        status: 'completed'
-      })
-      .select('orderNumber amount createdAt -_id')
-      .sort({ createdAt: -1 })
-      .limit(5)
-    ]);
-
-    // Calculate seller rating (if you have ratings system)
-    const ratingStats = await Order.aggregate([
+    const topSellers = await Order.aggregate([
       {
         $match: {
-          sellerId: mongoose.Types.ObjectId(sellerId),
-          rating: { $exists: true, $ne: null }
+          status: 'completed',
+          ...dateFilter
         }
       },
       {
         $group: {
-          _id: null,
-          averageRating: { $avg: "$rating" },
-          totalReviews: { $sum: 1 }
+          _id: "$sellerId",
+          totalSales: { $sum: "$amount" },
+          totalOrders: { $sum: 1 },
+          averageOrderValue: { $avg: "$amount" }
+        }
+      },
+      {
+        $sort: { totalSales: -1 }
+      },
+      {
+        $limit: parseInt(limit)
+      },
+      {
+        $lookup: {
+          from: "users", // Your users collection name
+          localField: "_id",
+          foreignField: "_id",
+          as: "sellerInfo"
+        }
+      },
+      {
+        $unwind: {
+          path: "$sellerInfo",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $project: {
+          sellerId: "$_id",
+          totalSales: 1,
+          totalOrders: 1,
+          averageOrderValue: { $round: ["$averageOrderValue", 2] },
+          sellerName: "$sellerInfo.name",
+          sellerAvatar: "$sellerInfo.avatar",
+          sellerRating: "$sellerInfo.rating",
+          joinDate: "$sellerInfo.createdAt"
         }
       }
     ]);
-
-    // Get seller's top products/categories if needed
-    const topCategories = await Order.aggregate([
-      {
-        $match: {
-          sellerId: mongoose.Types.ObjectId(sellerId),
-          status: 'completed'
-        }
-      },
-      { $unwind: "$items" },
-      {
-        $group: {
-          _id: "$items.category",
-          totalSold: { $sum: "$items.quantity" },
-          totalRevenue: { $sum: { $multiply: ["$items.price", "$items.quantity"] } }
-        }
-      },
-      { $sort: { totalRevenue: -1 } },
-      { $limit: 3 }
-    ]);
-
-    const stats = sellerStats[0] || {
-      totalSales: 0,
-      totalOrders: 0,
-      averageOrderValue: 0
-    };
-
-    const rating = ratingStats[0] || {
-      averageRating: 0,
-      totalReviews: 0
-    };
 
     res.status(200).json({
       success: true,
       data: {
-        sellerId,
-        stats: {
-          totalSales: stats.totalSales,
-          totalOrders: stats.totalOrders,
-          averageOrderValue: Math.round(stats.averageOrderValue * 100) / 100,
-          successRate: stats.totalOrders > 0 ? '98%' : '0%' // You can calculate this based on your logic
-        },
-        rating: {
-          average: Math.round(rating.averageRating * 10) / 10 || 0,
-          totalReviews: rating.totalReviews || 0
-        },
-        recentOrders,
-        topCategories,
-        joinDate: req.user?.createdAt // If you want to show when seller joined
+        period,
+        topSellers,
+        lastUpdated: new Date()
       }
     });
   } catch (error) {
-    console.error('Public seller stats error:', error);
+    console.error('Top sellers error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch seller statistics'
+      error: 'Failed to fetch top sellers'
     });
   }
 });
+
 router.get("/dashboard", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
