@@ -8,6 +8,14 @@ const Seller = require("../../models/marketplace/Seller");
 const Withdrawal = require("../../models/marketplace/Withdrawal");
 const stripeConfig = require("../../config/stripe");
 
+// Helper function to convert to ObjectId
+const toObjectId = (id) => {
+  if (mongoose.Types.ObjectId.isValid(id)) {
+    return new mongoose.Types.ObjectId(id);
+  }
+  return null;
+};
+
 // ========== PUBLIC ROUTES ========== //
 
 // Public route to get all users' total earnings (for leaderboard/stats)
@@ -155,9 +163,18 @@ router.get("/public/earnings-leaderboard", async (req, res) => {
 router.get("/public/user-earnings/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
+    
+    // Validate ObjectId
+    const objectId = toObjectId(userId);
+    if (!objectId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid user ID'
+      });
+    }
 
     // Validate user exists
-    const user = await User.findById(userId).select('name username avatar');
+    const user = await User.findById(objectId).select('name username avatar');
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -169,7 +186,7 @@ router.get("/public/user-earnings/:userId", async (req, res) => {
     const earningsStats = await Order.aggregate([
       {
         $match: {
-          sellerId: mongoose.Types.ObjectId(userId),
+          sellerId: objectId,
           status: 'completed',
           paymentReleased: true
         }
@@ -186,11 +203,11 @@ router.get("/public/user-earnings/:userId", async (req, res) => {
     ]);
 
     // Get seller info if exists
-    const seller = await Seller.findOne({ userId }).select('rating totalSales createdAt');
+    const seller = await Seller.findOne({ userId: objectId }).select('rating totalSales createdAt');
 
     // Get recent completed orders (public info only)
     const recentOrders = await Order.find({
-      sellerId: userId,
+      sellerId: objectId,
       status: 'completed'
     })
       .select('listingId amount status createdAt')
@@ -319,15 +336,17 @@ router.post("/confirm-payment", authenticateMiddleware, async (req, res) => {
 
     // Update seller's pending balance
     const fees = stripeConfig.calculateFees(order.amount);
+    const sellerId = toObjectId(order.sellerId);
+    
     await Seller.findOneAndUpdate(
-      { userId: order.sellerId },
+      { userId: sellerId },
       { 
         $inc: { 
           pendingBalance: fees.sellerAmount,
           totalSales: 1 
         },
         $setOnInsert: {
-          userId: order.sellerId,
+          userId: sellerId,
           rating: 5.0,
           totalWithdrawn: 0
         }
@@ -378,9 +397,11 @@ router.post("/capture-payment", authenticateMiddleware, async (req, res) => {
     const platformFee = fees.platformFee;
     const sellerAmount = fees.sellerAmount;
 
+    const sellerId = toObjectId(order.sellerId);
+
     // Update seller's earnings
     await Seller.findOneAndUpdate(
-      { userId: order.sellerId },
+      { userId: sellerId },
       { 
         $inc: { 
           balance: sellerAmount,
@@ -391,7 +412,7 @@ router.post("/capture-payment", authenticateMiddleware, async (req, res) => {
     );
 
     // Update user's balance
-    await User.findByIdAndUpdate(order.sellerId, {
+    await User.findByIdAndUpdate(sellerId, {
       $inc: { 
         balance: sellerAmount
       }
@@ -560,8 +581,9 @@ router.post("/request-refund", authenticateMiddleware, async (req, res) => {
     
     // Deduct from seller's pending balance if not released yet
     if (!order.paymentReleased && order.sellerAmount) {
+      const sellerId = toObjectId(order.sellerId);
       await Seller.findOneAndUpdate(
-        { userId: order.sellerId },
+        { userId: sellerId },
         { 
           $inc: { 
             pendingBalance: -order.sellerAmount
@@ -596,7 +618,15 @@ router.get("/withdrawals", authenticateMiddleware, async (req, res) => {
     const userId = req.user.id || req.user._id;
     const { page = 1, limit = 10, status } = req.query;
 
-    const query = { sellerId: mongoose.Types.ObjectId(userId) };
+    const objectId = toObjectId(userId);
+    if (!objectId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid user ID'
+      });
+    }
+
+    const query = { sellerId: objectId };
     
     if (status && status !== 'all') {
       query.status = status;
@@ -612,13 +642,13 @@ router.get("/withdrawals", authenticateMiddleware, async (req, res) => {
 
     const total = await Withdrawal.countDocuments(query);
 
-    const seller = await Seller.findOne({ userId: mongoose.Types.ObjectId(userId) });
+    const seller = await Seller.findOne({ userId: objectId });
     
     // CORRECTED EARNINGS CALCULATION
     const earningsSummary = await Order.aggregate([
       { 
         $match: { 
-          sellerId: mongoose.Types.ObjectId(userId),
+          sellerId: objectId,
           status: 'completed',
           paymentReleased: true
         } 
@@ -683,7 +713,15 @@ router.post("/withdrawals", authenticateMiddleware, async (req, res) => {
     }
 
     const amountInCents = parseInt(amount);
-    const seller = await Seller.findOne({ userId: mongoose.Types.ObjectId(userId) });
+    const objectId = toObjectId(userId);
+    if (!objectId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid user ID'
+      });
+    }
+
+    const seller = await Seller.findOne({ userId: objectId });
     
     if (!seller) {
       return res.status(404).json({
@@ -696,7 +734,7 @@ router.post("/withdrawals", authenticateMiddleware, async (req, res) => {
     const earningsSummary = await Order.aggregate([
       { 
         $match: { 
-          sellerId: mongoose.Types.ObjectId(userId),
+          sellerId: objectId,
           status: 'completed',
           paymentReleased: true
         } 
@@ -735,7 +773,7 @@ router.post("/withdrawals", authenticateMiddleware, async (req, res) => {
     }
 
     const withdrawal = new Withdrawal({
-      sellerId: userId,
+      sellerId: objectId,
       amount: amountInCents,
       status: 'pending',
       requestDate: new Date(),
@@ -752,7 +790,7 @@ router.post("/withdrawals", authenticateMiddleware, async (req, res) => {
     await seller.save();
 
     // Also update user balance
-    await User.findByIdAndUpdate(userId, {
+    await User.findByIdAndUpdate(objectId, {
       $inc: { 
         balance: -amountInCents
       }
@@ -864,7 +902,15 @@ router.post("/withdrawals/:withdrawalId/cancel", authenticateMiddleware, async (
     withdrawal.cancelledAt = new Date();
     await withdrawal.save();
 
-    const seller = await Seller.findOne({ userId: mongoose.Types.ObjectId(userId) });
+    const objectId = toObjectId(userId);
+    if (!objectId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid user ID'
+      });
+    }
+
+    const seller = await Seller.findOne({ userId: objectId });
     if (seller) {
       seller.totalWithdrawn = Math.max(0, (seller.totalWithdrawn || 0) - withdrawal.amount);
       seller.balance = (seller.balance || 0) + withdrawal.amount;
@@ -872,7 +918,7 @@ router.post("/withdrawals/:withdrawalId/cancel", authenticateMiddleware, async (
     }
 
     // Also update user balance
-    await User.findByIdAndUpdate(userId, {
+    await User.findByIdAndUpdate(objectId, {
       $inc: { 
         balance: withdrawal.amount
       }
@@ -897,10 +943,18 @@ router.post("/withdrawals/:withdrawalId/cancel", authenticateMiddleware, async (
 router.get("/withdrawals/stats/summary", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
+    const objectId = toObjectId(userId);
+    
+    if (!objectId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid user ID'
+      });
+    }
 
     const withdrawalStats = await Withdrawal.aggregate([
       {
-        $match: { sellerId: mongoose.Types.ObjectId(userId) }
+        $match: { sellerId: objectId }
       },
       {
         $group: {
@@ -914,7 +968,7 @@ router.get("/withdrawals/stats/summary", authenticateMiddleware, async (req, res
     const totalWithdrawn = await Withdrawal.aggregate([
       {
         $match: { 
-          sellerId: mongoose.Types.ObjectId(userId),
+          sellerId: objectId,
           status: 'completed'
         }
       },
@@ -929,7 +983,7 @@ router.get("/withdrawals/stats/summary", authenticateMiddleware, async (req, res
     const pendingWithdrawals = await Withdrawal.aggregate([
       {
         $match: { 
-          sellerId: mongoose.Types.ObjectId(userId),
+          sellerId: objectId,
           status: { $in: ['pending', 'processing'] }
         }
       },
@@ -942,7 +996,7 @@ router.get("/withdrawals/stats/summary", authenticateMiddleware, async (req, res
     ]);
 
     const lastWithdrawal = await Withdrawal.findOne({
-      sellerId: userId,
+      sellerId: objectId,
       status: 'completed'
     }).sort({ completedAt: -1 });
 
@@ -971,8 +1025,16 @@ router.get("/withdrawals/stats/summary", authenticateMiddleware, async (req, res
 router.get("/earnings/balance", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
+    const objectId = toObjectId(userId);
+    
+    if (!objectId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid user ID'
+      });
+    }
 
-    const seller = await Seller.findOne({ userId: mongoose.Types.ObjectId(userId) });
+    const seller = await Seller.findOne({ userId: objectId });
     
     if (!seller) {
       return res.status(200).json({
@@ -993,7 +1055,7 @@ router.get("/earnings/balance", authenticateMiddleware, async (req, res) => {
     const earningsSummary = await Order.aggregate([
       { 
         $match: { 
-          sellerId: mongoose.Types.ObjectId(userId),
+          sellerId: objectId,
           status: 'completed',
           paymentReleased: true
         } 
@@ -1019,7 +1081,7 @@ router.get("/earnings/balance", authenticateMiddleware, async (req, res) => {
     const thisMonthEarnings = await Order.aggregate([
       { 
         $match: { 
-          sellerId: mongoose.Types.ObjectId(userId),
+          sellerId: objectId,
           status: 'completed',
           paymentReleased: true,
           completedAt: {
@@ -1044,7 +1106,7 @@ router.get("/earnings/balance", authenticateMiddleware, async (req, res) => {
     const platformFees = await Order.aggregate([
       { 
         $match: { 
-          sellerId: mongoose.Types.ObjectId(userId),
+          sellerId: objectId,
           status: 'completed',
           paymentReleased: true
         } 
@@ -1090,11 +1152,19 @@ router.get("/earnings/monthly", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
     const { months = 6 } = req.query;
+    
+    const objectId = toObjectId(userId);
+    if (!objectId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid user ID'
+      });
+    }
 
     const monthlyEarnings = await Order.aggregate([
       {
         $match: {
-          sellerId: mongoose.Types.ObjectId(userId),
+          sellerId: objectId,
           status: 'completed',
           paymentReleased: true,
           completedAt: {
@@ -1153,11 +1223,19 @@ router.get("/earnings/history", authenticateMiddleware, async (req, res) => {
     const userId = req.user.id || req.user._id;
     const { page = 1, limit = 20, type = 'all' } = req.query;
 
+    const objectId = toObjectId(userId);
+    if (!objectId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid user ID'
+      });
+    }
+
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
     // Get completed orders (earnings)
     const earningsQuery = { 
-      sellerId: mongoose.Types.ObjectId(userId),
+      sellerId: objectId,
       status: 'completed',
       paymentReleased: true
     };
@@ -1173,13 +1251,13 @@ router.get("/earnings/history", authenticateMiddleware, async (req, res) => {
     const totalEarnings = await Order.countDocuments(earningsQuery);
 
     // Get withdrawals
-    const withdrawals = await Withdrawal.find({ sellerId: userId })
+    const withdrawals = await Withdrawal.find({ sellerId: objectId })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
       .lean();
 
-    const totalWithdrawals = await Withdrawal.countDocuments({ sellerId: userId });
+    const totalWithdrawals = await Withdrawal.countDocuments({ sellerId: objectId });
 
     let combinedHistory = [];
     
@@ -1253,9 +1331,17 @@ router.get("/earnings/history", authenticateMiddleware, async (req, res) => {
 router.get("/earnings/debug", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
+    const objectId = toObjectId(userId);
+    
+    if (!objectId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid user ID'
+      });
+    }
     
     const orders = await Order.find({ 
-      sellerId: userId,
+      sellerId: objectId,
       status: 'completed' 
     })
     .select('amount platformFee sellerAmount paymentReleased status createdAt completedAt')
@@ -1266,7 +1352,7 @@ router.get("/earnings/debug", authenticateMiddleware, async (req, res) => {
     const totalSellerAmount = orders.reduce((sum, o) => sum + (o.sellerAmount || o.amount * 0.9), 0);
     const totalPlatformFee = orders.reduce((sum, o) => sum + (o.platformFee || o.amount * 0.1), 0);
 
-    const seller = await Seller.findOne({ userId }).select('balance totalWithdrawn pendingBalance');
+    const seller = await Seller.findOne({ userId: objectId }).select('balance totalWithdrawn pendingBalance');
 
     res.status(200).json({
       success: true,
@@ -1361,8 +1447,9 @@ router.post("/stripe-webhook", express.raw({type: 'application/json'}), async (r
         
         // Deduct from seller's pending balance
         if (!order.paymentReleased && order.sellerAmount) {
+          const sellerId = toObjectId(order.sellerId);
           await Seller.findOneAndUpdate(
-            { userId: order.sellerId },
+            { userId: sellerId },
             { 
               $inc: { 
                 pendingBalance: -order.sellerAmount
