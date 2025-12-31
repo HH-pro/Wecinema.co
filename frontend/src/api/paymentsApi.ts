@@ -54,7 +54,7 @@ export interface WithdrawalHistory {
     total: number;
     pages: number;
   };
-  balance: {
+  balance?: {
     availableBalance: number; // in cents
     pendingBalance: number; // in cents
     totalEarnings: number; // in cents
@@ -71,6 +71,16 @@ export interface WithdrawalStats {
   totalWithdrawn: number;
   pendingWithdrawals: number;
   lastWithdrawal: Withdrawal | null;
+}
+
+export interface EarningsBalance {
+  availableBalance: number;
+  pendingBalance: number;
+  totalEarnings: number;
+  totalWithdrawn: number;
+  walletBalance: number;
+  lastWithdrawal: string | null;
+  nextPayoutDate: string;
 }
 
 export interface ApiResponse<T = any> {
@@ -232,6 +242,48 @@ export const getWithdrawalHistory = async (
     return response.data;
   } catch (error: any) {
     console.error('Error fetching withdrawal history:', error);
+    // Mock data for development
+    if (process.env.NODE_ENV === 'development') {
+      return {
+        success: true,
+        data: {
+          withdrawals: [
+            {
+              _id: 'mock_1',
+              amount: 15000,
+              status: 'completed',
+              description: 'Withdrawal to bank account',
+              destination: 'Bank Account •••• 4321',
+              createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+              completedAt: new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString(),
+              updatedAt: new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString()
+            },
+            {
+              _id: 'mock_2',
+              amount: 25000,
+              status: 'pending',
+              description: 'Withdrawal request',
+              destination: 'Stripe Account',
+              createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+              updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+            }
+          ],
+          pagination: {
+            page: params.page || 1,
+            limit: params.limit || 10,
+            total: 2,
+            pages: 1
+          },
+          balance: {
+            availableBalance: 150000,
+            pendingBalance: 50000,
+            totalEarnings: 200000,
+            totalWithdrawn: 40000
+          }
+        }
+      };
+    }
+    
     return {
       success: false,
       error: error.response?.data?.error || 'Failed to fetch withdrawal history'
@@ -258,6 +310,22 @@ export const requestWithdrawal = async (amount: number): Promise<ApiResponse<{
     return response.data;
   } catch (error: any) {
     console.error('Error requesting withdrawal:', error);
+    // Mock success for development
+    if (process.env.NODE_ENV === 'development') {
+      return {
+        success: true,
+        message: 'Withdrawal request submitted successfully',
+        data: {
+          withdrawalId: 'mock_' + Date.now(),
+          amount,
+          status: 'pending',
+          estimatedArrival: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+          newBalance: 100000,
+          availableBalance: 100000
+        }
+      };
+    }
+    
     return {
       success: false,
       error: error.response?.data?.error || 'Failed to request withdrawal'
@@ -318,23 +386,32 @@ export const getWithdrawalStats = async (): Promise<ApiResponse<WithdrawalStats>
 /**
  * Get seller earnings balance
  */
-export const getEarningsBalance = async (): Promise<ApiResponse<{
-  availableBalance: number;
-  pendingBalance: number;
-  totalEarnings: number;
-  totalWithdrawn: number;
-  walletBalance: number;
-  lastWithdrawal: string | null;
-  nextPayoutDate: string;
-}>> => {
+export const getEarningsBalance = async (): Promise<ApiResponse<EarningsBalance>> => {
   try {
-    // This endpoint might be different - adjust based on your backend
-    const response = await axios.get(`${API_BASE_URL}/earnings/balance`, {
+    // Try to get from payments API first
+    const response = await getWithdrawalHistory({ page: 1, limit: 1 });
+    if (response.success && response.data?.balance) {
+      return {
+        success: true,
+        data: {
+          availableBalance: response.data.balance.availableBalance,
+          pendingBalance: response.data.balance.pendingBalance,
+          totalEarnings: response.data.balance.totalEarnings,
+          totalWithdrawn: response.data.balance.totalWithdrawn,
+          walletBalance: response.data.balance.availableBalance,
+          lastWithdrawal: response.data.withdrawals[0]?.createdAt || null,
+          nextPayoutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+        }
+      };
+    }
+    
+    // Fallback to direct API call
+    const earningsResponse = await axios.get(`${API_BASE_URL}/earnings/balance`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem('token')}`
       }
     });
-    return response.data;
+    return earningsResponse.data;
   } catch (error: any) {
     console.error('Error fetching earnings balance:', error);
     
@@ -459,8 +536,8 @@ export const getEarningsHistory = async (params: {
           }
         ],
         pagination: {
-          page: 1,
-          limit: 10,
+          page: params.page || 1,
+          limit: params.limit || 10,
           total: 3,
           pages: 1
         }
