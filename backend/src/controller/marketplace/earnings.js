@@ -196,7 +196,7 @@ router.get("/all-sellers",  async (req, res) => {
     });
   }
 });
-router.get("/dashboard", auth, async (req, res) => {
+router.get("/dashboard", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
 
@@ -414,7 +414,7 @@ router.get("/dashboard", auth, async (req, res) => {
 });
 
 // ========== PROCESS PAYOUT TO SELLER ========== //
-router.post("/process-payout", auth, async (req, res) => {
+router.post("/process-payout", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     const { amount, paymentMethod, accountDetails } = req.body;
@@ -517,7 +517,7 @@ router.post("/process-payout", auth, async (req, res) => {
 });
 
 // ========== GET PAYMENT HISTORY ========== //
-router.get("/payment-history", auth, async (req, res) => {
+router.get("/payment-history", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     const { page = 1, limit = 20, type, status } = req.query;
@@ -577,7 +577,7 @@ router.get("/payment-history", auth, async (req, res) => {
 });
 
 // ========== GET WITHDRAWAL HISTORY ========== //
-router.get("/withdrawal-history", auth, async (req, res) => {
+router.get("/withdrawal-history", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     const { status } = req.query;
@@ -624,7 +624,7 @@ router.get("/withdrawal-history", auth, async (req, res) => {
 
 // ========== RELEASE PENDING PAYMENTS ========== //
 // This route should be called by admin/cron job to release completed order payments
-router.post("/release-payment/:orderId", auth, async (req, res) => {
+router.post("/release-payment/:orderId", authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.params;
     const userId = req.user.id;
