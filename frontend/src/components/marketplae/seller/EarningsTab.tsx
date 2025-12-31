@@ -1,1000 +1,568 @@
-// components/marketplace/seller/EarningsTab.tsx
+// src/components/marketplae/seller/EarningsTab.tsx - COMPLETE UPDATED VERSION
 import React, { useState, useEffect } from 'react';
-import StripeStatusCard from './StripeStatusCard';
-import EarningsOverview from './EarningsOverview';
-import EarningsStats from './EarningsStats';
-import WithdrawBalance from './WithdrawBalance';
-import paymentsApi from '../../../api/paymentsApi';
-import { getCurrentUserId } from '../../../utilities/helperfFunction';
+import { paymentsApi } from '../../../api/marketplace/paymentsApi'; // ✅ DIRECT IMPORT
 
 interface EarningsTabProps {
-  stripeStatus: any;
+  earningsBalance: any;
+  monthlyEarnings: any[];
+  earningsHistory: any[];
   orderStats: any;
-  balanceData?: {
-    availableBalance: number; // in cents
-    pendingBalance: number; // in cents
-    totalEarnings: number; // in cents
-    totalWithdrawn: number; // in cents
-    thisMonthRevenue: number; // in cents
-    lastWithdrawal: string | null;
-    nextPayoutDate: string;
-    lifetimeRevenue?: number; // in cents
-  };
-  monthlyEarnings?: any[];
-  earningsHistory?: any[];
-  onWithdrawSuccess: (amount: number) => void;
+  onWithdrawRequest: (amount: number) => Promise<void>;
   loading: boolean;
-  onRefresh: () => void;
-  onGoToWithdraw?: () => void;
-  totalWithdrawn?: number; // in cents
+  onRefresh: () => Promise<void>;
+  formatCurrency?: (amount: number) => string;
+  formatCurrencyShort?: (amount: number) => string;
 }
 
 const EarningsTab: React.FC<EarningsTabProps> = ({
-  stripeStatus,
+  earningsBalance,
+  monthlyEarnings,
+  earningsHistory,
   orderStats,
-  balanceData,
-  monthlyEarnings: initialMonthlyEarnings = [],
-  earningsHistory: initialEarningsHistory = [],
-  onWithdrawSuccess,
+  onWithdrawRequest,
   loading,
   onRefresh,
-  onGoToWithdraw,
-  totalWithdrawn = 0
+  formatCurrency = paymentsApi.formatCurrency, // ✅ DEFAULT TO PAYMENTS API
+  formatCurrencyShort = paymentsApi.formatCurrencyShort // ✅ DEFAULT TO PAYMENTS API
 }) => {
-  const [withdrawals, setWithdrawals] = useState<any[]>([]);
-  const [withdrawalsLoading, setWithdrawalsLoading] = useState(false);
-  const [liveEarnings, setLiveEarnings] = useState<any>(null);
-  const [liveLoading, setLiveLoading] = useState(false);
-  const [monthlyEarnings, setMonthlyEarnings] = useState<any[]>(initialMonthlyEarnings);
-  const [earningsHistory, setEarningsHistory] = useState<any[]>(initialEarningsHistory);
-  const [realTimeUpdate, setRealTimeUpdate] = useState(0);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  
-  // Get current user ID on component mount
-  useEffect(() => {
-    const userId = getCurrentUserId();
-    setCurrentUserId(userId);
-  }, []);
-  
-  // Fetch live earnings data using paymentsApi
-  const fetchLiveEarnings = async () => {
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [error, setError] = useState('');
+  const [activeChart, setActiveChart] = useState('monthly');
+  const [detailedEarnings, setDetailedEarnings] = useState<any>(null);
+  const [detailedLoading, setDetailedLoading] = useState(false);
+
+  // ✅ FETCH DETAILED EARNINGS FROM PAYMENTS API
+  const fetchDetailedEarnings = async () => {
     try {
-      setLiveLoading(true);
-      
-      // Check if user is logged in
-      if (!currentUserId) {
-        console.warn('No user ID found, cannot fetch earnings');
-        return null;
-      }
-      
-      // Get earnings balance from paymentsApi
-      const balanceResponse = await paymentsApi.getEarningsBalance();
-      
-      if (balanceResponse.success && balanceResponse.data) {
-        setLiveEarnings(balanceResponse.data);
-        
-        // Store user-specific earnings in localStorage
-        localStorage.setItem(`earnings_${currentUserId}`, JSON.stringify({
-          ...balanceResponse.data,
-          lastUpdated: Date.now()
-        }));
-        
-        return balanceResponse.data;
-      }
-      
-      // Try to get from localStorage as fallback
-      const savedEarnings = localStorage.getItem(`earnings_${currentUserId}`);
-      if (savedEarnings) {
-        const parsed = JSON.parse(savedEarnings);
-        setLiveEarnings(parsed);
-        return parsed;
-      }
-      
-      // Fallback to balanceData if API fails
-      if (balanceData) {
-        setLiveEarnings(balanceData);
-        return balanceData;
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Error fetching live earnings:', error);
-      
-      // Try localStorage fallback
-      if (currentUserId) {
-        const savedEarnings = localStorage.getItem(`earnings_${currentUserId}`);
-        if (savedEarnings) {
-          const parsed = JSON.parse(savedEarnings);
-          setLiveEarnings(parsed);
-          return parsed;
-        }
-      }
-      
-      // Use balanceData as fallback
-      if (balanceData) {
-        setLiveEarnings(balanceData);
-      }
-      return null;
-    } finally {
-      setLiveLoading(false);
-    }
-  };
-  
-  // Fetch withdrawals using paymentsApi
-  const fetchWithdrawals = async () => {
-    try {
-      setWithdrawalsLoading(true);
-      
-      // Check if user is logged in
-      if (!currentUserId) {
-        console.warn('No user ID found, cannot fetch withdrawals');
-        return;
-      }
-      
-      // Get withdrawal history from paymentsApi
-      const response = await paymentsApi.getWithdrawalHistory({ limit: 5 });
-      
-      if (response.success && response.data?.withdrawals) {
-        // Filter withdrawals for current user (should be done by backend, but double-check)
-        const userWithdrawals = response.data.withdrawals.filter((w: any) => 
-          w.userId === currentUserId || !w.userId // Include if no userId (backward compatibility)
-        );
-        
-        setWithdrawals(userWithdrawals);
-        
-        // Store user-specific withdrawals
-        localStorage.setItem(`withdrawals_${currentUserId}`, JSON.stringify({
-          withdrawals: userWithdrawals,
-          lastUpdated: Date.now()
-        }));
-        
-        return;
-      }
-      
-      // Try localStorage fallback
-      const savedWithdrawals = localStorage.getItem(`withdrawals_${currentUserId}`);
-      if (savedWithdrawals) {
-        const parsed = JSON.parse(savedWithdrawals);
-        setWithdrawals(parsed.withdrawals || []);
-        return;
-      }
-      
-      // Fallback: If we have balanceData with withdrawals, use that
-      if (balanceData?.totalWithdrawn && currentUserId) {
-        // Create mock withdrawals based on total withdrawn
-        setWithdrawals([
-          {
-            _id: '1',
-            userId: currentUserId,
-            type: 'withdrawal',
-            amount: Math.min(balanceData.totalWithdrawn, 50000),
-            status: 'completed',
-            description: 'Withdrawal to bank',
-            createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-          }
-        ]);
-      }
-    } catch (error) {
-      console.error('Error fetching withdrawals:', error);
-      
-      // Try localStorage fallback
-      if (currentUserId) {
-        const savedWithdrawals = localStorage.getItem(`withdrawals_${currentUserId}`);
-        if (savedWithdrawals) {
-          const parsed = JSON.parse(savedWithdrawals);
-          setWithdrawals(parsed.withdrawals || []);
-          return;
-        }
-      }
-    } finally {
-      setWithdrawalsLoading(false);
-    }
-  };
-  
-  // Fetch earnings history using paymentsApi
-  const fetchEarningsHistory = async () => {
-    try {
-      // Check if user is logged in
-      if (!currentUserId) {
-        console.warn('No user ID found, cannot fetch earnings history');
-        return [];
-      }
-      
-      const response = await paymentsApi.getEarningsHistory({ limit: 10 });
-      
-      if (response.success && response.data?.earnings) {
-        // Filter earnings for current user
-        const userEarnings = response.data.earnings.filter((e: any) => 
-          e.userId === currentUserId || !e.userId // Include if no userId (backward compatibility)
-        );
-        
-        setEarningsHistory(userEarnings);
-        
-        // Store user-specific earnings history
-        localStorage.setItem(`earnings_history_${currentUserId}`, JSON.stringify({
-          earnings: userEarnings,
-          lastUpdated: Date.now()
-        }));
-        
-        return userEarnings;
-      }
-      
-      // Try localStorage fallback
-      const savedHistory = localStorage.getItem(`earnings_history_${currentUserId}`);
-      if (savedHistory) {
-        const parsed = JSON.parse(savedHistory);
-        setEarningsHistory(parsed.earnings || []);
-        return parsed.earnings || [];
-      }
-      
-      return [];
-    } catch (error) {
-      console.error('Error fetching earnings history:', error);
-      
-      // Try localStorage fallback
-      if (currentUserId) {
-        const savedHistory = localStorage.getItem(`earnings_history_${currentUserId}`);
-        if (savedHistory) {
-          const parsed = JSON.parse(savedHistory);
-          setEarningsHistory(parsed.earnings || []);
-          return parsed.earnings || [];
-        }
-      }
-      
-      return [];
-    }
-  };
-  
-  // Fetch monthly earnings using paymentsApi
-  const fetchMonthlyEarnings = async () => {
-    try {
-      // Check if user is logged in
-      if (!currentUserId) {
-        console.warn('No user ID found, cannot fetch monthly earnings');
-        return [];
-      }
-      
-      const response = await paymentsApi.getMonthlyEarnings({ months: 6 });
+      setDetailedLoading(true);
+      const response = await paymentsApi.getEarningsHistory({ page: 1, limit: 50 });
       
       if (response.success && response.data) {
-        // Filter monthly earnings for current user
-        const userMonthlyEarnings = response.data.filter((item: any) => 
-          item.userId === currentUserId || !item.userId // Include if no userId (backward compatibility)
-        );
-        
-        setMonthlyEarnings(userMonthlyEarnings);
-        
-        // Store user-specific monthly earnings
-        localStorage.setItem(`monthly_earnings_${currentUserId}`, JSON.stringify({
-          earnings: userMonthlyEarnings,
-          lastUpdated: Date.now()
-        }));
-        
-        return userMonthlyEarnings;
+        setDetailedEarnings(response.data);
       }
-      
-      // Try localStorage fallback
-      const savedMonthly = localStorage.getItem(`monthly_earnings_${currentUserId}`);
-      if (savedMonthly) {
-        const parsed = JSON.parse(savedMonthly);
-        setMonthlyEarnings(parsed.earnings || []);
-        return parsed.earnings || [];
-      }
-      
-      return [];
     } catch (error) {
-      console.error('Error fetching monthly earnings:', error);
-      
-      // Try localStorage fallback
-      if (currentUserId) {
-        const savedMonthly = localStorage.getItem(`monthly_earnings_${currentUserId}`);
-        if (savedMonthly) {
-          const parsed = JSON.parse(savedMonthly);
-          setMonthlyEarnings(parsed.earnings || []);
-          return parsed.earnings || [];
-        }
-      }
-      
-      return [];
+      console.error('Error fetching detailed earnings:', error);
+    } finally {
+      setDetailedLoading(false);
     }
   };
-  
-  // Calculate real-time metrics with safe defaults
-  const calculateRealTimeMetrics = () => {
-    // Ensure orderStats has safe defaults
-    const safeOrderStats = {
-      totalOrders: orderStats?.totalOrders || 0,
-      completed: orderStats?.completed || 0,
-      ...orderStats
-    };
-    
-    if (!liveEarnings && !balanceData) {
-      return {
-        monthOverMonthGrowth: 0,
-        avgOrderValue: 0,
-        completionRate: 0,
-        lifetimeRevenue: 0,
-        totalWithdrawn: totalWithdrawn || 0,
-        netEarnings: 0
-      };
+
+  useEffect(() => {
+    fetchDetailedEarnings();
+  }, []);
+
+  const handleWithdraw = async () => {
+    if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) {
+      setError('Please enter a valid amount');
+      return;
     }
     
-    const data = liveEarnings || balanceData || {};
+    setWithdrawing(true);
+    try {
+      await onWithdrawRequest(parseFloat(withdrawAmount));
+      setWithdrawAmount('');
+      setError('');
+      await Promise.all([onRefresh(), fetchDetailedEarnings()]);
+    } catch (err: any) {
+      setError(err.message || 'Failed to process withdrawal');
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
+  // ✅ CALCULATE EARNINGS GROWTH
+  const calculateGrowth = () => {
+    if (!monthlyEarnings || monthlyEarnings.length < 2) return { percent: 0, amount: 0 };
     
-    // Calculate growth percentage if we have monthly data
-    const currentMonth = new Date().getMonth() + 1;
-    const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-    const currentYear = new Date().getFullYear();
-    const lastMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+    const currentMonth = monthlyEarnings[monthlyEarnings.length - 1]?.earnings || 0;
+    const previousMonth = monthlyEarnings[monthlyEarnings.length - 2]?.earnings || 0;
     
-    const currentMonthData = monthlyEarnings?.find((item: any) => 
-      item._id?.month === currentMonth && item._id?.year === currentYear
-    );
+    if (previousMonth === 0) return { percent: 100, amount: currentMonth };
     
-    const lastMonthData = monthlyEarnings?.find((item: any) => 
-      item._id?.month === lastMonth && item._id?.year === lastMonthYear
-    );
-    
-    const thisMonthRevenue = data?.thisMonthRevenue || 0;
-    const lastMonthEarnings = lastMonthData?.earnings || 0;
-    
-    const monthOverMonthGrowth = lastMonthEarnings > 0 
-      ? ((thisMonthRevenue - lastMonthEarnings) / lastMonthEarnings) * 100
-      : 0;
-    
-    // Calculate average order value with safe division
-    const totalEarningsValue = data?.totalEarnings || 0;
-    const avgOrderValue = safeOrderStats.totalOrders > 0 
-      ? totalEarningsValue / safeOrderStats.totalOrders 
-      : 0;
-    
-    // Calculate completion rate with safe division
-    const completionRate = safeOrderStats.totalOrders > 0
-      ? ((safeOrderStats.completed || 0) / safeOrderStats.totalOrders) * 100
-      : 0;
+    const growthPercent = ((currentMonth - previousMonth) / previousMonth) * 100;
+    const growthAmount = currentMonth - previousMonth;
     
     return {
-      monthOverMonthGrowth: monthOverMonthGrowth || 0,
-      avgOrderValue: avgOrderValue || 0,
-      completionRate: completionRate || 0,
-      lifetimeRevenue: data?.lifetimeRevenue || data?.totalEarnings || 0,
-      totalWithdrawn: data?.totalWithdrawn || totalWithdrawn || 0,
-      netEarnings: (data?.totalEarnings || 0) - (data?.totalWithdrawn || totalWithdrawn || 0)
+      percent: Math.round(growthPercent),
+      amount: growthAmount
     };
   };
-  
-  // Initial data fetch
-  useEffect(() => {
-    if (stripeStatus?.chargesEnabled && currentUserId) {
-      fetchAllEarningsData();
-    }
-  }, [stripeStatus, currentUserId]);
-  
-  // Fetch all earnings data
-  const fetchAllEarningsData = async () => {
-    try {
-      if (!currentUserId) {
-        console.warn('Cannot fetch data: No user ID');
-        return;
-      }
-      
-      await Promise.all([
-        fetchLiveEarnings(),
-        fetchWithdrawals(),
-        fetchEarningsHistory(),
-        fetchMonthlyEarnings()
-      ]);
-    } catch (error) {
-      console.error('Error fetching earnings data:', error);
-    }
+
+  const growth = calculateGrowth();
+
+  // ✅ GET MONTH NAME
+  const getMonthName = (monthIndex: number) => {
+    const date = new Date();
+    date.setMonth(monthIndex);
+    return date.toLocaleString('default', { month: 'short' });
   };
-  
-  // Refresh data periodically (every 30 seconds)
-  useEffect(() => {
-    if (stripeStatus?.chargesEnabled && currentUserId) {
-      const interval = setInterval(() => {
-        fetchLiveEarnings();
-        setRealTimeUpdate(prev => prev + 1);
-      }, 30000); // 30 seconds
-      
-      return () => clearInterval(interval);
-    }
-  }, [stripeStatus, currentUserId]);
-  
-  // Handle manual refresh
-  const handleManualRefresh = async () => {
-    try {
-      if (!currentUserId) {
-        console.warn('Cannot refresh: No user ID');
-        return;
-      }
-      
-      await fetchAllEarningsData();
-      onRefresh(); // Call parent refresh if needed
-    } catch (error) {
-      console.error('Error refreshing data:', error);
-    }
+
+  // ✅ GET EARNINGS BY TYPE
+  const getEarningsByType = () => {
+    if (!detailedEarnings?.earnings) return { completed: 0, pending: 0, withdrawn: 0 };
+    
+    const completed = detailedEarnings.earnings
+      .filter((item: any) => item.type === 'earning' && item.status === 'completed')
+      .reduce((sum: number, item: any) => sum + item.amount, 0);
+    
+    const pending = detailedEarnings.earnings
+      .filter((item: any) => item.type === 'earning' && item.status === 'pending')
+      .reduce((sum: number, item: any) => sum + item.amount, 0);
+    
+    const withdrawn = detailedEarnings.earnings
+      .filter((item: any) => item.type === 'withdrawal' && item.status === 'completed')
+      .reduce((sum: number, item: any) => sum + item.amount, 0);
+    
+    return { completed, pending, withdrawn };
   };
-  
-  // Handle withdrawal request
-  const handleWithdrawRequest = async (amountInCents: number) => {
-    try {
-      if (!currentUserId) {
-        console.error('Cannot withdraw: No user ID');
-        return;
-      }
-      
-      // Call parent handler
-      onWithdrawSuccess(amountInCents);
-      
-      // Refresh data after withdrawal
-      setTimeout(() => {
-        fetchAllEarningsData();
-      }, 1000);
-    } catch (error) {
-      console.error('Error handling withdrawal:', error);
+
+  const earningsByType = getEarningsByType();
+
+  // ✅ FORMAT DATE
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // ✅ GET TRANSACTION ICON
+  const getTransactionIcon = (type: string, status: string) => {
+    if (type === 'earning') {
+      return status === 'completed' ? '💰' : '⏳';
+    } else if (type === 'withdrawal') {
+      return status === 'completed' ? '💸' : '⏳';
     }
+    return '📊';
   };
-  
-  if (loading || liveLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your earnings data...</p>
-          <p className="text-sm text-gray-500 mt-1">Updating in real-time</p>
-        </div>
-      </div>
-    );
-  }
-  
-  if (!stripeStatus?.chargesEnabled) {
-    return (
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">
-        <div className="text-5xl mb-4 text-gray-300">💰</div>
-        <h3 className="text-lg font-medium text-gray-900">Payments Not Setup</h3>
-        <p className="mt-2 text-gray-500 mb-6">
-          Connect your Stripe account to start earning and withdraw your funds.
-        </p>
-        <button
-          onClick={onRefresh}
-          className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow"
-        >
-          💰 Setup Payments
-        </button>
-      </div>
-    );
-  }
-  
-  if (!currentUserId) {
-    return (
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center">
-        <div className="text-5xl mb-4 text-gray-300">🔒</div>
-        <h3 className="text-lg font-medium text-gray-900">Authentication Required</h3>
-        <p className="mt-2 text-gray-500 mb-6">
-          Please log in to view your earnings.
-        </p>
-        <button
-          onClick={() => window.location.href = '/login'}
-          className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 shadow-md hover:shadow"
-        >
-          Go to Login
-        </button>
-      </div>
-    );
-  }
-  
-  // Calculate this month's revenue with safe defaults
-  const currentMonth = new Date().getMonth() + 1;
-  const currentYear = new Date().getFullYear();
-  const thisMonthData = monthlyEarnings?.find((item: any) => 
-    item._id?.month === currentMonth && item._id?.year === currentYear
-  );
-  
-  const thisMonthRevenue = thisMonthData?.earnings || 
-                          liveEarnings?.thisMonthRevenue || 
-                          balanceData?.thisMonthRevenue || 
-                          0;
-  
-  // Get real-time metrics with safe defaults
-  const realTimeMetrics = calculateRealTimeMetrics();
-  
-  // Get effective data (live earnings first, then balanceData)
-  const effectiveData = liveEarnings || balanceData || {};
-  
-  // Format currency helper with safe defaults
-  const formatCurrency = (amountInCents: number): string => {
-    return paymentsApi.formatCurrency(amountInCents || 0);
+
+  // ✅ GET TRANSACTION COLOR
+  const getTransactionColor = (type: string) => {
+    if (type === 'earning') return 'text-green-600';
+    if (type === 'withdrawal') return 'text-blue-600';
+    return 'text-gray-600';
   };
-  
+
+  // ✅ GET TRANSACTION SIGN
+  const getTransactionSign = (type: string) => {
+    if (type === 'earning') return '+';
+    if (type === 'withdrawal') return '-';
+    return '';
+  };
+
   return (
-    <div className="space-y-8">
-      {/* User-specific header */}
-      <div className="flex items-center justify-between bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-center">
-          <div className="relative">
-            <div className="w-3 h-3 bg-green-500 rounded-full animate-ping absolute"></div>
-            <div className="w-3 h-3 bg-green-600 rounded-full relative"></div>
-          </div>
-          <span className="ml-3 text-sm font-medium text-gray-700">
-            Your Earnings Dashboard • User: {currentUserId?.slice(-6)}...
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">
-            Updated {realTimeUpdate === 0 ? 'just now' : `${realTimeUpdate * 30} seconds ago`}
-          </span>
-          <button
-            onClick={handleManualRefresh}
-            className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-2"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Refresh
-          </button>
-        </div>
-      </div>
-      
-      {/* Stripe Status Card */}
-      <StripeStatusCard stripeStatus={stripeStatus} />
-      
-      {/* Withdraw Balance Component - With User-specific Data */}
-      <WithdrawBalance
-        stripeStatus={stripeStatus}
-        availableBalance={effectiveData?.availableBalance || 0}
-        pendingBalance={effectiveData?.pendingBalance || 0}
-        totalEarnings={effectiveData?.totalEarnings || 0}
-        thisMonthEarnings={thisMonthRevenue}
-        onWithdrawSuccess={handleWithdrawRequest}
-        formatCurrency={formatCurrency}
-        userId={currentUserId}
-      />
-      
-      {/* Earnings Overview - Updated with User-specific Data */}
-      <EarningsOverview
-        stripeStatus={stripeStatus}
-        orderStats={orderStats}
-        balanceData={effectiveData}
-        thisMonthRevenue={thisMonthRevenue}
-        realTimeMetrics={realTimeMetrics}
-        formatCurrency={formatCurrency}
-        userId={currentUserId}
-      />
-      
-      {/* Earnings Stats - Updated with User-specific Data */}
-      <EarningsStats
-        orderStats={orderStats}
-        stripeStatus={stripeStatus}
-        monthlyEarnings={monthlyEarnings}
-        realTimeMetrics={realTimeMetrics}
-        formatCurrency={formatCurrency}
-        userId={currentUserId}
-      />
-      
-      {/* User-specific Earnings Dashboard */}
+    <div className="space-y-6">
+      {/* Earnings Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Available Balance */}
-        <div className="bg-white border border-green-200 rounded-xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <span className="text-green-600 text-xl">💰</span>
-            </div>
-            <div className="text-xs font-medium text-gray-500">
-              Your Balance
-            </div>
-          </div>
-          <p className="text-sm text-gray-500 mb-1">Available Balance</p>
-          <p className="text-2xl font-bold text-gray-900">
-            {formatCurrency(effectiveData?.availableBalance || 0)}
-          </p>
-          <p className="text-xs text-gray-500 mt-2">Ready for withdrawal</p>
-        </div>
-        
-        {/* Pending Balance */}
-        <div className="bg-white border border-yellow-200 rounded-xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <span className="text-yellow-600 text-xl">⏳</span>
-            </div>
-          </div>
-          <p className="text-sm text-gray-500 mb-1">Pending Balance</p>
-          <p className="text-2xl font-bold text-gray-900">
-            {formatCurrency(effectiveData?.pendingBalance || 0)}
-          </p>
-          <p className="text-xs text-gray-500 mt-2">From your active orders</p>
-        </div>
-        
-        {/* This Month - LINE 826 SHOULD BE HERE */}
-        <div className="bg-white border border-blue-200 rounded-xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <span className="text-blue-600 text-xl">📈</span>
-            </div>
-            <div className={`text-sm font-medium px-2 py-1 rounded ${
-              realTimeMetrics?.monthOverMonthGrowth > 0 
-                ? 'text-green-600 bg-green-50' 
-                : 'text-red-600 bg-red-50'
-            }`}>
-              {realTimeMetrics?.monthOverMonthGrowth > 0 ? '↑' : '↓'} 
-              {/* FIXED LINE 826: Added optional chaining and default value */}
-              {Math.abs(realTimeMetrics?.monthOverMonthGrowth || 0).toFixed(1)}%
-            </div>
-          </div>
-          <p className="text-sm text-gray-500 mb-1">Your Earnings This Month</p>
-          <p className="text-2xl font-bold text-gray-900">
-            {formatCurrency(thisMonthRevenue)}
-          </p>
-          <p className="text-xs text-gray-500 mt-2">Your month-over-month growth</p>
-        </div>
-        
-        {/* Total Withdrawn */}
-        <div className="bg-white border border-purple-200 rounded-xl p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <span className="text-purple-600 text-xl">💳</span>
-            </div>
-          </div>
-          <p className="text-sm text-gray-500 mb-1">Your Total Withdrawn</p>
-          <p className="text-2xl font-bold text-gray-900">
-            {formatCurrency(realTimeMetrics?.totalWithdrawn || 0)}
-          </p>
-          <p className="text-xs text-gray-500 mt-2">Paid to your account</p>
-        </div>
-      </div>
-      
-      {/* Recent Transactions Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Recent Earnings */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-green-50 to-emerald-100 border border-green-200 rounded-2xl p-6">
+          <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Your Recent Earnings</h3>
-              <p className="text-sm text-gray-500 mt-1">Your latest income transactions</p>
+              <p className="text-sm font-medium text-green-800">Available Balance</p>
+              <p className="text-3xl font-bold text-green-900 mt-2">
+                {formatCurrency(earningsBalance?.availableBalance || 0)}
+              </p>
+              <p className="text-sm text-green-700 mt-2">
+                Ready to withdraw
+              </p>
             </div>
-            <button
-              onClick={fetchEarningsHistory}
-              className="text-sm text-blue-600 hover:text-blue-800"
-            >
-              Refresh
-            </button>
-          </div>
-          <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
-            {earningsHistory && earningsHistory.length > 0 ? (
-              earningsHistory.map((transaction, index) => (
-                <div key={index} className="p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className={`p-2 rounded-lg ${
-                        transaction.type === 'earning' ? 'bg-green-100 text-green-600' :
-                        transaction.type === 'withdrawal' ? 'bg-blue-100 text-blue-600' :
-                        'bg-red-100 text-red-600'
-                      }`}>
-                        {transaction.type === 'earning' ? '💰' :
-                         transaction.type === 'withdrawal' ? '💳' : '🔄'}
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {transaction.description || 'Earnings Transaction'}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {new Date(transaction.date || transaction.createdAt).toLocaleDateString()} • 
-                          {transaction.status === 'completed' ? '✅ Completed' :
-                           transaction.status === 'pending' ? '⏳ Pending' : '❌ Failed'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className={`text-right ${
-                      transaction.type === 'earning' ? 'text-green-600' :
-                      transaction.type === 'withdrawal' ? 'text-blue-600' : 'text-red-600'
-                    }`}>
-                      <p className="font-medium">
-                        {transaction.type === 'earning' ? '+' : '-'}{formatCurrency(transaction.amount || 0)}
-                      </p>
-                      {transaction.balanceAfter && (
-                        <p className="text-sm text-gray-500">
-                          Balance: {formatCurrency(transaction.balanceAfter)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="p-8 text-center text-gray-500">
-                <div className="text-3xl mb-2">📊</div>
-                <p>No earnings transactions yet</p>
-                <p className="text-sm mt-1">Complete orders to see your earnings here</p>
-                <button
-                  onClick={fetchEarningsHistory}
-                  className="mt-4 px-4 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200"
-                >
-                  Load Transactions
-                </button>
-              </div>
-            )}
-          </div>
-          <div className="p-4 border-t border-gray-200 text-center">
-            <button
-              onClick={fetchEarningsHistory}
-              className="text-blue-600 hover:text-blue-800 text-sm font-medium hover:underline"
-            >
-              Load more transactions →
-            </button>
+            <div className="text-4xl text-green-600">💰</div>
           </div>
         </div>
-        
-        {/* Recent Withdrawals */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+
+        <div className="bg-gradient-to-r from-blue-50 to-cyan-100 border border-blue-200 rounded-2xl p-6">
+          <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Your Recent Withdrawals</h3>
-              <p className="text-sm text-gray-500 mt-1">Your withdrawal requests</p>
+              <p className="text-sm font-medium text-blue-800">Pending Balance</p>
+              <p className="text-3xl font-bold text-blue-900 mt-2">
+                {formatCurrency(earningsBalance?.pendingBalance || 0)}
+              </p>
+              <p className="text-sm text-blue-700 mt-2">
+                From active orders
+              </p>
             </div>
-            <button
-              onClick={fetchWithdrawals}
-              className="text-sm text-blue-600 hover:text-blue-800"
-            >
-              Refresh
-            </button>
+            <div className="text-4xl text-blue-600">⏳</div>
           </div>
-          <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
-            {withdrawals.length > 0 ? (
-              withdrawals.map((withdrawal, index) => (
-                <div key={index} className="p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className={`p-2 rounded-lg ${
-                        withdrawal.status === 'completed' ? 'bg-green-100 text-green-600' :
-                        withdrawal.status === 'pending' ? 'bg-yellow-100 text-yellow-600' :
-                        'bg-red-100 text-red-600'
-                      }`}>
-                        {withdrawal.status === 'completed' ? '✅' :
-                         withdrawal.status === 'pending' ? '⏳' : '❌'}
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {withdrawal.description || 'Withdrawal Request'}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {new Date(withdrawal.createdAt || withdrawal.date).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    <div className={`text-right ${
-                      withdrawal.status === 'completed' ? 'text-green-600' :
-                      withdrawal.status === 'pending' ? 'text-yellow-600' : 'text-red-600'
-                    }`}>
-                      <p className="font-medium">
-                        -{formatCurrency(withdrawal.amount || 0)}
-                      </p>
-                      <p className="text-sm text-gray-500 capitalize">
-                        {withdrawal.status}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="p-8 text-center text-gray-500">
-                <div className="text-3xl mb-2">💳</div>
-                <p>No withdrawals yet</p>
-                <p className="text-sm mt-1">Withdraw your earnings when you're ready</p>
-                <button
-                  onClick={fetchWithdrawals}
-                  className="mt-4 px-4 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200"
-                >
-                  Load Withdrawals
-                </button>
-              </div>
-            )}
+        </div>
+
+        <div className="bg-gradient-to-r from-purple-50 to-violet-100 border border-purple-200 rounded-2xl p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-purple-800">Total Earnings</p>
+              <p className="text-3xl font-bold text-purple-900 mt-2">
+                {formatCurrency(earningsBalance?.totalEarnings || orderStats.totalRevenue * 100 || 0)}
+              </p>
+              <p className="text-sm text-purple-700 mt-2">
+                All-time earnings
+              </p>
+            </div>
+            <div className="text-4xl text-purple-600">📈</div>
           </div>
-          <div className="p-4 border-t border-gray-200 text-center">
-            <button
-              onClick={onGoToWithdraw}
-              className="text-blue-600 hover:text-blue-800 text-sm font-medium hover:underline"
-            >
-              View all withdrawals →
-            </button>
+        </div>
+
+        <div className="bg-gradient-to-r from-amber-50 to-orange-100 border border-amber-200 rounded-2xl p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-amber-800">Monthly Growth</p>
+              <p className={`text-3xl font-bold ${growth.percent >= 0 ? 'text-green-900' : 'text-red-900'} mt-2`}>
+                {growth.percent >= 0 ? '+' : ''}{growth.percent}%
+              </p>
+              <p className="text-sm text-amber-700 mt-2">
+                vs last month
+              </p>
+            </div>
+            <div className="text-4xl text-amber-600">
+              {growth.percent >= 0 ? '📈' : '📉'}
+            </div>
           </div>
         </div>
       </div>
-      
-      {/* User Earnings Insights */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">💰 Your Earnings Insights</h3>
-          <span className="text-xs text-gray-500">User ID: {currentUserId?.slice(-8)}</span>
+
+      {/* Chart Section */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Earnings Overview</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Track your earnings performance over time
+            </p>
+          </div>
+          <div className="flex space-x-2 mt-2 md:mt-0">
+            <button
+              onClick={() => setActiveChart('monthly')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg ${
+                activeChart === 'monthly'
+                  ? 'bg-yellow-100 text-yellow-700 border border-yellow-200'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setActiveChart('detailed')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg ${
+                activeChart === 'detailed'
+                  ? 'bg-yellow-100 text-yellow-700 border border-yellow-200'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
+              }`}
+            >
+              Detailed
+            </button>
+          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Payout Schedule</h4>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Next Payout</span>
-                <span className="text-sm font-medium text-green-600">
-                  {effectiveData?.nextPayoutDate 
-                    ? new Date(effectiveData.nextPayoutDate).toLocaleDateString()
-                    : 'Not scheduled'}
-                </span>
+
+        {activeChart === 'monthly' ? (
+          <div className="space-y-4">
+            {/* Monthly Earnings Chart */}
+            <div className="h-64 flex items-end space-x-2 md:space-x-4">
+              {monthlyEarnings.map((monthData, index) => {
+                const maxEarnings = Math.max(...monthlyEarnings.map(m => m.earnings || 0));
+                const height = maxEarnings > 0 ? (monthData.earnings / maxEarnings) * 100 : 0;
+                
+                return (
+                  <div key={index} className="flex flex-col items-center flex-1">
+                    <div className="w-full max-w-20 mx-auto">
+                      <div 
+                        className="bg-gradient-to-t from-yellow-400 to-yellow-500 rounded-t-lg transition-all duration-300"
+                        style={{ height: `${Math.max(10, height)}%` }}
+                      />
+                    </div>
+                    <div className="mt-2 text-center">
+                      <p className="text-xs font-medium text-gray-700">
+                        {getMonthName(monthData._id.month)}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {formatCurrencyShort(monthData.earnings || 0)}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {monthData.orders || 0} orders
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Chart Legend */}
+            <div className="flex items-center justify-center space-x-6 pt-4 border-t border-gray-100">
+              <div className="flex items-center">
+                <div className="w-3 h-3 bg-gradient-to-t from-yellow-400 to-yellow-500 rounded mr-2"></div>
+                <span className="text-sm text-gray-600">Monthly Earnings</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Last Withdrawal</span>
-                <span className="text-sm text-gray-900">
-                  {effectiveData?.lastWithdrawal 
-                    ? new Date(effectiveData.lastWithdrawal).toLocaleDateString()
-                    : 'Never'}
-                </span>
+              <div className="flex items-center">
+                <div className="w-3 h-3 bg-gradient-to-t from-blue-400 to-blue-500 rounded mr-2"></div>
+                <span className="text-sm text-gray-600">Order Count</span>
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-3">
-              Funds are typically available 2-3 business days after withdrawal request.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Earnings Breakdown */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                <div className="flex items-center">
+                  <div className="bg-green-100 p-2 rounded-lg mr-3">
+                    <span className="text-green-600">💰</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-green-800">Completed Earnings</p>
+                    <p className="text-xl font-bold text-green-900 mt-1">
+                      {formatCurrency(earningsByType.completed)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <div className="flex items-center">
+                  <div className="bg-blue-100 p-2 rounded-lg mr-3">
+                    <span className="text-blue-600">⏳</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-blue-800">Pending Earnings</p>
+                    <p className="text-xl font-bold text-blue-900 mt-1">
+                      {formatCurrency(earningsByType.pending)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+                <div className="flex items-center">
+                  <div className="bg-purple-100 p-2 rounded-lg mr-3">
+                    <span className="text-purple-600">💸</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-purple-800">Total Withdrawn</p>
+                    <p className="text-xl font-bold text-purple-900 mt-1">
+                      {formatCurrency(earningsByType.withdrawn)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Withdrawal Section */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Withdrawal</h3>
+        
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Withdrawal Amount
+            </label>
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-gray-500 sm:text-sm">₹</span>
+                  </div>
+                  <input
+                    type="number"
+                    value={withdrawAmount}
+                    onChange={(e) => {
+                      setWithdrawAmount(e.target.value);
+                      setError('');
+                    }}
+                    placeholder="Enter amount"
+                    className="pl-10 pr-4 py-3 w-full border border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                    min="1"
+                    step="1"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={handleWithdraw}
+                disabled={!withdrawAmount || withdrawing || loading || (earningsBalance?.availableBalance || 0) < 500}
+                className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-xl hover:from-yellow-600 hover:to-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow"
+              >
+                {withdrawing ? (
+                  <div className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processing...
+                  </div>
+                ) : (
+                  'Withdraw'
+                )}
+              </button>
+            </div>
+            <p className="text-sm text-gray-500 mt-2">
+              Available: {formatCurrency(earningsBalance?.availableBalance || 0)} • Minimum: ₹500
             </p>
           </div>
           
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Your Performance</h4>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Avg Order Value</span>
-                <span className="font-medium text-gray-900">
-                  {formatCurrency(realTimeMetrics?.avgOrderValue || 0)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Completion Rate</span>
-                <span className="font-medium text-gray-900">
-                  {/* FIXED: Added optional chaining and default value */}
-                  {(realTimeMetrics?.completionRate || 0).toFixed(1)}%
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Month Growth</span>
-                <span className={`font-medium ${
-                  realTimeMetrics?.monthOverMonthGrowth && realTimeMetrics.monthOverMonthGrowth > 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {realTimeMetrics?.monthOverMonthGrowth && realTimeMetrics.monthOverMonthGrowth > 0 ? '+' : ''}
-                  {/* FIXED: Added optional chaining and default value */}
-                  {(realTimeMetrics?.monthOverMonthGrowth || 0).toFixed(1)}%
-                </span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Your Earnings (USD)</h4>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
-                  <span className="text-sm text-gray-700">Available</span>
-                </div>
-                <span className="font-medium text-gray-900">
-                  {formatCurrency(effectiveData?.availableBalance || 0)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
-                  <span className="text-sm text-gray-700">Pending</span>
-                </div>
-                <span className="font-medium text-gray-900">
-                  {formatCurrency(effectiveData?.pendingBalance || 0)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
-                  <span className="text-sm text-gray-700">Total</span>
-                </div>
-                <span className="font-medium text-gray-900">
-                  {formatCurrency(effectiveData?.totalEarnings || 0)}
-                </span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Your Net Earnings</h4>
-            <div className="text-center py-4">
-              <div className="text-3xl font-bold text-gray-900 mb-2">
-                {formatCurrency(realTimeMetrics?.netEarnings || 0)}
-              </div>
-              <p className="text-sm text-gray-600">After your withdrawals</p>
-              <div className="mt-4 text-xs text-gray-500">
-                <div className="flex justify-between mb-1">
-                  <span>Total Earned:</span>
-                  <span>{formatCurrency(effectiveData?.totalEarnings || 0)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>You Withdrew:</span>
-                  <span>-{formatCurrency(realTimeMetrics?.totalWithdrawn || 0)}</span>
-                </div>
-                <div className="border-t border-gray-200 mt-2 pt-2 flex justify-between font-medium">
-                  <span>Your Balance:</span>
-                  <span>{formatCurrency(realTimeMetrics?.netEarnings || 0)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Your Monthly Earnings Chart */}
-      <div className="bg-white border border-gray-200 rounded-xl p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Your Monthly Earnings Trend</h3>
-            <p className="text-sm text-gray-500 mt-1">Your last 6 months earnings</p>
-          </div>
-          <button
-            onClick={fetchMonthlyEarnings}
-            className="text-sm text-blue-600 hover:text-blue-800"
-          >
-            Refresh Chart
-          </button>
-        </div>
-        <div className="h-64 flex items-end space-x-2">
-          {monthlyEarnings.length > 0 ? (
-            monthlyEarnings.map((month, index) => {
-              const earnings = month.earnings || 0;
-              const maxEarnings = Math.max(...monthlyEarnings.map(m => m.earnings || 0));
-              const heightPercentage = maxEarnings > 0 ? (earnings / maxEarnings) * 100 : 0;
-              
-              return (
-                <div key={index} className="flex-1 flex flex-col items-center">
-                  <div 
-                    className="w-full bg-gradient-to-t from-blue-500 to-blue-600 rounded-t-lg"
-                    style={{ height: `${heightPercentage}%` }}
-                  ></div>
-                  <div className="mt-2 text-xs text-gray-500">
-                    {month._id?.month}/{month._id?.year?.toString().slice(-2) || 'N/A'}
-                  </div>
-                  <div className="mt-1 text-sm font-medium">
-                    {formatCurrency(earnings)}
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="w-full text-center py-12 text-gray-500">
-              <div className="text-3xl mb-2">📊</div>
-              <p>No monthly earnings data available</p>
+          {/* Quick Amount Buttons */}
+          <div className="flex flex-wrap gap-2">
+            {[500, 1000, 2500, 5000, 10000].map((amount) => (
               <button
-                onClick={fetchMonthlyEarnings}
-                className="mt-4 px-4 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200"
+                key={amount}
+                type="button"
+                onClick={() => setWithdrawAmount(amount.toString())}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 transition-colors duration-200"
               >
-                Load Your Monthly Data
+                ₹{amount.toLocaleString()}
               </button>
-            </div>
-          )}
+            ))}
+            <button
+              type="button"
+              onClick={() => setWithdrawAmount(((earningsBalance?.availableBalance || 0) / 100).toString())}
+              className="px-4 py-2 bg-yellow-100 hover:bg-yellow-200 border border-yellow-300 rounded-lg text-sm font-medium text-yellow-700 transition-colors duration-200"
+            >
+              Withdraw All
+            </button>
+          </div>
         </div>
       </div>
-      
-      {/* Quick Actions */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
-        <div className="text-sm text-gray-500">
-          <span className="flex items-center">
-            <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-            Your live data • User: {currentUserId?.slice(-6)}...
-          </span>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-4">
+
+      {/* Earnings History */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Recent Transactions</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Your earnings and withdrawal history
+            </p>
+          </div>
           <button
-            onClick={handleManualRefresh}
-            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition duration-200 flex items-center gap-2 justify-center"
+            onClick={() => Promise.all([onRefresh(), fetchDetailedEarnings()])}
+            disabled={loading || detailedLoading}
+            className="px-4 py-2 text-sm font-medium text-yellow-600 hover:text-yellow-700 disabled:opacity-50 flex items-center"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            Refresh Your Data
+            {loading || detailedLoading ? 'Refreshing...' : 'Refresh'}
           </button>
-          <button
-            onClick={onGoToWithdraw}
-            className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow text-center"
-          >
-            💳 Withdraw Your Earnings
-          </button>
+        </div>
+
+        {detailedLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading earnings history...</p>
+            </div>
+          </div>
+        ) : detailedEarnings?.earnings?.length > 0 ? (
+          <div className="space-y-4">
+            {detailedEarnings.earnings.slice(0, 10).map((transaction: any) => (
+              <div key={transaction._id} className="flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:bg-gray-50">
+                <div className="flex items-center flex-1">
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-xl">
+                      {getTransactionIcon(transaction.type, transaction.status)}
+                    </div>
+                  </div>
+                  <div className="ml-4 flex-1">
+                    <p className="font-medium text-gray-900">{transaction.description}</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {formatDate(transaction.date)}
+                      {transaction.balanceAfter && (
+                        <span className="ml-2">
+                          • Balance: {formatCurrency(transaction.balanceAfter)}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <div className={`text-lg font-semibold ${getTransactionColor(transaction.type)}`}>
+                  {getTransactionSign(transaction.type)}{formatCurrency(transaction.amount)}
+                </div>
+              </div>
+            ))}
+            
+            {detailedEarnings.pagination?.total > 10 && (
+              <div className="text-center pt-4">
+                <button className="text-sm text-yellow-600 hover:text-yellow-700 font-medium">
+                  View All Transactions ({detailedEarnings.pagination.total})
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <div className="text-5xl mb-4 text-gray-300">💰</div>
+            <h3 className="text-lg font-medium text-gray-900">No Transactions Yet</h3>
+            <p className="mt-2 text-gray-500 mb-6">
+              Complete orders to start earning!
+            </p>
+            <button
+              onClick={onRefresh}
+              className="px-6 py-2 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200"
+            >
+              Check for New Earnings
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Earnings Summary */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Earnings Summary</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h4 className="text-sm font-medium text-gray-700 mb-3">Payout Schedule</h4>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Next Payout Date</span>
+                <span className="font-medium text-gray-900">
+                  {earningsBalance?.nextPayoutDate 
+                    ? new Date(earningsBalance.nextPayoutDate).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric'
+                      })
+                    : 'Not available'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Payout Frequency</span>
+                <span className="font-medium text-gray-900">Weekly</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Processing Time</span>
+                <span className="font-medium text-gray-900">2-3 business days</span>
+              </div>
+            </div>
+          </div>
+          
+          <div>
+            <h4 className="text-sm font-medium text-gray-700 mb-3">Platform Fees</h4>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Service Fee</span>
+                <span className="font-medium text-gray-900">10% per order</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Withdrawal Fee</span>
+                <span className="font-medium text-gray-900">Free</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Payment Processing</span>
+                <span className="font-medium text-gray-900">2.9% + ₹3</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
