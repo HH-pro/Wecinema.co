@@ -65,9 +65,9 @@ const WithdrawBalance: React.FC<WithdrawBalanceProps> = ({
       const response = await paymentsApi.getWithdrawalHistory({ limit: 1 });
       
       if (response.success && response.data?.balance) {
-        const { availableBalance, pendingBalance } = response.data.balance;
+        const { availableBalance, pendingBalance: apiPendingBalance } = response.data.balance;
         const newAvailableBalance = availableBalance || propAvailableBalance || 0;
-        const newPendingBalance = pendingBalance || propPendingBalance || 0;
+        const newPendingBalance = apiPendingBalance || propPendingBalance || 0;
         
         // Only update state if values actually changed
         if (newAvailableBalance !== liveAvailableBalance) {
@@ -305,7 +305,7 @@ const WithdrawBalance: React.FC<WithdrawBalanceProps> = ({
           <p className="text-sm text-gray-500">
             Complete orders to start earning. Pending balance becomes available after order completion.
           </p>
-          {/* FIXED LINE 201: Changed pendingBalance to livePendingBalance */}
+          {/* FIXED: This was line 201 - using livePendingBalance instead of pendingBalance */}
           {livePendingBalance > 0 && (
             <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-sm font-medium text-yellow-800">
