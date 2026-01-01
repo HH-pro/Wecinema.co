@@ -1,4 +1,3 @@
-// src/components/marketplae/seller/WithdrawTab.tsx - UPDATED VERSION
 import React, { useState, useEffect } from 'react';
 import marketplaceApi from '../../../api/marketplaceApi';
 
@@ -12,9 +11,6 @@ interface WithdrawTabProps {
   onWithdrawRequest: (amountInDollars: number) => Promise<void>;
   onRefresh: () => Promise<void>;
   formatCurrency?: (amountInCents: number) => string;
-  validateWithdrawalAmount?: (amountInCents: number, availableBalance: number, minWithdrawal?: number) => any;
-  dollarsToCents?: (dollars: number) => number;
-  centsToDollars?: (cents: number) => number;
 }
 
 const WithdrawTab: React.FC<WithdrawTabProps> = ({
@@ -26,27 +22,96 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
   onPageChange,
   onWithdrawRequest,
   onRefresh,
-  formatCurrency = marketplaceApi.formatCurrency,
-  validateWithdrawalAmount = marketplaceApi.validateWithdrawalAmount,
-  dollarsToCents = marketplaceApi.dollarsToCents,
-  centsToDollars = marketplaceApi.centsToDollars
+  formatCurrency = marketplaceApi.formatCurrency
 }) => {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [availableBalance, setAvailableBalance] = useState(0);
   const [withdrawalStats, setWithdrawalStats] = useState<any>(null);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [selectedMethod, setSelectedMethod] = useState('stripe');
+
+  // Helper functions
+  const dollarsToCents = (dollars: number): number => {
+    return Math.round(dollars * 100);
+  };
+
+  const centsToDollars = (cents: number): number => {
+    return cents / 100;
+  };
+
+  const validateWithdrawalAmount = (amountInCents: number, availableBalance: number): { valid: boolean; error?: string } => {
+    const minWithdrawal = 500; // $5.00 minimum
+    
+    if (amountInCents < minWithdrawal) {
+      return { valid: false, error: `Minimum withdrawal amount is ${formatCurrency(minWithdrawal)}` };
+    }
+    
+    if (amountInCents > availableBalance) {
+      return { valid: false, error: 'Insufficient balance' };
+    }
+    
+    return { valid: true };
+  };
 
   // ✅ FETCH WITHDRAWAL STATS FROM MARKETPLACE API
   const fetchWithdrawalStats = async () => {
     try {
       setStatsLoading(true);
-      const response = await marketplaceApi.payments.getWithdrawalStats();
       
-      if (response.success && response.data) {
-        setWithdrawalStats(response.data);
+      // Try multiple endpoints for withdrawal stats
+      try {
+        // First try earnings API
+        const earningsResponse = await marketplaceApi.earnings.getEarningsDashboard();
+        if (earningsResponse.success && earningsResponse.data) {
+          const data = earningsResponse.data;
+          setWithdrawalStats({
+            totalWithdrawn: data.totalWithdrawn || 0,
+            availableBalance: data.availableBalance || 0,
+            pendingBalance: data.pendingBalance || 0
+          });
+          return;
+        }
+      } catch (error) {
+        console.log('Earnings dashboard failed, trying other endpoints...');
       }
+      
+      // Try withdrawal history endpoint
+      try {
+        const withdrawalResponse = await marketplaceApi.earnings.getWithdrawalHistory({ status: '' });
+        if (withdrawalResponse.success) {
+          let withdrawals: any[] = [];
+          
+          if (Array.isArray(withdrawalResponse.data)) {
+            withdrawals = withdrawalResponse.data;
+          } else if (withdrawalResponse.data && Array.isArray(withdrawalResponse.data.withdrawals)) {
+            withdrawals = withdrawalResponse.data.withdrawals;
+          } else if (withdrawalResponse.data && withdrawalResponse.data.history) {
+            withdrawals = withdrawalResponse.data.history;
+          }
+          
+          // Calculate stats
+          const totalWithdrawn = withdrawals
+            .filter((w: any) => w.status === 'completed')
+            .reduce((sum: number, w: any) => sum + (w.amount || 0), 0);
+          
+          const pendingWithdrawals = withdrawals.filter((w: any) => 
+            w.status === 'pending' || w.status === 'processing'
+          ).length;
+          
+          setWithdrawalStats({
+            totalWithdrawn,
+            pendingWithdrawals,
+            lastWithdrawal: withdrawals.length > 0 ? withdrawals[0] : null
+          });
+        }
+      } catch (error) {
+        console.log('Withdrawal history endpoint failed');
+      }
+      
     } catch (error) {
       console.error('Error fetching withdrawal stats:', error);
     } finally {
@@ -54,19 +119,68 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
     }
   };
 
+  // ✅ FETCH PAYMENT METHODS
+  const fetchPaymentMethods = async () => {
+    try {
+      // Check Stripe status first
+      const stripeStatusResponse = await marketplaceApi.stripe.getStripeStatus();
+      if (stripeStatusResponse.success && stripeStatusResponse.data) {
+        const methods = [];
+        
+        // Add Stripe if connected
+        if (stripeStatusResponse.data.chargesEnabled) {
+          methods.push({
+            id: 'stripe',
+            name: 'Stripe Balance',
+            description: 'Transfer to your Stripe account',
+            icon: '💳',
+            available: true
+          });
+        }
+        
+        // Add bank transfer option
+        methods.push({
+          id: 'bank_transfer',
+          name: 'Bank Transfer',
+          description: 'Direct bank transfer',
+          icon: '🏦',
+          available: true
+        });
+        
+        setPaymentMethods(methods);
+      }
+    } catch (error) {
+      console.error('Error fetching payment methods:', error);
+    }
+  };
+
   useEffect(() => {
-    // Calculate available balance from payments API data
-    const balance = 
-      earningsBalance?.availableBalance || 
-      stripeStatus?.availableBalance || 
-      withdrawalHistory?.balance?.availableBalance || 
-      0;
+    // Calculate available balance from multiple sources
+    let balance = 0;
+    
+    // Check earnings balance first
+    if (earningsBalance?.availableBalance) {
+      balance = earningsBalance.availableBalance;
+    } 
+    // Check stripe status
+    else if (stripeStatus?.balance?.available) {
+      balance = stripeStatus.balance.available;
+    }
+    // Check withdrawal history balance
+    else if (withdrawalHistory?.balance?.availableBalance) {
+      balance = withdrawalHistory.balance.availableBalance;
+    }
+    // Use withdrawal stats if available
+    else if (withdrawalStats?.availableBalance) {
+      balance = withdrawalStats.availableBalance;
+    }
     
     setAvailableBalance(balance);
     
-    // Fetch withdrawal stats
+    // Fetch withdrawal stats and payment methods
     fetchWithdrawalStats();
-  }, [earningsBalance, stripeStatus, withdrawalHistory]);
+    fetchPaymentMethods();
+  }, [earningsBalance, stripeStatus, withdrawalHistory, withdrawalStats]);
 
   const handleWithdraw = async () => {
     if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) {
@@ -77,7 +191,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
     const amountInDollars = parseFloat(withdrawAmount);
     const amountInCents = dollarsToCents(amountInDollars);
     
-    // ✅ USE MARKETPLACE API VALIDATION
+    // Validate withdrawal amount
     const validation = validateWithdrawalAmount(amountInCents, availableBalance);
     
     if (!validation.valid) {
@@ -89,10 +203,36 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
     setWithdrawing(true);
     
     try {
-      await onWithdrawRequest(amountInDollars);
-      setWithdrawAmount('');
-      await onRefresh(); // Refresh data
-      await fetchWithdrawalStats(); // Refresh stats
+      // Process withdrawal through marketplace API
+      const response = await marketplaceApi.earnings.processPayout(
+        amountInCents,
+        selectedMethod,
+        {
+          note: 'Withdrawal request from seller dashboard',
+          timestamp: new Date().toISOString()
+        }
+      );
+      
+      if (response.success) {
+        setSuccessMessage(`Successfully requested withdrawal of ${formatCurrency(amountInCents)}`);
+        setWithdrawAmount('');
+        
+        // Call parent handler
+        await onWithdrawRequest(amountInDollars);
+        
+        // Refresh all data
+        await Promise.all([
+          onRefresh(),
+          fetchWithdrawalStats()
+        ]);
+        
+        // Clear success message after 5 seconds
+        setTimeout(() => {
+          setSuccessMessage('');
+        }, 5000);
+      } else {
+        setError(response.error || 'Failed to process withdrawal');
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to process withdrawal');
     } finally {
@@ -102,32 +242,35 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
 
   // ✅ QUICK WITHDRAWAL AMOUNT BUTTONS (USD)
   const quickAmounts = [
-    { label: '$5', value: 5 },
     { label: '$10', value: 10 },
     { label: '$25', value: 25 },
     { label: '$50', value: 50 },
     { label: '$100', value: 100 },
+    { label: '$250', value: 250 },
     { label: 'All', value: centsToDollars(availableBalance) }
   ];
 
   const handleQuickAmount = (amount: number) => {
-    setWithdrawAmount(amount.toString());
+    // Cap at available balance
+    const cappedAmount = Math.min(amount, centsToDollars(availableBalance));
+    setWithdrawAmount(cappedAmount.toFixed(2));
     setError('');
   };
 
   // ✅ GET STATUS BADGE STYLE
   const getStatusBadgeStyle = (status: string) => {
-    switch (status.toLowerCase()) {
+    switch (status?.toLowerCase()) {
       case 'completed':
+      case 'paid':
+      case 'success':
         return 'bg-green-100 text-green-800 border-green-200';
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'processing':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'failed':
-        return 'bg-red-100 text-red-800 border-red-200';
+      case 'rejected':
       case 'cancelled':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-red-100 text-red-800 border-red-200';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200';
     }
@@ -135,28 +278,33 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
 
   // ✅ FORMAT DATE FOR DISPLAY
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+    } catch (error) {
+      return 'Invalid date';
+    }
   };
 
   // ✅ CALCULATE TOTAL WITHDRAWN
   const calculateTotalWithdrawn = () => {
+    // Try multiple sources
     if (earningsBalance?.totalWithdrawn) {
       return earningsBalance.totalWithdrawn;
     }
     
-    if (withdrawalHistory?.balance?.totalWithdrawn) {
-      return withdrawalHistory.balance.totalWithdrawn;
+    if (withdrawalStats?.totalWithdrawn) {
+      return withdrawalStats.totalWithdrawn;
     }
     
     if (withdrawalHistory?.withdrawals && withdrawalHistory.withdrawals.length > 0) {
       return withdrawalHistory.withdrawals
-        .filter((w: any) => w.status === 'completed')
-        .reduce((sum: number, w: any) => sum + w.amount, 0);
+        .filter((w: any) => w.status === 'completed' || w.status === 'paid')
+        .reduce((sum: number, w: any) => sum + (w.amount || 0), 0);
     }
     
     return 0;
@@ -164,8 +312,57 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
 
   const totalWithdrawn = calculateTotalWithdrawn();
 
+  // ✅ GET WITHDRAWALS FROM HISTORY
+  const getWithdrawalsList = () => {
+    if (!withdrawalHistory) return [];
+    
+    if (Array.isArray(withdrawalHistory)) {
+      return withdrawalHistory;
+    }
+    
+    if (withdrawalHistory.withdrawals && Array.isArray(withdrawalHistory.withdrawals)) {
+      return withdrawalHistory.withdrawals;
+    }
+    
+    if (withdrawalHistory.history && Array.isArray(withdrawalHistory.history)) {
+      return withdrawalHistory.history;
+    }
+    
+    if (withdrawalHistory.data && Array.isArray(withdrawalHistory.data)) {
+      return withdrawalHistory.data;
+    }
+    
+    return [];
+  };
+
+  const withdrawalsList = getWithdrawalsList();
+
   return (
     <div className="space-y-6">
+      {/* Success Message */}
+      {successMessage && (
+        <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
+          <div className="flex items-center">
+            <svg className="w-5 h-5 text-green-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-sm text-green-800">{successMessage}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+          <div className="flex items-center">
+            <svg className="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        </div>
+      )}
+
       {/* Balance Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Available to Withdraw Card */}
@@ -232,23 +429,25 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
               <p className="text-sm font-medium text-gray-600">Pending Withdrawals</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
                 {withdrawalStats.pendingWithdrawals || 
-                  (withdrawalHistory?.withdrawals?.filter((w: any) => w.status === 'pending').length || 0)}
+                  withdrawalsList.filter((w: any) => 
+                    w.status === 'pending' || w.status === 'processing'
+                  ).length}
               </p>
             </div>
             <div className="bg-gray-50 rounded-xl p-4">
               <p className="text-sm font-medium text-gray-600">Completed</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
-                {withdrawalStats.statsByStatus?.find((s: any) => s._id === 'completed')?.count || 
-                  (withdrawalHistory?.withdrawals?.filter((w: any) => w.status === 'completed').length || 0)}
+                {withdrawalStats.completedWithdrawals ||
+                  withdrawalsList.filter((w: any) => 
+                    w.status === 'completed' || w.status === 'paid'
+                  ).length}
               </p>
             </div>
             <div className="bg-gray-50 rounded-xl p-4">
               <p className="text-sm font-medium text-gray-600">Last Withdrawal</p>
               <p className="text-lg font-bold text-gray-900 mt-1">
-                {withdrawalStats.lastWithdrawal 
-                  ? formatCurrency(withdrawalStats.lastWithdrawal.amount)
-                  : withdrawalHistory?.withdrawals?.length > 0
-                  ? formatCurrency(withdrawalHistory.withdrawals[0].amount)
+                {withdrawalsList.length > 0
+                  ? formatCurrency(withdrawalsList[0].amount || 0)
                   : 'None'}
               </p>
             </div>
@@ -262,11 +461,14 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
           <div>
             <h3 className="text-lg font-semibold text-gray-900">Request Withdrawal</h3>
             <p className="text-sm text-gray-600 mt-1">
-              Transfer funds to your bank account
+              Transfer funds to your preferred payment method
             </p>
           </div>
           <button
-            onClick={onRefresh}
+            onClick={async () => {
+              await onRefresh();
+              await fetchWithdrawalStats();
+            }}
             disabled={loading || statsLoading}
             className="mt-2 md:mt-0 px-4 py-2 text-sm font-medium text-yellow-600 hover:text-yellow-700 disabled:opacity-50 flex items-center"
           >
@@ -277,18 +479,38 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
           </button>
         </div>
         
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
-            <div className="flex items-center">
-              <svg className="w-5 h-5 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          </div>
-        )}
-
         <div className="space-y-6">
+          {/* Payment Method Selection */}
+          {paymentMethods.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Payment Method
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {paymentMethods.map((method) => (
+                  <button
+                    key={method.id}
+                    type="button"
+                    onClick={() => setSelectedMethod(method.id)}
+                    className={`p-4 border rounded-xl text-left transition-colors duration-200 ${
+                      selectedMethod === method.id
+                        ? 'border-yellow-500 bg-yellow-50'
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    <div className="flex items-center">
+                      <span className="text-2xl mr-3">{method.icon}</span>
+                      <div>
+                        <p className="font-medium text-gray-900">{method.name}</p>
+                        <p className="text-sm text-gray-600">{method.description}</p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Quick Amount Buttons */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -301,6 +523,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                   type="button"
                   onClick={() => handleQuickAmount(item.value)}
                   className="px-4 py-3 bg-gray-50 hover:bg-gray-100 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 transition-colors duration-200"
+                  disabled={availableBalance < dollarsToCents(item.value)}
                 >
                   {item.label}
                 </button>
@@ -321,20 +544,25 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                 type="number"
                 value={withdrawAmount}
                 onChange={(e) => {
-                  setWithdrawAmount(e.target.value);
-                  setError('');
+                  const value = e.target.value;
+                  if (parseFloat(value) <= centsToDollars(availableBalance)) {
+                    setWithdrawAmount(value);
+                    setError('');
+                  }
                 }}
                 placeholder="Enter amount"
                 className="pl-10 pr-4 py-3 w-full border border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                min="1"
+                min="0.01"
                 step="0.01"
+                max={centsToDollars(availableBalance)}
               />
               <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                <span className="text-gray-500 sm:text-sm">.00</span>
+                <span className="text-gray-500 sm:text-sm">USD</span>
               </div>
             </div>
             <p className="text-sm text-gray-500 mt-2">
-              Available balance: <span className="font-semibold">{formatCurrency(availableBalance)}</span> • Minimum: $5.00
+              Available: <span className="font-semibold">{formatCurrency(availableBalance)}</span> • 
+              Minimum: <span className="font-semibold">$5.00</span>
             </p>
           </div>
 
@@ -354,7 +582,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                   Processing Withdrawal...
                 </>
               ) : (
-                'Withdraw Funds'
+                `Withdraw ${withdrawAmount ? `$${withdrawAmount}` : 'Funds'}`
               )}
             </button>
           </div>
@@ -368,10 +596,10 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
               <div>
                 <h4 className="text-sm font-medium text-blue-800">Withdrawal Information</h4>
                 <ul className="mt-2 text-sm text-blue-700 space-y-1">
-                  <li>• Withdrawals are processed within 2-3 business days</li>
+                  <li>• Withdrawals are processed within 1-3 business days</li>
                   <li>• Minimum withdrawal amount is $5.00</li>
                   <li>• No withdrawal fees for sellers</li>
-                  <li>• Funds are transferred to your connected bank account</li>
+                  <li>• Funds are transferred to your selected payment method</li>
                 </ul>
               </div>
             </div>
@@ -390,7 +618,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
           </div>
           <div className="flex items-center space-x-2">
             <span className="text-sm text-gray-600">
-              Page {currentPage} of {withdrawalHistory?.pagination?.pages || 1}
+              Showing {withdrawalsList.length} withdrawals
             </span>
             <div className="flex space-x-1">
               <button
@@ -402,7 +630,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
               </button>
               <button
                 onClick={() => onPageChange(currentPage + 1)}
-                disabled={currentPage >= (withdrawalHistory?.pagination?.pages || 1) || loading}
+                disabled={loading}
                 className="px-3 py-1 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
                 Next
@@ -418,7 +646,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
               <p className="text-gray-600">Loading withdrawal history...</p>
             </div>
           </div>
-        ) : withdrawalHistory?.withdrawals?.length > 0 ? (
+        ) : withdrawalsList.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead>
@@ -426,16 +654,16 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Destination</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {withdrawalHistory.withdrawals.map((withdrawal: any) => (
-                  <tr key={withdrawal._id} className="hover:bg-gray-50">
+                {withdrawalsList.map((withdrawal: any) => (
+                  <tr key={withdrawal._id || withdrawal.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{formatDate(withdrawal.createdAt)}</div>
+                      <div className="text-sm text-gray-900">{formatDate(withdrawal.createdAt || withdrawal.date)}</div>
                       {withdrawal.estimatedArrival && (
                         <div className="text-xs text-gray-500">
                           Est: {formatDate(withdrawal.estimatedArrival)}
@@ -449,18 +677,13 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${getStatusBadgeStyle(withdrawal.status)}`}>
-                        {withdrawal.status}
+                        {withdrawal.status || 'pending'}
                       </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {withdrawal.destination || 'Bank Account'}
+                        {withdrawal.paymentMethod || 'Stripe'}
                       </div>
-                      {withdrawal.stripePayoutId && (
-                        <div className="text-xs text-gray-500">
-                          ID: {withdrawal.stripePayoutId.slice(-8)}
-                        </div>
-                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-sm text-gray-900">
@@ -473,26 +696,11 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                       )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      {withdrawal.status === 'pending' && (
-                        <button
-                          onClick={async () => {
-                            if (window.confirm('Are you sure you want to cancel this withdrawal?')) {
-                              try {
-                                const response = await marketplaceApi.withdrawals.cancelWithdrawal(withdrawal._id);
-                                if (response.success) {
-                                  alert('Withdrawal cancelled successfully!');
-                                  await onRefresh();
-                                }
-                              } catch (error) {
-                                alert('Failed to cancel withdrawal');
-                              }
-                            }
-                          }}
-                          className="text-sm text-red-600 hover:text-red-800 font-medium"
-                        >
-                          Cancel
-                        </button>
-                      )}
+                      <div className="text-sm text-gray-500">
+                        {withdrawal.referenceId || withdrawal.stripePayoutId ? 
+                          `ID: ${(withdrawal.referenceId || withdrawal.stripePayoutId).slice(-8)}` : 
+                          '—'}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -506,6 +714,12 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
             <p className="mt-2 text-gray-500 mb-6">
               You haven't made any withdrawal requests yet.
             </p>
+            <button
+              onClick={() => handleQuickAmount(10)}
+              className="px-6 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
+            >
+              Make Your First Withdrawal
+            </button>
           </div>
         )}
       </div>
