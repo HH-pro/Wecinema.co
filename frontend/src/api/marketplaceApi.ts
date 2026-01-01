@@ -53,27 +53,12 @@ const handleApiError = (error, defaultMessage = 'API Error') => {
     data: errorData
   };
 };
-
 // ============================================
-// ✅ AMOUNT CONVERSION FUNCTIONS
-// ============================================
-
-// Convert dollars to cents (e.g., $15.00 → 1500)
-export const dollarsToCents = (dollars) => {
-  return Math.round(parseFloat(dollars || 0) * 100);
-};
-
-// Convert cents to dollars (e.g., 1500 → $15.00)
-export const centsToDollars = (cents) => {
-  return parseFloat(cents || 0) / 100;
-};
-
-// ============================================
-// ✅ CURRENCY FORMATTING FUNCTIONS (DOLLAR ONLY)
+// ✅ CURRENCY FORMATTING FUNCTIONS (UPDATED FOR DOLLAR)
 // ============================================
 
-export const formatCurrency = (amountInCents) => {
-  const amountInDollars = centsToDollars(amountInCents);
+export const formatCurrency = (amount) => {
+  const amountInDollars = (amount || 0) / 100;
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -82,16 +67,16 @@ export const formatCurrency = (amountInCents) => {
   }).format(amountInDollars);
 };
 
-export const formatCurrencyAmount = (amountInCents) => {
-  const amountInDollars = centsToDollars(amountInCents);
+export const formatCurrencyAmount = (amount) => {
+  const amountInDollars = (amount || 0) / 100;
   return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(amountInDollars);
 };
 
-export const formatCurrencyShort = (amountInCents) => {
-  const amountInDollars = centsToDollars(amountInCents);
+export const formatCurrencyShort = (amount) => {
+  const amountInDollars = (amount || 0) / 100;
   if (amountInDollars >= 1000000) {
     return `$${(amountInDollars / 1000000).toFixed(1)}M`;
   } else if (amountInDollars >= 1000) {
@@ -101,20 +86,20 @@ export const formatCurrencyShort = (amountInCents) => {
 };
 
 // Dollar format (USD always)
-export const formatCurrencyWithSymbol = (amountInCents) => {
-  const amountInDollars = centsToDollars(amountInCents);
+export const formatCurrencyWithSymbol = (amount) => {
+  const amountInDollars = (amount || 0) / 100;
   return `$${amountInDollars.toFixed(2)}`;
 };
 
 // Simple amount display without symbol
-export const formatAmount = (amountInCents) => {
-  const amountInDollars = centsToDollars(amountInCents);
+export const formatAmount = (amount) => {
+  const amountInDollars = (amount || 0) / 100;
   return amountInDollars.toFixed(2);
 };
 
 // Alternative: Direct dollar formatting
-export const formatUSD = (amountInCents) => {
-  const amountInDollars = centsToDollars(amountInCents);
+export const formatUSD = (amount) => {
+  const amountInDollars = (amount || 0) / 100;
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -122,155 +107,36 @@ export const formatUSD = (amountInCents) => {
     maximumFractionDigits: 2
   }).format(amountInDollars);
 };
-
-// ============================================
-// ✅ VALIDATION FUNCTIONS
-// ============================================
-
-export const validateWithdrawalAmount = (amountInCents, availableBalance, minWithdrawal = 500) => {
-  if (amountInCents < minWithdrawal) {
-    return {
-      valid: false,
-      error: `Minimum withdrawal amount is ${formatCurrency(minWithdrawal)}`
-    };
-  }
-  
-  if (amountInCents > availableBalance) {
-    return {
-      valid: false,
-      error: 'Insufficient balance'
-    };
-  }
-  
-  return { valid: true };
-};
-
-// ============================================
-// ✅ EARNINGS CALCULATION FUNCTIONS
-// ============================================
-
-export const calculateSellerEarnings = (orderAmountInCents, commissionPercentage = 10) => {
-  // Ensure amount is in cents
-  const amountInCents = typeof orderAmountInCents === 'number' ? 
-    orderAmountInCents : 
-    dollarsToCents(orderAmountInCents);
-  
-  // Calculate commission in cents
-  const commission = Math.round((amountInCents * commissionPercentage) / 100);
-  
-  // Calculate seller earnings in cents
-  const sellerEarnings = amountInCents - commission;
-  
-  return {
-    totalAmount: amountInCents,
-    commission,
-    sellerEarnings,
-    commissionPercentage,
-    formattedTotalAmount: formatCurrency(amountInCents),
-    formattedCommission: formatCurrency(commission),
-    formattedSellerEarnings: formatCurrency(sellerEarnings)
-  };
-};
-
 // ============================================
 // ✅ EARNINGS API
 // ============================================
 
 const earningsApi = {
-  // GET EARNINGS DASHBOARD
   getEarningsDashboard: async () => {
     try {
       const response = await axios.get(
         `${API_BASE_URL}/marketplace/stripe/earnings/dashboard`,
         getHeaders()
       );
-      
-      const result = normalizeResponse(response);
-      
-      if (result.success && result.data) {
-        const data = result.data;
-        
-        // Convert all amounts to cents for consistency
-        const processedData = {
-          // Convert string amounts to numbers and ensure they're in cents
-          availableBalance: parseInt(data.availableBalance) || 
-                           parseInt(data.available_balance) || 
-                           dollarsToCents(data.availableBalance) || 0,
-          pendingBalance: parseInt(data.pendingBalance) || 
-                         parseInt(data.pending_balance) || 
-                         dollarsToCents(data.pendingBalance) || 0,
-          totalEarnings: parseInt(data.totalEarnings) || 
-                        parseInt(data.total_earnings) || 
-                        dollarsToCents(data.totalEarnings) || 0,
-          totalWithdrawn: parseInt(data.totalWithdrawn) || 
-                         parseInt(data.total_withdrawn) || 
-                         dollarsToCents(data.totalWithdrawn) || 0,
-          thisMonthRevenue: parseInt(data.thisMonthRevenue) || 
-                           parseInt(data.this_month_revenue) || 
-                           dollarsToCents(data.thisMonthRevenue) || 0,
-          lifetimeRevenue: parseInt(data.lifetimeRevenue) || 
-                          parseInt(data.lifetime_revenue) || 
-                          dollarsToCents(data.lifetimeRevenue) || 0,
-          currency: data.currency || 'usd',
-          lastUpdated: data.lastUpdated || new Date().toISOString()
-        };
-        
-        // Add formatted versions for display
-        return {
-          ...result,
-          data: {
-            ...processedData,
-            formattedAvailableBalance: formatCurrency(processedData.availableBalance),
-            formattedPendingBalance: formatCurrency(processedData.pendingBalance),
-            formattedTotalEarnings: formatCurrency(processedData.totalEarnings),
-            formattedTotalWithdrawn: formatCurrency(processedData.totalWithdrawn),
-            formattedThisMonthRevenue: formatCurrency(processedData.thisMonthRevenue),
-            formattedLifetimeRevenue: formatCurrency(processedData.lifetimeRevenue)
-          }
-        };
-      }
-      
-      return result;
+      return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error, 'Failed to fetch earnings dashboard');
     }
   },
 
-  // PROCESS PAYOUT/WITHDRAWAL
-  processPayout: async (amountInCents, paymentMethod, accountDetails) => {
+  processPayout: async (amount, paymentMethod, accountDetails) => {
     try {
-      // Ensure amount is in cents
-      const amount = typeof amountInCents === 'number' ? 
-        amountInCents : 
-        dollarsToCents(amountInCents);
-      
       const response = await axios.post(
         `${API_BASE_URL}/marketplace/stripe/earnings/process-payout`,
-        { 
-          amount, // Send in cents
-          paymentMethod, 
-          accountDetails 
-        },
+        { amount, paymentMethod, accountDetails },
         getHeaders()
       );
-      
-      const result = normalizeResponse(response);
-      
-      // Add formatted amount to response
-      if (result.success) {
-        return {
-          ...result,
-          formattedAmount: formatCurrency(amount)
-        };
-      }
-      
-      return result;
+      return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error, 'Failed to process payout');
     }
   },
 
-  // GET PAYMENT HISTORY
   getPaymentHistory: async (params = {}) => {
     try {
       const { page = 1, limit = 20, type, status } = params;
@@ -281,72 +147,12 @@ const earningsApi = {
           ...getHeaders()
         }
       );
-      
-      const result = normalizeResponse(response);
-      
-      if (result.success) {
-        let paymentData = [];
-        
-        // Handle different response structures
-        if (Array.isArray(result.data)) {
-          paymentData = result.data;
-        } else if (result.data && Array.isArray(result.data.payments)) {
-          paymentData = result.data.payments;
-        } else if (result.data && Array.isArray(result.data.history)) {
-          paymentData = result.data.history;
-        } else if (result.data && Array.isArray(result.data.data)) {
-          paymentData = result.data.data;
-        }
-        
-        // Process each payment - ensure amounts are in cents
-        const processedPayments = paymentData.map(payment => {
-          // Convert amount to cents if needed
-          let amountInCents = payment.amount || 0;
-          if (amountInCents < 1000 && amountInCents > 0) {
-            // If amount looks like dollars (e.g., 1500 for $15.00), convert to cents
-            amountInCents = dollarsToCents(amountInCents);
-          }
-          
-          // Calculate seller earnings for order payments
-          let sellerEarnings = amountInCents;
-          let commission = 0;
-          let commissionPercentage = 10;
-          
-          if (payment.type === 'order_payment' || payment.type === 'earning' || payment.type === 'order_completion') {
-            const earnings = calculateSellerEarnings(amountInCents, commissionPercentage);
-            sellerEarnings = earnings.sellerEarnings;
-            commission = earnings.commission;
-          }
-          
-          return {
-            ...payment,
-            amount: amountInCents,
-            sellerEarnings,
-            commission,
-            commissionPercentage,
-            formattedAmount: formatCurrency(amountInCents),
-            formattedSellerEarnings: formatCurrency(sellerEarnings),
-            formattedCommission: formatCurrency(commission),
-            // Add date formatting
-            formattedDate: payment.createdAt ? new Date(payment.createdAt).toLocaleDateString('en-US') : 'N/A',
-            formattedTime: payment.createdAt ? new Date(payment.createdAt).toLocaleTimeString('en-US') : ''
-          };
-        });
-        
-        return {
-          ...result,
-          data: processedPayments,
-          formattedTotal: formatCurrency(processedPayments.reduce((sum, p) => sum + p.amount, 0))
-        };
-      }
-      
-      return result;
+      return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error, 'Failed to fetch payment history');
     }
   },
 
-  // GET WITHDRAWAL HISTORY
   getWithdrawalHistory: async (params = {}) => {
     try {
       const { status } = params;
@@ -357,69 +163,12 @@ const earningsApi = {
           ...getHeaders()
         }
       );
-      
-      const result = normalizeResponse(response);
-      
-      if (result.success) {
-        let withdrawalData = [];
-        
-        // Handle different response structures
-        if (Array.isArray(result.data)) {
-          withdrawalData = result.data;
-        } else if (result.data && Array.isArray(result.data.withdrawals)) {
-          withdrawalData = result.data.withdrawals;
-        } else if (result.data && Array.isArray(result.data.history)) {
-          withdrawalData = result.data.history;
-        }
-        
-        // Process withdrawals - ensure amounts are in cents
-        const processedWithdrawals = withdrawalData.map(withdrawal => {
-          // Convert amount to cents if needed
-          let amountInCents = withdrawal.amount || 0;
-          if (amountInCents < 1000 && amountInCents > 0) {
-            amountInCents = dollarsToCents(amountInCents);
-          }
-          
-          return {
-            ...withdrawal,
-            amount: amountInCents,
-            formattedAmount: formatCurrency(amountInCents),
-            formattedDate: withdrawal.createdAt ? new Date(withdrawal.createdAt).toLocaleDateString('en-US') : 'N/A',
-            formattedTime: withdrawal.createdAt ? new Date(withdrawal.createdAt).toLocaleTimeString('en-US') : '',
-            // Add status badge class
-            statusClass: withdrawal.status === 'completed' ? 'success' :
-                        withdrawal.status === 'pending' ? 'warning' :
-                        withdrawal.status === 'failed' ? 'error' : 'default'
-          };
-        });
-        
-        // Calculate stats
-        const totalWithdrawn = processedWithdrawals
-          .filter(w => w.status === 'completed')
-          .reduce((sum, w) => sum + w.amount, 0);
-        
-        const pendingWithdrawals = processedWithdrawals
-          .filter(w => w.status === 'pending').length;
-        
-        return {
-          ...result,
-          data: processedWithdrawals,
-          stats: {
-            totalWithdrawn,
-            pendingWithdrawals,
-            totalCount: processedWithdrawals.length,
-            formattedTotalWithdrawn: formatCurrency(totalWithdrawn)
-          }
-        };
-      }
-      
-      return result;
+      return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error, 'Failed to fetch withdrawal history');
     }
   },
 
-  // RELEASE PENDING PAYMENT
   releasePayment: async (orderId) => {
     try {
       const response = await axios.post(
@@ -427,26 +176,7 @@ const earningsApi = {
         {},
         getHeaders()
       );
-      
-      const result = normalizeResponse(response);
-      
-      // Add formatted earnings if available
-      if (result.success && result.data) {
-        const data = result.data;
-        if (data.sellerAmount || data.amount) {
-          const amountInCents = data.sellerAmount || data.amount;
-          return {
-            ...result,
-            formattedAmount: formatCurrency(amountInCents),
-            data: {
-              ...data,
-              formattedSellerAmount: formatCurrency(amountInCents)
-            }
-          };
-        }
-      }
-      
-      return result;
+      return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error, 'Failed to release payment');
     }
@@ -458,58 +188,18 @@ const earningsApi = {
 // ============================================
 
 const stripeApi = {
-  // GET STRIPE STATUS
   getStripeStatus: async () => {
     try {
       const response = await axios.get(
         `${API_BASE_URL}/marketplace/stripe/status`,
         getHeaders()
       );
-      
-      const result = normalizeResponse(response);
-      
-      // Process balance amounts
-      if (result.success && result.data) {
-        const data = result.data;
-        
-        // Convert balance amounts to cents
-        if (data.balance) {
-          const balance = data.balance;
-          if (balance.available && Array.isArray(balance.available)) {
-            balance.available = balance.available.map(item => ({
-              ...item,
-              amount: item.amount || 0,
-              formattedAmount: formatCurrency(item.amount || 0)
-            }));
-          }
-          
-          if (balance.pending && Array.isArray(balance.pending)) {
-            balance.pending = balance.pending.map(item => ({
-              ...item,
-              amount: item.amount || 0,
-              formattedAmount: formatCurrency(item.amount || 0)
-            }));
-          }
-        }
-        
-        return {
-          ...result,
-          data: {
-            ...data,
-            // Add formatted available balance
-            formattedAvailableBalance: formatCurrency(data.availableBalance || 0),
-            formattedPendingBalance: formatCurrency(data.pendingBalance || 0)
-          }
-        };
-      }
-      
-      return result;
+      return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error, 'Failed to fetch Stripe status');
     }
   },
 
-  // SIMPLE STATUS (Alternative)
   getStripeStatusSimple: async () => {
     try {
       const response = await axios.get(
@@ -522,7 +212,6 @@ const stripeApi = {
     }
   },
 
-  // CREATE ACCOUNT LINK
   createStripeAccountLink: async () => {
     try {
       const response = await axios.post(
@@ -536,7 +225,6 @@ const stripeApi = {
     }
   },
 
-  // ONBOARD SELLER
   onboardSeller: async () => {
     try {
       const response = await axios.post(
@@ -550,7 +238,6 @@ const stripeApi = {
     }
   },
 
-  // COMPLETE ONBOARDING
   completeOnboarding: async () => {
     try {
       const response = await axios.post(
@@ -564,84 +251,30 @@ const stripeApi = {
     }
   },
 
-  // GET BALANCE
   getStripeBalance: async () => {
     try {
       const response = await axios.get(
         `${API_BASE_URL}/marketplace/stripe/balance`,
         getHeaders()
       );
-      
-      const result = normalizeResponse(response);
-      
-      // Process and format balance data
-      if (result.success && result.data) {
-        const data = result.data;
-        
-        // Calculate totals and format
-        const availableTotal = data.available?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
-        const pendingTotal = data.pending?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
-        
-        return {
-          ...result,
-          data: {
-            ...data,
-            availableTotal,
-            pendingTotal,
-            formattedAvailableTotal: formatCurrency(availableTotal),
-            formattedPendingTotal: formatCurrency(pendingTotal),
-            totalBalance: availableTotal + pendingTotal,
-            formattedTotalBalance: formatCurrency(availableTotal + pendingTotal)
-          }
-        };
-      }
-      
-      return result;
+      return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error, 'Failed to fetch Stripe balance');
     }
   },
 
-  // GET PAYOUTS
   getStripePayouts: async () => {
     try {
       const response = await axios.get(
         `${API_BASE_URL}/marketplace/stripe/payouts`,
         getHeaders()
       );
-      
-      const result = normalizeResponse(response);
-      
-      // Format payout amounts
-      if (result.success && result.data) {
-        let payouts = [];
-        
-        if (Array.isArray(result.data)) {
-          payouts = result.data;
-        } else if (result.data && Array.isArray(result.data.payouts)) {
-          payouts = result.data.payouts;
-        }
-        
-        const formattedPayouts = payouts.map(payout => ({
-          ...payout,
-          formattedAmount: formatCurrency(payout.amount || 0),
-          formattedArrivalDate: payout.arrival_date ? new Date(payout.arrival_date * 1000).toLocaleDateString('en-US') : 'N/A',
-          formattedCreated: payout.created ? new Date(payout.created * 1000).toLocaleDateString('en-US') : 'N/A'
-        }));
-        
-        return {
-          ...result,
-          data: formattedPayouts
-        };
-      }
-      
-      return result;
+      return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error, 'Failed to fetch payouts');
     }
   },
 
-  // CREATE PAYMENT INTENT
   createPaymentIntent: async (orderId) => {
     try {
       const response = await axios.post(
@@ -649,30 +282,12 @@ const stripeApi = {
         { orderId },
         getHeaders()
       );
-      
-      const result = normalizeResponse(response);
-      
-      // Format amount in response
-      if (result.success && result.data) {
-        const data = result.data;
-        if (data.amount) {
-          return {
-            ...result,
-            data: {
-              ...data,
-              formattedAmount: formatCurrency(data.amount)
-            }
-          };
-        }
-      }
-      
-      return result;
+      return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error, 'Failed to create payment intent');
     }
   },
 
-  // CONFIRM PAYMENT
   confirmPayment: async (paymentIntentId) => {
     try {
       const response = await axios.post(
@@ -686,7 +301,6 @@ const stripeApi = {
     }
   },
 
-  // CREATE LOGIN LINK
   createLoginLink: async () => {
     try {
       const response = await axios.post(
@@ -700,39 +314,13 @@ const stripeApi = {
     }
   },
 
-  // STRIPE PAYOUTS
   getStripePayoutsHistory: async () => {
     try {
       const response = await axios.get(
         `${API_BASE_URL}/marketplace/stripe/stripe-payouts`,
         getHeaders()
       );
-      
-      const result = normalizeResponse(response);
-      
-      // Format payout history
-      if (result.success && result.data) {
-        let payouts = [];
-        
-        if (Array.isArray(result.data)) {
-          payouts = result.data;
-        } else if (result.data && Array.isArray(result.data.payouts)) {
-          payouts = result.data.payouts;
-        }
-        
-        const formattedPayouts = payouts.map(payout => ({
-          ...payout,
-          formattedAmount: formatCurrency(payout.amount || 0),
-          formattedDate: payout.created ? new Date(payout.created * 1000).toLocaleDateString('en-US') : 'N/A'
-        }));
-        
-        return {
-          ...result,
-          data: formattedPayouts
-        };
-      }
-      
-      return result;
+      return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error, 'Failed to fetch Stripe payouts');
     }
@@ -753,8 +341,7 @@ const listingsApi = {
       if (normalized.success && normalized.data && Array.isArray(normalized.data)) {
         normalized.data = normalized.data.map(listing => ({
           ...listing,
-          formattedPrice: formatCurrency(dollarsToCents(listing.price)),
-          priceInCents: dollarsToCents(listing.price)
+          formattedPrice: formatCurrency(listing.price)
         }));
       }
       
@@ -778,8 +365,7 @@ const listingsApi = {
       if (normalized.success && normalized.data && normalized.data.listings) {
         normalized.data.listings = normalized.data.listings.map(listing => ({
           ...listing,
-          formattedPrice: formatCurrency(dollarsToCents(listing.price)),
-          priceInCents: dollarsToCents(listing.price)
+          formattedPrice: formatCurrency(listing.price)
         }));
       }
       
@@ -791,15 +377,9 @@ const listingsApi = {
 
   createListing: async (listingData) => {
     try {
-      // Convert price to cents before sending
-      const dataToSend = {
-        ...listingData,
-        price: dollarsToCents(listingData.price)
-      };
-      
       const response = await axios.post(
         `${API_BASE_URL}/marketplace/listings/create-listing`,
-        dataToSend,
+        listingData,
         getHeaders()
       );
       return normalizeResponse(response);
@@ -813,7 +393,7 @@ const listingsApi = {
       const dataToSend = {
         title: updateData.title,
         description: updateData.description,
-        price: dollarsToCents(updateData.price)
+        price: updateData.price
       };
       
       const response = await axios.put(
@@ -860,8 +440,7 @@ const listingsApi = {
       
       // Format listing price
       if (normalized.success && normalized.data) {
-        normalized.data.formattedPrice = formatCurrency(dollarsToCents(normalized.data.price));
-        normalized.data.priceInCents = dollarsToCents(normalized.data.price);
+        normalized.data.formattedPrice = formatCurrency(normalized.data.price);
       }
       
       return normalized;
@@ -883,8 +462,7 @@ const listingsApi = {
       if (normalized.success && normalized.data && Array.isArray(normalized.data)) {
         normalized.data = normalized.data.map(listing => ({
           ...listing,
-          formattedPrice: formatCurrency(dollarsToCents(listing.price)),
-          priceInCents: dollarsToCents(listing.price)
+          formattedPrice: formatCurrency(listing.price)
         }));
       }
       
@@ -900,44 +478,6 @@ const listingsApi = {
 // ============================================
 
 const ordersApi = {
-  // Complete order with earnings calculation
-  completeOrder: async (orderId) => {
-    try {
-      const response = await axios.put(
-        `${API_BASE_URL}/marketplace/orders/${orderId}/complete`,
-        {},
-        getHeaders()
-      );
-      
-      const result = normalizeResponse(response);
-      
-      // Process and format earnings data
-      if (result.success && result.data) {
-        const data = result.data;
-        
-        // Calculate seller earnings from order amount
-        if (data.order?.amount || data.payment?.totalAmountInCents) {
-          const orderAmount = data.payment?.totalAmountInCents || dollarsToCents(data.order?.amount);
-          const earnings = calculateSellerEarnings(orderAmount);
-          
-          return {
-            ...result,
-            data: {
-              ...data,
-              earnings,
-              formattedEarnings: formatCurrency(earnings.sellerEarnings),
-              formattedCommission: formatCurrency(earnings.commission)
-            }
-          };
-        }
-      }
-      
-      return result;
-    } catch (error) {
-      return handleApiError(error, 'Failed to complete order');
-    }
-  },
-
   getMySales: async () => {
     try {
       const endpoints = [
@@ -960,21 +500,12 @@ const ordersApi = {
             orders = [];
           }
           
-          // Format order amounts and calculate earnings
-          const formattedOrders = orders.map(order => {
-            const orderAmount = dollarsToCents(order.amount || order.totalAmount || 0);
-            const earnings = calculateSellerEarnings(orderAmount);
-            
-            return {
-              ...order,
-              amount: orderAmount,
-              formattedAmount: formatCurrency(orderAmount),
-              formattedPrice: formatCurrency(dollarsToCents(order.price || 0)),
-              earnings,
-              formattedEarnings: formatCurrency(earnings.sellerEarnings),
-              formattedCommission: formatCurrency(earnings.commission)
-            };
-          });
+          // Format order amounts
+          const formattedOrders = orders.map(order => ({
+            ...order,
+            formattedAmount: formatCurrency(order.amount || order.totalAmount || 0),
+            formattedPrice: formatCurrency(order.price || 0)
+          }));
           
           return formattedOrders;
         } catch (err) {
@@ -996,26 +527,7 @@ const ordersApi = {
         { status, ...additionalData },
         getHeaders()
       );
-      
-      const result = normalizeResponse(response);
-      
-      // Add earnings calculation for completed orders
-      if (result.success && result.data && (status === 'completed' || status === 'delivered')) {
-        const orderData = result.data;
-        const orderAmount = dollarsToCents(orderData.amount || orderData.totalAmount || 0);
-        const earnings = calculateSellerEarnings(orderAmount);
-        
-        return {
-          ...result,
-          data: {
-            ...orderData,
-            ...earnings,
-            formattedOrderAmount: formatCurrency(orderAmount)
-          }
-        };
-      }
-      
-      return result;
+      return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error, 'Failed to update order status');
     }
@@ -1028,33 +540,26 @@ const ordersApi = {
         getHeaders()
       );
       
-      const result = normalizeResponse(response);
+      const normalized = normalizeResponse(response);
       
-      // Format order amounts and calculate earnings
-      if (result.success && result.data) {
-        const data = result.data;
-        const orderAmount = dollarsToCents(data.totalAmount || data.amount || 0);
-        const earnings = calculateSellerEarnings(orderAmount);
+      // Format order amounts
+      if (normalized.success && normalized.data) {
+        const data = normalized.data;
+        data.formattedTotal = formatCurrency(data.totalAmount || data.amount || 0);
+        data.formattedSubtotal = formatCurrency(data.subtotal || 0);
+        data.formattedTax = formatCurrency(data.tax || 0);
+        data.formattedShipping = formatCurrency(data.shipping || 0);
         
-        return {
-          ...result,
-          data: {
-            ...data,
-            ...earnings,
-            formattedTotal: formatCurrency(orderAmount),
-            formattedSubtotal: formatCurrency(dollarsToCents(data.subtotal || 0)),
-            formattedTax: formatCurrency(dollarsToCents(data.tax || 0)),
-            formattedShipping: formatCurrency(dollarsToCents(data.shipping || 0)),
-            items: data.items?.map(item => ({
-              ...item,
-              formattedPrice: formatCurrency(dollarsToCents(item.price || 0)),
-              formattedTotal: formatCurrency(dollarsToCents(item.total || 0))
-            })) || []
-          }
-        };
+        if (data.items && Array.isArray(data.items)) {
+          data.items = data.items.map(item => ({
+            ...item,
+            formattedPrice: formatCurrency(item.price || 0),
+            formattedTotal: formatCurrency(item.total || 0)
+          }));
+        }
       }
       
-      return result;
+      return normalized;
     } catch (error) {
       return handleApiError(error, 'Failed to fetch order details');
     }
@@ -1082,8 +587,8 @@ const offersApi = {
       if (normalized.success && normalized.offers && Array.isArray(normalized.offers)) {
         normalized.offers = normalized.offers.map(offer => ({
           ...offer,
-          formattedOfferAmount: formatCurrency(dollarsToCents(offer.offerAmount || 0)),
-          formattedOriginalPrice: formatCurrency(dollarsToCents(offer.originalPrice || 0))
+          formattedOfferAmount: formatCurrency(offer.offerAmount || 0),
+          formattedOriginalPrice: formatCurrency(offer.originalPrice || 0)
         }));
       }
       
@@ -1159,7 +664,25 @@ export const getCurrentUserId = () => {
   }
 };
 
-// Get payout status color
+// ============================================
+// ✅ EARNINGS HELPER FUNCTIONS
+// ============================================
+
+export const calculateSellerEarnings = (orderAmount, commissionPercentage = 10) => {
+  const commission = (orderAmount * commissionPercentage) / 100;
+  const sellerEarnings = orderAmount - commission;
+  
+  return {
+    totalAmount: orderAmount,
+    commission,
+    sellerEarnings,
+    commissionPercentage,
+    formattedTotalAmount: formatCurrency(orderAmount),
+    formattedCommission: formatCurrency(commission),
+    formattedSellerEarnings: formatCurrency(sellerEarnings)
+  };
+};
+
 export const getPayoutStatusColor = (status) => {
   switch (status?.toLowerCase()) {
     case 'completed':
@@ -1190,39 +713,6 @@ export const getPaymentMethodIcon = (method) => {
   }
 };
 
-// Process order payment with earnings calculation
-export const processOrderPayment = async (orderId, amountInDollars) => {
-  try {
-    const amountInCents = dollarsToCents(amountInDollars);
-    const earnings = calculateSellerEarnings(amountInCents);
-    
-    const response = await axios.post(
-      `${API_BASE_URL}/marketplace/orders/${orderId}/process-payment`,
-      { 
-        amount: amountInCents,
-        currency: 'usd'
-      },
-      getHeaders()
-    );
-    
-    const result = normalizeResponse(response);
-    
-    if (result.success && result.data) {
-      return {
-        ...result,
-        data: {
-          ...result.data,
-          ...earnings
-        }
-      };
-    }
-    
-    return result;
-  } catch (error) {
-    return handleApiError(error, 'Failed to process payment');
-  }
-};
-
 // ============================================
 // ✅ MAIN API EXPORT
 // ============================================
@@ -1241,21 +731,12 @@ const marketplaceApi = {
   formatCurrencyShort,
   formatCurrencyWithSymbol,
   formatAmount,
-  formatUSD,
-  
-  // Amount Conversion
-  dollarsToCents,
-  centsToDollars,
-  validateWithdrawalAmount,
-  
-  // Calculations
-  calculateSellerEarnings,
-  processOrderPayment,
   
   // Utility Functions
   testApiConnection,
   checkAuth,
   getCurrentUserId,
+  calculateSellerEarnings,
   getPayoutStatusColor,
   getPaymentMethodIcon,
   
@@ -1269,7 +750,6 @@ const marketplaceApi = {
   getListingDetails: listingsApi.getListingDetails,
   
   // Orders
-  completeOrder: ordersApi.completeOrder,
   getMySales: ordersApi.getMySales,
   updateOrderStatus: ordersApi.updateOrderStatus,
   getOrderDetails: ordersApi.getOrderDetails,
