@@ -10,17 +10,65 @@ const { protect, isHypeModeUser, isSeller, authenticateMiddleware } = require(".
 // ===================================================
 router.get("/listings", async (req, res) => {
   try {
-    const listings = await MarketplaceListing.find({ status: "active" })
-      .populate("sellerId", "username avatar sellerRating email");
-    res.status(200).json(listings);
+    const { category, minPrice, maxPrice, type, search, page = 1, limit = 12 } = req.query;
+    
+    const filter = { status: "active" };
+    
+    // Apply filters
+    if (category) filter.category = category;
+    if (type) filter.type = type;
+    if (minPrice) filter.price = { ...filter.price, $gte: parseFloat(minPrice) };
+    if (maxPrice) filter.price = { ...filter.price, $lte: parseFloat(maxPrice) };
+    
+    // Search filter
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { tags: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    const listings = await MarketplaceListing.find(filter)
+      .populate("sellerId", "username avatar sellerRating email")
+      .sort({ updatedAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await MarketplaceListing.countDocuments(filter);
+    
+    // Format prices to show USD
+    const formattedListings = listings.map(listing => ({
+      ...listing.toObject(),
+      formattedPrice: `$${listing.price.toFixed(2)}`,
+      priceWithOriginal: listing.priceWithOriginal
+    }));
+
+    res.status(200).json({
+      success: true,
+      listings: formattedListings,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      },
+      currency: "USD"
+    });
   } catch (error) {
     console.error("❌ Error fetching listings:", error);
-    res.status(500).json({ error: "Failed to fetch listings" });
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to fetch listings" 
+    });
   }
 });
 
-/// ===================================================
-// ✅ GET USER'S LISTINGS (My Listings)
+// ===================================================
+// ✅ GET USER'S LISTINGS (My Listings) - UPDATED FOR USD
+// ===================================================
 router.get("/my-listings", authenticateMiddleware, async (req, res) => {
   try {
     const sellerId = req.user._id;
@@ -36,7 +84,7 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
 
     // Get listings with pagination
     const listings = await MarketplaceListing.find(filter)
-      .select("title price status mediaUrls description category tags createdAt updatedAt views sellerId")
+      .select("title price status mediaUrls description category tags createdAt updatedAt views sellerId originalPrice originalCurrency exchangeRate convertedAt")
       .populate("sellerId", "username avatar sellerRating")
       .sort({ updatedAt: -1 })
       .skip(skip)
@@ -44,24 +92,29 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
 
     const total = await MarketplaceListing.countDocuments(filter);
 
-    // ✅ REMOVE or modify cache headers to prevent 304
-    // Option 1: Remove cache headers entirely
-    // Option 2: Add cache-busting headers
-    
+    // Format listings with USD prices
+    const formattedListings = listings.map(listing => ({
+      ...listing.toObject(),
+      formattedPrice: `$${listing.price.toFixed(2)}`,
+      priceWithOriginal: listing.priceWithOriginal
+    }));
+
+    // Cache control headers
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
     
     res.status(200).json({
       success: true,
-      listings,
+      listings: formattedListings,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
         pages: Math.ceil(total / parseInt(limit))
       },
-      timestamp: new Date().getTime() // Add timestamp to prevent caching
+      timestamp: new Date().getTime(),
+      displayCurrency: "USD"
     });
     
   } catch (error) {
@@ -72,53 +125,67 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
     });
   }
 });
+
 // ===================================================
-// ✅ CREATE LISTING
+// ✅ CREATE LISTING - UPDATED FOR USD
+// ===================================================
 router.post("/create-listing", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== CREATE LISTING REQUEST ===");
-    console.log("Full request object:", {
-      user: req.user,
-      body: req.body,
-      headers: req.headers
-    });
+    console.log("Body:", req.body);
 
-    // Debug: Check if user is properly authenticated
     if (!req.user || !req.user._id) {
-      console.error("❌ User not authenticated. req.user:", req.user);
       return res.status(401).json({
         success: false,
-        error: "User not authenticated. Please log in again."
+        error: "User not authenticated"
       });
     }
 
-    const { title, description, price, type, category, tags, mediaUrls } = req.body;
+    const { title, description, price, type, category, tags, mediaUrls, currency = 'USD' } = req.body;
     const sellerId = req.user._id;
 
-    console.log("✅ Authenticated user ID:", sellerId);
+    console.log("💰 Currency received:", currency, "Price:", price);
 
     // Enhanced validation
     if (!title || !description || !price || !type) {
       return res.status(400).json({ 
         success: false,
         error: "Missing required fields",
-        required: ["title", "description", "price", "type"],
-        received: {
-          title: !!title,
-          description: !!description,
-          price: !!price,
-          type: !!type,
-          category: !!category
-        }
+        required: ["title", "description", "price", "type"]
       });
     }
 
     // Validate price
-    if (isNaN(price) || price <= 0) {
+    const priceNumber = parseFloat(price);
+    if (isNaN(priceNumber) || priceNumber <= 0) {
       return res.status(400).json({
         success: false,
         error: "Price must be a positive number",
         received: price
+      });
+    }
+
+    // 🆕 Currency validation and conversion
+    let priceInUSD = priceNumber;
+    let originalPrice = null;
+    let originalCurrency = null;
+    let exchangeRate = 83; // Default exchange rate INR to USD
+
+    if (currency.toUpperCase() === 'INR' || currency === '₹') {
+      console.log("🔄 Converting INR to USD...");
+      originalPrice = priceNumber;
+      originalCurrency = 'INR';
+      priceInUSD = parseFloat((priceNumber / exchangeRate).toFixed(2));
+      console.log(`💰 Converted: ₹${originalPrice} → $${priceInUSD} (Rate: ${exchangeRate})`);
+    } else if (currency.toUpperCase() === 'USD' || currency === '$') {
+      console.log("✅ Price already in USD");
+      priceInUSD = parseFloat(priceNumber.toFixed(2));
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: "Unsupported currency. Use USD or INR",
+        received: currency,
+        supported: ["USD", "INR"]
       });
     }
 
@@ -127,7 +194,7 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
     const mediaArray = Array.isArray(mediaUrls) ? mediaUrls : (mediaUrls ? [mediaUrls] : []);
     const actualCategory = category || 'uncategorized';
 
-    // Get seller email with better error handling
+    // Get seller info
     let sellerEmail = null;
     let seller = null;
     
@@ -135,96 +202,102 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
       seller = await User.findById(sellerId).select('email username').exec();
       if (seller) {
         sellerEmail = seller.email;
-        console.log("✅ Seller found:", {
-          id: seller._id,
-          email: seller.email,
-          username: seller.username
-        });
       } else {
-        console.error("❌ Seller not found in database for ID:", sellerId);
         return res.status(404).json({
           success: false,
-          error: "User account not found. Please contact support."
+          error: "User account not found"
         });
       }
     } catch (emailError) {
       console.error("❌ Error fetching seller:", emailError.message);
       return res.status(500).json({
         success: false,
-        error: "Could not retrieve user information",
-        details: emailError.message
+        error: "Could not retrieve user information"
       });
     }
 
     // Validate email format
     if (sellerEmail && !isValidEmail(sellerEmail)) {
-      console.error("❌ Invalid seller email format:", sellerEmail);
       return res.status(400).json({
         success: false,
         error: "Invalid email format in user account"
       });
     }
 
-    // Create listing data
+    // Create listing data with USD
     const listingData = {
       sellerId: sellerId,
       sellerEmail: sellerEmail,
       title: title.trim(),
       description: description.trim(),
-      price: parseFloat(price).toFixed(2),
+      price: priceInUSD, // Always store in USD
+      originalPrice: originalCurrency ? originalPrice : null,
+      originalCurrency: originalCurrency,
+      exchangeRate: originalCurrency ? exchangeRate : null,
+      convertedAt: originalCurrency ? new Date() : null,
       type: type,
       category: actualCategory.trim(),
       tags: tagsArray.map(tag => tag.trim()).filter(tag => tag),
       mediaUrls: mediaArray,
-      status: "active",
-      createdAt: new Date(),
-      updatedAt: new Date()
+      status: "active"
     };
 
-    console.log("📝 Creating listing with data:", listingData);
+    console.log("📝 Creating listing with USD:", {
+      price: `$${priceInUSD}`,
+      original: originalPrice ? `₹${originalPrice}` : null
+    });
 
     // Create the listing
     const listing = await MarketplaceListing.create(listingData);
 
-    console.log("✅ Listing created successfully:", {
-      id: listing._id,
-      title: listing.title,
-      sellerId: listing.sellerId,
-      sellerEmail: listing.sellerEmail
-    });
-
-    res.status(201).json({ 
+    // Prepare response
+    const response = {
       success: true,
       message: "Listing created successfully", 
       listing: {
         id: listing._id,
         title: listing.title,
         price: listing.price,
+        formattedPrice: `$${listing.price.toFixed(2)}`,
+        originalPrice: listing.originalPrice,
+        originalCurrency: listing.originalCurrency,
+        exchangeRate: listing.exchangeRate,
         type: listing.type,
         category: listing.category,
         status: listing.status,
         createdAt: listing.createdAt,
         seller: {
           id: seller._id,
-          username: seller.username,
-          email: sellerEmail ? 'email_provided' : 'no_email'
+          username: seller.username
         }
+      },
+      currencyInfo: {
+        displayCurrency: "USD",
+        originalCurrency: listing.originalCurrency
       }
-    });
+    };
+
+    // Add conversion details if applicable
+    if (listing.originalCurrency === 'INR') {
+      response.conversionDetails = {
+        originalAmount: `₹${listing.originalPrice}`,
+        convertedAmount: `$${listing.price}`,
+        exchangeRate: listing.exchangeRate
+      };
+    }
+
+    res.status(201).json(response);
 
   } catch (error) {
     console.error("❌ Error creating listing:", error);
     
-    // Handle duplicate key errors
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
-        error: "Listing with similar details already exists",
-        details: error.keyValue
+        error: "Listing with similar details already exists"
       });
     }
     
-    // Handle validation errors
     if (error.name === 'ValidationError') {
       const errors = {};
       Object.keys(error.errors).forEach(key => {
@@ -238,43 +311,30 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    // Handle database connection errors
-    if (error.name === 'MongooseError' || error.message.includes('buffering timed out')) {
+    if (error.name === 'MongooseError') {
       return res.status(503).json({
         success: false,
-        error: "Database temporarily unavailable",
-        details: "Please try again in a moment"
+        error: "Database temporarily unavailable"
       });
     }
 
     res.status(500).json({ 
       success: false,
-      error: "Failed to create listing", 
+      error: "Failed to create listing",
       details: error.message 
     });
   }
 });
 
-// Email validation helper function
-function isValidEmail(email) {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-}
-
 // ===================================================
-// ✅ EDIT/UPDATE LISTING
-// ===================================================
-// ===================================================
-// ✅ EDIT LISTING (Only title, description, price - others optional)
+// ✅ EDIT/UPDATE LISTING - UPDATED FOR USD
 // ===================================================
 router.put("/:id", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== EDIT LISTING REQUEST ===");
-    console.log("Listing ID:", req.params.id);
     console.log("Update data:", req.body);
-    console.log("User ID:", req.user._id);
 
-    const { title, description, price, type, category, tags, mediaUrls } = req.body;
+    const { title, description, price, type, category, tags, mediaUrls, currency = 'USD' } = req.body;
     const listingId = req.params.id;
     const sellerId = req.user._id;
 
@@ -285,40 +345,20 @@ router.put("/:id", authenticateMiddleware, async (req, res) => {
     });
 
     if (!existingListing) {
-      console.log("❌ Listing not found or unauthorized:", { listingId, sellerId });
       return res.status(404).json({ 
         success: false,
-        error: "Listing not found or you don't have permission to edit this listing" 
+        error: "Listing not found or no permission" 
       });
     }
 
-    // Build update object - only update provided fields
+    // Build update object
     const updateData = {};
+    let hasUpdates = false;
     
-    // Required validations only for fields that are provided
-    if (title !== undefined) {
-      if (!title || title.trim() === '') {
-        return res.status(400).json({
-          success: false,
-          error: "Title cannot be empty",
-          field: "title"
-        });
-      }
-      updateData.title = title.trim();
-    }
-    
-    if (description !== undefined) {
-      if (!description || description.trim() === '') {
-        return res.status(400).json({
-          success: false,
-          error: "Description cannot be empty",
-          field: "description"
-        });
-      }
-      updateData.description = description.trim();
-    }
-    
+    // Handle price update with currency conversion
     if (price !== undefined) {
+      hasUpdates = true;
+      
       if (price === null || price === '') {
         return res.status(400).json({
           success: false,
@@ -328,59 +368,82 @@ router.put("/:id", authenticateMiddleware, async (req, res) => {
       }
       
       const priceNum = parseFloat(price);
-      if (isNaN(priceNum)) {
+      if (isNaN(priceNum) || priceNum <= 0) {
         return res.status(400).json({
           success: false,
-          error: "Price must be a valid number",
-          field: "price",
-          received: price
+          error: "Price must be a valid positive number",
+          field: "price"
         });
       }
-      
-      if (priceNum <= 0) {
-        return res.status(400).json({
-          success: false,
-          error: "Price must be greater than 0",
-          field: "price",
-          received: price
-        });
+
+      let priceInUSD = priceNum;
+      let originalPrice = null;
+      let originalCurrency = null;
+      let exchangeRate = 83;
+
+      if (currency.toUpperCase() === 'INR' || currency === '₹') {
+        originalPrice = priceNum;
+        originalCurrency = 'INR';
+        priceInUSD = parseFloat((priceNum / exchangeRate).toFixed(2));
+        
+        updateData.price = priceInUSD;
+        updateData.originalPrice = originalPrice;
+        updateData.originalCurrency = originalCurrency;
+        updateData.exchangeRate = exchangeRate;
+        updateData.convertedAt = new Date();
+        
+        console.log(`💰 Price updated with conversion: ₹${originalPrice} → $${priceInUSD}`);
+      } else {
+        // If updating in USD, clear original currency fields
+        updateData.price = parseFloat(priceNum.toFixed(2));
+        updateData.originalPrice = null;
+        updateData.originalCurrency = null;
+        updateData.exchangeRate = null;
+        updateData.convertedAt = null;
       }
-      
-      updateData.price = priceNum.toFixed(2);
     }
     
-    // Optional fields - only update if provided
-    if (type !== undefined) {
+    // Other fields
+    if (title !== undefined && title.trim() !== existingListing.title) {
+      hasUpdates = true;
+      updateData.title = title.trim();
+    }
+    
+    if (description !== undefined && description.trim() !== existingListing.description) {
+      hasUpdates = true;
+      updateData.description = description.trim();
+    }
+    
+    if (type !== undefined && type !== existingListing.type) {
+      hasUpdates = true;
       updateData.type = type;
     }
     
-    if (category !== undefined) {
-      updateData.category = category?.trim() || existingListing.category || 'uncategorized';
+    if (category !== undefined && category?.trim() !== existingListing.category) {
+      hasUpdates = true;
+      updateData.category = category?.trim() || 'uncategorized';
     }
     
     if (tags !== undefined) {
+      hasUpdates = true;
       const tagsArray = Array.isArray(tags) ? tags : (tags ? [tags] : []);
       updateData.tags = tagsArray.map(tag => tag?.trim()).filter(tag => tag);
     }
     
     if (mediaUrls !== undefined) {
+      hasUpdates = true;
       const mediaArray = Array.isArray(mediaUrls) ? mediaUrls : (mediaUrls ? [mediaUrls] : []);
       updateData.mediaUrls = mediaArray;
     }
     
-    // Check if at least one field is being updated
-    if (Object.keys(updateData).length === 0) {
+    if (!hasUpdates) {
       return res.status(400).json({
         success: false,
-        error: "No fields provided for update",
-        message: "Please provide at least one field to update (title, description, or price)"
+        error: "No changes provided for update"
       });
     }
     
-    // Add updated timestamp
     updateData.updatedAt = new Date();
-
-    console.log("Updating with data:", updateData);
 
     // Update the listing
     const updatedListing = await MarketplaceListing.findByIdAndUpdate(
@@ -388,26 +451,29 @@ router.put("/:id", authenticateMiddleware, async (req, res) => {
       { $set: updateData },
       { 
         new: true, 
-        runValidators: true,
-        context: 'query' // This helps with some validation scenarios
+        runValidators: true
       }
-    ).select("title price type category tags description mediaUrls status updatedAt sellerId");
+    ).select("title price type category tags description mediaUrls status updatedAt sellerId originalPrice originalCurrency exchangeRate");
 
     if (!updatedListing) {
-      console.log("❌ Failed to update listing after findByIdAndUpdate");
       return res.status(404).json({ 
         success: false,
         error: "Failed to update listing" 
       });
     }
 
-    console.log("✅ Listing updated successfully:", updatedListing._id);
-
-    res.status(200).json({ 
+    // Prepare response
+    const response = {
       success: true,
       message: "Listing updated successfully", 
-      listing: updatedListing 
-    });
+      listing: {
+        ...updatedListing.toObject(),
+        formattedPrice: `$${updatedListing.price.toFixed(2)}`,
+        priceWithOriginal: updatedListing.priceWithOriginal
+      }
+    };
+
+    res.status(200).json(response);
 
   } catch (error) {
     console.error("❌ Error updating listing:", error);
@@ -425,8 +491,6 @@ router.put("/:id", authenticateMiddleware, async (req, res) => {
         errors[key] = error.errors[key].message;
       });
       
-      console.log("Validation errors:", errors);
-      
       return res.status(400).json({
         success: false,
         error: "Validation failed",
@@ -437,17 +501,14 @@ router.put("/:id", authenticateMiddleware, async (req, res) => {
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
-        error: "Listing with similar details already exists",
-        details: error.keyValue
+        error: "Listing with similar details already exists"
       });
     }
 
-    if (error.name === 'MongoNetworkError' || error.message.includes('buffering timed out') || error.name === 'MongooseError') {
-      console.error("Database connection error:", error.message);
+    if (error.name === 'MongoNetworkError') {
       return res.status(503).json({
         success: false,
-        error: "Database temporarily unavailable",
-        details: "Please try again in a moment"
+        error: "Database temporarily unavailable"
       });
     }
     
@@ -458,14 +519,12 @@ router.put("/:id", authenticateMiddleware, async (req, res) => {
     });
   }
 });
+
+// ===================================================
 // ✅ TOGGLE LISTING STATUS (Active/Inactive)
 // ===================================================
 router.patch("/:id/toggle-status", authenticateMiddleware, async (req, res) => {
   try {
-    console.log("=== TOGGLE LISTING STATUS ===");
-    console.log("Listing ID:", req.params.id);
-    console.log("User ID:", req.user._id);
-
     const listingId = req.params.id;
     const sellerId = req.user._id;
 
@@ -477,7 +536,8 @@ router.patch("/:id/toggle-status", authenticateMiddleware, async (req, res) => {
 
     if (!listing) {
       return res.status(404).json({ 
-        error: "Listing not found or you don't have permission to modify this listing" 
+        success: false,
+        error: "Listing not found or no permission" 
       });
     }
 
@@ -487,36 +547,40 @@ router.patch("/:id/toggle-status", authenticateMiddleware, async (req, res) => {
     const updatedListing = await MarketplaceListing.findByIdAndUpdate(
       listingId,
       { 
-        $set: { 
-          status: newStatus,
-          updatedAt: new Date()
-        } 
+        status: newStatus,
+        updatedAt: new Date()
       },
       { new: true }
-    ).select("title status updatedAt");
-
-    console.log(`✅ Listing status changed from ${listing.status} to ${newStatus}`);
+    ).select("title status updatedAt price formattedPrice");
 
     res.status(200).json({ 
+      success: true,
       message: `Listing ${newStatus === "active" ? "activated" : "deactivated"} successfully`,
-      listing: updatedListing,
-      previousStatus: listing.status,
-      newStatus: newStatus
+      listing: {
+        ...updatedListing.toObject(),
+        formattedPrice: `$${updatedListing.price.toFixed(2)}`
+      }
     });
 
   } catch (error) {
     console.error("❌ Error toggling listing status:", error);
     
     if (error.name === 'CastError') {
-      return res.status(400).json({ error: "Invalid listing ID format" });
+      return res.status(400).json({ 
+        success: false,
+        error: "Invalid listing ID format" 
+      });
     }
     
-    res.status(500).json({ error: "Failed to toggle listing status" });
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to toggle listing status" 
+    });
   }
 });
 
 // ===================================================
-// ✅ GET SINGLE LISTING DETAILS
+// ✅ GET SINGLE LISTING DETAILS - UPDATED FOR USD
 // ===================================================
 router.get("/listing/:id", async (req, res) => {
   try {
@@ -524,29 +588,46 @@ router.get("/listing/:id", async (req, res) => {
     
     const listing = await MarketplaceListing.findById(listingId)
       .populate("sellerId", "username avatar sellerRating email phone")
-      .select("title description price type category tags mediaUrls status sellerId createdAt updatedAt views");
+      .select("title description price type category tags mediaUrls status sellerId createdAt updatedAt views originalPrice originalCurrency exchangeRate");
     
     if (!listing) {
-      return res.status(404).json({ error: "Listing not found" });
+      return res.status(404).json({ 
+        success: false,
+        error: "Listing not found" 
+      });
     }
     
     // Increment view count
     listing.views = (listing.views || 0) + 1;
     await listing.save();
     
+    // Format response
+    const formattedListing = {
+      ...listing.toObject(),
+      formattedPrice: `$${listing.price.toFixed(2)}`,
+      priceWithOriginal: listing.priceWithOriginal
+    };
+    
     res.status(200).json({ 
       success: true,
-      listing 
+      listing: formattedListing,
+      displayCurrency: "USD"
     });
     
   } catch (error) {
     console.error("❌ Error fetching listing details:", error);
     
     if (error.name === 'CastError') {
-      return res.status(400).json({ error: "Invalid listing ID format" });
+      return res.status(400).json({ 
+        success: false,
+        error: "Invalid listing ID format" 
+      });
     }
     
-    res.status(500).json({ error: "Failed to fetch listing details" });
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to fetch listing details" 
+    });
   }
 });
 
@@ -560,29 +641,37 @@ router.get("/user/:userId/listings", async (req, res) => {
     
     const filter = { sellerId: userId };
     if (status) filter.status = status;
-    else filter.status = 'active'; // Default to active listings
+    else filter.status = 'active';
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
-    console.log("📝 Fetching listings for user:", userId);
-
     // Verify user exists
     const user = await User.findById(userId).select('username avatar sellerRating');
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ 
+        success: false,
+        error: "User not found" 
+      });
     }
 
     const listings = await MarketplaceListing.find(filter)
-      .select("title price status mediaUrls description category tags createdAt updatedAt")
+      .select("title price status mediaUrls description category tags createdAt updatedAt originalPrice originalCurrency")
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
 
     const total = await MarketplaceListing.countDocuments(filter);
 
+    // Format listings
+    const formattedListings = listings.map(listing => ({
+      ...listing.toObject(),
+      formattedPrice: `$${listing.price.toFixed(2)}`,
+      priceWithOriginal: listing.priceWithOriginal
+    }));
+
     res.status(200).json({
       success: true,
-      listings,
+      listings: formattedListings,
       user: {
         id: user._id,
         username: user.username,
@@ -594,75 +683,63 @@ router.get("/user/:userId/listings", async (req, res) => {
         limit: parseInt(limit),
         total,
         pages: Math.ceil(total / parseInt(limit))
-      }
+      },
+      displayCurrency: "USD"
     });
     
   } catch (error) {
     console.error("❌ Error fetching user listings:", error);
-    res.status(500).json({ error: "Failed to fetch user listings" });
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to fetch user listings" 
+    });
   }
 });
 
+// ===================================================
+// ✅ DELETE LISTING
+// ===================================================
 router.delete("/:id", authenticateMiddleware, async (req, res) => {
   try {
-    console.log("=== DELETE LISTING REQUEST ===");
-    console.log("Listing ID to delete:", req.params.id);
-    console.log("User making request:", req.user._id);
-
     const listingId = req.params.id;
     const userId = req.user._id;
     
-    // First, validate the ID format
+    // Validate ID format
     if (!mongoose.Types.ObjectId.isValid(listingId)) {
-      console.log("❌ Invalid listing ID format:", listingId);
       return res.status(400).json({ 
+        success: false,
         error: "Invalid listing ID format" 
       });
     }
     
-    // Check if listing exists at all
+    // Find listing
     const listing = await MarketplaceListing.findById(listingId);
     
     if (!listing) {
-      console.log("❌ Listing not found in database. ID:", listingId);
-      
-      // Optional: Check if ID might exist in a different format
-      // or if we should search differently
-      const allListings = await MarketplaceListing.find({});
-      console.log(`DEBUG: Total listings in database: ${allListings.length}`);
-      console.log("DEBUG: First few listing IDs:", allListings.slice(0, 3).map(l => l._id));
-      
       return res.status(404).json({ 
-        error: "Listing not found",
-        details: `No listing found with ID: ${listingId}`
+        success: false,
+        error: "Listing not found"
       });
     }
     
-    // Check if user owns the listing
+    // Check ownership
     if (!listing.sellerId.equals(userId)) {
-      console.log("❌ User not authorized to delete this listing");
-      console.log("Listing sellerId:", listing.sellerId);
-      console.log("Request userId:", userId);
-      
       return res.status(403).json({ 
-        error: "You don't have permission to delete this listing" 
+        success: false,
+        error: "No permission to delete this listing" 
       });
     }
     
     // Delete the listing
     await MarketplaceListing.findByIdAndDelete(listingId);
     
-    console.log("✅ Listing deleted successfully:", {
-      id: listing._id,
-      title: listing.title,
-      sellerId: listing.sellerId
-    });
-    
     res.status(200).json({ 
+      success: true,
       message: "Listing deleted successfully", 
-      listing: {
+      deletedListing: {
         _id: listing._id,
         title: listing.title,
+        price: `$${listing.price}`,
         status: listing.status
       }
     });
@@ -670,12 +747,15 @@ router.delete("/:id", authenticateMiddleware, async (req, res) => {
     console.error("❌ Error deleting listing:", error);
     
     if (error.name === 'CastError') {
-      return res.status(400).json({ error: "Invalid listing ID format" });
+      return res.status(400).json({ 
+        success: false,
+        error: "Invalid listing ID format" 
+      });
     }
     
     res.status(500).json({ 
-      error: "Failed to delete listing",
-      details: error.message 
+      success: false,
+      error: "Failed to delete listing"
     });
   }
 });
@@ -688,21 +768,17 @@ router.delete("/admin/delete-all-listings", authenticateMiddleware, async (req, 
     // Optional: Add admin check here
     // if (!req.user.isAdmin) return res.status(403).json({ error: "Admin access required" });
     
-    console.log("🚨 ATTEMPTING TO DELETE ALL LISTINGS");
-    
     const beforeCount = await MarketplaceListing.countDocuments();
-    console.log(`Listings before deletion: ${beforeCount}`);
     
     if (beforeCount === 0) {
       return res.status(404).json({ 
+        success: false,
         message: "No listings found to delete",
         deletedCount: 0
       });
     }
 
     const result = await MarketplaceListing.deleteMany({});
-    
-    console.log(`✅ Successfully deleted ${result.deletedCount} listings`);
     
     res.status(200).json({ 
       success: true,
@@ -715,10 +791,161 @@ router.delete("/admin/delete-all-listings", authenticateMiddleware, async (req, 
   } catch (error) {
     console.error("❌ Error deleting all listings:", error);
     res.status(500).json({ 
-      error: "Failed to delete listings",
-      details: error.message 
+      success: false,
+      error: "Failed to delete listings"
     });
   }
 });
+
+// ===================================================
+// ✅ BULK CONVERT EXISTING LISTINGS TO USD
+// ===================================================
+router.post("/admin/convert-to-usd", authenticateMiddleware, async (req, res) => {
+  try {
+    const { exchangeRate = 83 } = req.body;
+    
+    console.log("🔄 Starting bulk conversion to USD with rate:", exchangeRate);
+    
+    // Find all listings without originalCurrency (assuming they're in INR)
+    const listingsToConvert = await MarketplaceListing.find({
+      $or: [
+        { originalCurrency: { $exists: false } },
+        { originalCurrency: null }
+      ]
+    });
+    
+    console.log(`📊 Found ${listingsToConvert.length} listings to convert`);
+    
+    const conversionResults = {
+      converted: 0,
+      skipped: 0,
+      errors: [],
+      details: []
+    };
+    
+    // Convert each listing
+    for (const listing of listingsToConvert) {
+      try {
+        // Check if price looks like INR (large numbers)
+        const originalPrice = listing.price;
+        
+        // Convert to USD
+        const priceInUSD = parseFloat((originalPrice / exchangeRate).toFixed(2));
+        
+        // Update listing
+        listing.originalPrice = originalPrice;
+        listing.originalCurrency = 'INR';
+        listing.price = priceInUSD;
+        listing.exchangeRate = exchangeRate;
+        listing.convertedAt = new Date();
+        
+        await listing.save();
+        
+        conversionResults.converted++;
+        conversionResults.details.push({
+          id: listing._id,
+          title: listing.title,
+          original: originalPrice,
+          converted: priceInUSD,
+          rate: exchangeRate
+        });
+        
+        console.log(`✅ Converted: ${listing.title} - ₹${originalPrice} → $${priceInUSD}`);
+        
+      } catch (convError) {
+        conversionResults.skipped++;
+        conversionResults.errors.push({
+          id: listing._id,
+          title: listing.title,
+          error: convError.message
+        });
+        console.error(`❌ Failed to convert ${listing.title}:`, convError.message);
+      }
+    }
+    
+    res.status(200).json({
+      success: true,
+      message: `Bulk conversion completed. Converted: ${conversionResults.converted}, Skipped: ${conversionResults.skipped}`,
+      results: conversionResults,
+      exchangeRate: exchangeRate
+    });
+    
+  } catch (error) {
+    console.error("❌ Error in bulk conversion:", error);
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to perform bulk conversion" 
+    });
+  }
+});
+
+// ===================================================
+// ✅ GET CURRENCY STATS
+// ===================================================
+router.get("/stats/currency", authenticateMiddleware, async (req, res) => {
+  try {
+    // Get currency distribution
+    const currencyStats = await MarketplaceListing.aggregate([
+      {
+        $group: {
+          _id: "$originalCurrency",
+          count: { $sum: 1 },
+          avgOriginalPrice: { $avg: "$originalPrice" },
+          avgUSDPrice: { $avg: "$price" },
+          totalUSDValue: { $sum: "$price" }
+        }
+      },
+      {
+        $project: {
+          currency: {
+            $ifNull: ["$_id", "USD"]
+          },
+          count: 1,
+          avgOriginalPrice: { $round: ["$avgOriginalPrice", 2] },
+          avgUSDPrice: { $round: ["$avgUSDPrice", 2] },
+          totalUSDValue: { $round: ["$totalUSDValue", 2] }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+    
+    // Get conversion stats
+    const conversionStats = await MarketplaceListing.aggregate([
+      {
+        $match: {
+          originalCurrency: { $exists: true, $ne: null }
+        }
+      },
+      {
+        $group: {
+          _id: "$originalCurrency",
+          count: { $sum: 1 },
+          avgExchangeRate: { $avg: "$exchangeRate" }
+        }
+      }
+    ]);
+    
+    res.status(200).json({
+      success: true,
+      currencyStats,
+      conversionStats,
+      displayCurrency: "USD",
+      defaultExchangeRate: 83
+    });
+    
+  } catch (error) {
+    console.error("❌ Error fetching currency stats:", error);
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to fetch currency statistics" 
+    });
+  }
+});
+
+// Email validation helper function
+function isValidEmail(email) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
 
 module.exports = router;
