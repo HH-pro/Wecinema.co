@@ -46,7 +46,7 @@ import VideoPlayerModal from '../../components/marketplae/seller/VideoPlayerModa
 const formatCurrency = (amount: number) => {
   // Convert cents to rupees
   const amountInRupees = amount / 100;
-  return `₹${amountInRupees.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `$${amountInRupees.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 // Simple fallback components
