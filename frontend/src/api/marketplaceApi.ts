@@ -537,11 +537,11 @@ export const formatCurrencyAmount = (amount) => {
 export const formatCurrencyShort = (amount) => {
   const amountInRupees = (amount || 0) / 100;
   if (amountInRupees >= 10000000) {
-    return `₹${(amountInRupees / 10000000).toFixed(1)}Cr`;
+    return `$${(amountInRupees / 10000000).toFixed(1)}Cr`;
   } else if (amountInRupees >= 100000) {
-    return `₹${(amountInRupees / 100000).toFixed(1)}L`;
+    return `$${(amountInRupees / 100000).toFixed(1)}L`;
   } else if (amountInRupees >= 1000) {
-    return `₹${(amountInRupees / 1000).toFixed(1)}K`;
+    return `$${(amountInRupees / 1000).toFixed(1)}K`;
   }
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
