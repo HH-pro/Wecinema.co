@@ -25,7 +25,7 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
   try {
     const sellerId = req.user._id;
     
-    const { status, page = 1, limit = 10 } = req.query;
+    const { status, page = 1, limit = 10, currency = "USD" } = req.query;
     
     const filter = { sellerId };
     if (status) filter.status = status;
@@ -36,7 +36,7 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
 
     // Get listings with pagination
     const listings = await MarketplaceListing.find(filter)
-      .select("title price status mediaUrls description category tags createdAt updatedAt views sellerId")
+      .select("title price status mediaUrls description category tags createdAt updatedAt views sellerId currency")
       .populate("sellerId", "username avatar sellerRating")
       .sort({ updatedAt: -1 })
       .skip(skip)
@@ -44,24 +44,40 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
 
     const total = await MarketplaceListing.countDocuments(filter);
 
-    // ✅ REMOVE or modify cache headers to prevent 304
-    // Option 1: Remove cache headers entirely
-    // Option 2: Add cache-busting headers
-    
+    // ✅ Convert prices to USD if stored in INR
+    const formattedListings = listings.map(listing => {
+      const listingObj = listing.toObject();
+      
+      // Check if price is in INR and convert to USD
+      if (listing.currency === "INR" || listing.currency === "₹") {
+        // Convert INR to USD (assuming 1 USD = 83 INR, adjust as needed)
+        const exchangeRate = 83;
+        listingObj.price = listing.price / exchangeRate;
+        listingObj.originalPrice = listing.price; // Keep original for reference
+        listingObj.currency = "USD";
+        listingObj.displayPrice = `$${(listing.price / exchangeRate).toFixed(2)}`;
+      } else {
+        listingObj.displayPrice = `$${listing.price.toFixed(2)}`;
+      }
+      
+      return listingObj;
+    });
+
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
     
     res.status(200).json({
       success: true,
-      listings,
+      listings: formattedListings,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
         pages: Math.ceil(total / parseInt(limit))
       },
-      timestamp: new Date().getTime() // Add timestamp to prevent caching
+      timestamp: new Date().getTime(),
+      currency: "USD" // Explicitly mention currency
     });
     
   } catch (error) {
