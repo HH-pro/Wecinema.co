@@ -1,7 +1,7 @@
-// src/api/marketplaceApi.js - UPDATED WITH EARNINGS/WITHDRAWAL ROUTES
+// src/api/marketplaceApi.js - UPDATED WITH CORRECT ROUTES
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:3000';
+const API_BASE_URL = 'http://localhost:3000/api';
 
 // ============================================
 // ✅ HELPER FUNCTIONS (PRIVATE)
@@ -52,7 +52,7 @@ const handleApiError = (error, defaultMessage = 'API Error') => {
 };
 
 // ============================================
-// ✅ EARNINGS API
+// ✅ EARNINGS API - UPDATED URLs
 // ============================================
 
 const earningsApi = {
@@ -133,7 +133,162 @@ const earningsApi = {
 };
 
 // ============================================
-// ✅ LISTINGS API
+// ✅ STRIPE API - UPDATED URLs
+// ============================================
+
+const stripeApi = {
+  // GET STRIPE STATUS
+  getStripeStatus: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/status`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch Stripe status');
+    }
+  },
+
+  // SIMPLE STATUS (Alternative)
+  getStripeStatusSimple: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/status-simple`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch Stripe status');
+    }
+  },
+
+  // CREATE ACCOUNT LINK
+  createStripeAccountLink: async () => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/stripe/create-account-link`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to create Stripe link');
+    }
+  },
+
+  // ONBOARD SELLER
+  onboardSeller: async () => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/stripe/onboard-seller`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to onboard seller');
+    }
+  },
+
+  // COMPLETE ONBOARDING
+  completeOnboarding: async () => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/stripe/complete-onboarding`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to complete onboarding');
+    }
+  },
+
+  // GET BALANCE
+  getStripeBalance: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/balance`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch Stripe balance');
+    }
+  },
+
+  // GET PAYOUTS
+  getStripePayouts: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/payouts`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch payouts');
+    }
+  },
+
+  // CREATE PAYMENT INTENT
+  createPaymentIntent: async (orderId) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/stripe/create-payment-intent`,
+        { orderId },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to create payment intent');
+    }
+  },
+
+  // CONFIRM PAYMENT
+  confirmPayment: async (paymentIntentId) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/stripe/confirm-payment`,
+        { paymentIntentId },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to confirm payment');
+    }
+  },
+
+  // CREATE LOGIN LINK
+  createLoginLink: async () => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/stripe/create-login-link`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to create login link');
+    }
+  },
+
+  // STRIPE PAYOUTS
+  getStripePayoutsHistory: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/stripe-payouts`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch Stripe payouts');
+    }
+  }
+};
+
+// ============================================
+// ✅ LISTINGS API - UPDATED URLs
 // ============================================
 
 const listingsApi = {
@@ -240,7 +395,7 @@ const listingsApi = {
 };
 
 // ============================================
-// ✅ ORDERS API
+// ✅ ORDERS API - UPDATED URLs
 // ============================================
 
 const ordersApi = {
@@ -308,7 +463,7 @@ const ordersApi = {
 };
 
 // ============================================
-// ✅ OFFERS API
+// ✅ OFFERS API - UPDATED URLs
 // ============================================
 
 const offersApi = {
@@ -353,49 +508,6 @@ const offersApi = {
       return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error, 'Failed to reject offer');
-    }
-  }
-};
-
-// ============================================
-// ✅ STRIPE API
-// ============================================
-
-const stripeApi = {
-  getStripeStatus: async () => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/stripe/status`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error, 'Failed to fetch Stripe status');
-    }
-  },
-
-  createStripeAccountLink: async () => {
-    try {
-      const response = await axios.post(
-        `${API_BASE_URL}/marketplace/stripe/create-account-link`,
-        {},
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error, 'Failed to create Stripe link');
-    }
-  },
-
-  getStripeBalance: async () => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/stripe/balance`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error, 'Failed to fetch Stripe balance');
     }
   }
 };
@@ -563,8 +675,16 @@ const marketplaceApi = {
   
   // Stripe
   getStripeStatus: stripeApi.getStripeStatus,
+  getStripeStatusSimple: stripeApi.getStripeStatusSimple,
   createStripeAccountLink: stripeApi.createStripeAccountLink,
   getStripeBalance: stripeApi.getStripeBalance,
+  onboardSeller: stripeApi.onboardSeller,
+  completeOnboarding: stripeApi.completeOnboarding,
+  getStripePayouts: stripeApi.getStripePayouts,
+  createPaymentIntent: stripeApi.createPaymentIntent,
+  confirmPayment: stripeApi.confirmPayment,
+  createLoginLink: stripeApi.createLoginLink,
+  getStripePayoutsHistory: stripeApi.getStripePayoutsHistory,
   
   // Earnings
   getEarningsDashboard: earningsApi.getEarningsDashboard,
@@ -592,4 +712,3 @@ export {
   stripeApi,
   earningsApi
 };
-
