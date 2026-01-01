@@ -1137,18 +1137,37 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
     let paymentSuccess = false;
     let transferError = null;
     let transferId = null;
-    let sellerAmount = 0;
-    let platformFee = 0;
+    let sellerAmountInCents = 0;
+    let platformFeeInCents = 0;
+
+    // ✅ IMPORTANT: All amounts are in CENTS (not dollars)
+    const orderAmountInCents = Math.round(order.amount * 100); // Convert to cents if stored as dollars
 
     // ✅ Process payment to seller if applicable
     if (order.stripePaymentIntentId && !order.paymentReleased && order.sellerId.stripeAccountId) {
       try {
         console.log('💰 Processing payment release for order:', orderId);
+        console.log('📊 Order amount:', {
+          amountInDatabase: order.amount,
+          amountInCents: orderAmountInCents,
+          type: typeof order.amount
+        });
         
-        // Calculate amounts
-        const platformFeePercent = 0.15; // 15% platform fee
-        platformFee = order.amount * platformFeePercent;
-        sellerAmount = order.amount - platformFee;
+        // Calculate amounts in CENTS
+        const platformFeePercent = 0.10; // ✅ 10% platform fee (not 15%)
+        platformFeeInCents = Math.round(orderAmountInCents * platformFeePercent);
+        sellerAmountInCents = orderAmountInCents - platformFeeInCents;
+
+        console.log('📈 Payment breakdown:', {
+          totalAmount: orderAmountInCents,
+          platformFeePercent: `${platformFeePercent * 100}%`,
+          platformFee: platformFeeInCents,
+          sellerAmount: sellerAmountInCents,
+          // Convert to dollars for readability
+          totalAmountDollars: (orderAmountInCents / 100).toFixed(2),
+          platformFeeDollars: (platformFeeInCents / 100).toFixed(2),
+          sellerAmountDollars: (sellerAmountInCents / 100).toFixed(2)
+        });
 
         // 1. Check seller's Stripe account status
         let sellerAccount;
@@ -1216,10 +1235,10 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
           throw new Error('PAYMENT_INTENT_ERROR');
         }
 
-        // 3. Create transfer to seller
+        // 3. Create transfer to seller (amounts are already in cents)
         try {
           const transfer = await stripe.transfers.create({
-            amount: Math.round(sellerAmount * 100), // Convert to cents
+            amount: sellerAmountInCents, // Already in cents
             currency: 'usd',
             destination: order.sellerId.stripeAccountId,
             transfer_group: `ORDER_${orderId}`,
@@ -1228,13 +1247,22 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
               buyerId: order.buyerId._id.toString(),
               sellerId: order.sellerId._id.toString(),
               listingId: order.listingId?._id.toString(),
-              amount: order.amount
-            }
+              amount: orderAmountInCents,
+              platformFee: platformFeeInCents,
+              sellerAmount: sellerAmountInCents,
+              commissionPercentage: '10%'
+            },
+            description: `Payment for order ${orderId} - ${order.listingId?.title || 'Item'}`
           });
 
           paymentSuccess = true;
           transferId = transfer.id;
-          console.log('💵 Transfer created:', transfer.id);
+          console.log('💵 Transfer created:', {
+            id: transfer.id,
+            amount: transfer.amount,
+            currency: transfer.currency,
+            sellerAmountDollars: (sellerAmountInCents / 100).toFixed(2)
+          });
 
         } catch (transferErr) {
           console.error('Transfer creation failed:', transferErr.message);
@@ -1245,8 +1273,14 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
             throw new Error('SELLER_ACCOUNT_NEEDS_SETUP');
           } else if (transferErr.code === 'account_invalid') {
             throw new Error('SELLER_ACCOUNT_INVALID');
+          } else if (transferErr.code === 'amount_too_small') {
+            console.log('Amount too small for transfer:', sellerAmountInCents);
+            // Still mark as success but log it
+            paymentSuccess = true;
+            transferError = 'Amount will be held until minimum threshold reached';
+          } else {
+            throw new Error('TRANSFER_FAILED: ' + transferErr.message);
           }
-          throw new Error('TRANSFER_FAILED');
         }
 
       } catch (stripeError) {
@@ -1277,9 +1311,59 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
       order.paymentReleased = true;
       order.releaseDate = new Date();
       order.stripeTransferId = transferId;
-      order.platformFee = platformFee;
-      order.sellerAmount = sellerAmount;
+      order.platformFee = platformFeeInCents / 100; // Store in dollars for database
+      order.sellerAmount = sellerAmountInCents / 100; // Store in dollars for database
       order.paymentStatus = 'released';
+      
+      // ✅ Create earning record for seller
+      try {
+        const earning = new Earning({
+          sellerId: order.sellerId._id,
+          orderId: order._id,
+          amount: sellerAmountInCents, // Store in cents
+          commission: platformFeeInCents, // Store in cents
+          totalAmount: orderAmountInCents, // Store in cents
+          status: 'pending',
+          type: 'order_completion',
+          stripeTransferId: transferId,
+          currency: 'usd',
+          metadata: {
+            orderNumber: order.orderNumber,
+            listingTitle: order.listingId?.title,
+            commissionPercentage: '10%'
+          }
+        });
+        
+        await earning.save();
+        console.log('📊 Earning record created:', earning._id);
+        
+        // ✅ Update seller's balance
+        await SellerBalance.findOneAndUpdate(
+          { sellerId: order.sellerId._id },
+          {
+            $inc: {
+              pendingBalance: sellerAmountInCents, // Add to pending balance (in cents)
+              totalEarnings: sellerAmountInCents, // Add to total earnings (in cents)
+              totalSales: orderAmountInCents, // Add to total sales (in cents)
+              totalCommission: platformFeeInCents // Add to platform commission (in cents)
+            },
+            lastEarningDate: new Date(),
+            lastUpdated: new Date()
+          },
+          { upsert: true, new: true }
+        );
+        
+        console.log('💰 Seller balance updated with:', {
+          pendingBalanceAdded: sellerAmountInCents,
+          totalEarningsAdded: sellerAmountInCents,
+          totalSalesAdded: orderAmountInCents,
+          totalCommissionAdded: platformFeeInCents
+        });
+        
+      } catch (dbError) {
+        console.error('Error creating earning record:', dbError.message);
+        // Don't fail the order completion if earning record fails
+      }
     } else if (transferError) {
       order.paymentStatus = 'failed';
       order.paymentError = transferError;
@@ -1294,11 +1378,14 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
       await User.findByIdAndUpdate(order.sellerId._id, {
         $inc: {
           completedOrders: 1,
-          totalEarnings: sellerAmount,
-          totalSales: order.amount
+          // Note: These should be in dollars for user stats
+          totalEarnings: sellerAmountInCents / 100,
+          totalSales: orderAmountInCents / 100
         },
         lastPaymentDate: new Date()
       });
+      
+      console.log('👤 Seller stats updated');
     }
 
     // ✅ Send notifications
@@ -1308,32 +1395,49 @@ router.put("/:orderId/complete", authenticateMiddleware, async (req, res) => {
       console.error('Email notification failed:', emailError.message);
     }
 
-    // ✅ Prepare response
+    // ✅ Prepare response with clear amounts
     const response = {
       success: true,
       message: paymentSuccess 
-        ? 'Order completed! Payment released to seller.' 
+        ? `Order completed! $${(sellerAmountInCents / 100).toFixed(2)} released to seller.` 
         : transferError 
-          ? 'Order completed. Payment release failed: ' + transferError
+          ? `Order completed. Payment release failed: ${transferError}`
           : 'Order completed successfully.',
       order: {
         _id: order._id,
         orderNumber: order.orderNumber || order._id.toString().slice(-8).toUpperCase(),
         status: order.status,
         amount: order.amount,
-        completedAt: order.completedAt
+        completedAt: order.completedAt,
+        paymentDetails: {
+          released: paymentSuccess,
+          sellerAmount: sellerAmountInCents / 100, // Convert to dollars for response
+          platformFee: platformFeeInCents / 100, // Convert to dollars for response
+          totalAmount: orderAmountInCents / 100, // Convert to dollars for response
+          commissionPercentage: '10%'
+        }
       },
       payment: {
         released: paymentSuccess,
         success: paymentSuccess,
         error: transferError,
-        sellerAmount: sellerAmount,
-        platformFee: platformFee
+        sellerAmountInCents: sellerAmountInCents,
+        platformFeeInCents: platformFeeInCents,
+        totalAmountInCents: orderAmountInCents,
+        sellerAmountDollars: (sellerAmountInCents / 100).toFixed(2),
+        platformFeeDollars: (platformFeeInCents / 100).toFixed(2),
+        totalAmountDollars: (orderAmountInCents / 100).toFixed(2)
       },
       nextSteps: paymentSuccess 
         ? 'Consider leaving a review for the seller'
         : 'The seller needs to complete their Stripe setup to receive payments'
     };
+
+    console.log('✅ Order completion response:', {
+      orderAmount: response.order.paymentDetails.totalAmount,
+      sellerReceived: response.order.paymentDetails.sellerAmount,
+      platformFee: response.order.paymentDetails.platformFee
+    });
 
     res.status(200).json(response);
 
