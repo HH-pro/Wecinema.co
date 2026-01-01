@@ -53,65 +53,60 @@ const handleApiError = (error, defaultMessage = 'API Error') => {
     data: errorData
   };
 };
-
 // ============================================
-// ✅ CURRENCY FORMATTING FUNCTIONS (UPDATED)
+// ✅ CURRENCY FORMATTING FUNCTIONS (UPDATED FOR DOLLAR)
 // ============================================
 
 export const formatCurrency = (amount) => {
-  const amountInRupees = (amount || 0) / 100;
-  return new Intl.NumberFormat('en-IN', {
+  const amountInDollars = (amount || 0) / 100;
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'INR',
+    currency: 'USD',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  }).format(amountInRupees);
+  }).format(amountInDollars);
 };
 
 export const formatCurrencyAmount = (amount) => {
-  const amountInRupees = (amount || 0) / 100;
-  return new Intl.NumberFormat('en-IN', {
+  const amountInDollars = (amount || 0) / 100;
+  return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  }).format(amountInRupees);
+  }).format(amountInDollars);
 };
 
 export const formatCurrencyShort = (amount) => {
-  const amountInRupees = (amount || 0) / 100;
-  if (amountInRupees >= 10000000) {
-    return `₹${(amountInRupees / 10000000).toFixed(1)}Cr`;
-  } else if (amountInRupees >= 100000) {
-    return `₹${(amountInRupees / 100000).toFixed(1)}L`;
-  } else if (amountInRupees >= 1000) {
-    return `₹${(amountInRupees / 1000).toFixed(1)}K`;
+  const amountInDollars = (amount || 0) / 100;
+  if (amountInDollars >= 1000000) {
+    return `$${(amountInDollars / 1000000).toFixed(1)}M`;
+  } else if (amountInDollars >= 1000) {
+    return `$${(amountInDollars / 1000).toFixed(1)}K`;
   }
-  return `₹${amountInRupees.toFixed(2)}`;
+  return `$${amountInDollars.toFixed(2)}`;
 };
 
-// Add dollar format as well for compatibility
-export const formatCurrencyWithSymbol = (amount, currency = 'INR') => {
-  const amountInBase = (amount || 0) / 100;
-  const symbol = currency === 'USD' ? '$' : '₹';
-  
-  if (currency === 'USD') {
-    return `${symbol}${amountInBase.toFixed(2)}`;
-  }
-  
-  // For INR, format with commas
-  const formatted = new Intl.NumberFormat('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(amountInBase);
-  
-  return `₹${formatted}`;
+// Dollar format (USD always)
+export const formatCurrencyWithSymbol = (amount) => {
+  const amountInDollars = (amount || 0) / 100;
+  return `$${amountInDollars.toFixed(2)}`;
 };
 
 // Simple amount display without symbol
 export const formatAmount = (amount) => {
-  const amountInRupees = (amount || 0) / 100;
-  return amountInRupees.toFixed(2);
+  const amountInDollars = (amount || 0) / 100;
+  return amountInDollars.toFixed(2);
 };
 
+// Alternative: Direct dollar formatting
+export const formatUSD = (amount) => {
+  const amountInDollars = (amount || 0) / 100;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amountInDollars);
+};
 // ============================================
 // ✅ EARNINGS API
 // ============================================
