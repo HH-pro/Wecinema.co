@@ -18,29 +18,28 @@ const marketplaceListingSchema = new mongoose.Schema({
     maxlength: 2000
   },
   
-  // 🆕 UPDATED: Price always in USD
+  // ✅ Price in INR (Database mein INR hi store hoga)
   price: { 
     type: Number, 
     required: true,
     min: 0,
     set: function(value) {
-      // Round to 2 decimal places for USD
+      // 2 decimal places tak round karein
       return parseFloat(value.toFixed(2));
     }
   },
   
-  // 🆕 NEW: Store original currency for conversion tracking
-  originalCurrency: {
+  // ✅ NEW: Display currency (bas display ke liye)
+  displayCurrency: {
     type: String,
-    enum: ['USD', 'INR', null],
-    default: null
+    enum: ['USD'],
+    default: 'USD'
   },
   
-  // 🆕 NEW: Store original price if converted from another currency
-  originalPrice: {
+  // ✅ NEW: Exchange rate for display
+  displayExchangeRate: {
     type: Number,
-    min: 0,
-    default: null
+    default: 83 // INR to USD rate
   },
   
   type: {
@@ -82,17 +81,6 @@ const marketplaceListingSchema = new mongoose.Schema({
       },
       message: 'Invalid email format'
     }
-  },
-  
-  // 🆕 NEW: Exchange rate used for conversion
-  exchangeRate: {
-    type: Number,
-    default: 83 // Default INR to USD rate
-  },
-  
-  // 🆕 NEW: When the conversion was done
-  convertedAt: {
-    type: Date
   },
   
   // Optional enhancements
@@ -155,9 +143,9 @@ marketplaceListingSchema.index({ price: 1 });
 marketplaceListingSchema.index({ sellerEmail: 1 });
 marketplaceListingSchema.index({ title: 'text', description: 'text', tags: 'text' });
 
-// 🆕 Pre-save middleware for currency conversion
+// Pre-save middleware
 marketplaceListingSchema.pre('save', async function(next) {
-  // Generate slug from title
+  // Generate slug
   if (this.isModified('title')) {
     this.slug = this.title
       .toLowerCase()
@@ -166,21 +154,7 @@ marketplaceListingSchema.pre('save', async function(next) {
       .replace(/^-|-$/g, '');
   }
   
-  // 🆕 Auto-convert price to USD if needed
-  // When creating new listing with originalCurrency = 'INR'
-  if (this.isNew && this.originalCurrency === 'INR' && this.originalPrice) {
-    // Convert INR to USD
-    const exchangeRate = this.exchangeRate || 83;
-    this.price = parseFloat((this.originalPrice / exchangeRate).toFixed(2));
-    this.convertedAt = new Date();
-  }
-  
-  // 🆕 Update convertedAt when price is modified
-  if (this.isModified('price') && this.originalCurrency && this.originalCurrency !== 'USD') {
-    this.convertedAt = new Date();
-  }
-  
-  // Populate sellerEmail from User model if not provided
+  // Populate sellerEmail
   if (!this.sellerEmail && this.sellerId) {
     try {
       const User = mongoose.model('User');
@@ -196,60 +170,30 @@ marketplaceListingSchema.pre('save', async function(next) {
   next();
 });
 
-// 🆕 Virtual for formatted price in USD
-marketplaceListingSchema.virtual('formattedPrice').get(function() {
-  return `$${this.price.toFixed(2)}`;
+// ✅ Virtual for formatted price in $ (Display ke liye)
+marketplaceListingSchema.virtual('displayPrice').get(function() {
+  const priceInUSD = this.price / (this.displayExchangeRate || 83);
+  return `$${priceInUSD.toFixed(2)}`;
 });
 
-// 🆕 Virtual to display price with original currency if converted
-marketplaceListingSchema.virtual('priceWithOriginal').get(function() {
-  if (this.originalCurrency && this.originalPrice) {
-    if (this.originalCurrency === 'INR') {
-      return {
-        usd: `$${this.price.toFixed(2)}`,
-        original: `₹${this.originalPrice.toFixed(2)}`,
-        currency: this.originalCurrency
-      };
-    }
-  }
+// ✅ Virtual for actual price in INR (Database value)
+marketplaceListingSchema.virtual('actualPrice').get(function() {
+  return `₹${this.price.toFixed(2)}`;
+});
+
+// ✅ Method to get both prices
+marketplaceListingSchema.methods.getPriceInfo = function() {
+  const priceInUSD = this.price / (this.displayExchangeRate || 83);
   return {
-    usd: `$${this.price.toFixed(2)}`,
-    original: null,
-    currency: 'USD'
+    priceInUSD: priceInUSD.toFixed(2),
+    priceInINR: this.price.toFixed(2),
+    display: `$${priceInUSD.toFixed(2)}`,
+    actual: `₹${this.price.toFixed(2)}`,
+    exchangeRate: this.displayExchangeRate || 83
   };
-});
-
-// 🆕 Method to convert existing listings to USD
-marketplaceListingSchema.methods.convertToUSD = function(exchangeRate = 83) {
-  if (this.originalCurrency && this.originalCurrency !== 'USD') {
-    this.exchangeRate = exchangeRate;
-    this.price = parseFloat((this.originalPrice / exchangeRate).toFixed(2));
-    this.convertedAt = new Date();
-    return this;
-  }
-  return this;
 };
 
-// 🆕 Static method to convert all INR listings to USD
-marketplaceListingSchema.statics.convertAllINRtoUSD = async function(exchangeRate = 83) {
-  const listings = await this.find({ originalCurrency: 'INR' });
-  
-  for (let listing of listings) {
-    listing.price = parseFloat((listing.originalPrice / exchangeRate).toFixed(2));
-    listing.exchangeRate = exchangeRate;
-    listing.convertedAt = new Date();
-    await listing.save();
-  }
-  
-  return listings.length;
-};
-
-// 🆕 Method to check if listing is available
-marketplaceListingSchema.methods.isAvailable = function() {
-  return this.status === 'active' && (!this.expiresAt || this.expiresAt > new Date());
-};
-
-// 🆕 Static method for active listings
+// Static method for active listings
 marketplaceListingSchema.statics.findActive = function() {
   return this.find({ 
     status: 'active',
@@ -260,25 +204,9 @@ marketplaceListingSchema.statics.findActive = function() {
   });
 };
 
-// 🆕 Method to get seller contact info
-marketplaceListingSchema.methods.getSellerContact = function() {
-  return {
-    email: this.sellerEmail,
-    currency: 'USD' // Always USD
-  };
-};
-
-// 🆕 Static method to find listings by seller email
-marketplaceListingSchema.statics.findBySellerEmail = function(email) {
-  return this.find({ sellerEmail: email.toLowerCase() });
-};
-
-// 🆕 Update email when seller updates their email
-marketplaceListingSchema.statics.updateSellerEmail = async function(sellerId, newEmail) {
-  return this.updateMany(
-    { sellerId: sellerId },
-    { sellerEmail: newEmail.toLowerCase() }
-  );
+// Method to check if listing is available
+marketplaceListingSchema.methods.isAvailable = function() {
+  return this.status === 'active' && (!this.expiresAt || this.expiresAt > new Date());
 };
 
 const MarketplaceListing = mongoose.model('MarketplaceListing', marketplaceListingSchema);
