@@ -73,7 +73,7 @@ const earningsApi = {
   processPayout: async (amount, paymentMethod, accountDetails) => {
     try {
       const response = await axios.post(
-        `${API_BASE_URL}/marketplace/earnings/process-payout`,
+        `${API_BASE_URL}/marketplace/stripe/earnings/process-payout`,
         { amount, paymentMethod, accountDetails },
         getHeaders()
       );
@@ -88,7 +88,7 @@ const earningsApi = {
     try {
       const { page = 1, limit = 20, type, status } = params;
       const response = await axios.get(
-        `${API_BASE_URL}/marketplace/earnings/payment-history`,
+        `${API_BASE_URL}/marketplace/stripe/earnings/payment-history`,
         {
           params: { page, limit, type, status },
           ...getHeaders()
@@ -105,7 +105,7 @@ const earningsApi = {
     try {
       const { status } = params;
       const response = await axios.get(
-        `${API_BASE_URL}/marketplace/earnings/withdrawal-history`,
+        `${API_BASE_URL}/marketplace/stripe/earnings/withdrawal-history`,
         {
           params: { status },
           ...getHeaders()
@@ -121,7 +121,7 @@ const earningsApi = {
   releasePayment: async (orderId) => {
     try {
       const response = await axios.post(
-        `${API_BASE_URL}/marketplace/earnings/release-payment/${orderId}`,
+        `${API_BASE_URL}/marketplace/stripe/earnings/release-payment/${orderId}`,
         {},
         getHeaders()
       );
