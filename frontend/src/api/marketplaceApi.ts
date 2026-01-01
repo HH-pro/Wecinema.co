@@ -1,4 +1,7 @@
-// src/api/marketplaceApi.js - UPDATED WITH CORRECT ROUTES
+// ============================================
+// ✅ MARKETPLACE API INTEGRATION
+// ============================================
+
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:3000';
@@ -52,11 +55,68 @@ const handleApiError = (error, defaultMessage = 'API Error') => {
 };
 
 // ============================================
-// ✅ EARNINGS API - UPDATED URLs
+// ✅ CURRENCY FORMATTING FUNCTIONS (UPDATED)
+// ============================================
+
+export const formatCurrency = (amount) => {
+  const amountInRupees = (amount || 0) / 100;
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amountInRupees);
+};
+
+export const formatCurrencyAmount = (amount) => {
+  const amountInRupees = (amount || 0) / 100;
+  return new Intl.NumberFormat('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amountInRupees);
+};
+
+export const formatCurrencyShort = (amount) => {
+  const amountInRupees = (amount || 0) / 100;
+  if (amountInRupees >= 10000000) {
+    return `₹${(amountInRupees / 10000000).toFixed(1)}Cr`;
+  } else if (amountInRupees >= 100000) {
+    return `₹${(amountInRupees / 100000).toFixed(1)}L`;
+  } else if (amountInRupees >= 1000) {
+    return `₹${(amountInRupees / 1000).toFixed(1)}K`;
+  }
+  return `₹${amountInRupees.toFixed(2)}`;
+};
+
+// Add dollar format as well for compatibility
+export const formatCurrencyWithSymbol = (amount, currency = 'INR') => {
+  const amountInBase = (amount || 0) / 100;
+  const symbol = currency === 'USD' ? '$' : '₹';
+  
+  if (currency === 'USD') {
+    return `${symbol}${amountInBase.toFixed(2)}`;
+  }
+  
+  // For INR, format with commas
+  const formatted = new Intl.NumberFormat('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amountInBase);
+  
+  return `₹${formatted}`;
+};
+
+// Simple amount display without symbol
+export const formatAmount = (amount) => {
+  const amountInRupees = (amount || 0) / 100;
+  return amountInRupees.toFixed(2);
+};
+
+// ============================================
+// ✅ EARNINGS API
 // ============================================
 
 const earningsApi = {
-  // GET EARNINGS DASHBOARD
   getEarningsDashboard: async () => {
     try {
       const response = await axios.get(
@@ -69,7 +129,6 @@ const earningsApi = {
     }
   },
 
-  // PROCESS PAYOUT/WITHDRAWAL
   processPayout: async (amount, paymentMethod, accountDetails) => {
     try {
       const response = await axios.post(
@@ -83,7 +142,6 @@ const earningsApi = {
     }
   },
 
-  // GET PAYMENT HISTORY
   getPaymentHistory: async (params = {}) => {
     try {
       const { page = 1, limit = 20, type, status } = params;
@@ -100,7 +158,6 @@ const earningsApi = {
     }
   },
 
-  // GET WITHDRAWAL HISTORY
   getWithdrawalHistory: async (params = {}) => {
     try {
       const { status } = params;
@@ -117,7 +174,6 @@ const earningsApi = {
     }
   },
 
-  // RELEASE PENDING PAYMENT
   releasePayment: async (orderId) => {
     try {
       const response = await axios.post(
@@ -133,11 +189,10 @@ const earningsApi = {
 };
 
 // ============================================
-// ✅ STRIPE API - UPDATED URLs
+// ✅ STRIPE API
 // ============================================
 
 const stripeApi = {
-  // GET STRIPE STATUS
   getStripeStatus: async () => {
     try {
       const response = await axios.get(
@@ -150,7 +205,6 @@ const stripeApi = {
     }
   },
 
-  // SIMPLE STATUS (Alternative)
   getStripeStatusSimple: async () => {
     try {
       const response = await axios.get(
@@ -163,7 +217,6 @@ const stripeApi = {
     }
   },
 
-  // CREATE ACCOUNT LINK
   createStripeAccountLink: async () => {
     try {
       const response = await axios.post(
@@ -177,7 +230,6 @@ const stripeApi = {
     }
   },
 
-  // ONBOARD SELLER
   onboardSeller: async () => {
     try {
       const response = await axios.post(
@@ -191,7 +243,6 @@ const stripeApi = {
     }
   },
 
-  // COMPLETE ONBOARDING
   completeOnboarding: async () => {
     try {
       const response = await axios.post(
@@ -205,7 +256,6 @@ const stripeApi = {
     }
   },
 
-  // GET BALANCE
   getStripeBalance: async () => {
     try {
       const response = await axios.get(
@@ -218,7 +268,6 @@ const stripeApi = {
     }
   },
 
-  // GET PAYOUTS
   getStripePayouts: async () => {
     try {
       const response = await axios.get(
@@ -231,7 +280,6 @@ const stripeApi = {
     }
   },
 
-  // CREATE PAYMENT INTENT
   createPaymentIntent: async (orderId) => {
     try {
       const response = await axios.post(
@@ -245,7 +293,6 @@ const stripeApi = {
     }
   },
 
-  // CONFIRM PAYMENT
   confirmPayment: async (paymentIntentId) => {
     try {
       const response = await axios.post(
@@ -259,7 +306,6 @@ const stripeApi = {
     }
   },
 
-  // CREATE LOGIN LINK
   createLoginLink: async () => {
     try {
       const response = await axios.post(
@@ -273,7 +319,6 @@ const stripeApi = {
     }
   },
 
-  // STRIPE PAYOUTS
   getStripePayoutsHistory: async () => {
     try {
       const response = await axios.get(
@@ -288,14 +333,24 @@ const stripeApi = {
 };
 
 // ============================================
-// ✅ LISTINGS API - UPDATED URLs
+// ✅ LISTINGS API
 // ============================================
 
 const listingsApi = {
   getAllListings: async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/marketplace/listings`);
-      return normalizeResponse(response);
+      const normalized = normalizeResponse(response);
+      
+      // Format listing prices
+      if (normalized.success && normalized.data && Array.isArray(normalized.data)) {
+        normalized.data = normalized.data.map(listing => ({
+          ...listing,
+          formattedPrice: formatCurrency(listing.price)
+        }));
+      }
+      
+      return normalized;
     } catch (error) {
       return handleApiError(error, 'Failed to fetch listings');
     }
@@ -308,7 +363,18 @@ const listingsApi = {
         params: { page, limit, status },
         ...getHeaders()
       });
-      return normalizeResponse(response);
+      
+      const normalized = normalizeResponse(response);
+      
+      // Format listing prices
+      if (normalized.success && normalized.data && normalized.data.listings) {
+        normalized.data.listings = normalized.data.listings.map(listing => ({
+          ...listing,
+          formattedPrice: formatCurrency(listing.price)
+        }));
+      }
+      
+      return normalized;
     } catch (error) {
       return handleApiError(error, 'Failed to fetch your listings');
     }
@@ -375,7 +441,14 @@ const listingsApi = {
   getListingDetails: async (listingId) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/marketplace/listings/${listingId}`);
-      return normalizeResponse(response);
+      const normalized = normalizeResponse(response);
+      
+      // Format listing price
+      if (normalized.success && normalized.data) {
+        normalized.data.formattedPrice = formatCurrency(normalized.data.price);
+      }
+      
+      return normalized;
     } catch (error) {
       return handleApiError(error, 'Failed to fetch listing details');
     }
@@ -387,7 +460,18 @@ const listingsApi = {
       const response = await axios.get(`${API_BASE_URL}/marketplace/user/${userId}/listings`, {
         params: { page, limit, status }
       });
-      return normalizeResponse(response);
+      
+      const normalized = normalizeResponse(response);
+      
+      // Format listing prices
+      if (normalized.success && normalized.data && Array.isArray(normalized.data)) {
+        normalized.data = normalized.data.map(listing => ({
+          ...listing,
+          formattedPrice: formatCurrency(listing.price)
+        }));
+      }
+      
+      return normalized;
     } catch (error) {
       return handleApiError(error, 'Failed to fetch user listings');
     }
@@ -395,7 +479,7 @@ const listingsApi = {
 };
 
 // ============================================
-// ✅ ORDERS API - UPDATED URLs
+// ✅ ORDERS API
 // ============================================
 
 const ordersApi = {
@@ -415,15 +499,20 @@ const ordersApi = {
           });
           
           const data = response.data || response;
-          const orders = data.sales || data.orders || data.data || data;
+          let orders = data.sales || data.orders || data.data || data;
           
-          if (Array.isArray(orders)) {
-            return orders;
+          if (!Array.isArray(orders)) {
+            orders = [];
           }
           
-          if (data.success && Array.isArray(data.data)) {
-            return data.data;
-          }
+          // Format order amounts
+          const formattedOrders = orders.map(order => ({
+            ...order,
+            formattedAmount: formatCurrency(order.amount || order.totalAmount || 0),
+            formattedPrice: formatCurrency(order.price || 0)
+          }));
+          
+          return formattedOrders;
         } catch (err) {
           continue;
         }
@@ -455,7 +544,27 @@ const ordersApi = {
         `${API_BASE_URL}/marketplace/orders/${orderId}`,
         getHeaders()
       );
-      return normalizeResponse(response);
+      
+      const normalized = normalizeResponse(response);
+      
+      // Format order amounts
+      if (normalized.success && normalized.data) {
+        const data = normalized.data;
+        data.formattedTotal = formatCurrency(data.totalAmount || data.amount || 0);
+        data.formattedSubtotal = formatCurrency(data.subtotal || 0);
+        data.formattedTax = formatCurrency(data.tax || 0);
+        data.formattedShipping = formatCurrency(data.shipping || 0);
+        
+        if (data.items && Array.isArray(data.items)) {
+          data.items = data.items.map(item => ({
+            ...item,
+            formattedPrice: formatCurrency(item.price || 0),
+            formattedTotal: formatCurrency(item.total || 0)
+          }));
+        }
+      }
+      
+      return normalized;
     } catch (error) {
       return handleApiError(error, 'Failed to fetch order details');
     }
@@ -463,7 +572,7 @@ const ordersApi = {
 };
 
 // ============================================
-// ✅ OFFERS API - UPDATED URLs
+// ✅ OFFERS API
 // ============================================
 
 const offersApi = {
@@ -477,6 +586,15 @@ const offersApi = {
       
       if (normalized.success && !normalized.offers && normalized.data) {
         normalized.offers = normalized.data;
+      }
+      
+      // Format offer amounts
+      if (normalized.success && normalized.offers && Array.isArray(normalized.offers)) {
+        normalized.offers = normalized.offers.map(offer => ({
+          ...offer,
+          formattedOfferAmount: formatCurrency(offer.offerAmount || 0),
+          formattedOriginalPrice: formatCurrency(offer.originalPrice || 0)
+        }));
       }
       
       return normalized;
@@ -513,43 +631,8 @@ const offersApi = {
 };
 
 // ============================================
-// ✅ UTILITY FUNCTIONS (PUBLIC)
+// ✅ UTILITY FUNCTIONS
 // ============================================
-
-export const formatCurrency = (amount) => {
-  const amountInRupees = (amount || 0) / 100;
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(amountInRupees);
-};
-
-export const formatCurrencyAmount = (amount) => {
-  const amountInRupees = (amount || 0) / 100;
-  return new Intl.NumberFormat('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(amountInRupees);
-};
-
-export const formatCurrencyShort = (amount) => {
-  const amountInRupees = (amount || 0) / 100;
-  if (amountInRupees >= 10000000) {
-    return `₹${(amountInRupees / 10000000).toFixed(1)}Cr`;
-  } else if (amountInRupees >= 100000) {
-    return `₹${(amountInRupees / 100000).toFixed(1)}L`;
-  } else if (amountInRupees >= 1000) {
-    return `₹${(amountInRupees / 1000).toFixed(1)}K`;
-  }
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(amountInRupees);
-};
 
 export const testApiConnection = async () => {
   try {
@@ -587,17 +670,21 @@ export const getCurrentUserId = () => {
 };
 
 // ============================================
-// ✅ HELPER FUNCTIONS FOR EARNINGS
+// ✅ EARNINGS HELPER FUNCTIONS
 // ============================================
 
 export const calculateSellerEarnings = (orderAmount, commissionPercentage = 10) => {
   const commission = (orderAmount * commissionPercentage) / 100;
   const sellerEarnings = orderAmount - commission;
+  
   return {
     totalAmount: orderAmount,
     commission,
     sellerEarnings,
-    commissionPercentage
+    commissionPercentage,
+    formattedTotalAmount: formatCurrency(orderAmount),
+    formattedCommission: formatCurrency(commission),
+    formattedSellerEarnings: formatCurrency(sellerEarnings)
   };
 };
 
@@ -632,7 +719,7 @@ export const getPaymentMethodIcon = (method) => {
 };
 
 // ============================================
-// ✅ MAIN API EXPORT (SINGLE EXPORT OBJECT)
+// ✅ MAIN API EXPORT
 // ============================================
 
 const marketplaceApi = {
@@ -643,10 +730,14 @@ const marketplaceApi = {
   stripe: stripeApi,
   earnings: earningsApi,
   
-  // Utility Functions
+  // Currency Formatting Functions
   formatCurrency,
   formatCurrencyAmount,
   formatCurrencyShort,
+  formatCurrencyWithSymbol,
+  formatAmount,
+  
+  // Utility Functions
   testApiConnection,
   checkAuth,
   getCurrentUserId,
@@ -654,7 +745,7 @@ const marketplaceApi = {
   getPayoutStatusColor,
   getPaymentMethodIcon,
   
-  // Direct API Methods (for convenience)
+  // Direct API Methods
   // Listings
   getAllListings: listingsApi.getAllListings,
   getMyListings: listingsApi.getMyListings,
@@ -698,13 +789,13 @@ const marketplaceApi = {
 // ✅ EXPORT CONFIGURATION
 // ============================================
 
-// Export the full API object as default
+// Default export
 export default marketplaceApi;
 
-// Export all individual functions and modules
+// Named exports
 export { marketplaceApi };
 
-// Export API modules (optional - for advanced usage)
+// Module exports
 export {
   listingsApi,
   ordersApi,
