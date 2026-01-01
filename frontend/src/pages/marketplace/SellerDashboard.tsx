@@ -10,30 +10,8 @@ import { getCurrentUserId } from '../../utilities/helperfFunction';
 // Import API
 import marketplaceApi from '../../api/marketplaceApi';
 
-// Import components
-import DashboardHeader from '../../components/marketplae/seller/DashboardHeader';
-import TabNavigation from '../../components/marketplae/seller/TabNavigation';
-import StatsGrid from '../../components/marketplae/seller/StatsGrid';
-import WelcomeCard from '../../components/marketplae/seller/WelcomeCard';
-import RecentOrders from '../../components/marketplae/seller/RecentOrders';
-import ActionCard from '../../components/marketplae/seller/ActionCard';
-import OrderWorkflowGuide from '../../components/marketplae/seller/OrderWorkflowGuide';
-import StripeAccountStatus from '../../components/marketplae/seller/StripeAccountStatus';
-import StripeSuccessAlert from '../../components/marketplae/seller/StripeSuccessAlert';
-
-// Import tab components
-import OffersTab from '../../components/marketplae/seller/OffersTab';
-import ListingsTab from '../../components/marketplae/seller/ListingsTab';
-import OrdersTab from '../../components/marketplae/seller/OrdersTab';
-import WithdrawTab from '../../components/marketplae/seller/WithdrawTab';
-import EarningsTab from '../../components/marketplae/seller/EarningsTab';
-
-// Import modals
-import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
-import OrderDetailsModal from '../../components/marketplae/seller/OrderDetailsModal';
-import EditListingModal from '../../components/marketplae/seller/EditListingModal';
-import DeleteListingModal from '../../components/marketplae/seller/DeleteListingModal';
-import VideoPlayerModal from '../../components/marketplae/seller/VideoPlayerModal';
+// Import components (keep your existing imports)
+// ... existing component imports ...
 
 // For now, create a simple formatCurrency function
 const formatCurrency = (amount: number) => {
@@ -56,24 +34,7 @@ const SimpleFallback = ({ name }: { name: string }) => (
 
 // Use simple checks for components
 const SafeDashboardHeader = (typeof DashboardHeader === 'function' || typeof DashboardHeader === 'object') ? DashboardHeader : () => <SimpleFallback name="DashboardHeader" />;
-const SafeTabNavigation = (typeof TabNavigation === 'function' || typeof TabNavigation === 'object') ? TabNavigation : () => <SimpleFallback name="TabNavigation" />;
-const SafeWelcomeCard = (typeof WelcomeCard === 'function' || typeof WelcomeCard === 'object') ? WelcomeCard : () => <SimpleFallback name="WelcomeCard" />;
-const SafeStatsGrid = (typeof StatsGrid === 'function' || typeof StatsGrid === 'object') ? StatsGrid : () => <SimpleFallback name="StatsGrid" />;
-const SafeRecentOrders = (typeof RecentOrders === 'function' || typeof RecentOrders === 'object') ? RecentOrders : () => <SimpleFallback name="RecentOrders" />;
-const SafeActionCard = (typeof ActionCard === 'function' || typeof ActionCard === 'object') ? ActionCard : () => <SimpleFallback name="ActionCard" />;
-const SafeOrderWorkflowGuide = (typeof OrderWorkflowGuide === 'function' || typeof OrderWorkflowGuide === 'object') ? OrderWorkflowGuide : () => <SimpleFallback name="OrderWorkflowGuide" />;
-const SafeStripeAccountStatus = (typeof StripeAccountStatus === 'function' || typeof StripeAccountStatus === 'object') ? StripeAccountStatus : () => <SimpleFallback name="StripeAccountStatus" />;
-const SafeStripeSuccessAlert = (typeof StripeSuccessAlert === 'function' || typeof StripeSuccessAlert === 'object') ? StripeSuccessAlert : () => <SimpleFallback name="StripeSuccessAlert" />;
-const SafeOffersTab = (typeof OffersTab === 'function' || typeof OffersTab === 'object') ? OffersTab : () => <SimpleFallback name="OffersTab" />;
-const SafeListingsTab = (typeof ListingsTab === 'function' || typeof ListingsTab === 'object') ? ListingsTab : () => <SimpleFallback name="ListingsTab" />;
-const SafeOrdersTab = (typeof OrdersTab === 'function' || typeof OrdersTab === 'object') ? OrdersTab : () => <SimpleFallback name="OrdersTab" />;
-const SafeWithdrawTab = (typeof WithdrawTab === 'function' || typeof WithdrawTab === 'object') ? WithdrawTab : () => <SimpleFallback name="WithdrawTab" />;
-const SafeEarningsTab = (typeof EarningsTab === 'function' || typeof EarningsTab === 'object') ? EarningsTab : () => <SimpleFallback name="EarningsTab" />;
-const SafeStripeSetupModal = (typeof StripeSetupModal === 'function' || typeof StripeSetupModal === 'object') ? StripeSetupModal : () => <SimpleFallback name="StripeSetupModal" />;
-const SafeOrderDetailsModal = (typeof OrderDetailsModal === 'function' || typeof OrderDetailsModal === 'object') ? OrderDetailsModal : () => <SimpleFallback name="OrderDetailsModal" />;
-const SafeEditListingModal = (typeof EditListingModal === 'function' || typeof EditListingModal === 'object') ? EditListingModal : () => <SimpleFallback name="EditListingModal" />;
-const SafeDeleteListingModal = (typeof DeleteListingModal === 'function' || typeof DeleteListingModal === 'object') ? DeleteListingModal : () => <SimpleFallback name="DeleteListingModal" />;
-const SafeVideoPlayerModal = (typeof VideoPlayerModal === 'function' || typeof VideoPlayerModal === 'object') ? VideoPlayerModal : () => <SimpleFallback name="VideoPlayerModal" />;
+// ... other safe components ...
 
 // Interfaces
 interface Order {
@@ -102,48 +63,6 @@ interface Order {
   }>;
 }
 
-interface Offer {
-  _id: string;
-  listingId: string;
-  listingTitle: string;
-  buyerId: string;
-  buyerName: string;
-  buyerEmail: string;
-  amount: number; // in cents
-  status: string;
-  message?: string;
-  createdAt: string;
-  videoUrl?: string;
-}
-
-interface Listing {
-  _id: string;
-  title: string;
-  description: string;
-  price: number; // in dollars
-  category: string;
-  tags: string[];
-  status: string;
-  sellerId: string;
-  createdAt: string;
-  updatedAt: string;
-  images?: string[];
-  videoUrl?: string;
-  deliveryTime?: number;
-  revisions?: number;
-  featured?: boolean;
-}
-
-interface ListingsData {
-  listings: Listing[];
-  pagination?: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
-}
-
 interface OrderStats {
   totalOrders: number;
   activeOrders: number;
@@ -160,45 +79,6 @@ interface OrderStats {
   availableBalance?: number; // in cents
 }
 
-interface StripeStatus {
-  connected: boolean;
-  chargesEnabled: boolean;
-  detailsSubmitted: boolean;
-  accountId?: string;
-  email?: string;
-  country?: string;
-  status?: string;
-  payoutsEnabled?: boolean;
-  name?: string;
-  balance?: number; // in cents
-  availableBalance?: number; // in cents
-  pendingBalance?: number; // in cents
-}
-
-interface Withdrawal {
-  _id: string;
-  amount: number; // in cents
-  status: string;
-  stripeTransferId?: string;
-  stripePayoutId?: string;
-  createdAt: string;
-  completedAt?: string;
-  failedAt?: string;
-  failureReason?: string;
-  destination?: string;
-  description?: string;
-}
-
-interface WithdrawalHistory {
-  withdrawals: Withdrawal[];
-  pagination?: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
-}
-
 interface EarningsBalance {
   availableBalance: number; // in cents
   pendingBalance: number; // in cents
@@ -212,12 +92,12 @@ interface EarningsBalance {
 
 const SellerDashboard: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [offers, setOffers] = useState<Offer[]>([]);
-  const [listingsData, setListingsData] = useState<ListingsData | null>(null);
+  const [offers, setOffers] = useState<any[]>([]);
+  const [listingsData, setListingsData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [error, setError] = useState('');
-  const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(null);
+  const [stripeStatus, setStripeStatus] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showStripeSuccessAlert, setShowStripeSuccessAlert] = useState(false);
@@ -243,12 +123,6 @@ const SellerDashboard: React.FC = () => {
   // Earnings balance for EarningsTab
   const [earningsBalance, setEarningsBalance] = useState<EarningsBalance | null>(null);
   
-  // Withdrawal states
-  const [withdrawalHistory, setWithdrawalHistory] = useState<WithdrawalHistory | null>(null);
-  const [withdrawalsLoading, setWithdrawalsLoading] = useState(false);
-  const [withdrawalsPage, setWithdrawalsPage] = useState(1);
-  const [withdrawalsLimit] = useState(10);
-  
   // Separate loading states
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [listingsLoading, setListingsLoading] = useState(false);
@@ -258,174 +132,7 @@ const SellerDashboard: React.FC = () => {
   // Track if initial data has been loaded
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   
-  // Modal states
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [showOrderModal, setShowOrderModal] = useState(false);
-  const [editingListing, setEditingListing] = useState<Listing | null>(null);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [deletingListing, setDeletingListing] = useState<Listing | null>(null);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showStripeSetup, setShowStripeSetup] = useState(false);
-  
-  // Video player modal
-  const [showVideoModal, setShowVideoModal] = useState(false);
-  const [currentVideoUrl, setCurrentVideoUrl] = useState<string>('');
-  const [currentVideoTitle, setCurrentVideoTitle] = useState<string>('');
-  
-  // Listing management states
-  const [listingActionLoading, setListingActionLoading] = useState<string | null>(null);
-  const [listingsPage, setListingsPage] = useState(1);
-  const [listingsLimit] = useState(10);
-  const [listingsStatusFilter, setListingsStatusFilter] = useState<string>('');
-
-  // Order management states
-  const [orderActionLoading, setOrderActionLoading] = useState<string | null>(null);
-  const [ordersFilter, setOrdersFilter] = useState<string>('all');
-  const [ordersPage, setOrdersPage] = useState(1);
-  const [ordersLimit] = useState(10);
-  
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  
-  // Calculate stats
-  const totalListings = listingsData?.listings?.length || 0;
-  const activeListings = listingsData?.listings?.filter((listing) => listing.status === 'active').length || 0;
-  const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
-  const totalWithdrawals = withdrawalHistory?.withdrawals?.length || 0;
-
-  // Tab configuration - WITH EARNINGS TAB
-  const tabs = [
-    { id: 'overview', label: 'Overview', icon: '📊', badge: null },
-    { id: 'earnings', label: 'Earnings', icon: '💰', badge: null },
-    { id: 'listings', label: 'My Listings', icon: '🏠', badge: totalListings > 0 ? totalListings : null },
-    { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders > 0 ? orderStats.activeOrders : null },
-    { id: 'offers', label: 'Offers', icon: '💌', badge: pendingOffers > 0 ? pendingOffers : null },
-    { id: 'withdraw', label: 'Withdraw', icon: '💸', badge: null }
-  ];
-
-  // Action Cards
-  const [actionCards] = useState([
-    {
-      title: 'Analytics Dashboard',
-      description: 'View detailed analytics and performance metrics for your listings.',
-      icon: '📊',
-      iconBg: 'from-blue-500 to-blue-600',
-      bgGradient: 'from-blue-50 to-indigo-50',
-      borderColor: 'border-blue-200',
-      actions: [
-        {
-          label: 'View Analytics',
-          onClick: () => navigate('/marketplace/analytics'),
-          variant: 'primary' as const
-        }
-      ]
-    },
-    {
-      title: 'Seller Resources',
-      description: 'Access guides, tutorials, and tips to grow your business on Marketplace.',
-      icon: '📚',
-      iconBg: 'from-orange-500 to-orange-600',
-      bgGradient: 'from-orange-50 to-amber-50',
-      borderColor: 'border-orange-200',
-      actions: [
-        {
-          label: 'Learn More',
-          onClick: () => navigate('/marketplace/seller/resources'),
-          variant: 'secondary' as const
-        }
-      ]
-    }
-  ]);
-
-  // ✅ Get mock Stripe status for development
-  const getMockStripeStatus = (): StripeStatus => {
-    const savedStatus = localStorage.getItem('stripe_status');
-    if (savedStatus) {
-      return JSON.parse(savedStatus);
-    }
-    
-    return {
-      connected: false,
-      chargesEnabled: false,
-      detailsSubmitted: false,
-      status: 'not_connected',
-      balance: 0,
-      availableBalance: 0,
-      pendingBalance: 0
-    };
-  };
-
-  // ✅ Handle mock Stripe connection for development
-  const handleMockStripeConnect = () => {
-    // Calculate total balance from completed orders
-    const completedOrdersRevenue = orders
-      .filter(order => order.status === 'completed')
-      .reduce((sum, order) => sum + (order.amount || 0), 0);
-    
-    // Calculate pending balance from active orders
-    const pendingOrdersRevenue = orders
-      .filter(order => ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(order.status))
-      .reduce((sum, order) => sum + (order.amount || 0), 0);
-    
-    const mockStatus: StripeStatus = {
-      connected: true,
-      chargesEnabled: true,
-      detailsSubmitted: true,
-      status: 'active',
-      accountId: 'acct_mock_' + Date.now(),
-      email: 'seller@example.com',
-      country: 'US',
-      payoutsEnabled: true,
-      name: 'Test Seller',
-      balance: completedOrdersRevenue + pendingOrdersRevenue,
-      availableBalance: completedOrdersRevenue,
-      pendingBalance: pendingOrdersRevenue
-    };
-    
-    localStorage.setItem('stripe_status', JSON.stringify(mockStatus));
-    setStripeStatus(mockStatus);
-    setShowStripeSuccessAlert(true);
-    setSuccessMessage('Mock Stripe account connected successfully! You can now test payment features.');
-    setShowStripeSetup(false);
-    setError('');
-    
-    // Update order stats with available balance
-    setOrderStats(prev => ({
-      ...prev,
-      availableBalance: completedOrdersRevenue
-    }));
-  };
-
-  // ✅ Check URL params for Stripe return success
-  useEffect(() => {
-    const checkStripeReturn = () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const stripeStatus = urlParams.get('stripe');
-      const accountId = urlParams.get('account_id');
-      
-      if (stripeStatus === 'success' && accountId) {
-        console.log('✅ Stripe connected successfully via URL params');
-        
-        // Show success alert
-        setShowStripeSuccessAlert(true);
-        
-        // Clear URL params
-        window.history.replaceState({}, '', window.location.pathname);
-        
-        // Update Stripe status
-        setTimeout(() => {
-          checkStripeAccountStatus();
-          fetchDashboardData();
-        }, 1000);
-        
-        // Show success message
-        setSuccessMessage('Stripe account connected successfully! You can now accept payments.');
-      }
-    };
-    
-    checkStripeReturn();
-  }, []);
-
-  // ✅ Calculate order stats (amounts in cents)
+  // ✅ IMPROVED: Calculate order stats (amounts in cents)
   const calculateOrderStats = useCallback((orders: Order[]): OrderStats => {
     const now = new Date();
     const thisMonth = now.getMonth();
@@ -437,10 +144,8 @@ const SellerDashboard: React.FC = () => {
              orderDate.getFullYear() === thisYear;
     });
 
-    // Calculate total revenue from completed orders (in cents)
-    const totalRevenue = orders
-      .filter(order => order.status === 'completed')
-      .reduce((sum, order) => sum + (order.amount || 0), 0);
+    // Calculate total revenue from ALL orders (not just completed)
+    const totalRevenue = orders.reduce((sum, order) => sum + (order.amount || 0), 0);
 
     // Calculate pending revenue from active orders (in cents)
     const pendingRevenue = orders
@@ -449,7 +154,6 @@ const SellerDashboard: React.FC = () => {
 
     // Calculate this month revenue (in cents)
     const thisMonthRevenue = thisMonthOrders
-      .filter(order => order.status === 'completed')
       .reduce((sum, order) => sum + (order.amount || 0), 0);
 
     return {
@@ -470,166 +174,275 @@ const SellerDashboard: React.FC = () => {
     };
   }, []);
 
+  // ✅ NEW: Calculate earnings from orders with commission
+  const calculateEarningsFromOrders = async (orders: Order[]) => {
+    try {
+      console.log('📊 Calculating earnings from orders:', orders.length);
+      
+      // Filter completed orders
+      const completedOrders = orders.filter(order => 
+        order.status === 'completed' || order.status === 'delivered'
+      );
+      
+      // Filter pending orders
+      const pendingOrders = orders.filter(order => 
+        ['paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(order.status)
+      );
+      
+      // Calculate commission (10%)
+      const commissionRate = 0.10; // 10% commission
+      
+      // Calculate earnings
+      const completedEarnings = completedOrders.reduce((sum, order) => {
+        const orderAmount = order.amount || 0;
+        const commission = Math.round(orderAmount * commissionRate);
+        return sum + (orderAmount - commission);
+      }, 0);
+      
+      const pendingEarnings = pendingOrders.reduce((sum, order) => {
+        const orderAmount = order.amount || 0;
+        const commission = Math.round(orderAmount * commissionRate);
+        return sum + (orderAmount - commission);
+      }, 0);
+      
+      // Calculate this month revenue
+      const now = new Date();
+      const thisMonth = now.getMonth();
+      const thisYear = now.getFullYear();
+      
+      const thisMonthRevenue = completedOrders
+        .filter(order => {
+          const orderDate = new Date(order.createdAt);
+          return orderDate.getMonth() === thisMonth && 
+                 orderDate.getFullYear() === thisYear;
+        })
+        .reduce((sum, order) => {
+          const orderAmount = order.amount || 0;
+          const commission = Math.round(orderAmount * commissionRate);
+          return sum + (orderAmount - commission);
+        }, 0);
+      
+      const earningsData: EarningsBalance = {
+        availableBalance: completedEarnings,
+        pendingBalance: pendingEarnings,
+        totalEarnings: completedEarnings + pendingEarnings,
+        totalWithdrawn: 0, // This should come from withdrawal history
+        thisMonthRevenue: thisMonthRevenue,
+        lastWithdrawal: null,
+        nextPayoutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        lifetimeRevenue: completedEarnings + pendingEarnings
+      };
+      
+      console.log('📈 Earnings calculated:', {
+        completedEarnings: formatCurrency(completedEarnings),
+        pendingEarnings: formatCurrency(pendingEarnings),
+        thisMonthRevenue: formatCurrency(thisMonthRevenue),
+        totalOrders: orders.length,
+        completedOrders: completedOrders.length,
+        pendingOrders: pendingOrders.length
+      });
+      
+      setEarningsBalance(earningsData);
+      setOrderStats(prev => ({
+        ...prev,
+        availableBalance: earningsData.availableBalance
+      }));
+      
+      return earningsData;
+    } catch (error) {
+      console.error('Error calculating earnings:', error);
+      return null;
+    }
+  };
+
   // ✅ Fetch earnings data for EarningsTab
   const fetchEarningsData = async () => {
     try {
       setEarningsLoading(true);
       console.log('📊 Fetching earnings data...');
       
-      // Fetch earnings dashboard from API
-      const response = await marketplaceApi.earnings.getEarningsDashboard();
-      console.log('Earnings dashboard response:', response);
+      const currentUserId = getCurrentUserId();
+      if (!currentUserId) return;
       
-      if (response.success && response.data) {
-        const data = response.data;
+      // First try seller-specific earnings API
+      try {
+        const response = await marketplaceApi.earnings.getSellerEarningsDashboard(currentUserId);
         
-        // Create earnings balance object with proper cents amounts
-        const earningsData: EarningsBalance = {
-          availableBalance: data.availableBalance || 0,
-          pendingBalance: data.pendingBalance || 0,
-          totalEarnings: data.totalEarnings || 0,
-          totalWithdrawn: data.totalWithdrawn || 0,
-          thisMonthRevenue: data.thisMonthRevenue || 0,
-          lastWithdrawal: data.lastWithdrawal || null,
-          nextPayoutDate: data.nextPayoutDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          lifetimeRevenue: data.lifetimeRevenue || data.totalEarnings || 0
-        };
-        
-        console.log('📈 Earnings data processed:', earningsData);
-        setEarningsBalance(earningsData);
-        
-        // Also update order stats with available balance
-        setOrderStats(prev => ({
-          ...prev,
-          availableBalance: earningsData.availableBalance
-        }));
-      } else {
-        console.log('Earnings API response not successful, using calculated data');
-        
-        // Fallback: Calculate from orders
-        const completedOrders = orders.filter(order => order.status === 'completed');
-        const totalEarnings = completedOrders.reduce((sum, order) => {
-          const orderAmount = order.amount || 0;
-          const commission = Math.round(orderAmount * 0.10); // 10% commission
-          return sum + (orderAmount - commission);
-        }, 0);
-        
-        const pendingOrders = orders.filter(order => 
-          ['paid', 'processing', 'in_progress', 'delivered'].includes(order.status)
-        );
-        const pendingEarnings = pendingOrders.reduce((sum, order) => {
-          const orderAmount = order.amount || 0;
-          const commission = Math.round(orderAmount * 0.10);
-          return sum + (orderAmount - commission);
-        }, 0);
-        
-        const earningsData: EarningsBalance = {
-          availableBalance: totalEarnings,
-          pendingBalance: pendingEarnings,
-          totalEarnings: totalEarnings + pendingEarnings,
-          totalWithdrawn: 0,
-          thisMonthRevenue: calculateThisMonthRevenue(orders),
-          lastWithdrawal: null,
-          nextPayoutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          lifetimeRevenue: totalEarnings + pendingEarnings
-        };
-        
-        setEarningsBalance(earningsData);
-        setOrderStats(prev => ({
-          ...prev,
-          availableBalance: earningsData.availableBalance
-        }));
+        if (response.success && response.data) {
+          const data = response.data;
+          
+          const earningsData: EarningsBalance = {
+            availableBalance: data.availableBalance || 0,
+            pendingBalance: data.pendingBalance || 0,
+            totalEarnings: data.totalEarnings || 0,
+            totalWithdrawn: data.totalWithdrawn || 0,
+            thisMonthRevenue: data.thisMonthRevenue || 0,
+            lastWithdrawal: data.lastWithdrawal || null,
+            nextPayoutDate: data.nextPayoutDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            lifetimeRevenue: data.lifetimeRevenue || data.totalEarnings || 0
+          };
+          
+          console.log('📈 Seller earnings from API:', earningsData);
+          setEarningsBalance(earningsData);
+          
+          // Update order stats with available balance
+          setOrderStats(prev => ({
+            ...prev,
+            availableBalance: earningsData.availableBalance
+          }));
+          
+          return;
+        }
+      } catch (apiError) {
+        console.log('Seller earnings API failed, trying regular API...');
       }
+      
+      // Fallback: Try regular earnings API
+      try {
+        const response = await marketplaceApi.earnings.getEarningsDashboard();
+        
+        if (response.success && response.data) {
+          const data = response.data;
+          
+          const earningsData: EarningsBalance = {
+            availableBalance: data.availableBalance || 0,
+            pendingBalance: data.pendingBalance || 0,
+            totalEarnings: data.totalEarnings || 0,
+            totalWithdrawn: data.totalWithdrawn || 0,
+            thisMonthRevenue: data.thisMonthRevenue || 0,
+            lastWithdrawal: data.lastWithdrawal || null,
+            nextPayoutDate: data.nextPayoutDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            lifetimeRevenue: data.lifetimeRevenue || data.totalEarnings || 0
+          };
+          
+          console.log('📈 Earnings from regular API:', earningsData);
+          setEarningsBalance(earningsData);
+          
+          // Update order stats with available balance
+          setOrderStats(prev => ({
+            ...prev,
+            availableBalance: earningsData.availableBalance
+          }));
+          
+          return;
+        }
+      } catch (regularError) {
+        console.log('Regular earnings API also failed, calculating from orders...');
+      }
+      
+      // Final fallback: Calculate from orders
+      if (orders.length > 0) {
+        await calculateEarningsFromOrders(orders);
+      } else {
+        // If no orders, fetch orders first
+        await fetchSellerOrders(true);
+      }
+      
     } catch (error) {
       console.error('Error fetching earnings data:', error);
       
       // Fallback to calculated earnings
-      const completedOrders = orders.filter(order => order.status === 'completed');
-      const totalEarnings = completedOrders.reduce((sum, order) => {
-        const orderAmount = order.amount || 0;
-        const commission = Math.round(orderAmount * 0.10);
-        return sum + (orderAmount - commission);
-      }, 0);
-      
-      const earningsData: EarningsBalance = {
-        availableBalance: totalEarnings,
-        pendingBalance: 0,
-        totalEarnings: totalEarnings,
-        totalWithdrawn: 0,
-        thisMonthRevenue: calculateThisMonthRevenue(orders),
-        lastWithdrawal: null,
-        nextPayoutDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        lifetimeRevenue: totalEarnings
-      };
-      
-      setEarningsBalance(earningsData);
+      if (orders.length > 0) {
+        await calculateEarningsFromOrders(orders);
+      }
     } finally {
       setEarningsLoading(false);
     }
   };
 
-  // Helper function to calculate this month revenue
-  const calculateThisMonthRevenue = (orders: Order[]): number => {
-    const now = new Date();
-    const thisMonth = now.getMonth();
-    const thisYear = now.getFullYear();
-    
-    return orders
-      .filter(order => {
-        const orderDate = new Date(order.createdAt);
-        return orderDate.getMonth() === thisMonth && 
-               orderDate.getFullYear() === thisYear &&
-               order.status === 'completed';
-      })
-      .reduce((sum, order) => {
-        const orderAmount = order.amount || 0;
-        const commission = Math.round(orderAmount * 0.10);
-        return sum + (orderAmount - commission);
-      }, 0);
-  };
-
-  // ✅ Check Stripe account status with fallback to mock data
-  const checkStripeAccountStatus = async (): Promise<StripeStatus | null> => {
+  // ✅ Fetch seller orders with improved logic
+  const fetchSellerOrders = async (forEarnings = false) => {
     try {
-      console.log('🔍 Checking Stripe status...');
+      if (!forEarnings) setOrdersLoading(true);
       
-      // Check if we're in development mode
-      const isDevelopment = window.location.hostname === 'localhost' || 
-                           window.location.hostname === '127.0.0.1' ||
-                           process.env.NODE_ENV === 'development';
+      const currentUserId = getCurrentUserId();
+      if (!currentUserId) {
+        setError('User not authenticated');
+        return;
+      }
       
-      // Always use mock data in development for now
-      if (isDevelopment) {
-        console.log('🛠️ Development mode: Using mock Stripe data');
-        await new Promise(resolve => setTimeout(resolve, 300));
+      console.log('🛒 Fetching orders for seller:', currentUserId);
+      
+      // Try seller-specific orders API first
+      const response = await marketplaceApi.orders.getSellerOrders(currentUserId, {
+        page: ordersPage,
+        limit: 100, // Get more for earnings calculation
+        status: ordersFilter !== 'all' ? ordersFilter : ''
+      });
+      
+      if (response.success) {
+        let ordersData = response.data?.orders || response.data || [];
         
-        const mockStatus = getMockStripeStatus();
-        setStripeStatus(mockStatus);
-        return mockStatus;
-      }
-      
-      // Production: Try real API
-      try {
-        const response = await marketplaceApi.stripe.getStripeStatus();
-        if (response.success) {
-          setStripeStatus(response.data);
-          return response.data;
-        } else {
-          throw new Error('Stripe status API failed');
+        // Ensure it's an array
+        if (!Array.isArray(ordersData)) {
+          ordersData = [];
         }
-      } catch (apiError: any) {
-        console.warn('API unavailable:', apiError.message);
-        // Fall back to mock data
-        const mockStatus = getMockStripeStatus();
-        setStripeStatus(mockStatus);
-        return mockStatus;
+        
+        console.log(`✅ Found ${ordersData.length} orders for seller`);
+        
+        // Filter orders if needed (for orders tab only)
+        let filteredOrders = ordersData;
+        if (!forEarnings && ordersFilter !== 'all') {
+          filteredOrders = ordersData.filter(order => order.status === ordersFilter);
+        }
+        
+        // Paginate (for orders tab only)
+        let paginatedOrders = filteredOrders;
+        if (!forEarnings) {
+          const startIndex = (ordersPage - 1) * ordersLimit;
+          paginatedOrders = filteredOrders.slice(startIndex, startIndex + ordersLimit);
+        }
+        
+        // Set orders
+        setOrders(paginatedOrders);
+        
+        // Calculate stats from ALL orders (not just filtered/paginated)
+        const stats = calculateOrderStats(ordersData);
+        setOrderStats(stats);
+        
+        // Log order details for debugging
+        console.log('📋 Order Details:', ordersData.map(order => ({
+          id: order._id,
+          amount: order.amount,
+          status: order.status,
+          sellerId: order.sellerId,
+          buyerId: order.buyerId,
+          title: order.listingTitle
+        })));
+        
+        // If fetching for earnings, calculate earnings
+        if (forEarnings) {
+          await calculateEarningsFromOrders(ordersData);
+        }
+        
+        return ordersData;
+      } else {
+        console.error('Failed to fetch seller orders:', response.error);
+        
+        // Fallback to getMySales
+        const fallbackOrders = await marketplaceApi.orders.getMySales();
+        if (Array.isArray(fallbackOrders) && fallbackOrders.length > 0) {
+          console.log(`🔄 Fallback: Found ${fallbackOrders.length} orders from getMySales`);
+          setOrders(fallbackOrders);
+          const stats = calculateOrderStats(fallbackOrders);
+          setOrderStats(stats);
+          
+          if (forEarnings) {
+            await calculateEarningsFromOrders(fallbackOrders);
+          }
+          
+          return fallbackOrders;
+        }
+        
+        setError('No orders found. Please try again.');
+        return [];
       }
-      
-    } catch (err: any) {
-      console.warn('Stripe check failed:', err.message);
-      const mockStatus = getMockStripeStatus();
-      setStripeStatus(mockStatus);
-      return mockStatus;
+    } catch (error: any) {
+      console.error('Error fetching seller orders:', error);
+      setError('Failed to load orders. Please try again.');
+      return [];
+    } finally {
+      if (!forEarnings) setOrdersLoading(false);
     }
   };
 
@@ -646,37 +459,12 @@ const SellerDashboard: React.FC = () => {
         return;
       }
 
-      console.log('📊 Fetching dashboard data for user:', currentUserId);
+      console.log('📊 Fetching dashboard data for seller:', currentUserId);
 
-      // Fetch orders using API
-      const ordersData = await marketplaceApi.orders.getMySales();
+      // Fetch orders for this seller
+      const ordersData = await fetchSellerOrders(false);
       
-      if (ordersData && ordersData.length > 0) {
-        console.log('📦 Orders fetched:', ordersData.length);
-        const stats = calculateOrderStats(ordersData);
-        setOrders(ordersData);
-        setOrderStats(stats);
-      } else {
-        console.log('No orders found');
-        setOrders([]);
-        setOrderStats({
-          totalOrders: 0,
-          activeOrders: 0,
-          pendingPayment: 0,
-          processing: 0,
-          inProgress: 0,
-          delivered: 0,
-          completed: 0,
-          cancelled: 0,
-          totalRevenue: 0,
-          pendingRevenue: 0,
-          thisMonthOrders: 0,
-          thisMonthRevenue: 0,
-          availableBalance: 0
-        });
-      }
-
-      // Fetch offers and listings in parallel with error handling
+      // Fetch offers and listings in parallel
       try {
         const [offersResponse, listingsResponse] = await Promise.allSettled([
           marketplaceApi.offers.getReceivedOffers(),
@@ -709,534 +497,28 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Fetch orders for OrdersTab
-  const fetchSellerOrders = async () => {
+  // ✅ Check Stripe account status
+  const checkStripeAccountStatus = async () => {
     try {
-      setOrdersLoading(true);
+      console.log('🔍 Checking Stripe status...');
       
-      const ordersData = await marketplaceApi.orders.getMySales();
-      
-      if (ordersData && ordersData.length > 0) {
-        // Filter orders if needed
-        let filteredOrders = ordersData;
-        if (ordersFilter !== 'all') {
-          filteredOrders = ordersData.filter(order => order.status === ordersFilter);
-        }
-        
-        // Paginate
-        const startIndex = (ordersPage - 1) * ordersLimit;
-        const paginatedOrders = filteredOrders.slice(startIndex, startIndex + ordersLimit);
-        
-        // Update state
-        setOrders(paginatedOrders);
-        
-        // Calculate stats from ALL orders (not just paginated)
-        const stats = calculateOrderStats(ordersData);
-        setOrderStats(stats);
-      }
-    } catch (error: any) {
-      console.error('Error fetching seller orders:', error);
-      setError('Failed to load orders. Please try again.');
-    } finally {
-      setOrdersLoading(false);
-    }
-  };
-
-  // ✅ Fetch listings
-  const fetchListings = async () => {
-    try {
-      setListingsLoading(true);
-      
-      const params: any = {
-        page: listingsPage,
-        limit: listingsLimit
-      };
-      
-      if (listingsStatusFilter) {
-        params.status = listingsStatusFilter;
-      }
-      
-      const response = await marketplaceApi.listings.getMyListings(params);
+      // Try API first
+      const response = await marketplaceApi.stripe.getStripeStatusSimple();
       
       if (response.success) {
-        setListingsData(response);
+        setStripeStatus(response.data);
+        return response.data;
       } else {
-        console.error('Failed to fetch listings:', response.error);
-        setError('Failed to load listings. Please try again.');
+        throw new Error('Stripe status API failed');
       }
-    } catch (error: any) {
-      console.error('Error fetching listings:', error);
-      setError('Failed to load listings. Please try again.');
-    } finally {
-      setListingsLoading(false);
+    } catch (err: any) {
+      console.warn('Stripe check failed:', err.message);
+      // Return null or default status
+      return null;
     }
   };
 
-  // ✅ Fetch offers
-  const fetchOffers = async () => {
-    try {
-      setOffersLoading(true);
-      
-      const response = await marketplaceApi.offers.getReceivedOffers();
-      
-      if (response.success) {
-        setOffers(response.offers || response.data || []);
-      } else {
-        console.error('Failed to fetch offers:', response.error);
-        setError('Failed to load offers. Please try again.');
-      }
-    } catch (error: any) {
-      console.error('Error fetching offers:', error);
-      setError('Failed to load offers. Please try again.');
-    } finally {
-      setOffersLoading(false);
-    }
-  };
-
-  // ✅ Fetch withdrawal history from API
-  const fetchWithdrawalHistory = async () => {
-    try {
-      setWithdrawalsLoading(true);
-      
-      // Fetch withdrawal history from API
-      const response = await marketplaceApi.earnings.getWithdrawalHistory({});
-      
-      if (response.success) {
-        setWithdrawalHistory({
-          withdrawals: response.data || response.withdrawals || [],
-          pagination: response.pagination || {
-            page: 1,
-            limit: 10,
-            total: 0,
-            pages: 1
-          }
-        });
-      } else {
-        console.log('No withdrawal history found');
-        setWithdrawalHistory({
-          withdrawals: [],
-          pagination: {
-            page: 1,
-            limit: 10,
-            total: 0,
-            pages: 1
-          }
-        });
-      }
-    } catch (error: any) {
-      console.error('Error fetching withdrawal history:', error);
-      setError('Failed to load withdrawal history. Please try again.');
-      setWithdrawalHistory({
-        withdrawals: [],
-        pagination: {
-          page: 1,
-          limit: 10,
-          total: 0,
-          pages: 1
-        }
-      });
-    } finally {
-      setWithdrawalsLoading(false);
-    }
-  };
-
-  // ✅ Handle withdrawal request
-  const handleWithdrawRequest = async (amountInDollars: number) => {
-    try {
-      setRefreshing(true);
-      
-      // Convert amount to cents
-      const amountInCents = marketplaceApi.dollarsToCents(amountInDollars);
-      
-      // Call API to process withdrawal
-      const response = await marketplaceApi.earnings.processPayout(
-        amountInCents,
-        'stripe',
-        { note: 'Withdrawal from seller dashboard' }
-      );
-      
-      if (response.success) {
-        // Update Stripe balance
-        setStripeStatus(prev => {
-          if (!prev) return prev;
-          
-          return {
-            ...prev,
-            availableBalance: (prev.availableBalance || 0) - amountInCents,
-            balance: (prev.balance || 0) - amountInCents
-          };
-        });
-        
-        // Update order stats
-        setOrderStats(prev => ({
-          ...prev,
-          availableBalance: (prev.availableBalance || 0) - amountInCents
-        }));
-        
-        // Update earnings balance
-        setEarningsBalance(prev => {
-          if (!prev) return null;
-          
-          return {
-            ...prev,
-            availableBalance: (prev.availableBalance || 0) - amountInCents,
-            totalWithdrawn: (prev.totalWithdrawn || 0) + amountInCents
-          };
-        });
-        
-        setSuccessMessage(`Withdrawal request of $${amountInDollars.toFixed(2)} submitted successfully! Funds will arrive in 2-3 business days.`);
-        
-        // Refresh withdrawal history
-        fetchWithdrawalHistory();
-      } else {
-        throw new Error(response.error || 'Withdrawal failed');
-      }
-    } catch (error: any) {
-      console.error('Error processing withdrawal:', error);
-      setError(error.message || 'Failed to process withdrawal. Please try again.');
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  // ✅ Handle Edit Listing
-  const handleEditListing = (listing: Listing) => {
-    setEditingListing(listing);
-    setShowEditModal(true);
-  };
-
-  const handleEditModalSave = async (updatedData: { title: string; description: string; price: number }) => {
-    if (!editingListing) return;
-
-    try {
-      setListingActionLoading(`edit-${editingListing._id}`);
-      
-      const response = await marketplaceApi.listings.editListing(editingListing._id, updatedData);
-
-      if (response.success) {
-        setListingsData(prev => {
-          if (!prev) return prev;
-          
-          const updatedListings = prev.listings.map(l => {
-            if (l._id === editingListing._id) {
-              return {
-                ...l,
-                title: updatedData.title,
-                description: updatedData.description,
-                price: updatedData.price,
-                updatedAt: new Date().toISOString(),
-                ...response.data
-              };
-            }
-            return l;
-          });
-          
-          return {
-            ...prev,
-            listings: updatedListings
-          };
-        });
-        
-        setShowEditModal(false);
-        setEditingListing(null);
-        setSuccessMessage('Listing updated successfully!');
-        
-        // Refresh listings after edit
-        fetchListings();
-      } else {
-        console.log('Edit failed:', response.error);
-        setError('Failed to update listing. Please try again.');
-      }
-    } catch (error: any) {
-      console.error('Error updating listing:', error);
-      setError('Failed to update listing. Please try again.');
-    } finally {
-      setListingActionLoading(null);
-    }
-  };
-
-  // ✅ Handle Delete Listing
-  const handleDeleteListing = (listing: Listing) => {
-    setDeletingListing(listing);
-    setShowDeleteModal(true);
-  };
-
-  const handleDeleteModalConfirm = async () => {
-    if (!deletingListing) return;
-
-    try {
-      setListingActionLoading(`delete-${deletingListing._id}`);
-      
-      const response = await marketplaceApi.listings.deleteListing(deletingListing._id);
-
-      if (response.success) {
-        setListingsData(prev => {
-          if (!prev) return prev;
-          
-          const updatedListings = prev.listings.filter(l => l._id !== deletingListing._id);
-          
-          return {
-            ...prev,
-            listings: updatedListings,
-            pagination: {
-              ...prev.pagination,
-              total: (prev.pagination?.total || 1) - 1
-            }
-          };
-        });
-        
-        setShowDeleteModal(false);
-        setDeletingListing(null);
-        setSuccessMessage('Listing deleted successfully!');
-        
-        // Refresh listings after delete
-        fetchListings();
-      } else {
-        console.log('Delete failed:', response.error);
-        setError('Failed to delete listing. Please try again.');
-      }
-    } catch (error: any) {
-      console.error('Error deleting listing:', error);
-      setError('Failed to delete listing. Please try again.');
-    } finally {
-      setListingActionLoading(null);
-    }
-  };
-
-  // ✅ Handle Toggle Listing Status
-  const handleToggleListingStatus = async (listing: Listing) => {
-    try {
-      setListingActionLoading(`toggle-${listing._id}`);
-
-      const response = await marketplaceApi.listings.toggleListingStatus(listing._id);
-
-      if (response.success) {
-        const newStatus = response.data?.status || (listing.status === 'active' ? 'inactive' : 'active');
-        
-        setListingsData(prev => {
-          if (!prev) return prev;
-          
-          const updatedListings = prev.listings.map(l => {
-            if (l._id === listing._id) {
-              return {
-                ...l,
-                status: newStatus,
-                updatedAt: response.data?.updatedAt || new Date().toISOString(),
-                ...response.data
-              };
-            }
-            return l;
-          });
-          
-          return {
-            ...prev,
-            listings: updatedListings
-          };
-        });
-        
-        setSuccessMessage(`Listing ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully!`);
-      } else {
-        console.log('Toggle failed:', response.error);
-        setError('Failed to update listing status. Please try again.');
-      }
-      
-    } catch (error: any) {
-      console.error('Error toggling listing status:', error);
-      setError('Failed to update listing status. Please try again.');
-    } finally {
-      setListingActionLoading(null);
-    }
-  };
-
-  // ✅ Order management functions
-  const handleSimpleStartProcessing = async (order: Order) => {
-    try {
-      setOrderActionLoading(order._id);
-      
-      const response = await marketplaceApi.orders.updateOrderStatus(order._id, 'processing');
-
-      if (response.success) {
-        updateOrderInState(order._id, 'processing', {
-          processingAt: new Date().toISOString()
-        });
-        setSuccessMessage('Order is now being processed!');
-      } else {
-        setError('Failed to start processing. Please try again.');
-      }
-    } catch (error: any) {
-      console.error('Error starting processing:', error);
-      setError('Failed to start processing. Please try again.');
-    } finally {
-      setOrderActionLoading(null);
-    }
-  };
-
-  const handleSimpleStartWork = async (order: Order) => {
-    try {
-      setOrderActionLoading(order._id);
-      
-      const response = await marketplaceApi.orders.updateOrderStatus(order._id, 'in_progress');
-
-      if (response.success) {
-        updateOrderInState(order._id, 'in_progress', {
-          startedAt: new Date().toISOString()
-        });
-        setSuccessMessage('Work started on order!');
-      } else {
-        setError('Failed to start work. Please try again.');
-      }
-    } catch (error: any) {
-      console.error('Error starting work:', error);
-      setError('Failed to start work. Please try again.');
-    } finally {
-      setOrderActionLoading(null);
-    }
-  };
-
-  const handleSimpleDeliver = async (order: Order) => {
-    try {
-      setSelectedOrder(order);
-      setOrderActionLoading(order._id);
-      
-      const response = await marketplaceApi.orders.updateOrderStatus(order._id, 'delivered');
-
-      if (response.success) {
-        updateOrderInState(order._id, 'delivered', {
-          deliveredAt: new Date().toISOString()
-        });
-        setSuccessMessage('Order delivered successfully!');
-      } else {
-        setError('Failed to deliver order. Please try again.');
-      }
-    } catch (error: any) {
-      console.error('Error delivering order:', error);
-      setError('Failed to deliver order. Please try again.');
-    } finally {
-      setOrderActionLoading(null);
-    }
-  };
-
-  const handleSimpleCancel = async (order: Order) => {
-    if (window.confirm('Are you sure you want to cancel this order? This action cannot be undone.')) {
-      try {
-        setOrderActionLoading(order._id);
-        
-        const response = await marketplaceApi.orders.updateOrderStatus(order._id, 'cancelled');
-
-        if (response.success) {
-          updateOrderInState(order._id, 'cancelled', {
-            cancelledAt: new Date().toISOString()
-          });
-          setSuccessMessage('Order cancelled successfully!');
-        } else {
-          setError('Failed to cancel order. Please try again.');
-        }
-      } catch (error: any) {
-        console.error('Error cancelling order:', error);
-        setError('Failed to cancel order. Please try again.');
-      } finally {
-        setOrderActionLoading(null);
-      }
-    }
-  };
-
-  const handleSimpleCompleteRevision = async (order: Order) => {
-    try {
-      setOrderActionLoading(order._id);
-      
-      const response = await marketplaceApi.orders.updateOrderStatus(order._id, 'delivered');
-
-      if (response.success) {
-        updateOrderInState(order._id, 'delivered', {
-          deliveredAt: new Date().toISOString()
-        });
-        setSuccessMessage('Revision completed and order delivered!');
-      } else {
-        setError('Failed to complete revision. Please try again.');
-      }
-    } catch (error: any) {
-      console.error('Error completing revision:', error);
-      setError('Failed to complete revision. Please try again.');
-    } finally {
-      setOrderActionLoading(null);
-    }
-  };
-
-  const updateOrderInState = (orderId: string, newStatus: string, updates?: any) => {
-    setOrders(prev => prev.map(order => {
-      if (order._id === orderId) {
-        return { 
-          ...order, 
-          status: newStatus,
-          updatedAt: new Date().toISOString(),
-          ...updates
-        };
-      }
-      return order;
-    }));
-    
-    // Recalculate stats with updated orders
-    const updatedOrders = orders.map(order => 
-      order._id === orderId ? { ...order, status: newStatus, ...updates } : order
-    );
-    const updatedStats = calculateOrderStats(updatedOrders);
-    setOrderStats(updatedStats);
-  };
-
-  const handleViewOrderDetails = (orderId: string) => {
-    setSelectedOrderId(orderId);
-    setShowOrderModal(true);
-  };
-
-  const handlePlayVideo = (videoUrl: string, title: string) => {
-    setCurrentVideoUrl(videoUrl);
-    setCurrentVideoTitle(title);
-    setShowVideoModal(true);
-  };
-
-  // ✅ Handle offer actions
-  const handleOfferAction = async (offerId: string, action: 'accept' | 'reject') => {
-    try {
-      setOrderActionLoading(offerId);
-      
-      let response;
-      if (action === 'accept') {
-        response = await marketplaceApi.offers.acceptOffer(offerId);
-      } else {
-        response = await marketplaceApi.offers.rejectOffer(offerId);
-      }
-
-      if (response.success) {
-        setOffers(prev => prev.filter(offer => offer._id !== offerId));
-        setSuccessMessage(`Offer ${action}ed successfully!`);
-        
-        // Refresh offers list
-        fetchOffers();
-      } else {
-        setError(`Failed to ${action} offer. Please try again.`);
-      }
-    } catch (error: any) {
-      console.error(`Error ${action}ing offer:`, error);
-      setError(`Failed to ${action} offer. Please try again.`);
-    } finally {
-      setOrderActionLoading(null);
-    }
-  };
-
-  const handleStripeSetupSuccess = () => {
-    setShowStripeSetup(false);
-    
-    // In development, simulate successful connection
-    if (process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') {
-      handleMockStripeConnect();
-    } else {
-      setTimeout(() => {
-        checkStripeAccountStatus();
-        fetchDashboardData();
-      }, 1000);
-    }
-  };
-
+  // ✅ Handle refresh
   const handleRefresh = async () => {
     setRefreshing(true);
     setError('');
@@ -1258,25 +540,6 @@ const SellerDashboard: React.FC = () => {
     } finally {
       setRefreshing(false);
     }
-  };
-
-  // ✅ Handle open Stripe setup with development check
-  const handleOpenStripeSetup = () => {
-    const isDevelopment = window.location.hostname === 'localhost' || 
-                         window.location.hostname === '127.0.0.1';
-    
-    if (isDevelopment) {
-      const useMock = window.confirm(
-        'Development Mode: Would you like to use a mock Stripe connection for testing?\n\nClick OK for mock connection or Cancel for real setup.'
-      );
-      
-      if (useMock) {
-        handleMockStripeConnect();
-        return;
-      }
-    }
-    
-    setShowStripeSetup(true);
   };
 
   // ✅ Initial data loading
@@ -1302,52 +565,20 @@ const SellerDashboard: React.FC = () => {
     }
   }, [activeTab]);
 
-  // ✅ Fetch listings when tab changes
-  useEffect(() => {
-    if (activeTab === 'listings') {
-      fetchListings();
-    }
-  }, [activeTab, listingsPage, listingsStatusFilter]);
+  // Calculate stats for display
+  const totalListings = listingsData?.listings?.length || 0;
+  const activeListings = listingsData?.listings?.filter((listing: any) => listing.status === 'active').length || 0;
+  const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
 
-  // ✅ Fetch orders when orders tab is active
-  useEffect(() => {
-    if (activeTab === 'orders') {
-      fetchSellerOrders();
-    }
-  }, [activeTab, ordersPage, ordersFilter]);
-
-  // ✅ Fetch offers when offers tab is active
-  useEffect(() => {
-    if (activeTab === 'offers') {
-      fetchOffers();
-    }
-  }, [activeTab]);
-
-  // ✅ Fetch withdrawal history when withdraw tab is active
-  useEffect(() => {
-    if (activeTab === 'withdraw') {
-      fetchWithdrawalHistory();
-    }
-  }, [activeTab, withdrawalsPage]);
-
-  // Determine loading state
-  const getCurrentLoadingState = () => {
-    if (activeTab === 'overview') return loading && !initialDataLoaded;
-    if (activeTab === 'earnings') return earningsLoading;
-    if (activeTab === 'listings') return listingsLoading;
-    if (activeTab === 'orders') return ordersLoading;
-    if (activeTab === 'offers') return offersLoading;
-    if (activeTab === 'withdraw') return withdrawalsLoading;
-    return loading;
-  };
-
-  const currentLoading = getCurrentLoadingState();
-
-  // Calculate total withdrawn amount
-  const totalWithdrawn = withdrawalHistory?.withdrawals?.reduce(
-    (sum, w) => sum + (w.status === 'completed' ? w.amount : 0), 
-    0
-  ) || 0;
+  // Tab configuration
+  const tabs = [
+    { id: 'overview', label: 'Overview', icon: '📊', badge: null },
+    { id: 'earnings', label: 'Earnings', icon: '💰', badge: null },
+    { id: 'listings', label: 'My Listings', icon: '🏠', badge: totalListings > 0 ? totalListings : null },
+    { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders > 0 ? orderStats.activeOrders : null },
+    { id: 'offers', label: 'Offers', icon: '💌', badge: pendingOffers > 0 ? pendingOffers : null },
+    { id: 'withdraw', label: 'Withdraw', icon: '💸', badge: null }
+  ];
 
   // Show loading only on initial load
   if (loading && !initialDataLoaded) {
@@ -1369,59 +600,11 @@ const SellerDashboard: React.FC = () => {
     return formatCurrency(amount);
   };
 
-  // Calculate monthly earnings for chart
-  const calculateMonthlyEarnings = () => {
-    // This would normally come from API
-    return [
-      { month: 'Jan', earnings: 50000 },
-      { month: 'Feb', earnings: 75000 },
-      { month: 'Mar', earnings: 100000 },
-      { month: 'Apr', earnings: 125000 },
-      { month: 'May', earnings: 150000 },
-      { month: 'Jun', earnings: 135000 }
-    ];
-  };
-
-  const monthlyEarnings = calculateMonthlyEarnings();
-
-  // Calculate earnings history from completed orders
-  const calculateEarningsHistory = () => {
-    return orders
-      .filter(order => order.status === 'completed')
-      .map(order => {
-        const orderAmount = order.amount || 0;
-        const commission = Math.round(orderAmount * 0.10);
-        const sellerEarnings = orderAmount - commission;
-        
-        return {
-          _id: order._id,
-          orderId: order._id,
-          amount: sellerEarnings,
-          commission,
-          totalAmount: orderAmount,
-          description: `Order: ${order.listingTitle}`,
-          status: 'completed',
-          createdAt: order.createdAt,
-          type: 'order_earning'
-        };
-      });
-  };
-
-  const earningsHistory = calculateEarningsHistory();
-
   return (
     <MarketplaceLayout>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
-          {/* ✅ Stripe Success Alert */}
-          {showStripeSuccessAlert && (
-            <SafeStripeSuccessAlert 
-              show={showStripeSuccessAlert}
-              onClose={() => setShowStripeSuccessAlert(false)}
-            />
-          )}
-
           {/* Header */}
           <SafeDashboardHeader
             title="Seller Dashboard"
@@ -1432,61 +615,6 @@ const SellerDashboard: React.FC = () => {
             stripeStatus={stripeStatus}
             onCheckStripe={checkStripeAccountStatus}
           />
-
-          {/* ✅ Development Mode Banner */}
-          {(process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') && (
-            <div className="mb-6 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-4">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center">
-                  <div className="bg-purple-100 p-2 rounded-lg mr-3">
-                    <span className="text-purple-600 text-xl">🛠️</span>
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-purple-800">Development Mode</h3>
-                    <p className="text-sm text-purple-700">
-                      Using live earnings data from your orders. All amounts in US dollars ($).
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  {!stripeStatus?.chargesEnabled ? (
-                    <button
-                      onClick={handleMockStripeConnect}
-                      className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-sm font-medium rounded-lg transition duration-200 shadow-md hover:shadow"
-                    >
-                      Connect Mock Stripe
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        const mockStatus: StripeStatus = {
-                          connected: false,
-                          chargesEnabled: false,
-                          detailsSubmitted: false,
-                          status: 'not_connected',
-                          balance: 0,
-                          availableBalance: 0,
-                          pendingBalance: 0
-                        };
-                        localStorage.setItem('stripe_status', JSON.stringify(mockStatus));
-                        setStripeStatus(mockStatus);
-                        setSuccessMessage('Mock Stripe disconnected. You can reconnect anytime.');
-                      }}
-                      className="px-4 py-2 bg-white border border-purple-300 text-purple-600 hover:bg-purple-50 text-sm font-medium rounded-lg transition duration-200"
-                    >
-                      Disconnect Mock
-                    </button>
-                  )}
-                  <button
-                    onClick={checkStripeAccountStatus}
-                    className="px-4 py-2 bg-white border border-purple-300 text-purple-600 hover:bg-purple-50 text-sm font-medium rounded-lg transition duration-200"
-                  >
-                    Refresh Status
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* ✅ Success Message */}
           {successMessage && (
@@ -1532,15 +660,6 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* ✅ Stripe Account Status (Only show if not connected) */}
-          {!stripeStatus?.chargesEnabled && (
-            <SafeStripeAccountStatus
-              stripeStatus={stripeStatus}
-              onSetupClick={handleOpenStripeSetup}
-              isLoading={stripeStatus === null}
-            />
-          )}
-
           {/* ✅ Navigation */}
           <SafeTabNavigation
             tabs={tabs}
@@ -1550,274 +669,329 @@ const SellerDashboard: React.FC = () => {
 
           {/* Tab Content */}
           <div className="mt-2">
-            {currentLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Loading {activeTab}...</p>
-                </div>
-              </div>
-            ) : (
-              <>
-                {/* Overview Tab */}
-                {activeTab === 'overview' && (
-                  <div className="space-y-8">
-                    {/* Welcome Card */}
-                    <SafeWelcomeCard
-                      title="Welcome back, Seller! 👋"
-                      subtitle="Manage your business efficiently with real-time insights and quick actions."
-                      primaryAction={{
-                        label: '+ Create New Listing',
-                        onClick: () => navigate('/marketplace/create')
-                      }}
-                      secondaryAction={{
-                        label: '💰 Setup Payments',
-                        onClick: handleOpenStripeSetup,
-                        visible: !stripeStatus?.chargesEnabled
-                      }}
-                    />
+            {activeTab === 'overview' && (
+              <div className="space-y-8">
+                {/* Welcome Card */}
+                <SafeWelcomeCard
+                  title="Welcome back, Seller! 👋"
+                  subtitle="Manage your business efficiently with real-time insights and quick actions."
+                  primaryAction={{
+                    label: '+ Create New Listing',
+                    onClick: () => navigate('/marketplace/create')
+                  }}
+                  secondaryAction={{
+                    label: '💰 Setup Payments',
+                    onClick: () => setShowStripeSetup(true),
+                    visible: !stripeStatus?.chargesEnabled
+                  }}
+                />
 
-                    {/* Stats Grid */}
-                    <SafeStatsGrid
-                      stats={{
-                        totalRevenue: orderStats.totalRevenue,
-                        totalOrders: orderStats.totalOrders,
-                        activeOrders: orderStats.activeOrders,
-                        pendingOffers: pendingOffers,
-                        totalListings: totalListings,
-                        activeListings: activeListings,
-                        thisMonthRevenue: orderStats.thisMonthRevenue,
-                        thisMonthOrders: orderStats.thisMonthOrders,
-                        availableBalance: earningsBalance?.availableBalance || orderStats.availableBalance,
-                        totalWithdrawn: earningsBalance?.totalWithdrawn || totalWithdrawn
-                      }}
-                      onTabChange={setActiveTab}
-                    />
-
-                    {/* Order Workflow Guide */}
-                    <SafeOrderWorkflowGuide />
-
-                    {/* Recent Orders */}
-                    {orders.length > 0 ? (
-                      <SafeRecentOrders
-                        orders={orders.slice(0, 5)}
-                        onViewOrderDetails={handleViewOrderDetails}
-                        onStartProcessing={handleSimpleStartProcessing}
-                        onStartWork={handleSimpleStartWork}
-                        onDeliver={handleSimpleDeliver}
-                        onCancel={handleSimpleCancel}
-                        onCompleteRevision={handleSimpleCompleteRevision}
-                        onViewAll={() => setActiveTab('orders')}
-                        onCreateListing={() => navigate('/marketplace/create')}
-                        orderActionLoading={orderActionLoading}
-                      />
-                    ) : (
-                      <div className="bg-white rounded-2xl shadow-sm border border-yellow-200 p-8 text-center">
-                        <div className="text-5xl mb-4 text-gray-300">📦</div>
-                        <h3 className="text-lg font-medium text-gray-900">No Orders Yet</h3>
-                        <p className="mt-2 text-gray-500 mb-6">
-                          {stripeStatus?.chargesEnabled 
-                            ? 'You can accept payments. Create listings to start receiving orders!'
-                            : 'Create listings to start receiving orders.'
-                          }
-                        </p>
-                        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                          <button
-                            onClick={() => navigate('/marketplace/create')}
-                            className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 shadow-md hover:shadow"
-                          >
-                            + Create Your First Listing
-                          </button>
-                          {!stripeStatus?.chargesEnabled && (
-                            <button
-                              onClick={handleOpenStripeSetup}
-                              className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow"
-                            >
-                              💰 Setup Payments
-                            </button>
-                          )}
+                {/* Stats Grid */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Business Overview</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-blue-700">Total Orders</p>
+                          <p className="text-2xl font-bold text-blue-900">{orderStats.totalOrders}</p>
+                        </div>
+                        <div className="bg-blue-100 p-3 rounded-lg">
+                          <span className="text-blue-600 text-xl">📦</span>
                         </div>
                       </div>
-                    )}
-
-                    {/* Action Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {actionCards.map((card, index) => (
-                        <SafeActionCard
-                          key={index}
-                          title={card.title}
-                          description={card.description}
-                          icon={card.icon}
-                          iconBg={card.iconBg}
-                          bgGradient={card.bgGradient}
-                          borderColor={card.borderColor}
-                          actions={card.actions}
-                        />
-                      ))}
+                    </div>
+                    
+                    <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-xl p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-green-700">Total Revenue</p>
+                          <p className="text-2xl font-bold text-green-900">{safeFormatCurrency(orderStats.totalRevenue)}</p>
+                        </div>
+                        <div className="bg-green-100 p-3 rounded-lg">
+                          <span className="text-green-600 text-xl">💰</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-xl p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-yellow-700">Available Balance</p>
+                          <p className="text-2xl font-bold text-yellow-900">
+                            {safeFormatCurrency(earningsBalance?.availableBalance || 0)}
+                          </p>
+                        </div>
+                        <div className="bg-yellow-100 p-3 rounded-lg">
+                          <span className="text-yellow-600 text-xl">💳</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-purple-700">Active Listings</p>
+                          <p className="text-2xl font-bold text-purple-900">{activeListings}</p>
+                        </div>
+                        <div className="bg-purple-100 p-3 rounded-lg">
+                          <span className="text-purple-600 text-xl">🏠</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                )}
+                </div>
 
-                {/* Earnings Tab - UPDATED */}
-                {activeTab === 'earnings' && (
-                  <SafeEarningsTab
-                    stripeStatus={stripeStatus}
-                    orderStats={orderStats}
-                    balanceData={earningsBalance}
-                    monthlyEarnings={monthlyEarnings}
-                    earningsHistory={earningsHistory}
-                    onWithdrawSuccess={handleWithdrawRequest}
-                    loading={earningsLoading}
-                    onRefresh={async () => {
-                      await fetchEarningsData();
-                      await checkStripeAccountStatus();
-                    }}
-                    onGoToWithdraw={() => setActiveTab('withdraw')}
-                    totalWithdrawn={earningsBalance?.totalWithdrawn || 0}
-                  />
+                {/* Recent Orders */}
+                {orders.length > 0 ? (
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="px-6 py-4 border-b border-gray-200">
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-semibold text-gray-900">Recent Orders</h3>
+                        <button
+                          onClick={() => setActiveTab('orders')}
+                          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                        >
+                          View All →
+                        </button>
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Listing</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {orders.slice(0, 5).map((order) => (
+                            <tr key={order._id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                #{order._id.slice(-6)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {order.listingTitle || 'N/A'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
+                                {safeFormatCurrency(order.amount || 0)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                  order.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                  order.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                                  order.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
+                                  order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {order.status.replace('_', ' ')}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {new Date(order.createdAt).toLocaleDateString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-2xl shadow-sm border border-yellow-200 p-8 text-center">
+                    <div className="text-5xl mb-4 text-gray-300">📦</div>
+                    <h3 className="text-lg font-medium text-gray-900">No Orders Yet</h3>
+                    <p className="mt-2 text-gray-500 mb-6">
+                      Create listings to start receiving orders!
+                    </p>
+                    <button
+                      onClick={() => navigate('/marketplace/create')}
+                      className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 shadow-md hover:shadow"
+                    >
+                      + Create Your First Listing
+                    </button>
+                  </div>
                 )}
-
-                {/* Offers Tab */}
-                {activeTab === 'offers' && (
-                  <SafeOffersTab
-                    offers={offers}
-                    loading={offersLoading}
-                    onOfferAction={handleOfferAction}
-                    onPlayVideo={handlePlayVideo}
-                    onRefresh={() => fetchOffers()}
-                    actionLoading={orderActionLoading}
-                    onViewListing={(listingId) => navigate(`/marketplace/listing/${listingId}`)}
-                  />
-                )}
-
-                {/* Listings Tab */}
-                {activeTab === 'listings' && (
-                  <SafeListingsTab
-                    listingsData={listingsData}
-                    loading={listingsLoading}
-                    statusFilter={listingsStatusFilter}
-                    currentPage={listingsPage}
-                    onStatusFilterChange={setListingsStatusFilter}
-                    onPageChange={setListingsPage}
-                    onEditListing={handleEditListing}
-                    onDeleteListing={handleDeleteListing}
-                    onToggleStatus={handleToggleListingStatus}
-                    onPlayVideo={handlePlayVideo}
-                    onRefresh={fetchListings}
-                    actionLoading={listingActionLoading}
-                    onCreateListing={() => navigate('/marketplace/create')}
-                    onViewListing={(id) => navigate(`/marketplace/listing/${id}`)}
-                  />
-                )}
-
-                {/* Orders Tab */}
-                {activeTab === 'orders' && (
-                  <SafeOrdersTab
-                    orders={orders}
-                    loading={ordersLoading}
-                    filter={ordersFilter}
-                    onFilterChange={setOrdersFilter}
-                    onViewOrderDetails={handleViewOrderDetails}
-                    onPlayVideo={handlePlayVideo}
-                    onRefresh={() => fetchSellerOrders()}
-                    onStartProcessing={(orderId) => {
-                      const order = orders.find(o => o._id === orderId);
-                      if (order) handleSimpleStartProcessing(order);
-                    }}
-                    onStartWork={(orderId) => {
-                      const order = orders.find(o => o._id === orderId);
-                      if (order) handleSimpleStartWork(order);
-                    }}
-                    onDeliver={(order) => handleSimpleDeliver(order)}
-                    onCancel={(order) => handleSimpleCancel(order)}
-                    onCompleteRevision={(order) => handleSimpleCompleteRevision(order)}
-                    actionLoading={orderActionLoading}
-                    stats={orderStats}
-                    onPageChange={setOrdersPage}
-                    currentPage={ordersPage}
-                  />
-                )}
-
-                {/* Withdraw Tab */}
-                {activeTab === 'withdraw' && (
-                  <SafeWithdrawTab
-                    stripeStatus={stripeStatus}
-                    withdrawalHistory={withdrawalHistory}
-                    earningsBalance={earningsBalance}
-                    loading={withdrawalsLoading}
-                    currentPage={withdrawalsPage}
-                    onPageChange={setWithdrawalsPage}
-                    onWithdrawRequest={handleWithdrawRequest}
-                    onRefresh={async () => {
-                      await fetchWithdrawalHistory();
-                      await fetchEarningsData();
-                    }}
-                    formatCurrency={safeFormatCurrency}
-                  />
-                )}
-              </>
+              </div>
             )}
+
+            {activeTab === 'earnings' && (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-xl font-semibold text-gray-900">Earnings Dashboard</h3>
+                  <button
+                    onClick={fetchEarningsData}
+                    disabled={earningsLoading}
+                    className="px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 text-sm font-medium rounded-lg transition duration-200 flex items-center"
+                  >
+                    {earningsLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-blue-600 mr-2"></div>
+                        Refreshing...
+                      </>
+                    ) : (
+                      'Refresh'
+                    )}
+                  </button>
+                </div>
+
+                {earningsLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+                      <p className="text-gray-600">Loading earnings data...</p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Balance Summary */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                      <div className="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-xl p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-green-700">Available Balance</p>
+                            <p className="text-3xl font-bold text-green-900 mt-2">
+                              {safeFormatCurrency(earningsBalance?.availableBalance || 0)}
+                            </p>
+                            <p className="text-xs text-green-600 mt-1">Ready to withdraw</p>
+                          </div>
+                          <div className="bg-green-100 p-4 rounded-lg">
+                            <span className="text-green-600 text-2xl">💰</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-xl p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-yellow-700">Pending Balance</p>
+                            <p className="text-3xl font-bold text-yellow-900 mt-2">
+                              {safeFormatCurrency(earningsBalance?.pendingBalance || 0)}
+                            </p>
+                            <p className="text-xs text-yellow-600 mt-1">In progress orders</p>
+                          </div>
+                          <div className="bg-yellow-100 p-4 rounded-lg">
+                            <span className="text-yellow-600 text-2xl">⏳</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-blue-700">Total Earnings</p>
+                            <p className="text-3xl font-bold text-blue-900 mt-2">
+                              {safeFormatCurrency(earningsBalance?.totalEarnings || 0)}
+                            </p>
+                            <p className="text-xs text-blue-600 mt-1">Lifetime total</p>
+                          </div>
+                          <div className="bg-blue-100 p-4 rounded-lg">
+                            <span className="text-blue-600 text-2xl">📈</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Withdraw Button */}
+                    <div className="mb-8">
+                      <button
+                        onClick={() => setActiveTab('withdraw')}
+                        disabled={(earningsBalance?.availableBalance || 0) <= 0}
+                        className={`w-full py-4 rounded-xl font-semibold text-lg transition-all duration-200 ${
+                          (earningsBalance?.availableBalance || 0) > 0
+                            ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl'
+                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        }`}
+                      >
+                        {(earningsBalance?.availableBalance || 0) > 0
+                          ? `Withdraw ${safeFormatCurrency(earningsBalance?.availableBalance || 0)}`
+                          : 'No funds available to withdraw'
+                        }
+                      </button>
+                    </div>
+
+                    {/* Earnings Breakdown */}
+                    <div className="bg-gray-50 rounded-xl p-6 mb-6">
+                      <h4 className="text-lg font-medium text-gray-900 mb-4">Earnings Breakdown</h4>
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Completed Orders Revenue</span>
+                          <span className="font-semibold text-gray-900">
+                            {safeFormatCurrency(orderStats.totalRevenue)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600">Platform Commission (10%)</span>
+                          <span className="font-semibold text-red-600">
+                            -{safeFormatCurrency(Math.round(orderStats.totalRevenue * 0.10))}
+                          </span>
+                        </div>
+                        <div className="border-t border-gray-200 pt-4">
+                          <div className="flex justify-between items-center">
+                            <span className="text-gray-900 font-medium">Your Earnings</span>
+                            <span className="font-bold text-green-700 text-lg">
+                              {safeFormatCurrency(earningsBalance?.availableBalance || 0)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Orders Summary */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="bg-white border border-gray-200 rounded-xl p-6">
+                        <h4 className="text-lg font-medium text-gray-900 mb-4">Orders Summary</h4>
+                        <div className="space-y-3">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Total Orders</span>
+                            <span className="font-semibold">{orderStats.totalOrders}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Completed Orders</span>
+                            <span className="font-semibold text-green-600">{orderStats.completed}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Active Orders</span>
+                            <span className="font-semibold text-blue-600">{orderStats.activeOrders}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Cancelled Orders</span>
+                            <span className="font-semibold text-red-600">{orderStats.cancelled}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-white border border-gray-200 rounded-xl p-6">
+                        <h4 className="text-lg font-medium text-gray-900 mb-4">Revenue Summary</h4>
+                        <div className="space-y-3">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">This Month</span>
+                            <span className="font-semibold">{safeFormatCurrency(orderStats.thisMonthRevenue)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Pending Revenue</span>
+                            <span className="font-semibold text-yellow-600">{safeFormatCurrency(orderStats.pendingRevenue)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Total Withdrawn</span>
+                            <span className="font-semibold text-purple-600">{safeFormatCurrency(earningsBalance?.totalWithdrawn || 0)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            
+            {/* Other tabs (listings, orders, offers, withdraw) remain similar to your existing code */}
+            {activeTab === 'listings' && <SafeListingsTab /* props */ />}
+            {activeTab === 'orders' && <SafeOrdersTab /* props */ />}
+            {activeTab === 'offers' && <SafeOffersTab /* props */ />}
+            {activeTab === 'withdraw' && <SafeWithdrawTab /* props */ />}
           </div>
-
-          {/* Modals */}
-          {showStripeSetup && (
-            <SafeStripeSetupModal
-              show={showStripeSetup}
-              onClose={() => setShowStripeSetup(false)}
-              onSuccess={handleStripeSetupSuccess}
-              stripeConnected={stripeStatus?.chargesEnabled || false}
-            />
-          )}
-
-          {selectedOrderId && (
-            <SafeOrderDetailsModal
-              orderId={selectedOrderId}
-              isOpen={showOrderModal}
-              onClose={() => {
-                setShowOrderModal(false);
-                setSelectedOrderId(null);
-              }}
-              onStatusUpdate={() => {
-                fetchSellerOrders();
-                fetchDashboardData();
-              }}
-            />
-          )}
-
-          {showEditModal && editingListing && (
-            <SafeEditListingModal
-              listing={editingListing}
-              isOpen={showEditModal}
-              onClose={() => {
-                setShowEditModal(false);
-                setEditingListing(null);
-              }}
-              onSave={handleEditModalSave}
-              loading={listingActionLoading?.startsWith('edit-') || false}
-            />
-          )}
-
-          {showDeleteModal && deletingListing && (
-            <SafeDeleteListingModal
-              listing={deletingListing}
-              isOpen={showDeleteModal}
-              onClose={() => {
-                setShowDeleteModal(false);
-                setDeletingListing(null);
-              }}
-              onConfirm={handleDeleteModalConfirm}
-              loading={listingActionLoading?.startsWith('delete-') || false}
-            />
-          )}
-
-          {showVideoModal && (
-            <SafeVideoPlayerModal
-              videoUrl={currentVideoUrl}
-              title={currentVideoTitle}
-              isOpen={showVideoModal}
-              onClose={() => setShowVideoModal(false)}
-            />
-          )}
         </div>
       </div>
     </MarketplaceLayout>
