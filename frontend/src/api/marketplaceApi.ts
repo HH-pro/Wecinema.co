@@ -1,4 +1,4 @@
-// src/api/marketplaceApi.js - UPDATED WITH CORRECT ROUTES
+// src/api/marketplaceApi.js - UPDATED WITH COMPLETE EARNINGS FUNCTIONALITY
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:3000';
@@ -52,20 +52,107 @@ const handleApiError = (error, defaultMessage = 'API Error') => {
 };
 
 // ============================================
-// ✅ EARNINGS API - UPDATED URLs
+// ✅ EARNINGS API - COMPLETE FUNCTIONALITY
 // ============================================
 
 const earningsApi = {
-  // GET EARNINGS DASHBOARD
-  getEarningsDashboard: async () => {
+  // GET EARNINGS DASHBOARD WITH STATS
+  getEarningsDashboard: async (timeRange = 'month') => {
     try {
       const response = await axios.get(
         `${API_BASE_URL}/marketplace/stripe/earnings/dashboard`,
-        getHeaders()
+        {
+          params: { timeRange },
+          ...getHeaders()
+        }
       );
       return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error, 'Failed to fetch earnings dashboard');
+    }
+  },
+
+  // GET EARNINGS SUMMARY
+  getEarningsSummary: async (startDate, endDate) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/summary`,
+        {
+          params: { startDate, endDate },
+          ...getHeaders()
+        }
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch earnings summary');
+    }
+  },
+
+  // GET EARNINGS BREAKDOWN BY PERIOD
+  getEarningsBreakdown: async (period = 'daily', limit = 30) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/breakdown`,
+        {
+          params: { period, limit },
+          ...getHeaders()
+        }
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch earnings breakdown');
+    }
+  },
+
+  // GET TOTAL EARNINGS
+  getTotalEarnings: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/total`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch total earnings');
+    }
+  },
+
+  // GET AVAILABLE BALANCE
+  getAvailableBalance: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/balance`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch available balance');
+    }
+  },
+
+  // GET PENDING EARNINGS
+  getPendingEarnings: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/pending`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch pending earnings');
+    }
+  },
+
+  // GET PAID OUT EARNINGS
+  getPaidOutEarnings: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/paid`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch paid out earnings');
     }
   },
 
@@ -83,14 +170,42 @@ const earningsApi = {
     }
   },
 
+  // REQUEST WITHDRAWAL
+  requestWithdrawal: async (amount, withdrawalMethod = 'bank_transfer') => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/stripe/earnings/request-withdrawal`,
+        { amount, withdrawalMethod },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to request withdrawal');
+    }
+  },
+
+  // CANCEL WITHDRAWAL
+  cancelWithdrawal: async (withdrawalId) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/stripe/earnings/cancel-withdrawal/${withdrawalId}`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to cancel withdrawal');
+    }
+  },
+
   // GET PAYMENT HISTORY
   getPaymentHistory: async (params = {}) => {
     try {
-      const { page = 1, limit = 20, type, status } = params;
+      const { page = 1, limit = 20, type, status, startDate, endDate } = params;
       const response = await axios.get(
         `${API_BASE_URL}/marketplace/stripe/earnings/payment-history`,
         {
-          params: { page, limit, type, status },
+          params: { page, limit, type, status, startDate, endDate },
           ...getHeaders()
         }
       );
@@ -100,20 +215,150 @@ const earningsApi = {
     }
   },
 
+  // GET TRANSACTION HISTORY
+  getTransactionHistory: async (params = {}) => {
+    try {
+      const { page = 1, limit = 50, transactionType, startDate, endDate } = params;
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/transactions`,
+        {
+          params: { page, limit, transactionType, startDate, endDate },
+          ...getHeaders()
+        }
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch transaction history');
+    }
+  },
+
   // GET WITHDRAWAL HISTORY
   getWithdrawalHistory: async (params = {}) => {
     try {
-      const { status } = params;
+      const { page = 1, limit = 20, status } = params;
       const response = await axios.get(
         `${API_BASE_URL}/marketplace/stripe/earnings/withdrawal-history`,
         {
-          params: { status },
+          params: { page, limit, status },
           ...getHeaders()
         }
       );
       return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error, 'Failed to fetch withdrawal history');
+    }
+  },
+
+  // GET EARNINGS BY LISTING
+  getEarningsByListing: async (listingId) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/by-listing/${listingId}`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch listing earnings');
+    }
+  },
+
+  // GET EARNINGS BY DATE RANGE
+  getEarningsByDateRange: async (startDate, endDate) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/by-date-range`,
+        {
+          params: { startDate, endDate },
+          ...getHeaders()
+        }
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch earnings by date range');
+    }
+  },
+
+  // GET MONTHLY EARNINGS
+  getMonthlyEarnings: async (year, month) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/monthly`,
+        {
+          params: { year, month },
+          ...getHeaders()
+        }
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch monthly earnings');
+    }
+  },
+
+  // GET YEARLY EARNINGS
+  getYearlyEarnings: async (year) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/yearly`,
+        {
+          params: { year },
+          ...getHeaders()
+        }
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch yearly earnings');
+    }
+  },
+
+  // GET EARNINGS ANALYTICS
+  getEarningsAnalytics: async (params = {}) => {
+    try {
+      const { 
+        groupBy = 'day', 
+        startDate, 
+        endDate,
+        limit = 30 
+      } = params;
+      
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/analytics`,
+        {
+          params: { groupBy, startDate, endDate, limit },
+          ...getHeaders()
+        }
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch earnings analytics');
+    }
+  },
+
+  // GET TOP EARNING LISTINGS
+  getTopEarningListings: async (limit = 10) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/top-listings`,
+        {
+          params: { limit },
+          ...getHeaders()
+        }
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch top earning listings');
+    }
+  },
+
+  // GET COMMISSION BREAKDOWN
+  getCommissionBreakdown: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/commission-breakdown`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch commission breakdown');
     }
   },
 
@@ -128,6 +373,237 @@ const earningsApi = {
       return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error, 'Failed to release payment');
+    }
+  },
+
+  // GET WITHDRAWAL SETTINGS
+  getWithdrawalSettings: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/withdrawal-settings`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch withdrawal settings');
+    }
+  },
+
+  // UPDATE WITHDRAWAL SETTINGS
+  updateWithdrawalSettings: async (settings) => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/stripe/earnings/withdrawal-settings`,
+        settings,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to update withdrawal settings');
+    }
+  },
+
+  // CHECK WITHDRAWAL ELIGIBILITY
+  checkWithdrawalEligibility: async (amount) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/stripe/earnings/check-eligibility`,
+        { amount },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to check withdrawal eligibility');
+    }
+  },
+
+  // GET MINIMUM WITHDRAWAL AMOUNT
+  getMinimumWithdrawalAmount: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/minimum-withdrawal`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch minimum withdrawal amount');
+    }
+  },
+
+  // GET WITHDRAWAL METHODS
+  getWithdrawalMethods: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/withdrawal-methods`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch withdrawal methods');
+    }
+  },
+
+  // ADD WITHDRAWAL METHOD
+  addWithdrawalMethod: async (methodData) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/stripe/earnings/withdrawal-methods`,
+        methodData,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to add withdrawal method');
+    }
+  },
+
+  // REMOVE WITHDRAWAL METHOD
+  removeWithdrawalMethod: async (methodId) => {
+    try {
+      const response = await axios.delete(
+        `${API_BASE_URL}/marketplace/stripe/earnings/withdrawal-methods/${methodId}`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to remove withdrawal method');
+    }
+  },
+
+  // SET DEFAULT WITHDRAWAL METHOD
+  setDefaultWithdrawalMethod: async (methodId) => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/stripe/earnings/withdrawal-methods/${methodId}/default`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to set default withdrawal method');
+    }
+  },
+
+  // GET EARNINGS STATEMENT
+  getEarningsStatement: async (period = 'month', year, month) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/statement`,
+        {
+          params: { period, year, month },
+          ...getHeaders()
+        }
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch earnings statement');
+    }
+  },
+
+  // GENERATE EARNINGS REPORT
+  generateEarningsReport: async (params = {}) => {
+    try {
+      const { format = 'pdf', startDate, endDate } = params;
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/stripe/earnings/generate-report`,
+        { format, startDate, endDate },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to generate earnings report');
+    }
+  },
+
+  // DOWNLOAD EARNINGS REPORT
+  downloadEarningsReport: async (reportId) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/download-report/${reportId}`,
+        {
+          ...getHeaders(),
+          responseType: 'blob'
+        }
+      );
+      return response;
+    } catch (error) {
+      return handleApiError(error, 'Failed to download earnings report');
+    }
+  },
+
+  // GET TAX INFORMATION
+  getTaxInformation: async () => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/tax-info`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch tax information');
+    }
+  },
+
+  // UPDATE TAX INFORMATION
+  updateTaxInformation: async (taxData) => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/stripe/earnings/tax-info`,
+        taxData,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to update tax information');
+    }
+  },
+
+  // GET TAX DOCUMENTS
+  getTaxDocuments: async (year) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/tax-documents`,
+        {
+          params: { year },
+          ...getHeaders()
+        }
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch tax documents');
+    }
+  },
+
+  // GET REVENUE PROJECTIONS
+  getRevenueProjections: async (period = 'month', months = 6) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/projections`,
+        {
+          params: { period, months },
+          ...getHeaders()
+        }
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch revenue projections');
+    }
+  },
+
+  // GET PERFORMANCE METRICS
+  getPerformanceMetrics: async (params = {}) => {
+    try {
+      const { startDate, endDate, compareWithPrevious = false } = params;
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/earnings/performance`,
+        {
+          params: { startDate, endDate, compareWithPrevious },
+          ...getHeaders()
+        }
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error, 'Failed to fetch performance metrics');
     }
   }
 };
@@ -537,11 +1013,11 @@ export const formatCurrencyAmount = (amount) => {
 export const formatCurrencyShort = (amount) => {
   const amountInRupees = (amount || 0) / 100;
   if (amountInRupees >= 10000000) {
-    return `$${(amountInRupees / 10000000).toFixed(1)}Cr`;
+    return `₹${(amountInRupees / 10000000).toFixed(1)}Cr`;
   } else if (amountInRupees >= 100000) {
-    return `$${(amountInRupees / 100000).toFixed(1)}L`;
+    return `₹${(amountInRupees / 100000).toFixed(1)}L`;
   } else if (amountInRupees >= 1000) {
-    return `$${(amountInRupees / 1000).toFixed(1)}K`;
+    return `₹${(amountInRupees / 1000).toFixed(1)}K`;
   }
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
@@ -601,15 +1077,31 @@ export const calculateSellerEarnings = (orderAmount, commissionPercentage = 10) 
   };
 };
 
+export const calculateNetEarnings = (grossEarnings, fees, taxes = 0) => {
+  const netEarnings = grossEarnings - fees - taxes;
+  return {
+    grossEarnings,
+    fees,
+    taxes,
+    netEarnings
+  };
+};
+
 export const getPayoutStatusColor = (status) => {
   switch (status?.toLowerCase()) {
     case 'completed':
+    case 'paid':
+    case 'success':
       return 'success';
     case 'processing':
+    case 'in_transit':
       return 'warning';
     case 'pending':
+    case 'on_hold':
       return 'info';
     case 'failed':
+    case 'cancelled':
+    case 'rejected':
       return 'error';
     default:
       return 'default';
@@ -619,16 +1111,163 @@ export const getPayoutStatusColor = (status) => {
 export const getPaymentMethodIcon = (method) => {
   switch (method?.toLowerCase()) {
     case 'stripe':
+    case 'card':
+    case 'credit_card':
       return 'credit_card';
     case 'bank_transfer':
+    case 'bank':
       return 'account_balance';
     case 'paypal':
       return 'paypal';
     case 'cash':
       return 'money';
+    case 'upi':
+      return 'payment';
+    case 'wallet':
+      return 'account_balance_wallet';
     default:
       return 'payment';
   }
+};
+
+export const formatDateForEarnings = (dateString) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-IN', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+};
+
+export const getEarningsTimePeriod = (period) => {
+  const now = new Date();
+  const periods = {
+    'today': {
+      start: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+      end: now
+    },
+    'week': {
+      start: new Date(now.setDate(now.getDate() - 7)),
+      end: new Date()
+    },
+    'month': {
+      start: new Date(now.getFullYear(), now.getMonth(), 1),
+      end: now
+    },
+    'year': {
+      start: new Date(now.getFullYear(), 0, 1),
+      end: now
+    }
+  };
+  return periods[period] || periods.month;
+};
+
+export const validateWithdrawalAmount = (amount, minAmount = 50000, maxAmount = 100000000) => {
+  const amountInRupees = amount / 100;
+  const minAmountInRupees = minAmount / 100;
+  const maxAmountInRupees = maxAmount / 100;
+  
+  if (amount < minAmount) {
+    return {
+      valid: false,
+      message: `Minimum withdrawal amount is ₹${formatCurrencyAmount(minAmount)}`
+    };
+  }
+  
+  if (amount > maxAmount) {
+    return {
+      valid: false,
+      message: `Maximum withdrawal amount is ₹${formatCurrencyAmount(maxAmount)}`
+    };
+  }
+  
+  return { valid: true, message: '' };
+};
+
+// ============================================
+// ✅ EARNINGS DATA PROCESSING FUNCTIONS
+// ============================================
+
+export const processEarningsData = (rawData) => {
+  if (!rawData) return null;
+  
+  const processedData = {
+    summary: {
+      totalEarnings: rawData.totalEarnings || 0,
+      availableBalance: rawData.availableBalance || 0,
+      pendingEarnings: rawData.pendingEarnings || 0,
+      paidOutEarnings: rawData.paidOutEarnings || 0,
+      thisMonthEarnings: rawData.thisMonthEarnings || 0,
+      lastMonthEarnings: rawData.lastMonthEarnings || 0,
+      growthRate: rawData.growthRate || 0
+    },
+    
+    breakdown: {
+      byPeriod: rawData.breakdownByPeriod || [],
+      byListing: rawData.breakdownByListing || [],
+      byCategory: rawData.breakdownByCategory || []
+    },
+    
+    transactions: {
+      recent: rawData.recentTransactions || [],
+      pending: rawData.pendingTransactions || [],
+      completed: rawData.completedTransactions || []
+    },
+    
+    payouts: {
+      recent: rawData.recentPayouts || [],
+      pending: rawData.pendingPayouts || [],
+      history: rawData.payoutHistory || []
+    },
+    
+    analytics: {
+      dailyAverage: rawData.dailyAverage || 0,
+      weeklyAverage: rawData.weeklyAverage || 0,
+      monthlyAverage: rawData.monthlyAverage || 0,
+      peakDay: rawData.peakDay || null,
+      peakAmount: rawData.peakAmount || 0
+    }
+  };
+  
+  return processedData;
+};
+
+export const generateEarningsReportData = (earningsData) => {
+  if (!earningsData) return null;
+  
+  const reportData = {
+    summary: {
+      totalRevenue: earningsData.totalEarnings || 0,
+      netEarnings: earningsData.availableBalance || 0,
+      platformFees: earningsData.totalFees || 0,
+      totalTransactions: earningsData.totalTransactions || 0,
+      averageOrderValue: earningsData.averageOrderValue || 0
+    },
+    
+    performance: {
+      currentPeriod: earningsData.currentPeriodEarnings || 0,
+      previousPeriod: earningsData.previousPeriodEarnings || 0,
+      growthPercentage: earningsData.growthPercentage || 0,
+      bestPerformingListing: earningsData.bestListing || null,
+      conversionRate: earningsData.conversionRate || 0
+    },
+    
+    timeline: earningsData.timelineData || [],
+    
+    recommendations: [
+      earningsData.availableBalance > 1000000 
+        ? "Consider withdrawing funds to your bank account" 
+        : "Continue selling to reach withdrawal threshold",
+      earningsData.growthRate < 0 
+        ? "Review your listings and pricing strategy" 
+        : "Great growth! Consider adding more listings",
+      earningsData.pendingEarnings > 0 
+        ? "Complete pending orders to release payments" 
+        : "All payments processed successfully"
+    ]
+  };
+  
+  return reportData;
 };
 
 // ============================================
@@ -651,8 +1290,14 @@ const marketplaceApi = {
   checkAuth,
   getCurrentUserId,
   calculateSellerEarnings,
+  calculateNetEarnings,
   getPayoutStatusColor,
   getPaymentMethodIcon,
+  formatDateForEarnings,
+  getEarningsTimePeriod,
+  validateWithdrawalAmount,
+  processEarningsData,
+  generateEarningsReportData,
   
   // Direct API Methods (for convenience)
   // Listings
@@ -686,12 +1331,54 @@ const marketplaceApi = {
   createLoginLink: stripeApi.createLoginLink,
   getStripePayoutsHistory: stripeApi.getStripePayoutsHistory,
   
-  // Earnings
+  // Earnings - Dashboard & Summary
   getEarningsDashboard: earningsApi.getEarningsDashboard,
-  processPayout: earningsApi.processPayout,
+  getEarningsSummary: earningsApi.getEarningsSummary,
+  getEarningsBreakdown: earningsApi.getEarningsBreakdown,
+  getTotalEarnings: earningsApi.getTotalEarnings,
+  getAvailableBalance: earningsApi.getAvailableBalance,
+  getPendingEarnings: earningsApi.getPendingEarnings,
+  getPaidOutEarnings: earningsApi.getPaidOutEarnings,
+  
+  // Earnings - History & Transactions
   getPaymentHistory: earningsApi.getPaymentHistory,
+  getTransactionHistory: earningsApi.getTransactionHistory,
   getWithdrawalHistory: earningsApi.getWithdrawalHistory,
-  releasePayment: earningsApi.releasePayment
+  getEarningsByListing: earningsApi.getEarningsByListing,
+  getEarningsByDateRange: earningsApi.getEarningsByDateRange,
+  getMonthlyEarnings: earningsApi.getMonthlyEarnings,
+  getYearlyEarnings: earningsApi.getYearlyEarnings,
+  
+  // Earnings - Analytics & Reports
+  getEarningsAnalytics: earningsApi.getEarningsAnalytics,
+  getTopEarningListings: earningsApi.getTopEarningListings,
+  getCommissionBreakdown: earningsApi.getCommissionBreakdown,
+  getEarningsStatement: earningsApi.getEarningsStatement,
+  generateEarningsReport: earningsApi.generateEarningsReport,
+  downloadEarningsReport: earningsApi.downloadEarningsReport,
+  getRevenueProjections: earningsApi.getRevenueProjections,
+  getPerformanceMetrics: earningsApi.getPerformanceMetrics,
+  
+  // Earnings - Payouts & Withdrawals
+  processPayout: earningsApi.processPayout,
+  requestWithdrawal: earningsApi.requestWithdrawal,
+  cancelWithdrawal: earningsApi.cancelWithdrawal,
+  releasePayment: earningsApi.releasePayment,
+  
+  // Earnings - Settings & Configuration
+  getWithdrawalSettings: earningsApi.getWithdrawalSettings,
+  updateWithdrawalSettings: earningsApi.updateWithdrawalSettings,
+  checkWithdrawalEligibility: earningsApi.checkWithdrawalEligibility,
+  getMinimumWithdrawalAmount: earningsApi.getMinimumWithdrawalAmount,
+  getWithdrawalMethods: earningsApi.getWithdrawalMethods,
+  addWithdrawalMethod: earningsApi.addWithdrawalMethod,
+  removeWithdrawalMethod: earningsApi.removeWithdrawalMethod,
+  setDefaultWithdrawalMethod: earningsApi.setDefaultWithdrawalMethod,
+  
+  // Earnings - Tax & Compliance
+  getTaxInformation: earningsApi.getTaxInformation,
+  updateTaxInformation: earningsApi.updateTaxInformation,
+  getTaxDocuments: earningsApi.getTaxDocuments
 };
 
 // ============================================
