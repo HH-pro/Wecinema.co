@@ -60,7 +60,7 @@ const earningsApi = {
   getEarningsDashboard: async () => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/marketplace/earnings/dashboard`,
+        `${API_BASE_URL}/marketplace/stripe/earnings/dashboard`,
         getHeaders()
       );
       return normalizeResponse(response);
