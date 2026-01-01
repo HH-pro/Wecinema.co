@@ -18,28 +18,22 @@ const marketplaceListingSchema = new mongoose.Schema({
     maxlength: 2000
   },
   
-  // ✅ Price in INR (Database mein INR hi store hoga)
+  // ✅ Price in USD (Database mein USD hi store hoga)
   price: { 
     type: Number, 
     required: true,
     min: 0,
     set: function(value) {
-      // 2 decimal places tak round karein
+      // 2 decimal places for USD
       return parseFloat(value.toFixed(2));
     }
   },
   
-  // ✅ NEW: Display currency (bas display ke liye)
-  displayCurrency: {
+  // ✅ Currency field (for future reference)
+  currency: {
     type: String,
     enum: ['USD'],
     default: 'USD'
-  },
-  
-  // ✅ NEW: Exchange rate for display
-  displayExchangeRate: {
-    type: Number,
-    default: 83 // INR to USD rate
   },
   
   type: {
@@ -167,29 +161,23 @@ marketplaceListingSchema.pre('save', async function(next) {
     }
   }
   
+  // Ensure currency is always USD
+  this.currency = 'USD';
+  
   next();
 });
 
-// ✅ Virtual for formatted price in $ (Display ke liye)
-marketplaceListingSchema.virtual('displayPrice').get(function() {
-  const priceInUSD = this.price / (this.displayExchangeRate || 83);
-  return `$${priceInUSD.toFixed(2)}`;
+// ✅ Virtual for formatted price in USD
+marketplaceListingSchema.virtual('formattedPrice').get(function() {
+  return `$${this.price.toFixed(2)}`;
 });
 
-// ✅ Virtual for actual price in INR (Database value)
-marketplaceListingSchema.virtual('actualPrice').get(function() {
-  return `₹${this.price.toFixed(2)}`;
-});
-
-// ✅ Method to get both prices
+// ✅ Simple method to get price info
 marketplaceListingSchema.methods.getPriceInfo = function() {
-  const priceInUSD = this.price / (this.displayExchangeRate || 83);
   return {
-    priceInUSD: priceInUSD.toFixed(2),
-    priceInINR: this.price.toFixed(2),
-    display: `$${priceInUSD.toFixed(2)}`,
-    actual: `₹${this.price.toFixed(2)}`,
-    exchangeRate: this.displayExchangeRate || 83
+    amount: this.price,
+    formatted: `$${this.price.toFixed(2)}`,
+    currency: 'USD'
   };
 };
 
