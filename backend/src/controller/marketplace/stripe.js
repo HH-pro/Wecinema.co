@@ -601,7 +601,7 @@ router.post('/earnings/release-payment/:orderId', authenticateMiddleware, async 
 // ============================================
 
 // ✅ FIXED: Stripe Status Endpoint with timeout handling
-router.get('/stripe/status', authenticateMiddleware, async (req, res) => {
+router.get('/status', authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     
