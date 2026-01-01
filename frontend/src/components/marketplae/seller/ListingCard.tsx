@@ -166,7 +166,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isCurrentUser, onEdi
 
         <div className="absolute bottom-3 left-3 right-3">
           <div className="bg-black bg-opacity-70 text-white px-3 py-2 rounded-lg backdrop-blur-sm border border-white border-opacity-20">
-            <span className="text-lg font-bold">{listing.price?.toLocaleString() || '0'}</span>
+            <span className="text-lg font-bold">${listing.price?.toLocaleString() || '0'}</span>
           </div>
         </div>
       </div>
