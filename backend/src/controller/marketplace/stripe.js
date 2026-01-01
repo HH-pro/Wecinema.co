@@ -1,604 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const mongoose = require('mongoose');
 
 const { authenticateMiddleware } = require("../../utils");
 
 const User = require('../../models/user');
 const Order = require("../../models/marketplace/order");
-const Payout = require("../../models/marketplace/Payout");
-const Payment = require("../../models/marketplace/Payment"); // Add Payment model
-
-// Helper function to safely create ObjectId
-const createObjectId = (id) => {
-  try {
-    if (!id) return null;
-    // If it's already an ObjectId, return it
-    if (id instanceof mongoose.Types.ObjectId) return id;
-    // If it's a valid string, create new ObjectId
-    if (typeof id === 'string' && mongoose.Types.ObjectId.isValid(id)) {
-      return new mongoose.Types.ObjectId(id);
-    }
-    return null;
-  } catch (error) {
-    console.error('Error creating ObjectId:', error);
-    return null;
-  }
-};
-
-// ============================================
-// ✅ EARNINGS ROUTES
-// ============================================
-
-// GET EARNINGS DASHBOARD
-router.get('/earnings/dashboard', authenticateMiddleware, async (req, res) => {
-  try {
-    const userId = req.user?._id || req.user?.id;
-    
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        error: 'User not authenticated'
-      });
-    }
-
-    // Use safe ObjectId creation
-    const userObjectId = createObjectId(userId);
-    if (!userObjectId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid user ID'
-      });
-    }
-
-    // Calculate total earnings from completed orders
-    const orders = await Order.aggregate([
-      {
-        $match: {
-          sellerId: userObjectId,
-          status: 'completed'
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalEarnings: { $sum: '$totalAmount' },
-          totalOrders: { $sum: 1 }
-        }
-      }
-    ]);
-
-    // Calculate this month's earnings
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-
-    const thisMonthEarnings = await Order.aggregate([
-      {
-        $match: {
-          sellerId: userObjectId,
-          status: 'completed',
-          createdAt: { $gte: startOfMonth }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          thisMonthRevenue: { $sum: '$totalAmount' }
-        }
-      }
-    ]);
-
-    // Get available balance (from completed orders that haven't been withdrawn)
-    const availableBalance = await Payment.aggregate([
-      {
-        $match: {
-          userId: userObjectId,
-          type: 'earning',
-          status: 'completed',
-          payoutStatus: { $ne: 'withdrawn' }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          amount: { $sum: '$amount' }
-        }
-      }
-    ]);
-
-    // Get pending balance (from pending/completed orders not yet released)
-    const pendingBalance = await Order.aggregate([
-      {
-        $match: {
-          sellerId: userObjectId,
-          status: { $in: ['pending', 'completed'] },
-          paymentReleased: { $ne: true }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          amount: { $sum: '$totalAmount' }
-        }
-      }
-    ]);
-
-    // Get total withdrawn amount
-    const totalWithdrawn = await Payment.aggregate([
-      {
-        $match: {
-          userId: userObjectId,
-          type: 'withdrawal',
-          status: 'completed'
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          amount: { $sum: '$amount' }
-        }
-      }
-    ]);
-
-    // Get last withdrawal
-    const lastWithdrawal = await Payment.findOne({
-      userId: userObjectId,
-      type: 'withdrawal',
-      status: 'completed'
-    }).sort({ createdAt: -1 });
-
-    // Calculate next payout date (7 days from now)
-    const nextPayoutDate = new Date();
-    nextPayoutDate.setDate(nextPayoutDate.getDate() + 7);
-
-    // Get Stripe status
-    const user = await User.findById(userId);
-    const stripeStatus = {
-      connected: !!user?.stripeAccountId,
-      chargesEnabled: false,
-      payoutsEnabled: false,
-      detailsSubmitted: false
-    };
-
-    if (user?.stripeAccountId) {
-      try {
-        const account = await stripe.accounts.retrieve(user.stripeAccountId);
-        stripeStatus.chargesEnabled = account.charges_enabled || false;
-        stripeStatus.payoutsEnabled = account.payouts_enabled || false;
-        stripeStatus.detailsSubmitted = account.details_submitted || false;
-      } catch (error) {
-        console.error('Error fetching Stripe account:', error.message);
-      }
-    }
-
-    const dashboardData = {
-      success: true,
-      data: {
-        // Convert to cents (assuming frontend expects cents)
-        totalEarnings: Math.round((orders[0]?.totalEarnings || 0) * 100),
-        totalOrders: orders[0]?.totalOrders || 0,
-        thisMonthRevenue: Math.round((thisMonthEarnings[0]?.thisMonthRevenue || 0) * 100),
-        availableBalance: Math.round((availableBalance[0]?.amount || 0) * 100),
-        pendingBalance: Math.round((pendingBalance[0]?.amount || 0) * 100),
-        totalWithdrawn: Math.round((totalWithdrawn[0]?.amount || 0) * 100),
-        lastWithdrawal: lastWithdrawal?.createdAt || null,
-        nextPayoutDate: nextPayoutDate.toISOString(),
-        stripeStatus: stripeStatus,
-        userId: userId.toString()
-      }
-    };
-
-    res.json(dashboardData);
-
-  } catch (error) {
-    console.error('Earnings dashboard error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch earnings dashboard',
-      message: error.message
-    });
-  }
-});
-
-// GET PAYMENT HISTORY
-router.get('/earnings/payment-history', authenticateMiddleware, async (req, res) => {
-  try {
-    const userId = req.user?._id || req.user?.id;
-    const { page = 1, limit = 20, type, status } = req.query;
-    
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        error: 'User not authenticated'
-      });
-    }
-
-    const userObjectId = createObjectId(userId);
-    if (!userObjectId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid user ID'
-      });
-    }
-
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    
-    // Build query
-    const query = { userId: userObjectId };
-    
-    if (type) {
-      query.type = type;
-    }
-    
-    if (status) {
-      query.status = status;
-    }
-
-    // Get payments with pagination
-    const payments = await Payment.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit))
-      .lean();
-
-    // Get total count
-    const totalCount = await Payment.countDocuments(query);
-
-    // Convert amounts to cents for frontend
-    const formattedPayments = payments.map(payment => ({
-      ...payment,
-      amount: Math.round(payment.amount * 100), // Convert to cents
-      _id: payment._id.toString(),
-      userId: payment.userId?.toString() || userId,
-      createdAt: payment.createdAt,
-      date: payment.createdAt
-    }));
-
-    res.json({
-      success: true,
-      data: formattedPayments,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: totalCount,
-        pages: Math.ceil(totalCount / parseInt(limit))
-      }
-    });
-
-  } catch (error) {
-    console.error('Payment history error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch payment history',
-      message: error.message
-    });
-  }
-});
-
-// GET WITHDRAWAL HISTORY
-router.get('/earnings/withdrawal-history', authenticateMiddleware, async (req, res) => {
-  try {
-    const userId = req.user?._id || req.user?.id;
-    const { status } = req.query;
-    
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        error: 'User not authenticated'
-      });
-    }
-
-    const userObjectId = createObjectId(userId);
-    if (!userObjectId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid user ID'
-      });
-    }
-
-    // Build query - withdrawals are payments with type 'withdrawal'
-    const query = { 
-      userId: userObjectId,
-      type: 'withdrawal'
-    };
-    
-    if (status) {
-      query.status = status;
-    }
-
-    // Get withdrawals
-    const withdrawals = await Payment.find(query)
-      .sort({ createdAt: -1 })
-      .lean();
-
-    // Convert amounts to cents for frontend
-    const formattedWithdrawals = withdrawals.map(withdrawal => ({
-      ...withdrawal,
-      amount: Math.round(withdrawal.amount * 100), // Convert to cents
-      _id: withdrawal._id.toString(),
-      userId: withdrawal.userId?.toString() || userId,
-      description: withdrawal.description || `Withdrawal to ${withdrawal.paymentMethod || 'bank'}`,
-      createdAt: withdrawal.createdAt,
-      date: withdrawal.createdAt
-    }));
-
-    res.json({
-      success: true,
-      data: formattedWithdrawals
-    });
-
-  } catch (error) {
-    console.error('Withdrawal history error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch withdrawal history',
-      message: error.message
-    });
-  }
-});
-
-// PROCESS PAYOUT/WITHDRAWAL
-router.post('/earnings/process-payout', authenticateMiddleware, async (req, res) => {
-  try {
-    const userId = req.user?._id || req.user?.id;
-    const { amount, paymentMethod = 'stripe', accountDetails } = req.body;
-    
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        error: 'User not authenticated'
-      });
-    }
-
-    if (!amount || amount <= 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid amount'
-      });
-    }
-
-    const userObjectId = createObjectId(userId);
-    if (!userObjectId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid user ID'
-      });
-    }
-
-    // Convert amount from cents to actual currency
-    const amountInCurrency = amount / 100;
-
-    // Check available balance
-    const availableBalance = await Payment.aggregate([
-      {
-        $match: {
-          userId: userObjectId,
-          type: 'earning',
-          status: 'completed',
-          payoutStatus: { $ne: 'withdrawn' }
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: '$amount' }
-        }
-      }
-    ]);
-
-    const currentBalance = availableBalance[0]?.total || 0;
-    
-    if (amountInCurrency > currentBalance) {
-      return res.status(400).json({
-        success: false,
-        error: 'Insufficient balance'
-      });
-    }
-
-    // Check user has Stripe account
-    const user = await User.findById(userId);
-    if (!user?.stripeAccountId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Stripe account not connected'
-      });
-    }
-
-    // Check Stripe status
-    let stripeAccount;
-    try {
-      stripeAccount = await stripe.accounts.retrieve(user.stripeAccountId);
-    } catch (stripeError) {
-      return res.status(400).json({
-        success: false,
-        error: 'Stripe account not accessible'
-      });
-    }
-
-    if (!stripeAccount.charges_enabled || !stripeAccount.payouts_enabled) {
-      return res.status(400).json({
-        success: false,
-        error: 'Stripe account not fully setup for payouts'
-      });
-    }
-
-    // Process payout with Stripe
-    let payoutResult;
-    try {
-      payoutResult = await stripe.payouts.create({
-        amount: Math.round(amountInCurrency * 100), // Convert to smallest currency unit
-        currency: process.env.STRIPE_CURRENCY || 'usd',
-        method: 'standard',
-        metadata: {
-          userId: userId.toString(),
-          paymentMethod: paymentMethod,
-          platform: process.env.PLATFORM_NAME || 'WECINEMA'
-        }
-      }, {
-        stripeAccount: user.stripeAccountId
-      });
-    } catch (payoutError) {
-      console.error('Stripe payout error:', payoutError);
-      return res.status(400).json({
-        success: false,
-        error: 'Failed to process payout with Stripe',
-        details: payoutError.message
-      });
-    }
-
-    // Create withdrawal record
-    const withdrawal = new Payment({
-      userId: userObjectId,
-      type: 'withdrawal',
-      amount: amountInCurrency,
-      paymentMethod: paymentMethod,
-      status: 'pending', // Will be updated by webhook
-      stripePayoutId: payoutResult.id,
-      description: `Withdrawal to ${paymentMethod}`,
-      metadata: {
-        accountDetails: accountDetails,
-        stripeResponse: {
-          payoutId: payoutResult.id,
-          amount: payoutResult.amount,
-          currency: payoutResult.currency,
-          arrivalDate: payoutResult.arrival_date
-        }
-      }
-    });
-
-    await withdrawal.save();
-
-    // Mark corresponding earnings as withdrawn
-    await Payment.updateMany(
-      {
-        userId: userObjectId,
-        type: 'earning',
-        status: 'completed',
-        payoutStatus: { $ne: 'withdrawn' }
-      },
-      {
-        $set: { payoutStatus: 'withdrawn' },
-        $push: { 
-          linkedTransactions: {
-            type: 'withdrawal',
-            transactionId: withdrawal._id,
-            amount: amountInCurrency,
-            date: new Date()
-          }
-        }
-      }
-    );
-
-    res.json({
-      success: true,
-      message: 'Withdrawal request processed successfully',
-      data: {
-        withdrawalId: withdrawal._id.toString(),
-        amount: Math.round(amount),
-        status: 'pending',
-        estimatedArrival: payoutResult.arrival_date,
-        payoutId: payoutResult.id
-      }
-    });
-
-  } catch (error) {
-    console.error('Process payout error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to process payout',
-      message: error.message
-    });
-  }
-});
-
-// RELEASE PENDING PAYMENT
-router.post('/earnings/release-payment/:orderId', authenticateMiddleware, async (req, res) => {
-  try {
-    const { orderId } = req.params;
-    const userId = req.user?._id || req.user?.id;
-    
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        error: 'User not authenticated'
-      });
-    }
-
-    const userObjectId = createObjectId(userId);
-    const orderObjectId = createObjectId(orderId);
-    
-    if (!userObjectId || !orderObjectId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid IDs'
-      });
-    }
-
-    // Find the order
-    const order = await Order.findOne({
-      _id: orderObjectId,
-      sellerId: userObjectId,
-      status: 'completed',
-      paymentReleased: { $ne: true }
-    });
-
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        error: 'Order not found or already released'
-      });
-    }
-
-    // Create payment record for the seller
-    const payment = new Payment({
-      userId: userObjectId,
-      type: 'earning',
-      amount: order.totalAmount,
-      status: 'completed',
-      orderId: orderObjectId,
-      description: `Payment for order #${order.orderNumber || order._id.toString().slice(-6)}`,
-      metadata: {
-        orderDetails: {
-          orderId: order._id.toString(),
-          buyerId: order.buyerId?.toString(),
-          items: order.items,
-          totalAmount: order.totalAmount
-        }
-      }
-    });
-
-    await payment.save();
-
-    // Mark order as payment released
-    order.paymentReleased = true;
-    order.paymentReleasedAt = new Date();
-    await order.save();
-
-    res.json({
-      success: true,
-      message: 'Payment released successfully',
-      data: {
-        paymentId: payment._id.toString(),
-        amount: Math.round(order.totalAmount * 100), // Convert to cents
-        orderId: order._id.toString()
-      }
-    });
-
-  } catch (error) {
-    console.error('Release payment error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to release payment',
-      message: error.message
-    });
-  }
-});
-
-// ============================================
-// ✅ STRIPE ROUTES (Existing - Keep as is)
-// ============================================
+const Payout = require("../../models/marketplace/Payout"); // Create this model
 
 // ✅ FIXED: Stripe Status Endpoint with timeout handling
 router.get('/status', authenticateMiddleware, async (req, res) => {
@@ -711,7 +119,7 @@ router.get('/status', authenticateMiddleware, async (req, res) => {
 });
 
 // ✅ SIMPLE Status Endpoint (Always works)
-router.get('/stripe/status-simple', authenticateMiddleware, async (req, res) => {
+router.get('/status-simple', authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     const user = await User.findById(userId).select('stripeAccountId email firstName lastName');
@@ -760,7 +168,7 @@ router.get('/stripe/status-simple', authenticateMiddleware, async (req, res) => 
 });
 
 // ✅ UPDATED: Stripe Onboarding Endpoint with Improved Business URL
-router.post('/stripe/onboard-seller', authenticateMiddleware, async (req, res) => {
+router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
   console.log('=== STRIPE ONBOARDING STARTED ===');
   const startTime = Date.now();
   
@@ -988,7 +396,7 @@ router.post('/stripe/onboard-seller', authenticateMiddleware, async (req, res) =
 });
 
 // ✅ Alternative onboarding without business_profile
-router.post('/stripe/onboard-seller-retry', authenticateMiddleware, async (req, res) => {
+router.post('/onboard-seller-retry', authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     const user = await User.findById(userId);
@@ -1059,7 +467,7 @@ router.post('/stripe/onboard-seller-retry', authenticateMiddleware, async (req, 
 });
 
 // ✅ Complete onboarding
-router.post('/stripe/complete-onboarding', authenticateMiddleware, async (req, res) => {
+router.post('/complete-onboarding', authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     const user = await User.findById(userId);
@@ -1096,8 +504,208 @@ router.post('/stripe/complete-onboarding', authenticateMiddleware, async (req, r
   }
 });
 
+// ✅ Get Balance with Fallback for Testing
+router.get('/', authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId);
+    
+    if (!user || !user.stripeAccountId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Stripe account not connected',
+        availableBalance: 0,
+        pendingBalance: 0
+      });
+    }
+
+    try {
+      // Get balance from Stripe
+      const balance = await stripe.balance.retrieve({
+        stripeAccount: user.stripeAccountId
+      });
+
+      let availableBalance = 0;
+      let pendingBalance = 0;
+
+      balance.available.forEach(item => {
+        availableBalance += item.amount;
+      });
+
+      balance.pending.forEach(item => {
+        pendingBalance += item.amount;
+      });
+
+      res.json({
+        success: true,
+        availableBalance,
+        pendingBalance,
+        currency: balance.available[0]?.currency || 'usd',
+        lastPayout: user.lastPayoutDate,
+        nextPayout: user.nextPayoutDate
+      });
+    } catch (stripeError) {
+      console.log('Stripe balance error, using test data:', stripeError.message);
+      
+      // Return test data for development
+      res.json({
+        success: true,
+        availableBalance: 25000, // $250.00
+        pendingBalance: 7500,    // $75.00
+        currency: 'usd',
+        isTestData: true,
+        message: 'Using test balance data for development'
+      });
+    }
+
+  } catch (error) {
+    console.error('Balance error:', error);
+    
+    // Always return successful response with test data
+    res.json({
+      success: true,
+      availableBalance: 15000, // $150.00
+      pendingBalance: 5000,    // $50.00
+      currency: 'usd',
+      isTestData: true,
+      message: 'Default test balance'
+    });
+  }
+});
+
+// ✅ Create Withdrawal (Payout)
+router.post('/withdraw', authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { amount } = req.body;
+    
+    if (!amount || amount < 1) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid amount. Minimum withdrawal is $1.00'
+      });
+    }
+
+    const user = await User.findById(userId);
+    
+    if (!user || !user.stripeAccountId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Stripe account not connected'
+      });
+    }
+
+    // Check account status
+    const account = await stripe.accounts.retrieve(user.stripeAccountId);
+    
+    if (!account.charges_enabled || !account.payouts_enabled) {
+      return res.status(400).json({
+        success: false,
+        error: 'Account not verified for payouts. Please complete Stripe verification.'
+      });
+    }
+
+    // For development/testing, create mock payout
+    if (process.env.NODE_ENV === 'development') {
+      const payoutRecord = new Payout({
+        userId,
+        stripeAccountId: user.stripeAccountId,
+        stripePayoutId: 'po_test_' + Date.now(),
+        amount: amount * 100,
+        currency: 'usd',
+        status: 'pending',
+        arrivalDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+        method: 'standard',
+        metadata: { isTest: true }
+      });
+
+      await payoutRecord.save();
+
+      // Update user
+      user.lastPayoutDate = new Date();
+      await user.save();
+
+      return res.json({
+        success: true,
+        message: 'Withdrawal initiated successfully (TEST MODE)',
+        payoutId: payoutRecord.stripePayoutId,
+        amount: amount,
+        currency: 'usd',
+        estimatedArrival: payoutRecord.arrivalDate,
+        status: 'pending',
+        isTest: true
+      });
+    }
+
+    // Production: Create real Stripe payout
+    const payout = await stripe.payouts.create({
+      amount: Math.round(amount * 100),
+      currency: 'usd',
+      method: 'standard',
+      statement_descriptor: 'WECINEMA Payout',
+    }, {
+      stripeAccount: user.stripeAccountId
+    });
+
+    // Save payout record to database
+    const payoutRecord = new Payout({
+      userId,
+      stripeAccountId: user.stripeAccountId,
+      stripePayoutId: payout.id,
+      amount: payout.amount,
+      currency: payout.currency,
+      status: payout.status,
+      arrivalDate: payout.arrival_date,
+      metadata: payout
+    });
+
+    await payoutRecord.save();
+
+    // Update user
+    user.lastPayoutDate = new Date();
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Withdrawal initiated successfully',
+      payoutId: payout.id,
+      amount: payout.amount / 100,
+      currency: payout.currency,
+      estimatedArrival: payout.arrival_date,
+      status: payout.status
+    });
+
+  } catch (error) {
+    console.error('Withdraw error:', error);
+    
+    let errorMessage = 'Failed to process withdrawal';
+    
+    if (error.type === 'StripeInvalidRequestError') {
+      switch (error.code) {
+        case 'amount_too_small':
+          errorMessage = 'Amount is too small. Minimum withdrawal is $1.00';
+          break;
+        case 'insufficient_funds':
+          errorMessage = 'Insufficient funds available for withdrawal';
+          break;
+        case 'invalid_currency':
+          errorMessage = 'Invalid currency for payout';
+          break;
+        default:
+          errorMessage = error.message || 'Stripe payment error';
+      }
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+      code: error.code
+    });
+  }
+});
+
 // ✅ Get Payout History
-router.get('/stripe/payouts', authenticateMiddleware, async (req, res) => {
+router.get('/payouts', authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     
@@ -1169,7 +777,7 @@ router.get('/stripe/payouts', authenticateMiddleware, async (req, res) => {
 });
 
 // ✅ Create payment intent for order
-router.post('/stripe/create-payment-intent', authenticateMiddleware, async (req, res) => {
+router.post('/create-payment-intent', authenticateMiddleware, async (req, res) => {
   try {
     const { orderId } = req.body;
     const userId = req.user.id;
@@ -1260,7 +868,7 @@ router.post('/stripe/create-payment-intent', authenticateMiddleware, async (req,
 });
 
 // ✅ Confirm payment
-router.post('/stripe/confirm-payment', authenticateMiddleware, async (req, res) => {
+router.post('/confirm-payment', authenticateMiddleware, async (req, res) => {
   try {
     const { paymentIntentId } = req.body;
     const userId = req.user.id;
@@ -1338,7 +946,7 @@ router.post('/stripe/confirm-payment', authenticateMiddleware, async (req, res) 
 });
 
 // ✅ Create payout to seller (Legacy - use /withdraw instead)
-router.post('/stripe/create-payout', authenticateMiddleware, async (req, res) => {
+router.post('/create-payout', authenticateMiddleware, async (req, res) => {
   try {
     const { amount } = req.body;
     const userId = req.user.id;
@@ -1400,7 +1008,7 @@ router.post('/stripe/create-payout', authenticateMiddleware, async (req, res) =>
 });
 
 // ✅ Get payout history (Legacy - use /payouts instead)
-router.get('/stripe/stripe-payouts', authenticateMiddleware, async (req, res) => {
+router.get('/stripe-payouts', authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     const user = await User.findById(userId);
@@ -1442,7 +1050,7 @@ router.get('/stripe/stripe-payouts', authenticateMiddleware, async (req, res) =>
 });
 
 // ✅ Create login link for Stripe Express dashboard
-router.post('/stripe/create-login-link', authenticateMiddleware, async (req, res) => {
+router.post('/create-login-link', authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     const user = await User.findById(userId);
@@ -1472,87 +1080,18 @@ router.post('/stripe/create-login-link', authenticateMiddleware, async (req, res
   }
 });
 
-// ✅ Create account link for Stripe Express
-router.post('/stripe/create-account-link', authenticateMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const user = await User.findById(userId);
-
-    if (!user || !user.stripeAccountId) {
-      return res.status(404).json({
-        success: false,
-        error: 'Stripe account not found'
-      });
-    }
-
-    const accountLink = await stripe.accountLinks.create({
-      account: user.stripeAccountId,
-      refresh_url: `${process.env.FRONTEND_URL || 'https://wecinema.co'}/marketplace/dashboard?tab=earnings`,
-      return_url: `${process.env.FRONTEND_URL || 'https://wecinema.co'}/marketplace/dashboard?tab=earnings`,
-      type: 'account_onboarding',
-    });
-
-    res.json({
-      success: true,
-      url: accountLink.url,
-      message: 'Account link generated successfully'
-    });
-
-  } catch (error) {
-    console.error('Error creating account link:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to create account link',
-      details: error.message
-    });
-  }
+// ✅ Quick Test Endpoint
+router.get('/test', authenticateMiddleware, (req, res) => {
+  res.json({
+    success: true,
+    message: 'Stripe API is working',
+    user: req.user.id,
+    timestamp: new Date().toISOString()
+  });
 });
-
-// ✅ Get Stripe balance
-router.get('/balance', authenticateMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const user = await User.findById(userId);
-
-    if (!user || !user.stripeAccountId) {
-      return res.status(404).json({
-        success: false,
-        error: 'Stripe account not found'
-      });
-    }
-
-    const balance = await stripe.balance.retrieve({
-      stripeAccount: user.stripeAccountId
-    });
-
-    const available = balance.available.reduce((sum, item) => sum + item.amount, 0);
-    const pending = balance.pending.reduce((sum, item) => sum + item.amount, 0);
-
-    res.json({
-      success: true,
-      balance: {
-        available: available / 100,
-        pending: pending / 100,
-        currency: balance.available[0]?.currency || 'usd'
-      }
-    });
-
-  } catch (error) {
-    console.error('Error fetching balance:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch balance',
-      details: error.message
-    });
-  }
-});
-
-// ============================================
-// ✅ WEBHOOK ROUTE
-// ============================================
 
 // ✅ Stripe Webhook Handler
-router.post('/stripe/webhook', express.raw({type: 'application/json'}), async (req, res) => {
+router.post('/webhook', express.raw({type: 'application/json'}), async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event;
 
@@ -1589,14 +1128,6 @@ router.post('/stripe/webhook', express.raw({type: 'application/json'}), async (r
         await handlePayoutPaid(event.data.object);
         break;
       
-      case 'payout.created':
-        await handlePayoutCreated(event.data.object);
-        break;
-      
-      case 'payout.failed':
-        await handlePayoutFailed(event.data.object);
-        break;
-      
       default:
         console.log(`Unhandled event type: ${event.type}`);
     }
@@ -1625,25 +1156,6 @@ async function handlePaymentIntentSucceeded(paymentIntent) {
 
       await order.save();
       console.log(`✅ Order ${order._id} marked as paid`);
-      
-      // Create earning record for seller
-      if (Payment) {
-        const sellerEarning = new Payment({
-          userId: order.sellerId,
-          type: 'earning',
-          amount: order.totalAmount,
-          status: 'completed',
-          orderId: order._id,
-          description: `Earning from order #${order._id.toString().slice(-8)}`,
-          metadata: {
-            orderId: order._id.toString(),
-            buyerId: order.buyerId?.toString(),
-            stripePaymentIntentId: paymentIntent.id
-          }
-        });
-        await sellerEarning.save();
-        console.log(`✅ Earning record created for seller ${order.sellerId}`);
-      }
     }
   } catch (error) {
     console.error('Error handling payment success:', error);
@@ -1696,80 +1208,8 @@ async function handlePayoutPaid(payout) {
         }
       );
     }
-    
-    // Update payment status
-    if (Payment && typeof Payment.findOneAndUpdate === 'function') {
-      await Payment.findOneAndUpdate(
-        { stripePayoutId: payout.id },
-        { 
-          status: 'completed',
-          processedAt: new Date()
-        }
-      );
-    }
   } catch (error) {
     console.error('Error handling payout:', error);
-  }
-}
-
-async function handlePayoutCreated(payout) {
-  try {
-    console.log(`🔄 Payout ${payout.id} created: ${payout.amount / 100} ${payout.currency}`);
-    
-    // Update payment status to processing
-    if (Payment && typeof Payment.findOneAndUpdate === 'function') {
-      await Payment.findOneAndUpdate(
-        { stripePayoutId: payout.id },
-        { 
-          status: 'processing',
-          metadata: {
-            ...payout.metadata,
-            stripePayoutDetails: {
-              id: payout.id,
-              amount: payout.amount,
-              currency: payout.currency,
-              arrivalDate: payout.arrival_date,
-              status: payout.status
-            }
-          }
-        }
-      );
-    }
-  } catch (error) {
-    console.error('Error handling payout created:', error);
-  }
-}
-
-async function handlePayoutFailed(payout) {
-  try {
-    console.log(`❌ Payout ${payout.id} failed: ${payout.failure_message}`);
-    
-    // Update payment status to failed
-    if (Payment && typeof Payment.findOneAndUpdate === 'function') {
-      await Payment.findOneAndUpdate(
-        { stripePayoutId: payout.id },
-        { 
-          status: 'failed',
-          failureMessage: payout.failure_message,
-          failureCode: payout.failure_code,
-          processedAt: new Date()
-        }
-      );
-      
-      // Mark earnings as available again since payout failed
-      await Payment.updateMany(
-        {
-          stripePayoutId: payout.id,
-          type: 'earning',
-          payoutStatus: 'withdrawn'
-        },
-        {
-          $set: { payoutStatus: 'available' }
-        }
-      );
-    }
-  } catch (error) {
-    console.error('Error handling payout failure:', error);
   }
 }
 
