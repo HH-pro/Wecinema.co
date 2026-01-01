@@ -1,7 +1,7 @@
 // src/api/marketplaceApi.js - UPDATED WITH CORRECT ROUTES
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:3000/';
+const API_BASE_URL = 'http://localhost:3000';
 
 // ============================================
 // ✅ HELPER FUNCTIONS (PRIVATE)
