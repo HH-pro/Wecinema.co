@@ -1509,7 +1509,7 @@ router.post('/stripe/create-account-link', authenticateMiddleware, async (req, r
 });
 
 // ✅ Get Stripe balance
-router.get('/stripe/balance', authenticateMiddleware, async (req, res) => {
+router.get('/balance', authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     const user = await User.findById(userId);
