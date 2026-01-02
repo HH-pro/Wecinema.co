@@ -1,4 +1,4 @@
-// routes/offerRoutes.js - Optimized Version with Payment Confirmation Redirect
+// routes/offerRoutes.js - Complete Version - Listings Never Removed
 const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
@@ -12,7 +12,7 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const emailService = require('../../../services/emailService');
 const admin = require('firebase-admin');
 
-// Initialize Firebase if not already initialized
+// Initialize Firebase
 if (!admin.apps.length && process.env.FIREBASE_PRIVATE_KEY) {
   try {
     admin.initializeApp({
@@ -24,7 +24,7 @@ if (!admin.apps.length && process.env.FIREBASE_PRIVATE_KEY) {
       databaseURL: process.env.FIREBASE_DATABASE_URL
     });
   } catch (error) {
-    console.log('Firebase initialization warning:', error.message);
+    console.log('Firebase init warning:', error.message);
   }
 }
 
@@ -35,7 +35,131 @@ const validateAmount = (amount) => {
   return !isNaN(numAmount) && numAmount >= 0.50;
 };
 
-// ✅ FIREBASE CHAT ROOM CREATION
+// ✅ CHECK FOR EXISTING ORDER ON LISTING
+const checkExistingOrder = async (buyerId, listingId) => {
+  try {
+    const existingOrder = await Order.findOne({
+      buyerId: new mongoose.Types.ObjectId(buyerId),
+      listingId: new mongoose.Types.ObjectId(listingId),
+      status: { $in: ['pending_payment', 'paid', 'in_progress', 'pending_delivery', 'completed'] }
+    });
+    
+    return existingOrder;
+  } catch (error) {
+    console.error('Check existing order error:', error);
+    return null;
+  }
+};
+
+// ✅ CHECK FOR EXISTING OFFER ON LISTING
+const checkExistingOffer = async (buyerId, listingId) => {
+  try {
+    const existingOffer = await Offer.findOne({
+      buyerId: new mongoose.Types.ObjectId(buyerId),
+      listingId: new mongoose.Types.ObjectId(listingId),
+      status: { $in: ['pending', 'pending_payment', 'paid', 'accepted'] }
+    });
+    
+    return existingOffer;
+  } catch (error) {
+    console.error('Check existing offer error:', error);
+    return null;
+  }
+};
+
+// ✅ UPDATE LISTING STATUS (NEVER DELETE)
+const updateListingStatus = async (listingId, status, orderId = null) => {
+  try {
+    const updateData = { status };
+    
+    if (status === 'reserved') {
+      updateData.reservedUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      updateData.currentOrderId = orderId;
+      updateData.lastOrderAt = new Date();
+    } else if (status === 'active') {
+      updateData.reservedUntil = null;
+      updateData.currentOrderId = null;
+    } else if (status === 'sold') {
+      updateData.reservedUntil = null;
+      updateData.currentOrderId = orderId;
+      updateData.soldAt = new Date();
+    } else if (status === 'inactive') {
+      updateData.inactiveAt = new Date();
+    } else if (status === 'deleted') {
+      updateData.deletedAt = new Date();
+      updateData.deleted = true;
+    }
+    
+    const updatedListing = await MarketplaceListing.findByIdAndUpdate(
+      listingId,
+      updateData,
+      { new: true }
+    );
+    
+    console.log(`✅ Listing ${listingId} status updated to: ${status}`);
+    return updatedListing;
+  } catch (error) {
+    console.error('Update listing status error:', error);
+    return null;
+  }
+};
+
+// ✅ CHECK IF LISTING IS AVAILABLE FOR OFFERS
+const isListingAvailable = async (listingId) => {
+  try {
+    const listing = await MarketplaceListing.findById(listingId);
+    
+    if (!listing) return { available: false, message: 'Listing not found' };
+    
+    if (listing.status === 'active') {
+      return { 
+        available: true, 
+        message: 'Listing is available for offers' 
+      };
+    } else if (listing.status === 'reserved') {
+      // Check if reservation is expired
+      if (listing.reservedUntil && listing.reservedUntil < new Date()) {
+        // Auto-renew to active if reservation expired
+        await updateListingStatus(listingId, 'active');
+        return { 
+          available: true, 
+          message: 'Listing is now available (reservation expired)' 
+        };
+      }
+      return { 
+        available: false, 
+        message: 'Listing is currently reserved for another order' 
+      };
+    } else if (listing.status === 'sold') {
+      return { 
+        available: false, 
+        message: 'Listing has been sold' 
+      };
+    } else if (listing.status === 'inactive') {
+      return { 
+        available: false, 
+        message: 'Listing is inactive' 
+      };
+    } else if (listing.status === 'deleted') {
+      return { 
+        available: false, 
+        message: 'Listing has been deleted' 
+      };
+    } else if (listing.status === 'draft') {
+      return { 
+        available: false, 
+        message: 'Listing is in draft mode' 
+      };
+    }
+    
+    return { available: false, message: 'Listing is not available' };
+  } catch (error) {
+    console.error('Check listing availability error:', error);
+    return { available: false, message: 'Error checking listing availability' };
+  }
+};
+
+// ✅ CREATE FIREBASE CHAT ROOM
 const createFirebaseChatRoom = async (order, buyer, seller) => {
   try {
     if (!admin.apps.length) return null;
@@ -76,12 +200,11 @@ const createFirebaseChatRoom = async (order, buyer, seller) => {
     
     await db.collection('chatRooms').doc(chatRoomId).set(chatRoomData);
     
-    // Add initial system message
     await db.collection('chatRooms').doc(chatRoomId).collection('messages').add({
       senderId: 'system',
       senderName: 'System',
       senderRole: 'system',
-      message: `🎉 **Order #${order._id.toString().slice(-8).toUpperCase()} has been placed!**`,
+      message: `🎉 **Order #${order._id.toString().slice(-8).toUpperCase()} has been placed!**\n\nBuyer: ${buyer.username}\nSeller: ${seller.username}\nAmount: $${order.amount}`,
       timestamp: new Date().toISOString(),
       type: 'system',
       readBy: []
@@ -103,7 +226,7 @@ const createFirebaseChatRoom = async (order, buyer, seller) => {
     await localChat.save();
     return chatRoomId;
   } catch (error) {
-    console.error('Firebase chat room creation error:', error);
+    console.error('Firebase chat error:', error);
     return null;
   }
 };
@@ -119,29 +242,28 @@ const sendOrderNotifications = async (order, offer, buyer, seller) => {
     
     const systemUserId = new mongoose.Types.ObjectId('000000000000000000000000');
     
-    // Seller notification
-    const sellerMessage = new Message({
-      orderId: order._id,
-      senderId: systemUserId,
-      receiverId: order.sellerId,
-      message: `🎉 **NEW ORDER RECEIVED!**\nOrder ID: ${order._id.toString().slice(-8).toUpperCase()}`,
-      read: false,
-      messageType: 'new_order_notification',
-      metadata: { chatLink, firebaseChatId }
-    });
+    const messages = [
+      new Message({
+        orderId: order._id,
+        senderId: systemUserId,
+        receiverId: seller._id,
+        message: `🎉 **NEW ORDER RECEIVED!**\n\nOrder ID: #${order._id.toString().slice(-8).toUpperCase()}\nBuyer: ${buyer.username}\nAmount: $${order.amount}\nListing: ${offer.listingId?.title}`,
+        read: false,
+        messageType: 'new_order_notification',
+        metadata: { chatLink, firebaseChatId }
+      }),
+      new Message({
+        orderId: order._id,
+        senderId: systemUserId,
+        receiverId: buyer._id,
+        message: `✅ **ORDER CONFIRMED!**\n\nOrder ID: #${order._id.toString().slice(-8).toUpperCase()}\nSeller: ${seller.username}\nAmount: $${order.amount}\nListing: ${offer.listingId?.title}`,
+        read: false,
+        messageType: 'order_confirmation',
+        metadata: { chatLink, firebaseChatId }
+      })
+    ];
     
-    // Buyer notification
-    const buyerMessage = new Message({
-      orderId: order._id,
-      senderId: systemUserId,
-      receiverId: order.buyerId,
-      message: `✅ **ORDER CONFIRMED!**\nOrder ID: ${order._id.toString().slice(-8).toUpperCase()}`,
-      read: false,
-      messageType: 'order_confirmation',
-      metadata: { chatLink, firebaseChatId }
-    });
-    
-    await Promise.all([sellerMessage.save(), buyerMessage.save()]);
+    await Message.insertMany(messages);
     
     // Send emails if configured
     if (emailService) {
@@ -151,13 +273,13 @@ const sendOrderNotifications = async (order, offer, buyer, seller) => {
           emailService.sendOrderConfirmationToBuyer(order, buyer, seller, chatLink)
         ]);
       } catch (emailError) {
-        console.error('Email sending failed:', emailError.message);
+        console.error('Email error:', emailError.message);
       }
     }
     
     return { chatLink, firebaseChatId };
   } catch (error) {
-    console.error('Order notifications error:', error);
+    console.error('Notifications error:', error);
     return null;
   }
 };
@@ -175,22 +297,20 @@ const cleanupExpiredOffers = async () => {
       if (offer.paymentIntentId) {
         try {
           await stripe.paymentIntents.cancel(offer.paymentIntentId);
-        } catch (stripeError) {
-          // Payment intent might already be cancelled
-        }
+        } catch (stripeError) {}
       }
       await Offer.findByIdAndDelete(offer._id);
     }
     
     return expiredOffers.length;
   } catch (error) {
-    console.error('Cleanup expired offers error:', error);
+    console.error('Cleanup error:', error);
     return 0;
   }
 };
 
 // ============================
-// ✅ ROUTES START HERE
+// ✅ ROUTES
 // ============================
 
 // ✅ HEALTH CHECK
@@ -202,80 +322,160 @@ router.get("/health", (req, res) => {
   });
 });
 
-// ✅ CHECK PENDING OFFER
-router.get("/check-pending-offer/:listingId", authenticateMiddleware, async (req, res) => {
+// ✅ CHECK LISTING STATUS & AVAILABILITY
+router.get("/check-listing-status/:listingId", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
     const { listingId } = req.params;
 
     if (!userId || !listingId || !validateObjectId(listingId)) {
-      return res.status(400).json({ success: false, error: 'Invalid request' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid request' 
+      });
     }
 
-    const pendingOffer = await Offer.findOne({
-      listingId: new mongoose.Types.ObjectId(listingId),
-      buyerId: new mongoose.Types.ObjectId(userId),
-      status: { $in: ['pending', 'pending_payment', 'paid', 'accepted'] }
-    }).select('_id status amount paymentIntentId isTemporary expiresAt').lean();
+    // Check for existing order
+    const existingOrder = await checkExistingOrder(userId, listingId);
+    
+    // Check for existing offer
+    const existingOffer = await checkExistingOffer(userId, listingId);
+    
+    // Get listing with full details
+    const listing = await MarketplaceListing.findById(listingId)
+      .select('status sellerId title price description category condition mediaUrls totalOrders views createdAt currentOrderId reservedUntil soldAt deleted deletedAt')
+      .populate('sellerId', 'username avatar rating');
+
+    if (!listing) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Listing not found' 
+      });
+    }
+
+    // Check listing availability
+    const availability = await isListingAvailable(listingId);
+    
+    // Check if user is seller
+    const isOwner = listing.sellerId._id.toString() === userId.toString();
 
     res.status(200).json({
       success: true,
-      hasPendingOffer: !!pendingOffer,
-      data: pendingOffer || null
+      data: {
+        listing: {
+          _id: listing._id,
+          title: listing.title,
+          price: listing.price,
+          description: listing.description,
+          category: listing.category,
+          condition: listing.condition,
+          mediaUrls: listing.mediaUrls,
+          status: listing.status,
+          sellerId: listing.sellerId,
+          totalOrders: listing.totalOrders,
+          views: listing.views,
+          createdAt: listing.createdAt,
+          currentOrderId: listing.currentOrderId,
+          reservedUntil: listing.reservedUntil,
+          soldAt: listing.soldAt,
+          deleted: listing.deleted || false,
+          isOwner,
+          isActive: listing.status === 'active',
+          isReserved: listing.status === 'reserved',
+          isSold: listing.status === 'sold',
+          isInactive: listing.status === 'inactive',
+          isDeleted: listing.deleted || listing.status === 'deleted'
+        },
+        existingOrder: existingOrder ? {
+          _id: existingOrder._id,
+          status: existingOrder.status,
+          amount: existingOrder.amount,
+          orderType: existingOrder.orderType,
+          createdAt: existingOrder.createdAt,
+          redirectUrl: `/myorder/${existingOrder._id}`
+        } : null,
+        existingOffer: existingOffer ? {
+          _id: existingOffer._id,
+          status: existingOffer.status,
+          amount: existingOffer.amount,
+          paymentIntentId: existingOffer.paymentIntentId,
+          isTemporary: existingOffer.isTemporary,
+          expiresAt: existingOffer.expiresAt
+        } : null,
+        availability: {
+          ...availability,
+          canMakeOffer: !existingOrder && !existingOffer && availability.available,
+          canView: !listing.deleted && listing.status !== 'deleted'
+        },
+        userStatus: {
+          hasOrder: !!existingOrder,
+          hasOffer: !!existingOffer,
+          isOwner,
+          canMakeOffer: !existingOrder && !existingOffer && availability.available && !isOwner
+        }
+      }
     });
   } catch (error) {
-    console.error('Check pending offer error:', error);
-    res.status(500).json({ success: false, error: 'Server error' });
+    console.error('Check listing status error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to check listing status' 
+    });
   }
 });
 
-// ✅ MAKE OFFER (TEMPORARY - REQUIRES PAYMENT)
+// ✅ MAKE OFFER WITH PAYMENT
 router.post("/make-offer", authenticateMiddleware, async (req, res) => {
   let session;
   let stripePaymentIntent = null;
   let temporaryOffer = null;
   
   try {
-    const { listingId, amount, requirements } = req.body;
+    const { listingId, amount, requirements, expectedDelivery } = req.body;
     const userId = req.user.id;
 
     // Validation
     if (!userId || !listingId || !amount || !validateObjectId(listingId)) {
-      return res.status(400).json({ success: false, error: 'Invalid request' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid request parameters' 
+      });
     }
 
     const offerAmount = parseFloat(amount);
     if (!validateAmount(amount)) {
-      return res.status(400).json({ success: false, error: 'Minimum amount is $0.50' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Minimum amount is $0.50' 
+      });
     }
 
-    // Start transaction
-    session = await mongoose.startSession();
-    session.startTransaction();
-
-    // Find listing
-    const listing = await MarketplaceListing.findById(listingId).session(session);
-    if (!listing || listing.status !== 'active') {
-      await session.abortTransaction();
-      return res.status(400).json({ success: false, error: 'Listing not available' });
+    // ✅ CHECK LISTING AVAILABILITY
+    const availability = await isListingAvailable(listingId);
+    if (!availability.available) {
+      return res.status(400).json({ 
+        success: false, 
+        error: availability.message 
+      });
     }
 
-    // Check if user is seller
-    if (listing.sellerId.toString() === userId.toString()) {
-      await session.abortTransaction();
-      return res.status(400).json({ success: false, error: 'Cannot make offer on your own listing' });
+    // ✅ CHECK FOR EXISTING ORDER FIRST
+    const existingOrder = await checkExistingOrder(userId, listingId);
+    if (existingOrder) {
+      return res.status(400).json({
+        success: false,
+        error: 'You already have an order on this listing',
+        data: {
+          orderId: existingOrder._id,
+          status: existingOrder.status,
+          redirectUrl: `/myorder/${existingOrder._id}`
+        }
+      });
     }
 
-    // Check for existing offers
-    const existingOffer = await Offer.findOne({
-      listingId,
-      buyerId: userId,
-      status: { $in: ['pending', 'pending_payment', 'paid', 'accepted'] }
-    }).session(session);
-
+    // ✅ CHECK FOR EXISTING OFFER
+    const existingOffer = await checkExistingOffer(userId, listingId);
     if (existingOffer) {
-      await session.abortTransaction();
-      
       if (existingOffer.status === 'pending_payment' && existingOffer.paymentIntentId) {
         try {
           const paymentIntent = await stripe.paymentIntents.retrieve(existingOffer.paymentIntentId);
@@ -292,14 +492,47 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
             });
           }
         } catch (stripeError) {
-          console.error('Stripe retrieval error:', stripeError.message);
+          console.error('Stripe error:', stripeError.message);
         }
       }
       
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'You already have a pending offer',
-        existingOfferId: existingOffer._id
+        error: 'You already have an offer on this listing',
+        existingOfferId: existingOffer._id,
+        existingOfferStatus: existingOffer.status
+      });
+    }
+
+    // Start transaction
+    session = await mongoose.startSession();
+    session.startTransaction();
+
+    // Find listing
+    const listing = await MarketplaceListing.findById(listingId).session(session);
+    if (!listing) {
+      await session.abortTransaction();
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Listing not found' 
+      });
+    }
+
+    // Check if user is seller
+    if (listing.sellerId.toString() === userId.toString()) {
+      await session.abortTransaction();
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Cannot make offer on your own listing' 
+      });
+    }
+
+    // Check listing status again within transaction
+    if (listing.status !== 'active') {
+      await session.abortTransaction();
+      return res.status(400).json({ 
+        success: false, 
+        error: `Listing is not available for offers (status: ${listing.status})` 
       });
     }
 
@@ -311,8 +544,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
         listingId: listingId.toString(),
         buyerId: userId.toString(),
         sellerId: listing.sellerId.toString(),
-        type: 'offer_payment',
-        temporary: 'true'
+        type: 'offer_payment'
       },
       automatic_payment_methods: { enabled: true },
       description: `Offer for: ${listing.title}`
@@ -326,6 +558,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
       paymentIntentId: stripePaymentIntent.id,
       status: 'pending_payment',
       requirements: requirements || '',
+      expectedDelivery: expectedDelivery ? new Date(expectedDelivery) : null,
       isTemporary: true,
       expiresAt: new Date(Date.now() + 30 * 60 * 1000) // 30 minutes
     });
@@ -340,7 +573,9 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
         offer: temporaryOffer,
         clientSecret: stripePaymentIntent.client_secret,
         paymentIntentId: stripePaymentIntent.id,
-        amount: offerAmount
+        amount: offerAmount,
+        listingTitle: listing.title,
+        expiresIn: '30 minutes'
       }
     });
 
@@ -366,9 +601,9 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
   }
 });
 
-// ✅ CONFIRM OFFER PAYMENT (REDIRECT TO MYORDER PAGE)
+// ✅ CONFIRM OFFER PAYMENT & CREATE ORDER
 router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) => {
-  console.log("🔍 Confirm Offer Payment Request:", req.body);
+  console.log("🔍 Confirm Offer Payment:", req.body);
   
   let session;
   try {
@@ -376,7 +611,10 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     const userId = req.user.id;
 
     if (!offerId || !paymentIntentId || !userId || !validateObjectId(offerId)) {
-      return res.status(400).json({ success: false, error: 'Invalid request' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid request parameters' 
+      });
     }
 
     // Start transaction
@@ -394,7 +632,41 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
 
     if (!offer) {
       await session.abortTransaction();
-      return res.status(404).json({ success: false, error: 'Offer not found' });
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Offer not found or access denied' 
+      });
+    }
+
+    // ✅ CHECK IF USER ALREADY HAS ORDER ON THIS LISTING
+    const existingOrder = await checkExistingOrder(userId, offer.listingId._id);
+    if (existingOrder) {
+      await session.abortTransaction();
+      
+      // Update offer status to cancelled
+      await Offer.findByIdAndUpdate(offerId, { 
+        status: 'cancelled',
+        cancellationReason: 'User already has an order on this listing'
+      });
+      
+      // Refund payment if made
+      if (offer.paymentIntentId) {
+        try {
+          await stripe.paymentIntents.cancel(offer.paymentIntentId);
+        } catch (stripeError) {
+          console.error('Refund error:', stripeError.message);
+        }
+      }
+      
+      return res.status(400).json({
+        success: false,
+        error: 'You already have an order on this listing',
+        data: {
+          orderId: existingOrder._id,
+          orderStatus: existingOrder.status,
+          redirectUrl: `/myorder/${existingOrder._id}`
+        }
+      });
     }
 
     // Check if already processed
@@ -406,7 +678,7 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
         message: 'Payment already confirmed',
         data: {
           orderId: existingOrder?._id,
-          redirectUrl: `/orders/${existingOrder?._id}`,
+          redirectUrl: `/myorder/${existingOrder?._id}`,
           chatUrl: `/chat/order_${existingOrder?._id}`
         }
       });
@@ -426,7 +698,6 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     try {
       paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
       
-      // Handle requires_capture status
       if (paymentIntent.status === 'requires_capture') {
         paymentIntent = await stripe.paymentIntents.capture(paymentIntentId);
       }
@@ -455,16 +726,24 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     offer.expiresAt = null;
     await offer.save({ session });
 
-    // Get buyer and seller details
-    const buyer = await mongoose.model('User').findById(userId).select('username email avatar').session(session);
-    const seller = await mongoose.model('User').findById(offer.listingId.sellerId).select('username email avatar').session(session);
+    // Get user details
+    const buyer = await mongoose.model('User').findById(userId)
+      .select('username email avatar')
+      .session(session);
+    
+    const seller = await mongoose.model('User').findById(offer.listingId.sellerId)
+      .select('username email avatar')
+      .session(session);
 
     if (!buyer || !seller) {
       await session.abortTransaction();
-      return res.status(404).json({ success: false, error: 'User details not found' });
+      return res.status(404).json({ 
+        success: false, 
+        error: 'User details not found' 
+      });
     }
 
-    // Create order
+    // ✅ CREATE ORDER
     const orderData = {
       buyerId: userId,
       sellerId: offer.listingId.sellerId,
@@ -479,16 +758,25 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       maxRevisions: 3,
       paymentReleased: false,
       orderDate: new Date(),
-      metadata: { paymentStatus: paymentIntent.status }
+      metadata: {
+        paymentStatus: paymentIntent.status,
+        paymentMethod: paymentIntent.payment_method_types?.[0] || 'card',
+        offerAmount: offer.amount,
+        listingTitle: offer.listingId.title
+      }
     };
 
     if (offer.requirements) orderData.requirements = offer.requirements;
+    if (offer.expectedDelivery) orderData.expectedDelivery = offer.expectedDelivery;
     if (offer.message) orderData.buyerNote = offer.message;
 
     const order = new Order(orderData);
     await order.save({ session });
 
-    // Update listing
+    // ✅ UPDATE LISTING STATUS TO 'RESERVED' (NEVER DELETE)
+    await updateListingStatus(offer.listingId._id, 'reserved', order._id);
+
+    // Increase listing order count
     await MarketplaceListing.findByIdAndUpdate(
       offer.listingId._id, 
       { 
@@ -501,32 +789,34 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     // Commit transaction
     await session.commitTransaction();
     console.log("✅ Order created successfully:", order._id);
+    console.log("✅ Listing status updated to 'reserved':", offer.listingId._id);
 
-    // Send notifications (async, don't wait for completion)
+    // Send notifications (async)
     sendOrderNotifications(order, offer, buyer, seller).catch(console.error);
 
-    // ✅ SUCCESS RESPONSE WITH REDIRECT TO MYORDER PAGE
+    // ✅ SUCCESS RESPONSE
     res.status(200).json({
       success: true,
       message: 'Payment confirmed! Redirecting to your order...',
       data: {
         orderId: order._id,
-        // ✅ REDIRECT TO MYORDER PAGE
         redirectUrl: `/myorder/${order._id}`,
-        // Alternative: redirectUrl: `/orders/${order._id}`,
         chatUrl: `/chat/order_${order._id}`,
         paymentStatus: paymentIntent.status,
+        listingStatus: 'reserved',
+        listingId: offer.listingId._id,
         orderDetails: {
           amount: order.amount,
           sellerName: seller.username,
           buyerName: buyer.username,
-          listingTitle: offer.listingId?.title
+          listingTitle: offer.listingId?.title,
+          orderDate: order.orderDate
         }
       }
     });
 
   } catch (error) {
-    console.error('Confirm offer payment error:', error);
+    console.error('Confirm payment error:', error);
     
     if (session) await session.abortTransaction();
     
@@ -540,198 +830,6 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
   }
 });
 
-// ✅ CANCEL TEMPORARY OFFER
-router.post("/cancel-temporary-offer/:offerId", authenticateMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { offerId } = req.params;
-
-    if (!validateObjectId(offerId)) {
-      return res.status(400).json({ success: false, error: 'Invalid offer ID' });
-    }
-
-    const offer = await Offer.findOne({
-      _id: offerId,
-      buyerId: userId,
-      status: 'pending_payment',
-      isTemporary: true
-    });
-
-    if (!offer) {
-      return res.status(404).json({ success: false, error: 'Temporary offer not found' });
-    }
-
-    // Cancel Stripe payment intent
-    if (offer.paymentIntentId) {
-      try {
-        await stripe.paymentIntents.cancel(offer.paymentIntentId);
-      } catch (stripeError) {
-        console.error('Cancel payment intent error:', stripeError.message);
-      }
-    }
-
-    // Delete offer
-    await Offer.findByIdAndDelete(offerId);
-
-    res.status(200).json({
-      success: true,
-      message: 'Temporary offer cancelled'
-    });
-  } catch (error) {
-    console.error('Cancel temporary offer error:', error);
-    res.status(500).json({ success: false, error: 'Failed to cancel offer' });
-  }
-});
-
-// ✅ GET OFFER PAYMENT STATUS
-router.get("/payment-status/:offerId", authenticateMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { offerId } = req.params;
-
-    if (!validateObjectId(offerId)) {
-      return res.status(400).json({ success: false, error: 'Invalid offer ID' });
-    }
-
-    const offer = await Offer.findOne({
-      _id: offerId,
-      buyerId: userId
-    }).select('status paymentIntentId isTemporary expiresAt amount');
-
-    if (!offer) {
-      return res.status(404).json({ success: false, error: 'Offer not found' });
-    }
-
-    let stripeStatus = null;
-    if (offer.paymentIntentId) {
-      try {
-        const paymentIntent = await stripe.paymentIntents.retrieve(offer.paymentIntentId);
-        stripeStatus = paymentIntent.status;
-      } catch (stripeError) {
-        console.error('Stripe status error:', stripeError.message);
-      }
-    }
-
-    res.status(200).json({
-      success: true,
-      data: {
-        offerId: offer._id,
-        status: offer.status,
-        stripeStatus,
-        isTemporary: offer.isTemporary,
-        isExpired: offer.expiresAt && offer.expiresAt < new Date(),
-        amount: offer.amount,
-        canContinuePayment: ['requires_payment_method', 'requires_confirmation', 'requires_action'].includes(stripeStatus),
-        requiresCapture: stripeStatus === 'requires_capture'
-      }
-    });
-  } catch (error) {
-    console.error('Payment status error:', error);
-    res.status(500).json({ success: false, error: 'Failed to get payment status' });
-  }
-});
-
-// ✅ GET MY OFFERS (BUYER)
-router.get("/my-offers", authenticateMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    
-    const offers = await Offer.find({ 
-      buyerId: userId,
-      status: { $ne: 'pending_payment' } // Don't show temporary unpaid offers
-    })
-    .populate({
-      path: 'listingId',
-      select: 'title price mediaUrls status sellerId',
-      populate: { path: 'sellerId', select: 'username avatar rating' }
-    })
-    .sort({ createdAt: -1 })
-    .lean();
-
-    res.status(200).json({
-      success: true,
-      data: offers,
-      count: offers.length
-    });
-  } catch (error) {
-    console.error('My offers error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch offers' });
-  }
-});
-
-// ✅ GET OFFERS RECEIVED (SELLER)
-router.get("/received-offers", authenticateMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    
-    const myListings = await MarketplaceListing.find({ sellerId: userId });
-    const listingIds = myListings.map(listing => listing._id);
-    
-    const offers = await Offer.find({ 
-      listingId: { $in: listingIds },
-      status: { $ne: 'pending_payment' } // Don't show temporary unpaid offers
-    })
-    .populate('buyerId', 'username avatar email rating')
-    .populate('listingId', 'title price mediaUrls status')
-    .sort({ createdAt: -1 });
-    
-    res.status(200).json({
-      success: true,
-      data: offers,
-      count: offers.length
-    });
-  } catch (error) {
-    console.error('Received offers error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch offers' });
-  }
-});
-
-// ✅ GET SINGLE OFFER
-router.get("/:id", authenticateMiddleware, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const offerId = req.params.id;
-
-    if (!validateObjectId(offerId)) {
-      return res.status(400).json({ success: false, error: 'Invalid offer ID' });
-    }
-
-    const offer = await Offer.findById(offerId)
-      .populate('buyerId', 'username avatar email')
-      .populate('listingId', 'title price sellerId')
-      .populate('listingId.sellerId', 'username avatar');
-
-    if (!offer) {
-      return res.status(404).json({ success: false, error: 'Offer not found' });
-    }
-
-    const isBuyer = offer.buyerId._id.toString() === userId.toString();
-    const isSeller = offer.listingId.sellerId._id.toString() === userId.toString();
-
-    if (!isBuyer && !isSeller) {
-      return res.status(403).json({ success: false, error: 'Not authorized' });
-    }
-
-    const order = await Order.findOne({ offerId: offer._id })
-      .select('status paidAt');
-    
-    const chat = await Chat.findOne({ orderId: order?._id });
-
-    res.status(200).json({
-      success: true,
-      data: {
-        ...offer.toObject(),
-        associatedOrder: order,
-        chatRoom: chat,
-        userRole: isBuyer ? 'buyer' : 'seller'
-      }
-    });
-  } catch (error) {
-    console.error('Get offer error:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch offer' });
-  }
-});
-
 // ✅ ACCEPT OFFER (SELLER)
 router.put("/accept-offer/:id", authenticateMiddleware, async (req, res) => {
   let session;
@@ -740,7 +838,10 @@ router.put("/accept-offer/:id", authenticateMiddleware, async (req, res) => {
     const offerId = req.params.id;
     
     if (!validateObjectId(offerId)) {
-      return res.status(400).json({ success: false, error: 'Invalid offer ID' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid offer ID' 
+      });
     }
 
     session = await mongoose.startSession();
@@ -753,13 +854,19 @@ router.put("/accept-offer/:id", authenticateMiddleware, async (req, res) => {
 
     if (!offer) {
       await session.abortTransaction();
-      return res.status(404).json({ success: false, error: 'Offer not found' });
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Offer not found' 
+      });
     }
 
     // Check if user is seller
     if (offer.listingId.sellerId.toString() !== userId.toString()) {
       await session.abortTransaction();
-      return res.status(403).json({ success: false, error: 'Not authorized' });
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Not authorized' 
+      });
     }
 
     // Check if offer is paid
@@ -767,7 +874,34 @@ router.put("/accept-offer/:id", authenticateMiddleware, async (req, res) => {
       await session.abortTransaction();
       return res.status(400).json({ 
         success: false, 
-        error: 'Offer not paid yet' 
+        error: 'Offer must be paid before acceptance' 
+      });
+    }
+
+    // Check if order already exists
+    const existingOrder = await Order.findOne({ offerId: offer._id }).session(session);
+    if (existingOrder) {
+      // Update existing order
+      existingOrder.status = 'in_progress';
+      existingOrder.acceptedAt = new Date();
+      await existingOrder.save({ session });
+      
+      // ✅ UPDATE LISTING STATUS TO 'RESERVED' (IF NOT ALREADY)
+      const listing = await MarketplaceListing.findById(offer.listingId._id).session(session);
+      if (listing && listing.status !== 'reserved') {
+        await updateListingStatus(offer.listingId._id, 'reserved', existingOrder._id);
+      }
+      
+      await session.commitTransaction();
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Offer accepted (existing order updated)!',
+        data: {
+          orderId: existingOrder._id,
+          redirectUrl: `/myorder/${existingOrder._id}`,
+          listingStatus: 'reserved'
+        }
       });
     }
 
@@ -776,25 +910,31 @@ router.put("/accept-offer/:id", authenticateMiddleware, async (req, res) => {
     offer.acceptedAt = new Date();
     await offer.save({ session });
 
-    // Update order if exists
-    const order = await Order.findOne({ offerId: offer._id }).session(session);
-    if (order) {
-      order.status = 'in_progress';
-      order.acceptedAt = new Date();
-      await order.save({ session });
-    }
+    // Create order
+    const order = new Order({
+      buyerId: offer.buyerId._id,
+      sellerId: offer.listingId.sellerId,
+      listingId: offer.listingId._id,
+      offerId: offer._id,
+      orderType: 'accepted_offer',
+      amount: offer.amount,
+      status: 'in_progress',
+      paidAt: offer.paidAt,
+      acceptedAt: new Date(),
+      revisions: 0,
+      maxRevisions: 3,
+      paymentReleased: false,
+      orderDate: new Date(),
+      requirements: offer.requirements,
+      expectedDelivery: offer.expectedDelivery
+    });
+    
+    await order.save({ session });
 
-    // Update listing
-    await MarketplaceListing.findByIdAndUpdate(
-      offer.listingId._id, 
-      { 
-        status: 'reserved',
-        reservedUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-      },
-      { session }
-    );
+    // ✅ UPDATE LISTING STATUS TO 'RESERVED'
+    await updateListingStatus(offer.listingId._id, 'reserved', order._id);
 
-    // Reject other offers
+    // Reject other offers on same listing
     await Offer.updateMany(
       { 
         listingId: offer.listingId._id, 
@@ -803,7 +943,8 @@ router.put("/accept-offer/:id", authenticateMiddleware, async (req, res) => {
       },
       { 
         status: 'rejected',
-        rejectedAt: new Date()
+        rejectedAt: new Date(),
+        rejectionReason: 'Another offer was accepted'
       },
       { session }
     );
@@ -815,28 +956,37 @@ router.put("/accept-offer/:id", authenticateMiddleware, async (req, res) => {
       message: 'Offer accepted!',
       data: {
         offerId: offer._id,
-        orderId: order?._id
+        orderId: order._id,
+        redirectUrl: `/myorder/${order._id}`,
+        listingStatus: 'reserved'
       }
     });
 
   } catch (error) {
     console.error('Accept offer error:', error);
     if (session) await session.abortTransaction();
-    res.status(500).json({ success: false, error: 'Failed to accept offer' });
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to accept offer' 
+    });
   } finally {
     if (session) session.endSession();
   }
 });
 
-// ✅ REJECT OFFER (SELLER)
+// ✅ REJECT OFFER
 router.put("/reject-offer/:id", authenticateMiddleware, async (req, res) => {
   let session;
   try {
     const userId = req.user.id;
     const offerId = req.params.id;
+    const { rejectionReason } = req.body;
     
     if (!validateObjectId(offerId)) {
-      return res.status(400).json({ success: false, error: 'Invalid offer ID' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid offer ID' 
+      });
     }
 
     session = await mongoose.startSession();
@@ -848,13 +998,19 @@ router.put("/reject-offer/:id", authenticateMiddleware, async (req, res) => {
     
     if (!offer) {
       await session.abortTransaction();
-      return res.status(404).json({ success: false, error: 'Offer not found' });
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Offer not found' 
+      });
     }
 
     // Check if user is seller
     if (offer.listingId.sellerId.toString() !== userId.toString()) {
       await session.abortTransaction();
-      return res.status(403).json({ success: false, error: 'Not authorized' });
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Not authorized' 
+      });
     }
 
     if (!['pending', 'paid', 'pending_payment'].includes(offer.status)) {
@@ -868,7 +1024,7 @@ router.put("/reject-offer/:id", authenticateMiddleware, async (req, res) => {
     // Update offer
     offer.status = 'rejected';
     offer.rejectedAt = new Date();
-    offer.rejectionReason = req.body.rejectionReason || 'Seller rejected offer';
+    offer.rejectionReason = rejectionReason || 'Seller rejected offer';
     await offer.save({ session });
 
     // Refund if paid
@@ -880,73 +1036,227 @@ router.put("/reject-offer/:id", authenticateMiddleware, async (req, res) => {
       }
     }
 
-    // Update listing
-    await MarketplaceListing.findByIdAndUpdate(
-      offer.listingId._id, 
-      { status: 'active' },
-      { session }
-    );
+    // ✅ CHECK IF LISTING SHOULD BE SET BACK TO ACTIVE
+    // Only if there are no other active orders on this listing
+    const activeOrder = await Order.findOne({
+      listingId: offer.listingId._id,
+      status: { $in: ['pending_payment', 'paid', 'in_progress', 'pending_delivery'] }
+    }).session(session);
+
+    if (!activeOrder) {
+      await updateListingStatus(offer.listingId._id, 'active');
+    }
 
     await session.commitTransaction();
 
     res.status(200).json({ 
       success: true,
-      message: 'Offer rejected'
+      message: 'Offer rejected',
+      data: {
+        listingStatus: activeOrder ? 'reserved' : 'active',
+        refundInitiated: offer.status === 'paid' && offer.paymentIntentId
+      }
     });
   } catch (error) {
     console.error('Reject offer error:', error);
     if (session) await session.abortTransaction();
-    res.status(500).json({ success: false, error: 'Failed to reject offer' });
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to reject offer' 
+    });
   } finally {
     if (session) session.endSession();
   }
 });
 
-// ✅ CAPTURE PAYMENT (for requires_capture)
-router.post("/capture-payment/:orderId", authenticateMiddleware, async (req, res) => {
+// ✅ GET ORDER STATUS
+router.get("/order-status/:listingId", authenticateMiddleware, async (req, res) => {
   try {
-    const { orderId } = req.params;
     const userId = req.user.id;
+    const { listingId } = req.params;
 
-    const order = await Order.findOne({
-      _id: orderId,
-      buyerId: userId,
-      status: 'pending_capture'
-    });
-
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        error: 'Order not found or not ready for capture'
+    if (!validateObjectId(listingId)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid listing ID' 
       });
     }
 
-    // Capture payment
-    const paymentIntent = await stripe.paymentIntents.capture(order.stripePaymentIntentId);
-    
-    // Update order
-    order.status = 'paid';
-    order.metadata.captured = true;
-    await order.save();
+    const existingOrder = await Order.findOne({
+      buyerId: userId,
+      listingId: listingId,
+      status: { $in: ['pending_payment', 'paid', 'in_progress', 'pending_delivery', 'completed'] }
+    }).select('_id status amount orderDate');
 
-    // Update offer
-    if (order.offerId) {
-      await Offer.findByIdAndUpdate(order.offerId, { status: 'paid' });
+    if (existingOrder) {
+      return res.status(200).json({
+        success: true,
+        hasOrder: true,
+        data: existingOrder,
+        message: 'You already have an order on this listing',
+        redirectUrl: `/myorder/${existingOrder._id}`
+      });
     }
 
     res.status(200).json({
       success: true,
-      message: 'Payment captured',
-      data: { orderId: order._id, paymentStatus: paymentIntent.status }
+      hasOrder: false,
+      message: 'No existing order found'
     });
-
   } catch (error) {
-    console.error('Capture payment error:', error);
-    res.status(500).json({ success: false, error: 'Failed to capture payment' });
+    console.error('Order status error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to check order status' 
+    });
   }
 });
 
-// ✅ CLEANUP EXPIRED OFFERS (CRON ENDPOINT)
+// ✅ GET MY OFFERS
+router.get("/my-offers", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    const offers = await Offer.find({ 
+      buyerId: userId,
+      status: { $ne: 'pending_payment' }
+    })
+    .populate({
+      path: 'listingId',
+      select: 'title price mediaUrls status sellerId',
+      populate: { 
+        path: 'sellerId', 
+        select: 'username avatar rating' 
+      }
+    })
+    .populate('buyerId', 'username avatar email')
+    .sort({ createdAt: -1 })
+    .lean();
+
+    const offersWithOrderCheck = await Promise.all(
+      offers.map(async (offer) => {
+        const order = await Order.findOne({ offerId: offer._id })
+          .select('status _id');
+        const listing = await MarketplaceListing.findById(offer.listingId._id)
+          .select('status currentOrderId title');
+        return {
+          ...offer,
+          associatedOrder: order,
+          listingStatus: listing?.status || 'unknown',
+          listingTitle: listing?.title || 'Unknown'
+        };
+      })
+    );
+
+    res.status(200).json({
+      success: true,
+      data: offersWithOrderCheck,
+      count: offersWithOrderCheck.length
+    });
+  } catch (error) {
+    console.error('My offers error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch offers' 
+    });
+  }
+});
+
+// ✅ GET OFFERS RECEIVED
+router.get("/received-offers", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    const myListings = await MarketplaceListing.find({ 
+      sellerId: userId,
+      deleted: { $ne: true }
+    });
+    const listingIds = myListings.map(listing => listing._id);
+    
+    const offers = await Offer.find({ 
+      listingId: { $in: listingIds },
+      status: { $ne: 'pending_payment' }
+    })
+    .populate('buyerId', 'username avatar email rating')
+    .populate('listingId', 'title price mediaUrls status')
+    .sort({ createdAt: -1 });
+    
+    res.status(200).json({
+      success: true,
+      data: offers,
+      count: offers.length
+    });
+  } catch (error) {
+    console.error('Received offers error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch offers' 
+    });
+  }
+});
+
+// ✅ GET SINGLE OFFER
+router.get("/:id", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const offerId = req.params.id;
+
+    if (!validateObjectId(offerId)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid offer ID' 
+      });
+    }
+
+    const offer = await Offer.findById(offerId)
+      .populate('buyerId', 'username avatar email')
+      .populate('listingId', 'title price sellerId status')
+      .populate('listingId.sellerId', 'username avatar');
+
+    if (!offer) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Offer not found' 
+      });
+    }
+
+    const isBuyer = offer.buyerId._id.toString() === userId.toString();
+    const isSeller = offer.listingId.sellerId._id.toString() === userId.toString();
+
+    if (!isBuyer && !isSeller) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Not authorized' 
+      });
+    }
+
+    const order = await Order.findOne({ offerId: offer._id })
+      .select('status paidAt amount orderDate expectedDelivery');
+    
+    const chat = await Chat.findOne({ orderId: order?._id })
+      .select('firebaseChatId status');
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...offer.toObject(),
+        associatedOrder: order,
+        chatRoom: chat,
+        userRole: isBuyer ? 'buyer' : 'seller',
+        hasExistingOrder: !!order,
+        listingStatus: offer.listingId.status
+      }
+    });
+  } catch (error) {
+    console.error('Get offer error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch offer' 
+    });
+  }
+});
+
+// ✅ CLEANUP EXPIRED OFFERS
 router.post("/cleanup-expired-offers", async (req, res) => {
   try {
     const cleanedCount = await cleanupExpiredOffers();
@@ -957,11 +1267,14 @@ router.post("/cleanup-expired-offers", async (req, res) => {
     });
   } catch (error) {
     console.error("Cleanup error:", error);
-    res.status(500).json({ success: false, error: "Cleanup failed" });
+    res.status(500).json({ 
+      success: false, 
+      error: "Cleanup failed" 
+    });
   }
 });
 
-// ✅ SCHEDULED CLEANUP (every 30 minutes)
+// ✅ SCHEDULED CLEANUP
 setInterval(() => {
   console.log("🕐 Running scheduled cleanup...");
   cleanupExpiredOffers().catch(console.error);
