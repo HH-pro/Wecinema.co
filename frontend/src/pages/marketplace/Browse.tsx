@@ -8,9 +8,9 @@ import {
 } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import marketplaceApi from '../../api/marketplaceApi';
-import VideoPlayerModal from '../../components/marketplace/VideoPlayerModal';
-import PaymentModal from '../../components/marketplace/PaymentModal';
-import OfferModal from '../../components/marketplace/OfferModal';
+import VideoPlayerModal from '../../components/marketplae/VideoPlayerModal';
+import PaymentModal from '../../components/marketplae/paymentModal';
+import OfferModal from '../../components/marketplae/OfferModal';
 
 // Constants for placeholder images - Higher quality Unsplash images
 const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1611224923853-80b023f02d71?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80';
