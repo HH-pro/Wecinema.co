@@ -21,7 +21,7 @@ import {
 } from 'react-icons/fi';
 
 // Components
-import ListingCard from '../../components/marketplace/ListingCard';
+import ListingCard from '../../components/marketplae/ListingCard';
 import MarketplaceLayout from '../../components/Layout';
 
 // Types
