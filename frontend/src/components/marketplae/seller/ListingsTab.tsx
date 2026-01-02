@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import MarketplaceLayout from '../../components/Layout';
-import { Listing } from '../../types/marketplace';
+import MarketplaceLayout from '../../../components/Layout';
+import { Listing } from '../../../types/marketplace';
 import { 
   FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiAlertCircle, 
   FiLoader, FiUser, FiPlay, FiClock, FiShoppingBag, FiTag,
@@ -8,10 +8,10 @@ import {
   FiImage, FiFileText
 } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
-import marketplaceApi from '../../api/marketplaceApi';
-import VideoPlayerModal from '../../components/marketplae/VideoPlayerModal';
-import PaymentModal from '../../components/marketplae/PaymentModal';
-import OfferModal from '../../components/marketplae/OfferModal';
+import marketplaceApi from '../../../api/marketplaceApi';
+import VideoPlayerModal from '../../../components/marketplae/VideoPlayerModal';
+import PaymentModal from '../../../components/marketplae/PaymentModal';
+import OfferModal from '../../../components/marketplae/OfferModal';
 
 // Constants for placeholder images
 const VIDEO_PLACEHOLDER = 'https://images.unsplash.com/photo-1579546929662-711aa81148cf?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
