@@ -1615,30 +1615,7 @@ router.get("/seller-listing-status/:listingId", authenticateMiddleware, async (r
   }
 });
 
-// ✅ CLEANUP EXPIRED OFFERS
-const cleanupExpiredOffers = async () => {
-  try {
-    const expiredOffers = await Offer.find({
-      status: 'pending_payment',
-      expiresAt: { $lt: new Date() },
-      isTemporary: true
-    });
 
-    for (const offer of expiredOffers) {
-      if (offer.paymentIntentId) {
-        try {
-          await stripe.paymentIntents.cancel(offer.paymentIntentId);
-        } catch (stripeError) {}
-      }
-      await Offer.findByIdAndDelete(offer._id);
-    }
-    
-    return expiredOffers.length;
-  } catch (error) {
-    console.error('Cleanup error:', error);
-    return 0;
-  }
-};
 
 // ✅ SCHEDULED CLEANUP (NO AUTO-RENEW)
 setInterval(() => {
