@@ -1233,46 +1233,43 @@ export const offersApi = {
   },
 
   // Get offers made (as buyer)
- getMyOffers: async (): Promise<ApiResponse<{ 
+ getMyOffers: async (retry: boolean = false): Promise<ApiResponse<{ 
   offers: Offer[]; 
   count: number;
 }>> => {
   try {
-    // Add cache busting parameter
-    const timestamp = Date.now();
+    const headers = {
+      ...getHeaders(),
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
+    };
+    
+    // For retry, add a different cache busting parameter
+    const cacheBuster = retry ? `retry_${Date.now()}` : `init_${Date.now()}`;
     
     const response = await axios.get(
       `${API_BASE_URL}/marketplace/offers/my-offers`,
       {
-        ...getHeaders(),
+        headers,
         params: {
-          _: timestamp, // Cache busting parameter
-          refresh: true // Optional: explicit refresh flag
+          cacheBuster,
+          t: Date.now()
         }
       }
     );
     
-    // Log response for debugging
-    console.log('My offers response status:', response.status);
-    console.log('My offers count:', response.data?.data?.count || 0);
-    
     return normalizeResponse(response);
-  } catch (error) {
-    console.error('Error fetching my offers:', error);
     
-    // Check if it's a 304 Not Modified error
+  } catch (error) {
     const axiosError = error as AxiosError;
-    if (axiosError.response?.status === 304) {
-      console.warn('Received 304 Not Modified. Cache issue detected.');
-      
-      // Return a custom error or retry without cache
-      return {
-        success: false,
-        error: 'Data might be cached. Please refresh.',
-        data: null
-      } as ApiResponse<{ offers: Offer[]; count: number }>;
+    
+    // If first attempt fails with 304, retry once with different cache buster
+    if (!retry && axiosError.response?.status === 304) {
+      console.log('304 received, retrying without cache...');
+      return getMyOffers(true); // Retry
     }
     
+    console.error('Error fetching my offers:', axiosError.response?.status, axiosError.message);
     return handleApiError(axiosError, 'Failed to fetch my offers');
   }
 },
