@@ -9,7 +9,8 @@ import {
   RiShoppingBagLine,
   RiListCheck,
   RiMessageLine,
-  RiMovie2Line
+  RiMovie2Line,
+  RiPriceTag3Line // Added for My Offers icon
 } from "react-icons/ri";
 import { LiaSignInAltSolid } from "react-icons/lia";
 import { HiUserAdd } from "react-icons/hi";
@@ -154,6 +155,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 title="Switch to Buyer Mode"
               >
                 <FaShoppingCart size={12} />
+                <span className="btn-label">Buyer</span>
               </button>
               <button
                 className={`type-btn ${userType === 'seller' ? 'active' : ''}`}
@@ -161,6 +163,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 title="Switch to Seller Mode"
               >
                 <FaUserTie size={12} />
+                <span className="btn-label">Seller</span>
               </button>
             </div>
           )}
@@ -194,7 +197,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               <Link
                 to="/marketplace/buyer-dashboard"
                 className={`sidebar-item ${getActiveClass(
-                  "/marketplace/dashboard"
+                  "/marketplace/buyer-dashboard"
                 )} ${expand ? "" : "collapsed"}`}
               >
                 <RiListCheck className="sidebar-icon" />
@@ -208,6 +211,15 @@ const Sidebar: React.FC<SidebarProps> = ({
               >
                 <RiShoppingBagLine className="sidebar-icon" />
                 <span className="sidebar-text">My Orders</span>
+              </Link>
+              <Link
+                to="/marketplace/my-offers"
+                className={`sidebar-item ${getActiveClass(
+                  "/marketplace/my-offers"
+                )} ${expand ? "" : "collapsed"}`}
+              >
+                <RiPriceTag3Line className="sidebar-icon" />
+                <span className="sidebar-text">My Offers</span>
               </Link>
             </>
           )}
@@ -226,13 +238,23 @@ const Sidebar: React.FC<SidebarProps> = ({
               </Link>
 
               <Link
-                to="/marketplace/dashboard"
+                to="/marketplace/seller-dashboard"
                 className={`sidebar-item ${getActiveClass(
-                  "/marketplace/dashboard"
+                  "/marketplace/seller-dashboard"
                 )} ${expand ? "" : "collapsed"}`}
               >
                 <RiListCheck className="sidebar-icon" />
                 <span className="sidebar-text">Seller Dashboard</span>
+              </Link>
+              
+              <Link
+                to="/marketplace/received-offers"
+                className={`sidebar-item ${getActiveClass(
+                  "/marketplace/received-offers"
+                )} ${expand ? "" : "collapsed"}`}
+              >
+                <RiPriceTag3Line className="sidebar-icon" />
+                <span className="sidebar-text">Received Offers</span>
               </Link>
             </>
           )}
