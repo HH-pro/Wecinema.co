@@ -4,7 +4,8 @@ import { Listing } from '../../types/marketplace';
 import { 
   FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiAlertCircle, 
   FiLoader, FiUser, FiPlay, FiClock, FiShoppingBag, FiTag,
-  FiTarget, FiTrendingUp, FiDollarSign, FiEye, FiHeart, FiVideo
+  FiTarget, FiTrendingUp, FiDollarSign, FiEye, FiHeart, FiVideo,
+  FiImage, FiFileText
 } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import marketplaceApi from '../../api/marketplaceApi';
@@ -12,9 +13,9 @@ import VideoPlayerModal from '../../components/marketplae/VideoPlayerModal';
 import PaymentModal from '../../components/marketplae/PaymentModal';
 import OfferModal from '../../components/marketplae/OfferModal';
 
-// Constants for placeholder images - Light theme friendly
+// Constants for placeholder images
 const VIDEO_PLACEHOLDER = 'https://images.unsplash.com/photo-1579546929662-711aa81148cf?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
-const ERROR_IMAGE = 'https://via.placeholder.com/300x200/F3F4F6/6B7280?text=Video+Preview';
+const DEFAULT_THUMBNAIL = 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
 
 const Browse: React.FC = () => {
   const [listings, setListings] = useState<Listing[]>([]);
@@ -35,8 +36,9 @@ const Browse: React.FC = () => {
   const [videoListing, setVideoListing] = useState<Listing | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('');
   
-  // New state for image loading errors
+  // Image loading states
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+  const [imageLoading, setImageLoading] = useState<Record<string, boolean>>({});
   const navigate = useNavigate();
 
   const [filters, setFilters] = useState({
@@ -54,10 +56,7 @@ const Browse: React.FC = () => {
     expectedDelivery: ''
   });
 
-  // Video player ref
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  // Fetch listings and user data on component mount
+  // Fetch listings and user data
   useEffect(() => {
     fetchListings();
     fetchCurrentUser();
@@ -79,8 +78,8 @@ const Browse: React.FC = () => {
       setLoading(true);
       setError('');
       setImageErrors({});
+      setImageLoading({});
       
-      // ✅ FIXED: Proper params passing to API
       const params: any = {};
       
       if (filters.type) params.type = filters.type;
@@ -90,8 +89,6 @@ const Browse: React.FC = () => {
       if (filters.sortBy) params.sortBy = filters.sortBy;
       if (searchQuery) params.search = searchQuery;
       
-      console.log('📡 Fetching listings with params:', params);
-
       const response = await marketplaceApi.listings.getAllListings(params);
       
       if (!response.success) {
@@ -100,9 +97,7 @@ const Browse: React.FC = () => {
 
       const listingsData = response.data?.listings || [];
       
-      console.log('✅ Listings fetched:', listingsData.length);
-      
-      // Apply local filtering for active category
+      // Apply local filtering
       let filteredData = listingsData;
       
       if (activeCategory && activeCategory !== 'all') {
@@ -168,7 +163,6 @@ const Browse: React.FC = () => {
   };
 
   const handleVideoClick = (videoUrl: string, title: string, listing: Listing) => {
-    console.log('🎬 Opening video:', videoUrl);
     setSelectedVideo(videoUrl);
     setVideoTitle(title);
     setVideoListing(listing);
@@ -180,10 +174,6 @@ const Browse: React.FC = () => {
     setSelectedVideo('');
     setVideoTitle('');
     setVideoListing(null);
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.currentTime = 0;
-    }
   };
 
   const handleOfferFormChange = (field: string, value: string) => {
@@ -342,7 +332,6 @@ const Browse: React.FC = () => {
       return true;
     }
     
-    // ✅ Check for video URLs in mediaUrls
     if (url.includes('/video/') || url.includes('.mp4') || url.includes('.mov')) {
       return true;
     }
@@ -350,14 +339,19 @@ const Browse: React.FC = () => {
     return false;
   };
 
+  const isImageUrl = (url: string): boolean => {
+    if (!url || typeof url !== 'string') return false;
+    
+    const imageExtensions = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i;
+    return imageExtensions.test(url);
+  };
+
   const getFirstVideoUrl = (listing: Listing): string => {
     if (!listing.mediaUrls || listing.mediaUrls.length === 0) return '';
     
-    // ✅ First check for video URLs
     const videoUrl = listing.mediaUrls.find(url => isVideoUrl(url));
     if (videoUrl) return videoUrl;
     
-    // ✅ If listing has a videoUrl field
     if (listing.videoUrl && isVideoUrl(listing.videoUrl)) {
       return listing.videoUrl;
     }
@@ -365,117 +359,69 @@ const Browse: React.FC = () => {
     return '';
   };
 
-  const generateVideoThumbnail = (videoUrl: string): string => {
-    if (!videoUrl) return VIDEO_PLACEHOLDER;
+  const getFirstImageUrl = (listing: Listing): string => {
+    if (!listing.mediaUrls || listing.mediaUrls.length === 0) return '';
     
-    console.log('🔍 Generating thumbnail for:', videoUrl);
+    const imageUrl = listing.mediaUrls.find(url => isImageUrl(url));
+    if (imageUrl) return imageUrl;
     
-    if (videoUrl.includes('cloudinary.com') && videoUrl.includes('/video/')) {
-      try {
-        let thumbnailUrl = videoUrl.replace('/video/upload/', '/image/upload/w_400,h_225,c_fill,q_auto,f_auto/');
-        thumbnailUrl = thumbnailUrl.replace(/\.(mp4|mov|avi|webm)$/i, '.jpg');
-        console.log('📸 Generated Cloudinary thumbnail:', thumbnailUrl);
-        return thumbnailUrl;
-      } catch (error) {
-        console.error('Error generating thumbnail:', error);
-        return VIDEO_PLACEHOLDER;
-      }
+    return '';
+  };
+
+  const getMediaType = (listing: Listing): 'video' | 'image' | 'document' | 'none' => {
+    if (!listing.mediaUrls || listing.mediaUrls.length === 0) {
+      return 'none';
     }
     
-    if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
-      const videoId = videoUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
-      if (videoId) {
-        return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-      }
+    if (listing.mediaUrls.some(url => isVideoUrl(url))) {
+      return 'video';
     }
     
-    if (videoUrl.includes('vimeo.com')) {
-      const videoId = videoUrl.match(/vimeo\.com\/(\d+)/)?.[1];
-      if (videoId) {
-        return `https://vumbnail.com/${videoId}.jpg`;
-      }
+    if (listing.mediaUrls.some(url => isImageUrl(url))) {
+      return 'image';
     }
     
-    // ✅ For direct video URLs, return placeholder
-    if (isVideoUrl(videoUrl)) {
-      return VIDEO_PLACEHOLDER;
-    }
-    
-    return videoUrl; // Return the URL itself if it's not a video (might be an image)
+    return 'document';
   };
 
   const getThumbnailUrl = (listing: Listing): string => {
     const listingId = listing._id || 'unknown';
     
     if (imageErrors[listingId]) {
-      return ERROR_IMAGE;
+      return DEFAULT_THUMBNAIL;
     }
     
-    // ✅ FIXED: Check listing.thumbnail first
+    // Use listing thumbnail if available
     if (listing.thumbnail && listing.thumbnail.trim() !== '') {
-      console.log('📸 Using listing thumbnail:', listing.thumbnail);
       return listing.thumbnail;
     }
     
-    // ✅ Check mediaUrls for images or videos
-    if (listing.mediaUrls && listing.mediaUrls.length > 0) {
-      // First try to find an image
-      const imageUrl = listing.mediaUrls.find(url => 
-        url && url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
-      );
-      
-      if (imageUrl) {
-        console.log('📸 Found image URL:', imageUrl);
-        return imageUrl;
-      }
-      
-      // Then try to find video and generate thumbnail
-      const videoUrl = listing.mediaUrls.find(url => isVideoUrl(url));
-      if (videoUrl) {
-        const thumbnail = generateVideoThumbnail(videoUrl);
-        console.log('📸 Generated video thumbnail:', thumbnail);
-        return thumbnail;
-      }
-      
-      // Return first media URL if nothing else works
-      const firstUrl = listing.mediaUrls[0];
-      if (firstUrl) {
-        console.log('📸 Using first media URL:', firstUrl);
-        return firstUrl;
-      }
+    // Use first image from mediaUrls
+    const imageUrl = getFirstImageUrl(listing);
+    if (imageUrl) {
+      return imageUrl;
     }
     
-    console.log('📸 Using default placeholder');
-    return VIDEO_PLACEHOLDER;
+    // For videos, return video placeholder
+    if (getMediaType(listing) === 'video') {
+      return VIDEO_PLACEHOLDER;
+    }
+    
+    return DEFAULT_THUMBNAIL;
   };
 
   const handleImageError = (listingId: string) => {
-    console.error('🖼️ Image failed to load for listing:', listingId);
     setImageErrors(prev => ({
       ...prev,
       [listingId]: true
     }));
   };
 
-  const getMediaType = (listing: Listing): 'image' | 'video' | 'none' => {
-    if (!listing.mediaUrls || listing.mediaUrls.length === 0) {
-      return 'none';
-    }
-    
-    const videoUrl = listing.mediaUrls.find(url => isVideoUrl(url));
-    if (videoUrl) {
-      return 'video';
-    }
-    
-    const imageUrl = listing.mediaUrls.find(url => 
-      url && url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
-    );
-    
-    if (imageUrl) {
-      return 'image';
-    }
-    
-    return 'none';
+  const handleImageLoad = (listingId: string) => {
+    setImageLoading(prev => ({
+      ...prev,
+      [listingId]: false
+    }));
   };
 
   const getQualityBadge = (quality?: string) => {
@@ -488,6 +434,9 @@ const Browse: React.FC = () => {
       case 'hd':
       case '1080p':
         return { color: 'bg-gradient-to-r from-blue-500 to-blue-400 text-white', label: 'HD' };
+      case 'sd':
+      case 'standard':
+        return { color: 'bg-gradient-to-r from-gray-500 to-gray-400 text-white', label: 'SD' };
       default:
         return { color: 'bg-gradient-to-r from-yellow-400 to-yellow-300 text-gray-800', label: '' };
     }
@@ -504,6 +453,7 @@ const Browse: React.FC = () => {
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
 
+  // Loading state
   if (loading) {
     return (
       <MarketplaceLayout>
@@ -524,14 +474,14 @@ const Browse: React.FC = () => {
   return (
     <MarketplaceLayout>
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-8">
-        {/* Animated Background Effects - Light version */}
+        {/* Animated Background Effects */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-0 left-1/4 w-72 h-72 bg-yellow-100 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"></div>
           <div className="absolute bottom-0 right-1/4 w-72 h-72 bg-amber-100 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse delay-1000"></div>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          {/* Error Banner - Light theme */}
+          {/* Error Banner */}
           {error && (
             <div className="mb-6 bg-gradient-to-r from-yellow-50 to-amber-50 backdrop-blur-xl border-l-4 border-yellow-500 rounded-r-lg shadow-lg p-6 animate-slideIn">
               <div className="flex items-center gap-4">
@@ -553,7 +503,7 @@ const Browse: React.FC = () => {
             </div>
           )}
 
-          {/* Header Section - Clean Light Design */}
+          {/* Header Section */}
           <div className="mb-10">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
               <div className="space-y-4">
@@ -568,7 +518,6 @@ const Browse: React.FC = () => {
               <div className="flex flex-col sm:flex-row gap-3">
                 {marketplaceApi.utils.checkAuth() && (
                   <>
-                    {/* ✅ FIXED: Yellow-White Gradient Button */}
                     <button 
                       onClick={() => navigate('/marketplace/create')}
                       className="group relative inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-yellow-500 via-yellow-400 to-yellow-300 text-gray-800 font-semibold rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 overflow-hidden border border-yellow-200"
@@ -621,7 +570,7 @@ const Browse: React.FC = () => {
               ))}
             </div>
 
-            {/* Search Bar - Clean Design */}
+            {/* Search Bar */}
             <div className="mt-8 max-w-3xl">
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -646,7 +595,7 @@ const Browse: React.FC = () => {
             </div>
           </div>
 
-          {/* Simple Stats - Clean Design */}
+          {/* Simple Stats */}
           <div className="mb-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white border border-gray-200 rounded-xl p-5 text-center shadow-sm">
               <div className="text-2xl font-bold text-gray-900 mb-1">{listings.length}</div>
@@ -666,7 +615,7 @@ const Browse: React.FC = () => {
             </div>
           </div>
 
-          {/* Filters Section - FIXED: Videos Category and Price Range */}
+          {/* Filters Section */}
           {showFilters && (
             <div className="mb-8 bg-white rounded-2xl shadow-lg border border-gray-200 p-6 animate-fadeIn">
               <div className="flex items-center justify-between mb-6">
@@ -817,7 +766,7 @@ const Browse: React.FC = () => {
             </div>
           </div>
 
-          {/* Listings Grid - 3 Videos Per Row */}
+          {/* Listings Grid */}
           {listings.length === 0 ? (
             <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-12 text-center">
               <div className="max-w-md mx-auto">
@@ -855,58 +804,84 @@ const Browse: React.FC = () => {
                 const mediaType = getMediaType(listing);
                 const isVideo = mediaType === 'video';
                 const qualityBadge = getQualityBadge(listing.quality);
+                const listingId = listing._id || 'unknown';
+                const isLoading = imageLoading[listingId] !== false;
                 
                 return (
-                  <div key={listing._id} className="group bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-300 border border-gray-200 overflow-hidden hover:-translate-y-1">
-                    {/* Video Preview Container */}
-                    <div className="relative h-48 bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden">
-                      {/* Thumbnail Image */}
-                      <div className="relative w-full h-full">
-                        <img
-                          src={thumbnailUrl}
-                          alt={listing.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          onError={() => handleImageError(listing._id)}
-                          loading="lazy"
-                          onLoad={() => console.log('✅ Thumbnail loaded:', listing.title)}
-                        />
-                        
-                        {/* Gradient Overlay */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent"></div>
-                        
-                        {/* Quality Badge */}
-                        {qualityBadge.label && (
-                          <div className={`absolute top-3 left-3 z-10 px-2 py-1 rounded ${qualityBadge.color} text-xs font-bold shadow-sm`}>
-                            {qualityBadge.label}
-                          </div>
-                        )}
-                        
-                        {/* Video Indicator */}
-                        {isVideo && (
-                          <div className="absolute top-3 right-3 z-10 px-2 py-1 rounded bg-black/60 text-white text-xs font-medium flex items-center gap-1">
-                            <FiVideo size={10} />
-                            Video
-                          </div>
-                        )}
-                        
-                        {/* Play Button Overlay for Videos */}
-                        {isVideo && videoUrl && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleVideoClick(videoUrl, listing.title, listing);
-                            }}
-                            className="absolute inset-0 flex items-center justify-center group/play opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                  <div key={listingId} className="group bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-300 border border-gray-200 overflow-hidden hover:-translate-y-1">
+                    {/* Media Thumbnail - Updated */}
+                    <div className="h-48 bg-gradient-to-br from-gray-50 to-gray-100 relative overflow-hidden">
+                      {isVideo && videoUrl ? (
+                        // Video thumbnail with play button
+                        <div 
+                          className="relative w-full h-full cursor-pointer"
+                          onClick={() => handleVideoClick(videoUrl, listing.title, listing)}
+                        >
+                          {/* Video element for preview */}
+                          <video
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            preload="metadata"
+                            poster={getFirstImageUrl(listing) || thumbnailUrl}
+                            muted
                           >
-                            <div className="relative">
-                              <div className="absolute inset-0 animate-ping bg-yellow-400 rounded-full opacity-20"></div>
-                              <div className="relative w-14 h-14 rounded-full bg-gradient-to-r from-yellow-500 to-amber-500 flex items-center justify-center border-4 border-white/70 shadow-lg transform group-hover/play:scale-110 transition-all duration-300">
-                                <FiPlay className="text-white ml-1" size={20} />
-                              </div>
+                            <source src={videoUrl} type="video/mp4" />
+                          </video>
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition-all duration-300">
+                            <div className="w-12 h-12 bg-white bg-opacity-90 rounded-full flex items-center justify-center transform scale-0 group-hover:scale-100 transition-transform duration-300">
+                              <FiPlay className="text-gray-900" size={20} />
                             </div>
-                          </button>
-                        )}
-                      </div>
+                          </div>
+                          <div className="absolute top-3 left-3">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                              <FiVideo className="w-3 h-3 mr-1" />
+                              Video
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        // Image thumbnail
+                        <div className="relative w-full h-full">
+                          {isLoading && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="animate-spin rounded-full h-8 w-8 border-2 border-transparent border-t-yellow-500 border-r-amber-500"></div>
+                            </div>
+                          )}
+                          <img
+                            src={thumbnailUrl}
+                            alt={listing.title}
+                            className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                            onError={() => handleImageError(listingId)}
+                            onLoad={() => handleImageLoad(listingId)}
+                            loading="lazy"
+                          />
+                          
+                          {/* Media type badge */}
+                          <div className="absolute top-3 left-3">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${
+                              mediaType === 'image' 
+                                ? 'bg-green-100 text-green-800 border-green-200'
+                                : mediaType === 'document'
+                                ? 'bg-blue-100 text-blue-800 border-blue-200'
+                                : 'bg-gray-100 text-gray-800 border-gray-200'
+                            }`}>
+                              {mediaType === 'image' && <FiImage className="w-3 h-3 mr-1" />}
+                              {mediaType === 'document' && <FiFileText className="w-3 h-3 mr-1" />}
+                              {mediaType === 'video' && <FiVideo className="w-3 h-3 mr-1" />}
+                              {mediaType.charAt(0).toUpperCase() + mediaType.slice(1)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Gradient Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent"></div>
+                      
+                      {/* Quality Badge */}
+                      {qualityBadge.label && (
+                        <div className={`absolute top-3 right-3 z-10 px-2 py-1 rounded ${qualityBadge.color} text-xs font-bold shadow-sm`}>
+                          {qualityBadge.label}
+                        </div>
+                      )}
                     </div>
 
                     {/* Content */}
@@ -957,14 +932,24 @@ const Browse: React.FC = () => {
                         </div>
                       </div>
                       
-                      {/* ✅ FIXED: Yellow-White Gradient Button */}
-                      <button
-                        onClick={() => handleMakeOffer(listing)}
-                        className="w-full bg-gradient-to-r from-yellow-500 via-yellow-400 to-yellow-300 hover:from-yellow-600 hover:via-yellow-500 hover:to-yellow-400 text-gray-800 text-sm py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 group/btn font-medium border border-yellow-200 shadow-sm hover:shadow"
-                      >
-                        <FiDollarSign size={14} className="group-hover/btn:scale-110 transition-transform" />
-                        Buy Now - {marketplaceApi.utils.formatCurrency(listing.price)}
-                      </button>
+                      {/* Action Buttons */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleMakeOffer(listing)}
+                          className="flex-1 bg-gradient-to-r from-yellow-500 via-yellow-400 to-yellow-300 hover:from-yellow-600 hover:via-yellow-500 hover:to-yellow-400 text-gray-800 text-sm py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 group/btn font-medium border border-yellow-200 shadow-sm hover:shadow"
+                        >
+                          <FiDollarSign size={14} className="group-hover/btn:scale-110 transition-transform" />
+                          Buy Now
+                        </button>
+                        {isVideo && videoUrl && (
+                          <button
+                            onClick={() => handleVideoClick(videoUrl, listing.title, listing)}
+                            className="px-3 bg-gradient-to-r from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100 text-gray-700 text-sm py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 font-medium border border-gray-300 shadow-sm hover:shadow"
+                          >
+                            <FiPlay size={14} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
