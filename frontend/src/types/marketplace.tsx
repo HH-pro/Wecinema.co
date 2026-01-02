@@ -503,31 +503,3 @@ export interface DashboardStats {
   recentActivity: (Order | Offer | Message)[];
 }
 
-// Export all types
-export type {
-  User,
-  Listing,
-  Order,
-  Offer,
-  Message,
-  Review,
-  CartItem,
-  Favorite,
-  CommissionRequest,
-  Category,
-  Tag,
-  Notification,
-  ListingFormData,
-  OrderFormData,
-  OfferFormData,
-  ReviewFormData,
-  ApiResponse,
-  ListingFilters,
-  SearchOptions,
-  PaymentIntent,
-  PaymentMethod,
-  BillingDetails,
-  AnalyticsData,
-  DashboardStats,
-  MediaFile,
-};
