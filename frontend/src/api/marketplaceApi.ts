@@ -1493,6 +1493,189 @@ export const formatBytes = (bytes: number, decimals: number = 2): string => {
   
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 };
+// ============================================
+// ✅ PAYMENTS API
+// ============================================
+
+export const paymentsApi = {
+  // Create payment intent for offer/order
+  createPaymentIntent: async (data: {
+    offerId?: string;
+    orderId?: string;
+    amount: number;
+    currency?: string;
+  }): Promise<ApiResponse<{
+    clientSecret: string;
+    paymentIntentId: string;
+    amount: number;
+    currency: string;
+  }>> => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/payments/create-payment-intent`,
+        data,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to create payment intent');
+    }
+  },
+
+  // Confirm payment
+  confirmPayment: async (data: {
+    orderId: string;
+    paymentIntentId: string;
+  }): Promise<ApiResponse<{
+    order: Order;
+    success: boolean;
+    message: string;
+  }>> => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/payments/confirm-payment`,
+        data,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to confirm payment');
+    }
+  },
+
+  // Capture payment (release funds to seller)
+  capturePayment: async (data: {
+    orderId: string;
+  }): Promise<ApiResponse<{
+    order: Order;
+    sellerAmount: number;
+    platformFee: number;
+    platformFeePercent: number;
+    message: string;
+  }>> => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/payments/capture-payment`,
+        data,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to capture payment');
+    }
+  },
+
+  // Cancel payment
+  cancelPayment: async (data: {
+    orderId: string;
+  }): Promise<ApiResponse<{
+    order: Order;
+    success: boolean;
+    message: string;
+  }>> => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/payments/cancel-payment`,
+        data,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to cancel payment');
+    }
+  },
+
+  // Get payment status
+  getPaymentStatus: async (orderId: string): Promise<ApiResponse<{
+    orderStatus: string;
+    paymentIntent: {
+      status: string;
+      amount: number;
+      currency: string;
+      created: number;
+    } | null;
+    paymentReleased: boolean;
+    releaseDate: string | null;
+    fees: {
+      platformFee: number;
+      sellerAmount: number;
+      platformFeePercent: number;
+    };
+  }>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/payments/payment-status/${orderId}`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to fetch payment status');
+    }
+  },
+
+  // Request refund
+  requestRefund: async (data: {
+    orderId: string;
+    reason?: string;
+  }): Promise<ApiResponse<{
+    refundId: string;
+    order: Order;
+    success: boolean;
+    message: string;
+  }>> => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/payments/request-refund`,
+        data,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to process refund');
+    }
+  },
+
+  // Create offer payment intent (specific for offers)
+  createOfferPaymentIntent: async (offerId: string): Promise<ApiResponse<{
+    clientSecret: string;
+    paymentIntentId: string;
+    amount: number;
+    orderId: string;
+  }>> => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/payments/create-offer-payment-intent`,
+        { offerId },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to create offer payment');
+    }
+  },
+
+  // Update offer payment status
+  updateOfferPayment: async (data: {
+    offerId: string;
+    paymentIntentId: string;
+    status: string;
+  }): Promise<ApiResponse<{
+    offer: Offer;
+    success: boolean;
+    message: string;
+  }>> => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/offers/${data.offerId}/payment`,
+        data,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to update payment status');
+    }
+  }
+};
 
 // ============================================
 // ✅ EXPORT ALL APIs
@@ -1506,6 +1689,7 @@ const marketplaceApi = {
     formatCurrency,
     calculatePlatformFee,
     calculateSellerPayout,
+    payments: paymentsApi, // ✅ Add this line
     checkAuth,
     getCurrentUser,
     getApiBaseUrl,
