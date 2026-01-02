@@ -8,22 +8,45 @@ export interface User {
   isHypeModeUser: boolean;
   role: string;
 }
-
+// src/types/marketplace.ts
 export interface Listing {
   _id: string;
   title: string;
   description: string;
   price: number;
-  type: 'for_sale' | 'licensing' | 'adaptation_rights' | 'commission';
+  formattedPrice: string;
+  status: 'active' | 'sold' | 'pending' | 'draft' | 'inactive';
+  mediaUrls: string[];
+  thumbnail?: string;
   category: string;
   tags: string[];
-  mediaUrls: string[];
-  status: 'draft' | 'active' | 'sold' | 'inactive';
-  sellerId: User;
+  views: number;
+  favoriteCount: number;
+  purchaseCount: number;
+  sellerId: {
+    _id: string;
+    username: string;
+    avatar?: string;
+    sellerRating?: number;
+    email?: string;
+    phoneNumber?: string;
+  };
+  sellerEmail?: string;
+  type: string;
+  currency: string;
+  isDigital: boolean;
   createdAt: string;
   updatedAt: string;
+  createdAtFormatted?: string;
+  statusColor?: string;
+  seller?: {
+    _id: string;
+    username: string;
+    avatar?: string;
+    sellerRating?: number;
+    email?: string;
+  };
 }
-
 export interface Order {
   _id: string;
   buyerId: User;
