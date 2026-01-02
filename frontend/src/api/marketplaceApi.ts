@@ -170,72 +170,121 @@ export const listingsApi = {
   type?: string;
 }): Promise<ApiResponse<{ listings: Listing[] }>> => {
   try {
+    console.log('📡 Fetching listings with params:', params);
+    
     const response = await axios.get(`${API_BASE_URL}/marketplace/listings`, {
       params
     });
     
     const data = response.data;
     
-    // Log for debugging
-    console.log('🎯 API Response Analysis:', {
+    // ✅ Enhanced debugging
+    console.log('🎯 API Response Full Analysis:', {
+      status: response.status,
+      dataKeys: data && typeof data === 'object' ? Object.keys(data) : 'N/A',
       isArray: Array.isArray(data),
-      type: typeof data,
-      keys: data && typeof data === 'object' ? Object.keys(data) : [],
+      hasSuccess: !!(data?.success),
       hasListings: !!(data?.listings),
-      listingsIsArray: Array.isArray(data?.listings)
+      hasDataProperty: !!(data?.data),
+      listingsIsArray: Array.isArray(data?.listings),
+      dataListingsIsArray: Array.isArray(data?.data?.listings),
+      responseStructure: data
     });
     
-    // Handle all possible response structures
+    // ✅ Handle ALL possible response structures
     let listings: Listing[] = [];
     let pagination = undefined;
     let message = '';
+    let currency = 'USD';
+    let filters = undefined;
     
-    if (Array.isArray(data)) {
-      // Case 1: Response is directly an array
-      listings = data;
-      message = `Found ${listings.length} listings`;
-    } 
-    else if (data && typeof data === 'object') {
-      // Case 2: Standard API response
+    if (data && typeof data === 'object') {
+      // Check if API returned error
       if (data.success === false) {
+        console.error('❌ API returned error:', data.error);
         return {
           success: false,
-          error: data.error || 'API error',
-          status: data.status
+          error: data.error || 'API request failed',
+          status: data.status,
+          message: data.message
         };
       }
       
-      // Extract listings from various possible structures
-      if (Array.isArray(data.listings)) {
+      // ✅ CASE 1: Direct listings array (most common)
+      if (data.listings && Array.isArray(data.listings)) {
         listings = data.listings;
-      } 
-      else if (Array.isArray(data.data)) {
+        console.log(`✅ Found ${listings.length} listings in data.listings`);
+      }
+      // ✅ CASE 2: Nested listings in data property
+      else if (data.data && data.data.listings && Array.isArray(data.data.listings)) {
+        listings = data.data.listings;
+        console.log(`✅ Found ${listings.length} listings in data.data.listings`);
+      }
+      // ✅ CASE 3: Direct data array
+      else if (data.data && Array.isArray(data.data)) {
         listings = data.data;
-      } 
-      else if (Array.isArray(data.items)) {
-        listings = data.items;
+        console.log(`✅ Found ${listings.length} listings in data.data array`);
+      }
+      // ✅ CASE 4: Response itself is the array
+      else if (Array.isArray(data)) {
+        listings = data;
+        console.log(`✅ Response is direct array with ${listings.length} listings`);
+      }
+      // ✅ CASE 5: Try to find any array in the response
+      else {
+        const arrayKeys = Object.keys(data).filter(key => Array.isArray(data[key]));
+        if (arrayKeys.length > 0) {
+          listings = data[arrayKeys[0]];
+          console.log(`✅ Found ${listings.length} listings in key: ${arrayKeys[0]}`);
+        }
       }
       
-      // Extract pagination if available
-      if (data.pagination) {
-        pagination = data.pagination;
-      }
+      // Extract additional metadata
+      pagination = data.pagination || data.data?.pagination;
+      message = data.message || `Found ${listings.length} listing${listings.length !== 1 ? 's' : ''}`;
+      currency = data.currency || 'USD';
+      filters = data.filters;
       
-      // Extract message
-      message = data.message || `Found ${listings.length} listings`;
+      // Log first listing for debugging
+      if (listings.length > 0) {
+        console.log('📝 Sample listing structure:', {
+          id: listings[0]._id,
+          title: listings[0].title,
+          price: listings[0].price,
+          formattedPrice: listings[0].formattedPrice,
+          seller: listings[0].sellerId,
+          mediaUrls: listings[0].mediaUrls,
+          hasThumbnail: !!listings[0].thumbnail
+        });
+      }
     }
     
-    console.log(`✅ Processed ${listings.length} listings`);
+    console.log(`✅ Final: Returning ${listings.length} listings`);
     
+    // ✅ Return the standardized response
     return {
       success: true,
       data: { listings },
       pagination,
-      message
+      message,
+      currency,
+      filters
     };
     
   } catch (error) {
     console.error('❌ Error fetching listings:', error);
+    
+    // Enhanced error logging
+    if (axios.isAxiosError(error)) {
+      console.error('Axios Error Details:', {
+        message: error.message,
+        code: error.code,
+        status: error.response?.status,
+        data: error.response?.data,
+        url: error.config?.url
+      });
+    }
+    
     return handleApiError(error as AxiosError, 'Failed to fetch listings');
   }
 },
