@@ -1,6 +1,6 @@
 // src/pages/marketplace/MyOffers.tsx
 import React, { useState, useEffect } from 'react';
-import MarketplaceLayout from '../../components/Layout';
+import MarketplaceLayout from '../../../components/Layout';
 import { 
   FiCreditCard, FiCheck, FiX, FiAlertCircle, FiLoader, 
   FiClock, FiCheckCircle, FiXCircle, FiEye, FiDollarSign,
@@ -9,7 +9,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import marketplaceApi from '../../api/marketplaceApi';
+import marketplaceApi from '../../../api/marketplaceApi';
 
 // Get Stripe key from environment variable
 const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "pk_test_51SKw7ZHYamYyPYbDUlqbeydcW1hVGrHOvCZ8mBwSU1gw77TIRyzng31iSqAvPIQzTYKG8UWfDew7kdKgBxsw7vtq00WTLU3YCZ";
