@@ -1247,7 +1247,6 @@ export const offersApi = {
     
     const response = await axios.get(
       `${API_BASE_URL}/marketplace/offers/my-offers`,
-      { headers }
     );
     return normalizeResponse(response);
   } catch (error) {
