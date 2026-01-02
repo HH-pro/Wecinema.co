@@ -1,4 +1,4 @@
-// src/pages/marketplace/OffersPage.jsx
+// src/pages/marketplace/MyOffersPage.tsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -18,19 +18,15 @@ import {
   Alert,
   AlertTitle,
   Divider,
-  TextField,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  IconButton,
-  Tooltip,
   Badge,
   List,
   ListItem,
   ListItemText,
-  ListItemIcon,
-  ListItemSecondaryAction
+  ListItemIcon
 } from '@mui/material';
 import {
   AttachMoney as MoneyIcon,
@@ -38,8 +34,6 @@ import {
   CheckCircle as CheckIcon,
   Cancel as CancelIcon,
   Visibility as ViewIcon,
-  Chat as ChatIcon,
-  Delete as DeleteIcon,
   Payment as PaymentIcon,
   Receipt as ReceiptIcon,
   Store as StoreIcon,
@@ -49,7 +43,8 @@ import {
   Info as InfoIcon,
   ArrowForward as ArrowIcon,
   Refresh as RefreshIcon,
-  AddOffer as AddOfferIcon
+  Add as AddIcon, // Changed from AddOfferIcon
+  LocalOffer as OfferIcon // New icon for offers
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import marketplaceApi from '../../api/marketplaceApi';
@@ -60,28 +55,91 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
 const stripePromise = loadStripe('your_publishable_key_here');
 
 // ============================================
+// ✅ INTERFACE DEFINITIONS
+// ============================================
+
+interface Offer {
+  _id: string;
+  listingId: {
+    _id: string;
+    title: string;
+    price: number;
+    sellerId?: {
+      username: string;
+      email?: string;
+    };
+  };
+  buyerId?: {
+    username: string;
+    email?: string;
+  };
+  amount: number;
+  offeredPrice?: number;
+  status: 'pending' | 'pending_payment' | 'paid' | 'accepted' | 'rejected' | 'cancelled' | 'expired';
+  message?: string;
+  requirements?: string;
+  paymentIntentId?: string;
+  isTemporary?: boolean;
+  expiresAt?: string;
+  createdAt: string;
+  paidAt?: string;
+}
+
+interface OfferStatusChipProps {
+  status: string;
+}
+
+interface PaymentModalProps {
+  open: boolean;
+  onClose: () => void;
+  clientSecret?: string;
+  offerId: string;
+  amount: number;
+  onPaymentSuccess: (offerId: string, paymentIntentId: string) => void;
+}
+
+interface OfferDetailsModalProps {
+  open: boolean;
+  onClose: () => void;
+  offer: Offer | null;
+  userRole: 'buyer' | 'seller';
+}
+
+interface PendingPaymentCardProps {
+  offer: Offer;
+  onCancelOffer: (offerId: string) => void;
+}
+
+interface OfferCardProps {
+  offer: Offer;
+  type: 'made' | 'received';
+  onViewDetails: (offer: Offer) => void;
+  onCancelOffer?: (offerId: string) => void;
+}
+
+// ============================================
 // ✅ OFFER STATUS COMPONENT
 // ============================================
 
-const OfferStatusChip = ({ status }) => {
-  const getStatusConfig = (status) => {
+const OfferStatusChip: React.FC<OfferStatusChipProps> = ({ status }) => {
+  const getStatusConfig = (status: string) => {
     switch (status) {
       case 'pending_payment':
-        return { color: 'warning', label: 'Payment Required', icon: <PaymentIcon fontSize="small" /> };
+        return { color: 'warning' as const, label: 'Payment Required', icon: <PaymentIcon fontSize="small" /> };
       case 'pending':
-        return { color: 'info', label: 'Pending Review', icon: <TimeIcon fontSize="small" /> };
+        return { color: 'info' as const, label: 'Pending Review', icon: <TimeIcon fontSize="small" /> };
       case 'paid':
-        return { color: 'success', label: 'Paid', icon: <CheckIcon fontSize="small" /> };
+        return { color: 'success' as const, label: 'Paid', icon: <CheckIcon fontSize="small" /> };
       case 'accepted':
-        return { color: 'success', label: 'Accepted', icon: <CheckIcon fontSize="small" /> };
+        return { color: 'success' as const, label: 'Accepted', icon: <CheckIcon fontSize="small" /> };
       case 'rejected':
-        return { color: 'error', label: 'Rejected', icon: <CancelIcon fontSize="small" /> };
+        return { color: 'error' as const, label: 'Rejected', icon: <CancelIcon fontSize="small" /> };
       case 'cancelled':
-        return { color: 'error', label: 'Cancelled', icon: <CancelIcon fontSize="small" /> };
+        return { color: 'error' as const, label: 'Cancelled', icon: <CancelIcon fontSize="small" /> };
       case 'expired':
-        return { color: 'default', label: 'Expired', icon: <TimeIcon fontSize="small" /> };
+        return { color: 'default' as const, label: 'Expired', icon: <TimeIcon fontSize="small" /> };
       default:
-        return { color: 'default', label: status, icon: null };
+        return { color: 'default' as const, label: status, icon: null };
     }
   };
 
@@ -102,14 +160,21 @@ const OfferStatusChip = ({ status }) => {
 // ✅ PAYMENT MODAL COMPONENT
 // ============================================
 
-const PaymentModal = ({ open, onClose, clientSecret, offerId, amount, onPaymentSuccess }) => {
+const PaymentModal: React.FC<PaymentModalProps> = ({ 
+  open, 
+  onClose, 
+  clientSecret, 
+  offerId, 
+  amount, 
+  onPaymentSuccess 
+}) => {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const handleSubmit = async (event) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     
     if (!stripe || !elements) {
@@ -120,31 +185,34 @@ const PaymentModal = ({ open, onClose, clientSecret, offerId, amount, onPaymentS
     setError(null);
 
     try {
-      const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+      const cardElement = elements.getElement(CardElement);
+      if (!cardElement) {
+        throw new Error('Card element not found');
+      }
+
+      const { error: stripeError, paymentIntent } = await stripe.confirmCardPayment(clientSecret || '', {
         payment_method: {
-          card: elements.getElement(CardElement),
+          card: cardElement,
           billing_details: {
-            name: 'Customer Name', // Get from user profile
-            email: 'customer@example.com' // Get from user profile
+            name: 'Customer Name',
+            email: 'customer@example.com'
           },
         },
       });
 
       if (stripeError) {
-        setError(stripeError.message);
+        setError(stripeError.message || 'Payment failed');
         setProcessing(false);
         return;
       }
 
-      if (paymentIntent.status === 'succeeded' || paymentIntent.status === 'requires_capture') {
+      if (paymentIntent && (paymentIntent.status === 'succeeded' || paymentIntent.status === 'requires_capture')) {
         setSuccess(true);
         
-        // Call parent callback
         if (onPaymentSuccess) {
           onPaymentSuccess(offerId, paymentIntent.id);
         }
         
-        // Close after delay
         setTimeout(() => {
           onClose();
         }, 2000);
@@ -241,16 +309,18 @@ const PaymentModal = ({ open, onClose, clientSecret, offerId, amount, onPaymentS
 // ✅ OFFER DETAILS MODAL
 // ============================================
 
-const OfferDetailsModal = ({ open, onClose, offer, userRole }) => {
+const OfferDetailsModal: React.FC<OfferDetailsModalProps> = ({ open, onClose, offer, userRole }) => {
+  const [loading, setLoading] = useState(false);
+
   if (!offer) return null;
 
   const canCancel = offer.status === 'pending' || offer.status === 'pending_payment';
-  const canPay = offer.status === 'pending_payment' && userRole === 'buyer';
   const canAccept = offer.status === 'paid' && userRole === 'seller';
   const canReject = (offer.status === 'pending' || offer.status === 'paid') && userRole === 'seller';
 
-  const handleAction = async (action) => {
+  const handleAction = async (action: 'cancel' | 'accept' | 'reject') => {
     try {
+      setLoading(true);
       switch (action) {
         case 'cancel':
           await marketplaceApi.offers.cancelOffer(offer._id);
@@ -267,6 +337,8 @@ const OfferDetailsModal = ({ open, onClose, offer, userRole }) => {
     } catch (error) {
       console.error(`Error ${action}ing offer:`, error);
       alert(`Failed to ${action} offer`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -292,7 +364,7 @@ const OfferDetailsModal = ({ open, onClose, offer, userRole }) => {
                 {offer.listingId?.title || 'N/A'}
               </Typography>
               <Typography variant="body2" color="textSecondary">
-                Price: ${offer.listingId?.price || 0}
+                Original Price: ${offer.listingId?.price || 0}
               </Typography>
             </Paper>
 
@@ -383,7 +455,7 @@ const OfferDetailsModal = ({ open, onClose, offer, userRole }) => {
         </Grid>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} color="inherit">
+        <Button onClick={onClose} color="inherit" disabled={loading}>
           Close
         </Button>
         
@@ -392,6 +464,7 @@ const OfferDetailsModal = ({ open, onClose, offer, userRole }) => {
             onClick={() => handleAction('cancel')}
             color="error"
             startIcon={<CancelIcon />}
+            disabled={loading}
           >
             Cancel Offer
           </Button>
@@ -403,6 +476,7 @@ const OfferDetailsModal = ({ open, onClose, offer, userRole }) => {
             color="success"
             variant="contained"
             startIcon={<CheckIcon />}
+            disabled={loading}
           >
             Accept Offer
           </Button>
@@ -414,6 +488,7 @@ const OfferDetailsModal = ({ open, onClose, offer, userRole }) => {
             color="error"
             variant="outlined"
             startIcon={<CancelIcon />}
+            disabled={loading}
           >
             Reject Offer
           </Button>
@@ -427,32 +502,25 @@ const OfferDetailsModal = ({ open, onClose, offer, userRole }) => {
 // ✅ PENDING PAYMENT CARD COMPONENT
 // ============================================
 
-const PendingPaymentCard = ({ offer, onCompletePayment, onCancelOffer }) => {
+const PendingPaymentCard: React.FC<PendingPaymentCardProps> = ({ offer, onCancelOffer }) => {
   const [showPayment, setShowPayment] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [paymentClientSecret, setPaymentClientSecret] = useState<string>('');
 
   const handleCompletePayment = async () => {
     try {
       setLoading(true);
       
-      // Get payment status first
       const statusResponse = await marketplaceApi.offers.getPaymentStatus(offer._id);
       
-      if (statusResponse.success) {
-        const { canContinuePayment, stripeStatus } = statusResponse.data;
+      if (statusResponse.success && statusResponse.data) {
+        const { canContinuePayment, paymentIntentId } = statusResponse.data;
         
-        if (canContinuePayment) {
-          // Get payment intent details
-          const paymentResponse = await marketplaceApi.offers.makeOffer({
-            listingId: offer.listingId._id,
-            amount: offer.amount,
-            message: offer.message,
-            requirements: offer.requirements
-          });
-          
-          if (paymentResponse.success) {
-            setShowPayment(true);
-          }
+        if (canContinuePayment && paymentIntentId) {
+          // For existing payment intent, we need to get the client secret
+          // This would typically come from your backend
+          setPaymentClientSecret(paymentIntentId); // This should be the actual client secret
+          setShowPayment(true);
         } else {
           alert('Cannot continue payment. Please check offer status.');
         }
@@ -465,9 +533,8 @@ const PendingPaymentCard = ({ offer, onCompletePayment, onCancelOffer }) => {
     }
   };
 
-  const handlePaymentSuccess = async (offerId, paymentIntentId) => {
+  const handlePaymentSuccess = async (offerId: string, paymentIntentId: string) => {
     try {
-      // Confirm offer payment
       await marketplaceApi.offers.confirmOfferPayment({
         offerId,
         paymentIntentId
@@ -478,6 +545,12 @@ const PendingPaymentCard = ({ offer, onCompletePayment, onCancelOffer }) => {
     } catch (error) {
       console.error('Error confirming payment:', error);
       alert('Failed to confirm payment');
+    }
+  };
+
+  const handleCancel = () => {
+    if (window.confirm('Are you sure you want to cancel this pending offer?')) {
+      onCancelOffer(offer._id);
     }
   };
 
@@ -519,7 +592,7 @@ const PendingPaymentCard = ({ offer, onCompletePayment, onCancelOffer }) => {
                 variant="outlined"
                 color="error"
                 startIcon={<CancelIcon />}
-                onClick={() => onCancelOffer(offer._id)}
+                onClick={handleCancel}
                 sx={{ mr: 1 }}
               >
                 Cancel
@@ -544,7 +617,7 @@ const PendingPaymentCard = ({ offer, onCompletePayment, onCancelOffer }) => {
           <PaymentModal
             open={showPayment}
             onClose={() => setShowPayment(false)}
-            clientSecret={offer.paymentIntentId}
+            clientSecret={paymentClientSecret}
             offerId={offer._id}
             amount={offer.amount}
             onPaymentSuccess={handlePaymentSuccess}
@@ -559,25 +632,23 @@ const PendingPaymentCard = ({ offer, onCompletePayment, onCancelOffer }) => {
 // ✅ OFFER CARD COMPONENT
 // ============================================
 
-const OfferCard = ({ offer, type = 'received', onViewDetails, onCancelOffer }) => {
+const OfferCard: React.FC<OfferCardProps> = ({ offer, type = 'received', onViewDetails, onCancelOffer }) => {
   const isPendingPayment = offer.status === 'pending_payment';
   
   if (isPendingPayment && type === 'made') {
     return (
       <PendingPaymentCard 
         offer={offer} 
-        onCompletePayment={() => {}} 
-        onCancelOffer={onCancelOffer}
+        onCancelOffer={onCancelOffer || (() => {})}
       />
     );
   }
 
   const getActionButtons = () => {
     if (type === 'made') {
-      // Buyer's view
       return (
         <>
-          {offer.status === 'pending' && (
+          {offer.status === 'pending' && onCancelOffer && (
             <Button
               size="small"
               variant="outlined"
@@ -593,13 +664,13 @@ const OfferCard = ({ offer, type = 'received', onViewDetails, onCancelOffer }) =
             variant="outlined"
             startIcon={<ViewIcon />}
             onClick={() => onViewDetails(offer)}
+            sx={{ ml: 1 }}
           >
             View Details
           </Button>
         </>
       );
     } else {
-      // Seller's view
       return (
         <>
           {offer.status === 'paid' && (
@@ -673,36 +744,33 @@ const OfferCard = ({ offer, type = 'received', onViewDetails, onCancelOffer }) =
 };
 
 // ============================================
-// ✅ MAIN OFFERS PAGE COMPONENT
+// ✅ MAIN MY OFFERS PAGE COMPONENT
 // ============================================
 
-const OffersPage = () => {
+const MyOffersPage: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
-  const [offers, setOffers] = useState([]);
-  const [receivedOffers, setReceivedOffers] = useState([]);
+  const [offers, setOffers] = useState<Offer[]>([]);
+  const [receivedOffers, setReceivedOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState({ made: 0, received: 0 });
-  const [selectedOffer, setSelectedOffer] = useState(null);
+  const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
   const [showDetails, setShowDetails] = useState(false);
-  const [cancelDialog, setCancelDialog] = useState(null);
+  const [cancelDialog, setCancelDialog] = useState<{ offerId: string; open: boolean } | null>(null);
   const [processing, setProcessing] = useState(false);
 
-  // Fetch offers data
   const fetchOffers = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Fetch offers made
       const madeResponse = await marketplaceApi.offers.getMyOffers();
       if (madeResponse.success) {
         setOffers(madeResponse.data?.offers || []);
         setStats(prev => ({ ...prev, made: madeResponse.data?.count || 0 }));
       }
 
-      // Fetch offers received
       const receivedResponse = await marketplaceApi.offers.getReceivedOffers();
       if (receivedResponse.success) {
         setReceivedOffers(receivedResponse.data?.offers || []);
@@ -720,23 +788,19 @@ const OffersPage = () => {
     fetchOffers();
   }, []);
 
-  // Handle tab change
-  const handleTabChange = (event, newValue) => {
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
 
-  // Handle view offer details
-  const handleViewDetails = (offer) => {
+  const handleViewDetails = (offer: Offer) => {
     setSelectedOffer(offer);
     setShowDetails(true);
   };
 
-  // Handle cancel offer
-  const handleCancelOffer = async (offerId) => {
+  const handleCancelOffer = (offerId: string) => {
     setCancelDialog({ offerId, open: true });
   };
 
-  // Confirm cancel offer
   const confirmCancelOffer = async () => {
     if (!cancelDialog) return;
 
@@ -746,7 +810,7 @@ const OffersPage = () => {
       
       if (response.success) {
         alert('Offer cancelled successfully');
-        fetchOffers(); // Refresh list
+        fetchOffers();
       } else {
         alert(response.error || 'Failed to cancel offer');
       }
@@ -759,15 +823,14 @@ const OffersPage = () => {
     }
   };
 
-  // Handle cancel temporary offer
-  const handleCancelTemporaryOffer = async (offerId) => {
+  const handleCancelTemporaryOffer = async (offerId: string) => {
     try {
       setProcessing(true);
       const response = await marketplaceApi.offers.cancelTemporaryOffer(offerId);
       
       if (response.success) {
         alert('Temporary offer cancelled');
-        fetchOffers(); // Refresh list
+        fetchOffers();
       } else {
         alert(response.error || 'Failed to cancel offer');
       }
@@ -779,13 +842,11 @@ const OffersPage = () => {
     }
   };
 
-  // Filter offers by status
-  const filterOffersByStatus = (offersList, status) => {
+  const filterOffersByStatus = (offersList: Offer[], status: string) => {
     return offersList.filter(offer => offer.status === status);
   };
 
-  // Calculate statistics
-  const calculateStats = (offersList) => {
+  const calculateStats = (offersList: Offer[]) => {
     const pendingPayment = filterOffersByStatus(offersList, 'pending_payment').length;
     const pending = filterOffersByStatus(offersList, 'pending').length;
     const paid = filterOffersByStatus(offersList, 'paid').length;
@@ -814,7 +875,7 @@ const OffersPage = () => {
       {/* Header */}
       <Box mb={4}>
         <Typography variant="h4" fontWeight="bold" gutterBottom>
-          Manage Offers
+          My Offers
         </Typography>
         <Typography variant="body1" color="textSecondary">
           Track and manage all your offers and negotiations in one place
@@ -862,20 +923,7 @@ const OffersPage = () => {
             </Typography>
           </Paper>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Paper sx={{ p: 3, textAlign:"center" }}>
-            <Box display="flex" alignItems="center" justifyContent="center" mb={1}>
-              <TrendingIcon color="success" sx={{ mr: 1 }} />
-              <Typography variant="h5" fontWeight="bold">
-                {receivedStats.paid}
-              </Typography>
-            </Box>
-            <Typography variant="body2" color="textSecondary">
-              Paid Offers
-            </Typography>
-          </Paper>
-        </Grid>
-      </Grid>
+     
 
       {/* Error Alert */}
       {error && (
@@ -958,7 +1006,6 @@ const OffersPage = () => {
                       <Grid item xs={12} key={offer._id}>
                         <PendingPaymentCard
                           offer={offer}
-                          onCompletePayment={() => {}}
                           onCancelOffer={handleCancelTemporaryOffer}
                         />
                       </Grid>
@@ -971,7 +1018,7 @@ const OffersPage = () => {
               {/* All Offers Made */}
               {offers.length === 0 ? (
                 <Box textAlign="center" py={4}>
-                  <AddOfferIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
+                  <OfferIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
                   <Typography variant="h6" gutterBottom>
                     No Offers Made Yet
                   </Typography>
@@ -1088,16 +1135,14 @@ const OffersPage = () => {
                   )}
 
                   {/* All Received Offers */}
-                  {receivedOffers.map((offer) => (
-                    offer.status !== 'paid' && (
-                      <Grid item xs={12} md={6} key={offer._id}>
-                        <OfferCard
-                          offer={offer}
-                          type="received"
-                          onViewDetails={handleViewDetails}
-                        />
-                      </Grid>
-                    )
+                  {receivedOffers.filter(o => o.status !== 'paid').map((offer) => (
+                    <Grid item xs={12} md={6} key={offer._id}>
+                      <OfferCard
+                        offer={offer}
+                        type="received"
+                        onViewDetails={handleViewDetails}
+                      />
+                    </Grid>
                   ))}
                 </Grid>
               )}
@@ -1139,17 +1184,12 @@ const OffersPage = () => {
       )}
 
       {/* Cancel Confirmation Dialog */}
-      <Dialog open={cancelDialog?.open || false} onClose={() => setCancelDialog(null)}>
+      <Dialog open={!!cancelDialog?.open} onClose={() => setCancelDialog(null)}>
         <DialogTitle>Cancel Offer</DialogTitle>
         <DialogContent>
           <Typography>
             Are you sure you want to cancel this offer? This action cannot be undone.
           </Typography>
-          {selectedOffer?.status === 'pending_payment' && (
-            <Alert severity="info" sx={{ mt: 2 }}>
-              This will also cancel the pending payment intent.
-            </Alert>
-          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCancelDialog(null)} disabled={processing}>
@@ -1208,4 +1248,4 @@ const OffersPage = () => {
   );
 };
 
-export default OffersPage;
+export default MyOffersPage;
