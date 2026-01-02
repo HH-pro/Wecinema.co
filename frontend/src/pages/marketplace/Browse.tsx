@@ -136,29 +136,6 @@ const Browse: React.FC = () => {
       // Apply sorting
       const sortedData = sortListings(filteredData, filters.sortBy);
       
-      // Debug: Check video detection for all listings
-      console.log('🎬 ========== VIDEO DETECTION DEBUG ==========');
-      sortedData.forEach((listing, index) => {
-        console.log(`\n📊 Listing ${index + 1}: ${listing.title}`);
-        console.log('📁 Media URLs:', listing.mediaUrls);
-        console.log('📁 Thumbnail from API:', listing.thumbnail);
-        
-        // Check each URL
-        listing.mediaUrls?.forEach((url, urlIndex) => {
-          const isVideo = isVideoUrl(url);
-          console.log(`   URL ${urlIndex + 1}: ${url}`);
-          console.log(`   Is Video? ${isVideo}`);
-        });
-        
-        const videoUrl = getFirstVideoUrl(listing);
-        const mediaType = getMediaType(listing);
-        const thumbnailUrl = getThumbnailUrl(listing);
-        console.log('🎯 First video URL found:', videoUrl || 'None');
-        console.log('🎯 Media Type:', mediaType);
-        console.log('🖼️ Thumbnail URL to use:', thumbnailUrl);
-      });
-      console.log('🎬 ==========================================\n');
-      
       setListings(sortedData);
     } catch (error: any) {
       console.error('Error fetching listings:', error);
@@ -215,7 +192,6 @@ const Browse: React.FC = () => {
   // Handle video click - open popup
   const handleVideoClick = (videoUrl: string, title: string, listing: Listing) => {
     console.log('🎬 Opening video:', videoUrl);
-    console.log('📁 Listing media URLs:', listing.mediaUrls);
     
     setSelectedVideo(videoUrl);
     setVideoTitle(title);
@@ -424,25 +400,19 @@ const Browse: React.FC = () => {
   // FIXED VIDEO DETECTION AND THUMBNAIL LOGIC
   // ============================================
 
-  // Check if media is a video - FIXED VERSION
+  // Check if media is a video
   const isVideoUrl = (url: string): boolean => {
-    if (!url || typeof url !== 'string') {
-      return false;
-    }
-    
-    const urlLower = url.toLowerCase();
+    if (!url || typeof url !== 'string') return false;
     
     // Check for video file extensions
     const videoExtensions = /\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v|ogg|ogv|3gp|3g2)$/i;
     
     if (videoExtensions.test(url)) {
-      console.log('✅ Video detected by extension:', url);
       return true;
     }
     
-    // Check for Cloudinary video URLs (API returns these as both mediaUrls and thumbnails)
-    if (urlLower.includes('cloudinary.com') && urlLower.includes('/video/')) {
-      console.log('✅ Cloudinary video detected:', url);
+    // Check for Cloudinary video URLs
+    if (url.includes('cloudinary.com') && url.includes('/video/')) {
       return true;
     }
     
@@ -451,45 +421,36 @@ const Browse: React.FC = () => {
 
   // Get first video URL from listing
   const getFirstVideoUrl = (listing: Listing): string => {
-    if (!listing.mediaUrls || !Array.isArray(listing.mediaUrls) || listing.mediaUrls.length === 0) {
-      return '';
-    }
+    if (!listing.mediaUrls || listing.mediaUrls.length === 0) return '';
     
     // Find first video URL
-    for (const url of listing.mediaUrls) {
-      if (isVideoUrl(url)) {
-        console.log('🎬 Found video URL:', url);
-        return url;
-      }
-    }
+    const videoUrl = listing.mediaUrls.find(url => isVideoUrl(url));
     
-    return '';
+    return videoUrl || '';
   };
 
-  // Generate PROPER Cloudinary thumbnail URL from video URL
+  // Generate video thumbnail from video URL - SIMPLE AND RELIABLE
   const generateVideoThumbnail = (videoUrl: string): string => {
     if (!videoUrl) return VIDEO_PLACEHOLDER;
     
-    console.log('🖼️ Generating thumbnail for:', videoUrl);
-    
-    // For Cloudinary videos - generate proper thumbnail URL
+    // If it's a Cloudinary video URL, generate thumbnail
     if (videoUrl.includes('cloudinary.com') && videoUrl.includes('/video/')) {
       // Convert Cloudinary video URL to thumbnail URL
-      // Format: https://res.cloudinary.com/folajimidev/video/upload/v1767372201/b9pi1iyrjkb4moodzwx2.mp4
+      // Example: https://res.cloudinary.com/folajimidev/video/upload/v1767372201/b9pi1iyrjkb4moodzwx2.mp4
       // To: https://res.cloudinary.com/folajimidev/image/upload/w_600,h_400,c_fill,q_auto,f_auto/v1767372201/b9pi1iyrjkb4moodzwx2.jpg
       
-      // Extract version and public ID
-      const parts = videoUrl.split('/upload/');
-      if (parts.length === 2) {
-        const baseUrl = parts[0];
-        const path = parts[1];
+      try {
+        // Replace /video/upload/ with /image/upload/ and add thumbnail parameters
+        let thumbnailUrl = videoUrl.replace('/video/upload/', '/image/upload/w_600,h_400,c_fill,q_auto,f_auto/');
         
-        // Remove .mp4 extension and add .jpg
-        const pathWithoutExt = path.replace(/\.(mp4|mov|avi|webm)$/i, '');
-        const thumbnailUrl = `${baseUrl}/image/upload/w_600,h_400,c_fill,q_auto,f_auto/${pathWithoutExt}.jpg`;
+        // Replace .mp4 with .jpg
+        thumbnailUrl = thumbnailUrl.replace(/\.(mp4|mov|avi|webm)$/i, '.jpg');
         
         console.log('📸 Generated Cloudinary thumbnail:', thumbnailUrl);
         return thumbnailUrl;
+      } catch (error) {
+        console.error('Error generating thumbnail:', error);
+        return VIDEO_PLACEHOLDER;
       }
     }
     
@@ -509,11 +470,10 @@ const Browse: React.FC = () => {
       }
     }
     
-    console.log('📹 Using generic video placeholder');
     return VIDEO_PLACEHOLDER;
   };
 
-  // Get thumbnail URL - FIXED FOR CLOUDINARY VIDEO URLs
+  // Get thumbnail URL - FIXED VERSION
   const getThumbnailUrl = (listing: Listing): string => {
     const listingId = listing._id || 'unknown';
     
@@ -522,75 +482,75 @@ const Browse: React.FC = () => {
       return ERROR_IMAGE;
     }
     
-    // FIRST: Check if listing has a thumbnail property from API
+    // 1. First check if listing has a thumbnail from API
     if (listing.thumbnail && listing.thumbnail !== '') {
-      console.log(`📸 Using API thumbnail for "${listing.title}":`, listing.thumbnail);
-      
-      // Check if the thumbnail is actually a video URL
+      // Check if thumbnail is a video URL
       if (isVideoUrl(listing.thumbnail)) {
-        console.log('⚠️ API thumbnail is a video URL, generating image thumbnail');
         return generateVideoThumbnail(listing.thumbnail);
       }
-      
       return listing.thumbnail;
     }
     
-    // SECOND: If no thumbnail from API, check mediaUrls
+    // 2. If no thumbnail, check mediaUrls
     if (!listing.mediaUrls || listing.mediaUrls.length === 0) {
       return PLACEHOLDER_IMAGE;
     }
     
-    console.log(`📸 Generating thumbnail for "${listing.title}" from media URLs`);
-    
-    // Check if first media URL is a video
-    const firstMediaUrl = listing.mediaUrls[0];
-    if (firstMediaUrl && isVideoUrl(firstMediaUrl)) {
-      console.log('🎬 First media URL is a video, generating thumbnail');
-      return generateVideoThumbnail(firstMediaUrl);
-    }
-    
-    // Try to find an image in mediaUrls
+    // 3. Check for images in mediaUrls
     const imageUrl = listing.mediaUrls.find(url => 
       url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) && !isVideoUrl(url)
     );
     
     if (imageUrl) {
-      console.log('🖼️ Found image URL:', imageUrl);
       return imageUrl;
     }
     
-    // If all else fails, use placeholder
-    console.log('⚠️ Using placeholder image');
+    // 4. Check for video URLs and generate thumbnails
+    const videoUrl = getFirstVideoUrl(listing);
+    if (videoUrl) {
+      return generateVideoThumbnail(videoUrl);
+    }
+    
+    // 5. Use first URL (might be a video, but better than nothing)
+    const firstUrl = listing.mediaUrls[0];
+    if (firstUrl) {
+      // If it's a video URL, generate thumbnail
+      if (isVideoUrl(firstUrl)) {
+        return generateVideoThumbnail(firstUrl);
+      }
+      return firstUrl;
+    }
+    
     return PLACEHOLDER_IMAGE;
   };
 
   // Handle image loading error
   const handleImageError = (listingId: string) => {
-    console.error('❌ Image load error for listing:', listingId);
     setImageErrors(prev => ({
       ...prev,
       [listingId]: true
     }));
   };
 
-  // Get media type for a listing - SIMPLE LOGIC
+  // Get media type for a listing
   const getMediaType = (listing: Listing): 'image' | 'video' | 'none' => {
-    if (!listing.mediaUrls || !Array.isArray(listing.mediaUrls) || listing.mediaUrls.length === 0) {
+    if (!listing.mediaUrls || listing.mediaUrls.length === 0) {
       return 'none';
     }
     
-    // Check if any media URL is a video
-    for (const url of listing.mediaUrls) {
-      if (isVideoUrl(url)) {
-        return 'video';
-      }
+    // Check for video
+    const videoUrl = listing.mediaUrls.find(url => isVideoUrl(url));
+    if (videoUrl) {
+      return 'video';
     }
     
-    // Check if any media URL is an image
-    for (const url of listing.mediaUrls) {
-      if (url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)) {
-        return 'image';
-      }
+    // Check for image
+    const imageUrl = listing.mediaUrls.find(url => 
+      url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
+    );
+    
+    if (imageUrl) {
+      return 'image';
     }
     
     return 'none';
@@ -599,10 +559,14 @@ const Browse: React.FC = () => {
   if (loading) {
     return (
       <MarketplaceLayout>
-        <div className="min-h-screen flex items-center justify-center">
+        <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center p-4">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600 text-lg">Loading listings...</p>
+            <div className="relative">
+              <div className="absolute inset-0 animate-ping bg-yellow-400 opacity-20 rounded-full"></div>
+              <div className="relative animate-spin rounded-full h-20 w-20 border-4 border-yellow-600 border-t-transparent mx-auto"></div>
+            </div>
+            <p className="mt-6 text-gray-700 text-lg font-medium">Loading amazing content...</p>
+            <p className="mt-2 text-gray-500 text-sm">Discovering the best videos and creative assets</p>
           </div>
         </div>
       </MarketplaceLayout>
@@ -611,21 +575,25 @@ const Browse: React.FC = () => {
 
   return (
     <MarketplaceLayout>
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Error Banner */}
           {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="mb-6 bg-gradient-to-r from-red-50 to-red-100 border-l-4 border-red-500 rounded-r-lg shadow-lg p-4 animate-slideIn">
               <div className="flex items-center gap-3">
-                <FiAlertCircle className="text-red-500 flex-shrink-0" size={20} />
+                <div className="flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                    <FiAlertCircle className="text-red-600" size={20} />
+                  </div>
+                </div>
                 <div className="flex-1">
                   <p className="text-red-800 text-sm font-medium">{error}</p>
                 </div>
                 <button
                   onClick={() => setError('')}
-                  className="text-red-500 hover:text-red-700 p-1"
+                  className="text-red-500 hover:text-red-700 p-1 transition-colors"
                 >
-                  <FiX size={16} />
+                  <FiX size={18} />
                 </button>
               </div>
             </div>
@@ -633,11 +601,13 @@ const Browse: React.FC = () => {
 
           {/* Header Section */}
           <div className="mb-8">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Video Marketplace</h1>
-                <p className="mt-2 text-gray-600">
-                  Discover amazing video content, scripts, and creative assets
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+              <div className="space-y-2">
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-yellow-600 bg-clip-text text-transparent">
+                  Video Marketplace
+                </h1>
+                <p className="text-gray-600 text-lg max-w-2xl">
+                  Discover premium video content, scripts, and creative assets from talented creators worldwide
                 </p>
               </div>
               
@@ -646,73 +616,87 @@ const Browse: React.FC = () => {
                   <>
                     <button 
                       onClick={() => navigate('/marketplace/create')}
-                      className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                      className="group relative inline-flex items-center justify-center px-5 py-3 bg-gradient-to-r from-yellow-600 to-yellow-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
                     >
-                      <FiPlus className="mr-2" size={18} />
-                      <span className="hidden sm:inline">Create Listing</span>
-                      <span className="sm:hidden">Create</span>
+                      <div className="absolute inset-0 bg-gradient-to-r from-yellow-700 to-yellow-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                      <FiPlus className="relative mr-2" size={18} />
+                      <span className="relative">Create Listing</span>
                     </button>
                     <button 
                       onClick={() => navigate('/marketplace/my-orders')}
-                      className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                      className="inline-flex items-center justify-center px-5 py-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-xl bg-white hover:bg-gray-50 shadow-sm hover:shadow transition-all duration-200"
                     >
                       <FiCreditCard className="mr-2" size={18} />
-                      <span className="hidden sm:inline">My Offers</span>
-                      <span className="sm:hidden">Offers</span>
+                      My Offers
                     </button>
                   </>
                 )}
                 
                 <button 
                   onClick={() => setShowFilters(!showFilters)}
-                  className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                  className="inline-flex items-center justify-center px-5 py-3 border-2 border-gray-300 text-gray-700 font-semibold rounded-xl bg-white hover:bg-gray-50 shadow-sm hover:shadow transition-all duration-200"
                 >
                   <FiFilter className="mr-2" size={18} />
-                  <span className="hidden sm:inline">Filters</span>
-                  <span className="sm:hidden">Filter</span>
+                  {showFilters ? 'Hide Filters' : 'Show Filters'}
                 </button>
               </div>
             </div>
 
             {/* Search Bar */}
-            <div className="mt-6 max-w-2xl">
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FiSearch className="text-gray-400" size={20} />
+            <div className="mt-8 max-w-3xl mx-auto">
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <FiSearch className="text-gray-400 group-focus-within:text-yellow-600 transition-colors" size={20} />
                 </div>
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search videos, scripts, or creative assets..."
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm sm:text-base"
+                  placeholder="Search videos, scripts, music, animation, or creative assets..."
+                  className="block w-full pl-12 pr-4 py-4 border-2 border-gray-300 rounded-2xl bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 shadow-sm hover:shadow transition-all duration-200 text-base"
                 />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <FiX size={18} />
+                  </button>
+                )}
               </div>
             </div>
           </div>
 
           {/* Filters Section */}
           {showFilters && (
-            <div className="mb-8 bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Filters</h3>
+            <div className="mb-8 bg-white rounded-2xl shadow-lg border border-gray-200 p-6 animate-fadeIn">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-yellow-50 to-yellow-100 flex items-center justify-center">
+                    <FiFilter className="text-yellow-600" size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Advanced Filters</h3>
+                    <p className="text-gray-600 text-sm">Refine your search to find exactly what you need</p>
+                  </div>
+                </div>
                 <button
                   onClick={clearFilters}
-                  className="text-sm text-yellow-600 hover:text-yellow-500 font-medium"
+                  className="px-4 py-2 text-sm font-medium text-yellow-600 hover:text-yellow-700 bg-gradient-to-r from-yellow-50 to-yellow-100 hover:from-yellow-100 hover:to-yellow-200 rounded-lg transition-all duration-200"
                 >
-                  Clear all
+                  Clear all filters
                 </button>
               </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-800">
                     Listing Type
                   </label>
                   <select 
                     value={filters.type}
                     onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none text-sm transition-all duration-200 bg-white hover:border-gray-400"
                   >
                     <option value="">All Types</option>
                     <option value="for_sale">For Sale</option>
@@ -722,8 +706,8 @@ const Browse: React.FC = () => {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-800">
                     Category
                   </label>
                   <input
@@ -731,31 +715,34 @@ const Browse: React.FC = () => {
                     value={filters.category}
                     onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
                     placeholder="Video, Script, Music, Animation..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none text-sm transition-all duration-200 bg-white hover:border-gray-400"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-800">
                     Min Price
                   </label>
-                  <input
-                    type="number"
-                    placeholder="$0"
-                    value={filters.minPrice}
-                    onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm"
-                  />
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      value={filters.minPrice}
+                      onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))}
+                      className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none text-sm transition-all duration-200 bg-white hover:border-gray-400"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-800">
                     Sort By
                   </label>
                   <select 
                     value={filters.sortBy}
                     onChange={(e) => setFilters(prev => ({ ...prev, sortBy: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none text-sm transition-all duration-200 bg-white hover:border-gray-400"
                   >
                     <option value="newest">Newest First</option>
                     <option value="oldest">Oldest First</option>
@@ -769,137 +756,138 @@ const Browse: React.FC = () => {
           )}
 
           {/* Results Count */}
-          <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <p className="text-gray-600 text-sm sm:text-base">
-              Showing <span className="font-semibold">{filteredListings.length}</span> listings
+          <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="px-4 py-2 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-xl">
+                <p className="text-gray-800 text-sm font-semibold">
+                  Showing <span className="text-yellow-700">{filteredListings.length}</span> listings
+                  {searchQuery && (
+                    <span> for "<span className="text-yellow-700">{searchQuery}</span>"</span>
+                  )}
+                </p>
+              </div>
               {searchQuery && (
-                <span> for "<span className="font-semibold">{searchQuery}</span>"</span>
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="text-sm text-yellow-600 hover:text-yellow-700 font-medium flex items-center gap-1 transition-colors"
+                >
+                  <FiX size={14} />
+                  Clear search
+                </button>
               )}
-            </p>
+            </div>
             
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="text-sm text-yellow-600 hover:text-yellow-500 font-medium self-start sm:self-auto"
-              >
-                Clear search
-              </button>
-            )}
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <FiEye size={14} />
+              <span>Discover amazing content from creative professionals</span>
+            </div>
           </div>
 
-          {/* Listings Grid - 3 PER ROW */}
+          {/* Listings Grid */}
           {filteredListings.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 sm:p-12 text-center">
+            <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-xl border border-gray-200 p-12 text-center">
               <div className="max-w-md mx-auto">
-                <div className="w-16 h-16 sm:w-24 sm:h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                  <FiSearch size={24} className="text-gray-400 sm:w-8 sm:h-8" />
+                <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-full flex items-center justify-center shadow-inner">
+                  <FiSearch size={32} className="text-yellow-600" />
                 </div>
-                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">
                   {searchQuery || Object.values(filters).some(Boolean) 
                     ? 'No listings found' 
-                    : 'No listings yet'
+                    : 'Welcome to the Marketplace!'
                   }
                 </h3>
-                <p className="text-gray-600 text-sm sm:text-base mb-6">
+                <p className="text-gray-600 text-base mb-8">
                   {searchQuery || Object.values(filters).some(Boolean)
                     ? 'Try adjusting your search or filters to find what you\'re looking for.'
-                    : 'Be the first to create a listing and start trading!'
+                    : 'Be the first to create a listing and start trading amazing content!'
                   }
                 </p>
                 {marketplaceApi.utils.checkAuth() && (
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <button 
                       onClick={() => navigate('/marketplace/create')}
-                      className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-transparent text-sm sm:text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                      className="inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-yellow-600 to-yellow-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
                     >
                       <FiPlus className="mr-2" size={18} />
-                      Create First Listing
+                      Create Your First Listing
                     </button>
                   </div>
                 )}
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredListings.map(listing => {
                 const thumbnailUrl = getThumbnailUrl(listing);
                 const videoUrl = getFirstVideoUrl(listing);
                 const mediaType = getMediaType(listing);
                 const isVideo = mediaType === 'video';
                 
-                console.log(`\n🎬 Rendering: ${listing.title}`);
-                console.log(`   Thumbnail URL: ${thumbnailUrl}`);
-                console.log(`   Video URL: ${videoUrl}`);
-                console.log(`   Is Video? ${isVideo}`);
-                
                 return (
-                  <div key={listing._id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 border border-gray-200 group">
+                  <div key={listing._id} className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-200 overflow-hidden hover:-translate-y-1">
                     {/* Video/Image Preview */}
-                    <div 
-                      className="relative h-48 bg-gray-900 cursor-pointer overflow-hidden"
-                      onClick={() => {
-                        if (isVideo && videoUrl) {
-                          handleVideoClick(videoUrl, listing.title, listing);
-                        }
-                      }}
-                    >
-                      {/* Thumbnail Image with fallback */}
+                    <div className="relative h-56 bg-gradient-to-br from-gray-900 to-black overflow-hidden">
+                      {/* Thumbnail Image */}
                       <div className="relative w-full h-full">
                         <img
                           src={thumbnailUrl}
                           alt={listing.title}
-                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          onError={(e) => {
-                            console.error('❌ Image load error:', thumbnailUrl);
-                            handleImageError(listing._id);
-                          }}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          onError={() => handleImageError(listing._id)}
                           loading="lazy"
                         />
                         
-                        {/* Loading skeleton */}
-                        <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>
+                        {/* Gradient Overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent"></div>
                         
                         {/* Play Button Overlay for Videos */}
-                        {isVideo && videoUrl && (
-                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                            <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-2 border-white/30 transform group-hover:scale-110 transition-transform duration-300">
-                              <FiPlay className="text-white ml-1" size={28} />
-                            </div>
-                            <div className="absolute bottom-2 left-2 text-white text-xs bg-black/50 px-2 py-1 rounded">
-                              Click to play
+                        {isVideo && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="relative group/play">
+                              <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/20 to-yellow-600/20 rounded-full blur-xl group-hover/play:blur-2xl transition-all duration-300"></div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleVideoClick(videoUrl, listing.title, listing);
+                                }}
+                                className="relative w-16 h-16 rounded-full bg-gradient-to-r from-yellow-600 to-yellow-500 flex items-center justify-center border-4 border-white/30 shadow-2xl transform group-hover/play:scale-110 transition-all duration-300"
+                              >
+                                <FiPlay className="text-white ml-1" size={24} />
+                              </button>
                             </div>
                           </div>
                         )}
                         
                         {/* Media Type Badge */}
-                        <div className={`absolute top-2 right-2 text-white text-xs px-2 py-1 rounded-md flex items-center gap-1 backdrop-blur-sm ${isVideo ? 'bg-red-500/80' : mediaType === 'image' ? 'bg-blue-500/80' : 'bg-gray-500/80'}`}>
+                        <div className={`absolute top-4 right-4 text-white text-xs font-semibold px-3 py-1.5 rounded-full backdrop-blur-md ${isVideo ? 'bg-gradient-to-r from-red-500/90 to-red-600/90' : mediaType === 'image' ? 'bg-gradient-to-r from-blue-500/90 to-blue-600/90' : 'bg-gradient-to-r from-gray-600/90 to-gray-700/90'}`}>
                           {isVideo ? (
-                            <>
-                              <FiVideo size={10} />
-                              VIDEO
-                            </>
+                            <div className="flex items-center gap-1.5">
+                              <FiVideo size={12} />
+                              VIDEO CONTENT
+                            </div>
                           ) : mediaType === 'image' ? (
-                            <>
-                              <FiImage size={10} />
+                            <div className="flex items-center gap-1.5">
+                              <FiImage size={12} />
                               IMAGE
-                            </>
+                            </div>
                           ) : (
-                            <>
-                              <FiImage size={10} />
+                            <div className="flex items-center gap-1.5">
+                              <FiImage size={12} />
                               MEDIA
-                            </>
+                            </div>
                           )}
                         </div>
                       </div>
                       
                       {/* Category Badge */}
-                      <div className="absolute bottom-2 left-2">
-                        <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded-md backdrop-blur-sm bg-yellow-500/90">
+                      <div className="absolute bottom-4 left-4">
+                        <span className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg">
                           {listing.category}
                         </span>
                       </div>
                     </div>
 
+                    
                     {/* Content */}
                     <div className="p-4">
                       <div className="flex justify-between items-start mb-2">
@@ -953,6 +941,7 @@ const Browse: React.FC = () => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              console.log('▶️ Play button clicked for:', listing.title);
                               handleVideoClick(videoUrl, listing.title, listing);
                             }}
                             className="px-3 bg-gray-800 hover:bg-gray-900 text-white text-sm py-2 rounded-md transition-colors duration-200 flex items-center gap-2 group/play"
