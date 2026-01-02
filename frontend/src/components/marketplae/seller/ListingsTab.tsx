@@ -1,582 +1,953 @@
-// src/components/marketplae/seller/ListingsTab.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import MarketplaceLayout from '../../components/Layout';
+import { Listing } from '../../types/marketplace';
+import { 
+  FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiAlertCircle, 
+  FiLoader, FiUser, FiPlay, FiClock, FiShoppingBag, FiTag,
+  FiTarget, FiTrendingUp, FiDollarSign, FiEye, FiHeart, FiVideo,
+  FiImage, FiFileText
+} from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
+import marketplaceApi from '../../api/marketplaceApi';
+import VideoPlayerModal from '../../components/marketplae/VideoPlayerModal';
+import PaymentModal from '../../components/marketplae/PaymentModal';
+import OfferModal from '../../components/marketplae/OfferModal';
 
-interface Listing {
-  _id: string;
-  title: string;
-  description: string;
-  price: number;
-  type: string;
-  category: string;
-  tags: string[];
-  mediaUrls: string[];
-  status: 'active' | 'inactive' | 'draft' | 'sold';
-  views?: number;
-  sellerId: {
-    _id: string;
-    username: string;
-  };
-  createdAt: string;
-  updatedAt: string;
-}
+// Constants for placeholder images
+const VIDEO_PLACEHOLDER = 'https://images.unsplash.com/photo-1579546929662-711aa81148cf?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
+const DEFAULT_THUMBNAIL = 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
 
-interface ListingsData {
-  listings: Listing[];
-  pagination?: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
-}
+const Browse: React.FC = () => {
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [showOfferModal, setShowOfferModal] = useState<boolean>(false);
+  const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
+  const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
+  const [clientSecret, setClientSecret] = useState<string>('');
+  const [offerData, setOfferData] = useState<any>(null);
+  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [error, setError] = useState<string>('');
+  const [showVideoPopup, setShowVideoPopup] = useState<boolean>(false);
+  const [selectedVideo, setSelectedVideo] = useState<string>('');
+  const [videoTitle, setVideoTitle] = useState<string>('');
+  const [videoListing, setVideoListing] = useState<Listing | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string>('');
+  
+  // Image loading states
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+  const [imageLoading, setImageLoading] = useState<Record<string, boolean>>({});
+  const navigate = useNavigate();
 
-interface ListingsTabProps {
-  listingsData: ListingsData | null;
-  loading: boolean;
-  statusFilter: string;
-  currentPage: number;
-  onStatusFilterChange: (status: string) => void;
-  onPageChange: (page: number) => void;
-  onEditListing: (listing: Listing) => void;
-  onDeleteListing: (listing: Listing) => void;
-  onToggleStatus: (listing: Listing) => void;
-  onPlayVideo: (videoUrl: string, title: string) => void;
-  onRefresh: () => void;
-  actionLoading: string | null;
-  onCreateListing: () => void;
-}
+  const [filters, setFilters] = useState({
+    type: '',
+    category: '',
+    minPrice: '',
+    maxPrice: '',
+    sortBy: 'latest'
+  });
 
-const ListingsTab: React.FC<ListingsTabProps> = ({
-  listingsData,
-  loading,
-  statusFilter,
-  currentPage,
-  onStatusFilterChange,
-  onPageChange,
-  onEditListing,
-  onDeleteListing,
-  onToggleStatus,
-  onPlayVideo,
-  onRefresh,
-  actionLoading,
-  onCreateListing
-}) => {
-  const [hoveredListing, setHoveredListing] = useState<string | null>(null);
-  const [confirmToggle, setConfirmToggle] = useState<string | null>(null);
+  const [offerForm, setOfferForm] = useState({
+    amount: '',
+    message: '',
+    requirements: '',
+    expectedDelivery: ''
+  });
 
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-    }).format(amount || 0);
-  };
+  // Fetch listings and user data
+  useEffect(() => {
+    fetchListings();
+    fetchCurrentUser();
+  }, [filters]);
 
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) {
-      return 'Today';
-    } else if (diffDays === 1) {
-      return 'Yesterday';
-    } else if (diffDays < 7) {
-      return `${diffDays} days ago`;
-    } else {
-      return date.toLocaleDateString('en-IN', {
-        day: 'numeric',
-        month: 'short',
-        year: diffDays > 365 ? 'numeric' : undefined
-      });
+  const fetchCurrentUser = async () => {
+    try {
+      const user = marketplaceApi.utils.getCurrentUser();
+      if (user) {
+        setCurrentUser(user);
+      }
+    } catch (error) {
+      console.error('Error fetching current user:', error);
     }
   };
 
-  const getStatusColor = (status: string): { bg: string; text: string; border: string; icon: string } => {
-    switch (status?.toLowerCase()) {
-      case 'active':
-        return {
-          bg: 'bg-green-50',
-          text: 'text-green-700',
-          border: 'border-green-200',
-          icon: '🟢'
-        };
-      case 'inactive':
-        return {
-          bg: 'bg-gray-50',
-          text: 'text-gray-700',
-          border: 'border-gray-200',
-          icon: '⚫'
-        };
-      case 'sold':
-        return {
-          bg: 'bg-blue-50',
-          text: 'text-blue-700',
-          border: 'border-blue-200',
-          icon: '💰'
-        };
-      case 'draft':
-        return {
-          bg: 'bg-yellow-50',
-          text: 'text-yellow-700',
-          border: 'border-yellow-200',
-          icon: '📝'
-        };
+  const fetchListings = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setImageErrors({});
+      setImageLoading({});
+      
+      const params: any = {};
+      
+      if (filters.type) params.type = filters.type;
+      if (filters.category) params.category = filters.category;
+      if (filters.minPrice) params.minPrice = parseFloat(filters.minPrice);
+      if (filters.maxPrice) params.maxPrice = parseFloat(filters.maxPrice);
+      if (filters.sortBy) params.sortBy = filters.sortBy;
+      if (searchQuery) params.search = searchQuery;
+      
+      const response = await marketplaceApi.listings.getAllListings(params);
+      
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to fetch listings');
+      }
+
+      const listingsData = response.data?.listings || [];
+      
+      // Apply local filtering
+      let filteredData = listingsData;
+      
+      if (activeCategory && activeCategory !== 'all') {
+        filteredData = filteredData.filter((listing: Listing) => 
+          listing.category?.toLowerCase() === activeCategory.toLowerCase()
+        );
+      }
+      
+      // Filter by status - only show active listings
+      filteredData = filteredData.filter((listing: Listing) => 
+        listing.status === 'active'
+      );
+
+      const sortedData = sortListings(filteredData, filters.sortBy);
+      
+      setListings(sortedData);
+      
+    } catch (error: any) {
+      console.error('Error fetching listings:', error);
+      setError(error.message || 'Failed to load listings. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sortListings = (data: Listing[], sortBy: string) => {
+    const sortedData = [...data];
+    
+    switch (sortBy) {
+      case 'latest':
+        return sortedData.sort((a, b) => 
+          new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime()
+        );
+      case 'price_low':
+        return sortedData.sort((a, b) => (a.price || 0) - (b.price || 0));
+      case 'price_high':
+        return sortedData.sort((a, b) => (b.price || 0) - (a.price || 0));
+      case 'popular':
+        return sortedData.sort((a, b) => {
+          const viewsA = a.views || 0;
+          const viewsB = b.views || 0;
+          return viewsB - viewsA;
+        });
       default:
-        return {
-          bg: 'bg-gray-50',
-          text: 'text-gray-700',
-          border: 'border-gray-200',
-          icon: '❓'
-        };
+        return sortedData;
     }
+  };
+
+  const handleViewDetails = (listingId: string) => {
+    navigate(`/marketplace/listings/${listingId}`);
+  };
+
+  const handleMakeOffer = (listing: Listing) => {
+    setSelectedListing(listing);
+    setOfferForm({
+      amount: listing.price.toString(),
+      message: '',
+      requirements: '',
+      expectedDelivery: ''
+    });
+    setShowOfferModal(true);
+    setError('');
+  };
+
+  const handleVideoClick = (videoUrl: string, title: string, listing: Listing) => {
+    setSelectedVideo(videoUrl);
+    setVideoTitle(title);
+    setVideoListing(listing);
+    setShowVideoPopup(true);
+  };
+
+  const handleCloseVideoPopup = () => {
+    setShowVideoPopup(false);
+    setSelectedVideo('');
+    setVideoTitle('');
+    setVideoListing(null);
+  };
+
+  const handleOfferFormChange = (field: string, value: string) => {
+    setOfferForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleSubmitOffer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedListing) return;
+
+    try {
+      setPaymentStatus('processing');
+      setError('');
+      
+      const response = await marketplaceApi.offers.makeOffer({
+        listingId: selectedListing._id,
+        amount: parseFloat(offerForm.amount),
+        message: offerForm.message,
+        requirements: offerForm.requirements,
+        expectedDelivery: offerForm.expectedDelivery
+      });
+
+      if (!response.success || !response.data?.clientSecret) {
+        throw new Error(response.error || 'No client secret received from server. Please try again.');
+      }
+
+      setClientSecret(response.data.clientSecret);
+      
+      setOfferData({
+        ...response.data,
+        type: 'offer',
+        amount: parseFloat(offerForm.amount),
+        offer: response.data.offer
+      });
+      
+      setShowOfferModal(false);
+      setShowPaymentModal(true);
+      setPaymentStatus('idle');
+      
+    } catch (error: any) {
+      console.error('❌ Error submitting offer with payment:', error);
+      setPaymentStatus('failed');
+      
+      const errorMessage = error.message || 
+                        error.error || 
+                        'Failed to submit offer';
+      
+      setError(errorMessage);
+    }
+  };
+
+  const handleDirectPayment = async (listing: Listing) => {
+    if (!listing._id) return;
+
+    try {
+      setPaymentStatus('processing');
+      setError('');
+      
+      const response = await marketplaceApi.offers.createDirectPayment(
+        listing._id,
+        ''
+      );
+
+      if (!response.success || !response.data?.clientSecret) {
+        throw new Error(response.error || 'No client secret received from server. Please try again.');
+      }
+
+      setClientSecret(response.data.clientSecret);
+      
+      setOfferData({
+        ...response.data,
+        type: 'direct_purchase',
+        amount: listing.price,
+        listing: listing,
+        order: response.data.order
+      });
+      
+      setShowPaymentModal(true);
+      setPaymentStatus('idle');
+      
+    } catch (error: any) {
+      console.error('❌ Error creating direct payment:', error);
+      setPaymentStatus('failed');
+      
+      const errorMessage = error.message || 
+                        error.error || 
+                        'Failed to initiate payment';
+      
+      setError(errorMessage);
+    }
+  };
+  
+  const handlePaymentSuccess = async () => {
+    try {
+      const user = marketplaceApi.utils.getCurrentUser();
+      console.log('✅ Payment completed successfully for:', {
+        buyerName: user?.username || 'A buyer',
+        type: offerData?.type,
+        amount: offerData?.amount
+      });
+
+    } catch (error) {
+      console.error('Error in payment success handling:', error);
+    }
+
+    setShowPaymentModal(false);
+    setSelectedListing(null);
+    setClientSecret('');
+    setOfferData(null);
+    setPaymentStatus('success');
+    
+    navigate('/marketplace/my-orders', { 
+      state: { 
+        message: 'Payment completed successfully! Your order has been placed.',
+        type: 'success'
+      } 
+    });
+  };
+
+  const handlePaymentClose = () => {
+    setShowPaymentModal(false);
+    setSelectedListing(null);
+    setClientSecret('');
+    setOfferData(null);
+    setPaymentStatus('idle');
+    setError('');
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      type: '',
+      category: '',
+      minPrice: '',
+      maxPrice: '',
+      sortBy: 'latest'
+    });
+    setSearchQuery('');
+    setActiveCategory('');
+    setError('');
   };
 
   const isVideoUrl = (url: string): boolean => {
-    if (!url) return false;
-    const videoExtensions = ['.mp4', '.mov', '.avi', '.wmv', '.flv', '.mkv', '.webm'];
-    const urlLower = url.toLowerCase();
-    return videoExtensions.some(ext => urlLower.endsWith(ext));
+    if (!url || typeof url !== 'string') return false;
+    
+    const videoExtensions = /\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v|ogg|ogv|3gp|3g2)$/i;
+    
+    if (videoExtensions.test(url)) {
+      return true;
+    }
+    
+    if (url.includes('cloudinary.com') && url.includes('/video/')) {
+      return true;
+    }
+    
+    if (url.includes('/video/') || url.includes('.mp4') || url.includes('.mov')) {
+      return true;
+    }
+    
+    return false;
   };
 
   const isImageUrl = (url: string): boolean => {
-    if (!url) return false;
-    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'];
-    const urlLower = url.toLowerCase();
-    return imageExtensions.some(ext => urlLower.endsWith(ext));
+    if (!url || typeof url !== 'string') return false;
+    
+    const imageExtensions = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i;
+    return imageExtensions.test(url);
   };
 
-  const getFirstMediaUrl = (mediaUrls: string[]): { url: string; isVideo: boolean; isImage: boolean } => {
-    if (!mediaUrls || mediaUrls.length === 0) {
-      return { url: '', isVideo: false, isImage: false };
+  const getFirstVideoUrl = (listing: Listing): string => {
+    if (!listing.mediaUrls || listing.mediaUrls.length === 0) return '';
+    
+    const videoUrl = listing.mediaUrls.find(url => isVideoUrl(url));
+    if (videoUrl) return videoUrl;
+    
+    if (listing.videoUrl && isVideoUrl(listing.videoUrl)) {
+      return listing.videoUrl;
     }
     
-    // Try to find an image first
-    for (const url of mediaUrls) {
-      if (isImageUrl(url)) {
-        return { url, isVideo: false, isImage: true };
-      }
-    }
-    
-    // Then try to find a video
-    for (const url of mediaUrls) {
-      if (isVideoUrl(url)) {
-        return { url, isVideo: true, isImage: false };
-      }
-    }
-    
-    // Return first URL as fallback
-    return { url: mediaUrls[0], isVideo: isVideoUrl(mediaUrls[0]), isImage: isImageUrl(mediaUrls[0]) };
+    return '';
   };
 
-  const getStatusTooltip = (status: string): string => {
-    switch (status?.toLowerCase()) {
-      case 'active': return 'This listing is visible to buyers';
-      case 'inactive': return 'This listing is hidden from buyers';
-      case 'sold': return 'This item has been sold';
-      case 'draft': return 'This listing is not published yet';
-      default: return 'Unknown status';
-    }
+  const getFirstImageUrl = (listing: Listing): string => {
+    if (!listing.mediaUrls || listing.mediaUrls.length === 0) return '';
+    
+    const imageUrl = listing.mediaUrls.find(url => isImageUrl(url));
+    if (imageUrl) return imageUrl;
+    
+    return '';
   };
 
-  const getToggleButtonText = (status: string): { text: string; color: string; hoverColor: string; icon: string } => {
-    switch (status?.toLowerCase()) {
-      case 'active':
-        return {
-          text: 'Deactivate',
-          color: 'bg-red-600 hover:bg-red-700',
-          hoverColor: 'hover:bg-red-700',
-          icon: '⏸️'
-        };
-      case 'inactive':
-        return {
-          text: 'Activate',
-          color: 'bg-green-600 hover:bg-green-700',
-          hoverColor: 'hover:bg-green-700',
-          icon: '▶️'
-        };
-      case 'draft':
-        return {
-          text: 'Publish',
-          color: 'bg-blue-600 hover:bg-blue-700',
-          hoverColor: 'hover:bg-blue-700',
-          icon: '📤'
-        };
+  const getMediaType = (listing: Listing): 'video' | 'image' | 'document' | 'none' => {
+    if (!listing.mediaUrls || listing.mediaUrls.length === 0) {
+      return 'none';
+    }
+    
+    if (listing.mediaUrls.some(url => isVideoUrl(url))) {
+      return 'video';
+    }
+    
+    if (listing.mediaUrls.some(url => isImageUrl(url))) {
+      return 'image';
+    }
+    
+    return 'document';
+  };
+
+  const getThumbnailUrl = (listing: Listing): string => {
+    const listingId = listing._id || 'unknown';
+    
+    if (imageErrors[listingId]) {
+      return DEFAULT_THUMBNAIL;
+    }
+    
+    // Use listing thumbnail if available
+    if (listing.thumbnail && listing.thumbnail.trim() !== '') {
+      return listing.thumbnail;
+    }
+    
+    // Use first image from mediaUrls
+    const imageUrl = getFirstImageUrl(listing);
+    if (imageUrl) {
+      return imageUrl;
+    }
+    
+    // For videos, return video placeholder
+    if (getMediaType(listing) === 'video') {
+      return VIDEO_PLACEHOLDER;
+    }
+    
+    return DEFAULT_THUMBNAIL;
+  };
+
+  const handleImageError = (listingId: string) => {
+    setImageErrors(prev => ({
+      ...prev,
+      [listingId]: true
+    }));
+  };
+
+  const handleImageLoad = (listingId: string) => {
+    setImageLoading(prev => ({
+      ...prev,
+      [listingId]: false
+    }));
+  };
+
+  const getQualityBadge = (quality?: string) => {
+    if (!quality) return { color: 'bg-gradient-to-r from-yellow-400 to-yellow-300 text-gray-800', label: '' };
+    
+    switch (quality.toLowerCase()) {
+      case '4k':
+      case 'ultra hd':
+        return { color: 'bg-gradient-to-r from-yellow-500 to-amber-500 text-white', label: '4K' };
+      case 'hd':
+      case '1080p':
+        return { color: 'bg-gradient-to-r from-blue-500 to-blue-400 text-white', label: 'HD' };
+      case 'sd':
+      case 'standard':
+        return { color: 'bg-gradient-to-r from-gray-500 to-gray-400 text-white', label: 'SD' };
       default:
-        return {
-          text: 'Toggle',
-          color: 'bg-gray-600 hover:bg-gray-700',
-          hoverColor: 'hover:bg-gray-700',
-          icon: '🔄'
-        };
+        return { color: 'bg-gradient-to-r from-yellow-400 to-yellow-300 text-gray-800', label: '' };
     }
   };
 
-  const handleToggleClick = (listing: Listing) => {
-    if (confirmToggle === listing._id) {
-      onToggleStatus(listing);
-      setConfirmToggle(null);
-    } else {
-      setConfirmToggle(listing._id);
-      // Auto-cancel confirmation after 5 seconds
-      setTimeout(() => {
-        setConfirmToggle(null);
-      }, 5000);
-    }
-  };
+  // Handle search with debounce
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      if (!loading) {
+        fetchListings();
+      }
+    }, 500);
 
-  const handleConfirmToggle = (listing: Listing) => {
-    onToggleStatus(listing);
-    setConfirmToggle(null);
-  };
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
 
-  const handleCancelToggle = () => {
-    setConfirmToggle(null);
-  };
-
-  const listings = listingsData?.listings || [];
-  const pagination = listingsData?.pagination;
-
-  // Calculate stats
-  const activeCount = listings.filter(l => l.status === 'active').length;
-  const inactiveCount = listings.filter(l => l.status === 'inactive').length;
-  const draftCount = listings.filter(l => l.status === 'draft').length;
-  const soldCount = listings.filter(l => l.status === 'sold').length;
-
-  return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-      <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">My Listings</h2>
-            <p className="text-sm text-gray-600 mt-1">Manage all your listings in one place</p>
-            
-            {/* Status Stats */}
-            <div className="flex flex-wrap gap-3 mt-3">
-              <div className="flex items-center">
-                <span className="flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
-                  <span className="mr-1">🟢</span> {activeCount} Active
-                </span>
-              </div>
-              <div className="flex items-center">
-                <span className="flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
-                  <span className="mr-1">⚫</span> {inactiveCount} Inactive
-                </span>
-              </div>
-              {/* <div className="flex items-center">
-                <span className="flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
-                  <span className="mr-1">📝</span> {draftCount} Draft
-                </span>
-              </div> */}
-              {/* <div className="flex items-center">
-                <span className="flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
-                  <span className="mr-1">💰</span> {soldCount} Sold
-                </span>
-              </div> */}
+  // Loading state
+  if (loading) {
+    return (
+      <MarketplaceLayout>
+        <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center p-4">
+          <div className="text-center">
+            <div className="relative inline-block">
+              <div className="absolute inset-0 animate-pulse bg-yellow-400 opacity-20 rounded-full blur-xl"></div>
+              <div className="relative animate-spin rounded-full h-24 w-24 border-4 border-transparent border-t-yellow-500 border-r-amber-500 mx-auto"></div>
             </div>
-          </div>
-          
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Status Filter */}
-            <div className="relative">
-              <select
-                value={statusFilter}
-                onChange={(e) => onStatusFilterChange(e.target.value)}
-                className="appearance-none bg-white border border-gray-300 rounded-lg pl-4 pr-10 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer hover:border-gray-400 transition-colors"
-              >
-                <option value="">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                {/* <option value="sold">Sold</option> */}
-                {/* <option value="draft">Draft</option> */}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-            
-            {/* Create Listing Button */}
-            <button
-              onClick={onCreateListing}
-              className="inline-flex items-center px-4 py-2.5 bg-gradient-to-r from-yellow-600 to-yellow-700 text-white font-medium rounded-lg hover:from-yellow-700 hover:to-yellow-800 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-            >
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              New Listing
-            </button>
-            
-            {/* Refresh Button */}
-            <button
-              onClick={onRefresh}
-              disabled={loading || actionLoading !== null}
-              className="inline-flex items-center px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:border-gray-400"
-            >
-              <svg className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              {loading ? 'Loading...' : 'Refresh'}
-            </button>
+            <p className="mt-8 text-gray-900 text-xl font-bold tracking-wider">LOADING VIDEO CONTENT</p>
+            <p className="mt-2 text-gray-600 text-sm">Discovering premium videos and creative assets</p>
           </div>
         </div>
-      </div>
-      
-      <div className="p-6">
-        {listings.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4 text-gray-300">🏠</div>
-            <h3 className="text-lg font-medium text-gray-900">No listings found</h3>
-            <p className="mt-2 text-gray-500">
-              {statusFilter 
-                ? `You don't have any ${statusFilter} listings.`
-                : "You haven't created any listings yet."}
-            </p>
-            <button
-              onClick={onCreateListing}
-              className="mt-4 inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-            >
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Create Your First Listing
-            </button>
-          </div>
-        ) : (
-          <>
-            {/* Listings Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-              {listings.map(listing => {
-                const { url: mediaUrl, isVideo, isImage } = getFirstMediaUrl(listing.mediaUrls);
-                const isProcessing = actionLoading === listing._id;
-                const isToggleProcessing = isProcessing;
-                const toggleButton = getToggleButtonText(listing.status);
-                const statusColor = getStatusColor(listing.status);
+      </MarketplaceLayout>
+    );
+  }
+
+  return (
+    <MarketplaceLayout>
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-8">
+        {/* Animated Background Effects */}
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-1/4 w-72 h-72 bg-yellow-100 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"></div>
+          <div className="absolute bottom-0 right-1/4 w-72 h-72 bg-amber-100 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse delay-1000"></div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          {/* Error Banner */}
+          {error && (
+            <div className="mb-6 bg-gradient-to-r from-yellow-50 to-amber-50 backdrop-blur-xl border-l-4 border-yellow-500 rounded-r-lg shadow-lg p-6 animate-slideIn">
+              <div className="flex items-center gap-4">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-r from-yellow-400 to-amber-400 flex items-center justify-center animate-pulse">
+                    <FiAlertCircle className="text-white" size={24} />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <p className="text-gray-900 text-lg font-bold">⚠️ {error}</p>
+                </div>
+                <button
+                  onClick={() => setError('')}
+                  className="text-yellow-600 hover:text-yellow-800 p-2 hover:bg-yellow-100 rounded-lg transition-all"
+                >
+                  <FiX size={20} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Header Section */}
+          <div className="mb-10">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+              <div className="space-y-4">
+                <h1 className="text-4xl md:text-5xl font-bold text-gray-900">
+                  Video Marketplace
+                </h1>
+                <p className="text-gray-600 text-lg max-w-2xl">
+                  Buy and sell premium video content. High-quality videos, instant delivery, commercial rights.
+                </p>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-3">
+                {marketplaceApi.utils.checkAuth() && (
+                  <>
+                    <button 
+                      onClick={() => navigate('/marketplace/create')}
+                      className="group relative inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-yellow-500 via-yellow-400 to-yellow-300 text-gray-800 font-semibold rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 overflow-hidden border border-yellow-200"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 via-yellow-300 to-yellow-200 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+                      <FiPlus className="relative mr-2" size={18} />
+                      <span className="relative">Upload Video</span>
+                    </button>
+                    <button 
+                      onClick={() => navigate('/marketplace/my-orders')}
+                      className="inline-flex items-center justify-center px-5 py-3 border border-gray-300 text-gray-700 font-semibold rounded-xl bg-white hover:bg-gray-50 shadow-sm hover:shadow transition-all duration-200"
+                    >
+                      <FiCreditCard className="mr-2" size={18} />
+                      My Orders
+                    </button>
+                  </>
+                )}
                 
-                return (
-                  <div 
-                    key={listing._id} 
-                    className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-xl transition-all duration-300 group bg-white"
-                    onMouseEnter={() => setHoveredListing(listing._id)}
-                    onMouseLeave={() => setHoveredListing(null)}
+                <button 
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="inline-flex items-center justify-center px-5 py-3 border border-gray-300 text-gray-700 font-semibold rounded-xl bg-white hover:bg-gray-50 shadow-sm hover:shadow transition-all duration-200"
+                >
+                  <FiFilter className="mr-2" size={18} />
+                  {showFilters ? 'Hide Filters' : 'Filters'}
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Categories */}
+            <div className="mt-8 flex flex-wrap gap-2">
+              <div className="flex items-center gap-2 text-gray-600">
+                <FiFilter className="text-yellow-500" />
+                <span className="font-medium">Browse:</span>
+              </div>
+              {['All', 'Videos', 'Music', 'Templates', 'Animations', 'Scripts'].map((category) => (
+                <button
+                  key={category}
+                  onClick={() => {
+                    const cat = category.toLowerCase();
+                    setActiveCategory(activeCategory === cat ? '' : cat);
+                  }}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    activeCategory === category.toLowerCase()
+                      ? 'bg-gradient-to-r from-yellow-500 to-amber-500 text-white shadow-sm'
+                      : 'bg-white text-gray-700 border border-gray-200 hover:border-yellow-400'
+                  }`}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+
+            {/* Search Bar */}
+            <div className="mt-8 max-w-3xl">
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <FiSearch className="text-gray-400 group-focus-within:text-yellow-500 transition-colors" size={20} />
+                </div>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search videos, music, templates, animations..."
+                  className="block w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 shadow-sm hover:shadow transition-all duration-200 text-base"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
                   >
-                    {/* Media Thumbnail */}
-                    <div className="h-48 bg-gradient-to-br from-gray-50 to-gray-100 relative overflow-hidden">
-                      {mediaUrl ? (
-                        isVideo ? (
-                          // Video thumbnail with play button
-                          <div 
-                            className="relative w-full h-full cursor-pointer"
-                            onClick={() => onPlayVideo(mediaUrl, listing.title)}
-                          >
-                            <video
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                              preload="metadata"
-                              poster={listing.mediaUrls.find(url => isImageUrl(url)) || ''}
-                            >
-                              <source src={mediaUrl} type="video/mp4" />
-                            </video>
-                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition-all duration-300">
-                              <div className="w-12 h-12 bg-white bg-opacity-90 rounded-full flex items-center justify-center transform scale-0 group-hover:scale-100 transition-transform duration-300">
-                                <svg className="w-6 h-6 text-gray-900" fill="currentColor" viewBox="0 0 24 24">
-                                  <path d="M8 5v14l11-7z" />
-                                </svg>
-                              </div>
-                            </div>
-                            <div className="absolute top-3 left-3">
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
-                                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
-                                  <path d="M8 5v14l11-7z" />
-                                </svg>
-                                Video
-                              </span>
-                            </div>
-                          </div>
-                        ) : isImage ? (
-                          // Image thumbnail
-                          <div className="relative w-full h-full">
-                            <img
-                              src={mediaUrl}
-                              alt={listing.title}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                              loading="lazy"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                          </div>
-                        ) : (
-                          // Generic media
-                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 group-hover:from-blue-100 group-hover:to-blue-200 transition-all duration-300">
-                            <div className="text-center transform group-hover:scale-110 transition-transform duration-300">
-                              <svg className="w-12 h-12 text-blue-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                              </svg>
-                              <p className="text-sm text-blue-600 mt-2">Media File</p>
-                            </div>
-                          </div>
-                        )
-                      ) : (
-                        // No media
-                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 group-hover:from-gray-200 group-hover:to-gray-300 transition-all duration-300">
-                          <div className="text-center transform group-hover:scale-110 transition-transform duration-300">
-                            <svg className="w-12 h-12 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <p className="text-sm text-gray-500 mt-2">No Media</p>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Status Badge with Tooltip */}
-                      <div className="absolute top-3 right-3 group/status">
-                        <div className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium border ${statusColor.bg} ${statusColor.text} ${statusColor.border} group-hover/status:shadow-md transition-shadow`}>
-                          <span className="mr-1.5">{statusColor.icon}</span>
-                          <span className="capitalize">{listing.status}</span>
-                        </div>
-                        <div className="absolute top-full right-0 mt-2 w-48 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover/status:opacity-100 group-hover/status:visible transition-all duration-200 z-10">
-                          {getStatusTooltip(listing.status)}
-                          <div className="absolute -top-1 right-3 w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-gray-900"></div>
-                        </div>
-                      </div>
-                      
-                      {/* Price Tag */}
-                      <div className="absolute bottom-3 left-3">
-                        <div className="bg-gradient-to-r from-green-600 to-green-700 text-white px-3 py-1.5 rounded-lg shadow-md">
-                          <p className="text-lg font-bold">{formatCurrency(listing.price)}</p>
-                        </div>
+                    <FiX size={18} />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Simple Stats */}
+          <div className="mb-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white border border-gray-200 rounded-xl p-5 text-center shadow-sm">
+              <div className="text-2xl font-bold text-gray-900 mb-1">{listings.length}</div>
+              <div className="text-gray-600 text-sm font-medium">Total Listings</div>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-5 text-center shadow-sm">
+              <div className="text-2xl font-bold text-gray-900 mb-1">
+                {listings.filter(l => getMediaType(l) === 'video').length}
+              </div>
+              <div className="text-gray-600 text-sm font-medium">Video Content</div>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-5 text-center shadow-sm">
+              <div className="text-2xl font-bold text-gray-900 mb-1">
+                {new Set(listings.map(l => l.sellerId?._id)).size}
+              </div>
+              <div className="text-gray-600 text-sm font-medium">Active Creators</div>
+            </div>
+          </div>
+
+          {/* Filters Section */}
+          {showFilters && (
+            <div className="mb-8 bg-white rounded-2xl shadow-lg border border-gray-200 p-6 animate-fadeIn">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-yellow-50 to-amber-50 flex items-center justify-center border border-yellow-100">
+                    <FiFilter className="text-yellow-600" size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Filters</h3>
+                    <p className="text-gray-600 text-sm">Refine your search results</p>
+                  </div>
+                </div>
+                <button
+                  onClick={clearFilters}
+                  className="px-4 py-2 text-sm font-medium text-yellow-600 hover:text-yellow-700 bg-gradient-to-r from-yellow-50 to-amber-50 hover:from-yellow-100 hover:to-amber-100 rounded-lg border border-yellow-200 transition-all duration-200"
+                >
+                  Clear all filters
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-800">
+                    Content Type
+                  </label>
+                  <select 
+                    value={filters.type}
+                    onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none text-sm transition-all duration-200 bg-white hover:border-gray-300"
+                  >
+                    <option value="">All Types</option>
+                    <option value="video">🎥 Video Content</option>
+                    <option value="music">🎵 Music & Audio</option>
+                    <option value="animation">✨ Animations</option>
+                    <option value="template">📁 Templates</option>
+                    <option value="script">📝 Scripts</option>
+                    <option value="graphics">🎨 Graphics</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-800">
+                    Category
+                  </label>
+                  <select 
+                    value={filters.category}
+                    onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none text-sm transition-all duration-200 bg-white hover:border-gray-300"
+                  >
+                    <option value="">All Categories</option>
+                    <option value="4k">🎬 4K Ultra HD Videos</option>
+                    <option value="hd">📹 Full HD Videos</option>
+                    <option value="background">🌅 Background Videos</option>
+                    <option value="stock">📹 Stock Footage</option>
+                    <option value="music">🎵 Background Music</option>
+                    <option value="sfx">🔊 Sound Effects</option>
+                    <option value="animation">✨ Motion Graphics</option>
+                    <option value="ae">🎬 After Effects Templates</option>
+                    <option value="premiere">🎥 Premiere Pro Templates</option>
+                    <option value="script">📝 Video Scripts</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-800">
+                    Sort By
+                  </label>
+                  <select 
+                    value={filters.sortBy}
+                    onChange={(e) => setFilters(prev => ({ ...prev, sortBy: e.target.value }))}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none text-sm transition-all duration-200 bg-white hover:border-gray-300"
+                  >
+                    <option value="latest">✨ Latest First</option>
+                    <option value="popular">🔥 Popular First</option>
+                    <option value="price_low">💰 Price: Low to High</option>
+                    <option value="price_high">💰 Price: High to Low</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-semibold text-gray-800">
+                    Price Range ($)
+                  </label>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-500 text-sm">Min:</span>
+                      <div className="relative flex-1">
+                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">$</div>
+                        <input
+                          type="number"
+                          placeholder="0"
+                          value={filters.minPrice}
+                          onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))}
+                          className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none text-sm"
+                          min="0"
+                        />
                       </div>
                     </div>
-                    
-                    {/* Listing Info */}
-                    <div className="p-5">
-                      <div className="mb-4">
-                        <h3 
-                          className="font-semibold text-gray-900 mb-2 truncate group-hover:text-blue-600 transition-colors cursor-pointer"
-                          title={listing.title}
-                          onClick={() => {/* Navigate to listing details */}}
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-500 text-sm">Max:</span>
+                      <div className="relative flex-1">
+                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">$</div>
+                        <input
+                          type="number"
+                          placeholder="1000"
+                          value={filters.maxPrice}
+                          onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: e.target.value }))}
+                          className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none text-sm"
+                          min="0"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <button
+                  onClick={fetchListings}
+                  className="w-full py-3 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                >
+                  Apply Filters
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Results Count */}
+          <div className="mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="px-4 py-2 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-lg border border-yellow-100">
+                <p className="text-gray-800 text-sm font-medium">
+                  Showing <span className="text-yellow-700 font-semibold">{listings.length}</span> listings
+                  {searchQuery && (
+                    <span> for "<span className="text-yellow-700 font-semibold">{searchQuery}</span>"</span>
+                  )}
+                </p>
+              </div>
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="text-sm text-yellow-600 hover:text-yellow-700 font-medium flex items-center gap-1 transition-colors"
+                >
+                  <FiX size={14} />
+                  Clear search
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Listings Grid */}
+          {listings.length === 0 ? (
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-12 text-center">
+              <div className="max-w-md mx-auto">
+                <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-yellow-50 to-amber-50 rounded-full flex items-center justify-center border border-yellow-100 shadow-inner">
+                  <FiVideo size={32} className="text-yellow-500" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                  {searchQuery || Object.values(filters).some(Boolean) 
+                    ? 'No listings found' 
+                    : 'Welcome to Video Marketplace!'
+                  }
+                </h3>
+                <p className="text-gray-600 text-base mb-8">
+                  {searchQuery || Object.values(filters).some(Boolean)
+                    ? 'Try adjusting your search or filters to find what you\'re looking for.'
+                    : 'Be the first to upload a video and start selling!'
+                  }
+                </p>
+                {marketplaceApi.utils.checkAuth() && (
+                  <button 
+                    onClick={() => navigate('/marketplace/create')}
+                    className="inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-yellow-500 via-yellow-400 to-yellow-300 text-gray-800 font-semibold rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 border border-yellow-200"
+                  >
+                    <FiPlus className="mr-2" size={18} />
+                    Upload Your First Video
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {listings.map(listing => {
+                const thumbnailUrl = getThumbnailUrl(listing);
+                const videoUrl = getFirstVideoUrl(listing);
+                const mediaType = getMediaType(listing);
+                const isVideo = mediaType === 'video';
+                const qualityBadge = getQualityBadge(listing.quality);
+                const listingId = listing._id || 'unknown';
+                const isLoading = imageLoading[listingId] !== false;
+                
+                return (
+                  <div key={listingId} className="group bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-300 border border-gray-200 overflow-hidden hover:-translate-y-1">
+                    {/* Media Thumbnail - Updated */}
+                    <div className="h-48 bg-gradient-to-br from-gray-50 to-gray-100 relative overflow-hidden">
+                      {isVideo && videoUrl ? (
+                        // Video thumbnail with play button
+                        <div 
+                          className="relative w-full h-full cursor-pointer"
+                          onClick={() => handleVideoClick(videoUrl, listing.title, listing)}
                         >
-                          {listing.title}
-                        </h3>
-                        
-                        <p className="text-sm text-gray-600 line-clamp-2 mb-3" title={listing.description}>
-                          {listing.description}
-                        </p>
-                        
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-2">
-                            <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${listing.category === 'service' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
-                              {listing.category}
-                            </span>
-                            <span className="text-xs text-gray-500 flex items-center">
-                              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                              </svg>
-                              {listing.views || 0} views
-                            </span>
+                          {/* Video element for preview */}
+                          <video
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            preload="metadata"
+                            poster={getFirstImageUrl(listing) || thumbnailUrl}
+                            muted
+                          >
+                            <source src={videoUrl} type="video/mp4" />
+                          </video>
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition-all duration-300">
+                            <div className="w-12 h-12 bg-white bg-opacity-90 rounded-full flex items-center justify-center transform scale-0 group-hover:scale-100 transition-transform duration-300">
+                              <FiPlay className="text-gray-900" size={20} />
+                            </div>
                           </div>
-                          
-                          <div className="text-xs text-gray-500">
-                            {formatDate(listing.updatedAt)}
+                          <div className="absolute top-3 left-3">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                              <FiVideo className="w-3 h-3 mr-1" />
+                              Video
+                            </span>
                           </div>
                         </div>
-                      </div>
-                      
-                      {/* Tags */}
-                      {listing.tags && listing.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mb-4">
-                          {listing.tags.slice(0, 4).map((tag, index) => (
-                            <span 
-                              key={index} 
-                              className="inline-flex items-center px-2.5 py-1 rounded-full text-xs bg-gradient-to-r from-gray-50 to-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200 transition-colors cursor-default"
-                              title={tag}
-                            >
-                              #{tag}
-                            </span>
-                          ))}
-                          {listing.tags.length > 4 && (
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs bg-gray-200 text-gray-600 border border-gray-300">
-                              +{listing.tags.length - 4}
-                            </span>
+                      ) : (
+                        // Image thumbnail
+                        <div className="relative w-full h-full">
+                          {isLoading && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="animate-spin rounded-full h-8 w-8 border-2 border-transparent border-t-yellow-500 border-r-amber-500"></div>
+                            </div>
                           )}
+                          <img
+                            src={thumbnailUrl}
+                            alt={listing.title}
+                            className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                            onError={() => handleImageError(listingId)}
+                            onLoad={() => handleImageLoad(listingId)}
+                            loading="lazy"
+                          />
+                          
+                          {/* Media type badge */}
+                          <div className="absolute top-3 left-3">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${
+                              mediaType === 'image' 
+                                ? 'bg-green-100 text-green-800 border-green-200'
+                                : mediaType === 'document'
+                                ? 'bg-blue-100 text-blue-800 border-blue-200'
+                                : 'bg-gray-100 text-gray-800 border-gray-200'
+                            }`}>
+                              {mediaType === 'image' && <FiImage className="w-3 h-3 mr-1" />}
+                              {mediaType === 'document' && <FiFileText className="w-3 h-3 mr-1" />}
+                              {mediaType === 'video' && <FiVideo className="w-3 h-3 mr-1" />}
+                              {mediaType.charAt(0).toUpperCase() + mediaType.slice(1)}
+                            </span>
+                          </div>
                         </div>
                       )}
                       
+                      {/* Gradient Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent"></div>
+                      
+                      {/* Quality Badge */}
+                      {qualityBadge.label && (
+                        <div className={`absolute top-3 right-3 z-10 px-2 py-1 rounded ${qualityBadge.color} text-xs font-bold shadow-sm`}>
+                          {qualityBadge.label}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-semibold text-gray-900 truncate text-sm group-hover:text-yellow-600 transition-colors">
+                          {listing.title}
+                        </h3>
+                      </div>
+                      
+                      <p className="text-gray-600 text-xs mb-3 line-clamp-2">
+                        {listing.description}
+                      </p>
+                      
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-200">
+                            {listing.sellerId?.avatar ? (
+                              <img 
+                                src={listing.sellerId.avatar} 
+                                alt={listing.sellerId.username}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/24/F3F4F6/9CA3AF?text=U';
+                                }}
+                              />
+                            ) : (
+                              <FiUser size={12} className="text-gray-600" />
+                            )}
+                          </div>
+                          <span className="text-xs text-gray-700 truncate max-w-[80px]">
+                            {listing.sellerId?.username || 'Seller'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <FiEye size={12} className="text-gray-400" />
+                          <span className="text-xs text-gray-500">{listing.views || 0}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="text-xs text-gray-500">
+                          <FiClock className="inline mr-1" size={10} />
+                          {listing.duration || 'N/A'}
+                        </div>
+                        <div className="text-green-600 font-bold text-sm">
+                          {marketplaceApi.utils.formatCurrency(listing.price)}
+                        </div>
+                      </div>
+                      
                       {/* Action Buttons */}
-                      <div className="pt-4 border-t border-gray-100">
-                        {confirmToggle === listing._id ? (
-                          // Confirmation Dialog
-                          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
-                            <p className="text-sm text-yellow-800 mb-2">
-                              Are you sure you want to {listing.status === 'active' ? 'deactivate' : 'activate'} this listing?
-                            </p>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleConfirmToggle(listing)}
-                                disabled={isToggleProcessing}
-                                className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 px-3 rounded-md transition-colors flex items-center justify-center disabled:opacity-50"
-                              >
-                                {isToggleProcessing ? (
-                                  <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                  </svg>
-                                ) : (
-                                  'Yes'
-                                )}
-                              </button>
-                              <button
-                                onClick={handleCancelToggle}
-                                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white text-sm font-medium py-2 px-3 rounded-md transition-colors"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          // Normal Action Buttons
-                          <div className="flex flex-col sm:flex-row gap-2">
-                            <button
-                              onClick={() => onEditListing(listing)}
-                              disabled={isProcessing}
-                              className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-medium py-2.5 px-3 rounded-lg transition-all duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md"
-                            >
-                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                              Edit
-                            </button>
-                            
-                            <button
-                              onClick={() => handleToggleClick(listing)}
-                              disabled={isProcessing || listing.status === 'sold'}
-                              className={`flex-1 ${toggleButton.color} text-white text-sm font-medium py-2.5 px-3 rounded-lg transition-all duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md ${listing.status === 'sold' ? 'cursor-not-allowed' : ''}`}
-                              title={listing.status === 'sold' ? 'Sold listings cannot be toggled' : ''}
-                            >
-                              {isToggleProcessing ? (
-                                <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                              ) : (
-                                <>
-                                  <span className="mr-2">{toggleButton.icon}</span>
-                                  {toggleButton.text}
-                                </>
-                              )}
-                            </button>
-                            
-                            <button
-                              onClick={() => onDeleteListing(listing)}
-                              disabled={isProcessing}
-                              className="flex-1 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white text-sm font-medium py-2.5 px-3 rounded-lg transition-all duration-200 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-md"
-                            >
-                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                              Delete
-                            </button>
-                          </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleMakeOffer(listing)}
+                          className="flex-1 bg-gradient-to-r from-yellow-500 via-yellow-400 to-yellow-300 hover:from-yellow-600 hover:via-yellow-500 hover:to-yellow-400 text-gray-800 text-sm py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 group/btn font-medium border border-yellow-200 shadow-sm hover:shadow"
+                        >
+                          <FiDollarSign size={14} className="group-hover/btn:scale-110 transition-transform" />
+                          Buy Now
+                        </button>
+                        {isVideo && videoUrl && (
+                          <button
+                            onClick={() => handleVideoClick(videoUrl, listing.title, listing)}
+                            className="px-3 bg-gradient-to-r from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100 text-gray-700 text-sm py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 font-medium border border-gray-300 shadow-sm hover:shadow"
+                          >
+                            <FiPlay size={14} />
+                          </button>
                         )}
                       </div>
                     </div>
@@ -584,71 +955,84 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
                 );
               })}
             </div>
-            
-            {/* Pagination */}
-            {pagination && pagination.pages > 1 && (
-              <div className="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
-                <div className="text-sm text-gray-700">
-                  Showing <span className="font-semibold">{(currentPage - 1) * (pagination.limit || 10) + 1}</span> to{' '}
-                  <span className="font-semibold">
-                    {Math.min(currentPage * (pagination.limit || 10), pagination.total)}
-                  </span> of{' '}
-                  <span className="font-semibold">{pagination.total}</span> listings
-                </div>
-                
-                <div className="flex justify-center items-center space-x-2">
-                  <button
-                    onClick={() => onPageChange(currentPage - 1)}
-                    disabled={currentPage === 1 || loading || actionLoading !== null}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                  >
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                    Previous
-                  </button>
-                  
-                  <div className="flex space-x-1">
-                    {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
-                      const pageNum = i + 1;
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => onPageChange(pageNum)}
-                          disabled={loading || actionLoading !== null}
-                          className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                            currentPage === pageNum
-                              ? 'bg-blue-600 text-white shadow-md'
-                              : 'text-gray-700 hover:bg-gray-100 border border-gray-300'
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    })}
-                    {pagination.pages > 5 && (
-                      <span className="px-3 py-2 text-gray-500">...</span>
-                    )}
-                  </div>
-                  
-                  <button
-                    onClick={() => onPageChange(currentPage + 1)}
-                    disabled={currentPage === pagination.pages || loading || actionLoading !== null}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                  >
-                    Next
-                    <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
+          )}
+
+          {/* Load More */}
+          {listings.length > 0 && listings.length >= 12 && (
+            <div className="mt-8 text-center">
+              <button 
+                onClick={fetchListings}
+                className="inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-yellow-500 via-yellow-400 to-yellow-300 text-gray-800 font-medium rounded-lg border border-yellow-200 hover:from-yellow-600 hover:via-yellow-500 hover:to-yellow-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-400 transition-all duration-200 shadow-sm hover:shadow"
+              >
+                Load more videos
+              </button>
+            </div>
+          )}
+
+          {/* Call to Action Footer */}
+          <div className="mt-12 text-center">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                Ready to buy or sell premium content?
+              </h2>
+              <p className="text-gray-600">
+                Join thousands of creators and buyers on our platform
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button 
+                onClick={() => navigate('/marketplace/create')}
+                className="px-8 py-3 bg-gradient-to-r from-yellow-500 via-yellow-400 to-yellow-300 text-gray-800 font-semibold rounded-lg border border-yellow-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200"
+              >
+                Start Selling Videos
+              </button>
+              <button 
+                onClick={() => setShowFilters(true)}
+                className="px-8 py-3 border border-gray-300 text-gray-700 font-semibold rounded-lg bg-white hover:bg-gray-50 shadow-sm hover:shadow transition-all duration-200"
+              >
+                Browse Catalog
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+
+      {/* Video Popup Modal */}
+      <VideoPlayerModal
+        show={showVideoPopup}
+        videoUrl={selectedVideo}
+        videoTitle={videoTitle}
+        videoThumbnail={videoListing ? getThumbnailUrl(videoListing) : ''}
+        onClose={handleCloseVideoPopup}
+      />
+
+      {/* Offer Modal */}
+      <OfferModal
+        show={showOfferModal}
+        selectedListing={selectedListing}
+        offerForm={offerForm}
+        onClose={() => setShowOfferModal(false)}
+        onSubmit={handleSubmitOffer}
+        onOfferFormChange={handleOfferFormChange}
+        paymentStatus={paymentStatus}
+        error={error}
+        getThumbnailUrl={getThumbnailUrl}
+      />
+
+      {/* Payment Modal */}
+      <PaymentModal
+        show={showPaymentModal}
+        clientSecret={clientSecret}
+        offerData={offerData}
+        onClose={handlePaymentClose}
+        onSuccess={handlePaymentSuccess}
+        paymentStatus={paymentStatus}
+        setPaymentStatus={setPaymentStatus}
+        currentUser={currentUser}
+        getThumbnailUrl={getThumbnailUrl}
+      />
+    </MarketplaceLayout>
   );
 };
 
-export default ListingsTab;
+export default Browse;
