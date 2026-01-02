@@ -1,6 +1,6 @@
 // src/pages/marketplace/Browse.tsx
 import React, { useState, useEffect } from 'react';
-import ListingCard from '../../components/marketplace/ListingCard';
+import ListingCard from '../../components/marketplae/ListingCard';
 import MarketplaceLayout from '../../components/Layout';
 import { Listing } from '../../types/marketplace';
 import { 
