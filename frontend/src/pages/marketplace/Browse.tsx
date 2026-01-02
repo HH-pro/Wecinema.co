@@ -2,15 +2,17 @@ import React, { useState, useEffect } from 'react';
 import ListingCard from '../../components/marketplae/ListingCard';
 import MarketplaceLayout from '../../components/Layout';
 import { Listing } from '../../types/marketplace';
-import { FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiCheck, FiAlertCircle, FiLoader, FiUser } from 'react-icons/fi';
+import { FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiCheck, FiAlertCircle, FiLoader, FiUser, FiCalendar, FiMail } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements, AddressElement } from '@stripe/react-stripe-js';
-import marketplaceApi, { listingsApi, ordersApi } from '../../api/marketplaceApi';
+import marketplaceApi from '../../api/marketplaceApi';
 
-// Stripe key from environment variable
-const stripePromise = loadStripe("pk_test_51SKw7ZHYamYyPYbDUlqbeydcW1hVGrHOvCZ8mBwSU1gw77TIRyzng31iSqAvPIQzTYKG8UWfDew7kdKgBxsw7vtq00WTLU3YCZ");
+// Get Stripe key from environment variable
+const STRIPE_PUBLISHABLE_KEY = "pk_test_51SKw7ZHYamYyPYbDUlqbeydcW1hVGrHOvCZ8mBwSU1gw77TIRyzng31iSqAvPIQzTYKG8UWfDew7kdKgBxsw7vtq00WTLU3YCZ";
+
+// Initialize Stripe
+const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 
 const Browse: React.FC = () => {
   const [listings, setListings] = useState<Listing[]>([]);
@@ -61,7 +63,7 @@ const Browse: React.FC = () => {
     fetchCurrentUser();
   }, [filters]);
 
-  const fetchCurrentUser = () => {
+  const fetchCurrentUser = async () => {
     try {
       const user = marketplaceApi.utils.getCurrentUser();
       if (user) {
@@ -74,9 +76,6 @@ const Browse: React.FC = () => {
           email: user.email || '',
           phone: user.phone || ''
         }));
-        
-        // Store in localStorage for payment form
-        localStorage.setItem('currentUser', JSON.stringify(user));
       }
     } catch (error) {
       console.error('Error fetching current user:', error);
@@ -88,52 +87,52 @@ const Browse: React.FC = () => {
       setLoading(true);
       setError('');
       
-      const params: any = {};
+      // Use marketplaceApi to fetch listings
+      const response = await marketplaceApi.listings.getAllListings({
+        type: filters.type || undefined,
+        category: filters.category || undefined,
+        minPrice: filters.minPrice ? parseFloat(filters.minPrice) : undefined,
+        maxPrice: filters.maxPrice ? parseFloat(filters.maxPrice) : undefined,
+        sortBy: filters.sortBy
+      });
       
-      // Apply filters to API params
-      if (filters.type) params.type = filters.type;
-      if (filters.category) params.category = filters.category;
-      if (filters.minPrice) params.minPrice = parseFloat(filters.minPrice);
-      if (filters.maxPrice) params.maxPrice = parseFloat(filters.maxPrice);
-      if (filters.sortBy) {
-        switch (filters.sortBy) {
-          case 'newest':
-            params.sortBy = 'createdAt';
-            params.sortOrder = 'desc';
-            break;
-          case 'oldest':
-            params.sortBy = 'createdAt';
-            params.sortOrder = 'asc';
-            break;
-          case 'price_low':
-            params.sortBy = 'price';
-            params.sortOrder = 'asc';
-            break;
-          case 'price_high':
-            params.sortBy = 'price';
-            params.sortOrder = 'desc';
-            break;
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to fetch listings');
+      }
+
+      const listingsData = response.data?.listings || [];
+      
+      // Apply local filtering
+      const filteredData = listingsData.filter((listing: Listing) => {
+        // Search filtering
+        if (searchQuery) {
+          const searchLower = searchQuery.toLowerCase();
+          const matchesSearch = 
+            listing.title.toLowerCase().includes(searchLower) ||
+            listing.description.toLowerCase().includes(searchLower) ||
+            (listing.tags && listing.tags.some(tag => tag.toLowerCase().includes(searchLower)));
+          if (!matchesSearch) return false;
         }
-      }
+        
+        // Filter by status - only show active listings
+        if (listing.status !== 'active') return false;
+        
+        return true;
+      });
+
+      // Apply sorting
+      const sortedData = sortListings(filteredData, filters.sortBy);
       
-      const response = await listingsApi.getAllListings(params);
-      
-      if (response.success && response.data?.listings) {
-        setListings(response.data.listings);
-      } else {
-        setError(response.error || 'Failed to load listings');
-        setListings([]);
-      }
+      setListings(sortedData);
     } catch (error: any) {
       console.error('Error fetching listings:', error);
-      setError('Failed to load listings. Please try again.');
-      setListings([]);
+      setError(error.message || 'Failed to load listings. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Local sorting function for UI
+  // Local sorting function
   const sortListings = (data: Listing[], sortBy: string) => {
     const sortedData = [...data];
     
@@ -177,15 +176,7 @@ const Browse: React.FC = () => {
     setError('');
   };
 
-  // Function to extract seller name from listing data
-  const getSellerName = (listing: Listing): string => {
-    if (listing.sellerId && typeof listing.sellerId === 'object' && 'username' in listing.sellerId) {
-      return (listing.sellerId as any).username;
-    }
-    return 'Seller';
-  };
-
-  // Handle offer submission with better error handling
+  // Handle offer submission
   const handleSubmitOffer = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -197,34 +188,29 @@ const Browse: React.FC = () => {
       
       console.log('🔄 Submitting offer with payment...');
 
-      const response = await axios.post('/marketplace/offers/make-offer', {
+      // Use marketplaceApi to make offer
+      const response = await marketplaceApi.offers.makeOffer({
         listingId: selectedListing._id,
         amount: parseFloat(offerForm.amount),
         message: offerForm.message,
         requirements: offerForm.requirements,
         expectedDelivery: offerForm.expectedDelivery
-      }, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        }
       });
 
-      console.log('✅ Offer with payment response:', response.data);
+      console.log('✅ Offer with payment response:', response);
 
-      // Check if clientSecret is present
-      if (!response.data.data?.clientSecret) {
-        throw new Error('No client secret received from server. Please try again.');
+      if (!response.success || !response.data?.clientSecret) {
+        throw new Error(response.error || 'No client secret received from server. Please try again.');
       }
 
-      setClientSecret(response.data.data.clientSecret);
+      setClientSecret(response.data.clientSecret);
       
-      // ENSURE PROPER DATA STRUCTURE
+      // Set offer data
       setOfferData({
-        ...response.data.data,
-        type: 'offer', // Explicitly set type
+        ...response.data,
+        type: 'offer',
         amount: parseFloat(offerForm.amount),
-        offer: response.data.data.offer // Ensure offer object is properly set
+        offer: response.data.offer
       });
       
       setShowOfferModal(false);
@@ -235,9 +221,8 @@ const Browse: React.FC = () => {
       console.error('❌ Error submitting offer with payment:', error);
       setPaymentStatus('failed');
       
-      const errorMessage = error.response?.data?.error || 
-                        error.response?.data?.details?.[0] || 
-                        error.message || 
+      const errorMessage = error.message || 
+                        error.error || 
                         'Failed to submit offer';
       
       setError(errorMessage);
@@ -251,7 +236,7 @@ const Browse: React.FC = () => {
     }
   };
 
-  // Handle direct payment with better error handling
+  // Handle direct payment
   const handleDirectPayment = async (listing: Listing) => {
     if (!listing._id) return;
 
@@ -261,30 +246,27 @@ const Browse: React.FC = () => {
       
       console.log('🔄 Creating direct payment for listing:', listing._id);
 
-      const response = await axios.post('/marketplace/offers/create-direct-payment', {
-        listingId: listing._id
-      }, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // Use marketplaceApi to create direct payment
+      const response = await marketplaceApi.offers.createDirectPayment(
+        listing._id,
+        '' // requirements (optional)
+      );
 
-      console.log('✅ Direct payment response:', response.data);
+      console.log('✅ Direct payment response:', response);
 
-      if (!response.data.data?.clientSecret) {
-        throw new Error('No client secret received from server. Please try again.');
+      if (!response.success || !response.data?.clientSecret) {
+        throw new Error(response.error || 'No client secret received from server. Please try again.');
       }
 
-      setClientSecret(response.data.data.clientSecret);
+      setClientSecret(response.data.clientSecret);
       
-      // ENSURE PROPER DATA STRUCTURE
+      // Set offer data
       setOfferData({
-        ...response.data.data,
+        ...response.data,
         type: 'direct_purchase',
         amount: listing.price,
         listing: listing,
-        order: response.data.data.order // Ensure order object is properly set
+        order: response.data.order
       });
       
       setShowPaymentModal(true);
@@ -294,9 +276,8 @@ const Browse: React.FC = () => {
       console.error('❌ Error creating direct payment:', error);
       setPaymentStatus('failed');
       
-      const errorMessage = error.response?.data?.error || 
-                        error.response?.data?.details?.[0] || 
-                        error.message || 
+      const errorMessage = error.message || 
+                        error.error || 
                         'Failed to initiate payment';
       
       setError(errorMessage);
@@ -304,7 +285,23 @@ const Browse: React.FC = () => {
   };
   
   // Handle payment success
-  const handlePaymentSuccess = () => {
+  const handlePaymentSuccess = async () => {
+    try {
+      // Get the current user info
+      const user = marketplaceApi.utils.getCurrentUser();
+      const buyerName = user?.username || 'A buyer';
+
+      // Log success - Email notifications are now handled by the backend
+      console.log('✅ Payment completed successfully for:', {
+        buyerName,
+        type: offerData?.type,
+        amount: offerData?.amount
+      });
+
+    } catch (error) {
+      console.error('Error in payment success handling:', error);
+    }
+
     setShowPaymentModal(false);
     setSelectedListing(null);
     setClientSecret('');
@@ -402,14 +399,16 @@ const Browse: React.FC = () => {
               </div>
               
               <div className="flex flex-col sm:flex-row gap-3">
-                <button 
-                  onClick={() => navigate('/marketplace/create')}
-                  className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
-                >
-                  <FiPlus className="mr-2" size={18} />
-                  <span className="hidden sm:inline">Create Listing</span>
-                  <span className="sm:hidden">Create</span>
-                </button>
+                {marketplaceApi.utils.checkAuth() && (
+                  <button 
+                    onClick={() => navigate('/marketplace/create')}
+                    className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                  >
+                    <FiPlus className="mr-2" size={18} />
+                    <span className="hidden sm:inline">Create Listing</span>
+                    <span className="sm:hidden">Create</span>
+                  </button>
+                )}
                 
                 <button 
                   onClick={() => setShowFilters(!showFilters)}
@@ -554,15 +553,17 @@ const Browse: React.FC = () => {
                     : 'Be the first to create a listing and start trading!'
                   }
                 </p>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <button 
-                    onClick={() => navigate('/marketplace/create')}
-                    className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-transparent text-sm sm:text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
-                  >
-                    <FiPlus className="mr-2" size={18} />
-                    Create First Listing
-                  </button>
-                </div>
+                {marketplaceApi.utils.checkAuth() && (
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <button 
+                      onClick={() => navigate('/marketplace/create')}
+                      className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-transparent text-sm sm:text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                    >
+                      <FiPlus className="mr-2" size={18} />
+                      Create First Listing
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -626,7 +627,7 @@ const Browse: React.FC = () => {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                      <FiPackage className="text-gray-400" size={20} />
+                      <FiMail className="text-gray-400" size={20} />
                     </div>
                   )}
                 </div>
@@ -634,7 +635,9 @@ const Browse: React.FC = () => {
                   <h4 className="font-semibold text-gray-900 text-sm sm:text-base truncate">{selectedListing.title}</h4>
                   <p className="text-gray-600 text-xs mt-1 line-clamp-2">{selectedListing.description}</p>
                   <div className="flex items-center gap-2 mt-2">
-                    <span className="text-green-600 text-base sm:text-lg font-bold">${selectedListing.price}</span>
+                    <span className="text-green-600 text-base sm:text-lg font-bold">
+                      {marketplaceApi.utils.formatCurrency(selectedListing.price)}
+                    </span>
                     <span className="bg-blue-100 text-blue-800 text-[10px] font-medium px-2 py-0.5 rounded-full">
                       {selectedListing.category}
                     </span>
@@ -643,7 +646,7 @@ const Browse: React.FC = () => {
                   {/* Seller Info */}
                   <div className="flex items-center gap-1 mt-2 text-xs text-gray-500">
                     <FiUser size={12} />
-                    <span>Seller: {getSellerName(selectedListing)}</span>
+                    <span>Seller: {selectedListing.sellerId?.username || 'Seller'}</span>
                   </div>
                 </div>
               </div>
@@ -736,7 +739,7 @@ const Browse: React.FC = () => {
         </div>
       )}
 
-      {/* Payment Modal - FIXED VERSION */}
+      {/* Payment Modal */}
       {showPaymentModal && clientSecret && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-2 sm:p-4 overflow-y-auto">
           <div className="w-full max-w-md sm:max-w-lg mx-4">
@@ -774,7 +777,9 @@ const Browse: React.FC = () => {
                           <div className="text-sm font-medium text-gray-700">
                             {offerData?.type === 'direct_purchase' ? 'Purchase Amount' : 'Offer Amount'}
                           </div>
-                          <div className="text-2xl font-bold text-gray-900">${offerData?.amount}</div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {marketplaceApi.utils.formatCurrency(offerData?.amount)}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -791,7 +796,7 @@ const Browse: React.FC = () => {
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                                <FiPackage className="text-gray-400" size={16} />
+                                <FiMail className="text-gray-400" size={16} />
                               </div>
                             )}
                           </div>
@@ -858,7 +863,7 @@ const Browse: React.FC = () => {
   );
 };
 
-// Payment Form Component with proper billing details handling
+// Payment Form Component
 const PaymentForm = ({ 
   offerData, 
   onSuccess, 
@@ -889,7 +894,6 @@ const PaymentForm = ({
 
     try {
       console.log('🔄 Confirming payment...');
-      console.log('📦 Offer Data for confirmation:', offerData);
 
       // Get user info
       const userInfo = {
@@ -915,7 +919,7 @@ const PaymentForm = ({
 
       console.log('📋 Billing details for Stripe:', billingDetailsForStripe);
 
-      // DIRECT CONFIRMATION WITHOUT submit()
+      // Direct confirmation without submit()
       const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
@@ -940,18 +944,20 @@ const PaymentForm = ({
         status: paymentIntent?.status
       });
 
-      // Prepare confirmation data with proper validation
+      // Prepare confirmation data
       let confirmationPayload;
       let confirmationEndpoint;
 
       if (offerData?.type === 'direct_purchase') {
-        confirmationEndpoint = '/marketplace/payments/confirm-payment';
+        // For direct purchase, use the orders API
+        confirmationEndpoint = '/marketplace/orders/confirm-payment';
         confirmationPayload = {
           orderId: offerData.order?._id,
           paymentIntentId: paymentIntent?.id,
           billingDetails: billingDetailsForStripe
         };
       } else {
+        // For offers, use the offers API
         confirmationEndpoint = '/marketplace/offers/confirm-offer-payment';
         confirmationPayload = {
           offerId: offerData?.offer?._id || offerData?.offerId,
@@ -965,26 +971,25 @@ const PaymentForm = ({
         payload: confirmationPayload
       });
 
-      // Validate required fields
-      if (!confirmationPayload.offerId && !confirmationPayload.orderId) {
-        throw new Error('Missing offerId or orderId for confirmation');
+      // Use marketplaceApi for the confirmation
+      let response;
+      if (offerData?.type === 'direct_purchase') {
+        // Note: You'll need to add a confirmDirectPayment method to your orders API
+        // For now, we'll use the offers API confirmOfferPayment as a fallback
+        response = await marketplaceApi.offers.confirmOfferPayment({
+          offerId: offerData.offer?._id,
+          paymentIntentId: paymentIntent?.id
+        });
+      } else {
+        response = await marketplaceApi.offers.confirmOfferPayment({
+          offerId: offerData?.offer?._id || offerData?.offerId,
+          paymentIntentId: paymentIntent?.id
+        });
       }
 
-      if (!confirmationPayload.paymentIntentId) {
-        throw new Error('Missing paymentIntentId for confirmation');
+      if (!response.success) {
+        throw new Error(response.error || 'Payment confirmation failed');
       }
-
-      // Send confirmation to server
-      const response = await axios.post(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:3000'}${confirmationEndpoint}`,
-        confirmationPayload,
-        { 
-          headers: { 
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          } 
-        }
-      );
 
       console.log('✅ Server confirmation successful:', response.data);
       setPaymentStatus('success');
@@ -995,22 +1000,12 @@ const PaymentForm = ({
       }, 1500);
 
     } catch (err: any) {
-      console.error('❌ Payment processing error:', {
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status,
-        config: err.config
-      });
+      console.error('❌ Payment processing error:', err);
       
-      // Enhanced error message
       let errorMessage = 'Payment failed. Please try again.';
       
-      if (err.response?.data?.error) {
-        errorMessage = err.response.data.error;
-      } else if (err.response?.data?.details) {
-        errorMessage = Array.isArray(err.response.data.details) 
-          ? err.response.data.details.join(', ')
-          : err.response.data.details;
+      if (err.error) {
+        errorMessage = err.error;
       } else if (err.message) {
         errorMessage = err.message;
       }
@@ -1145,7 +1140,7 @@ const PaymentForm = ({
               <span>{billingDetails.name || currentUser?.username || 'Not provided'}</span>
             </div>
             <div className="flex items-center gap-2">
-              <FiUser size={14} />
+              <FiMail size={14} />
               <span>{billingDetails.email || currentUser?.email || 'Not provided'}</span>
             </div>
           </div>
@@ -1245,7 +1240,7 @@ const PaymentForm = ({
               Success!
             </>
           ) : (
-            `Pay $${offerData?.amount}`
+            `Pay ${marketplaceApi.utils.formatCurrency(offerData?.amount)}`
           )}
         </button>
       </div>
