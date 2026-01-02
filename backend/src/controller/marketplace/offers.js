@@ -8,7 +8,7 @@ const Order = require("../../models/marketplace/order");
 const Chat = require("../../models/marketplace/Chat");
 const Message = require("../../models/marketplace/messages");
 const { authenticateMiddleware } = require("../../utils");
-const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
 const emailService = require('../../../services/emailService');
 const admin = require('firebase-admin');
 
@@ -345,11 +345,12 @@ const sendOrderDetailsWithChatLink = async (order, offer, buyer, seller) => {
 // ROUTES START HERE
 // ============================
 
-// ✅ NEW ROUTE: INITIALIZE OFFER (Create temporary offer without saving to DB)
-router.post("/initialize-offer", authenticateMiddleware, logRequest("INITIALIZE_OFFER"), async (req, res) => {
+// ✅ SIMPLIFIED: MAKE OFFER WITH IMMEDIATE PAYMENT (FIXED VERSION)
+router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), async (req, res) => {
+  console.log("=== MAKE OFFER WITH IMMEDIATE PAYMENT (Fixed) ===");
+  
+  let session;
   try {
-    console.log("=== INITIALIZE OFFER (Temporary) ===");
-    
     const { listingId, amount, message, requirements, expectedDelivery } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
 
@@ -383,9 +384,14 @@ router.post("/initialize-offer", authenticateMiddleware, logRequest("INITIALIZE_
       });
     }
 
-    // ✅ CHECK LISTING
-    const listing = await MarketplaceListing.findById(listingId);
+    // ✅ START TRANSACTION
+    session = await mongoose.startSession();
+    session.startTransaction();
+
+    // ✅ FIND LISTING WITH TRANSACTION
+    const listing = await MarketplaceListing.findById(listingId).session(session);
     if (!listing) {
+      await session.abortTransaction();
       return res.status(404).json({ 
         success: false,
         error: 'Listing not found' 
@@ -393,6 +399,7 @@ router.post("/initialize-offer", authenticateMiddleware, logRequest("INITIALIZE_
     }
 
     if (listing.status !== 'active') {
+      await session.abortTransaction();
       return res.status(400).json({ 
         success: false,
         error: 'Listing is not available for offers' 
@@ -401,30 +408,31 @@ router.post("/initialize-offer", authenticateMiddleware, logRequest("INITIALIZE_
 
     // Check if user is not the seller
     if (listing.sellerId.toString() === userId.toString()) {
+      await session.abortTransaction();
       return res.status(400).json({ 
         success: false,
         error: 'Cannot make offer on your own listing' 
       });
     }
 
-    // ✅ CHECK FOR EXISTING OFFERS IN DATABASE
+    // ✅ CHECK FOR EXISTING OFFERS
     const existingOffer = await Offer.findOne({
       listingId,
       buyerId: userId,
       status: { $in: ['pending', 'pending_payment', 'accepted', 'paid'] }
-    });
+    }).session(session);
 
     if (existingOffer) {
+      await session.abortTransaction();
       return res.status(400).json({ 
         success: false,
         error: 'You already have a pending offer for this listing',
-        existingOfferId: existingOffer._id,
-        offerStatus: existingOffer.status
+        existingOfferId: existingOffer._id
       });
     }
 
     // ✅ CREATE STRIPE PAYMENT INTENT
-    console.log("💳 Creating Stripe payment intent for offer...");
+    console.log("💳 Creating Stripe payment intent for immediate payment...");
     
     let paymentIntent;
     try {
@@ -435,16 +443,17 @@ router.post("/initialize-offer", authenticateMiddleware, logRequest("INITIALIZE_
           listingId: listingId.toString(),
           buyerId: userId.toString(),
           sellerId: listing.sellerId.toString(),
-          type: 'offer_payment',
-          stage: 'initialization'
+          type: 'offer_payment'
         },
         automatic_payment_methods: { enabled: true },
         description: `Offer for: ${listing.title}`,
       });
 
       console.log("✅ Stripe payment intent created:", paymentIntent.id);
+      console.log("✅ Client secret:", paymentIntent.client_secret ? "Received" : "Missing");
 
     } catch (stripeError) {
+      await session.abortTransaction();
       console.error('❌ Stripe payment intent creation failed:', stripeError);
       
       return res.status(400).json({ 
@@ -454,11 +463,21 @@ router.post("/initialize-offer", authenticateMiddleware, logRequest("INITIALIZE_
       });
     }
 
-    // ✅ CREATE TEMPORARY OFFER DATA (NOT SAVED TO DB YET)
+    // Check if client_secret is present
+    if (!paymentIntent.client_secret) {
+      await session.abortTransaction();
+      return res.status(500).json({ 
+        success: false,
+        error: 'Payment processing failed - no client secret received'
+      });
+    }
+
+    // ✅ CREATE TEMPORARY OFFER (NOT SAVED TO DATABASE)
+    const tempOfferId = `temp_${Date.now()}_${userId}`;
     const tempOfferData = {
-      id: `temp_${Date.now()}_${userId}`,
+      id: tempOfferId,
       buyerId: userId,
-      listingId: listingId,
+      listingId,
       amount: offerAmount,
       message: message || '',
       requirements: requirements || '',
@@ -466,19 +485,21 @@ router.post("/initialize-offer", authenticateMiddleware, logRequest("INITIALIZE_
       paymentIntentId: paymentIntent.id,
       status: 'initializing',
       createdAt: Date.now(),
-      expiresAt: Date.now() + 3600000 // 1 hour expiration
+      expiresAt: Date.now() + 3600000 // 1 hour
     };
 
-    // Store in memory (in production, use Redis)
-    tempOffers.set(tempOfferData.id, tempOfferData);
-    
-    console.log("✅ Temporary offer initialized:", tempOfferData.id);
+    // Store in memory
+    tempOffers.set(tempOfferId, tempOfferData);
+    console.log("✅ Temporary offer stored:", tempOfferId);
+
+    // ✅ COMMIT TRANSACTION
+    await session.commitTransaction();
 
     res.status(200).json({
       success: true,
-      message: 'Offer initialized. Complete payment to submit your offer.',
+      message: 'Please complete payment to submit your offer.',
       data: {
-        tempOfferId: tempOfferData.id,
+        tempOfferId: tempOfferId,
         paymentIntentId: paymentIntent.id,
         clientSecret: paymentIntent.client_secret,
         amount: offerAmount,
@@ -489,13 +510,21 @@ router.post("/initialize-offer", authenticateMiddleware, logRequest("INITIALIZE_
     });
 
   } catch (error) {
-    console.error('❌ Error initializing offer:', error);
+    console.error('❌ Error making offer:', error);
     
+    if (session) {
+      await session.abortTransaction();
+    }
+
     res.status(500).json({ 
       success: false,
-      error: 'Failed to initialize offer',
+      error: 'Failed to make offer',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
+  } finally {
+    if (session) {
+      session.endSession();
+    }
   }
 });
 
@@ -876,54 +905,6 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
   }
 });
 
-// ✅ MODIFIED: MAKE OFFER WITH IMMEDIATE PAYMENT (NOW JUST REDIRECTS TO NEW FLOW)
-router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), async (req, res) => {
-  try {
-    console.log("=== MAKE OFFER (Legacy endpoint - redirecting to new flow) ===");
-    
-    const { listingId, amount, message, requirements, expectedDelivery } = req.body;
-    const userId = req.user.id || req.user._id || req.user.userId;
-
-    // ✅ BASIC VALIDATION
-    if (!userId) {
-      return res.status(401).json({ 
-        success: false,
-        error: 'Authentication required' 
-      });
-    }
-
-    if (!listingId || !amount) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'Listing ID and amount are required' 
-      });
-    }
-
-    // Redirect to new flow
-    return res.status(200).json({
-      success: true,
-      message: 'Please use the new offer flow',
-      redirectTo: '/api/offers/initialize-offer',
-      data: {
-        listingId,
-        amount,
-        message,
-        requirements,
-        expectedDelivery
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Error in make-offer:', error);
-    
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to process offer request',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  }
-});
-
 // ✅ NEW ROUTE: CANCEL TEMPORARY OFFER
 router.post("/cancel-temp-offer", authenticateMiddleware, logRequest("CANCEL_TEMP_OFFER"), async (req, res) => {
   try {
@@ -988,43 +969,167 @@ router.post("/cancel-temp-offer", authenticateMiddleware, logRequest("CANCEL_TEM
   }
 });
 
-// ✅ MODIFIED: GET OFFERS MADE (BUYER) - Only shows offers that are in database (paid offers)
-router.get("/my-offers", authenticateMiddleware, logRequest("MY_OFFERS"), async (req, res) => {
+// ✅ DIRECT PURCHASE ROUTE
+router.post("/create-direct-payment", authenticateMiddleware, logRequest("DIRECT_PURCHASE"), async (req, res) => {
+  let session;
   try {
+    const { listingId, requirements } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
-    
-    if (!userId) {
-      return res.status(401).json({ 
+
+    if (!listingId) {
+      return res.status(400).json({ 
         success: false,
-        error: 'Authentication required' 
+        error: 'Listing ID is required' 
       });
     }
 
-    // Only get offers from database (paid offers)
-    const offers = await Offer.find({ 
-      buyerId: userId,
-      status: { $ne: 'initializing' } // Exclude initializing offers
-    })
-      .populate('listingId', 'title price mediaUrls status sellerId')
-      .populate('listingId.sellerId', 'username avatar rating')
-      .sort({ createdAt: -1 });
-    
-    res.status(200).json({
-      success: true,
-      data: offers,
-      count: offers.length,
-      note: 'Only shows offers that have been paid'
+    if (!validateObjectId(listingId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid listing ID format' 
+      });
+    }
+
+    // ✅ START TRANSACTION
+    session = await mongoose.startSession();
+    session.startTransaction();
+
+    const listing = await MarketplaceListing.findById(listingId).session(session);
+    if (!listing) {
+      await session.abortTransaction();
+      return res.status(404).json({ 
+        success: false,
+        error: 'Listing not found' 
+      });
+    }
+
+    if (listing.status !== 'active') {
+      await session.abortTransaction();
+      return res.status(400).json({ 
+        success: false,
+        error: 'Listing is not available for purchase' 
+      });
+    }
+
+    // Check if user is not the seller
+    if (listing.sellerId.toString() === userId.toString()) {
+      await session.abortTransaction();
+      return res.status(400).json({ 
+        success: false,
+        error: 'Cannot purchase your own listing' 
+      });
+    }
+
+    // Create payment intent
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(listing.price * 100),
+      currency: 'usd',
+      metadata: {
+        listingId: listingId.toString(),
+        buyerId: userId.toString(),
+        sellerId: listing.sellerId.toString(),
+        type: 'direct_purchase'
+      },
+      automatic_payment_methods: { enabled: true },
+      description: `Direct purchase: ${listing.title}`,
     });
+
+    // Check if client_secret is present
+    if (!paymentIntent.client_secret) {
+      await session.abortTransaction();
+      return res.status(500).json({ 
+        success: false,
+        error: 'Payment processing failed - no client secret received'
+      });
+    }
+
+    // Create order immediately for direct purchase
+    const order = new Order({
+      buyerId: userId,
+      sellerId: listing.sellerId,
+      listingId: listingId,
+      orderType: 'direct_purchase',
+      amount: listing.price,
+      status: 'pending_payment',
+      stripePaymentIntentId: paymentIntent.id,
+      revisions: 0,
+      maxRevisions: 3,
+      paymentReleased: false,
+      orderDate: new Date(),
+      requirements: requirements || ''
+    });
+
+    await order.save({ session });
+
+    // Create chat room for direct purchase
+    const chat = new Chat({
+      orderId: order._id,
+      participants: [
+        { userId: userId, role: 'buyer' },
+        { userId: listing.sellerId, role: 'seller' }
+      ],
+      listingId: listingId,
+      status: 'active',
+      lastMessageAt: new Date()
+    });
+
+    await chat.save({ session });
+
+    // ✅ DO NOT RESERVE LISTING - KEEP IT ACTIVE
+    // Listing remains active even after direct purchase initiation
+    // Only update order count
+    await MarketplaceListing.findByIdAndUpdate(
+      listingId,
+      { 
+        lastOrderAt: new Date(),
+        $inc: { totalOrders: 1 }
+      },
+      { session }
+    );
+
+    // ✅ COMMIT TRANSACTION
+    await session.commitTransaction();
+
+    res.status(201).json({
+      success: true,
+      message: 'Payment intent created for direct purchase',
+      data: {
+        order: {
+          _id: order._id,
+          amount: order.amount,
+          status: order.status
+        },
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        chatId: chat._id,
+        redirectUrl: `/messages?chat=${chat._id}&order=${order._id}`
+      }
+    });
+
   } catch (error) {
-    console.error('Error fetching my offers:', error);
+    console.error('❌ Error creating direct payment:', error);
+    
+    if (session) {
+      await session.abortTransaction();
+    }
+    
     res.status(500).json({ 
       success: false,
-      error: 'Failed to fetch offers' 
+      error: 'Failed to create payment intent',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
+  } finally {
+    if (session) {
+      session.endSession();
+    }
   }
 });
 
-// ✅ MODIFIED: GET OFFERS RECEIVED (SELLER)
+// =========================================
+// EXISTING ROUTES (KEPT AS IS)
+// =========================================
+
+// ✅ GET OFFERS RECEIVED (SELLER)
 router.get("/received-offers", authenticateMiddleware, logRequest("RECEIVED_OFFERS"), async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
@@ -1055,6 +1160,42 @@ router.get("/received-offers", authenticateMiddleware, logRequest("RECEIVED_OFFE
     });
   } catch (error) {
     console.error('Error fetching received offers:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch offers' 
+    });
+  }
+});
+
+// ✅ GET OFFERS MADE (BUYER) - Only shows offers that are in database (paid offers)
+router.get("/my-offers", authenticateMiddleware, logRequest("MY_OFFERS"), async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id || req.user.userId;
+    
+    if (!userId) {
+      return res.status(401).json({ 
+        success: false,
+        error: 'Authentication required' 
+      });
+    }
+
+    // Only get offers from database (paid offers)
+    const offers = await Offer.find({ 
+      buyerId: userId,
+      status: { $ne: 'initializing' } // Exclude initializing offers
+    })
+      .populate('listingId', 'title price mediaUrls status sellerId')
+      .populate('listingId.sellerId', 'username avatar rating')
+      .sort({ createdAt: -1 });
+    
+    res.status(200).json({
+      success: false,
+      data: offers,
+      count: offers.length,
+      note: 'Only shows offers that have been paid'
+    });
+  } catch (error) {
+    console.error('Error fetching my offers:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to fetch offers' 
@@ -1571,153 +1712,6 @@ router.put("/cancel-offer/:id", authenticateMiddleware, logRequest("CANCEL_OFFER
   }
 });
 
-// ✅ DIRECT PURCHASE ROUTE
-router.post("/create-direct-payment", authenticateMiddleware, logRequest("DIRECT_PURCHASE"), async (req, res) => {
-  let session;
-  try {
-    const { listingId, requirements } = req.body;
-    const userId = req.user.id || req.user._id || req.user.userId;
-
-    if (!listingId) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'Listing ID is required' 
-      });
-    }
-
-    if (!validateObjectId(listingId)) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'Invalid listing ID format' 
-      });
-    }
-
-    // ✅ START TRANSACTION
-    session = await mongoose.startSession();
-    session.startTransaction();
-
-    const listing = await MarketplaceListing.findById(listingId).session(session);
-    if (!listing) {
-      await session.abortTransaction();
-      return res.status(404).json({ 
-        success: false,
-        error: 'Listing not found' 
-      });
-    }
-
-    if (listing.status !== 'active') {
-      await session.abortTransaction();
-      return res.status(400).json({ 
-        success: false,
-        error: 'Listing is not available for purchase' 
-      });
-    }
-
-    // Check if user is not the seller
-    if (listing.sellerId.toString() === userId.toString()) {
-      await session.abortTransaction();
-      return res.status(400).json({ 
-        success: false,
-        error: 'Cannot purchase your own listing' 
-      });
-    }
-
-    // Create payment intent
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(listing.price * 100),
-      currency: 'usd',
-      metadata: {
-        listingId: listingId.toString(),
-        buyerId: userId.toString(),
-        sellerId: listing.sellerId.toString(),
-        type: 'direct_purchase'
-      },
-      automatic_payment_methods: { enabled: true },
-      description: `Direct purchase: ${listing.title}`,
-    });
-
-    // Create order immediately for direct purchase
-    const order = new Order({
-      buyerId: userId,
-      sellerId: listing.sellerId,
-      listingId: listingId,
-      orderType: 'direct_purchase',
-      amount: listing.price,
-      status: 'pending_payment',
-      stripePaymentIntentId: paymentIntent.id,
-      revisions: 0,
-      maxRevisions: 3,
-      paymentReleased: false,
-      orderDate: new Date(),
-      requirements: requirements || ''
-    });
-
-    await order.save({ session });
-
-    // Create chat room for direct purchase
-    const chat = new Chat({
-      orderId: order._id,
-      participants: [
-        { userId: userId, role: 'buyer' },
-        { userId: listing.sellerId, role: 'seller' }
-      ],
-      listingId: listingId,
-      status: 'active',
-      lastMessageAt: new Date()
-    });
-
-    await chat.save({ session });
-
-    // ✅ DO NOT RESERVE LISTING - KEEP IT ACTIVE
-    // Listing remains active even after direct purchase initiation
-    // Only update order count
-    await MarketplaceListing.findByIdAndUpdate(
-      listingId,
-      { 
-        lastOrderAt: new Date(),
-        $inc: { totalOrders: 1 }
-      },
-      { session }
-    );
-
-    // ✅ COMMIT TRANSACTION
-    await session.commitTransaction();
-
-    res.status(201).json({
-      success: true,
-      message: 'Payment intent created for direct purchase',
-      data: {
-        order: {
-          _id: order._id,
-          amount: order.amount,
-          status: order.status
-        },
-        clientSecret: paymentIntent.client_secret,
-        paymentIntentId: paymentIntent.id,
-        chatId: chat._id,
-        redirectUrl: `/messages?chat=${chat._id}&order=${order._id}`
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Error creating direct payment:', error);
-    
-    if (session) {
-      await session.abortTransaction();
-    }
-    
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to create payment intent',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
-  } finally {
-    if (session) {
-      session.endSession();
-    }
-  }
-});
-
 // ✅ GET CHAT LINK FOR ORDER
 router.get("/chat-link/:orderId", authenticateMiddleware, async (req, res) => {
   try {
@@ -1792,12 +1786,19 @@ router.get("/test-stripe", logRequest("TEST_STRIPE"), async (req, res) => {
       metadata: { test: 'true' }
     });
 
+    console.log("✅ Test Stripe Intent Created:", {
+      id: testIntent.id,
+      client_secret: testIntent.client_secret ? "Present" : "Missing",
+      status: testIntent.status
+    });
+
     res.json({
       success: true,
       message: 'Stripe is working correctly',
       data: {
         testIntentId: testIntent.id,
-        clientSecret: testIntent.client_secret
+        clientSecret: testIntent.client_secret,
+        status: testIntent.status
       }
     });
 
