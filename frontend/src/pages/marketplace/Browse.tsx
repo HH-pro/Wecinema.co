@@ -1,39 +1,43 @@
 // src/pages/marketplace/Browse.tsx
 import React, { useState, useEffect } from 'react';
-import ListingCard from '../../components/marketplae/ListingCard';
-import MarketplaceLayout from '../../components/Layout';
-import { Listing } from '../../types/marketplace';
-import { 
-  FiFilter, 
-  FiPlus, 
-  FiSearch, 
-  FiX, 
-  FiCreditCard, 
-  FiCheck, 
-  FiMail, 
-  FiAlertCircle, 
-  FiLoader, 
-  FiUser, 
+import { useNavigate } from 'react-router-dom';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements, AddressElement } from '@stripe/react-stripe-js';
+import {
+  FiFilter,
+  FiPlus,
+  FiSearch,
+  FiX,
+  FiCreditCard,
+  FiCheck,
+  FiMail,
+  FiAlertCircle,
+  FiLoader,
+  FiUser,
   FiCalendar,
   FiRefreshCw,
   FiTrendingUp,
   FiDollarSign,
   FiStar,
-  FiClock
+  FiClock,
+  FiPackage
 } from 'react-icons/fi';
-import { useNavigate } from 'react-router-dom';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, PaymentElement, useStripe, useElements, AddressElement } from '@stripe/react-stripe-js';
-import emailjs from '@emailjs/browser';
-import marketplaceApi, { ApiResponse } from '../../api/marketplaceApi';
 
-// Initialize EmailJS with your credentials
-emailjs.init("MIfBtNPcnoqBFU0LR");
+// Components
+import ListingCard from '../../components/marketplace/ListingCard';
+import MarketplaceLayout from '../../components/Layout';
 
-// Stripe test key for development
-const stripePromise = loadStripe("pk_test_51SKw7ZHYamYyPYbDUlqbeydcW1hVGrHOvCZ8mBwSU1gw77TIRyzng31iSqAvPIQzTYKG8UWfDew7kdKgBxsw7vtq00WTLU3YCZ");
+// Types
+import { Listing } from '../../types/marketplace';
+
+// API
+import marketplaceApi from '../../api/marketplaceApi';
+
+// Load Stripe from environment variable
+const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLIC_KEY || "pk_test_51SKw7ZHYamYyPYbDUlqbeydcW1hVGrHOvCZ8mBwSU1gw77TIRyzng31iSqAvPIQzTYKG8UWfDew7kdKgBxsw7vtq00WTLU3YCZ");
 
 const Browse: React.FC = () => {
+  // State Management
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [initialLoading, setInitialLoading] = useState<boolean>(true);
@@ -59,6 +63,7 @@ const Browse: React.FC = () => {
     hasMore: true
   });
 
+  // Billing details
   const [billingDetails, setBillingDetails] = useState({
     name: '',
     email: '',
@@ -75,50 +80,79 @@ const Browse: React.FC = () => {
 
   const navigate = useNavigate();
 
+  // Filters
   const [filters, setFilters] = useState({
     category: 'all',
     minPrice: '',
     maxPrice: '',
     sortBy: 'createdAt',
     sortOrder: 'desc',
-    status: 'active'
+    status: 'active',
+    type: ''
   });
 
+  // Offer form
   const [offerForm, setOfferForm] = useState({
     amount: '',
     message: '',
     requirements: '',
-    expectedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // Default 7 days from now
+    expectedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   });
 
-  // Fetch listings and user data on component mount
+  // Categories for dropdown
+  const categories = [
+    'all',
+    'Video',
+    'Script',
+    'Music',
+    'Animation',
+    'Documentary',
+    'Commercial',
+    'Film',
+    'Short Film',
+    'Series',
+    'Other'
+  ];
+
+  // Types for dropdown
+  const listingTypes = [
+    'all',
+    'for_sale',
+    'licensing',
+    'adaptation_rights',
+    'commission'
+  ];
+
+  // ==============================
+  // EFFECTS
+  // ==============================
+
   useEffect(() => {
     fetchListings();
     fetchCurrentUser();
   }, []);
 
-  // Fetch listings when filters change
   useEffect(() => {
     if (!initialLoading) {
       fetchListings();
     }
   }, [filters]);
 
+  // ==============================
+  // API FUNCTIONS
+  // ==============================
+
   const fetchCurrentUser = async () => {
     try {
       const user = marketplaceApi.utils.getCurrentUser();
       if (user) {
         setCurrentUser(user);
-        
-        // Set billing details from user data
         setBillingDetails(prev => ({
           ...prev,
           name: user.username || 'Customer',
           email: user.email || '',
           phone: user.phone || ''
         }));
-        
-        console.log('✅ Current user loaded:', user);
       }
     } catch (error) {
       console.error('Error fetching current user:', error);
@@ -133,16 +167,16 @@ const Browse: React.FC = () => {
         setLoading(true);
       }
       setError('');
-      
+
       const currentPage = loadMore ? pagination.page + 1 : 1;
       const params = {
         ...filters,
         page: currentPage,
         limit: pagination.limit,
-        search: searchQuery
+        search: searchQuery || undefined
       };
 
-      console.log('📡 Fetching listings with params:', params);
+      console.log('Fetching listings with params:', params);
       
       const response = await marketplaceApi.listings.getAllListings(params);
       
@@ -187,17 +221,18 @@ const Browse: React.FC = () => {
     }
   };
 
-  // Handle search
+  // ==============================
+  // EVENT HANDLERS
+  // ==============================
+
   const handleSearch = () => {
     fetchListings();
   };
 
-  // Handle view details
   const handleViewDetails = (listingId: string) => {
     navigate(`/marketplace/listings/${listingId}`);
   };
 
-  // Handle make offer
   const handleMakeOffer = (listing: Listing) => {
     setSelectedListing(listing);
     setOfferForm({
@@ -210,58 +245,38 @@ const Browse: React.FC = () => {
     setError('');
   };
 
-  // Get seller email from listing data
-  const getSellerEmail = (listing: Listing): string => {
-    if (listing.sellerId && typeof listing.sellerId === 'object' && 'email' in listing.sellerId) {
-      return (listing.sellerId as any).email;
-    }
-    if ((listing as any).sellerEmail) {
-      return (listing as any).sellerEmail;
-    }
-    return '';
-  };
+  const handleDirectPayment = async (listing: Listing) => {
+    if (!listing._id) return;
 
-  // Get seller name from listing data
-  const getSellerName = (listing: Listing): string => {
-    if (listing.sellerId && typeof listing.sellerId === 'object' && 'username' in listing.sellerId) {
-      return (listing.sellerId as any).username;
-    }
-    return 'Seller';
-  };
-
-  // Send email notification to seller
-  const sendSellerNotification = async (type: 'offer' | 'direct_purchase', data: any) => {
     try {
-      const templateParams = {
-        to_email: data.sellerEmail,
-        to_name: data.sellerName,
-        buyer_name: data.buyerName,
-        listing_title: data.listingTitle,
-        amount: data.amount,
-        message: data.message || 'No message provided',
-        expected_delivery: data.expectedDelivery || 'Not specified',
-        requirements: data.requirements || 'No specific requirements',
-        order_id: data.orderId,
-        offer_id: data.offerId,
-        type: type,
-        date: new Date().toLocaleDateString(),
-        dashboard_url: `${window.location.origin}/marketplace/seller/dashboard`
-      };
+      setPaymentStatus('processing');
+      setError('');
 
-      console.log('📧 Sending email with data:', templateParams);
+      const response = await marketplaceApi.orders.createOrder?.(listing._id, {
+        amount: listing.price,
+        paymentMethod: 'stripe'
+      });
 
-      const serviceID = 'service_pykwrta';
-      const templateID = type === 'offer' ? 'template_xtnsrmg' : 'template_h4gtoxd';
-
-      const result = await emailjs.send(serviceID, templateID, templateParams);
-      console.log(`✅ ${type === 'offer' ? 'Offer' : 'Purchase'} notification email sent successfully:`, result);
-      
-    } catch (error) {
-      console.error('❌ Failed to send email notification:', error);
+      if (response && response.success && response.data?.clientSecret) {
+        setClientSecret(response.data.clientSecret);
+        setOfferData({
+          ...response.data,
+          type: 'direct_purchase',
+          amount: listing.price,
+          listing: listing
+        });
+        setShowPaymentModal(true);
+        setPaymentStatus('idle');
+      } else {
+        throw new Error(response?.error || 'Failed to create order');
+      }
+    } catch (error: any) {
+      console.error('Error creating order:', error);
+      setPaymentStatus('failed');
+      setError(error.message || 'Failed to initiate payment');
     }
   };
 
-  // Handle offer submission
   const handleSubmitOffer = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -270,122 +285,38 @@ const Browse: React.FC = () => {
     try {
       setPaymentStatus('processing');
       setError('');
-      
-      console.log('🔄 Creating offer for listing:', selectedListing._id);
 
       const response = await marketplaceApi.offers.createOffer(
         selectedListing._id,
         {
           offeredPrice: parseFloat(offerForm.amount),
-          message: offerForm.message
+          message: offerForm.message,
+          requirements: offerForm.requirements,
+          expectedDelivery: offerForm.expectedDelivery
         }
       );
 
-      if (response.success && response.data?.offer) {
-        console.log('✅ Offer created:', response.data.offer);
-        
-        // Store offer data for payment
+      if (response.success && response.data?.clientSecret) {
+        setClientSecret(response.data.clientSecret);
         setOfferData({
           ...response.data,
           type: 'offer',
-          amount: parseFloat(offerForm.amount),
-          offer: response.data.offer
+          amount: parseFloat(offerForm.amount)
         });
-        
         setShowOfferModal(false);
-        
-        // Show success message
-        setSuccessMessage(`Offer created successfully! You can now proceed to payment from the "My Offers" section.`);
-        
-        // Clear form
-        setOfferForm({
-          amount: '',
-          message: '',
-          requirements: '',
-          expectedDelivery: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-        });
-        
-        setPaymentStatus('idle');
-        
-      } else {
-        throw new Error(response.error || 'Failed to create offer');
-      }
-      
-    } catch (error: any) {
-      console.error('❌ Error creating offer:', error);
-      setPaymentStatus('failed');
-      
-      const errorMessage = error.response?.data?.error || 
-                          error.message || 
-                          'Failed to submit offer';
-      
-      setError(errorMessage);
-    }
-  };
-
-  // Handle direct payment
-  const handleDirectPayment = async (listing: Listing) => {
-    if (!listing._id) return;
-
-    try {
-      setPaymentStatus('processing');
-      setError('');
-      
-      console.log('🔄 Creating order for listing:', listing._id);
-
-      const response = await marketplaceApi.orders.createOrder?.(listing._id);
-      
-      if (response && response.success) {
-        console.log('✅ Order created:', response.data);
-        
-        // Store order data for payment
-        setOfferData({
-          ...response.data,
-          type: 'direct_purchase',
-          amount: listing.price,
-          listing: listing,
-          order: response.data.order
-        });
-        
         setShowPaymentModal(true);
         setPaymentStatus('idle');
       } else {
-        throw new Error('Failed to create order');
+        throw new Error(response.error || 'Failed to create offer');
       }
-      
     } catch (error: any) {
-      console.error('❌ Error creating order:', error);
+      console.error('Error creating offer:', error);
       setPaymentStatus('failed');
-      setError('Failed to initiate payment. Please try again.');
+      setError(error.message || 'Failed to submit offer');
     }
   };
-  
-  // Handle payment success
+
   const handlePaymentSuccess = async () => {
-    try {
-      const buyerName = currentUser?.username || 'A buyer';
-
-      // Send email notification based on payment type
-      if (offerData?.type === 'direct_purchase' && offerData?.listing) {
-        const sellerEmail = getSellerEmail(offerData.listing);
-        const sellerName = getSellerName(offerData.listing);
-        
-        if (sellerEmail) {
-          await sendSellerNotification('direct_purchase', {
-            sellerEmail: sellerEmail,
-            sellerName: sellerName,
-            buyerName: buyerName,
-            listingTitle: offerData.listing.title,
-            amount: offerData.amount,
-            orderId: offerData.order?._id
-          });
-        }
-      }
-
-    } catch (error) {
-      console.error('Failed to send notification email:', error);
-    }
-
     setShowPaymentModal(false);
     setSelectedListing(null);
     setClientSecret('');
@@ -396,13 +327,13 @@ const Browse: React.FC = () => {
     // Refresh listings
     fetchListings();
     
-    // Navigate to orders page after delay
+    // Navigate to orders page
     setTimeout(() => {
-      navigate('/marketplace/my-orders', { 
-        state: { 
-          message: 'Payment completed successfully! Your order has been placed.',
+      navigate('/marketplace/my-orders', {
+        state: {
+          message: 'Payment completed successfully!',
           type: 'success'
-        } 
+        }
       });
     }, 2000);
   };
@@ -423,21 +354,20 @@ const Browse: React.FC = () => {
       maxPrice: '',
       sortBy: 'createdAt',
       sortOrder: 'desc',
-      status: 'active'
+      status: 'active',
+      type: ''
     });
     setSearchQuery('');
     setError('');
     fetchListings();
   };
 
-  // Filter listings based on search query
-  const filteredListings = listings.filter(listing =>
-    listing.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    listing.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (listing.tags && listing.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())))
-  );
+  const handleLoadMore = () => {
+    if (pagination.hasMore && !loading && !refreshing) {
+      fetchListings(true);
+    }
+  };
 
-  // Handle billing details change
   const handleBillingDetailsChange = (details: any) => {
     setBillingDetails(prev => ({
       ...prev,
@@ -445,27 +375,34 @@ const Browse: React.FC = () => {
     }));
   };
 
-  // Handle load more
-  const handleLoadMore = () => {
-    if (pagination.hasMore && !loading && !refreshing) {
-      fetchListings(true);
+  // ==============================
+  // HELPER FUNCTIONS
+  // ==============================
+
+  const getSellerEmail = (listing: Listing): string => {
+    if (listing.sellerId && typeof listing.sellerId === 'object' && 'email' in listing.sellerId) {
+      return (listing.sellerId as any).email;
     }
+    return '';
   };
 
-  // Categories for filter dropdown
-  const categories = [
-    'all',
-    'Video',
-    'Script',
-    'Music',
-    'Animation',
-    'Documentary',
-    'Commercial',
-    'Film',
-    'Short Film',
-    'Series',
-    'Other'
-  ];
+  const getSellerName = (listing: Listing): string => {
+    if (listing.sellerId && typeof listing.sellerId === 'object' && 'username' in listing.sellerId) {
+      return (listing.sellerId as any).username;
+    }
+    return 'Seller';
+  };
+
+  // Filter listings locally for search
+  const filteredListings = listings.filter(listing =>
+    listing.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    listing.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (listing.tags && listing.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())))
+  );
+
+  // ==============================
+  // RENDER FUNCTIONS
+  // ==============================
 
   if (initialLoading) {
     return (
@@ -475,11 +412,11 @@ const Browse: React.FC = () => {
             <div className="relative">
               <div className="w-20 h-20 border-4 border-yellow-200 border-t-yellow-600 rounded-full animate-spin"></div>
               <div className="absolute inset-0 flex items-center justify-center">
-                <FiFilm className="text-yellow-600 text-2xl" />
+                <FiPackage className="text-yellow-600 text-2xl" />
               </div>
             </div>
-            <p className="mt-6 text-gray-600 text-lg font-medium">Loading amazing content...</p>
-            <p className="mt-2 text-gray-500 text-sm">Discovering the best videos and scripts</p>
+            <p className="mt-6 text-gray-600 text-lg font-medium">Loading marketplace...</p>
+            <p className="mt-2 text-gray-500 text-sm">Discovering amazing content</p>
           </div>
         </div>
       </MarketplaceLayout>
@@ -494,32 +431,32 @@ const Browse: React.FC = () => {
           <div className="max-w-7xl mx-auto">
             <div className="flex flex-col md:flex-row items-center justify-between gap-8">
               <div className="flex-1">
-                <h1 className="text-4xl md:text-5xl font-bold mb-4">Discover Creative Content</h1>
+                <h1 className="text-4xl md:text-5xl font-bold mb-4">Marketplace</h1>
                 <p className="text-xl text-yellow-100 mb-8 max-w-2xl">
-                  Browse thousands of videos, scripts, and digital assets from talented creators worldwide.
+                  Buy, sell, and trade video content, scripts, and digital assets
                 </p>
                 <div className="flex flex-wrap gap-4">
                   <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full">
                     <FiTrendingUp />
-                    <span>Trending</span>
+                    <span>Trending Now</span>
                   </div>
                   <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full">
                     <FiStar />
-                    <span>Premium</span>
+                    <span>Premium Quality</span>
                   </div>
                   <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full">
                     <FiDollarSign />
-                    <span>Affordable</span>
+                    <span>Secure Payments</span>
                   </div>
                 </div>
               </div>
               <div className="flex-shrink-0">
-                <button 
+                <button
                   onClick={() => navigate('/marketplace/create')}
                   className="group bg-white text-yellow-700 hover:bg-gray-50 px-8 py-4 rounded-xl font-semibold text-lg shadow-2xl hover:shadow-3xl transition-all duration-300 flex items-center gap-3"
                 >
                   <FiPlus className="group-hover:rotate-90 transition-transform duration-300" size={24} />
-                  <span>Sell Your Content</span>
+                  <span>Create Listing</span>
                 </button>
               </div>
             </div>
@@ -527,7 +464,7 @@ const Browse: React.FC = () => {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Error/Success Messages */}
+          {/* Messages */}
           {error && (
             <div className="mb-6 animate-fade-in">
               <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg">
@@ -580,8 +517,8 @@ const Browse: React.FC = () => {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    placeholder="Search videos, scripts, titles, descriptions, tags..."
-                    className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all duration-200 text-sm sm:text-base"
+                    placeholder="Search titles, descriptions, tags, categories..."
+                    className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all duration-200"
                   />
                   {searchQuery && (
                     <button
@@ -597,20 +534,20 @@ const Browse: React.FC = () => {
                 </div>
               </div>
 
-              {/* Filter Toggle and Actions */}
+              {/* Action Buttons */}
               <div className="flex items-center gap-4">
                 <button
                   onClick={() => setShowFilters(!showFilters)}
                   className={`flex items-center gap-2 px-5 py-3 rounded-xl font-medium transition-all duration-200 ${
-                    showFilters 
-                      ? 'bg-yellow-600 text-white' 
+                    showFilters
+                      ? 'bg-yellow-600 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
                   <FiFilter size={18} />
                   <span className="hidden sm:inline">Filters</span>
                 </button>
-                
+
                 <button
                   onClick={() => fetchListings()}
                   disabled={loading}
@@ -626,21 +563,39 @@ const Browse: React.FC = () => {
             {showFilters && (
               <div className="mt-6 pt-6 border-t border-gray-200 animate-slide-down">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {/* Category Filter */}
+                  {/* Category */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Category
                     </label>
-                    <select 
+                    <select
                       value={filters.category}
                       onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all duration-200 text-sm"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                     >
                       {categories.map(category => (
                         <option key={category} value={category}>
                           {category.charAt(0).toUpperCase() + category.slice(1)}
                         </option>
                       ))}
+                    </select>
+                  </div>
+
+                  {/* Type */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Listing Type
+                    </label>
+                    <select
+                      value={filters.type}
+                      onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                    >
+                      <option value="">All Types</option>
+                      <option value="for_sale">For Sale</option>
+                      <option value="licensing">Licensing</option>
+                      <option value="adaptation_rights">Adaptation Rights</option>
+                      <option value="commission">Commission</option>
                     </select>
                   </div>
 
@@ -655,14 +610,14 @@ const Browse: React.FC = () => {
                         placeholder="Min $"
                         value={filters.minPrice}
                         onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))}
-                        className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all duration-200 text-sm"
+                        className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                       />
                       <input
                         type="number"
                         placeholder="Max $"
                         value={filters.maxPrice}
                         onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: e.target.value }))}
-                        className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all duration-200 text-sm"
+                        className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                       />
                     </div>
                   </div>
@@ -672,31 +627,15 @@ const Browse: React.FC = () => {
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Sort By
                     </label>
-                    <select 
+                    <select
                       value={filters.sortBy}
                       onChange={(e) => setFilters(prev => ({ ...prev, sortBy: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all duration-200 text-sm"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                     >
                       <option value="createdAt">Newest First</option>
                       <option value="price">Price: Low to High</option>
                       <option value="-price">Price: High to Low</option>
                       <option value="views">Most Viewed</option>
-                      <option value="sellerRating">Top Rated Sellers</option>
-                    </select>
-                  </div>
-
-                  {/* Sort Order */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Order
-                    </label>
-                    <select 
-                      value={filters.sortOrder}
-                      onChange={(e) => setFilters(prev => ({ ...prev, sortOrder: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all duration-200 text-sm"
-                    >
-                      <option value="desc">Descending</option>
-                      <option value="asc">Ascending</option>
                     </select>
                   </div>
                 </div>
@@ -709,7 +648,7 @@ const Browse: React.FC = () => {
                   <div className="flex gap-3">
                     <button
                       onClick={clearFilters}
-                      className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium transition-all duration-200"
+                      className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium"
                     >
                       Clear All
                     </button>
@@ -718,7 +657,7 @@ const Browse: React.FC = () => {
                         fetchListings();
                         setShowFilters(false);
                       }}
-                      className="px-5 py-2.5 bg-yellow-600 text-white rounded-xl hover:bg-yellow-700 font-medium transition-all duration-200"
+                      className="px-5 py-2.5 bg-yellow-600 text-white rounded-xl hover:bg-yellow-700 font-medium"
                     >
                       Apply Filters
                     </button>
@@ -731,11 +670,9 @@ const Browse: React.FC = () => {
           {/* Results Header */}
           <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">
-                Featured Listings
-              </h2>
+              <h2 className="text-2xl font-bold text-gray-900">Featured Listings</h2>
               <p className="text-gray-600 mt-1">
-                Discover amazing content from talented creators
+                {filteredListings.length} listings found
               </p>
             </div>
             <div className="flex items-center gap-3 text-sm text-gray-600">
@@ -769,23 +706,23 @@ const Browse: React.FC = () => {
                   No listings found
                 </h3>
                 <p className="text-gray-600 mb-8">
-                  {searchQuery || Object.values(filters).some(Boolean)
-                    ? 'Try adjusting your search or filters to find what you\'re looking for.'
+                  {searchQuery || Object.values(filters).some(val => val && val !== 'all')
+                    ? 'Try adjusting your search or filters'
                     : 'Be the first to create a listing!'
                   }
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <button 
+                  <button
                     onClick={clearFilters}
-                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium transition-all duration-200"
+                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium"
                   >
                     Clear Filters
                   </button>
-                  <button 
+                  <button
                     onClick={() => navigate('/marketplace/create')}
-                    className="px-6 py-3 bg-yellow-600 text-white rounded-xl hover:bg-yellow-700 font-medium transition-all duration-200"
+                    className="px-6 py-3 bg-yellow-600 text-white rounded-xl hover:bg-yellow-700 font-medium"
                   >
-                    Create First Listing
+                    Create Listing
                   </button>
                 </div>
               </div>
@@ -807,7 +744,7 @@ const Browse: React.FC = () => {
               {/* Load More */}
               {pagination.hasMore && (
                 <div className="mt-12 text-center">
-                  <button 
+                  <button
                     onClick={handleLoadMore}
                     disabled={refreshing || loading}
                     className="inline-flex items-center justify-center px-8 py-4 border border-gray-300 text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -831,16 +768,438 @@ const Browse: React.FC = () => {
         </div>
       </div>
 
-      {/* Offer Modal - Keep your existing offer modal implementation */}
-      {/* ... (keep your existing offer modal code) ... */}
+      {/* Offer Modal */}
+      {showOfferModal && selectedListing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-md rounded-xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+            <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-4 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Make an Offer</h3>
+                <p className="text-sm text-gray-600">Submit your offer for this listing</p>
+              </div>
+              <button
+                onClick={() => setShowOfferModal(false)}
+                className="p-1 rounded-md hover:bg-gray-100"
+              >
+                <FiX size={20} className="text-gray-600" />
+              </button>
+            </div>
 
-      {/* Payment Modal - Keep your existing payment modal implementation */}
-      {/* ... (keep your existing payment modal code) ... */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <div className="w-16 h-16 rounded-lg overflow-hidden border border-blue-300">
+                    {selectedListing.mediaUrls?.[0] ? (
+                      <img
+                        src={selectedListing.mediaUrls[0]}
+                        alt={selectedListing.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                        <FiPackage className="text-gray-400" size={24} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-gray-900">{selectedListing.title}</h4>
+                    <p className="text-green-600 text-lg font-bold">${selectedListing.price}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <FiUser size={12} className="text-gray-500" />
+                      <span className="text-xs text-gray-600">{getSellerName(selectedListing)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <form onSubmit={handleSubmitOffer} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Offer Amount ($)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="0.01"
+                    step="0.01"
+                    value={offerForm.amount}
+                    onChange={(e) => setOfferForm({ ...offerForm, amount: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                    placeholder="Enter your offer"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Message to Seller
+                  </label>
+                  <textarea
+                    value={offerForm.message}
+                    onChange={(e) => setOfferForm({ ...offerForm, message: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                    rows={3}
+                    placeholder="Tell the seller about your requirements..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Expected Delivery
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={offerForm.expectedDelivery}
+                    onChange={(e) => setOfferForm({ ...offerForm, expectedDelivery: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                    min={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+
+                {error && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2">
+                      <FiAlertCircle className="text-red-500" size={16} />
+                      <p className="text-sm text-red-700">{error}</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="sticky bottom-0 bg-white pt-4 border-t border-gray-200">
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowOfferModal(false)}
+                      className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={paymentStatus === 'processing'}
+                      className="flex-1 py-2.5 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:bg-gray-400 flex items-center justify-center gap-2"
+                    >
+                      {paymentStatus === 'processing' ? (
+                        <>
+                          <FiLoader className="animate-spin" size={16} />
+                          Processing...
+                        </>
+                      ) : (
+                        `Submit Offer - $${offerForm.amount}`
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && clientSecret && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md">
+            <div className="bg-white rounded-xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+              <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {offerData?.type === 'direct_purchase' ? 'Complete Purchase' : 'Complete Offer Payment'}
+                  </h3>
+                  <p className="text-sm text-gray-500">Secure payment via Stripe</p>
+                </div>
+                <button
+                  onClick={handlePaymentClose}
+                  className="p-2 hover:bg-gray-100 rounded-full"
+                  disabled={paymentStatus === 'processing'}
+                >
+                  <FiX size={20} className="text-gray-600" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-yellow-500 flex items-center justify-center">
+                        <FiCreditCard className="text-white" size={18} />
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-gray-700">
+                          {offerData?.type === 'direct_purchase' ? 'Purchase Amount' : 'Offer Amount'}
+                        </div>
+                        <div className="text-2xl font-bold text-gray-900">${offerData?.amount}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                  <Elements stripe={stripePromise} options={{
+                    clientSecret,
+                    appearance: {
+                      theme: 'stripe',
+                      variables: {
+                        colorPrimary: '#ca8a04',
+                        borderRadius: '0.5rem'
+                      }
+                    }
+                  }}>
+                    <PaymentForm
+                      offerData={offerData}
+                      onSuccess={handlePaymentSuccess}
+                      onClose={handlePaymentClose}
+                      paymentStatus={paymentStatus}
+                      setPaymentStatus={setPaymentStatus}
+                      billingDetails={billingDetails}
+                      onBillingDetailsChange={handleBillingDetailsChange}
+                      currentUser={currentUser}
+                    />
+                  </Elements>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </MarketplaceLayout>
   );
 };
 
-// Payment Form Component - Keep your existing implementation
-// ... (keep your existing PaymentForm component) ...
+// Payment Form Component
+const PaymentForm = ({
+  offerData,
+  onSuccess,
+  onClose,
+  paymentStatus,
+  setPaymentStatus,
+  billingDetails,
+  onBillingDetailsChange,
+  currentUser
+}: any) => {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showBillingForm, setShowBillingForm] = useState(false);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!stripe || !elements) {
+      setError('Payment system not ready. Please refresh the page.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setPaymentStatus('processing');
+    setError('');
+
+    try {
+      const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/marketplace/payment/success`,
+          payment_method_data: {
+            billing_details: {
+              name: currentUser?.username || billingDetails.name || 'Customer',
+              email: currentUser?.email || billingDetails.email || '',
+              phone: billingDetails.phone || undefined,
+              address: {
+                line1: billingDetails.address.line1 || 'N/A',
+                city: billingDetails.address.city || 'N/A',
+                state: billingDetails.address.state || 'N/A',
+                postal_code: billingDetails.address.postal_code || '00000',
+                country: billingDetails.address.country || 'US'
+              }
+            }
+          }
+        },
+        redirect: 'if_required'
+      });
+
+      if (stripeError) {
+        throw new Error(stripeError.message);
+      }
+
+      if (paymentIntent?.status === 'succeeded') {
+        setPaymentStatus('success');
+        setTimeout(() => {
+          onSuccess();
+        }, 1500);
+      } else {
+        throw new Error('Payment not completed');
+      }
+    } catch (err: any) {
+      console.error('Payment error:', err);
+      setError(err.message || 'Payment failed. Please try again.');
+      setPaymentStatus('failed');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAddressChange = (event: any) => {
+    if (event.complete) {
+      const address = event.value.address;
+      onBillingDetailsChange({
+        address: {
+          line1: address.line1 || '',
+          line2: address.line2 || '',
+          city: address.city || '',
+          state: address.state || '',
+          postal_code: address.postal_code || '',
+          country: address.country || 'US'
+        }
+      });
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-sm font-semibold text-gray-800">Billing Information</h4>
+          <button
+            type="button"
+            onClick={() => setShowBillingForm(!showBillingForm)}
+            className="text-xs text-yellow-600 hover:text-yellow-500"
+          >
+            {showBillingForm ? 'Hide' : 'Edit'}
+          </button>
+        </div>
+
+        {showBillingForm ? (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Full Name</label>
+              <input
+                type="text"
+                value={billingDetails.name || currentUser?.username || ''}
+                onChange={(e) => onBillingDetailsChange({ name: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Email Address</label>
+              <input
+                type="email"
+                value={billingDetails.email || currentUser?.email || ''}
+                onChange={(e) => onBillingDetailsChange({ email: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Phone Number</label>
+              <input
+                type="tel"
+                value={billingDetails.phone || ''}
+                onChange={(e) => onBillingDetailsChange({ phone: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Billing Address</label>
+              <div className="border border-gray-300 rounded-md">
+                <AddressElement
+                  options={{
+                    mode: 'billing',
+                    allowedCountries: ['US', 'CA', 'GB', 'AU', 'IN'],
+                    fields: { phone: 'always' },
+                    validation: { phone: { required: 'never' } }
+                  }}
+                  onChange={handleAddressChange}
+                />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-sm text-gray-600">
+            <div className="flex items-center gap-2 mb-2">
+              <FiUser size={14} />
+              <span>{billingDetails.name || currentUser?.username || 'Not provided'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <FiMail size={14} />
+              <span>{billingDetails.email || currentUser?.email || 'Not provided'}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <label className="text-sm font-semibold text-gray-800">Payment Details</label>
+          </div>
+          <div className="min-h-[200px]">
+            <PaymentElement options={{ layout: 'tabs' }} />
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <FiAlertCircle className="text-red-500 mt-0.5" size={18} />
+            <div className="flex-1">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {paymentStatus === 'success' && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+              <FiCheck className="text-green-600" size={16} />
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold text-green-800">Payment Successful!</h4>
+              <p className="text-sm text-green-700">Redirecting...</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={paymentStatus === 'processing' || paymentStatus === 'success'}
+          className="flex-1 py-3 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+        >
+          <FiX className="inline mr-2" size={16} />
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={!stripe || paymentStatus === 'processing' || paymentStatus === 'success' || isSubmitting}
+          className="flex-1 py-3 px-4 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:bg-gray-400 flex items-center justify-center gap-2"
+        >
+          {paymentStatus === 'processing' || isSubmitting ? (
+            <>
+              <FiLoader className="animate-spin" size={16} />
+              Processing...
+            </>
+          ) : paymentStatus === 'success' ? (
+            <>
+              <FiCheck size={16} />
+              Success!
+            </>
+          ) : (
+            `Pay $${offerData?.amount}`
+          )}
+        </button>
+      </div>
+    </form>
+  );
+};
 
 export default Browse;
