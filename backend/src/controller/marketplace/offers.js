@@ -830,7 +830,6 @@ router.get("/received-offers", authenticateMiddleware, logRequest("RECEIVED_OFFE
     });
   }
 });
-
 // ✅ GET OFFERS MADE (BUYER)
 router.get("/my-offers", authenticateMiddleware, logRequest("MY_OFFERS"), async (req, res) => {
   try {
@@ -843,25 +842,64 @@ router.get("/my-offers", authenticateMiddleware, logRequest("MY_OFFERS"), async 
       });
     }
 
+    // Prevent caching
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Last-Modified', new Date().toUTCString());
+
     const offers = await Offer.find({ buyerId: userId })
-      .populate('listingId', 'title price mediaUrls status sellerId')
-      .populate('listingId.sellerId', 'username avatar rating')
-      .sort({ createdAt: -1 });
-    
+      .populate({
+        path: 'listingId',
+        select: 'title price mediaUrls status sellerId category condition',
+        populate: {
+          path: 'sellerId',
+          select: 'username avatar rating email'
+        }
+      })
+      .populate('buyerId', 'username avatar email') // Populate buyer info too
+      .sort({ createdAt: -1 })
+      .lean(); // Use lean() for better performance
+
+    // Transform the data for better frontend consumption
+    const transformedOffers = offers.map(offer => ({
+      ...offer,
+      listing: offer.listingId, // Rename for clarity
+      buyer: offer.buyerId,
+      listingId: offer.listingId?._id, // Keep ID reference
+      buyerId: offer.buyerId?._id // Keep ID reference
+    }));
+
     res.status(200).json({
       success: true,
-      data: offers,
-      count: offers.length
+      data: {
+        offers: transformedOffers,
+        count: transformedOffers.length,
+        timestamp: new Date().toISOString()
+      }
     });
   } catch (error) {
     console.error('Error fetching my offers:', error);
-    res.status(500).json({ 
+    
+    // More specific error messages
+    let errorMessage = 'Failed to fetch offers';
+    let statusCode = 500;
+    
+    if (error.name === 'CastError') {
+      errorMessage = 'Invalid user ID format';
+      statusCode = 400;
+    } else if (error.name === 'ValidationError') {
+      errorMessage = 'Data validation error';
+      statusCode = 400;
+    }
+
+    res.status(statusCode).json({ 
       success: false,
-      error: 'Failed to fetch offers' 
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
-
 // ✅ GET SINGLE OFFER DETAILS
 router.get("/:id", authenticateMiddleware, logRequest("GET_OFFER"), async (req, res) => {
   try {
