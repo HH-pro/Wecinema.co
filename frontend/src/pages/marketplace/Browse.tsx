@@ -666,7 +666,6 @@ const Browse: React.FC = () => {
           )}
         </div>
       </div>
-
       {/* Video Popup Modal */}
       {showVideoPopup && selectedVideo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
@@ -687,61 +686,122 @@ const Browse: React.FC = () => {
             
             {/* Video Player */}
             <div className="relative w-full h-[70vh] bg-black flex items-center justify-center">
-              {isVideoUrl(selectedVideo) ? (
-                <>
-                  {/* YouTube Embed */}
-                  {selectedVideo.includes('youtube.com') || selectedVideo.includes('youtu.be') ? (
+              {(() => {
+                // Check if it's a YouTube URL
+                if (selectedVideo.includes('youtube.com') || selectedVideo.includes('youtu.be')) {
+                  const videoId = selectedVideo.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
+                  return (
                     <div className="w-full h-full">
                       <iframe
-                        src={`https://www.youtube.com/embed/${
-                          selectedVideo.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1]
-                        }?autoplay=1&rel=0`}
+                        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`}
                         title={videoTitle}
                         className="w-full h-full border-0"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
                       ></iframe>
                     </div>
-                  ) : 
-                  /* Vimeo Embed */
-                  selectedVideo.includes('vimeo.com') ? (
+                  );
+                }
+                
+                // Check if it's a Vimeo URL
+                if (selectedVideo.includes('vimeo.com')) {
+                  const videoId = selectedVideo.match(/vimeo\.com\/(\d+)/)?.[1];
+                  return (
                     <div className="w-full h-full">
                       <iframe
-                        src={`https://player.vimeo.com/video/${
-                          selectedVideo.match(/vimeo\.com\/(\d+)/)?.[1]
-                        }?autoplay=1&title=0&byline=0&portrait=0`}
+                        src={`https://player.vimeo.com/video/${videoId}?autoplay=1&title=0&byline=0&portrait=0`}
                         title={videoTitle}
                         className="w-full h-full border-0"
                         allow="autoplay; fullscreen; picture-in-picture"
                         allowFullScreen
                       ></iframe>
                     </div>
-                  ) : 
-                  /* Direct Video File */}
-                  (
-                    <video
-                      ref={videoRef}
-                      src={selectedVideo}
-                      controls
-                      autoPlay
-                      className="w-full h-full object-contain bg-black"
-                      onError={(e) => {
-                        console.error('Video playback error:', e);
-                        const videoElement = e.target as HTMLVideoElement;
-                        videoElement.controls = false;
-                        videoElement.innerHTML = `
-                          <div class="flex flex-col items-center justify-center h-full text-white p-8 text-center">
-                            <FiAlertCircle class="text-red-500 mb-4" size={48} />
-                            <h4 class="text-xl font-semibold mb-2">Unable to Play Video</h4>
-                            <p class="text-gray-300">The video format is not supported or the URL is invalid.</p>
-                            <p class="text-sm text-gray-400 mt-2 break-all max-w-full">${selectedVideo}</p>
-                          </div>
-                        `;
-                      }}
-                    >
-                      Your browser does not support the video tag.
-                    </video>
-                  )}
+                  );
+                }
+                
+                // For direct video files
+                return (
+                  <video
+                    ref={videoRef}
+                    src={selectedVideo}
+                    controls
+                    autoPlay
+                    className="w-full h-full object-contain bg-black"
+                    onError={(e) => {
+                      console.error('Video playback error:', e);
+                      const videoElement = e.target as HTMLVideoElement;
+                      videoElement.controls = false;
+                      const errorDiv = document.createElement('div');
+                      errorDiv.className = 'flex flex-col items-center justify-center h-full text-white p-8 text-center';
+                      errorDiv.innerHTML = `
+                        <div class="flex flex-col items-center justify-center">
+                          <svg class="text-red-500 mb-4" width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                          </svg>
+                          <h4 class="text-xl font-semibold mb-2">Unable to Play Video</h4>
+                          <p class="text-gray-300">The video format is not supported or the URL is invalid.</p>
+                          <p class="text-sm text-gray-400 mt-2 break-all max-w-full">${selectedVideo}</p>
+                        </div>
+                      `;
+                      videoElement.parentNode?.replaceChild(errorDiv, videoElement);
+                    }}
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                );
+              })()}
+            </div>
+            
+            {/* Footer Actions */}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+              <div className="flex justify-center gap-4">
+                <button
+                  onClick={() => {
+                    if (videoRef.current && !selectedVideo.includes('youtube') && !selectedVideo.includes('vimeo')) {
+                      if (videoRef.current.paused) {
+                        videoRef.current.play();
+                      } else {
+                        videoRef.current.pause();
+                      }
+                    }
+                  }}
+                  className="text-white hover:text-yellow-400 p-3 rounded-full hover:bg-white/10 transition-colors"
+                  title="Play/Pause"
+                >
+                  <FiPlay size={20} />
+                </button>
+                <button
+                  onClick={() => {
+                    if (videoRef.current) {
+                      videoRef.current.muted = !videoRef.current.muted;
+                    }
+                  }}
+                  className="text-white hover:text-yellow-400 p-3 rounded-full hover:bg-white/10 transition-colors"
+                  title="Mute/Unmute"
+                >
+                  <FiVolume2 size={20} />
+                </button>
+                <button
+                  onClick={() => {
+                    const videoContainer = document.querySelector('.relative.w-full.h-\\[70vh\\]');
+                    if (videoContainer) {
+                      if (document.fullscreenElement) {
+                        document.exitFullscreen();
+                      } else {
+                        videoContainer.requestFullscreen();
+                      }
+                    }
+                  }}
+                  className="text-white hover:text-yellow-400 p-3 rounded-full hover:bg-white/10 transition-colors"
+                  title="Fullscreen"
+                >
+                  <FiMaximize size={20} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-white p-8 text-center">
