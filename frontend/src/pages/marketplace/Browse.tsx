@@ -6,29 +6,23 @@ import {
   FiPlus,
   FiSearch,
   FiX,
-  FiCreditCard,
-  FiCheck,
-  FiAlertCircle,
-  FiLoader,
   FiRefreshCw,
   FiTrendingUp,
   FiDollarSign,
   FiStar,
   FiClock,
-  FiPackage,
-  FiEye,
-  FiShoppingCart
+  FiPackage
 } from 'react-icons/fi';
 
 // Components
 import ListingCard from '../../components/marketplae/ListingCard';
 import MarketplaceLayout from '../../components/Layout';
 
-// Types
-import { Listing } from '../../types/marketplace';
-
 // API
 import marketplaceApi from '../../api/marketplaceApi';
+
+// Types
+import { Listing } from '../../types/marketplace';
 
 const Browse: React.FC = () => {
   // State Management
@@ -36,27 +30,8 @@ const Browse: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [showFilters, setShowFilters] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [showOfferModal, setShowOfferModal] = useState<boolean>(false);
-  const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
-  const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
-  const [clientSecret, setClientSecret] = useState<string>('');
-  const [offerData, setOfferData] = useState<any>(null);
-  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
-  const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string>('');
-  const [debugInfo, setDebugInfo] = useState<any>(null);
-
-  // Pagination state
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 20,
-    total: 0,
-    pages: 1,
-    hasMore: true
-  });
-
-  const navigate = useNavigate();
 
   // Filters
   const [filters, setFilters] = useState({
@@ -66,22 +41,20 @@ const Browse: React.FC = () => {
     sortBy: 'createdAt',
     sortOrder: 'desc',
     status: 'active',
-    type: ''
+    type: 'all'
   });
+
+  const navigate = useNavigate();
 
   // Categories for dropdown
   const categories = [
-    'all',
-    'Video',
-    'Script',
-    'Music',
-    'Animation',
-    'Documentary',
-    'Commercial',
-    'Film',
-    'Short Film',
-    'Series',
-    'Other'
+    'all', 'Video', 'Script', 'Music', 'Animation', 
+    'Documentary', 'Commercial', 'Film', 'Short Film', 
+    'Series', 'Other'
+  ];
+
+  const listingTypes = [
+    'all', 'for_sale', 'licensing', 'adaptation_rights', 'commission'
   ];
 
   // ==============================
@@ -91,7 +64,6 @@ const Browse: React.FC = () => {
   useEffect(() => {
     console.log('🔄 Browse component mounted');
     fetchListings();
-    fetchCurrentUser();
   }, []);
 
   useEffect(() => {
@@ -103,31 +75,17 @@ const Browse: React.FC = () => {
   // API FUNCTIONS
   // ==============================
 
-  const fetchCurrentUser = async () => {
-    try {
-      const user = marketplaceApi.utils.getCurrentUser();
-      if (user) {
-        setCurrentUser(user);
-        console.log('✅ Current user loaded:', user);
-      } else {
-        console.log('⚠️ No user found in token');
-      }
-    } catch (error) {
-      console.error('Error fetching current user:', error);
-    }
-  };
-
   const fetchListings = async () => {
     try {
       console.log('🔄 Fetching listings with filters:', filters);
       setLoading(true);
       setError('');
-      setDebugInfo(null);
+      setSuccessMessage('');
 
       const params = {
         ...filters,
-        page: pagination.page,
-        limit: pagination.limit,
+        page: 1,
+        limit: 20,
         search: searchQuery || undefined
       };
 
@@ -137,31 +95,23 @@ const Browse: React.FC = () => {
       
       console.log('📦 API Response:', response);
       
-      setDebugInfo({
-        apiResponse: response,
-        timestamp: new Date().toISOString(),
-        params: params
-      });
-
       if (response.success) {
         const listingsData = response.data?.listings || [];
-        const total = response.data?.pagination?.total || 0;
-        const pages = response.data?.pagination?.pages || 1;
+        console.log('✅ Listings received:', listingsData.length);
         
-        console.log('✅ Listings received:', {
-          count: listingsData.length,
-          total: total,
-          pages: pages,
-          sample: listingsData[0]
-        });
+        // Debug: Log first listing
+        if (listingsData.length > 0) {
+          console.log('📝 First listing sample:', {
+            id: listingsData[0]._id,
+            title: listingsData[0].title,
+            price: listingsData[0].price,
+            formattedPrice: listingsData[0].formattedPrice,
+            seller: listingsData[0].sellerId,
+            mediaUrls: listingsData[0].mediaUrls
+          });
+        }
         
         setListings(listingsData);
-        setPagination(prev => ({
-          ...prev,
-          total,
-          pages,
-          hasMore: pagination.page < pages
-        }));
         
         if (listingsData.length === 0) {
           setSuccessMessage('No listings found. Try adjusting your filters or be the first to create a listing!');
@@ -194,41 +144,12 @@ const Browse: React.FC = () => {
 
   const handleMakeOffer = (listing: Listing) => {
     console.log('💰 Making offer for:', listing._id);
-    setSelectedListing(listing);
-    setShowOfferModal(true);
-    setError('');
+    alert('Make offer functionality will be implemented soon!');
   };
 
-  const handleDirectPayment = async (listing: Listing) => {
-    if (!listing._id) return;
-
-    try {
-      setPaymentStatus('processing');
-      setError('');
-
-      const response = await marketplaceApi.orders.createOrder?.(listing._id, {
-        amount: listing.price,
-        paymentMethod: 'stripe'
-      });
-
-      if (response && response.success && response.data?.clientSecret) {
-        setClientSecret(response.data.clientSecret);
-        setOfferData({
-          ...response.data,
-          type: 'direct_purchase',
-          amount: listing.price,
-          listing: listing
-        });
-        setShowPaymentModal(true);
-        setPaymentStatus('idle');
-      } else {
-        throw new Error(response?.error || 'Failed to create order');
-      }
-    } catch (error: any) {
-      console.error('❌ Error creating order:', error);
-      setPaymentStatus('failed');
-      setError(error.message || 'Failed to initiate payment');
-    }
+  const handleDirectPayment = (listing: Listing) => {
+    console.log('💳 Direct payment for:', listing._id);
+    alert('Direct payment functionality will be implemented soon!');
   };
 
   const clearFilters = () => {
@@ -240,7 +161,7 @@ const Browse: React.FC = () => {
       sortBy: 'createdAt',
       sortOrder: 'desc',
       status: 'active',
-      type: ''
+      type: 'all'
     });
     setSearchQuery('');
     setError('');
@@ -284,33 +205,6 @@ const Browse: React.FC = () => {
   return (
     <MarketplaceLayout>
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-        {/* Debug Panel - Only in development */}
-        {process.env.NODE_ENV === 'development' && debugInfo && (
-          <div className="fixed bottom-4 right-4 z-50 bg-gray-900 text-white p-4 rounded-lg shadow-2xl max-w-md max-h-64 overflow-y-auto">
-            <div className="flex justify-between items-center mb-2">
-              <h4 className="text-sm font-semibold">Debug Info</h4>
-              <button 
-                onClick={() => setDebugInfo(null)}
-                className="text-gray-400 hover:text-white"
-              >
-                <FiX size={16} />
-              </button>
-            </div>
-            <div className="text-xs space-y-1">
-              <div><strong>Listings Count:</strong> {listings.length}</div>
-              <div><strong>Filtered Count:</strong> {filteredListings.length}</div>
-              <div><strong>API Success:</strong> {debugInfo.apiResponse?.success?.toString()}</div>
-              <div><strong>Error:</strong> {debugInfo.apiResponse?.error || 'None'}</div>
-              <div className="pt-2 border-t border-gray-700">
-                <strong>Sample Listing:</strong>
-                <pre className="text-xs mt-1 overflow-auto max-h-20">
-                  {JSON.stringify(listings[0], null, 2)}
-                </pre>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Hero Section */}
         <div className="bg-gradient-to-r from-yellow-500 via-yellow-600 to-yellow-700 text-white py-12 px-4">
           <div className="max-w-7xl mx-auto">
@@ -354,7 +248,7 @@ const Browse: React.FC = () => {
             <div className="mb-6 animate-fade-in">
               <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg">
                 <div className="flex items-center gap-3">
-                  <FiAlertCircle className="text-red-500 flex-shrink-0" size={20} />
+                  <FiPackage className="text-red-500 flex-shrink-0" size={20} />
                   <div className="flex-1">
                     <p className="text-red-800 font-medium">{error}</p>
                   </div>
@@ -373,16 +267,10 @@ const Browse: React.FC = () => {
             <div className="mb-6 animate-fade-in">
               <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg">
                 <div className="flex items-center gap-3">
-                  <FiCheck className="text-green-500 flex-shrink-0" size={20} />
+                  <FiPackage className="text-green-500 flex-shrink-0" size={20} />
                   <div className="flex-1">
                     <p className="text-green-800 font-medium">{successMessage}</p>
                   </div>
-                  <button
-                    onClick={() => setSuccessMessage('')}
-                    className="text-green-500 hover:text-green-700 p-1"
-                  >
-                    <FiX size={16} />
-                  </button>
                 </div>
               </div>
             </div>
@@ -402,7 +290,7 @@ const Browse: React.FC = () => {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    placeholder="Search titles, descriptions, tags, categories..."
+                    placeholder="Search titles, descriptions, tags..."
                     className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all duration-200"
                   />
                   {searchQuery && (
@@ -460,7 +348,25 @@ const Browse: React.FC = () => {
                     >
                       {categories.map(category => (
                         <option key={category} value={category}>
-                          {category.charAt(0).toUpperCase() + category.slice(1)}
+                          {category === 'all' ? 'All Categories' : category}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Type */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Type
+                    </label>
+                    <select
+                      value={filters.type}
+                      onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                    >
+                      {listingTypes.map(type => (
+                        <option key={type} value={type}>
+                          {type === 'all' ? 'All Types' : type.replace('_', ' ').toUpperCase()}
                         </option>
                       ))}
                     </select>
@@ -469,19 +375,19 @@ const Browse: React.FC = () => {
                   {/* Price Range */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Price Range
+                      Price Range ($)
                     </label>
                     <div className="flex gap-3">
                       <input
                         type="number"
-                        placeholder="Min $"
+                        placeholder="Min"
                         value={filters.minPrice}
                         onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))}
                         className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                       />
                       <input
                         type="number"
-                        placeholder="Max $"
+                        placeholder="Max"
                         value={filters.maxPrice}
                         onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: e.target.value }))}
                         className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
@@ -502,22 +408,6 @@ const Browse: React.FC = () => {
                       <option value="createdAt">Newest First</option>
                       <option value="price">Price: Low to High</option>
                       <option value="-price">Price: High to Low</option>
-                      <option value="views">Most Viewed</option>
-                    </select>
-                  </div>
-
-                  {/* Sort Order */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Order
-                    </label>
-                    <select
-                      value={filters.sortOrder}
-                      onChange={(e) => setFilters(prev => ({ ...prev, sortOrder: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                    >
-                      <option value="desc">Descending</option>
-                      <option value="asc">Ascending</option>
                     </select>
                   </div>
                 </div>
@@ -525,7 +415,7 @@ const Browse: React.FC = () => {
                 {/* Filter Actions */}
                 <div className="flex justify-between items-center mt-6 pt-6 border-t border-gray-200">
                   <div className="text-sm text-gray-600">
-                    Showing {listings.length} of {pagination.total} listings
+                    Showing {listings.length} listings
                   </div>
                   <div className="flex gap-3">
                     <button
@@ -552,9 +442,11 @@ const Browse: React.FC = () => {
           {/* Results Header */}
           <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Featured Listings</h2>
+              <h2 className="text-2xl font-bold text-gray-900">
+                {searchQuery ? `Search Results for "${searchQuery}"` : 'Featured Listings'}
+              </h2>
               <p className="text-gray-600 mt-1">
-                {filteredListings.length} listings found
+                {filteredListings.length} {filteredListings.length === 1 ? 'listing' : 'listings'} found
               </p>
             </div>
             <div className="flex items-center gap-3 text-sm text-gray-600">
@@ -563,37 +455,17 @@ const Browse: React.FC = () => {
             </div>
           </div>
 
-          {/* DEBUG: Raw Data Display */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-semibold text-blue-900 flex items-center gap-2">
-                  <FiEye size={16} />
-                  Debug View
-                </h4>
-                <button
-                  onClick={() => console.log('Listings:', listings)}
-                  className="text-xs text-blue-600 hover:text-blue-800"
-                >
-                  Log to Console
-                </button>
-              </div>
-              <div className="text-xs text-blue-800 space-y-1">
-                <div><strong>Total Listings:</strong> {listings.length}</div>
-                <div><strong>Filtered Listings:</strong> {filteredListings.length}</div>
-                <div><strong>API Data Structure:</strong> Array: {Array.isArray(listings) ? 'Yes' : 'No'}</div>
-                {listings.length > 0 && (
-                  <div className="pt-2 border-t border-blue-300">
-                    <strong>First Listing Preview:</strong>
-                    <div className="mt-1 text-xs">
-                      <div><strong>ID:</strong> {listings[0]._id}</div>
-                      <div><strong>Title:</strong> {listings[0].title}</div>
-                      <div><strong>Price:</strong> {listings[0].price} ({listings[0].formattedPrice})</div>
-                      <div><strong>Media URLs:</strong> {Array.isArray(listings[0].mediaUrls) ? listings[0].mediaUrls.length : 'Not array'}</div>
-                    </div>
-                  </div>
-                )}
-              </div>
+          {/* Debug Info in Development */}
+          {process.env.NODE_ENV === 'development' && listings.length > 0 && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <details>
+                <summary className="text-sm font-medium text-blue-800 cursor-pointer">
+                  Debug: First Listing Data (Click to expand)
+                </summary>
+                <pre className="mt-2 text-xs overflow-auto max-h-40 p-2 bg-white border rounded">
+                  {JSON.stringify(listings[0], null, 2)}
+                </pre>
+              </details>
             </div>
           )}
 
@@ -630,82 +502,39 @@ const Browse: React.FC = () => {
               </div>
             </div>
           ) : (
-            <>
-              {/* Stats Bar */}
-              <div className="mb-6 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-xl p-4">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                      <FiShoppingCart className="text-green-600" size={20} />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-700">Active Listings</div>
-                      <div className="text-2xl font-bold text-gray-900">{filteredListings.length}</div>
-                    </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredListings.map((listing, index) => {
+                console.log(`🎨 Rendering listing ${index + 1}:`, listing.title);
+                return (
+                  <div key={listing._id} className="animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
+                    <ListingCard
+                      listing={listing}
+                      onViewDetails={handleViewDetails}
+                      onMakeOffer={handleMakeOffer}
+                      onDirectPayment={handleDirectPayment}
+                    />
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                      <FiDollarSign className="text-blue-600" size={20} />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium text-gray-700">Average Price</div>
-                      <div className="text-2xl font-bold text-gray-900">
-                        ${(filteredListings.reduce((sum, listing) => sum + (listing.price || 0), 0) / filteredListings.length).toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    Showing {filteredListings.length} of {pagination.total} listings
-                  </div>
-                </div>
-              </div>
+                );
+              })}
+            </div>
+          )}
 
-              {/* Listings Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredListings.map((listing, index) => {
-                  console.log(`Rendering listing ${index}:`, listing._id, listing.title);
-                  return (
-                    <div key={listing._id} className="animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
-                      <ListingCard
-                        listing={listing}
-                        onViewDetails={handleViewDetails}
-                        onMakeOffer={handleMakeOffer}
-                        onDirectPayment={handleDirectPayment}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Load More */}
-              {pagination.hasMore && (
-                <div className="mt-12 text-center">
-                  <button
-                    onClick={() => {
-                      setPagination(prev => ({ ...prev, page: prev.page + 1 }));
-                      fetchListings();
-                    }}
-                    disabled={loading}
-                    className="inline-flex items-center justify-center px-8 py-4 border border-gray-300 text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {loading ? (
-                      <>
-                        <FiLoader className="animate-spin mr-2" size={18} />
-                        Loading...
-                      </>
-                    ) : (
-                      'Load More Listings'
-                    )}
-                  </button>
-                </div>
-              )}
-            </>
+          {/* Load More (Optional) */}
+          {filteredListings.length > 0 && listings.length > 10 && (
+            <div className="mt-12 text-center">
+              <button
+                onClick={() => {
+                  // Implement load more functionality
+                  alert('Load more functionality will be implemented!');
+                }}
+                className="px-8 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium"
+              >
+                Load More Listings
+              </button>
+            </div>
           )}
         </div>
       </div>
-
-      {/* Offer Modal (Keep existing) */}
-      {/* Payment Modal (Keep existing) */}
     </MarketplaceLayout>
   );
 };
