@@ -35,7 +35,7 @@ const OfferModal: React.FC<OfferModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto">
       {/* Main container with top margin */}
-      <div className="mt-16 sm:mt-20 bg-white w-full max-w-md sm:max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[80vh] overflow-hidden scale-95 sm:scale-100 transition-transform duration-200 ease-out">
+      <div className="mt-26 sm:mt-20 bg-white w-full max-w-md sm:max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[80vh] overflow-hidden scale-95 sm:scale-100 transition-transform duration-200 ease-out">
         
         {/* Header */}
         <div className="sticky top-0 z-10 bg-gradient-to-r from-yellow-50 to-white border-b border-gray-200 p-3 sm:p-4 flex justify-between items-center">
