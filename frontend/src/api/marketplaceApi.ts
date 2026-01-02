@@ -170,79 +170,68 @@ export const listingsApi = {
   type?: string;
 }): Promise<ApiResponse<{ listings: Listing[] }>> => {
   try {
-    console.log('📡 Fetching listings with params:', params);
-    
     const response = await axios.get(`${API_BASE_URL}/marketplace/listings`, {
       params
     });
     
-    console.log('📦 API Response Status:', response.status);
+    const data = response.data;
     
-    // Handle different response structures
-    const responseData = response.data;
+    // Log for debugging
+    console.log('🎯 API Response Analysis:', {
+      isArray: Array.isArray(data),
+      type: typeof data,
+      keys: data && typeof data === 'object' ? Object.keys(data) : [],
+      hasListings: !!(data?.listings),
+      listingsIsArray: Array.isArray(data?.listings)
+    });
     
-    // CASE 1: Direct array response
-    if (Array.isArray(responseData)) {
-      console.log('✅ Case 1: Response is direct array');
-      return {
-        success: true,
-        data: { listings: responseData },
-        message: `Found ${responseData.length} listings`
-      };
+    // Handle all possible response structures
+    let listings: Listing[] = [];
+    let pagination = undefined;
+    let message = '';
+    
+    if (Array.isArray(data)) {
+      // Case 1: Response is directly an array
+      listings = data;
+      message = `Found ${listings.length} listings`;
+    } 
+    else if (data && typeof data === 'object') {
+      // Case 2: Standard API response
+      if (data.success === false) {
+        return {
+          success: false,
+          error: data.error || 'API error',
+          status: data.status
+        };
+      }
+      
+      // Extract listings from various possible structures
+      if (Array.isArray(data.listings)) {
+        listings = data.listings;
+      } 
+      else if (Array.isArray(data.data)) {
+        listings = data.data;
+      } 
+      else if (Array.isArray(data.items)) {
+        listings = data.items;
+      }
+      
+      // Extract pagination if available
+      if (data.pagination) {
+        pagination = data.pagination;
+      }
+      
+      // Extract message
+      message = data.message || `Found ${listings.length} listings`;
     }
     
-    // CASE 2: Standard API response with listings property
-    if (responseData && typeof responseData === 'object') {
-      
-      // If already has success property
-      if (responseData.success !== undefined) {
-        console.log('✅ Case 2a: Standard API response');
-        return responseData;
-      }
-      
-      // If has listings array
-      if (responseData.listings && Array.isArray(responseData.listings)) {
-        console.log('✅ Case 2b: Has listings array');
-        return {
-          success: true,
-          data: { listings: responseData.listings },
-          ...responseData // Include pagination etc.
-        };
-      }
-      
-      // If has data array
-      if (responseData.data && Array.isArray(responseData.data)) {
-        console.log('✅ Case 2c: Has data array');
-        return {
-          success: true,
-          data: { listings: responseData.data },
-          ...responseData
-        };
-      }
-      
-      // Try to find any array in the response
-      const arrayKeys = Object.keys(responseData).filter(key => 
-        Array.isArray(responseData[key])
-      );
-      
-      if (arrayKeys.length > 0) {
-        console.log(`✅ Case 2d: Found array in key: ${arrayKeys[0]}`);
-        return {
-          success: true,
-          data: { listings: responseData[arrayKeys[0]] },
-          message: `Found ${responseData[arrayKeys[0]].length} listings`
-        };
-      }
-    }
-    
-    // CASE 3: Fallback - empty array
-    console.warn('⚠️ Unknown response structure, returning empty');
-    console.log('Response data:', responseData);
+    console.log(`✅ Processed ${listings.length} listings`);
     
     return {
       success: true,
-      data: { listings: [] },
-      message: 'No listings found'
+      data: { listings },
+      pagination,
+      message
     };
     
   } catch (error) {
