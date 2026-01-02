@@ -277,10 +277,6 @@ router.get("/:id", async (req, res) => {
     });
   }
 });
-
-// ===================================================
-// ✅ GET USER'S LISTINGS (My Listings)
-// ===================================================
 router.get("/my-listings", authenticateMiddleware, async (req, res) => {
   try {
     console.log("🎯 /my-listings endpoint hit");
