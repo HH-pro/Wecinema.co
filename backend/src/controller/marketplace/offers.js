@@ -8,7 +8,7 @@ const Order = require("../../models/marketplace/order");
 const Chat = require("../../models/marketplace/Chat");
 const Message = require("../../models/marketplace/messages");
 const { authenticateMiddleware } = require("../../utils");
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
 const emailService = require('../../../services/emailService');
 const admin = require('firebase-admin');
 
