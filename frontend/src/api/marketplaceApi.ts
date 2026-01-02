@@ -446,63 +446,26 @@ export const listingsApi = {
     }
   },
 
-  getMyListings: async (params?: any): Promise<ApiResponse<{ listings: Listing[] }>> => {
-  try {
-    // Get token directly
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    
-    if (!token) {
-      return {
-        success: false,
-        error: 'Authentication required. Please login.',
-        status: 401
-      };
+  // Get seller's own listings
+  getMyListings: async (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    category?: string;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: string;
+  }): Promise<ApiResponse<{ listings: Listing[] }>> => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/marketplace/listings/my-listings`, {
+        params,
+        ...getHeaders()
+      });
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to fetch your listings');
     }
-    
-    const response = await fetch(`${API_BASE_URL}/marketplace/listings/my-listings?${new URLSearchParams(params || {}).toString()}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    const data = await response.json();
-    
-    if (!response.ok) {
-      return {
-        success: false,
-        error: data.error || `HTTP ${response.status}: ${response.statusText}`,
-        status: response.status
-      };
-    }
-    
-    if (!data.success) {
-      return {
-        success: false,
-        error: data.error || 'Failed to fetch listings',
-        status: data.status || response.status
-      };
-    }
-    
-    return {
-      success: true,
-      data: {
-        listings: data.listings || []
-      },
-      message: data.message,
-      status: response.status
-    };
-    
-  } catch (error: any) {
-    console.error('Fetch error:', error);
-    return {
-      success: false,
-      error: error.message || 'Network error',
-      status: 0
-    };
-  }
-},
+  },
 
   // Create new listing
   createListing: async (listingData: {
