@@ -157,36 +157,99 @@ const handleApiError = <T>(error: AxiosError, defaultMessage: string = 'API Erro
 // ============================================
 
 export const listingsApi = {
-  // Get all active listings (public)
-  getAllListings: async (params?: {
-    page?: number;
-    limit?: number;
-    category?: string;
-    minPrice?: number;
-    maxPrice?: number;
-    status?: string;
-    search?: string;
-    sortBy?: string;
-    sortOrder?: string;
-    type?: string;
-  }): Promise<ApiResponse<{ listings: Listing[] }>> => {
-    try {
-      console.log('📡 Fetching listings with params:', params);
-      
-      const response = await axios.get(`${API_BASE_URL}/marketplace/listings`, {
-        params
-      });
-      
-      const result = normalizeResponse<{ listings: Listing[] }>(response);
-      console.log('✅ Listings fetched:', result.success ? `${result.data?.listings?.length || 0} listings` : 'Failed');
-      
-      return result;
-    } catch (error) {
-      console.error('❌ Error fetching listings:', error);
-      return handleApiError(error as AxiosError, 'Failed to fetch listings');
+ getAllListings: async (params?: {
+  page?: number;
+  limit?: number;
+  category?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  status?: string;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: string;
+  type?: string;
+}): Promise<ApiResponse<{ listings: Listing[] }>> => {
+  try {
+    console.log('📡 Fetching listings with params:', params);
+    
+    const response = await axios.get(`${API_BASE_URL}/marketplace/listings`, {
+      params
+    });
+    
+    console.log('📦 API Response Status:', response.status);
+    
+    // Handle different response structures
+    const responseData = response.data;
+    
+    // CASE 1: Direct array response
+    if (Array.isArray(responseData)) {
+      console.log('✅ Case 1: Response is direct array');
+      return {
+        success: true,
+        data: { listings: responseData },
+        message: `Found ${responseData.length} listings`
+      };
     }
-  },
-
+    
+    // CASE 2: Standard API response with listings property
+    if (responseData && typeof responseData === 'object') {
+      
+      // If already has success property
+      if (responseData.success !== undefined) {
+        console.log('✅ Case 2a: Standard API response');
+        return responseData;
+      }
+      
+      // If has listings array
+      if (responseData.listings && Array.isArray(responseData.listings)) {
+        console.log('✅ Case 2b: Has listings array');
+        return {
+          success: true,
+          data: { listings: responseData.listings },
+          ...responseData // Include pagination etc.
+        };
+      }
+      
+      // If has data array
+      if (responseData.data && Array.isArray(responseData.data)) {
+        console.log('✅ Case 2c: Has data array');
+        return {
+          success: true,
+          data: { listings: responseData.data },
+          ...responseData
+        };
+      }
+      
+      // Try to find any array in the response
+      const arrayKeys = Object.keys(responseData).filter(key => 
+        Array.isArray(responseData[key])
+      );
+      
+      if (arrayKeys.length > 0) {
+        console.log(`✅ Case 2d: Found array in key: ${arrayKeys[0]}`);
+        return {
+          success: true,
+          data: { listings: responseData[arrayKeys[0]] },
+          message: `Found ${responseData[arrayKeys[0]].length} listings`
+        };
+      }
+    }
+    
+    // CASE 3: Fallback - empty array
+    console.warn('⚠️ Unknown response structure, returning empty');
+    console.log('Response data:', responseData);
+    
+    return {
+      success: true,
+      data: { listings: [] },
+      message: 'No listings found'
+    };
+    
+  } catch (error) {
+    console.error('❌ Error fetching listings:', error);
+    return handleApiError(error as AxiosError, 'Failed to fetch listings');
+  }
+},
   // Get seller's own listings
   getMyListings: async (params?: {
     page?: number;
