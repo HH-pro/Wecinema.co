@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FiCheck, FiX, FiUser, FiMail, FiCreditCard, FiAlertCircle, FiLoader } from 'react-icons/fi';
+import { FiCheck, FiX, FiUser, FiMail, FiCreditCard, FiAlertCircle, FiLoader, FiImage } from 'react-icons/fi';
 import { Elements, PaymentElement, useStripe, useElements, AddressElement } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import marketplaceApi from '../../api/marketplaceApi';
@@ -38,11 +38,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-2 sm:p-4 overflow-y-auto">
-      <div className="w-full max-w-md sm:max-w-lg mx-4">
-        <div className="bg-white rounded-lg shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
-          {/* Header */}
-          <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black bg-opacity-50 p-2 sm:p-4 overflow-y-auto">
+      <div className="w-full max-w-md sm:max-w-lg mx-4 mt-4 sm:mt-8 lg:mt-12">
+        <div className="bg-white rounded-lg shadow-xl flex flex-col max-h-[calc(100vh-4rem)] sm:max-h-[calc(100vh-6rem)] overflow-hidden">
+          {/* Header - Sticky */}
+          <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold text-gray-900">
                 {offerData?.type === 'direct_purchase' ? 'Complete Purchase' : 'Complete Offer Payment'}
