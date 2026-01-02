@@ -863,7 +863,7 @@ const OffersPage = () => {
           </Paper>
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <Paper sx={{ p: 3, textAlign="center" }}>
+          <Paper sx={{ p: 3, textAlign:"center" }}>
             <Box display="flex" alignItems="center" justifyContent="center" mb={1}>
               <TrendingIcon color="success" sx={{ mr: 1 }} />
               <Typography variant="h5" fontWeight="bold">
