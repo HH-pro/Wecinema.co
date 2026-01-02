@@ -47,7 +47,7 @@ import {
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import marketplaceApi, { Offer, ApiResponse } from '../../api/marketplaceApi';
-import { formatCurrency, formatBytes } from '../../utilities/helperfFunction';
+import { formatCurrency } from '../../utilities/helperfFunction';
 
 // Stripe configuration
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLIC_KEY || 'pk_test_your_public_key');
