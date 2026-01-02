@@ -1,157 +1,201 @@
-import React, { useState } from 'react';
-import { FiX, FiDollarSign, FiMessageSquare } from 'react-icons/fi';
+import React from 'react';
+import { FiX, FiCreditCard, FiAlertCircle, FiLoader, FiCalendar, FiMessageSquare } from 'react-icons/fi';
+import marketplaceApi from '../../api/marketplaceApi';
 
-interface MakeOfferModalProps {
-  listing: any;
+interface OfferModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (offerData: { amount: number; message: string }) => Promise<void>;
+  selectedListing: any;
+  offerForm: {
+    amount: string;
+    message: string;
+    requirements: string;
+    expectedDelivery: string;
+  };
+  setOfferForm: (form: any) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  paymentStatus: 'idle' | 'processing' | 'success' | 'failed';
+  error: string;
+  getThumbnailUrl: (listing: any) => string;
 }
 
-const MakeOfferModal: React.FC<MakeOfferModalProps> = ({ 
-  listing, 
-  isOpen, 
-  onClose, 
-  onSubmit 
+const OfferModal: React.FC<OfferModalProps> = ({
+  isOpen,
+  onClose,
+  selectedListing,
+  offerForm,
+  setOfferForm,
+  onSubmit,
+  paymentStatus,
+  error,
+  getThumbnailUrl
 }) => {
-  const [amount, setAmount] = useState('');
-  const [message, setMessage] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  if (!isOpen || !selectedListing) return null;
 
-  if (!isOpen) return null;
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-
-    const offerAmount = parseFloat(amount);
-    
-    if (!offerAmount || offerAmount <= 0) {
-      setError('Please enter a valid amount');
-      return;
-    }
-
-    if (offerAmount > listing.price * 2) {
-      setError('Offer amount seems too high');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      await onSubmit({ amount: offerAmount, message });
-      setAmount('');
-      setMessage('');
-      onClose();
-    } catch (err) {
-      setError('Failed to submit offer. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: price % 1 === 0 ? 0 : 2,
-    }).format(price);
+    onSubmit(e);
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl w-full max-w-md">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto">
+      <div className="bg-white w-full max-w-md sm:max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden">
+        
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900">Make an Offer</h2>
+        <div className="sticky top-0 z-10 bg-gradient-to-r from-yellow-50 to-white border-b border-gray-200 p-3 sm:p-4 flex justify-between items-center">
+          <div>
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900">Make an Offer</h3>
+            <p className="text-xs text-gray-600">Submit your offer for this listing</p>
+          </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="p-1 rounded-md hover:bg-gray-100 transition-colors"
           >
-            <FiX size={24} />
+            <FiX size={18} className="text-gray-600" />
           </button>
         </div>
 
-        {/* Listing Info */}
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="font-semibold text-gray-900 mb-2">{listing.title}</h3>
-          <p className="text-gray-600 text-sm">Listed at: {formatPrice(listing.price)}</p>
+        {/* Scrollable Body */}
+        <div className="flex-1 overflow-y-auto px-3 sm:px-5 py-3 space-y-4">
+          {/* Listing Preview */}
+          <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg shadow-sm flex items-start gap-3">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg overflow-hidden border border-blue-300 flex-shrink-0 bg-gray-100">
+              <img
+                src={getThumbnailUrl(selectedListing)}
+                alt={selectedListing.title}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h4 className="font-semibold text-gray-900 text-sm sm:text-base truncate">{selectedListing.title}</h4>
+              <p className="text-gray-600 text-xs mt-1 line-clamp-2">{selectedListing.description}</p>
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-green-600 text-base sm:text-lg font-bold">
+                  {marketplaceApi.utils.formatCurrency(selectedListing.price)}
+                </span>
+                <span className="bg-blue-100 text-blue-800 text-[10px] font-medium px-2 py-0.5 rounded-full">
+                  {selectedListing.category}
+                </span>
+              </div>
+              
+              {/* Seller Info */}
+              <div className="flex items-center gap-1 mt-2 text-xs text-gray-500">
+                <FiMessageSquare size={12} />
+                <span>Seller: {selectedListing.sellerId?.username || 'Seller'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Offer Form */}
+          <form onSubmit={handleSubmit} className="space-y-3">
+            {/* Amount */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-800 mb-1.5 flex items-center gap-1">
+                <FiCreditCard size={12} />
+                Offer Amount
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span className="text-gray-500 text-sm">$</span>
+                </div>
+                <input
+                  type="number"
+                  required
+                  min="0.50"
+                  step="0.01"
+                  value={offerForm.amount}
+                  onChange={(e) => setOfferForm({ ...offerForm, amount: e.target.value })}
+                  className="w-full pl-8 pr-2.5 py-1.5 sm:py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none text-xs sm:text-sm"
+                  placeholder="Enter your offer amount"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Minimum offer: $0.50</p>
+            </div>
+
+            {/* Message */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-800 mb-1.5">Message to Seller</label>
+              <textarea
+                value={offerForm.message}
+                onChange={(e) => setOfferForm({ ...offerForm, message: e.target.value })}
+                className="w-full px-2.5 py-1.5 sm:py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 resize-none outline-none text-xs sm:text-sm"
+                rows={3}
+                placeholder="Introduce yourself and explain your requirements..."
+              />
+            </div>
+
+            {/* Requirements */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-800 mb-1.5">Specific Requirements (Optional)</label>
+              <textarea
+                value={offerForm.requirements}
+                onChange={(e) => setOfferForm({ ...offerForm, requirements: e.target.value })}
+                className="w-full px-2.5 py-1.5 sm:py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 resize-none outline-none text-xs sm:text-sm"
+                rows={2}
+                placeholder="Any specific changes or requirements..."
+              />
+            </div>
+
+            {/* Date */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-800 mb-1.5 flex items-center gap-1">
+                <FiCalendar size={12} />
+                Expected Delivery Date
+              </label>
+              <input
+                type="date"
+                required
+                value={offerForm.expectedDelivery}
+                onChange={(e) => setOfferForm({ ...offerForm, expectedDelivery: e.target.value })}
+                className="w-full px-2.5 py-1.5 sm:py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none text-xs sm:text-sm"
+                min={new Date().toISOString().split('T')[0]}
+              />
+            </div>
+
+            {/* Info Box */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 text-xs text-yellow-700 flex gap-2 items-start">
+              <FiCreditCard className="text-yellow-600 mt-0.5" size={14} />
+              <p>
+                Payment will be processed immediately and securely held in escrow until the seller accepts your offer.
+              </p>
+            </div>
+
+            {/* Error Display */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-md p-3 text-xs text-red-700 flex gap-2 items-start">
+                <FiAlertCircle className="text-red-600 mt-0.5" size={14} />
+                <p>{error}</p>
+              </div>
+            )}
+          </form>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6">
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              {error}
-            </div>
-          )}
-
-          {/* Amount Input */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Offer Amount
-            </label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FiDollarSign className="text-gray-400" />
-              </div>
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                max={listing.price * 2}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter your offer amount"
-                required
-              />
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Suggested: {formatPrice(listing.price * 0.8)} - {formatPrice(listing.price)}
-            </p>
-          </div>
-
-          {/* Message Input */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Message (Optional)
-            </label>
-            <div className="relative">
-              <div className="absolute top-3 left-3 pointer-events-none">
-                <FiMessageSquare className="text-gray-400" />
-              </div>
-              <textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                rows={4}
-                className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                placeholder="Add a message to the seller..."
-              />
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-200 transition-colors duration-200"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-purple-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? 'Submitting...' : 'Submit Offer'}
-            </button>
-          </div>
-        </form>
+        {/* Sticky Footer */}
+        <div className="sticky bottom-0 bg-white border-t border-gray-200 p-3 flex flex-col sm:flex-row gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-100 transition-all text-xs sm:text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={paymentStatus === 'processing'}
+            className="flex-1 py-2 rounded-md bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white transition-all text-xs sm:text-sm font-medium flex items-center justify-center gap-2"
+          >
+            {paymentStatus === 'processing' ? (
+              <>
+                <FiLoader className="animate-spin" size={14} />
+                Processing...
+              </>
+            ) : (
+              `Submit Offer & Pay $${offerForm.amount || '0.00'}`
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
 };
 
-export default MakeOfferModal;
+export default OfferModal;
