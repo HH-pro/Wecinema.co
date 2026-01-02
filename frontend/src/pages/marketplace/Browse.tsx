@@ -337,7 +337,7 @@ const Browse: React.FC = () => {
     setPaymentStatus('success');
     
     // Redirect to orders page with success message
-    navigate('/marketplace/my-offers', { 
+    navigate('/marketplace/my-orders', { 
       state: { 
         message: 'Payment completed successfully! Your order has been placed.',
         type: 'success'
@@ -495,7 +495,7 @@ const Browse: React.FC = () => {
                       <span className="sm:hidden">Create</span>
                     </button>
                     <button 
-                      onClick={() => navigate('/marketplace/my-offers')}
+                      onClick={() => navigate('/marketplace/my-orders')}
                       className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
                     >
                       <FiCreditCard className="mr-2" size={18} />
