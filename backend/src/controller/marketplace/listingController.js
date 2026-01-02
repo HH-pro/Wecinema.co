@@ -70,57 +70,181 @@ router.get("/listings", async (req, res) => {
 // ===================================================
 router.get("/my-listings", authenticateMiddleware, async (req, res) => {
   try {
+    console.log("🎯 /my-listings endpoint hit");
+    console.log("User ID from token:", req.user?._id);
+    console.log("User:", req.user);
+    
     const sellerId = req.user._id;
     
-    const { status, page = 1, limit = 10 } = req.query;
+    // Parse query parameters
+    const { 
+      status, 
+      page = 1, 
+      limit = 10,
+      category,
+      search,
+      sortBy = 'updatedAt',
+      sortOrder = 'desc'
+    } = req.query;
     
-    const filter = { sellerId };
-    if (status) filter.status = status;
-
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    // Build filter
+    const filter = { sellerId: sellerId };
+    
+    if (status && status !== 'all') {
+      filter.status = status;
+    }
+    
+    if (category && category !== 'all') {
+      filter.category = category;
+    }
+    
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { tags: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    console.log("🔍 Filter criteria:", JSON.stringify(filter, null, 2));
+    
+    // Parse pagination
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+    const skip = (pageNum - 1) * limitNum;
+    
+    // Sort options
+    const sortOptions = {};
+    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
     
     // Get listings with pagination
     const listings = await MarketplaceListing.find(filter)
-      .select("title price status mediaUrls description category tags createdAt updatedAt views sellerId")
-      .populate("sellerId", "username avatar sellerRating")
-      .sort({ updatedAt: -1 })
+      .select("title price status mediaUrls description category tags createdAt updatedAt views sellerId isActive")
+      .populate({
+        path: "sellerId",
+        select: "username avatar sellerRating email phoneNumber"
+      })
+      .sort(sortOptions)
       .skip(skip)
-      .limit(parseInt(limit));
-
+      .limit(limitNum)
+      .lean(); // Use lean() for better performance
+    
+    console.log("📊 Found listings count:", listings.length);
+    
+    // If no listings found
+    if (listings.length === 0) {
+      console.log("ℹ️ No listings found for user:", sellerId);
+      
+      return res.status(200).json({
+        success: true,
+        listings: [],
+        message: "No listings found",
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total: 0,
+          pages: 0
+        },
+        timestamp: new Date().getTime(),
+        currency: "USD"
+      });
+    }
+    
+    // Count total documents
     const total = await MarketplaceListing.countDocuments(filter);
-
-    // ✅ Add $ sign to prices
-    const formattedListings = listings.map(listing => ({
-      ...listing.toObject(),
-      formattedPrice: `$${listing.price.toFixed(2)}`
-    }));
-
+    console.log("Total documents matching filter:", total);
+    
+    // Format listings
+    const formattedListings = listings.map(listing => {
+      // Ensure mediaUrls is an array
+      const mediaUrls = Array.isArray(listing.mediaUrls) ? listing.mediaUrls : [];
+      
+      // Get thumbnail (first image)
+      const thumbnail = mediaUrls.length > 0 ? mediaUrls[0] : null;
+      
+      return {
+        ...listing,
+        mediaUrls,
+        thumbnail,
+        formattedPrice: listing.price ? `$${listing.price.toFixed(2)}` : "N/A",
+        price: listing.price || 0,
+        // Format date
+        createdAtFormatted: new Date(listing.createdAt).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        }),
+        // Add status badge color
+        statusColor: listing.status === 'active' ? 'green' : 
+                    listing.status === 'sold' ? 'blue' : 
+                    listing.status === 'pending' ? 'orange' : 'gray'
+      };
+    });
+    
+    // Set response headers
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
+    res.setHeader('Content-Type', 'application/json');
+    
+    // Log successful response
+    console.log(`✅ Successfully returned ${formattedListings.length} listings`);
     
     res.status(200).json({
       success: true,
       listings: formattedListings,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: pageNum,
+        limit: limitNum,
         total,
-        pages: Math.ceil(total / parseInt(limit))
+        pages: Math.ceil(total / limitNum)
+      },
+      filters: {
+        status: status || 'all',
+        category: category || 'all',
+        search: search || '',
+        sortBy,
+        sortOrder
       },
       timestamp: new Date().getTime(),
-      currency: "USD"
+      currency: "USD",
+      message: `Found ${total} listing${total !== 1 ? 's' : ''}`
     });
     
   } catch (error) {
     console.error("❌ Error fetching my listings:", error);
-    res.status(500).json({ 
+    console.error("Error stack:", error.stack);
+    
+    // Send detailed error response
+    const errorResponse = {
       success: false,
-      error: "Failed to fetch my listings" 
-    });
+      error: "Failed to fetch my listings",
+      message: error.message,
+      code: error.code || 'SERVER_ERROR'
+    };
+    
+    // Add stack trace in development
+    if (process.env.NODE_ENV === 'development') {
+      errorResponse.stack = error.stack;
+    }
+    
+    // Check for specific errors
+    if (error.name === 'CastError') {
+      errorResponse.message = "Invalid user ID format";
+      errorResponse.code = 'INVALID_ID';
+      return res.status(400).json(errorResponse);
+    }
+    
+    if (error.name === 'ValidationError') {
+      errorResponse.message = "Validation error";
+      errorResponse.code = 'VALIDATION_ERROR';
+      errorResponse.details = error.errors;
+      return res.status(400).json(errorResponse);
+    }
+    
+    res.status(500).json(errorResponse);
   }
 });
-
 // ===================================================
 // ✅ CREATE LISTING (USD Only - Simple)
 // ===================================================
