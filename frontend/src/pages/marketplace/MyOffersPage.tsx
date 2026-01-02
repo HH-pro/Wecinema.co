@@ -923,7 +923,8 @@ const MyOffersPage: React.FC = () => {
             </Typography>
           </Paper>
         </Grid>
-     
+        
+      </Grid>
 
       {/* Error Alert */}
       {error && (
