@@ -141,6 +141,7 @@ const Browse: React.FC = () => {
       sortedData.forEach((listing, index) => {
         console.log(`\n📊 Listing ${index + 1}: ${listing.title}`);
         console.log('📁 Media URLs:', listing.mediaUrls);
+        console.log('📁 Thumbnail from API:', listing.thumbnail);
         
         // Check each URL
         listing.mediaUrls?.forEach((url, urlIndex) => {
@@ -151,8 +152,10 @@ const Browse: React.FC = () => {
         
         const videoUrl = getFirstVideoUrl(listing);
         const mediaType = getMediaType(listing);
+        const thumbnailUrl = getThumbnailUrl(listing);
         console.log('🎯 First video URL found:', videoUrl || 'None');
         console.log('🎯 Media Type:', mediaType);
+        console.log('🖼️ Thumbnail URL to use:', thumbnailUrl);
       });
       console.log('🎬 ==========================================\n');
       
@@ -418,112 +421,83 @@ const Browse: React.FC = () => {
   };
 
   // ============================================
-  // SIMPLE BUT EFFECTIVE VIDEO DETECTION
+  // FIXED VIDEO DETECTION AND THUMBNAIL LOGIC
   // ============================================
 
-  // Check if media is a video - SIMPLE AND RELIABLE
+  // Check if media is a video - FIXED VERSION
   const isVideoUrl = (url: string): boolean => {
     if (!url || typeof url !== 'string') {
-      console.log('❌ Invalid URL:', url);
       return false;
     }
     
-    console.log('🔍 Checking URL for video:', url);
-    
-    // Convert to lowercase for case-insensitive matching
     const urlLower = url.toLowerCase();
     
-    // 1. Check for video file extensions FIRST (most reliable)
-    const videoExtensions = /\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v|ogg|ogv|3gp|3g2|mpeg|mpg)$/i;
+    // Check for video file extensions
+    const videoExtensions = /\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v|ogg|ogv|3gp|3g2)$/i;
     
     if (videoExtensions.test(url)) {
-      console.log('✅ Video detected by file extension');
+      console.log('✅ Video detected by extension:', url);
       return true;
     }
     
-    // 2. Check for Cloudinary video patterns
-    if (urlLower.includes('cloudinary.com')) {
-      // Cloudinary video patterns
-      if (urlLower.includes('/video/') || 
-          urlLower.includes('.mp4') ||
-          urlLower.includes('.mov') ||
-          urlLower.includes('.avi') ||
-          urlLower.includes('.webm')) {
-        console.log('✅ Cloudinary video detected');
-        return true;
-      }
-      
-      // Also check for upload paths that might be videos
-      if (urlLower.includes('/upload/')) {
-        // Check if it has a video file extension in the path
-        const path = urlLower.split('/upload/')[1] || '';
-        if (path.match(/\.(mp4|mov|avi|webm)$/)) {
-          console.log('✅ Cloudinary upload video detected');
-          return true;
-        }
-      }
+    // Check for Cloudinary video URLs (API returns these as both mediaUrls and thumbnails)
+    if (urlLower.includes('cloudinary.com') && urlLower.includes('/video/')) {
+      console.log('✅ Cloudinary video detected:', url);
+      return true;
     }
     
-    // 3. Check for other video hosting platforms
-    const videoDomains = [
-      'youtube.com',
-      'youtu.be',
-      'vimeo.com',
-      'dailymotion.com'
-    ];
-    
-    for (const domain of videoDomains) {
-      if (urlLower.includes(domain)) {
-        console.log(`✅ Video detected by domain: ${domain}`);
-        return true;
-      }
-    }
-    
-    console.log('❌ Not a video URL');
     return false;
   };
 
   // Get first video URL from listing
   const getFirstVideoUrl = (listing: Listing): string => {
     if (!listing.mediaUrls || !Array.isArray(listing.mediaUrls) || listing.mediaUrls.length === 0) {
-      console.log('📭 No media URLs for listing:', listing.title);
       return '';
     }
     
-    console.log(`🎬 Searching for video in "${listing.title}":`);
-    
     // Find first video URL
     for (const url of listing.mediaUrls) {
-      const isVideo = isVideoUrl(url);
-      console.log(`   URL: ${url}`);
-      console.log(`   Is Video? ${isVideo}`);
-      
-      if (isVideo) {
-        console.log('✅ Found video URL:', url);
+      if (isVideoUrl(url)) {
+        console.log('🎬 Found video URL:', url);
         return url;
       }
     }
     
-    console.log('❌ No video URL found in this listing');
     return '';
   };
 
-  // Generate video thumbnail from video URL
+  // Generate PROPER Cloudinary thumbnail URL from video URL
   const generateVideoThumbnail = (videoUrl: string): string => {
-    if (!videoUrl) {
-      console.log('❌ No video URL provided for thumbnail');
-      return VIDEO_PLACEHOLDER;
-    }
+    if (!videoUrl) return VIDEO_PLACEHOLDER;
     
     console.log('🖼️ Generating thumbnail for:', videoUrl);
     
-    // If it's a YouTube URL, generate thumbnail
+    // For Cloudinary videos - generate proper thumbnail URL
+    if (videoUrl.includes('cloudinary.com') && videoUrl.includes('/video/')) {
+      // Convert Cloudinary video URL to thumbnail URL
+      // Format: https://res.cloudinary.com/folajimidev/video/upload/v1767372201/b9pi1iyrjkb4moodzwx2.mp4
+      // To: https://res.cloudinary.com/folajimidev/image/upload/w_600,h_400,c_fill,q_auto,f_auto/v1767372201/b9pi1iyrjkb4moodzwx2.jpg
+      
+      // Extract version and public ID
+      const parts = videoUrl.split('/upload/');
+      if (parts.length === 2) {
+        const baseUrl = parts[0];
+        const path = parts[1];
+        
+        // Remove .mp4 extension and add .jpg
+        const pathWithoutExt = path.replace(/\.(mp4|mov|avi|webm)$/i, '');
+        const thumbnailUrl = `${baseUrl}/image/upload/w_600,h_400,c_fill,q_auto,f_auto/${pathWithoutExt}.jpg`;
+        
+        console.log('📸 Generated Cloudinary thumbnail:', thumbnailUrl);
+        return thumbnailUrl;
+      }
+    }
+    
+    // For YouTube URLs
     if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
       const videoId = videoUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
       if (videoId) {
-        const thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-        console.log('📺 YouTube thumbnail:', thumbnail);
-        return thumbnail;
+        return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
       }
     }
     
@@ -531,29 +505,15 @@ const Browse: React.FC = () => {
     if (videoUrl.includes('vimeo.com')) {
       const videoId = videoUrl.match(/vimeo\.com\/(\d+)/)?.[1];
       if (videoId) {
-        const thumbnail = `https://vumbnail.com/${videoId}.jpg`;
-        console.log('🎬 Vimeo thumbnail:', thumbnail);
-        return thumbnail;
+        return `https://vumbnail.com/${videoId}.jpg`;
       }
     }
     
-    // For Cloudinary videos - generate thumbnail
-    if (videoUrl.includes('cloudinary.com')) {
-      console.log('☁️ Cloudinary video detected, generating thumbnail');
-      
-      // Simple method: just use the video URL but ensure it's treated as an image
-      // Cloudinary can serve video frames as images
-      const thumbnailUrl = videoUrl.replace('/video/upload/', '/image/upload/') + '.jpg';
-      console.log('📸 Generated Cloudinary thumbnail:', thumbnailUrl);
-      return thumbnailUrl;
-    }
-    
-    // For direct video files, use video placeholder
     console.log('📹 Using generic video placeholder');
     return VIDEO_PLACEHOLDER;
   };
 
-  // Get thumbnail URL with better error handling
+  // Get thumbnail URL - FIXED FOR CLOUDINARY VIDEO URLs
   const getThumbnailUrl = (listing: Listing): string => {
     const listingId = listing._id || 'unknown';
     
@@ -562,38 +522,45 @@ const Browse: React.FC = () => {
       return ERROR_IMAGE;
     }
     
+    // FIRST: Check if listing has a thumbnail property from API
+    if (listing.thumbnail && listing.thumbnail !== '') {
+      console.log(`📸 Using API thumbnail for "${listing.title}":`, listing.thumbnail);
+      
+      // Check if the thumbnail is actually a video URL
+      if (isVideoUrl(listing.thumbnail)) {
+        console.log('⚠️ API thumbnail is a video URL, generating image thumbnail');
+        return generateVideoThumbnail(listing.thumbnail);
+      }
+      
+      return listing.thumbnail;
+    }
+    
+    // SECOND: If no thumbnail from API, check mediaUrls
     if (!listing.mediaUrls || listing.mediaUrls.length === 0) {
       return PLACEHOLDER_IMAGE;
     }
     
-    console.log(`📸 Getting thumbnail for: ${listing.title}`);
-    console.log('📁 Media URLs:', listing.mediaUrls);
+    console.log(`📸 Generating thumbnail for "${listing.title}" from media URLs`);
     
-    // First, check if there's a video
-    const videoUrl = getFirstVideoUrl(listing);
-    if (videoUrl) {
-      console.log('🎥 Found video, generating thumbnail');
-      return generateVideoThumbnail(videoUrl);
+    // Check if first media URL is a video
+    const firstMediaUrl = listing.mediaUrls[0];
+    if (firstMediaUrl && isVideoUrl(firstMediaUrl)) {
+      console.log('🎬 First media URL is a video, generating thumbnail');
+      return generateVideoThumbnail(firstMediaUrl);
     }
     
-    // If no video, try to find an image
+    // Try to find an image in mediaUrls
     const imageUrl = listing.mediaUrls.find(url => 
-      url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
+      url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) && !isVideoUrl(url)
     );
     
     if (imageUrl) {
-      console.log('🖼️ Using image URL:', imageUrl);
+      console.log('🖼️ Found image URL:', imageUrl);
       return imageUrl;
     }
     
-    // Default to the first media URL
-    const firstUrl = listing.mediaUrls[0];
-    if (firstUrl) {
-      console.log('📄 Using first URL:', firstUrl);
-      return firstUrl;
-    }
-    
-    console.log('⚠️ Using placeholder');
+    // If all else fails, use placeholder
+    console.log('⚠️ Using placeholder image');
     return PLACEHOLDER_IMAGE;
   };
 
@@ -606,49 +573,27 @@ const Browse: React.FC = () => {
     }));
   };
 
-  // Get media type for a listing - SIMPLE AND RELIABLE
+  // Get media type for a listing - SIMPLE LOGIC
   const getMediaType = (listing: Listing): 'image' | 'video' | 'none' => {
     if (!listing.mediaUrls || !Array.isArray(listing.mediaUrls) || listing.mediaUrls.length === 0) {
       return 'none';
     }
     
-    console.log(`🔍 Getting media type for: ${listing.title}`);
-    
-    // Check for video first
-    const videoUrl = getFirstVideoUrl(listing);
-    if (videoUrl) {
-      console.log(`✅ ${listing.title} is a VIDEO`);
-      return 'video';
+    // Check if any media URL is a video
+    for (const url of listing.mediaUrls) {
+      if (isVideoUrl(url)) {
+        return 'video';
+      }
     }
     
-    // Check for image
+    // Check if any media URL is an image
     for (const url of listing.mediaUrls) {
       if (url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)) {
-        console.log(`✅ ${listing.title} is an IMAGE`);
         return 'image';
       }
     }
     
-    console.log(`❌ ${listing.title} has no recognizable media type`);
     return 'none';
-  };
-
-  // Debug function to check all listings
-  const debugListings = () => {
-    console.log('🔍 ========== DEBUG ALL LISTINGS ==========');
-    filteredListings.forEach((listing, index) => {
-      const videoUrl = getFirstVideoUrl(listing);
-      const mediaType = getMediaType(listing);
-      const thumbnailUrl = getThumbnailUrl(listing);
-      
-      console.log(`\n📊 ${index + 1}. ${listing.title}`);
-      console.log('   Media URLs:', listing.mediaUrls);
-      console.log('   Video URL:', videoUrl);
-      console.log('   Media Type:', mediaType);
-      console.log('   Thumbnail URL:', thumbnailUrl);
-      console.log('   Is Video?', mediaType === 'video');
-    });
-    console.log('🔍 =========================================\n');
   };
 
   if (loading) {
@@ -725,14 +670,6 @@ const Browse: React.FC = () => {
                   <FiFilter className="mr-2" size={18} />
                   <span className="hidden sm:inline">Filters</span>
                   <span className="sm:hidden">Filter</span>
-                </button>
-                
-                {/* Debug Button */}
-                <button
-                  onClick={debugListings}
-                  className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
-                >
-                  Debug Videos
                 </button>
               </div>
             </div>
@@ -890,13 +827,10 @@ const Browse: React.FC = () => {
                 const mediaType = getMediaType(listing);
                 const isVideo = mediaType === 'video';
                 
-                // Log each listing for debugging
-                console.log(`\n🎬 Rendering Listing: ${listing.title}`);
+                console.log(`\n🎬 Rendering: ${listing.title}`);
                 console.log(`   Thumbnail URL: ${thumbnailUrl}`);
                 console.log(`   Video URL: ${videoUrl}`);
-                console.log(`   Media Type: ${mediaType}`);
                 console.log(`   Is Video? ${isVideo}`);
-                console.log(`   Has Play Button? ${isVideo && videoUrl}`);
                 
                 return (
                   <div key={listing._id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 border border-gray-200 group">
@@ -904,14 +838,8 @@ const Browse: React.FC = () => {
                     <div 
                       className="relative h-48 bg-gray-900 cursor-pointer overflow-hidden"
                       onClick={() => {
-                        console.log(`🖱️ Clicked on: ${listing.title}`);
-                        console.log(`   Is Video? ${isVideo}`);
-                        console.log(`   Video URL: ${videoUrl}`);
-                        
                         if (isVideo && videoUrl) {
                           handleVideoClick(videoUrl, listing.title, listing);
-                        } else {
-                          console.log('⚠️ Not a video or no video URL available');
                         }
                       }}
                     >
@@ -921,7 +849,10 @@ const Browse: React.FC = () => {
                           src={thumbnailUrl}
                           alt={listing.title}
                           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          onError={() => handleImageError(listing._id)}
+                          onError={(e) => {
+                            console.error('❌ Image load error:', thumbnailUrl);
+                            handleImageError(listing._id);
+                          }}
                           loading="lazy"
                         />
                         
@@ -930,16 +861,14 @@ const Browse: React.FC = () => {
                         
                         {/* Play Button Overlay for Videos */}
                         {isVideo && videoUrl && (
-                          <>
-                            <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                              <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-2 border-white/30 transform group-hover:scale-110 transition-transform duration-300">
-                                <FiPlay className="text-white ml-1" size={28} />
-                              </div>
+                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-2 border-white/30 transform group-hover:scale-110 transition-transform duration-300">
+                              <FiPlay className="text-white ml-1" size={28} />
                             </div>
                             <div className="absolute bottom-2 left-2 text-white text-xs bg-black/50 px-2 py-1 rounded">
                               Click to play
                             </div>
-                          </>
+                          </div>
                         )}
                         
                         {/* Media Type Badge */}
@@ -969,13 +898,6 @@ const Browse: React.FC = () => {
                           {listing.category}
                         </span>
                       </div>
-                      
-                      {/* Debug Info Badge */}
-                      {process.env.NODE_ENV === 'development' && (
-                        <div className="absolute top-2 left-2 bg-black/70 text-white text-[10px] px-2 py-1 rounded">
-                          {isVideo ? '🎬 Video' : '🖼️ Image'}
-                        </div>
-                      )}
                     </div>
 
                     {/* Content */}
@@ -1031,7 +953,6 @@ const Browse: React.FC = () => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              console.log('▶️ Play button clicked for:', listing.title);
                               handleVideoClick(videoUrl, listing.title, listing);
                             }}
                             className="px-3 bg-gray-800 hover:bg-gray-900 text-white text-sm py-2 rounded-md transition-colors duration-200 flex items-center gap-2 group/play"
