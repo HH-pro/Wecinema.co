@@ -25,7 +25,7 @@ export interface Listing {
   description: string;
   price: number;
   formattedPrice: string;
-  status: 'active' | 'sold' | 'pending' | 'draft' | 'inactive';
+  status: 'active' | 'sold' | 'pending' | 'draft' | 'inactive' | 'reserved';
   mediaUrls: string[];
   thumbnail?: string;
   category: string;
@@ -40,6 +40,8 @@ export interface Listing {
     sellerRating?: number;
     email?: string;
     phoneNumber?: string;
+    stripeAccountId?: string;
+    stripeAccountStatus?: string;
   };
   sellerEmail?: string;
   type: string;
@@ -56,20 +58,41 @@ export interface Listing {
     sellerRating?: number;
     email?: string;
   };
+  maxRevisions?: number;
+  deliveryTime?: string;
+  availability?: string;
+  totalOrders?: number;
+  lastOrderAt?: string;
+  reservedUntil?: string;
 }
 
 export interface Order {
   _id: string;
-  listingId: Listing;
+  orderNumber?: string;
+  listingId: Listing | string;
   buyerId: {
     _id: string;
     username: string;
     email: string;
+    firstName?: string;
+    lastName?: string;
+    avatar?: string;
   };
-  sellerId: string;
+  sellerId: {
+    _id: string;
+    username: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    avatar?: string;
+    sellerRating?: number;
+    stripeAccountId?: string;
+    stripeAccountStatus?: string;
+  };
   amount: number;
-  status: 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
-  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
+  status: 'pending' | 'pending_payment' | 'paid' | 'processing' | 'in_progress' | 'delivered' | 'in_revision' | 'completed' | 'cancelled' | 'refunded' | 'disputed';
+  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded' | 'released' | 'held';
+  orderType: 'direct_purchase' | 'accepted_offer';
   shippingAddress?: {
     street: string;
     city: string;
@@ -77,8 +100,39 @@ export interface Order {
     zipCode: string;
     country: string;
   };
+  deliveryMessage?: string;
+  deliveryFiles?: string[];
+  deliveries?: string[];
+  revisions?: number;
+  maxRevisions?: number;
+  revisionNotes?: Array<{
+    notes: string;
+    requestedAt: string;
+    requestedBy: string;
+    completedAt?: string;
+  }>;
+  stripePaymentIntentId?: string;
+  stripeTransferId?: string;
+  platformFee?: number;
+  sellerAmount?: number;
+  paymentReleased?: boolean;
+  releaseDate?: string;
+  orderDate: string;
+  expectedDelivery?: string;
+  paidAt?: string;
+  processingAt?: string;
+  startedAt?: string;
+  deliveredAt?: string;
+  completedAt?: string;
+  cancelledAt?: string;
   createdAt: string;
   updatedAt: string;
+  buyerNotes?: string;
+  sellerNotes?: string;
+  cancelReason?: string;
+  cancelledBy?: string;
+  requirements?: string;
+  offerId?: string;
 }
 
 export interface Offer {
@@ -88,20 +142,190 @@ export interface Offer {
     _id: string;
     username: string;
     email: string;
+    avatar?: string;
   };
   sellerId: string;
   offeredPrice: number;
-  status: 'pending' | 'accepted' | 'rejected' | 'expired';
+  status: 'pending' | 'accepted' | 'rejected' | 'expired' | 'pending_payment' | 'paid' | 'cancelled';
   message?: string;
+  amount?: number;
+  paymentIntentId?: string;
+  requirements?: string;
+  expectedDelivery?: string;
+  createdAt: string;
+  updatedAt: string;
+  paidAt?: string;
+  acceptedAt?: string;
+  rejectedAt?: string;
+  cancelledAt?: string;
+  rejectionReason?: string;
+}
+
+export interface Delivery {
+  _id: string;
+  orderId: string;
+  sellerId: {
+    _id: string;
+    username: string;
+    avatar?: string;
+    firstName?: string;
+    lastName?: string;
+  };
+  buyerId: {
+    _id: string;
+    username: string;
+    avatar?: string;
+    firstName?: string;
+    lastName?: string;
+  };
+  message: string;
+  attachments: Array<{
+    filename: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+    url: string;
+    key?: string;
+  }>;
+  isFinalDelivery: boolean;
+  revisionNumber: number;
+  status: 'pending_review' | 'accepted' | 'revision_requested';
   createdAt: string;
   updatedAt: string;
 }
 
+export interface UploadedFile {
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  url: string;
+  path?: string;
+  extension?: string;
+}
+
+export interface OrderStats {
+  total: number;
+  active: number;
+  completed: number;
+  pending: number;
+  cancelled: number;
+  disputed: number;
+  totalSpent?: number;
+  totalRevenue?: number;
+  pendingRevenue?: number;
+}
+
+export interface OrderTimelineItem {
+  status: string;
+  date: string;
+  description: string;
+  icon: string;
+}
+
+export interface OrderSummary {
+  orderInfo: {
+    id: string;
+    orderNumber: string;
+    status: string;
+    createdAt: string;
+    orderType: string;
+  };
+  financial: {
+    totalAmount: number;
+    platformFee: number;
+    netAmount: number;
+    paymentStatus: string;
+    paymentReleased: boolean;
+    releaseDate?: string;
+  };
+  timeline: {
+    revisionsUsed: number;
+    revisionsLeft: number;
+    deliveriesCount: number;
+    expectedDelivery?: string;
+    timeRemaining?: number;
+    isOverdue?: boolean;
+    deliveredAt?: string;
+    completedAt?: string;
+  };
+  listing?: {
+    title: string;
+    category: string;
+    type: string;
+    price: number;
+  };
+  seller?: {
+    username: string;
+    rating?: number;
+    name?: string;
+  };
+  offer?: {
+    originalAmount: number;
+    message?: string;
+    expectedDelivery?: string;
+  };
+}
+
+export interface BuyerNextAction {
+  action: string;
+  label: string;
+  priority: 'high' | 'medium' | 'low';
+}
+
+export interface SellerAccountStatus {
+  account: {
+    id: string;
+    business_type: string;
+    business_profile: any;
+    charges_enabled: boolean;
+    payouts_enabled: boolean;
+    details_submitted: boolean;
+    capabilities: any;
+    requirements: {
+      currently_due: string[];
+      eventually_due: string[];
+      past_due: string[];
+      disabled_reason: string;
+    };
+  };
+  status: {
+    canReceivePayments: boolean;
+    missingRequirements: string[];
+    needsAction: boolean;
+    isActive: boolean;
+  };
+  setupLink?: string;
+  message: string;
+}
+
+export interface SellerStats {
+  statsByStatus: Array<{
+    _id: string;
+    count: number;
+    totalAmount: number;
+  }>;
+  totals: {
+    totalOrders: number;
+    totalRevenue: number;
+    averageOrderValue: number;
+    completedOrders: {
+      count: number;
+      revenue: number;
+    };
+    pendingOrders: {
+      count: number;
+      revenue: number;
+    };
+    thisMonthRevenue: number;
+  };
+  breakdown: Record<string, number>;
+}
+
 // ============================================
-// ✅ API CONFIGURATION (FIXED)
+// ✅ API CONFIGURATION
 // ============================================
 
-// ✅ FIXED: No process.env issues
 const API_BASE_URL = 'http://localhost:3000';
 
 // Helper function to get auth token
@@ -115,6 +339,18 @@ const getHeaders = (): { headers: Record<string, string> } => {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json'
   };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return { headers };
+};
+
+// Helper function for file upload headers
+const getUploadHeaders = (): { headers: Record<string, string> } => {
+  const token = getAuthToken();
+  const headers: Record<string, string> = {};
   
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -153,141 +389,54 @@ const handleApiError = <T>(error: AxiosError, defaultMessage: string = 'API Erro
 };
 
 // ============================================
-// ✅ LISTINGS API (UPDATED)
+// ✅ LISTINGS API
 // ============================================
 
 export const listingsApi = {
- getAllListings: async (params?: {
-  page?: number;
-  limit?: number;
-  category?: string;
-  minPrice?: number;
-  maxPrice?: number;
-  status?: string;
-  search?: string;
-  sortBy?: string;
-  sortOrder?: string;
-  type?: string;
-}): Promise<ApiResponse<{ listings: Listing[] }>> => {
-  try {
-    console.log('📡 Fetching listings with params:', params);
-    
-    const response = await axios.get(`${API_BASE_URL}/marketplace/listings`, {
-      params
-    });
-    
-    const data = response.data;
-    
-    // ✅ Enhanced debugging
-    console.log('🎯 API Response Full Analysis:', {
-      status: response.status,
-      dataKeys: data && typeof data === 'object' ? Object.keys(data) : 'N/A',
-      isArray: Array.isArray(data),
-      hasSuccess: !!(data?.success),
-      hasListings: !!(data?.listings),
-      hasDataProperty: !!(data?.data),
-      listingsIsArray: Array.isArray(data?.listings),
-      dataListingsIsArray: Array.isArray(data?.data?.listings),
-      responseStructure: data
-    });
-    
-    // ✅ Handle ALL possible response structures
-    let listings: Listing[] = [];
-    let pagination = undefined;
-    let message = '';
-    let currency = 'USD';
-    let filters = undefined;
-    
-    if (data && typeof data === 'object') {
-      // Check if API returned error
+  // Get all listings
+  getAllListings: async (params?: {
+    page?: number;
+    limit?: number;
+    category?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    status?: string;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: string;
+    type?: string;
+  }): Promise<ApiResponse<{ listings: Listing[]; pagination?: any; currency?: string; filters?: any }>> => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/marketplace/listings`, {
+        params
+      });
+      
+      const data = response.data;
+      
       if (data.success === false) {
-        console.error('❌ API returned error:', data.error);
         return {
           success: false,
-          error: data.error || 'API request failed',
-          status: data.status,
-          message: data.message
+          error: data.error || 'Failed to fetch listings',
+          status: data.status
         };
       }
       
-      // ✅ CASE 1: Direct listings array (most common)
-      if (data.listings && Array.isArray(data.listings)) {
-        listings = data.listings;
-        console.log(`✅ Found ${listings.length} listings in data.listings`);
-      }
-      // ✅ CASE 2: Nested listings in data property
-      else if (data.data && data.data.listings && Array.isArray(data.data.listings)) {
-        listings = data.data.listings;
-        console.log(`✅ Found ${listings.length} listings in data.data.listings`);
-      }
-      // ✅ CASE 3: Direct data array
-      else if (data.data && Array.isArray(data.data)) {
-        listings = data.data;
-        console.log(`✅ Found ${listings.length} listings in data.data array`);
-      }
-      // ✅ CASE 4: Response itself is the array
-      else if (Array.isArray(data)) {
-        listings = data;
-        console.log(`✅ Response is direct array with ${listings.length} listings`);
-      }
-      // ✅ CASE 5: Try to find any array in the response
-      else {
-        const arrayKeys = Object.keys(data).filter(key => Array.isArray(data[key]));
-        if (arrayKeys.length > 0) {
-          listings = data[arrayKeys[0]];
-          console.log(`✅ Found ${listings.length} listings in key: ${arrayKeys[0]}`);
-        }
-      }
-      
-      // Extract additional metadata
-      pagination = data.pagination || data.data?.pagination;
-      message = data.message || `Found ${listings.length} listing${listings.length !== 1 ? 's' : ''}`;
-      currency = data.currency || 'USD';
-      filters = data.filters;
-      
-      // Log first listing for debugging
-      if (listings.length > 0) {
-        console.log('📝 Sample listing structure:', {
-          id: listings[0]._id,
-          title: listings[0].title,
-          price: listings[0].price,
-          formattedPrice: listings[0].formattedPrice,
-          seller: listings[0].sellerId,
-          mediaUrls: listings[0].mediaUrls,
-          hasThumbnail: !!listings[0].thumbnail
-        });
-      }
+      return {
+        success: true,
+        data: {
+          listings: data.data?.listings || data.listings || [],
+          pagination: data.pagination,
+          currency: data.currency,
+          filters: data.filters
+        },
+        message: data.message
+      };
+    } catch (error) {
+      console.error('❌ Error fetching listings:', error);
+      return handleApiError(error as AxiosError, 'Failed to fetch listings');
     }
-    
-    console.log(`✅ Final: Returning ${listings.length} listings`);
-    
-    // ✅ Return the standardized response
-    return {
-      success: true,
-      data: { listings },
-      pagination,
-      message,
-      currency,
-      filters
-    };
-    
-  } catch (error) {
-    console.error('❌ Error fetching listings:', error);
-    
-    // Enhanced error logging
-    if (axios.isAxiosError(error)) {
-      console.error('Axios Error Details:', {
-        message: error.message,
-        code: error.code,
-        status: error.response?.status,
-        data: error.response?.data,
-        url: error.config?.url
-      });
-    }
-    
-    return handleApiError(error as AxiosError, 'Failed to fetch listings');
-  }
-},
+  },
+
   // Get seller's own listings
   getMyListings: async (params?: {
     page?: number;
@@ -318,6 +467,9 @@ export const listingsApi = {
     type: string;
     tags?: string[];
     mediaUrls?: string[];
+    maxRevisions?: number;
+    deliveryTime?: string;
+    availability?: string;
   }): Promise<ApiResponse<{ listing: Listing }>> => {
     try {
       const response = await axios.post(
@@ -341,6 +493,8 @@ export const listingsApi = {
     mediaUrls?: string[];
     status?: string;
     type?: string;
+    maxRevisions?: number;
+    deliveryTime?: string;
   }): Promise<ApiResponse<{ listing: Listing }>> => {
     try {
       const response = await axios.put(
@@ -442,48 +596,34 @@ export const listingsApi = {
 };
 
 // ============================================
-// ✅ ORDERS API
+// ✅ ORDERS API (COMPREHENSIVELY UPDATED)
 // ============================================
 
 export const ordersApi = {
-  // Get seller's orders/sales
-  getMySales: async (): Promise<Order[]> => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/orders/my-sales`,
-        getHeaders()
-      );
-      
-      const data = response.data;
-      let orders: Order[] = [];
-      
-      if (Array.isArray(data)) {
-        orders = data;
-      } else if (data?.sales && Array.isArray(data.sales)) {
-        orders = data.sales;
-      } else if (data?.orders && Array.isArray(data.orders)) {
-        orders = data.orders;
-      } else if (data?.data && Array.isArray(data.data)) {
-        orders = data.data;
-      }
-      
-      return orders;
-      
-    } catch (error) {
-      console.error('❌ Error fetching sales:', error);
-      return [];
-    }
-  },
-
-  // Create order for direct purchase
-  createOrder: async (listingId: string, orderData?: {
-    amount?: number;
+  // ========== ORDER CREATION ========== //
+  
+  // Create order (seller accepting offer)
+  createOrder: async (orderData: {
+    offerId: string;
+    listingId: string;
+    buyerId: string;
+    sellerId: string;
+    amount: number;
+    shippingAddress?: any;
     paymentMethod?: string;
-  }): Promise<ApiResponse<{ order: Order; clientSecret?: string }>> => {
+    notes?: string;
+    expectedDeliveryDays?: number;
+  }): Promise<ApiResponse<{ 
+    order: Order;
+    nextSteps: {
+      paymentRequired: boolean;
+      message: string;
+    };
+  }>> => {
     try {
       const response = await axios.post(
         `${API_BASE_URL}/marketplace/orders/create`,
-        { listingId, ...orderData },
+        orderData,
         getHeaders()
       );
       return normalizeResponse(response);
@@ -492,16 +632,791 @@ export const ordersApi = {
     }
   },
 
-  // Get my orders (as buyer)
-  getMyOrders: async (): Promise<ApiResponse<{ orders: Order[] }>> => {
+  // Create direct payment order
+  createDirectPayment: async (listingId: string, requirements?: string): Promise<ApiResponse<{
+    order: Order;
+    clientSecret: string;
+    paymentIntentId: string;
+    chatId: string;
+    redirectUrl: string;
+  }>> => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/offers/create-direct-payment`,
+        { listingId, requirements },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to create direct payment');
+    }
+  },
+
+  // ========== BUYER ORDER QUERIES ========== //
+  
+  // Get buyer's orders
+  getMyOrders: async (): Promise<ApiResponse<{ 
+    orders: Order[]; 
+    stats: OrderStats; 
+    count: number;
+  }>> => {
     try {
       const response = await axios.get(
         `${API_BASE_URL}/marketplace/orders/my-orders`,
         getHeaders()
       );
+      
+      const data = response.data;
+      
+      if (data.success === false) {
+        return {
+          success: false,
+          error: data.error || 'Failed to fetch orders',
+          message: data.message
+        };
+      }
+      
+      return {
+        success: true,
+        data: {
+          orders: data.orders || [],
+          stats: data.stats || {},
+          count: data.count || 0
+        },
+        message: data.message
+      };
+    } catch (error) {
+      console.error('❌ Error fetching orders:', error);
+      return handleApiError(error as AxiosError, 'Failed to fetch your orders');
+    }
+  },
+
+  // Get buyer dashboard statistics
+  getBuyerStats: async (): Promise<ApiResponse<{
+    stats: any[];
+    totals: {
+      totalOrders: number;
+      totalSpent: number;
+      activeOrders: number;
+      completedOrders: number;
+      pendingOrders: number;
+      cancelledOrders: number;
+    };
+  }>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/stats/buyer`,
+        getHeaders()
+      );
       return normalizeResponse(response);
     } catch (error) {
-      return handleApiError(error as AxiosError, 'Failed to fetch your orders');
+      return handleApiError(error as AxiosError, 'Failed to fetch buyer statistics');
+    }
+  },
+
+  // ========== SELLER ORDER QUERIES ========== //
+  
+  // Get seller's sales
+  getMySales: async (): Promise<ApiResponse<{ 
+    sales: Order[]; 
+    stats: OrderStats; 
+    count: number;
+  }>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/my-sales`,
+        getHeaders()
+      );
+      
+      const data = response.data;
+      
+      if (data.success === false) {
+        return {
+          success: false,
+          error: data.error || 'Failed to fetch sales',
+          message: data.message
+        };
+      }
+      
+      return {
+        success: true,
+        data: {
+          sales: data.sales || [],
+          stats: data.stats || {},
+          count: data.count || 0
+        },
+        message: data.message
+      };
+    } catch (error) {
+      console.error('❌ Error fetching sales:', error);
+      return handleApiError(error as AxiosError, 'Failed to fetch your sales');
+    }
+  },
+
+  // Get seller statistics
+  getSellerStats: async (): Promise<ApiResponse<SellerStats>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/stats/seller`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to fetch seller statistics');
+    }
+  },
+
+  // ========== SINGLE ORDER OPERATIONS ========== //
+  
+  // Get order details
+  getOrderDetails: async (orderId: string): Promise<ApiResponse<{
+    order: Order;
+    deliveries: Delivery[];
+    deliveryFiles: any[];
+    timeline: OrderTimelineItem[];
+    userRole: 'buyer' | 'seller' | 'admin';
+    permissions: {
+      canCompletePayment: boolean;
+      canRequestRevision: boolean;
+      canCompleteOrder: boolean;
+      canCancel: boolean;
+      canDownloadFiles: boolean;
+      canContactSeller: boolean;
+      canLeaveReview: boolean;
+      canViewDeliveryHistory: boolean;
+      canStartProcessing: boolean;
+      canStartWork: boolean;
+      canDeliver: boolean;
+      canCompleteRevision: boolean;
+    };
+    orderSummary: {
+      totalAmount: number;
+      platformFee: number;
+      netAmount: number;
+      revisionsUsed: number;
+      revisionsLeft: number;
+      expectedDelivery?: string;
+      daysRemaining?: number;
+    };
+  }>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/${orderId}`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to fetch order details');
+    }
+  },
+
+  // Get order timeline
+  getOrderTimeline: async (orderId: string): Promise<ApiResponse<{
+    timeline: OrderTimelineItem[];
+    currentStatus: string;
+    nextSteps: string[];
+  }>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/timeline`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to fetch order timeline');
+    }
+  },
+
+  // Get order summary
+  getOrderSummary: async (orderId: string): Promise<ApiResponse<{
+    summary: OrderSummary;
+    nextActions: BuyerNextAction[];
+  }>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/summary`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to fetch order summary');
+    }
+  },
+
+  // Update order status
+  updateOrderStatus: async (orderId: string, status: string): Promise<ApiResponse<{
+    order: Order;
+    previousStatus: string;
+    newStatus: string;
+    updatedAt: string;
+  }>> => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/status`,
+        { status },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to update order status');
+    }
+  },
+
+  // ========== BUYER ORDER ACTIONS ========== //
+  
+  // Complete order (buyer)
+  completeOrder: async (orderId: string): Promise<ApiResponse<{
+    order: Order;
+    payment: {
+      released: boolean;
+      success: boolean;
+      error?: string;
+      sellerAmountInCents: number;
+      platformFeeInCents: number;
+      totalAmountInCents: number;
+      sellerAmountDollars: string;
+      platformFeeDollars: string;
+      totalAmountDollars: string;
+    };
+    nextSteps: string;
+  }>> => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/complete`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to complete order');
+    }
+  },
+
+  // Request revision (buyer)
+  requestRevision: async (orderId: string, revisionNotes: string): Promise<ApiResponse<{
+    order: Order;
+    revisionsUsed: number;
+    revisionsLeft: number;
+    nextSteps: string;
+  }>> => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/request-revision`,
+        { revisionNotes },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to request revision');
+    }
+  },
+
+  // Cancel order (buyer)
+  cancelOrderByBuyer: async (orderId: string, cancelReason?: string): Promise<ApiResponse<{
+    order: Order;
+    refundProcessed: boolean;
+    nextSteps: string;
+  }>> => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/cancel-by-buyer`,
+        { cancelReason },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to cancel order');
+    }
+  },
+
+  // ========== SELLER ORDER ACTIONS ========== //
+  
+  // Start processing order (seller)
+  startProcessing: async (orderId: string): Promise<ApiResponse<{
+    order: Order;
+    nextAction: string;
+  }>> => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/start-processing`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to start processing');
+    }
+  },
+
+  // Start work on order (seller)
+  startWork: async (orderId: string): Promise<ApiResponse<{
+    order: Order;
+    nextAction: string;
+  }>> => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/start-work`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to start work');
+    }
+  },
+
+  // Deliver order (seller)
+  deliverOrder: async (orderId: string, deliveryData: {
+    deliveryMessage: string;
+    deliveryFiles?: string[];
+    attachments?: any[];
+    isFinalDelivery?: boolean;
+  }): Promise<ApiResponse<{
+    order: Order;
+    delivery: Delivery;
+    emailSent: boolean;
+    nextAction: string;
+    reviewPeriod: string;
+  }>> => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/deliver-with-email`,
+        deliveryData,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to deliver order');
+    }
+  },
+
+  // Complete revision (seller)
+  completeRevision: async (orderId: string, deliveryData: {
+    deliveryMessage: string;
+    deliveryFiles?: string[];
+    attachments?: any[];
+    isFinalDelivery?: boolean;
+  }): Promise<ApiResponse<{
+    order: Order;
+    delivery: Delivery;
+    revisionsUsed: number;
+    revisionsLeft: number;
+    emailSent: boolean;
+  }>> => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/complete-revision`,
+        deliveryData,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to complete revision');
+    }
+  },
+
+  // Cancel order (seller)
+  cancelOrderBySeller: async (orderId: string, cancelReason?: string): Promise<ApiResponse<{
+    order: Order;
+  }>> => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/cancel-by-seller`,
+        { cancelReason },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to cancel order');
+    }
+  },
+
+  // ========== DELIVERY MANAGEMENT ========== //
+  
+  // Get deliveries for order
+  getDeliveries: async (orderId: string): Promise<ApiResponse<{
+    deliveries: Delivery[];
+    count: number;
+    orderStatus: string;
+    revisionsUsed: number;
+    revisionsLeft: number;
+    canRequestRevision: boolean;
+  }>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/deliveries`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to fetch deliveries');
+    }
+  },
+
+  // Get delivery details
+  getDeliveryDetails: async (deliveryId: string): Promise<ApiResponse<{
+    delivery: Delivery;
+    userRole: 'buyer' | 'seller';
+    permissions: {
+      canDownloadFiles: boolean;
+      canRequestRevision: boolean;
+    };
+  }>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/deliveries/${deliveryId}`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to fetch delivery details');
+    }
+  },
+
+  // Get download files for order
+  getDownloadFiles: async (orderId: string): Promise<ApiResponse<{
+    files: any[];
+    count: number;
+    orderStatus: string;
+    totalRevisions: number;
+    canRequestRevision: boolean;
+  }>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/download-files`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to fetch download files');
+    }
+  },
+
+  // ========== FILE UPLOAD ========== //
+  
+  // Upload delivery files
+  uploadDeliveryFiles: async (files: File[]): Promise<ApiResponse<{
+    files: UploadedFile[];
+    count: number;
+  }>> => {
+    try {
+      const formData = new FormData();
+      files.forEach(file => {
+        formData.append('files', file);
+      });
+
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/orders/upload/delivery`,
+        formData,
+        {
+          headers: {
+            'Authorization': `Bearer ${getAuthToken()}`,
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to upload files');
+    }
+  },
+
+  // ========== STRIPE ACCOUNT MANAGEMENT ========== //
+  
+  // Check seller's Stripe account status
+  getSellerAccountStatus: async (): Promise<ApiResponse<SellerAccountStatus>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/seller/account-status`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to fetch Stripe account status');
+    }
+  },
+
+  // ========== ADMIN OPERATIONS ========== //
+  
+  // Delete all orders (admin only)
+  deleteAllOrders: async (): Promise<ApiResponse<{
+    deletedCount: number;
+    timestamp: string;
+  }>> => {
+    try {
+      const response = await axios.delete(
+        `${API_BASE_URL}/marketplace/orders/delete-all-orders`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to delete orders');
+    }
+  }
+};
+
+// ============================================
+// ✅ OFFERS API
+// ============================================
+
+export const offersApi = {
+  // Make an offer with immediate payment
+  makeOffer: async (offerData: {
+    listingId: string;
+    amount: number;
+    message?: string;
+    requirements?: string;
+    expectedDelivery?: string;
+  }): Promise<ApiResponse<{ 
+    offer: Offer; 
+    clientSecret: string; 
+    paymentIntentId: string;
+    amount: number;
+    nextSteps: string;
+  }>> => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/offers/make-offer`,
+        offerData,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to make offer');
+    }
+  },
+
+  // Confirm offer payment
+  confirmOfferPayment: async (paymentData: {
+    offerId: string;
+    paymentIntentId: string;
+  }): Promise<ApiResponse<{ 
+    orderId: string;
+    redirectUrl: string;
+    chatUrl?: string;
+    notifications: any;
+    orderDetails: {
+      amount: number;
+      sellerName: string;
+      buyerName: string;
+      listingTitle: string;
+      orderDate: string;
+      requirements?: string;
+    };
+  }>> => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/offers/confirm-offer-payment`,
+        paymentData,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to confirm payment');
+    }
+  },
+
+  // Get offers received (as seller)
+  getReceivedOffers: async (): Promise<ApiResponse<{ 
+    offers: Offer[]; 
+    count: number;
+  }>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/offers/received-offers`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to fetch received offers');
+    }
+  },
+
+  // Get offers made (as buyer)
+  getMyOffers: async (): Promise<ApiResponse<{ 
+    offers: Offer[]; 
+    count: number;
+  }>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/offers/my-offers`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to fetch my offers');
+    }
+  },
+
+  // Get single offer details
+  getOfferDetails: async (offerId: string): Promise<ApiResponse<{ 
+    offer: Offer;
+    associatedOrder?: any;
+    chatRoom?: any;
+    chatLink?: string;
+    userRole: 'buyer' | 'seller';
+  }>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/offers/${offerId}`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to fetch offer details');
+    }
+  },
+
+  // Accept offer (seller)
+  acceptOffer: async (offerId: string): Promise<ApiResponse<{ 
+    offer: Offer;
+    order?: any;
+    redirectUrl: string;
+  }>> => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/offers/accept-offer/${offerId}`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to accept offer');
+    }
+  },
+
+  // Reject offer (seller)
+  rejectOffer: async (offerId: string, rejectionReason?: string): Promise<ApiResponse<{ 
+    offer: Offer;
+    buyerNotified: boolean;
+  }>> => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/offers/reject-offer/${offerId}`,
+        { rejectionReason },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to reject offer');
+    }
+  },
+
+  // Cancel offer (buyer)
+  cancelOffer: async (offerId: string): Promise<ApiResponse<{ 
+    offer: Offer;
+    sellerNotified: boolean;
+  }>> => {
+    try {
+      const response = await axios.put(
+        `${API_BASE_URL}/marketplace/offers/cancel-offer/${offerId}`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to cancel offer');
+    }
+  },
+
+  // Get chat link for order
+  getChatLink: async (orderId: string): Promise<ApiResponse<{
+    chatLink: string;
+    firebaseChatId: string;
+    orderId: string;
+    directLink: string;
+  }>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/offers/chat-link/${orderId}`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to get chat link');
+    }
+  },
+
+  // Get offer statistics
+  getOfferStats: async (): Promise<ApiResponse<{
+    asBuyer: Record<string, number>;
+    asSeller: Record<string, number>;
+  }>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/offers/stats/overview`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to fetch offer statistics');
+    }
+  },
+
+  // Get messages for order
+  getOrderMessages: async (orderId: string): Promise<ApiResponse<{
+    messages: any[];
+    count: number;
+    orderId: string;
+  }>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/offers/messages/${orderId}`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to fetch order messages');
+    }
+  },
+
+  // Test Stripe connection
+  testStripeConnection: async (): Promise<ApiResponse<{
+    testIntentId: string;
+    clientSecret: string;
+  }>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/offers/test-stripe`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Stripe test failed');
+    }
+  },
+
+  // Health check
+  healthCheck: async (): Promise<ApiResponse<{
+    timestamp: string;
+    services: {
+      database: string;
+      stripe: string;
+      firebase: string;
+      emailService: string;
+    };
+  }>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/offers/health`
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Health check failed');
+    }
+  },
+
+  // Delete all offers (testing only)
+  deleteAllOffers: async (): Promise<ApiResponse<{
+    deletedCount: number;
+  }>> => {
+    try {
+      const response = await axios.delete(
+        `${API_BASE_URL}/marketplace/offers/delete-all-offers`
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to delete offers');
     }
   }
 };
@@ -516,6 +1431,16 @@ export const formatCurrency = (amount: number, currency: string = 'USD'): string
     style: 'currency',
     currency: currency,
   }).format(amount || 0);
+};
+
+// Calculate platform fee (10%)
+export const calculatePlatformFee = (amount: number): number => {
+  return parseFloat((amount * 0.10).toFixed(2));
+};
+
+// Calculate seller payout
+export const calculateSellerPayout = (amount: number): number => {
+  return parseFloat((amount - calculatePlatformFee(amount)).toFixed(2));
 };
 
 // Check if user is authenticated
@@ -556,6 +1481,19 @@ export const getApiBaseUrl = (): string => {
   return API_BASE_URL;
 };
 
+// Format bytes for file sizes
+export const formatBytes = (bytes: number, decimals: number = 2): string => {
+  if (bytes === 0) return '0 Bytes';
+  
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+};
+
 // ============================================
 // ✅ EXPORT ALL APIs
 // ============================================
@@ -563,11 +1501,15 @@ export const getApiBaseUrl = (): string => {
 const marketplaceApi = {
   listings: listingsApi,
   orders: ordersApi,
+  offers: offersApi,
   utils: {
     formatCurrency,
+    calculatePlatformFee,
+    calculateSellerPayout,
     checkAuth,
     getCurrentUser,
-    getApiBaseUrl
+    getApiBaseUrl,
+    formatBytes
   }
 };
 
