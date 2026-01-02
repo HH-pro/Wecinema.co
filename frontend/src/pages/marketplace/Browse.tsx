@@ -136,6 +136,18 @@ const Browse: React.FC = () => {
       // Apply sorting
       const sortedData = sortListings(filteredData, filters.sortBy);
       
+      // Debug: Check video detection for all listings
+      console.log('🎬 Video detection results:');
+      sortedData.forEach((listing, index) => {
+        const videoUrl = getFirstVideoUrl(listing);
+        const mediaType = getMediaType(listing);
+        console.log(`${index + 1}. ${listing.title}`);
+        console.log('   Media URLs:', listing.mediaUrls);
+        console.log('   Video URL found:', videoUrl);
+        console.log('   Media Type:', mediaType);
+        console.log('   Is Video?', mediaType === 'video');
+      });
+      
       setListings(sortedData);
     } catch (error: any) {
       console.error('Error fetching listings:', error);
@@ -192,6 +204,7 @@ const Browse: React.FC = () => {
   // Handle video click - open popup
   const handleVideoClick = (videoUrl: string, title: string, listing: Listing) => {
     console.log('🎬 Opening video:', videoUrl);
+    console.log('📁 Listing media URLs:', listing.mediaUrls);
     
     setSelectedVideo(videoUrl);
     setVideoTitle(title);
@@ -397,31 +410,55 @@ const Browse: React.FC = () => {
   };
 
   // ============================================
-  // SIMPLE VIDEO DETECTION LOGIC (Old working style)
+  // IMPROVED VIDEO DETECTION LOGIC WITH CLOUDINARY SUPPORT
   // ============================================
 
-  // Check if media is a video - SIMPLE VERSION
+  // Check if media is a video - IMPROVED CLOUDINARY SUPPORT
   const isVideoUrl = (url: string): boolean => {
     if (!url || typeof url !== 'string') return false;
     
+    const urlLower = url.toLowerCase();
+    
     // Common video file extensions
-    const videoExtensions = /\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v|ogg|ogv|3gp|3g2)$/i;
+    const videoExtensions = /\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v|ogg|ogv|3gp|3g2|mpeg|mpg|m2v|m4p|m4v|svi|3gpp|3gpp2|mxf|roq|nsv|flv|f4v|f4p|f4a|f4b)$/i;
     
     if (videoExtensions.test(url)) {
       return true;
     }
     
-    // Video hosting platforms
+    // Video hosting platforms with Cloudinary support
     const videoDomains = [
       'youtube.com',
       'youtu.be',
       'vimeo.com',
       'dailymotion.com',
-      'cloudinary.com'
+      'twitch.tv',
+      'streamable.com',
+      'cloudinary.com/video',
+      'cloudinary.com/upload/video',
+      'cloudinary.com/upload/v',
+      'res.cloudinary.com/video'
     ];
     
     // Check if URL contains any video domain
-    return videoDomains.some(domain => url.includes(domain));
+    for (const domain of videoDomains) {
+      if (urlLower.includes(domain)) {
+        return true;
+      }
+    }
+    
+    // Special Cloudinary video detection
+    if (urlLower.includes('cloudinary.com')) {
+      // Check if it's a Cloudinary video upload
+      if (urlLower.includes('/video/') || 
+          urlLower.includes('/upload/video/') ||
+          urlLower.includes('/upload/v') ||
+          urlLower.match(/\.(mp4|mov|avi|webm)$/)) {
+        return true;
+      }
+    }
+    
+    return false;
   };
 
   // Get first video URL from listing
@@ -433,6 +470,7 @@ const Browse: React.FC = () => {
     // Find first video URL
     for (const url of listing.mediaUrls) {
       if (isVideoUrl(url)) {
+        console.log('✅ Found video URL:', url);
         return url;
       }
     }
@@ -440,7 +478,7 @@ const Browse: React.FC = () => {
     return '';
   };
 
-  // Generate video thumbnail from video URL
+  // Generate video thumbnail from video URL - IMPROVED FOR CLOUDINARY
   const generateVideoThumbnail = (videoUrl: string): string => {
     if (!videoUrl) return VIDEO_PLACEHOLDER;
     
@@ -460,11 +498,43 @@ const Browse: React.FC = () => {
       }
     }
     
+    // For Cloudinary videos - generate thumbnail
+    if (videoUrl.includes('cloudinary.com')) {
+      // Extract Cloudinary public ID
+      const cloudinaryMatch = videoUrl.match(/cloudinary\.com\/[^\/]+\/(video|upload)\/(.*?)\/([^\.]+)\./);
+      
+      if (cloudinaryMatch) {
+        const publicId = cloudinaryMatch[3];
+        
+        // Generate thumbnail URL for Cloudinary video
+        // Replace video/upload with image/upload and add thumbnail parameters
+        const thumbnailUrl = videoUrl
+          .replace('/video/upload/', '/image/upload/')
+          .replace('/upload/video/', '/upload/')
+          .replace(/(\/upload\/.*?\/)([^\/]+)$/, '$1w_600,h_400,c_fill,q_auto,f_auto/$2.jpg');
+        
+        return thumbnailUrl;
+      }
+      
+      // Alternative method for Cloudinary thumbnails
+      if (videoUrl.includes('/upload/')) {
+        const baseUrl = videoUrl.split('/upload/')[0];
+        const path = videoUrl.split('/upload/')[1];
+        
+        if (path) {
+          // Remove any file extension and add thumbnail parameters
+          const pathWithoutExt = path.replace(/\.(mp4|mov|avi|webm)$/i, '');
+          const thumbnail = `${baseUrl}/image/upload/w_600,h_400,c_fill,q_auto,f_auto/${pathWithoutExt}.jpg`;
+          return thumbnail;
+        }
+      }
+    }
+    
     // For direct video files, use video placeholder
     return VIDEO_PLACEHOLDER;
   };
 
-  // Get thumbnail URL with better error handling
+  // Get thumbnail URL with better error handling - OPTIMIZED FOR CLOUDINARY
   const getThumbnailUrl = (listing: Listing): string => {
     const listingId = listing._id || 'unknown';
     
@@ -477,7 +547,25 @@ const Browse: React.FC = () => {
       return PLACEHOLDER_IMAGE;
     }
     
-    // Try to find an image first
+    // Check for Cloudinary media first (for better detection)
+    const cloudinaryMedia = listing.mediaUrls.find(url => 
+      url.includes('cloudinary.com')
+    );
+    
+    if (cloudinaryMedia) {
+      // Check if it's a video
+      const isVideo = isVideoUrl(cloudinaryMedia);
+      
+      if (isVideo) {
+        // Generate thumbnail for Cloudinary video
+        return generateVideoThumbnail(cloudinaryMedia);
+      } else {
+        // It's already a Cloudinary image, return as is
+        return cloudinaryMedia;
+      }
+    }
+    
+    // Try to find a regular image
     const imageUrl = listing.mediaUrls.find(url => 
       url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
     );
@@ -507,7 +595,7 @@ const Browse: React.FC = () => {
     }));
   };
 
-  // Get media type for a listing - SIMPLE AND RELIABLE
+  // Get media type for a listing - IMPROVED FOR CLOUDINARY
   const getMediaType = (listing: Listing): 'image' | 'video' | 'none' => {
     if (!listing.mediaUrls || !Array.isArray(listing.mediaUrls) || listing.mediaUrls.length === 0) {
       return 'none';
@@ -527,15 +615,14 @@ const Browse: React.FC = () => {
       }
     }
     
+    // Check for Cloudinary URLs that might be images
+    for (const url of listing.mediaUrls) {
+      if (url.includes('cloudinary.com') && !isVideoUrl(url)) {
+        return 'image';
+      }
+    }
+    
     return 'none';
-  };
-
-  // Get listing for the selected video
-  const getListingForVideo = (videoUrl: string): Listing | undefined => {
-    return listings.find(listing => {
-      const listingVideoUrl = getFirstVideoUrl(listing);
-      return listingVideoUrl === videoUrl;
-    });
   };
 
   if (loading) {
@@ -729,7 +816,7 @@ const Browse: React.FC = () => {
             )}
           </div>
 
-          {/* Listings Grid */}
+          {/* Listings Grid - 3 PER ROW */}
           {filteredListings.length === 0 ? (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 sm:p-12 text-center">
               <div className="max-w-md mx-auto">
@@ -799,6 +886,9 @@ const Browse: React.FC = () => {
                             <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-2 border-white/30 transform group-hover:scale-110 transition-transform duration-300">
                               <FiPlay className="text-white ml-1" size={28} />
                             </div>
+                            <div className="absolute bottom-2 left-2 text-white text-xs bg-black/50 px-2 py-1 rounded">
+                              Click to play
+                            </div>
                           </div>
                         )}
                         
@@ -829,6 +919,13 @@ const Browse: React.FC = () => {
                           {listing.category}
                         </span>
                       </div>
+                      
+                      {/* Cloudinary Badge if Cloudinary URL */}
+                      {thumbnailUrl.includes('cloudinary.com') && (
+                        <div className="absolute top-2 left-2 bg-green-600/80 text-white text-[10px] px-2 py-1 rounded backdrop-blur-sm">
+                          CLOUDINARY
+                        </div>
+                      )}
                     </div>
 
                     {/* Content */}
