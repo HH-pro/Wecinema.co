@@ -159,6 +159,8 @@ export interface Offer {
   rejectedAt?: string;
   cancelledAt?: string;
   rejectionReason?: string;
+  isTemporary?: boolean;
+  expiresAt?: string;
 }
 
 export interface Delivery {
@@ -1156,10 +1158,37 @@ export const ordersApi = {
 };
 
 // ============================================
-// ✅ OFFERS API
+// ✅ OFFERS API (UPDATED WITH NEW ROUTES)
 // ============================================
 
 export const offersApi = {
+  // ========== OFFER MANAGEMENT ========== //
+  
+  // Check for pending offer on a listing
+  checkPendingOffer: async (listingId: string): Promise<ApiResponse<{
+    hasPendingOffer: boolean;
+    data?: {
+      _id: string;
+      status: string;
+      amount: number;
+      createdAt: string;
+      paymentIntentId?: string;
+      isTemporary?: boolean;
+      expiresAt?: string;
+    };
+    message: string;
+  }>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/offers/check-pending-offer/${listingId}`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to check pending offer');
+    }
+  },
+
   // Make an offer with immediate payment
   makeOffer: async (offerData: {
     listingId: string;
@@ -1173,6 +1202,8 @@ export const offersApi = {
     paymentIntentId: string;
     amount: number;
     nextSteps: string;
+    stripeStatus?: string;
+    isExistingOffer?: boolean;
   }>> => {
     try {
       const response = await axios.post(
@@ -1186,6 +1217,47 @@ export const offersApi = {
     }
   },
 
+  // Cancel temporary offer (when user goes back without paying)
+  cancelTemporaryOffer: async (offerId: string): Promise<ApiResponse<{
+    offerId: string;
+    cancelledAt: string;
+  }>> => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/offers/cancel-temporary-offer/${offerId}`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to cancel temporary offer');
+    }
+  },
+
+  // Get offer payment status
+  getPaymentStatus: async (offerId: string): Promise<ApiResponse<{
+    offerId: string;
+    status: string;
+    stripeStatus: string | null;
+    isTemporary: boolean;
+    expiresAt: string | null;
+    isExpired: boolean;
+    paymentIntentId: string | null;
+    canContinuePayment: boolean;
+    requiresCapture: boolean;
+    amount: number;
+  }>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/offers/payment-status/${offerId}`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to get payment status');
+    }
+  },
+
   // Confirm offer payment
   confirmOfferPayment: async (paymentData: {
     offerId: string;
@@ -1195,6 +1267,8 @@ export const offersApi = {
     redirectUrl: string;
     chatUrl?: string;
     notifications: any;
+    paymentStatus: string;
+    requiresCapture: boolean;
     orderDetails: {
       amount: number;
       sellerName: string;
@@ -1213,6 +1287,24 @@ export const offersApi = {
       return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error as AxiosError, 'Failed to confirm payment');
+    }
+  },
+
+  // Capture payment manually (for requires_capture status)
+  capturePayment: async (orderId: string): Promise<ApiResponse<{
+    orderId: string;
+    paymentStatus: string;
+    capturedAt: string;
+  }>> => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/offers/capture-payment/${orderId}`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to capture payment');
     }
   },
 
@@ -1236,6 +1328,7 @@ export const offersApi = {
   getMyOffers: async (): Promise<ApiResponse<{ 
     offers: Offer[]; 
     count: number;
+    timestamp: string;
   }>> => {
     try {
       const response = await axios.get(
@@ -1406,9 +1499,27 @@ export const offersApi = {
     }
   },
 
+  // Cleanup expired offers
+  cleanupExpiredOffers: async (): Promise<ApiResponse<{
+    cleanedCount: number;
+    message: string;
+  }>> => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/offers/cleanup-expired-offers`,
+        {},
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to cleanup expired offers');
+    }
+  },
+
   // Delete all offers (testing only)
   deleteAllOffers: async (): Promise<ApiResponse<{
     deletedCount: number;
+    cancelledPaymentIntents: number;
   }>> => {
     try {
       const response = await axios.delete(
@@ -1418,81 +1529,29 @@ export const offersApi = {
     } catch (error) {
       return handleApiError(error as AxiosError, 'Failed to delete offers');
     }
-  }
-};
+  },
 
-// ============================================
-// ✅ UTILITY FUNCTIONS
-// ============================================
-
-// Format currency
-export const formatCurrency = (amount: number, currency: string = 'USD'): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency,
-  }).format(amount || 0);
-};
-
-// Calculate platform fee (10%)
-export const calculatePlatformFee = (amount: number): number => {
-  return parseFloat((amount * 0.10).toFixed(2));
-};
-
-// Calculate seller payout
-export const calculateSellerPayout = (amount: number): number => {
-  return parseFloat((amount - calculatePlatformFee(amount)).toFixed(2));
-};
-
-// Check if user is authenticated
-export const checkAuth = (): boolean => {
-  const token = getAuthToken();
-  return !!token;
-};
-
-// Get current user from token
-export const getCurrentUser = (): any => {
-  try {
-    const token = getAuthToken();
-    if (!token) return null;
-    
-    // Decode JWT token
+  // Get direct purchase route
+  createDirectPurchase: async (listingId: string, requirements?: string): Promise<ApiResponse<{
+    order: Order;
+    clientSecret: string;
+    paymentIntentId: string;
+    chatId: string;
+    redirectUrl: string;
+  }>> => {
     try {
-      const base64Url = token.split('.')[1];
-      if (!base64Url) return null;
-      
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-      }).join(''));
-      
-      return JSON.parse(jsonPayload);
-    } catch (decodeError) {
-      console.error('Error decoding token:', decodeError);
-      return null;
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/offers/create-direct-payment`,
+        { listingId, requirements },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to create direct purchase');
     }
-  } catch (error) {
-    console.error('Error getting current user:', error);
-    return null;
   }
 };
 
-// Get API base URL
-export const getApiBaseUrl = (): string => {
-  return API_BASE_URL;
-};
-
-// Format bytes for file sizes
-export const formatBytes = (bytes: number, decimals: number = 2): string => {
-  if (bytes === 0) return '0 Bytes';
-  
-  const k = 1024;
-  const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-};
 // ============================================
 // ✅ PAYMENTS API
 // ============================================
@@ -1678,6 +1737,143 @@ export const paymentsApi = {
 };
 
 // ============================================
+// ✅ UTILITY FUNCTIONS
+// ============================================
+
+// Format currency
+export const formatCurrency = (amount: number, currency: string = 'USD'): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency,
+  }).format(amount || 0);
+};
+
+// Calculate platform fee (10%)
+export const calculatePlatformFee = (amount: number): number => {
+  return parseFloat((amount * 0.10).toFixed(2));
+};
+
+// Calculate seller payout
+export const calculateSellerPayout = (amount: number): number => {
+  return parseFloat((amount - calculatePlatformFee(amount)).toFixed(2));
+};
+
+// Check if user is authenticated
+export const checkAuth = (): boolean => {
+  const token = getAuthToken();
+  return !!token;
+};
+
+// Get current user from token
+export const getCurrentUser = (): any => {
+  try {
+    const token = getAuthToken();
+    if (!token) return null;
+    
+    // Decode JWT token
+    try {
+      const base64Url = token.split('.')[1];
+      if (!base64Url) return null;
+      
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      
+      return JSON.parse(jsonPayload);
+    } catch (decodeError) {
+      console.error('Error decoding token:', decodeError);
+      return null;
+    }
+  } catch (error) {
+    console.error('Error getting current user:', error);
+    return null;
+  }
+};
+
+// Get API base URL
+export const getApiBaseUrl = (): string => {
+  return API_BASE_URL;
+};
+
+// Format bytes for file sizes
+export const formatBytes = (bytes: number, decimals: number = 2): string => {
+  if (bytes === 0) return '0 Bytes';
+  
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+};
+
+// Format date
+export const formatDate = (dateString: string, includeTime: boolean = false): string => {
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return 'Invalid date';
+  
+  const options: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  };
+  
+  if (includeTime) {
+    options.hour = '2-digit';
+    options.minute = '2-digit';
+  }
+  
+  return date.toLocaleDateString('en-US', options);
+};
+
+// Get days remaining until date
+export const getDaysRemaining = (dateString: string): number => {
+  const targetDate = new Date(dateString);
+  const today = new Date();
+  const diffTime = targetDate.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays;
+};
+
+// Validate offer amount
+export const validateOfferAmount = (amount: number, listingPrice: number): {
+  isValid: boolean;
+  message: string;
+  minAmount: number;
+  maxAmount: number;
+} => {
+  const minAmount = 0.50;
+  const maxAmount = listingPrice * 2; // Allow up to 2x listing price
+  
+  if (amount < minAmount) {
+    return {
+      isValid: false,
+      message: `Offer must be at least $${minAmount}`,
+      minAmount,
+      maxAmount
+    };
+  }
+  
+  if (amount > maxAmount) {
+    return {
+      isValid: false,
+      message: `Offer cannot exceed $${maxAmount.toFixed(2)}`,
+      minAmount,
+      maxAmount
+    };
+  }
+  
+  return {
+    isValid: true,
+    message: 'Valid offer amount',
+    minAmount,
+    maxAmount
+  };
+};
+
+// ============================================
 // ✅ EXPORT ALL APIs
 // ============================================
 
@@ -1685,15 +1881,18 @@ const marketplaceApi = {
   listings: listingsApi,
   orders: ordersApi,
   offers: offersApi,
+  payments: paymentsApi,
   utils: {
     formatCurrency,
     calculatePlatformFee,
     calculateSellerPayout,
-    payments: paymentsApi, // ✅ Add this line
     checkAuth,
     getCurrentUser,
     getApiBaseUrl,
-    formatBytes
+    formatBytes,
+    formatDate,
+    getDaysRemaining,
+    validateOfferAmount
   }
 };
 
