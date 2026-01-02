@@ -4,7 +4,8 @@ import MarketplaceLayout from '../../components/Layout';
 import { 
   FiCreditCard, FiCheck, FiX, FiAlertCircle, FiLoader, 
   FiClock, FiCheckCircle, FiXCircle, FiEye, FiDollarSign,
-  FiCalendar, FiMessageSquare, FiPackage, FiUser, FiTag
+  FiCalendar, FiMessageSquare, FiPackage, FiUser, FiTag,
+  FiShoppingBag
 } from 'react-icons/fi';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { loadStripe } from '@stripe/stripe-js';
@@ -61,6 +62,7 @@ const MyOffers: React.FC = () => {
   const [error, setError] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'pending' | 'paid' | 'accepted' | 'rejected' | 'all'>('pending');
+  const [refreshing, setRefreshing] = useState<boolean>(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -82,21 +84,38 @@ const MyOffers: React.FC = () => {
       setLoading(true);
       setError('');
       
-      // Add cache busting to prevent 304 responses
+      console.log('🔄 Fetching offers...');
+      
       const response = await marketplaceApi.offers.getMyOffers();
+      
+      console.log('📦 Offers API Response:', response);
       
       if (!response.success) {
         throw new Error(response.error || 'Failed to fetch offers');
       }
 
-      console.log('Offers fetched:', response.data?.offers?.length);
+      console.log('✅ Offers data:', response.data);
+      console.log('📊 Offers count:', response.data?.offers?.length);
+      
       setOffers(response.data?.offers || []);
     } catch (error: any) {
-      console.error('Error fetching offers:', error);
+      console.error('❌ Error fetching offers:', error);
       setError(error.message || 'Failed to load offers. Please try again.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  // Refresh offers
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchOffers();
+  };
+
+  // Handle view listing
+  const handleViewListing = (listingId: string) => {
+    navigate(`/marketplace/listings/${listingId}`);
   };
 
   // Handle payment for pending payment offer
@@ -112,23 +131,42 @@ const MyOffers: React.FC = () => {
       setError('');
       setPaymentStatus('idle');
 
-      // Fetch payment intent from backend
-      console.log('Creating payment intent for offer:', offer._id);
+      // Debug log
+      console.log('🔄 Creating payment intent for offer:', offer._id);
+      console.log('💰 Offer amount:', offer.amount);
       
-      const paymentResponse = await marketplaceApi.payments.createPaymentIntent({
-        offerId: offer._id,
-        amount: offer.amount,
-        currency: 'usd'
-      });
-
-      if (!paymentResponse.success) {
-        throw new Error(paymentResponse.error || 'Failed to create payment');
+      // Try different API endpoints
+      let paymentResponse;
+      
+      try {
+        // Try offer-specific payment endpoint first
+        paymentResponse = await marketplaceApi.payments.createOfferPaymentIntent(offer._id);
+      } catch (err) {
+        console.log('⚠️ Offer payment endpoint failed, trying general endpoint...');
+        
+        // Fallback to general payment intent endpoint
+        paymentResponse = await marketplaceApi.payments.createPaymentIntent({
+          offerId: offer._id,
+          amount: offer.amount,
+          currency: 'usd'
+        });
       }
 
-      setClientSecret(paymentResponse.data?.clientSecret || '');
+      console.log('💳 Payment intent response:', paymentResponse);
+      
+      if (!paymentResponse.success) {
+        throw new Error(paymentResponse.error || 'Failed to create payment intent');
+      }
+
+      if (!paymentResponse.data?.clientSecret) {
+        throw new Error('No client secret received from server');
+      }
+
+      setClientSecret(paymentResponse.data.clientSecret);
+      console.log('✅ Payment intent created, clientSecret received');
       
     } catch (error: any) {
-      console.error('Error setting up payment:', error);
+      console.error('❌ Error setting up payment:', error);
       setError(error.message || 'Failed to setup payment. Please try again.');
       setShowPaymentModal(false);
     }
@@ -249,10 +287,23 @@ const MyOffers: React.FC = () => {
 
   // Get thumbnail URL
   const getThumbnailUrl = (listing: any): string => {
-    if (!listing.mediaUrls || listing.mediaUrls.length === 0) {
-      return 'https://via.placeholder.com/100x100?text=No+Image';
+    if (!listing?.mediaUrls || listing.mediaUrls.length === 0) {
+      return 'https://via.placeholder.com/300x200.png?text=No+Image';
     }
     return listing.mediaUrls[0];
+  };
+
+  // Format date
+  const formatDate = (dateString: string) => {
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      return 'Invalid date';
+    }
   };
 
   if (loading) {
@@ -320,12 +371,49 @@ const MyOffers: React.FC = () => {
               
               <div className="flex flex-col sm:flex-row gap-3">
                 <button 
-                  onClick={() => navigate('/marketplace')}
-                  className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
+                  {refreshing ? (
+                    <>
+                      <FiLoader className="animate-spin mr-2" />
+                      Refreshing...
+                    </>
+                  ) : (
+                    'Refresh Offers'
+                  )}
+                </button>
+                <button 
+                  onClick={() => navigate('/marketplace')}
+                  className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                >
+                  <FiShoppingBag className="mr-2" />
                   Browse Listings
                 </button>
               </div>
+            </div>
+          </div>
+
+          {/* Debug Info */}
+          <div className="mb-6 bg-gray-100 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-700">
+                  Total Offers: <span className="font-bold">{offers.length}</span>
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Pending Payment: {offers.filter(o => o.status === 'pending_payment').length} |
+                  Paid: {offers.filter(o => o.status === 'paid').length} |
+                  Accepted: {offers.filter(o => o.status === 'accepted').length}
+                </p>
+              </div>
+              <button 
+                onClick={() => console.log('Offers data:', offers)}
+                className="text-xs bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded"
+              >
+                Debug Data
+              </button>
             </div>
           </div>
 
@@ -422,13 +510,19 @@ const MyOffers: React.FC = () => {
                   >
                     Browse Listings
                   </button>
+                  <button 
+                    onClick={handleRefresh}
+                    className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-gray-300 text-sm sm:text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                  >
+                    Refresh
+                  </button>
                 </div>
               </div>
             </div>
           ) : (
             <div className="space-y-6">
-              {filteredOffers.map(offer => (
-                <div key={offer._id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              {filteredOffers.map((offer, index) => (
+                <div key={offer._id || index} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                   <div className="p-6">
                     <div className="flex flex-col lg:flex-row lg:items-start gap-6">
                       {/* Thumbnail */}
@@ -438,10 +532,10 @@ const MyOffers: React.FC = () => {
                       >
                         <img
                           src={getThumbnailUrl(offer.listingId)}
-                          alt={offer.listingId.title}
+                          alt={offer.listingId.title || 'Listing Image'}
                           className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=No+Image';
+                            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200.png?text=No+Image';
                           }}
                         />
                       </div>
@@ -452,7 +546,7 @@ const MyOffers: React.FC = () => {
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
                               <h3 className="text-lg font-semibold text-gray-900">
-                                {offer.listingId.title}
+                                {offer.listingId?.title || 'Untitled Listing'}
                               </h3>
                               <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(offer.status)} flex items-center`}>
                                 {getStatusIcon(offer.status)}
@@ -461,24 +555,28 @@ const MyOffers: React.FC = () => {
                             </div>
                             
                             <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                              {offer.listingId.description}
+                              {offer.listingId?.description || 'No description available'}
                             </p>
                             
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                               <div className="flex items-center gap-2">
                                 <FiTag className="text-gray-400" size={16} />
-                                <span className="text-sm text-gray-700">{offer.listingId.category}</span>
+                                <span className="text-sm text-gray-700">
+                                  {offer.listingId?.category || 'Uncategorized'}
+                                </span>
                               </div>
                               
                               <div className="flex items-center gap-2">
                                 <FiUser className="text-gray-400" size={16} />
-                                <span className="text-sm text-gray-700">Seller: {offer.listingId.sellerId?.username || 'Unknown'}</span>
+                                <span className="text-sm text-gray-700">
+                                  Seller: {offer.listingId?.sellerId?.username || 'Unknown Seller'}
+                                </span>
                               </div>
                               
                               <div className="flex items-center gap-2">
                                 <FiCalendar className="text-gray-400" size={16} />
                                 <span className="text-sm text-gray-700">
-                                  Offered: {new Date(offer.createdAt).toLocaleDateString()}
+                                  Offered: {formatDate(offer.createdAt)}
                                 </span>
                               </div>
                               
@@ -486,7 +584,7 @@ const MyOffers: React.FC = () => {
                                 <div className="flex items-center gap-2">
                                   <FiCalendar className="text-gray-400" size={16} />
                                   <span className="text-sm text-gray-700">
-                                    Expected: {new Date(offer.expectedDelivery).toLocaleDateString()}
+                                    Expected: {formatDate(offer.expectedDelivery)}
                                   </span>
                                 </div>
                               )}
@@ -512,14 +610,14 @@ const MyOffers: React.FC = () => {
                                 {marketplaceApi.utils.formatCurrency(offer.amount)}
                               </div>
                               <div className="text-sm text-gray-500 mt-1">
-                                Original: {marketplaceApi.utils.formatCurrency(offer.listingId.price)}
+                                Original: {marketplaceApi.utils.formatCurrency(offer.listingId?.price || 0)}
                               </div>
                             </div>
                             
                             <div className="space-y-2">
                               {/* View Listing Button */}
                               <button
-                                onClick={() => navigate(`/marketplace/listings/${offer.listingId._id}`)}
+                                onClick={() => handleViewListing(offer.listingId._id)}
                                 className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm flex items-center justify-center gap-2"
                               >
                                 <FiEye size={14} />
@@ -553,7 +651,7 @@ const MyOffers: React.FC = () => {
                                     Awaiting Seller Acceptance
                                   </div>
                                   <div className="text-xs text-gray-500">
-                                    Payment completed on {new Date(offer.paidAt || offer.createdAt).toLocaleDateString()}
+                                    Paid on {offer.paidAt ? formatDate(offer.paidAt) : formatDate(offer.createdAt)}
                                   </div>
                                 </div>
                               )}
@@ -564,7 +662,7 @@ const MyOffers: React.FC = () => {
                                     Offer Accepted!
                                   </div>
                                   <div className="text-xs text-gray-500">
-                                    Accepted on {new Date(offer.acceptedAt || offer.updatedAt).toLocaleDateString()}
+                                    Accepted on {offer.acceptedAt ? formatDate(offer.acceptedAt) : formatDate(offer.updatedAt)}
                                   </div>
                                 </div>
                               )}
@@ -654,7 +752,7 @@ const MyOffers: React.FC = () => {
                     Complete Offer Payment
                   </h3>
                   <p className="text-sm text-gray-500 mt-1">
-                    Complete payment for your offer on "{selectedOffer.listingId.title}"
+                    Complete payment for your offer on "{selectedOffer.listingId?.title || 'Listing'}"
                   </p>
                 </div>
                 <button 
@@ -692,7 +790,7 @@ const MyOffers: React.FC = () => {
                         <div className="w-12 h-12 rounded-lg overflow-hidden border border-gray-300 flex-shrink-0">
                           <img
                             src={getThumbnailUrl(selectedOffer.listingId)}
-                            alt={selectedOffer.listingId.title}
+                            alt={selectedOffer.listingId?.title}
                             className="w-full h-full object-cover"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Preview';
@@ -701,15 +799,15 @@ const MyOffers: React.FC = () => {
                         </div>
                         <div className="flex-1 min-w-0">
                           <h4 className="font-semibold text-gray-900 text-sm truncate">
-                            {selectedOffer.listingId.title}
+                            {selectedOffer.listingId?.title || 'Listing'}
                           </h4>
                           <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                            {selectedOffer.listingId.description}
+                            {selectedOffer.listingId?.description || 'No description available'}
                           </p>
                           {selectedOffer.expectedDelivery && (
                             <div className="flex items-center gap-1 mt-2 text-xs text-gray-500">
                               <FiCalendar size={12} />
-                              <span>Expected: {new Date(selectedOffer.expectedDelivery).toLocaleDateString()}</span>
+                              <span>Expected: {formatDate(selectedOffer.expectedDelivery)}</span>
                             </div>
                           )}
                         </div>
@@ -811,11 +909,10 @@ const OfferPaymentForm = ({
         elements,
         confirmParams: {
           return_url: `${window.location.origin}/marketplace/offers?payment_success=true`,
-          // Pass offer details for backend verification
           metadata: {
             offerId: offer._id,
-            listingId: offer.listingId._id,
-            buyerId: offer.buyerId._id
+            listingId: offer.listingId?._id,
+            buyerId: offer.buyerId?._id
           }
         },
         redirect: 'if_required'
@@ -831,7 +928,7 @@ const OfferPaymentForm = ({
         
         if (paymentIntent.status === 'succeeded') {
           // Update offer status via API
-          const response = await marketplaceApi.offers.updateOfferPayment({
+          const response = await marketplaceApi.payments.updateOfferPayment({
             offerId: offer._id,
             paymentIntentId: paymentIntent.id,
             status: 'paid'
@@ -967,12 +1064,6 @@ const OfferPaymentForm = ({
       </div>
     </form>
   );
-};
-
-// Add missing functions
-const handleViewListing = (listingId: string) => {
-  // This will be called from the component
-  console.log('View listing:', listingId);
 };
 
 export default MyOffers;
