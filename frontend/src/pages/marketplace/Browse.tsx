@@ -802,7 +802,6 @@ const Browse: React.FC = () => {
           </div>
         </div>
       )}
-                </>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-white p-8 text-center">
                   <FiAlertCircle className="text-red-500 mb-4" size={48} />
