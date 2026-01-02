@@ -5,7 +5,7 @@ import { Listing } from '../../types/marketplace';
 import { 
   FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiCheck, FiAlertCircle, 
   FiLoader, FiUser, FiCalendar, FiMail, FiPlay, FiPause, FiVolume2, 
-  FiVolumeX, FiMaximize, FiMinimize, FiDownload, FiHeart, FiShare2 
+  FiVolumeX, FiMaximize, FiMinimize, FiEye, FiHeart 
 } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { loadStripe } from '@stripe/stripe-js';
@@ -337,7 +337,7 @@ const Browse: React.FC = () => {
     setPaymentStatus('success');
     
     // Redirect to orders page with success message
-    navigate('/marketplace/my-orders', { 
+    navigate('/marketplace/my-offers', { 
       state: { 
         message: 'Payment completed successfully! Your order has been placed.',
         type: 'success'
@@ -393,7 +393,22 @@ const Browse: React.FC = () => {
     return videoUrl || listing.mediaUrls[0];
   };
 
-  // Get thumbnail URL (first image or first media URL)
+  // Generate video thumbnail from video URL
+  const generateVideoThumbnail = (videoUrl: string): string => {
+    // If it's a YouTube URL, generate thumbnail
+    if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
+      const videoId = videoUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
+      if (videoId) {
+        return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+      }
+    }
+    
+    // For direct video files, use a video thumbnail placeholder
+    // In a real app, you might want to generate thumbnails on the server
+    return `https://via.placeholder.com/300x200/3B82F6/FFFFFF?text=Video+Preview`;
+  };
+
+  // Get thumbnail URL
   const getThumbnailUrl = (listing: Listing): string => {
     if (!listing.mediaUrls || listing.mediaUrls.length === 0) {
       return 'https://via.placeholder.com/300x200?text=No+Preview';
@@ -404,12 +419,23 @@ const Browse: React.FC = () => {
       url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
     );
     
-    return imageUrl || listing.mediaUrls[0];
+    if (imageUrl) return imageUrl;
+    
+    // Check if first media is a video
+    const videoUrl = getFirstVideoUrl(listing);
+    if (videoUrl && isVideoUrl(videoUrl)) {
+      return generateVideoThumbnail(videoUrl);
+    }
+    
+    return listing.mediaUrls[0];
   };
 
   // Check if media is a video
   const isVideoUrl = (url: string): boolean => {
-    return url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v)$/i) !== null;
+    return url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v)$/i) !== null ||
+           url.includes('youtube.com') || 
+           url.includes('youtu.be') ||
+           url.includes('vimeo.com');
   };
 
   if (loading) {
@@ -459,14 +485,24 @@ const Browse: React.FC = () => {
               
               <div className="flex flex-col sm:flex-row gap-3">
                 {marketplaceApi.utils.checkAuth() && (
-                  <button 
-                    onClick={() => navigate('/marketplace/create')}
-                    className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
-                  >
-                    <FiPlus className="mr-2" size={18} />
-                    <span className="hidden sm:inline">Create Listing</span>
-                    <span className="sm:hidden">Create</span>
-                  </button>
+                  <>
+                    <button 
+                      onClick={() => navigate('/marketplace/create')}
+                      className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                    >
+                      <FiPlus className="mr-2" size={18} />
+                      <span className="hidden sm:inline">Create Listing</span>
+                      <span className="sm:hidden">Create</span>
+                    </button>
+                    <button 
+                      onClick={() => navigate('/marketplace/my-offers')}
+                      className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                    >
+                      <FiCreditCard className="mr-2" size={18} />
+                      <span className="hidden sm:inline">My Offers</span>
+                      <span className="sm:hidden">Offers</span>
+                    </button>
+                  </>
                 )}
                 
                 <button 
@@ -633,7 +669,7 @@ const Browse: React.FC = () => {
                 const isVideo = isVideoUrl(videoUrl);
                 
                 return (
-                  <div key={listing._id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                  <div key={listing._id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 border border-gray-200">
                     {/* Video/Image Preview */}
                     <div 
                       className="relative h-48 bg-gray-900 cursor-pointer group"
@@ -643,47 +679,38 @@ const Browse: React.FC = () => {
                         }
                       }}
                     >
-                      {isVideo && videoUrl ? (
-                        <>
-                          {/* Video Thumbnail */}
-                          <div className="relative w-full h-full">
-                            <img
-                              src={thumbnailUrl}
-                              alt={listing.title}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Video+Preview';
-                              }}
-                            />
-                            {/* Play Button Overlay */}
-                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                              <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                                <FiPlay className="text-white" size={28} />
-                              </div>
+                      {/* Thumbnail Image */}
+                      <div className="relative w-full h-full">
+                        <img
+                          src={thumbnailUrl}
+                          alt={listing.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Video+Preview';
+                          }}
+                        />
+                        
+                        {/* Play Button Overlay for Videos */}
+                        {isVideo && (
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-2 border-white/30">
+                              <FiPlay className="text-white" size={28} />
                             </div>
-                            {/* Video Badge */}
-                            <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-md flex items-center gap-1">
+                          </div>
+                        )}
+                        
+                        {/* Media Type Badge */}
+                        <div className={`absolute top-2 right-2 text-white text-xs px-2 py-1 rounded-md flex items-center gap-1 ${isVideo ? 'bg-red-500' : 'bg-blue-500'}`}>
+                          {isVideo ? (
+                            <>
                               <FiPlay size={10} />
                               VIDEO
-                            </div>
-                          </div>
-                        </>
-                      ) : (
-                        // Image Thumbnail
-                        <div className="relative w-full h-full">
-                          <img
-                            src={thumbnailUrl}
-                            alt={listing.title}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=No+Preview';
-                            }}
-                          />
-                          <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-md">
-                            IMAGE
-                          </div>
+                            </>
+                          ) : (
+                            'IMAGE'
+                          )}
                         </div>
-                      )}
+                      </div>
                       
                       {/* Category Badge */}
                       <div className="absolute bottom-2 left-2">
