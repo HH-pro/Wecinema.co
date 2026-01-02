@@ -1,22 +1,20 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import { Listing } from '../../types/marketplace';
 import { 
   FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiAlertCircle, 
-  FiLoader, FiUser, FiMail, FiPlay, FiImage, FiVideo, FiEye, FiHeart,
-  FiChevronLeft, FiChevronRight, FiSliders, FiRefreshCw, FiTrendingUp
+  FiLoader, FiUser, FiMail, FiPlay, FiImage, FiVideo, FiEye, FiHeart 
 } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import marketplaceApi from '../../api/marketplaceApi';
 import VideoPlayerModal from '../../components/marketplae/VideoPlayerModal';
-import PaymentModal from '../../components/marketplae/paymentModal';
+import PaymentModal from '../../components/marketplae/PaymentModal';
 import OfferModal from '../../components/marketplae/OfferModal';
 
-// Constants for placeholder images - Higher quality Unsplash images
-const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1611224923853-80b023f02d71?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80';
-const VIDEO_PLACEHOLDER = 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80';
-const USER_PLACEHOLDER = 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80';
-const ERROR_IMAGE = 'https://via.placeholder.com/400x300/1f2937/ffffff?text=Preview+Unavailable';
+// Constants for placeholder images
+const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1579546929662-711aa81148cf?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
+const VIDEO_PLACEHOLDER = 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
+const ERROR_IMAGE = 'https://via.placeholder.com/300x200/cccccc/ffffff?text=Preview+Unavailable';
 
 const Browse: React.FC = () => {
   const [listings, setListings] = useState<Listing[]>([]);
@@ -34,7 +32,6 @@ const Browse: React.FC = () => {
   const [showVideoPopup, setShowVideoPopup] = useState<boolean>(false);
   const [selectedVideo, setSelectedVideo] = useState<string>('');
   const [videoTitle, setVideoTitle] = useState<string>('');
-  const [videoThumbnail, setVideoThumbnail] = useState<string>('');
   const [billingDetails, setBillingDetails] = useState({
     name: '',
     email: '',
@@ -51,13 +48,6 @@ const Browse: React.FC = () => {
   
   // New state for image loading errors
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
-  const [videoThumbnails, setVideoThumbnails] = useState<Record<string, string>>({});
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [totalPages, setTotalPages] = useState<number>(1);
-  const [itemsPerPage] = useState<number>(12);
-  const [hoveredCard, setHoveredCard] = useState<string | null>(null);
-  
   const navigate = useNavigate();
 
   const [filters, setFilters] = useState({
@@ -65,8 +55,7 @@ const Browse: React.FC = () => {
     category: '',
     minPrice: '',
     maxPrice: '',
-    sortBy: 'newest',
-    rating: ''
+    sortBy: 'newest'
   });
 
   const [offerForm, setOfferForm] = useState({
@@ -78,18 +67,12 @@ const Browse: React.FC = () => {
 
   // Video player ref
   const videoRef = useRef<HTMLVideoElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch listings and user data on component mount
   useEffect(() => {
     fetchListings();
     fetchCurrentUser();
-    
-    // Focus search input on mount
-    if (searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
-  }, [filters, currentPage]);
+  }, [filters]);
 
   const fetchCurrentUser = async () => {
     try {
@@ -122,9 +105,7 @@ const Browse: React.FC = () => {
         category: filters.category || undefined,
         minPrice: filters.minPrice ? parseFloat(filters.minPrice) : undefined,
         maxPrice: filters.maxPrice ? parseFloat(filters.maxPrice) : undefined,
-        sortBy: filters.sortBy,
-        page: currentPage,
-        limit: itemsPerPage
+        sortBy: filters.sortBy
       });
       
       if (!response.success) {
@@ -132,10 +113,6 @@ const Browse: React.FC = () => {
       }
 
       const listingsData = response.data?.listings || [];
-      const total = response.data?.total || 0;
-      
-      // Calculate total pages
-      setTotalPages(Math.ceil(total / itemsPerPage));
       
       // Apply local filtering
       const filteredData = listingsData.filter((listing: Listing) => {
@@ -152,28 +129,11 @@ const Browse: React.FC = () => {
         // Filter by status - only show active listings
         if (listing.status !== 'active') return false;
         
-        // Rating filter
-        if (filters.rating) {
-          const minRating = parseFloat(filters.rating);
-          const sellerRating = listing.sellerId?.sellerRating || 0;
-          if (sellerRating < minRating) return false;
-        }
-        
         return true;
       });
 
       // Apply sorting
       const sortedData = sortListings(filteredData, filters.sortBy);
-      
-      // Pre-generate video thumbnails
-      const thumbnails: Record<string, string> = {};
-      sortedData.forEach(listing => {
-        const videoUrl = getFirstVideoUrl(listing);
-        if (videoUrl) {
-          thumbnails[listing._id] = generateVideoThumbnail(videoUrl);
-        }
-      });
-      setVideoThumbnails(thumbnails);
       
       setListings(sortedData);
     } catch (error: any) {
@@ -181,7 +141,6 @@ const Browse: React.FC = () => {
       setError(error.message || 'Failed to load listings. Please try again.');
     } finally {
       setLoading(false);
-      setIsRefreshing(false);
     }
   };
 
@@ -208,12 +167,6 @@ const Browse: React.FC = () => {
           const ratingB = b.sellerId?.sellerRating || 0;
           return ratingB - ratingA;
         });
-      case 'popular':
-        return sortedData.sort((a, b) => {
-          const viewsA = a.views || 0;
-          const viewsB = b.views || 0;
-          return viewsB - viewsA;
-        });
       default:
         return sortedData;
     }
@@ -236,17 +189,9 @@ const Browse: React.FC = () => {
   };
 
   // Handle video click - open popup
-  const handleVideoClick = (videoUrl: string, title: string, listingId?: string) => {
+  const handleVideoClick = (videoUrl: string, title: string) => {
     setSelectedVideo(videoUrl);
     setVideoTitle(title);
-    
-    // Set thumbnail for the video
-    if (listingId && videoThumbnails[listingId]) {
-      setVideoThumbnail(videoThumbnails[listingId]);
-    } else {
-      setVideoThumbnail(generateVideoThumbnail(videoUrl));
-    }
-    
     setShowVideoPopup(true);
   };
 
@@ -255,7 +200,6 @@ const Browse: React.FC = () => {
     setShowVideoPopup(false);
     setSelectedVideo('');
     setVideoTitle('');
-    setVideoThumbnail('');
     if (videoRef.current) {
       videoRef.current.pause();
       videoRef.current.currentTime = 0;
@@ -402,9 +346,6 @@ const Browse: React.FC = () => {
     setOfferData(null);
     setPaymentStatus('success');
     
-    // Refresh listings
-    fetchListings();
-    
     // Redirect to orders page with success message
     navigate('/marketplace/my-orders', { 
       state: { 
@@ -429,27 +370,26 @@ const Browse: React.FC = () => {
       category: '',
       minPrice: '',
       maxPrice: '',
-      sortBy: 'newest',
-      rating: ''
+      sortBy: 'newest'
     });
     setSearchQuery('');
     setError('');
-    setCurrentPage(1);
   };
 
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    fetchListings();
-  };
-
-  // Handle search with debounce
-  const handleSearch = useCallback(
-    debounce((query: string) => {
-      setSearchQuery(query);
-      setCurrentPage(1);
-    }, 300),
-    []
+  // Filter listings based on search query
+  const filteredListings = listings.filter(listing =>
+    listing.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    listing.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (listing.tags && listing.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())))
   );
+
+  // Handle billing details change
+  const handleBillingDetailsChange = (details: any) => {
+    setBillingDetails(prev => ({
+      ...prev,
+      ...details
+    }));
+  };
 
   // Get first video URL from listing
   const getFirstVideoUrl = (listing: Listing): string => {
@@ -477,15 +417,7 @@ const Browse: React.FC = () => {
     if (videoUrl.includes('vimeo.com')) {
       const videoId = videoUrl.match(/vimeo\.com\/(\d+)/)?.[1];
       if (videoId) {
-        return `https://vumbnail.com/${videoId}_large.jpg`;
-      }
-    }
-    
-    // For Dailymotion
-    if (videoUrl.includes('dailymotion.com') || videoUrl.includes('dai.ly')) {
-      const videoId = videoUrl.match(/(?:dailymotion\.com\/video\/|dai\.ly\/)([^_]+)/)?.[1];
-      if (videoId) {
-        return `https://www.dailymotion.com/thumbnail/video/${videoId}`;
+        return `https://vumbnail.com/${videoId}.jpg`;
       }
     }
     
@@ -494,7 +426,7 @@ const Browse: React.FC = () => {
   };
 
   // Get thumbnail URL with better error handling
-  const getThumbnailUrl = useCallback((listing: Listing): string => {
+  const getThumbnailUrl = (listing: Listing): string => {
     const listingId = listing._id || 'unknown';
     
     // Check if this image has previously failed to load
@@ -513,16 +445,10 @@ const Browse: React.FC = () => {
     
     if (imageUrl) return imageUrl;
     
-    // Check if we have a pre-generated video thumbnail
-    if (videoThumbnails[listingId]) {
-      return videoThumbnails[listingId];
-    }
-    
     // Check if there's a video URL
     const videoUrl = getFirstVideoUrl(listing);
     if (videoUrl) {
-      const thumbnail = generateVideoThumbnail(videoUrl);
-      return thumbnail;
+      return generateVideoThumbnail(videoUrl);
     }
     
     // Default to the first media URL
@@ -532,7 +458,7 @@ const Browse: React.FC = () => {
     }
     
     return PLACEHOLDER_IMAGE;
-  }, [imageErrors, videoThumbnails]);
+  };
 
   // Handle image loading error
   const handleImageError = (listingId: string) => {
@@ -592,20 +518,13 @@ const Browse: React.FC = () => {
     return 'none';
   };
 
-  // Handle pagination
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  if (loading && !isRefreshing) {
+  if (loading) {
     return (
       <MarketplaceLayout>
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100">
+        <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-20 w-20 border-t-2 border-b-2 border-yellow-500 mx-auto mb-6"></div>
-            <p className="text-gray-600 text-lg font-medium">Loading amazing content...</p>
-            <p className="text-gray-500 text-sm mt-2">Discovering the best videos for you</p>
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600 text-lg">Loading listings...</p>
           </div>
         </div>
       </MarketplaceLayout>
@@ -614,23 +533,21 @@ const Browse: React.FC = () => {
 
   return (
     <MarketplaceLayout>
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-8">
+      <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Error Banner */}
           {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 animate-fadeIn">
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
               <div className="flex items-center gap-3">
-                <div className="flex-shrink-0">
-                  <FiAlertCircle className="text-red-500" size={24} />
-                </div>
+                <FiAlertCircle className="text-red-500 flex-shrink-0" size={20} />
                 <div className="flex-1">
                   <p className="text-red-800 text-sm font-medium">{error}</p>
                 </div>
                 <button
                   onClick={() => setError('')}
-                  className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 transition-colors"
+                  className="text-red-500 hover:text-red-700 p-1"
                 >
-                  <FiX size={20} />
+                  <FiX size={16} />
                 </button>
               </div>
             </div>
@@ -638,118 +555,86 @@ const Browse: React.FC = () => {
 
           {/* Header Section */}
           <div className="mb-8">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-2 h-8 bg-yellow-500 rounded-full"></div>
-                  <h1 className="text-3xl md:text-4xl font-bold text-gray-900">Video Marketplace</h1>
-                </div>
-                <p className="text-gray-600 text-lg">
-                  Discover amazing video content, scripts, and creative assets from talented creators
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Video Marketplace</h1>
+                <p className="mt-2 text-gray-600">
+                  Discover amazing video content, scripts, and creative assets
                 </p>
               </div>
               
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 {marketplaceApi.utils.checkAuth() && (
                   <>
                     <button 
                       onClick={() => navigate('/marketplace/create')}
-                      className="inline-flex items-center justify-center px-5 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-all duration-200 shadow-md hover:shadow-lg"
+                      className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
                     >
-                      <FiPlus className="mr-2" size={20} />
-                      <span>Create Listing</span>
+                      <FiPlus className="mr-2" size={18} />
+                      <span className="hidden sm:inline">Create Listing</span>
+                      <span className="sm:hidden">Create</span>
                     </button>
                     <button 
                       onClick={() => navigate('/marketplace/my-orders')}
-                      className="inline-flex items-center justify-center px-5 py-3 border border-gray-300 text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-all duration-200 shadow-sm hover:shadow"
+                      className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
                     >
-                      <FiCreditCard className="mr-2" size={20} />
-                      <span>My Offers</span>
+                      <FiCreditCard className="mr-2" size={18} />
+                      <span className="hidden sm:inline">My Offers</span>
+                      <span className="sm:hidden">Offers</span>
                     </button>
                   </>
                 )}
                 
                 <button 
                   onClick={() => setShowFilters(!showFilters)}
-                  className={`inline-flex items-center justify-center px-5 py-3 border text-base font-medium rounded-xl transition-all duration-200 ${
-                    showFilters 
-                      ? 'border-yellow-500 text-yellow-600 bg-yellow-50 shadow-sm' 
-                      : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50 shadow-sm hover:shadow'
-                  }`}
+                  className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
                 >
-                  <FiSliders className="mr-2" size={20} />
-                  <span>Filters</span>
-                </button>
-                
-                <button 
-                  onClick={handleRefresh}
-                  disabled={isRefreshing}
-                  className="inline-flex items-center justify-center px-5 py-3 border border-gray-300 text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-all duration-200 shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <FiRefreshCw className={`mr-2 ${isRefreshing ? 'animate-spin' : ''}`} size={20} />
-                  <span>Refresh</span>
+                  <FiFilter className="mr-2" size={18} />
+                  <span className="hidden sm:inline">Filters</span>
+                  <span className="sm:hidden">Filter</span>
                 </button>
               </div>
             </div>
 
             {/* Search Bar */}
-            <div className="mt-8 max-w-2xl">
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <FiSearch className="text-gray-400 group-hover:text-gray-500 transition-colors" size={22} />
+            <div className="mt-6 max-w-2xl">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <FiSearch className="text-gray-400" size={20} />
                 </div>
                 <input
-                  ref={searchInputRef}
                   type="text"
-                  defaultValue={searchQuery}
-                  onChange={(e) => handleSearch(e.target.value)}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search videos, scripts, or creative assets..."
-                  className="block w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent transition-all duration-200 text-base shadow-sm hover:shadow group-hover:border-gray-300"
+                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm sm:text-base"
                 />
-                {searchQuery && (
-                  <button
-                    onClick={() => {
-                      setSearchQuery('');
-                      if (searchInputRef.current) searchInputRef.current.value = '';
-                    }}
-                    className="absolute inset-y-0 right-0 pr-4 flex items-center"
-                  >
-                    <FiX className="text-gray-400 hover:text-gray-600 transition-colors" size={20} />
-                  </button>
-                )}
               </div>
             </div>
           </div>
 
           {/* Filters Section */}
           {showFilters && (
-            <div className="mb-8 bg-white rounded-2xl shadow-lg border border-gray-200 p-6 animate-slideDown">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">Filters & Sorting</h3>
-                  <p className="text-gray-600 text-sm mt-1">Refine your search results</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={clearFilters}
-                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 rounded-lg transition-colors"
-                  >
-                    <FiX className="mr-1" size={16} />
-                    Clear all
-                  </button>
-                </div>
+            <div className="mb-8 bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Filters</h3>
+                <button
+                  onClick={clearFilters}
+                  className="text-sm text-yellow-600 hover:text-yellow-500 font-medium"
+                >
+                  Clear all
+                </button>
               </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    <FiSliders className="inline mr-2" size={16} />
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Listing Type
                   </label>
                   <select 
                     value={filters.type}
                     onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all duration-200 text-sm bg-gray-50"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm"
                   >
                     <option value="">All Types</option>
                     <option value="for_sale">For Sale</option>
@@ -760,7 +645,7 @@ const Browse: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Category
                   </label>
                   <input
@@ -768,391 +653,252 @@ const Browse: React.FC = () => {
                     value={filters.category}
                     onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
                     placeholder="Video, Script, Music, Animation..."
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all duration-200 text-sm bg-gray-50"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    Price Range
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Min Price
                   </label>
-                  <div className="flex gap-3">
-                    <input
-                      type="number"
-                      placeholder="$ Min"
-                      value={filters.minPrice}
-                      onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all duration-200 text-sm bg-gray-50"
-                    />
-                    <input
-                      type="number"
-                      placeholder="$ Max"
-                      value={filters.maxPrice}
-                      onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all duration-200 text-sm bg-gray-50"
-                    />
-                  </div>
+                  <input
+                    type="number"
+                    placeholder="$0"
+                    value={filters.minPrice}
+                    onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm"
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    <FiTrendingUp className="inline mr-2" size={16} />
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Sort By
                   </label>
                   <select 
                     value={filters.sortBy}
                     onChange={(e) => setFilters(prev => ({ ...prev, sortBy: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all duration-200 text-sm bg-gray-50"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm"
                   >
                     <option value="newest">Newest First</option>
                     <option value="oldest">Oldest First</option>
                     <option value="price_low">Price: Low to High</option>
                     <option value="price_high">Price: High to Low</option>
                     <option value="rating">Highest Rated</option>
-                    <option value="popular">Most Popular</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-3">
-                    Min Rating
-                  </label>
-                  <select 
-                    value={filters.rating}
-                    onChange={(e) => setFilters(prev => ({ ...prev, rating: e.target.value }))}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-all duration-200 text-sm bg-gray-50"
-                  >
-                    <option value="">Any Rating</option>
-                    <option value="4.5">★★★★☆ & up</option>
-                    <option value="4">★★★★☆ & up</option>
-                    <option value="3">★★★☆☆ & up</option>
-                    <option value="2">★★☆☆☆ & up</option>
-                    <option value="1">★☆☆☆☆ & up</option>
                   </select>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Stats and Info Bar */}
-          <div className="mb-8">
-            <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-100 rounded-2xl p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-1">
-                    {searchQuery ? 'Search Results' : 'Featured Content'}
-                  </h3>
-                  <p className="text-gray-600">
-                    Showing <span className="font-bold text-yellow-600">{listings.length}</span> listings
-                    {searchQuery && (
-                      <span> for "<span className="font-semibold">{searchQuery}</span>"</span>
-                    )}
-                  </p>
-                </div>
-                
-                {searchQuery && (
-                  <button
-                    onClick={() => {
-                      setSearchQuery('');
-                      if (searchInputRef.current) searchInputRef.current.value = '';
-                    }}
-                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-yellow-600 hover:text-yellow-700 hover:bg-yellow-100 rounded-lg transition-colors self-start sm:self-auto"
-                  >
-                    <FiX className="mr-1" size={16} />
-                    Clear search
-                  </button>
-                )}
-              </div>
-            </div>
+          {/* Results Count */}
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <p className="text-gray-600 text-sm sm:text-base">
+              Showing <span className="font-semibold">{filteredListings.length}</span> listings
+              {searchQuery && (
+                <span> for "<span className="font-semibold">{searchQuery}</span>"</span>
+              )}
+            </p>
+            
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="text-sm text-yellow-600 hover:text-yellow-500 font-medium self-start sm:self-auto"
+              >
+                Clear search
+              </button>
+            )}
           </div>
 
           {/* Listings Grid */}
-          {listings.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
-              <div className="max-w-lg mx-auto">
-                <div className="w-32 h-32 mx-auto mb-6 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center">
-                  <FiSearch size={48} className="text-gray-400" />
+          {filteredListings.length === 0 ? (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 sm:p-12 text-center">
+              <div className="max-w-md mx-auto">
+                <div className="w-16 h-16 sm:w-24 sm:h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                  <FiSearch size={24} className="text-gray-400 sm:w-8 sm:h-8" />
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
                   {searchQuery || Object.values(filters).some(Boolean) 
-                    ? 'No matching listings found' 
+                    ? 'No listings found' 
                     : 'No listings yet'
                   }
                 </h3>
-                <p className="text-gray-600 text-lg mb-8">
+                <p className="text-gray-600 text-sm sm:text-base mb-6">
                   {searchQuery || Object.values(filters).some(Boolean)
                     ? 'Try adjusting your search or filters to find what you\'re looking for.'
-                    : 'Be the first to create a listing and start trading in the marketplace!'
+                    : 'Be the first to create a listing and start trading!'
                   }
                 </p>
                 {marketplaceApi.utils.checkAuth() && (
-                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <button 
                       onClick={() => navigate('/marketplace/create')}
-                      className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-all duration-200 shadow-md hover:shadow-lg"
+                      className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-transparent text-sm sm:text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
                     >
-                      <FiPlus className="mr-2" size={20} />
+                      <FiPlus className="mr-2" size={18} />
                       Create First Listing
-                    </button>
-                    <button 
-                      onClick={clearFilters}
-                      className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-all duration-200 shadow-sm hover:shadow"
-                    >
-                      <FiFilter className="mr-2" size={20} />
-                      Clear All Filters
                     </button>
                   </div>
                 )}
               </div>
             </div>
           ) : (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {listings.map(listing => {
-                  const thumbnailUrl = getThumbnailUrl(listing);
-                  const videoUrl = getFirstVideoUrl(listing);
-                  const isVideo = isVideoUrl(videoUrl);
-                  const mediaType = getMediaType(listing);
-                  const isHovered = hoveredCard === listing._id;
-                  
-                  return (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredListings.map(listing => {
+                const thumbnailUrl = getThumbnailUrl(listing);
+                const videoUrl = getFirstVideoUrl(listing);
+                const isVideo = isVideoUrl(videoUrl);
+                const mediaType = getMediaType(listing);
+                
+                return (
+                  <div key={listing._id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 border border-gray-200 group">
+                    {/* Video/Image Preview */}
                     <div 
-                      key={listing._id} 
-                      className="group bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 border border-gray-200 transform hover:-translate-y-1"
-                      onMouseEnter={() => setHoveredCard(listing._id)}
-                      onMouseLeave={() => setHoveredCard(null)}
+                      className="relative h-48 bg-gray-900 cursor-pointer overflow-hidden"
+                      onClick={() => {
+                        if (isVideo && videoUrl) {
+                          handleVideoClick(videoUrl, listing.title);
+                        }
+                      }}
                     >
-                      {/* Video/Image Preview */}
-                      <div 
-                        className="relative h-56 bg-gradient-to-br from-gray-900 to-black cursor-pointer overflow-hidden"
-                        onClick={() => {
-                          if (isVideo && videoUrl) {
-                            handleVideoClick(videoUrl, listing.title, listing._id);
-                          } else {
-                            handleViewDetails(listing._id);
-                          }
-                        }}
-                      >
-                        {/* Thumbnail Image */}
-                        <div className="relative w-full h-full">
-                          <img
-                            src={thumbnailUrl}
-                            alt={listing.title}
-                            className="w-full h-full object-cover transition-all duration-500 group-hover:scale-110 group-hover:brightness-110"
-                            onError={() => handleImageError(listing._id)}
-                            loading="lazy"
-                            style={{
-                              opacity: isHovered ? 0.95 : 1
-                            }}
-                          />
-                          
-                          {/* Gradient Overlay */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-60"></div>
-                          
-                          {/* Play Button Overlay for Videos */}
-                          {mediaType === 'video' && (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <div className={`w-16 h-16 rounded-full bg-gradient-to-r from-yellow-500 to-orange-500 flex items-center justify-center border-4 border-white/20 backdrop-blur-sm transform transition-all duration-300 ${
-                                isHovered ? 'scale-125' : 'scale-100'
-                              }`}>
-                                <FiPlay className="text-white ml-1" size={28} />
-                              </div>
+                      {/* Thumbnail Image with fallback */}
+                      <div className="relative w-full h-full">
+                        <img
+                          src={thumbnailUrl}
+                          alt={listing.title}
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          onError={() => handleImageError(listing._id)}
+                          loading="lazy"
+                        />
+                        
+                        {/* Loading skeleton */}
+                        <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>
+                        
+                        {/* Play Button Overlay for Videos */}
+                        {mediaType === 'video' && (
+                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-2 border-white/30 transform group-hover:scale-110 transition-transform duration-300">
+                              <FiPlay className="text-white ml-1" size={28} />
                             </div>
+                          </div>
+                        )}
+                        
+                        {/* Media Type Badge */}
+                        <div className={`absolute top-2 right-2 text-white text-xs px-2 py-1 rounded-md flex items-center gap-1 backdrop-blur-sm ${mediaType === 'video' ? 'bg-red-500/80' : 'bg-blue-500/80'}`}>
+                          {mediaType === 'video' ? (
+                            <>
+                              <FiVideo size={10} />
+                              VIDEO
+                            </>
+                          ) : mediaType === 'image' ? (
+                            <>
+                              <FiImage size={10} />
+                              IMAGE
+                            </>
+                          ) : (
+                            <>
+                              <FiImage size={10} />
+                              MEDIA
+                            </>
                           )}
-                          
-                          {/* Media Type Badge */}
-                          <div className={`absolute top-3 right-3 text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5 backdrop-blur-md shadow-lg ${
-                            mediaType === 'video' 
-                              ? 'bg-gradient-to-r from-red-500/90 to-pink-500/90' 
-                              : 'bg-gradient-to-r from-blue-500/90 to-cyan-500/90'
-                          }`}>
-                            {mediaType === 'video' ? (
-                              <>
-                                <FiVideo size={12} />
-                                <span className="font-semibold">VIDEO</span>
-                              </>
-                            ) : mediaType === 'image' ? (
-                              <>
-                                <FiImage size={12} />
-                                <span className="font-semibold">IMAGE</span>
-                              </>
-                            ) : (
-                              <>
-                                <FiImage size={12} />
-                                <span className="font-semibold">MEDIA</span>
-                              </>
-                            )}
-                          </div>
-                          
-                          {/* Views Badge */}
-                          {listing.views && listing.views > 0 && (
-                            <div className="absolute top-3 left-3 text-white text-xs px-2 py-1 rounded-lg bg-black/60 backdrop-blur-sm flex items-center gap-1">
-                              <FiEye size={10} />
-                              <span>{listing.views.toLocaleString()} views</span>
-                            </div>
-                          )}
-                          
-                          {/* Category Badge */}
-                          <div className="absolute bottom-3 left-3">
-                            <span className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white text-xs px-3 py-1.5 rounded-lg backdrop-blur-sm font-semibold shadow-lg">
-                              {listing.category}
-                            </span>
-                          </div>
-                          
-                          {/* Price Overlay */}
-                          <div className="absolute bottom-3 right-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-sm px-3 py-1.5 rounded-lg font-bold shadow-lg">
-                            {marketplaceApi.utils.formatCurrency(listing.price)}
-                          </div>
                         </div>
                       </div>
-
-                      {/* Content */}
-                      <div className="p-5">
-                        {/* Title and Duration */}
-                        <div className="flex justify-between items-start mb-3">
-                          <h3 
-                            className="font-bold text-gray-900 text-lg truncate cursor-pointer hover:text-yellow-600 transition-colors"
-                            onClick={() => handleViewDetails(listing._id)}
-                          >
-                            {listing.title}
-                          </h3>
-                          <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-md whitespace-nowrap">
-                            {listing.duration || 'N/A'}
-                          </div>
-                        </div>
-                        
-                        {/* Description */}
-                        <p className="text-gray-600 text-sm mb-4 line-clamp-2 min-h-[40px]">
-                          {listing.description}
-                        </p>
-                        
-                        {/* Seller Info */}
-                        <div className="flex items-center justify-between mb-5">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center overflow-hidden ring-2 ring-white shadow-sm">
-                              {listing.sellerId?.avatar ? (
-                                <img 
-                                  src={listing.sellerId.avatar} 
-                                  alt={listing.sellerId.username}
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).src = USER_PLACEHOLDER;
-                                  }}
-                                />
-                              ) : (
-                                <FiUser size={14} className="text-gray-600" />
-                              )}
-                            </div>
-                            <div>
-                              <span className="text-sm font-medium text-gray-900">
-                                {listing.sellerId?.username || 'Seller'}
-                              </span>
-                              {listing.sellerId?.sellerRating && (
-                                <div className="flex items-center gap-1 mt-0.5">
-                                  <div className="flex text-yellow-400">
-                                    {'★'.repeat(Math.floor(listing.sellerId.sellerRating))}
-                                    {'☆'.repeat(5 - Math.floor(listing.sellerId.sellerRating))}
-                                  </div>
-                                  <span className="text-xs text-gray-500">
-                                    ({listing.sellerId.sellerRating.toFixed(1)})
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {/* Type Badge */}
-                          <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-md">
-                            {listing.type?.replace('_', ' ').toUpperCase() || 'FOR SALE'}
-                          </div>
-                        </div>
-                        
-                        {/* Action Buttons */}
-                        <div className="flex gap-3">
-                          <button
-                            onClick={() => handleMakeOffer(listing)}
-                            className="flex-1 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white text-sm py-2.5 px-4 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-                          >
-                            <FiCreditCard size={16} />
-                            Make Offer
-                          </button>
-                          {mediaType === 'video' && videoUrl && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleVideoClick(videoUrl, listing.title, listing._id);
-                              }}
-                              className="px-4 bg-gradient-to-r from-gray-800 to-gray-900 hover:from-gray-900 hover:to-black text-white text-sm py-2.5 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-                            >
-                              <FiPlay size={16} />
-                              Preview
-                            </button>
-                          )}
-                        </div>
+                      
+                      {/* Category Badge */}
+                      <div className="absolute bottom-2 left-2">
+                        <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded-md backdrop-blur-sm bg-yellow-500/90">
+                          {listing.category}
+                        </span>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="mt-12 flex items-center justify-center gap-2">
-                  <button
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    className="flex items-center justify-center w-10 h-10 rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <FiChevronLeft size={20} />
-                  </button>
-                  
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
-                    }
-                    
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => handlePageChange(pageNum)}
-                        className={`w-10 h-10 rounded-xl font-medium transition-all ${
-                          currentPage === pageNum
-                            ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-lg'
-                            : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                  
-                  <button
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                    className="flex items-center justify-center w-10 h-10 rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <FiChevronRight size={20} />
-                  </button>
-                </div>
-              )}
-            </>
+                    {/* Content */}
+                    <div className="p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-semibold text-gray-900 truncate text-sm group-hover:text-yellow-600 transition-colors">
+                          {listing.title}
+                        </h3>
+                        <div className="text-xs text-gray-500">
+                          {listing.duration || 'N/A'}
+                        </div>
+                      </div>
+                      
+                      <p className="text-gray-600 text-xs mb-3 line-clamp-2">
+                        {listing.description}
+                      </p>
+                      
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                            {listing.sellerId?.avatar ? (
+                              <img 
+                                src={listing.sellerId.avatar} 
+                                alt={listing.sellerId.username}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/24/cccccc/ffffff?text=U';
+                                }}
+                              />
+                            ) : (
+                              <FiUser size={12} className="text-gray-600" />
+                            )}
+                          </div>
+                          <span className="text-xs text-gray-700 truncate max-w-[80px]">
+                            {listing.sellerId?.username || 'Seller'}
+                          </span>
+                        </div>
+                        <div className="text-green-600 font-bold">
+                          {marketplaceApi.utils.formatCurrency(listing.price)}
+                        </div>
+                      </div>
+                      
+                      {/* Action Buttons */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleMakeOffer(listing)}
+                          className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white text-sm py-2 px-3 rounded-md transition-colors duration-200 flex items-center justify-center gap-2 group/btn"
+                        >
+                          <FiCreditCard size={14} className="group-hover/btn:scale-110 transition-transform" />
+                          Make Offer
+                        </button>
+                        {mediaType === 'video' && videoUrl && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleVideoClick(videoUrl, listing.title);
+                            }}
+                            className="px-3 bg-gray-800 hover:bg-gray-900 text-white text-sm py-2 rounded-md transition-colors duration-200 flex items-center gap-2 group/play"
+                          >
+                            <FiPlay size={14} className="group-hover/play:scale-110 transition-transform" />
+                            Play
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Load More */}
+          {filteredListings.length > 0 && filteredListings.length >= 12 && (
+            <div className="mt-8 sm:mt-12 text-center">
+              <button 
+                onClick={fetchListings}
+                className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+              >
+                Load more listings
+              </button>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Video Player Modal */}
+      {/* Video Popup Modal */}
       <VideoPlayerModal
         show={showVideoPopup}
         videoUrl={selectedVideo}
         videoTitle={videoTitle}
-        videoThumbnail={videoThumbnail}
         onClose={handleCloseVideoPopup}
       />
 
@@ -1186,17 +932,5 @@ const Browse: React.FC = () => {
     </MarketplaceLayout>
   );
 };
-
-// Debounce utility function
-function debounce<T extends (...args: any[]) => any>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  };
-}
 
 export default Browse;
