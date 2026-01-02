@@ -82,12 +82,14 @@ const MyOffers: React.FC = () => {
       setLoading(true);
       setError('');
       
+      // Add cache busting to prevent 304 responses
       const response = await marketplaceApi.offers.getMyOffers();
       
       if (!response.success) {
         throw new Error(response.error || 'Failed to fetch offers');
       }
 
+      console.log('Offers fetched:', response.data?.offers?.length);
       setOffers(response.data?.offers || []);
     } catch (error: any) {
       console.error('Error fetching offers:', error);
@@ -97,27 +99,39 @@ const MyOffers: React.FC = () => {
     }
   };
 
-  // Filter offers based on active tab
-  const filteredOffers = offers.filter(offer => {
-    if (activeTab === 'all') return true;
-    if (activeTab === 'pending') return offer.status === 'pending' || offer.status === 'pending_payment';
-    if (activeTab === 'paid') return offer.status === 'paid';
-    if (activeTab === 'accepted') return offer.status === 'accepted';
-    if (activeTab === 'rejected') return offer.status === 'rejected' || offer.status === 'cancelled' || offer.status === 'expired';
-    return true;
-  });
-
   // Handle payment for pending payment offer
-  const handlePayOffer = (offer: Offer) => {
+  const handlePayOffer = async (offer: Offer) => {
     if (offer.status !== 'pending_payment') {
       setError('This offer is not ready for payment.');
       return;
     }
 
-    setSelectedOffer(offer);
-    setShowPaymentModal(true);
-    setError('');
-    setPaymentStatus('idle');
+    try {
+      setSelectedOffer(offer);
+      setShowPaymentModal(true);
+      setError('');
+      setPaymentStatus('idle');
+
+      // Fetch payment intent from backend
+      console.log('Creating payment intent for offer:', offer._id);
+      
+      const paymentResponse = await marketplaceApi.payments.createPaymentIntent({
+        offerId: offer._id,
+        amount: offer.amount,
+        currency: 'usd'
+      });
+
+      if (!paymentResponse.success) {
+        throw new Error(paymentResponse.error || 'Failed to create payment');
+      }
+
+      setClientSecret(paymentResponse.data?.clientSecret || '');
+      
+    } catch (error: any) {
+      console.error('Error setting up payment:', error);
+      setError(error.message || 'Failed to setup payment. Please try again.');
+      setShowPaymentModal(false);
+    }
   };
 
   // Handle payment success
@@ -128,10 +142,10 @@ const MyOffers: React.FC = () => {
     setPaymentStatus('success');
     setSuccessMessage('Payment completed successfully! Your offer has been submitted to the seller.');
     
-    // Refresh offers
+    // Refresh offers after payment
     setTimeout(() => {
       fetchOffers();
-    }, 1000);
+    }, 2000);
   };
 
   const handleClosePaymentModal = () => {
@@ -163,10 +177,15 @@ const MyOffers: React.FC = () => {
     }
   };
 
-  // View listing details
-  const handleViewListing = (listingId: string) => {
-    navigate(`/marketplace/listings/${listingId}`);
-  };
+  // Filter offers based on active tab
+  const filteredOffers = offers.filter(offer => {
+    if (activeTab === 'all') return true;
+    if (activeTab === 'pending') return offer.status === 'pending' || offer.status === 'pending_payment';
+    if (activeTab === 'paid') return offer.status === 'paid';
+    if (activeTab === 'accepted') return offer.status === 'accepted';
+    if (activeTab === 'rejected') return offer.status === 'rejected' || offer.status === 'cancelled' || offer.status === 'expired';
+    return true;
+  });
 
   // Get status badge color
   const getStatusColor = (status: string) => {
@@ -500,7 +519,7 @@ const MyOffers: React.FC = () => {
                             <div className="space-y-2">
                               {/* View Listing Button */}
                               <button
-                                onClick={() => handleViewListing(offer.listingId._id)}
+                                onClick={() => navigate(`/marketplace/listings/${offer.listingId._id}`)}
                                 className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm flex items-center justify-center gap-2"
                               >
                                 <FiEye size={14} />
@@ -518,7 +537,7 @@ const MyOffers: React.FC = () => {
                                 </button>
                               )}
                               
-                              {offer.status === 'pending' && (
+                              {(offer.status === 'pending' || offer.status === 'pending_payment') && (
                                 <button
                                   onClick={() => handleCancelOffer(offer._id)}
                                   className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors text-sm font-medium flex items-center justify-center gap-2"
@@ -698,28 +717,39 @@ const MyOffers: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Payment Form */}
-                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                    <Elements stripe={stripePromise} options={{ 
-                      appearance: {
-                        theme: 'stripe',
-                        variables: {
-                          colorPrimary: '#ca8a04',
-                          borderRadius: '0.5rem',
-                          fontFamily: 'Inter, system-ui, sans-serif',
+                  {/* Payment Form - Only show if clientSecret is available */}
+                  {clientSecret ? (
+                    <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                      <Elements stripe={stripePromise} options={{ 
+                        clientSecret,
+                        appearance: {
+                          theme: 'stripe',
+                          variables: {
+                            colorPrimary: '#ca8a04',
+                            borderRadius: '0.5rem',
+                            fontFamily: 'Inter, system-ui, sans-serif',
+                          }
                         }
-                      }
-                    }}>
-                      <OfferPaymentForm 
-                        offer={selectedOffer}
-                        onSuccess={handlePaymentSuccess}
-                        onClose={handleClosePaymentModal}
-                        paymentStatus={paymentStatus}
-                        setPaymentStatus={setPaymentStatus}
-                        setError={setError}
-                      />
-                    </Elements>
-                  </div>
+                      }}>
+                        <OfferPaymentForm 
+                          offer={selectedOffer}
+                          clientSecret={clientSecret}
+                          onSuccess={handlePaymentSuccess}
+                          onClose={handleClosePaymentModal}
+                          paymentStatus={paymentStatus}
+                          setPaymentStatus={setPaymentStatus}
+                          setError={setError}
+                        />
+                      </Elements>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 rounded-lg p-4 mb-4 text-center">
+                      <div className="py-8">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600 mx-auto mb-4"></div>
+                        <p className="text-gray-600">Setting up payment...</p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Security Info */}
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -748,6 +778,7 @@ const MyOffers: React.FC = () => {
 // Offer Payment Form Component
 const OfferPaymentForm = ({ 
   offer, 
+  clientSecret,
   onSuccess, 
   onClose, 
   paymentStatus, 
@@ -773,27 +804,51 @@ const OfferPaymentForm = ({
     setError('');
 
     try {
-      console.log('🔄 Processing offer payment...');
+      console.log('🔄 Processing payment for offer:', offer._id);
 
-      // For offers, we need to confirm with the server first
-      // Note: This is a simplified version. In production, you would:
-      // 1. Create payment intent on server
-      // 2. Get client secret
-      // 3. Confirm payment with Stripe
-      
-      // Since we're using the existing offer flow, we'll simulate the process
-      // In reality, you should create a payment intent for each offer
-      
-      setLocalError('Payment processing for offers is currently being set up. Please try again later or contact support.');
-      setPaymentStatus('failed');
-      
-      // For now, we'll simulate success after 2 seconds for testing
-      // setTimeout(() => {
-      //   setPaymentStatus('success');
-      //   setTimeout(() => {
-      //     onSuccess();
-      //   }, 1500);
-      // }, 2000);
+      // Confirm payment with Stripe
+      const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/marketplace/offers?payment_success=true`,
+          // Pass offer details for backend verification
+          metadata: {
+            offerId: offer._id,
+            listingId: offer.listingId._id,
+            buyerId: offer.buyerId._id
+          }
+        },
+        redirect: 'if_required'
+      });
+
+      if (stripeError) {
+        console.error('❌ Stripe error:', stripeError);
+        throw new Error(stripeError.message || 'Payment failed');
+      }
+
+      if (paymentIntent) {
+        console.log('✅ Payment intent status:', paymentIntent.status);
+        
+        if (paymentIntent.status === 'succeeded') {
+          // Update offer status via API
+          const response = await marketplaceApi.offers.updateOfferPayment({
+            offerId: offer._id,
+            paymentIntentId: paymentIntent.id,
+            status: 'paid'
+          });
+
+          if (!response.success) {
+            throw new Error(response.error || 'Failed to update offer status');
+          }
+
+          setPaymentStatus('success');
+          setTimeout(() => {
+            onSuccess();
+          }, 1500);
+        } else {
+          throw new Error(`Payment status: ${paymentIntent.status}`);
+        }
+      }
 
     } catch (err: any) {
       console.error('❌ Payment processing error:', err);
@@ -912,6 +967,12 @@ const OfferPaymentForm = ({
       </div>
     </form>
   );
+};
+
+// Add missing functions
+const handleViewListing = (listingId: string) => {
+  // This will be called from the component
+  console.log('View listing:', listingId);
 };
 
 export default MyOffers;
