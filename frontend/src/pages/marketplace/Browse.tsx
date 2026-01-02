@@ -18,14 +18,6 @@ import OfferModal from '../../components/marketplae/OfferModal';
 const VIDEO_PLACEHOLDER = 'https://images.unsplash.com/photo-1579546929662-711aa81148cf?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
 const ERROR_IMAGE = 'https://via.placeholder.com/300x200/F3F4F6/6B7280?text=Video+Preview';
 
-// Content type categories
-const CONTENT_TYPES = [
-  { id: 'sale', label: 'For Sale', icon: '💰' },
-  { id: 'commission', label: 'Commission', icon: '🎨' },
-  { id: 'adaptation', label: 'Adaptation Rights', icon: '📜' },
-  { id: 'license', label: 'License', icon: '📋' }
-];
-
 const Browse: React.FC = () => {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -117,7 +109,7 @@ const Browse: React.FC = () => {
       
       if (activeCategory && activeCategory !== 'all') {
         filteredData = filteredData.filter((listing: Listing) => 
-          listing.type?.toLowerCase() === activeCategory.toLowerCase()
+          listing.category?.toLowerCase() === activeCategory.toLowerCase()
         );
       }
       
@@ -281,12 +273,12 @@ const Browse: React.FC = () => {
     }
   };
 
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-    }).format(amount || 0);
-  };
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(amount || 0);
+};
 
   const formatDate = (dateString: string): string => {
     if (!dateString) return '';
@@ -556,26 +548,26 @@ const Browse: React.FC = () => {
               </div>
             </div>
 
-            {/* Content Type Categories */}
+            {/* Quick Categories */}
             <div className="mt-8 flex flex-wrap gap-2">
               <div className="flex items-center gap-2 text-gray-600">
                 <FiFilter className="text-yellow-500" />
                 <span className="font-medium">Browse:</span>
               </div>
-              {CONTENT_TYPES.map((type) => (
+              {['All', 'Videos', 'Music', 'Templates', 'Animations', 'Scripts'].map((category) => (
                 <button
-                  key={type.id}
+                  key={category}
                   onClick={() => {
-                    setActiveCategory(activeCategory === type.id ? '' : type.id);
+                    const cat = category.toLowerCase();
+                    setActiveCategory(activeCategory === cat ? '' : cat);
                   }}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                    activeCategory === type.id
+                    activeCategory === category.toLowerCase()
                       ? 'bg-gradient-to-r from-yellow-500 to-amber-500 text-white shadow-sm'
                       : 'bg-white text-gray-700 border border-gray-200 hover:border-yellow-400'
                   }`}
                 >
-                  <span className="mr-2">{type.icon}</span>
-                  {type.label}
+                  {category}
                 </button>
               ))}
             </div>
@@ -590,7 +582,7 @@ const Browse: React.FC = () => {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search videos by title, description, tags..."
+                  placeholder="Search videos, music, templates, animations..."
                   className="block w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 shadow-sm hover:shadow transition-all duration-200 text-base"
                 />
                 {searchQuery && (
@@ -625,7 +617,7 @@ const Browse: React.FC = () => {
             </div>
           </div>
 
-          {/* Filters Section - UPDATED Content Type options */}
+          {/* Filters Section - FIXED: Price Range in $ (Indian Rupees) */}
           {showFilters && (
             <div className="mb-8 bg-white rounded-2xl shadow-lg border border-gray-200 p-6 animate-fadeIn">
               <div className="flex items-center justify-between mb-6">
@@ -657,10 +649,12 @@ const Browse: React.FC = () => {
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none text-sm transition-all duration-200 bg-white hover:border-gray-300"
                   >
                     <option value="">All Types</option>
-                    <option value="sale">💰 For Sale</option>
-                    <option value="commission">🎨 Commission</option>
-                    <option value="adaptation">📜 Adaptation Rights</option>
-                    <option value="license">📋 License</option>
+                    <option value="video">🎥 Video Content</option>
+                    <option value="music">🎵 Music & Audio</option>
+                    <option value="animation">✨ Animations</option>
+                    <option value="template">📁 Templates</option>
+                    <option value="script">📝 Scripts</option>
+                    <option value="graphics">🎨 Graphics</option>
                   </select>
                 </div>
 
@@ -705,13 +699,13 @@ const Browse: React.FC = () => {
 
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-800">
-                    Price Range (₹)
+                    Price Range ($)
                   </label>
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <span className="text-gray-500 text-sm">Min:</span>
                       <div className="relative flex-1">
-                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">₹</div>
+                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">$</div>
                         <input
                           type="number"
                           placeholder="0"
@@ -725,7 +719,7 @@ const Browse: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <span className="text-gray-500 text-sm">Max:</span>
                       <div className="relative flex-1">
-                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">₹</div>
+                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">$</div>
                         <input
                           type="number"
                           placeholder="10000"
@@ -756,17 +750,9 @@ const Browse: React.FC = () => {
             <div className="flex items-center gap-3">
               <div className="px-4 py-2 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-lg border border-yellow-100">
                 <p className="text-gray-800 text-sm font-medium">
-                  {activeCategory ? (
-                    <>
-                      Showing <span className="text-yellow-700 font-semibold">{listings.length}</span> {CONTENT_TYPES.find(t => t.id === activeCategory)?.label.toLowerCase()} listings
-                    </>
-                  ) : (
-                    <>
-                      Showing <span className="text-yellow-700 font-semibold">{listings.length}</span> listings
-                      {searchQuery && (
-                        <span> for "<span className="text-yellow-700 font-semibold">{searchQuery}</span>"</span>
-                      )}
-                    </>
+                  Showing <span className="text-yellow-700 font-semibold">{listings.length}</span> listings
+                  {searchQuery && (
+                    <span> for "<span className="text-yellow-700 font-semibold">{searchQuery}</span>"</span>
                   )}
                 </p>
               </div>
@@ -777,15 +763,6 @@ const Browse: React.FC = () => {
                 >
                   <FiX size={14} />
                   Clear search
-                </button>
-              )}
-              {activeCategory && (
-                <button
-                  onClick={() => setActiveCategory('')}
-                  className="text-sm text-yellow-600 hover:text-yellow-700 font-medium flex items-center gap-1 transition-colors"
-                >
-                  <FiX size={14} />
-                  Clear filter
                 </button>
               )}
             </div>
@@ -799,17 +776,13 @@ const Browse: React.FC = () => {
                   <FiVideo size={32} className="text-yellow-500" />
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-3">
-                  {activeCategory 
-                    ? `No ${CONTENT_TYPES.find(t => t.id === activeCategory)?.label.toLowerCase()} listings found` 
-                    : searchQuery || Object.values(filters).some(Boolean) 
+                  {searchQuery || Object.values(filters).some(Boolean) 
                     ? 'No listings found' 
                     : 'Welcome to Video Marketplace!'
                   }
                 </h3>
                 <p className="text-gray-600 text-base mb-8">
-                  {activeCategory
-                    ? `There are currently no ${CONTENT_TYPES.find(t => t.id === activeCategory)?.label.toLowerCase()} listings. Be the first to create one!`
-                    : searchQuery || Object.values(filters).some(Boolean)
+                  {searchQuery || Object.values(filters).some(Boolean)
                     ? 'Try adjusting your search or filters to find what you\'re looking for.'
                     : 'Be the first to upload a video and start selling!'
                   }
@@ -913,16 +886,6 @@ const Browse: React.FC = () => {
                         </div>
                       )}
                       
-                      {/* Content Type Badge */}
-                      <div className="absolute top-3 left-3 z-10">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
-                          {CONTENT_TYPES.find(t => t.id === listing.type)?.icon || '📁'}
-                          <span className="ml-1">
-                            {CONTENT_TYPES.find(t => t.id === listing.type)?.label || listing.type || 'Sale'}
-                          </span>
-                        </span>
-                      </div>
-                      
                       {/* Price Tag - SAME as ListingsTab */}
                       <div className="absolute bottom-3 left-3">
                         <div className="bg-gradient-to-r from-green-600 to-green-700 text-white px-3 py-1.5 rounded-lg shadow-md">
@@ -987,7 +950,7 @@ const Browse: React.FC = () => {
                         </div>
                       )}
                       
-                      {/* Action Button - Only Buy Now */}
+                      {/* Action Button - REMOVED View Details, only Buy Now */}
                       <div className="pt-4 border-t border-gray-100">
                         <button
                           onClick={() => handleMakeOffer(listing)}
