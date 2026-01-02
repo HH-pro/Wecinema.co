@@ -1,5 +1,6 @@
 // src/pages/MyOffersPage.tsx
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -30,22 +31,20 @@ import {
   Payment,
   Refresh,
   CreditCard,
-  Lock
+  Lock,
+  NavigateNext
 } from '@mui/icons-material';
-import marketplaceApi, { Offer } from '../../api/marketplaceApi';
-import { formatCurrency } from '../../utilities/helperfFunction';
-
-// Replace process.env with direct Stripe key
-// Get this from your .env file or hardcode for testing
-const STRIPE_PUBLIC_KEY = 'pk_test_51QVNayJxZ9TRbmw52eO6ICeNyn0TP47cFmEuvmDOpOFEJKeJzZZDyn9fbXW4I8K8P7yOrN1Qx4vW9Y5vHzJ5duSU00hUXy8lTP';
+import marketplaceApi, { Offer } from '../api/marketplaceApi';
+import { formatCurrency } from '../utils/formatters';
 
 // Payment Modal Component
 const PaymentModal: React.FC<{
   open: boolean;
   onClose: () => void;
   offer: Offer;
-  onSuccess: (orderData: any) => void;
+  onSuccess: (orderId: string, orderData: any) => void;
 }> = ({ open, onClose, offer, onSuccess }) => {
+  const navigate = useNavigate();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
   const [cardNumber, setCardNumber] = useState('');
@@ -60,52 +59,74 @@ const PaymentModal: React.FC<{
     setError('');
 
     try {
-      // Step 1: Create payment intent using our API
-      const paymentResponse = await marketplaceApi.utils.payments.createOfferPaymentIntent(offer._id);
+      // Step 1: Create or get payment intent for this offer
+      // Check if offer already has a payment intent
+      let paymentIntentId = offer.paymentIntentId;
+      let clientSecret = '';
       
-      if (!paymentResponse.success || !paymentResponse.data?.clientSecret) {
-        throw new Error(paymentResponse.error || 'Payment setup failed');
+      if (!paymentIntentId) {
+        // Create payment intent for the offer
+        const paymentResponse = await marketplaceApi.utils.payments.createOfferPaymentIntent(offer._id);
+        
+        if (!paymentResponse.success) {
+          throw new Error(paymentResponse.error || 'Payment setup failed');
+        }
+        
+        clientSecret = paymentResponse.data?.clientSecret || '';
+        paymentIntentId = paymentResponse.data?.paymentIntentId || '';
       }
 
-      // Step 2: Use Stripe Elements for actual payment
-      // In a real app, you would load Stripe.js and use their card element
-      // For now, we'll simulate with a direct API call
-      const stripeResponse = await fetch('https://api.stripe.com/v1/payment_intents/' + paymentResponse.data.paymentIntentId, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${STRIPE_PUBLIC_KEY.replace('pk_', 'sk_')}`, // Convert to secret key
-        }
+      // Step 2: Simulate payment confirmation
+      // In production, you would use Stripe.js here
+      // For demo, we'll simulate a successful payment
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Step 3: Update offer payment status
+      const updateResponse = await marketplaceApi.utils.payments.updateOfferPayment({
+        offerId: offer._id,
+        paymentIntentId: paymentIntentId,
+        status: 'paid'
       });
 
-      if (!stripeResponse.ok) {
-        throw new Error('Stripe connection failed');
+      if (!updateResponse.success) {
+        throw new Error(updateResponse.error || 'Payment update failed');
       }
 
-      // Step 3: Simulate payment confirmation
-      // In production, you would use stripe.confirmCardPayment with the clientSecret
-      setTimeout(async () => {
-        try {
-          // Confirm payment with backend
-          const confirmResponse = await marketplaceApi.offers.confirmOfferPayment({
-            offerId: offer._id,
-            paymentIntentId: paymentResponse.data.paymentIntentId
-          });
+      // Step 4: Create order from paid offer
+      const orderResponse = await marketplaceApi.orders.createOrder({
+        offerId: offer._id,
+        listingId: (offer.listingId as any)._id,
+        buyerId: offer.buyerId._id,
+        sellerId: offer.sellerId,
+        amount: offer.offeredPrice,
+        notes: offer.message
+      });
 
-          if (confirmResponse.success) {
-            onSuccess(confirmResponse.data);
-            onClose();
-          } else {
-            throw new Error(confirmResponse.error || 'Payment confirmation failed');
-          }
-        } catch (err: any) {
-          setError(err.message || 'Payment failed. Please try again.');
-          setProcessing(false);
-        }
-      }, 2000);
+      if (!orderResponse.success) {
+        throw new Error(orderResponse.error || 'Order creation failed');
+      }
+
+      // Get the created order ID
+      const orderId = orderResponse.data?.order?._id;
+      
+      if (!orderId) {
+        throw new Error('Order ID not returned');
+      }
+
+      // Success!
+      onSuccess(orderId, orderResponse.data);
+      
+      // Close modal and show success message
+      onClose();
+      
+      // Navigate to order page
+      setTimeout(() => {
+        navigate(`/orders/${orderId}`);
+      }, 1000);
 
     } catch (err: any) {
       console.error('Payment error:', err);
-      setError(err.message || 'Payment failed. Please check your card details.');
+      setError(err.message || 'Payment failed. Please try again.');
       setProcessing(false);
     }
   };
@@ -116,7 +137,7 @@ const PaymentModal: React.FC<{
         <DialogTitle>
           <Box display="flex" alignItems="center" gap={1}>
             <Lock color="primary" />
-            <Typography variant="h6">Secure Payment</Typography>
+            <Typography variant="h6">Complete Payment</Typography>
           </Box>
         </DialogTitle>
         
@@ -215,25 +236,22 @@ const PaymentModal: React.FC<{
             </Alert>
           )}
 
-          {/* Security Info */}
-          <Paper variant="outlined" sx={{ p: 2, mt: 2, bgcolor: 'grey.50' }}>
-            <Box display="flex" alignItems="center" gap={1} mb={1}>
-              <Lock fontSize="small" color="success" />
-              <Typography variant="caption" fontWeight="medium">
-                Secure Payment
-              </Typography>
-            </Box>
-            <Typography variant="caption" color="text.secondary">
-              Your payment is processed securely by Stripe. We never store your card details.
-            </Typography>
-          </Paper>
-
           {/* Test Card Info */}
           <Alert severity="info" sx={{ mt: 2 }}>
             <Typography variant="caption">
-              <strong>For testing:</strong> Use card 4242 4242 4242 4242, any future expiry, any CVC
+              <strong>For testing:</strong> Use card number 4242 4242 4242 4242, any future expiry (e.g., 12/34), any CVC (e.g., 123)
             </Typography>
           </Alert>
+
+          {/* Success Simulation */}
+          {processing && (
+            <Box sx={{ mt: 2, textAlign: 'center' }}>
+              <CircularProgress size={24} sx={{ mb: 1 }} />
+              <Typography variant="body2" color="text.secondary">
+                Processing payment...
+              </Typography>
+            </Box>
+          )}
         </DialogContent>
 
         <DialogActions sx={{ px: 3, pb: 3 }}>
@@ -258,15 +276,18 @@ const PaymentModal: React.FC<{
 
 // Main Component
 const MyOffersPage: React.FC = () => {
+  const navigate = useNavigate();
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [successOrderId, setSuccessOrderId] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
-    severity: 'success' as 'success' | 'error'
+    severity: 'success' as 'success' | 'error',
+    autoHideDuration: 3000
   });
 
   // Fetch offers function
@@ -279,11 +300,11 @@ const MyOffersPage: React.FC = () => {
       if (response.success && response.data?.offers) {
         setOffers(response.data.offers);
       } else {
-        showSnackbar(response.error || 'Failed to load offers', 'error');
+        showSnackbar(response.error || 'Failed to load offers', 'error', 6000);
       }
     } catch (error) {
       console.error('Error fetching offers:', error);
-      showSnackbar('Network error. Please try again.', 'error');
+      showSnackbar('Network error. Please try again.', 'error', 6000);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -291,11 +312,12 @@ const MyOffersPage: React.FC = () => {
   };
 
   // Show snackbar helper
-  const showSnackbar = (message: string, severity: 'success' | 'error') => {
+  const showSnackbar = (message: string, severity: 'success' | 'error', duration = 3000) => {
     setSnackbar({
       open: true,
       message,
-      severity
+      severity,
+      autoHideDuration: duration
     });
   };
 
@@ -303,6 +325,17 @@ const MyOffersPage: React.FC = () => {
   useEffect(() => {
     fetchOffers();
   }, []);
+
+  // Auto-navigate on success
+  useEffect(() => {
+    if (successOrderId) {
+      const timer = setTimeout(() => {
+        navigate(`/orders/${successOrderId}`);
+      }, 1500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [successOrderId, navigate]);
 
   // Handle refresh
   const handleRefresh = () => {
@@ -317,12 +350,19 @@ const MyOffersPage: React.FC = () => {
   };
 
   // Handle payment success
-  const handlePaymentSuccess = (orderData: any) => {
+  const handlePaymentSuccess = (orderId: string, orderData: any) => {
+    // Store order ID for auto-redirect
+    setSuccessOrderId(orderId);
+    
     // Refresh offers list
     fetchOffers(false);
     
     // Show success message
-    showSnackbar('Payment successful! Offer is now paid.', 'success');
+    showSnackbar(
+      `Payment successful! Order #${orderId.slice(-6)} created. Redirecting to order page...`,
+      'success',
+      2000
+    );
   };
 
   // Handle cancel offer
@@ -347,6 +387,37 @@ const MyOffersPage: React.FC = () => {
     } catch (error) {
       console.error('Error cancelling offer:', error);
       showSnackbar('Network error. Please try again.', 'error');
+    }
+  };
+
+  // Handle view order
+  const handleViewOrder = (offer: Offer) => {
+    // First check if there's an associated order
+    if (offer.status === 'paid' || offer.status === 'accepted') {
+      // Try to get order details for this offer
+      marketplaceApi.orders.getMyOrders()
+        .then(response => {
+          if (response.success) {
+            // Find order for this offer
+            const order = response.data?.orders?.find((o: any) => 
+              o.offerId === offer._id || 
+              (o.listingId && 
+               typeof o.listingId === 'object' && 
+               o.listingId._id === (offer.listingId as any)._id)
+            );
+            
+            if (order) {
+              navigate(`/orders/${order._id}`);
+            } else {
+              showSnackbar('Order not found for this offer. Please try payment again.', 'error');
+            }
+          }
+        })
+        .catch(() => {
+          showSnackbar('Unable to fetch orders. Please try again.', 'error');
+        });
+    } else {
+      showSnackbar('Please complete payment first to view order', 'info');
     }
   };
 
@@ -430,11 +501,16 @@ const MyOffersPage: React.FC = () => {
           </Paper>
         </Grid>
         <Grid item xs={6} sm={3}>
-          <Paper sx={{ p: 2, textAlign: 'center', borderColor: 'warning.main', border: 2 }}>
+          <Paper sx={{ 
+            p: 2, 
+            textAlign: 'center',
+            border: pendingOffers.length > 0 ? 2 : 0,
+            borderColor: 'warning.main'
+          }}>
             <Typography variant="h5" color="warning.main" fontWeight="bold">
               {pendingOffers.length}
             </Typography>
-            <Typography variant="body2" color="warning.main">
+            <Typography variant="body2" color={pendingOffers.length > 0 ? 'warning.main' : 'text.secondary'}>
               Pending Payment
             </Typography>
           </Paper>
@@ -449,8 +525,39 @@ const MyOffersPage: React.FC = () => {
             </Typography>
           </Paper>
         </Grid>
-      
+        <Grid item xs={6} sm={3}>
+          <Paper sx={{ p: 2, textAlign: 'center' }}>
+            <Typography variant="h5" color="error.main" fontWeight="bold">
+              {cancelledOffers.length}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Cancelled
+            </Typography>
+          </Paper>
+        </Grid>
       </Grid>
+
+      {/* Success Alert for Auto-redirect */}
+      {successOrderId && (
+        <Alert 
+          severity="success" 
+          sx={{ mb: 3 }}
+          action={
+            <Button 
+              color="inherit" 
+              size="small" 
+              onClick={() => navigate(`/orders/${successOrderId}`)}
+              endIcon={<NavigateNext />}
+            >
+              Go Now
+            </Button>
+          }
+        >
+          <Typography variant="body2">
+            Payment successful! Redirecting to order #{successOrderId.slice(-6)}...
+          </Typography>
+        </Alert>
+      )}
 
       {/* Offers List */}
       {offers.length === 0 ? (
@@ -569,8 +676,8 @@ const MyOffersPage: React.FC = () => {
                         <Button
                           variant="outlined"
                           size="small"
-                          href={`/orders/${offer._id}`}
                           startIcon={<CheckCircle />}
+                          onClick={() => handleViewOrder(offer)}
                         >
                           View Order
                         </Button>
@@ -581,7 +688,7 @@ const MyOffersPage: React.FC = () => {
                           variant="outlined"
                           size="small"
                           color="primary"
-                          href={`/orders/${offer._id}/review`}
+                          onClick={() => navigate(`/reviews/create?offerId=${offer._id}`)}
                         >
                           Leave Review
                         </Button>
@@ -611,7 +718,7 @@ const MyOffersPage: React.FC = () => {
       {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={6000}
+        autoHideDuration={snackbar.autoHideDuration}
         onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
