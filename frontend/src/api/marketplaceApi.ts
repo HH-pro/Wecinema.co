@@ -1233,20 +1233,27 @@ export const offersApi = {
   },
 
   // Get offers made (as buyer)
-  getMyOffers: async (): Promise<ApiResponse<{ 
-    offers: Offer[]; 
-    count: number;
-  }>> => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/offers/my-offers`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error as AxiosError, 'Failed to fetch my offers');
-    }
-  },
+ getMyOffers: async (): Promise<ApiResponse<{ 
+  offers: Offer[]; 
+  count: number;
+}>> => {
+  try {
+    const headers = {
+      ...getHeaders(),
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    };
+    
+    const response = await axios.get(
+      `${API_BASE_URL}/marketplace/offers/my-offers`,
+      { headers }
+    );
+    return normalizeResponse(response);
+  } catch (error) {
+    return handleApiError(error as AxiosError, 'Failed to fetch my offers');
+  }
+},
 
   // Get single offer details
   getOfferDetails: async (offerId: string): Promise<ApiResponse<{ 
