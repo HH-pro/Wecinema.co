@@ -1,255 +1,282 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { FiUser, FiCreditCard, FiPlay, FiVideo, FiImage } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
+import { Listing } from '../../types/marketplace';
+import marketplaceApi from '../../api/marketplaceApi';
 
-interface Seller {
-  _id: string;
-  username: string;
-  avatar?: string;
-}
-
-interface Listing {
-  _id: string;
-  title: string;
-  description: string;
-  price: number;
-  category: string;
-  condition: string;
-  status: string;
-  tags: string[];
-  mediaUrls: string[];
-  thumbnailUrl?: string;
-  sellerId: Seller;
-  createdAt: string;
-  updatedAt: string;
-}
+// Constants
+const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1579546929662-711aa81148cf?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
+const ERROR_IMAGE = 'https://via.placeholder.com/300x200/cccccc/ffffff?text=Preview+Unavailable';
 
 interface ListingCardProps {
   listing: Listing;
-  isCurrentUser: boolean;
-  onEdit: (listingId: string) => void;
-  onDelete: (listingId: string) => void;
+  onMakeOffer: (listing: Listing) => void;
+  onVideoClick: (videoUrl: string, title: string) => void;
+  imageErrors: Record<string, boolean>;
+  onImageError: (listingId: string) => void;
 }
 
-const ListingCard: React.FC<ListingCardProps> = ({ listing, isCurrentUser, onEdit, onDelete }) => {
-  const [showActions, setShowActions] = useState(false);
-  const [imageError, setImageError] = useState(false);
-  const [imageLoading, setImageLoading] = useState(true);
+const ListingCard: React.FC<ListingCardProps> = ({
+  listing,
+  onMakeOffer,
+  onVideoClick,
+  imageErrors,
+  onImageError
+}) => {
+  const navigate = useNavigate();
 
-  const isVideo = (url: string) => {
+  // Check if URL is a video
+  const isVideoUrl = (url: string): boolean => {
     if (!url) return false;
-    const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.m3u8'];
-    return videoExtensions.some(ext => url.toLowerCase().includes(ext));
+    
+    // Check for video file extensions
+    const videoExtensions = /\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v|ogg|ogv|3gp|3g2)$/i;
+    if (videoExtensions.test(url)) {
+      return true;
+    }
+    
+    // Check for video hosting platforms
+    const videoDomains = [
+      'youtube.com',
+      'youtu.be',
+      'vimeo.com',
+      'dailymotion.com',
+      'streamable.com',
+      'cloudinary.com'
+    ];
+    
+    return videoDomains.some(domain => url.includes(domain));
   };
 
-  const firstMediaUrl = listing.mediaUrls && listing.mediaUrls.length > 0 ? listing.mediaUrls[0] : null;
-
-  const handleImageLoad = () => {
-    setImageLoading(false);
-    setImageError(false);
+  // Get first video URL from listing
+  const getFirstVideoUrl = (listing: Listing): string => {
+    if (!listing.mediaUrls || listing.mediaUrls.length === 0) return '';
+    
+    // Find first video URL
+    const videoUrl = listing.mediaUrls.find(url => isVideoUrl(url));
+    
+    return videoUrl || '';
   };
 
-  const handleImageError = () => {
-    setImageLoading(false);
-    setImageError(true);
+  // Generate YouTube thumbnail from URL
+  const getYouTubeThumbnail = (url: string): string => {
+    const videoId = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
+    if (videoId) {
+      return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+    }
+    return PLACEHOLDER_IMAGE;
   };
+
+  // Generate Vimeo thumbnail from URL
+  const getVimeoThumbnail = (url: string): string => {
+    const videoId = url.match(/vimeo\.com\/(\d+)/)?.[1];
+    if (videoId) {
+      // Using vumbnail service for Vimeo thumbnails
+      return `https://vumbnail.com/${videoId}.jpg`;
+    }
+    return PLACEHOLDER_IMAGE;
+  };
+
+  // Get appropriate thumbnail URL
+  const getThumbnailUrl = (): string => {
+    const listingId = listing._id || 'unknown';
+    
+    // Check if this image has previously failed to load
+    if (imageErrors[listingId]) {
+      return ERROR_IMAGE;
+    }
+    
+    if (!listing.mediaUrls || listing.mediaUrls.length === 0) {
+      return PLACEHOLDER_IMAGE;
+    }
+    
+    // Try to find a video URL first (for video thumbnails)
+    const videoUrl = getFirstVideoUrl(listing);
+    if (videoUrl) {
+      if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
+        return getYouTubeThumbnail(videoUrl);
+      } else if (videoUrl.includes('vimeo.com')) {
+        return getVimeoThumbnail(videoUrl);
+      }
+      // For direct video files, show video icon placeholder
+      return PLACEHOLDER_IMAGE;
+    }
+    
+    // Try to find an image
+    const imageUrl = listing.mediaUrls.find(url => 
+      url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
+    );
+    
+    if (imageUrl) return imageUrl;
+    
+    // Default to the first media URL
+    const firstUrl = listing.mediaUrls[0];
+    if (firstUrl) {
+      return firstUrl;
+    }
+    
+    return PLACEHOLDER_IMAGE;
+  };
+
+  // Get media type for a listing
+  const getMediaType = (): 'image' | 'video' | 'none' => {
+    if (!listing.mediaUrls || listing.mediaUrls.length === 0) {
+      return 'none';
+    }
+    
+    // Check for video
+    const videoUrl = listing.mediaUrls.find(url => isVideoUrl(url));
+    if (videoUrl) {
+      return 'video';
+    }
+    
+    // Check for image
+    const imageUrl = listing.mediaUrls.find(url => 
+      url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
+    );
+    
+    if (imageUrl) {
+      return 'image';
+    }
+    
+    return 'none';
+  };
+
+  const handleViewDetails = () => {
+    navigate(`/marketplace/listings/${listing._id}`);
+  };
+
+  const thumbnailUrl = getThumbnailUrl();
+  const videoUrl = getFirstVideoUrl(listing);
+  const mediaType = getMediaType();
+  const isVideo = mediaType === 'video';
 
   return (
-    <div 
-      className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all duration-300 border border-gray-200 relative group"
-      onMouseEnter={() => setShowActions(true)}
-      onMouseLeave={() => setShowActions(false)}
-    >
-      {isCurrentUser && (
-        <div className={`absolute top-3 left-3 flex gap-2 z-10 transition-all duration-300 ${
-          showActions ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'
-        }`}>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit(listing._id);
-            }}
-            className="bg-blue-500 hover:bg-blue-600 text-white p-2.5 rounded-full shadow-lg transition-all duration-200 transform hover:scale-110"
-            title="Edit Listing"
-          >
-            <span className="text-sm">✏️</span>
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(listing._id);
-            }}
-            className="bg-red-500 hover:bg-red-600 text-white p-2.5 rounded-full shadow-lg transition-all duration-200 transform hover:scale-110"
-            title="Delete Listing"
-          >
-            <span className="text-sm">🗑️</span>
-          </button>
-        </div>
-      )}
-
-      <div className="relative aspect-square bg-gray-100 overflow-hidden">
-        {firstMediaUrl ? (
-          isVideo(firstMediaUrl) ? (
-            <div className="w-full h-full bg-black flex items-center justify-center relative">
-              <video 
-                className="w-full h-full object-cover"
-                controls
-                muted
-                preload="metadata"
-                poster={listing.thumbnailUrl}
-              >
-                <source src={firstMediaUrl} type="video/mp4" />
-                Your browser does not support the video tag.
-              </video>
-              <div className="absolute bottom-3 right-3 bg-black bg-opacity-70 rounded-full p-2 backdrop-blur-sm">
-                <span className="text-white text-xs">🎥</span>
+    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 border border-gray-200 group">
+      {/* Video/Image Preview */}
+      <div 
+        className="relative h-48 bg-gray-900 cursor-pointer overflow-hidden"
+        onClick={() => {
+          if (isVideo && videoUrl) {
+            onVideoClick(videoUrl, listing.title);
+          }
+        }}
+      >
+        {/* Thumbnail Image */}
+        <div className="relative w-full h-full">
+          <img
+            src={thumbnailUrl}
+            alt={listing.title}
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            onError={() => onImageError(listing._id)}
+            loading="lazy"
+          />
+          
+          {/* Loading skeleton */}
+          <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>
+          
+          {/* Play Button Overlay for Videos */}
+          {isVideo && (
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+              <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-2 border-white/40 transform group-hover:scale-110 transition-transform duration-300">
+                <FiPlay className="text-white ml-1" size={32} />
               </div>
             </div>
-          ) : (
-            <>
-              {imageLoading && (
-                <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                </div>
-              )}
-              <img
-                src={firstMediaUrl}
-                alt={listing.title}
-                className={`w-full h-full object-cover transition-opacity duration-300 ${
-                  imageLoading ? 'opacity-0' : 'opacity-100'
-                }`}
-                onLoad={handleImageLoad}
-                onError={handleImageError}
-              />
-              {imageError && (
-                <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                  <div className="text-center">
-                    <span className="text-gray-400 text-4xl mb-2 block">📷</span>
-                    <span className="text-gray-500 text-sm">Image not available</span>
-                  </div>
-                </div>
-              )}
-            </>
-          )
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-            <div className="text-center">
-              <span className="text-gray-400 text-4xl mb-2 block">🏠</span>
-              <span className="text-gray-500 text-sm">No media</span>
-            </div>
+          )}
+          
+          {/* Media Type Badge */}
+          <div className={`absolute top-2 right-2 text-white text-xs px-2 py-1 rounded-md flex items-center gap-1 backdrop-blur-sm ${isVideo ? 'bg-red-500/80' : 'bg-blue-500/80'}`}>
+            {isVideo ? (
+              <>
+                <FiVideo size={10} />
+                VIDEO
+              </>
+            ) : mediaType === 'image' ? (
+              <>
+                <FiImage size={10} />
+                IMAGE
+              </>
+            ) : (
+              <>
+                <FiImage size={10} />
+                MEDIA
+              </>
+            )}
           </div>
-        )}
-        
-        <div className="absolute top-3 right-3">
-          <span
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold border backdrop-blur-sm ${
-              listing.status === 'active'
-                ? 'bg-green-500 text-white border-green-600'
-                : listing.status === 'sold'
-                ? 'bg-orange-500 text-white border-orange-600'
-                : listing.status === 'draft'
-                ? 'bg-gray-500 text-white border-gray-600'
-                : listing.status === 'inactive'
-                ? 'bg-red-500 text-white border-red-600'
-                : 'bg-purple-500 text-white border-purple-600'
-            }`}
-          >
-            {listing.status?.toUpperCase() || 'UNKNOWN'}
-          </span>
         </div>
-
-        {listing.mediaUrls && listing.mediaUrls.length > 1 && (
-          <div className="absolute top-3 left-3">
-            <span className="bg-black bg-opacity-70 text-white px-2.5 py-1.5 rounded-full text-xs font-medium backdrop-blur-sm border border-white border-opacity-20">
-              📸 {listing.mediaUrls.length}
-            </span>
-          </div>
-        )}
-
-        <div className="absolute bottom-3 left-3 right-3">
-          <div className="bg-black bg-opacity-70 text-white px-3 py-2 rounded-lg backdrop-blur-sm border border-white border-opacity-20">
-            <span className="text-lg font-bold">${listing.price?.toLocaleString() || '0'}</span>
-          </div>
+        
+        {/* Category Badge */}
+        <div className="absolute bottom-2 left-2">
+          <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded-md backdrop-blur-sm bg-yellow-500/90">
+            {listing.category}
+          </span>
         </div>
       </div>
 
+      {/* Content */}
       <div className="p-4">
-        <h3 className="font-bold text-lg mb-2 line-clamp-2 h-14 overflow-hidden text-gray-800 group-hover:text-blue-600 transition-colors">
-          {listing.title || 'Untitled Listing'}
-        </h3>
-
-        <p className="text-gray-600 text-sm mb-3 line-clamp-2 h-10 overflow-hidden leading-relaxed">
-          {listing.description || 'No description available'}
-        </p>
-
-        <div className="flex justify-between items-center mb-3">
-          {listing.category && (
-            <span className="bg-blue-100 text-blue-800 text-xs px-2.5 py-1.5 rounded-full font-medium border border-blue-200">
-              {listing.category}
-            </span>
-          )}
-          
-          {listing.condition && (
-            <span className="bg-gray-100 text-gray-800 text-xs px-2.5 py-1.5 rounded-full font-medium border border-gray-300">
-              {listing.condition}
-            </span>
-          )}
-        </div>
-
-        {listing.tags && listing.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-4">
-            {listing.tags.slice(0, 3).map((tag, index) => (
-              <span
-                key={index}
-                className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded border border-gray-300"
-              >
-                #{tag}
-              </span>
-            ))}
-            {listing.tags.length > 3 && (
-              <span className="text-gray-500 text-xs bg-gray-100 px-2 py-1 rounded border border-gray-300">
-                +{listing.tags.length - 3} more
-              </span>
-            )}
+        <div className="flex justify-between items-start mb-2">
+          <h3 
+            onClick={handleViewDetails}
+            className="font-semibold text-gray-900 truncate text-sm hover:text-yellow-600 transition-colors cursor-pointer"
+          >
+            {listing.title}
+          </h3>
+          <div className="text-xs text-gray-500">
+            {listing.duration || 'N/A'}
           </div>
-        )}
-
-        {listing.sellerId && (
-          <div className="flex items-center gap-2 pt-3 border-t border-gray-200">
-            <div className="flex items-center gap-2 flex-1">
-              {listing.sellerId.avatar ? (
-                <img
-                  src={listing.sellerId.avatar}
+        </div>
+        
+        <p className="text-gray-600 text-xs mb-3 line-clamp-2">
+          {listing.description}
+        </p>
+        
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+              {listing.sellerId?.avatar ? (
+                <img 
+                  src={listing.sellerId.avatar} 
                   alt={listing.sellerId.username}
-                  className="w-6 h-6 rounded-full object-cover border border-gray-300"
+                  className="w-full h-full object-cover"
                   onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                    const nextSibling = target.nextElementSibling as HTMLElement;
-                    if (nextSibling) nextSibling.style.display = 'flex';
+                    (e.target as HTMLImageElement).src = 'https://via.placeholder.com/24/cccccc/ffffff?text=U';
                   }}
                 />
-              ) : null}
-              <div className={`w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center text-xs border border-gray-400 ${
-                listing.sellerId.avatar ? 'hidden' : 'flex'
-              }`}>
-                👤
-              </div>
-              <span className="text-sm text-gray-700 font-medium truncate">
-                {listing.sellerId.username || 'Unknown Seller'}
-              </span>
+              ) : (
+                <FiUser size={12} className="text-gray-600" />
+              )}
             </div>
+            <span className="text-xs text-gray-700 truncate max-w-[80px]">
+              {listing.sellerId?.username || 'Seller'}
+            </span>
           </div>
-        )}
-
-        <div className="flex justify-between items-center mt-3 text-xs text-gray-500 border-t border-gray-100 pt-3">
-          <div className="text-center flex-1">
-            <div className="font-medium">Created</div>
-            <div>{new Date(listing.createdAt).toLocaleDateString()}</div>
+          <div className="text-green-600 font-bold">
+            {marketplaceApi.utils.formatCurrency(listing.price)}
           </div>
-          <div className="w-px h-6 bg-gray-200"></div>
-          <div className="text-center flex-1">
-            <div className="font-medium">Updated</div>
-            <div>{new Date(listing.updatedAt).toLocaleDateString()}</div>
-          </div>
+        </div>
+        
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => onMakeOffer(listing)}
+            className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white text-sm py-2 px-3 rounded-md transition-colors duration-200 flex items-center justify-center gap-2"
+          >
+            <FiCreditCard size={14} />
+            Make Offer
+          </button>
+          {isVideo && videoUrl && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onVideoClick(videoUrl, listing.title);
+              }}
+              className="px-3 bg-gray-800 hover:bg-gray-900 text-white text-sm py-2 rounded-md transition-colors duration-200 flex items-center gap-2"
+            >
+              <FiPlay size={14} />
+              Play
+            </button>
+          )}
         </div>
       </div>
     </div>
