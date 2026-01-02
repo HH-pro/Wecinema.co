@@ -44,6 +44,7 @@ export interface Listing {
   thumbnail?: string;
   createdAtFormatted?: string;
   statusColor?: string;
+  type?: string;
 }
 
 export interface Order {
@@ -103,7 +104,12 @@ export interface StripeAccount {
 // ✅ API CONFIGURATION
 // ============================================
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+// ✅ FIXED: Use hardcoded URL or window.location for client-side
+const API_BASE_URL = 'http://localhost:3000'; // For development
+// For production, you might want to use:
+// const API_BASE_URL = window.location.origin; // Same origin
+// OR
+// const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'; // For Vite
 
 // Helper function to get auth token
 const getAuthToken = (): string | null => {
@@ -113,12 +119,15 @@ const getAuthToken = (): string | null => {
 // Helper function to get headers
 const getHeaders = (): { headers: Record<string, string> } => {
   const token = getAuthToken();
-  return {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    }
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
   };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return { headers };
 };
 
 // Helper function to normalize API response
@@ -166,6 +175,7 @@ export const listingsApi = {
     search?: string;
     sortBy?: string;
     sortOrder?: string;
+    type?: string;
   }): Promise<ApiResponse<{ listings: Listing[] }>> => {
     try {
       const response = await axios.get(`${API_BASE_URL}/marketplace/listings`, {
@@ -207,6 +217,7 @@ export const listingsApi = {
     tags?: string[];
     mediaUrls?: string[];
     status?: 'active' | 'draft';
+    type?: string;
   }): Promise<ApiResponse<{ listing: Listing }>> => {
     try {
       const response = await axios.post(
@@ -228,6 +239,7 @@ export const listingsApi = {
     category?: string;
     tags?: string[];
     mediaUrls?: string[];
+    status?: string;
   }): Promise<ApiResponse<{ listing: Listing }>> => {
     try {
       console.log('📝 Edit API call:', { listingId, updateData });
@@ -333,6 +345,22 @@ export const listingsApi = {
     } catch (error) {
       return handleApiError(error as AxiosError, 'Failed to update views');
     }
+  },
+
+  // Search listings
+  searchListings: async (query: string, params?: {
+    page?: number;
+    limit?: number;
+    category?: string;
+  }): Promise<ApiResponse<{ listings: Listing[] }>> => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/marketplace/listings/search`, {
+        params: { q: query, ...params }
+      });
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to search listings');
+    }
   }
 };
 
@@ -344,52 +372,49 @@ export const ordersApi = {
   // Get seller's orders/sales
   getMySales: async (): Promise<Order[]> => {
     try {
-      const endpoints = [
+      const response = await axios.get(
         `${API_BASE_URL}/marketplace/orders/my-sales`,
-        `${API_BASE_URL}/marketplace/seller/orders`
-      ];
+        getHeaders()
+      );
       
-      for (const endpoint of endpoints) {
-        try {
-          const response = await axios.get(endpoint, {
-            ...getHeaders(),
-            params: { limit: 100 }
-          });
-          
-          const data = response.data;
-          
-          // Try to extract orders from different response structures
-          let orders: Order[] = [];
-          
-          if (Array.isArray(data)) {
-            orders = data;
-          } else if (data?.sales && Array.isArray(data.sales)) {
-            orders = data.sales;
-          } else if (data?.orders && Array.isArray(data.orders)) {
-            orders = data.orders;
-          } else if (data?.data && Array.isArray(data.data)) {
-            orders = data.data;
-          } else if (data?.success && Array.isArray(data.data)) {
-            orders = data.data;
-          }
-          
-          if (orders.length > 0) {
-            console.log('📊 Found orders at:', endpoint);
-            return orders;
-          }
-          
-        } catch (err) {
-          console.log(`⚠️ Endpoint ${endpoint} failed:`, (err as Error).message);
-          continue;
-        }
+      const data = response.data;
+      let orders: Order[] = [];
+      
+      if (Array.isArray(data)) {
+        orders = data;
+      } else if (data?.sales && Array.isArray(data.sales)) {
+        orders = data.sales;
+      } else if (data?.orders && Array.isArray(data.orders)) {
+        orders = data.orders;
+      } else if (data?.data && Array.isArray(data.data)) {
+        orders = data.data;
+      } else if (data?.success && Array.isArray(data.data)) {
+        orders = data.data;
       }
       
-      console.log('⚠️ No orders found in any endpoint');
-      return [];
+      return orders;
       
     } catch (error) {
       console.error('❌ Error fetching sales:', error);
       return [];
+    }
+  },
+
+  // Create order for direct purchase
+  createOrder: async (listingId: string, orderData?: {
+    amount?: number;
+    paymentMethod?: string;
+    shippingAddress?: any;
+  }): Promise<ApiResponse<{ order: Order; clientSecret?: string }>> => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/orders/create`,
+        { listingId, ...orderData },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to create order');
     }
   },
 
@@ -443,6 +468,20 @@ export const ordersApi = {
     } catch (error) {
       return handleApiError(error as AxiosError, 'Failed to fetch your orders');
     }
+  },
+
+  // Confirm payment for order
+  confirmPayment: async (orderId: string, paymentIntentId: string): Promise<ApiResponse<{ order: Order }>> => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/orders/${orderId}/confirm-payment`,
+        { paymentIntentId },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to confirm payment');
+    }
   }
 };
 
@@ -458,14 +497,7 @@ export const offersApi = {
         `${API_BASE_URL}/marketplace/offers/received-offers`,
         getHeaders()
       );
-      const normalized = normalizeResponse<{ offers: Offer[] }>(response);
-      
-      // Ensure offers array exists
-      if (normalized.success && !normalized.data?.offers && normalized.data) {
-        normalized.data = { offers: normalized.data as any };
-      }
-      
-      return normalized;
+      return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error as AxiosError, 'Failed to fetch offers');
     }
@@ -481,6 +513,25 @@ export const offersApi = {
       return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error as AxiosError, 'Failed to fetch sent offers');
+    }
+  },
+
+  // Create offer
+  createOffer: async (listingId: string, offerData: {
+    offeredPrice: number;
+    message?: string;
+    requirements?: string;
+    expectedDelivery?: string;
+  }): Promise<ApiResponse<{ offer: Offer; clientSecret?: string }>> => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/offers/make-offer`,
+        { listingId, ...offerData },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to create offer');
     }
   },
 
@@ -528,20 +579,17 @@ export const offersApi = {
     }
   },
 
-  // Create offer
-  createOffer: async (listingId: string, offerData: {
-    offeredPrice: number;
-    message?: string;
-  }): Promise<ApiResponse<{ offer: Offer }>> => {
+  // Confirm offer payment
+  confirmOfferPayment: async (offerId: string, paymentIntentId: string): Promise<ApiResponse<{ offer: Offer }>> => {
     try {
       const response = await axios.post(
-        `${API_BASE_URL}/marketplace/offers/${listingId}/make-offer`,
-        offerData,
+        `${API_BASE_URL}/marketplace/offers/${offerId}/confirm-payment`,
+        { paymentIntentId },
         getHeaders()
       );
       return normalizeResponse(response);
     } catch (error) {
-      return handleApiError(error as AxiosError, 'Failed to create offer');
+      return handleApiError(error as AxiosError, 'Failed to confirm offer payment');
     }
   }
 };
@@ -588,6 +636,20 @@ export const stripeApi = {
       return normalizeResponse(response);
     } catch (error) {
       return handleApiError(error as AxiosError, 'Failed to get Stripe dashboard link');
+    }
+  },
+
+  // Create payment intent
+  createPaymentIntent: async (amount: number, metadata?: any): Promise<ApiResponse<{ clientSecret: string }>> => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/stripe/create-payment-intent`,
+        { amount, metadata },
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to create payment intent');
     }
   }
 };
@@ -710,16 +772,23 @@ export const getCurrentUser = (): any => {
     const token = getAuthToken();
     if (!token) return null;
     
-    // Decode JWT token (assuming it's in format: header.payload.signature)
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(''));
-    
-    return JSON.parse(jsonPayload);
+    // Decode JWT token
+    try {
+      const base64Url = token.split('.')[1];
+      if (!base64Url) return null;
+      
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      
+      return JSON.parse(jsonPayload);
+    } catch (decodeError) {
+      console.error('Error decoding token:', decodeError);
+      return null;
+    }
   } catch (error) {
-    console.error('Error decoding token:', error);
+    console.error('Error getting current user:', error);
     return null;
   }
 };
@@ -748,6 +817,11 @@ export const uploadFile = async (file: File): Promise<string> => {
   }
 };
 
+// Get API base URL (useful for other parts of the app)
+export const getApiBaseUrl = (): string => {
+  return API_BASE_URL;
+};
+
 // ============================================
 // ✅ EXPORT ALL APIs
 // ============================================
@@ -764,55 +838,29 @@ const marketplaceApi = {
     testApiConnection,
     checkAuth,
     getCurrentUser,
-    uploadFile
+    uploadFile,
+    getApiBaseUrl
   }
 };
 
 export default marketplaceApi;
 
 // ============================================
-// ✅ HOOKS FOR REACT COMPONENTS
+// ✅ ENVIRONMENT CONFIGURATION FOR REACT APP
 // ============================================
 
-// Example React hook for using the API
-export const useMarketplaceApi = () => {
-  const api = marketplaceApi;
-  
-  // Custom hooks for common operations
-  const useMyListings = () => {
-    const [listings, setListings] = useState<Listing[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    
-    const fetchListings = async () => {
-      setLoading(true);
-      setError(null);
-      
-      try {
-        const response = await api.listings.getMyListings();
-        if (response.success) {
-          setListings(response.data?.listings || []);
-        } else {
-          setError(response.error || 'Failed to fetch listings');
-        }
-      } catch (err) {
-        setError('Network error');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    useEffect(() => {
-      fetchListings();
-    }, []);
-    
-    const refetch = () => fetchListings();
-    
-    return { listings, loading, error, refetch };
-  };
-  
-  return {
-    api,
-    useMyListings
-  };
-};
+/*
+To use environment variables in your React app:
+
+1. Create `.env` file in your React app root:
+   REACT_APP_API_URL=http://localhost:3000
+   REACT_APP_STRIPE_PUBLIC_KEY=pk_test_...
+
+2. Update the API_BASE_URL:
+   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+
+3. For Create React App, environment variables are automatically loaded.
+
+4. For Vite, use import.meta.env:
+   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+*/
