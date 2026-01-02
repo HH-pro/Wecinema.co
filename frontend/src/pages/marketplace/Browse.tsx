@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import ListingCard from '../../components/marketplace/ListingCard';
+import ListingCard from '../../components/marketplae/ListingCard';
 import MarketplaceLayout from '../../components/Layout';
 import { Listing } from '../../types/marketplace';
 import { 
