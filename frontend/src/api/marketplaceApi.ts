@@ -18,7 +18,6 @@ export interface ApiResponse<T = any> {
     pages: number;
   };
 }
-
 export interface Listing {
   _id: string;
   title: string;
@@ -26,13 +25,19 @@ export interface Listing {
   price: number;
   formattedPrice: string;
   status: 'active' | 'sold' | 'pending' | 'draft' | 'inactive' | 'reserved';
-  mediaUrls: string[];
-  thumbnail?: string;
+  type: string; // e.g., "for_sale", "for_rent"
   category: string;
   tags: string[];
+  currency: string;
+  isDigital: boolean;
+
+  mediaUrls: string[];           // Video or image URLs
+  thumbnail?: string;            // Optional thumbnail (video poster or image)
+
   views: number;
   favoriteCount: number;
   purchaseCount: number;
+
   sellerId: {
     _id: string;
     username: string;
@@ -43,14 +48,9 @@ export interface Listing {
     stripeAccountId?: string;
     stripeAccountStatus?: string;
   };
-  sellerEmail?: string;
-  type: string;
-  currency: string;
-  isDigital: boolean;
-  createdAt: string;
-  updatedAt: string;
-  createdAtFormatted?: string;
-  statusColor?: string;
+  
+  sellerEmail?: string;          // Optional seller email
+
   seller?: {
     _id: string;
     username: string;
@@ -58,13 +58,20 @@ export interface Listing {
     sellerRating?: number;
     email?: string;
   };
-  maxRevisions?: number;
-  deliveryTime?: string;
-  availability?: string;
+
+  maxRevisions?: number;         // For digital products/services
+  deliveryTime?: string;         // e.g., "3 days"
+  availability?: string;         // e.g., "In stock"
   totalOrders?: number;
   lastOrderAt?: string;
   reservedUntil?: string;
+
+  createdAt: string;             // ISO date string
+  updatedAt: string;             // ISO date string
+  createdAtFormatted?: string;   // e.g., "Jan 2, 2026"
+  statusColor?: string;          // e.g., "green", "red"
 }
+
 
 export interface Order {
   _id: string;
