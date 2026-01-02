@@ -617,7 +617,7 @@ const Browse: React.FC = () => {
             </div>
           </div>
 
-          {/* Filters Section */}
+          {/* Filters Section - FIXED: Price Range in ₹ (Indian Rupees) */}
           {showFilters && (
             <div className="mb-8 bg-white rounded-2xl shadow-lg border border-gray-200 p-6 animate-fadeIn">
               <div className="flex items-center justify-between mb-6">
@@ -699,13 +699,13 @@ const Browse: React.FC = () => {
 
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-800">
-                    Price Range ($)
+                    Price Range (₹)
                   </label>
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <span className="text-gray-500 text-sm">Min:</span>
                       <div className="relative flex-1">
-                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">$</div>
+                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">₹</div>
                         <input
                           type="number"
                           placeholder="0"
@@ -719,10 +719,10 @@ const Browse: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <span className="text-gray-500 text-sm">Max:</span>
                       <div className="relative flex-1">
-                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">$</div>
+                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">₹</div>
                         <input
                           type="number"
-                          placeholder="1000"
+                          placeholder="10000"
                           value={filters.maxPrice}
                           onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: e.target.value }))}
                           className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none text-sm"
@@ -950,25 +950,15 @@ const Browse: React.FC = () => {
                         </div>
                       )}
                       
-                      {/* Action Buttons - For Buyers */}
+                      {/* Action Button - REMOVED View Details, only Buy Now */}
                       <div className="pt-4 border-t border-gray-100">
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <button
-                            onClick={() => handleViewDetails(listing._id)}
-                            className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-medium py-2.5 px-3 rounded-lg transition-all duration-200 flex items-center justify-center hover:shadow-md"
-                          >
-                            <FiEye className="w-4 h-4 mr-2" />
-                            View Details
-                          </button>
-                          
-                          <button
-                            onClick={() => handleMakeOffer(listing)}
-                            className="flex-1 bg-gradient-to-r from-yellow-500 via-yellow-400 to-yellow-300 hover:from-yellow-600 hover:via-yellow-500 hover:to-yellow-400 text-gray-800 text-sm font-medium py-2.5 px-3 rounded-lg transition-all duration-200 flex items-center justify-center hover:shadow-md border border-yellow-200"
-                          >
-                            <FiDollarSign className="w-4 h-4 mr-2" />
-                            Buy Now
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => handleMakeOffer(listing)}
+                          className="w-full bg-gradient-to-r from-yellow-500 via-yellow-400 to-yellow-300 hover:from-yellow-600 hover:via-yellow-500 hover:to-yellow-400 text-gray-800 text-sm font-medium py-2.5 px-3 rounded-lg transition-all duration-200 flex items-center justify-center hover:shadow-md border border-yellow-200"
+                        >
+                          <FiDollarSign className="w-4 h-4 mr-2" />
+                          Buy Now - {formatCurrency(listing.price)}
+                        </button>
                       </div>
                       
                       {/* Seller Info */}
