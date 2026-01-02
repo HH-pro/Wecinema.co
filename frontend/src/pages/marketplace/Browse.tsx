@@ -5,7 +5,7 @@ import { Listing } from '../../types/marketplace';
 import { 
   FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiCheck, FiAlertCircle, 
   FiLoader, FiUser, FiCalendar, FiMail, FiPlay, FiPause, FiVolume2, 
-  FiVolumeX, FiMaximize, FiMinimize, FiEye, FiHeart 
+  FiVolumeX, FiMaximize, FiEye, FiHeart, FiImage, FiVideo 
 } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { loadStripe } from '@stripe/stripe-js';
@@ -17,6 +17,11 @@ const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "p
 
 // Initialize Stripe
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
+
+// Constants for placeholder images
+const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1579546929662-711aa81148cf?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
+const VIDEO_PLACEHOLDER = 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
+const ERROR_IMAGE = 'https://via.placeholder.com/300x200/cccccc/ffffff?text=Preview+Unavailable';
 
 const Browse: React.FC = () => {
   const [listings, setListings] = useState<Listing[]>([]);
@@ -47,6 +52,9 @@ const Browse: React.FC = () => {
       country: 'US'
     }
   });
+  
+  // New state for image loading errors
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const navigate = useNavigate();
 
   const [filters, setFilters] = useState({
@@ -96,6 +104,7 @@ const Browse: React.FC = () => {
     try {
       setLoading(true);
       setError('');
+      setImageErrors({}); // Reset image errors on new fetch
       
       // Use marketplaceApi to fetch listings
       const response = await marketplaceApi.listings.getAllListings({
@@ -387,10 +396,10 @@ const Browse: React.FC = () => {
     
     // Find first video URL
     const videoUrl = listing.mediaUrls.find(url => 
-      url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v)$/i)
+      isVideoUrl(url)
     );
     
-    return videoUrl || listing.mediaUrls[0];
+    return videoUrl || '';
   };
 
   // Generate video thumbnail from video URL
@@ -399,19 +408,33 @@ const Browse: React.FC = () => {
     if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
       const videoId = videoUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
       if (videoId) {
-        return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+        return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
       }
     }
     
-    // For direct video files, use a video thumbnail placeholder
-    // In a real app, you might want to generate thumbnails on the server
-    return `https://via.placeholder.com/300x200/3B82F6/FFFFFF?text=Video+Preview`;
+    // For Vimeo URLs
+    if (videoUrl.includes('vimeo.com')) {
+      const videoId = videoUrl.match(/vimeo\.com\/(\d+)/)?.[1];
+      if (videoId) {
+        return `https://vumbnail.com/${videoId}.jpg`;
+      }
+    }
+    
+    // For direct video files, use video placeholder
+    return VIDEO_PLACEHOLDER;
   };
 
-  // Get thumbnail URL
+  // Get thumbnail URL with better error handling
   const getThumbnailUrl = (listing: Listing): string => {
+    const listingId = listing._id || 'unknown';
+    
+    // Check if this image has previously failed to load
+    if (imageErrors[listingId]) {
+      return ERROR_IMAGE;
+    }
+    
     if (!listing.mediaUrls || listing.mediaUrls.length === 0) {
-      return 'https://via.placeholder.com/300x200?text=No+Preview';
+      return PLACEHOLDER_IMAGE;
     }
     
     // Try to find an image first
@@ -421,21 +444,77 @@ const Browse: React.FC = () => {
     
     if (imageUrl) return imageUrl;
     
-    // Check if first media is a video
+    // Check if there's a video URL
     const videoUrl = getFirstVideoUrl(listing);
-    if (videoUrl && isVideoUrl(videoUrl)) {
+    if (videoUrl) {
       return generateVideoThumbnail(videoUrl);
     }
     
-    return listing.mediaUrls[0];
+    // Default to the first media URL
+    const firstUrl = listing.mediaUrls[0];
+    if (firstUrl) {
+      return firstUrl;
+    }
+    
+    return PLACEHOLDER_IMAGE;
+  };
+
+  // Handle image loading error
+  const handleImageError = (listingId: string) => {
+    setImageErrors(prev => ({
+      ...prev,
+      [listingId]: true
+    }));
   };
 
   // Check if media is a video
   const isVideoUrl = (url: string): boolean => {
-    return url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v)$/i) !== null ||
-           url.includes('youtube.com') || 
-           url.includes('youtu.be') ||
-           url.includes('vimeo.com');
+    if (!url) return false;
+    
+    // Check for video file extensions
+    const videoExtensions = /\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v|ogg|ogv|3gp|3g2)$/i;
+    if (videoExtensions.test(url)) {
+      return true;
+    }
+    
+    // Check for video hosting platforms
+    const videoDomains = [
+      'youtube.com',
+      'youtu.be',
+      'vimeo.com',
+      'dailymotion.com',
+      'twitch.tv',
+      'streamable.com',
+      'cloudinary.com',
+      'vidyard.com',
+      'wistia.com'
+    ];
+    
+    return videoDomains.some(domain => url.includes(domain));
+  };
+
+  // Get media type for a listing
+  const getMediaType = (listing: Listing): 'image' | 'video' | 'none' => {
+    if (!listing.mediaUrls || listing.mediaUrls.length === 0) {
+      return 'none';
+    }
+    
+    // Check for video
+    const videoUrl = listing.mediaUrls.find(url => isVideoUrl(url));
+    if (videoUrl) {
+      return 'video';
+    }
+    
+    // Check for image
+    const imageUrl = listing.mediaUrls.find(url => 
+      url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
+    );
+    
+    if (imageUrl) {
+      return 'image';
+    }
+    
+    return 'none';
   };
 
   if (loading) {
@@ -667,54 +746,65 @@ const Browse: React.FC = () => {
                 const thumbnailUrl = getThumbnailUrl(listing);
                 const videoUrl = getFirstVideoUrl(listing);
                 const isVideo = isVideoUrl(videoUrl);
+                const mediaType = getMediaType(listing);
                 
                 return (
-                  <div key={listing._id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 border border-gray-200">
+                  <div key={listing._id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 border border-gray-200 group">
                     {/* Video/Image Preview */}
                     <div 
-                      className="relative h-48 bg-gray-900 cursor-pointer group"
+                      className="relative h-48 bg-gray-900 cursor-pointer overflow-hidden"
                       onClick={() => {
                         if (isVideo && videoUrl) {
                           handleVideoClick(videoUrl, listing.title);
                         }
                       }}
                     >
-                      {/* Thumbnail Image */}
+                      {/* Thumbnail Image with fallback */}
                       <div className="relative w-full h-full">
                         <img
                           src={thumbnailUrl}
                           alt={listing.title}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Video+Preview';
-                          }}
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          onError={() => handleImageError(listing._id)}
+                          loading="lazy"
                         />
                         
+                        {/* Loading skeleton */}
+                        <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>
+                        
                         {/* Play Button Overlay for Videos */}
-                        {isVideo && (
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                            <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-2 border-white/30">
-                              <FiPlay className="text-white" size={28} />
+                        {mediaType === 'video' && (
+                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-2 border-white/30 transform group-hover:scale-110 transition-transform duration-300">
+                              <FiPlay className="text-white ml-1" size={28} />
                             </div>
                           </div>
                         )}
                         
                         {/* Media Type Badge */}
-                        <div className={`absolute top-2 right-2 text-white text-xs px-2 py-1 rounded-md flex items-center gap-1 ${isVideo ? 'bg-red-500' : 'bg-blue-500'}`}>
-                          {isVideo ? (
+                        <div className={`absolute top-2 right-2 text-white text-xs px-2 py-1 rounded-md flex items-center gap-1 backdrop-blur-sm ${mediaType === 'video' ? 'bg-red-500/80' : 'bg-blue-500/80'}`}>
+                          {mediaType === 'video' ? (
                             <>
-                              <FiPlay size={10} />
+                              <FiVideo size={10} />
                               VIDEO
                             </>
+                          ) : mediaType === 'image' ? (
+                            <>
+                              <FiImage size={10} />
+                              IMAGE
+                            </>
                           ) : (
-                            'IMAGE'
+                            <>
+                              <FiImage size={10} />
+                              MEDIA
+                            </>
                           )}
                         </div>
                       </div>
                       
                       {/* Category Badge */}
                       <div className="absolute bottom-2 left-2">
-                        <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded-md">
+                        <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded-md backdrop-blur-sm bg-yellow-500/90">
                           {listing.category}
                         </span>
                       </div>
@@ -723,9 +813,12 @@ const Browse: React.FC = () => {
                     {/* Content */}
                     <div className="p-4">
                       <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-semibold text-gray-900 truncate text-sm">
+                        <h3 className="font-semibold text-gray-900 truncate text-sm group-hover:text-yellow-600 transition-colors">
                           {listing.title}
                         </h3>
+                        <div className="text-xs text-gray-500">
+                          {listing.duration || 'N/A'}
+                        </div>
                       </div>
                       
                       <p className="text-gray-600 text-xs mb-3 line-clamp-2">
@@ -734,10 +827,21 @@ const Browse: React.FC = () => {
                       
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
-                            <FiUser size={12} className="text-gray-600" />
+                          <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                            {listing.sellerId?.avatar ? (
+                              <img 
+                                src={listing.sellerId.avatar} 
+                                alt={listing.sellerId.username}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/24/cccccc/ffffff?text=U';
+                                }}
+                              />
+                            ) : (
+                              <FiUser size={12} className="text-gray-600" />
+                            )}
                           </div>
-                          <span className="text-xs text-gray-700">
+                          <span className="text-xs text-gray-700 truncate max-w-[80px]">
                             {listing.sellerId?.username || 'Seller'}
                           </span>
                         </div>
@@ -750,17 +854,20 @@ const Browse: React.FC = () => {
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleMakeOffer(listing)}
-                          className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white text-sm py-2 px-3 rounded-md transition-colors duration-200 flex items-center justify-center gap-2"
+                          className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white text-sm py-2 px-3 rounded-md transition-colors duration-200 flex items-center justify-center gap-2 group/btn"
                         >
-                          <FiCreditCard size={14} />
+                          <FiCreditCard size={14} className="group-hover/btn:scale-110 transition-transform" />
                           Make Offer
                         </button>
-                        {isVideo && videoUrl && (
+                        {mediaType === 'video' && videoUrl && (
                           <button
-                            onClick={() => handleVideoClick(videoUrl, listing.title)}
-                            className="px-3 bg-gray-800 hover:bg-gray-900 text-white text-sm py-2 rounded-md transition-colors duration-200 flex items-center gap-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleVideoClick(videoUrl, listing.title);
+                            }}
+                            className="px-3 bg-gray-800 hover:bg-gray-900 text-white text-sm py-2 rounded-md transition-colors duration-200 flex items-center gap-2 group/play"
                           >
-                            <FiPlay size={14} />
+                            <FiPlay size={14} className="group-hover/play:scale-110 transition-transform" />
                             Play
                           </button>
                         )}
@@ -789,35 +896,54 @@ const Browse: React.FC = () => {
       {/* Video Popup Modal */}
       {showVideoPopup && selectedVideo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-4xl max-h-[90vh] bg-black rounded-xl overflow-hidden">
+          <div className="relative w-full max-w-4xl max-h-[90vh] bg-black rounded-xl overflow-hidden shadow-2xl">
             {/* Header */}
             <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 to-transparent p-4 flex justify-between items-center">
-              <div className="text-white">
+              <div className="text-white truncate max-w-[80%]">
                 <h3 className="text-lg font-semibold truncate">{videoTitle}</h3>
+                <p className="text-sm text-gray-300 truncate">{selectedVideo}</p>
               </div>
               <button
                 onClick={handleCloseVideoPopup}
-                className="text-white hover:text-gray-300 p-2 rounded-full hover:bg-white/10 transition-colors"
+                className="text-white hover:text-gray-300 p-2 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"
               >
                 <FiX size={24} />
               </button>
             </div>
             
             {/* Video Player */}
-            <div className="relative w-full h-[70vh]">
-              <video
-                ref={videoRef}
-                src={selectedVideo}
-                controls
-                autoPlay
-                className="w-full h-full object-contain bg-black"
-                onError={(e) => {
-                  console.error('Video playback error:', e);
-                  alert('Unable to play video. Please check the video URL.');
-                }}
-              >
-                Your browser does not support the video tag.
-              </video>
+            <div className="relative w-full h-[70vh] bg-black flex items-center justify-center">
+              {isVideoUrl(selectedVideo) ? (
+                <video
+                  ref={videoRef}
+                  src={selectedVideo}
+                  controls
+                  autoPlay
+                  className="w-full h-full object-contain bg-black"
+                  onError={(e) => {
+                    console.error('Video playback error:', e);
+                    const videoElement = e.target as HTMLVideoElement;
+                    videoElement.controls = false;
+                    videoElement.innerHTML = `
+                      <div class="flex flex-col items-center justify-center h-full text-white p-8 text-center">
+                        <FiAlertCircle class="text-red-500 mb-4" size={48} />
+                        <h4 class="text-xl font-semibold mb-2">Unable to Play Video</h4>
+                        <p class="text-gray-300">The video format is not supported or the URL is invalid.</p>
+                        <p class="text-sm text-gray-400 mt-2">URL: ${selectedVideo}</p>
+                      </div>
+                    `;
+                  }}
+                >
+                  Your browser does not support the video tag.
+                </video>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-white p-8 text-center">
+                  <FiAlertCircle className="text-red-500 mb-4" size={48} />
+                  <h4 className="text-xl font-semibold mb-2">Invalid Video URL</h4>
+                  <p className="text-gray-300">The provided URL is not a valid video source.</p>
+                  <p className="text-sm text-gray-400 mt-2 break-all max-w-full">{selectedVideo}</p>
+                </div>
+              )}
             </div>
             
             {/* Footer Actions */}
@@ -826,12 +952,15 @@ const Browse: React.FC = () => {
                 <button
                   onClick={() => {
                     if (videoRef.current) {
-                      videoRef.current.paused 
-                        ? videoRef.current.play() 
-                        : videoRef.current.pause();
+                      if (videoRef.current.paused) {
+                        videoRef.current.play();
+                      } else {
+                        videoRef.current.pause();
+                      }
                     }
                   }}
-                  className="text-white hover:text-yellow-400 p-2 rounded-full hover:bg-white/10"
+                  className="text-white hover:text-yellow-400 p-3 rounded-full hover:bg-white/10 transition-colors"
+                  title="Play/Pause"
                 >
                   <FiPlay size={20} />
                 </button>
@@ -841,19 +970,23 @@ const Browse: React.FC = () => {
                       videoRef.current.muted = !videoRef.current.muted;
                     }
                   }}
-                  className="text-white hover:text-yellow-400 p-2 rounded-full hover:bg-white/10"
+                  className="text-white hover:text-yellow-400 p-3 rounded-full hover:bg-white/10 transition-colors"
+                  title="Mute/Unmute"
                 >
                   <FiVolume2 size={20} />
                 </button>
                 <button
                   onClick={() => {
                     if (videoRef.current) {
-                      if (videoRef.current.requestFullscreen) {
+                      if (document.fullscreenElement) {
+                        document.exitFullscreen();
+                      } else {
                         videoRef.current.requestFullscreen();
                       }
                     }
                   }}
-                  className="text-white hover:text-yellow-400 p-2 rounded-full hover:bg-white/10"
+                  className="text-white hover:text-yellow-400 p-3 rounded-full hover:bg-white/10 transition-colors"
+                  title="Fullscreen"
                 >
                   <FiMaximize size={20} />
                 </button>
@@ -886,19 +1019,19 @@ const Browse: React.FC = () => {
             <div className="flex-1 overflow-y-auto px-3 sm:px-5 py-3 space-y-4">
               {/* Listing Preview */}
               <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg shadow-sm flex items-start gap-3">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg overflow-hidden border border-blue-300 flex-shrink-0">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg overflow-hidden border border-blue-300 flex-shrink-0 bg-gray-100">
                   {getThumbnailUrl(selectedListing) ? (
                     <img
                       src={getThumbnailUrl(selectedListing)}
                       alt={selectedListing.title}
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Preview';
+                        (e.target as HTMLImageElement).src = ERROR_IMAGE;
                       }}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                      <FiMail className="text-gray-400" size={20} />
+                      <FiImage className="text-gray-400" size={20} />
                     </div>
                   )}
                 </div>
@@ -1058,19 +1191,19 @@ const Browse: React.FC = () => {
                     {offerData?.listing && (
                       <div className="mt-3 pt-3 border-t border-yellow-300">
                         <div className="flex items-start gap-3">
-                          <div className="w-12 h-12 rounded-lg overflow-hidden border border-gray-300 flex-shrink-0">
+                          <div className="w-12 h-12 rounded-lg overflow-hidden border border-gray-300 flex-shrink-0 bg-gray-100">
                             {getThumbnailUrl(offerData.listing) ? (
                               <img
                                 src={getThumbnailUrl(offerData.listing)}
                                 alt={offerData.listing.title}
                                 className="w-full h-full object-cover"
                                 onError={(e) => {
-                                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Preview';
+                                  (e.target as HTMLImageElement).src = ERROR_IMAGE;
                                 }}
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                                <FiMail className="text-gray-400" size={16} />
+                                <FiImage className="text-gray-400" size={16} />
                               </div>
                             )}
                           </div>
@@ -1452,9 +1585,9 @@ const PaymentForm = ({
                       country: 'auto',
                       postalCode: 'auto'
                     }
+                  }
                 }
-              }
-            }}
+              }}
             />
           </div>
         </div>
