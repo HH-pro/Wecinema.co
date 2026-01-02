@@ -1732,5 +1732,141 @@ router.get("/health", (req, res) => {
     }
   });
 });
+// ✅ STRIPE WEBHOOK FOR OFFER PAYMENTS
+router.post("/stripe-webhook", express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
 
+  try {
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    console.error('❌ Webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Handle the event
+  switch (event.type) {
+    case 'payment_intent.succeeded':
+      const paymentIntent = event.data.object;
+      await handleSuccessfulOfferPayment(paymentIntent);
+      break;
+    case 'payment_intent.payment_failed':
+      console.log('❌ Payment failed:', event.data.object.id);
+      break;
+    default:
+      console.log(`Unhandled event type ${event.type}`);
+  }
+
+  res.json({ received: true });
+});
+
+// ✅ HANDLE SUCCESSFUL OFFER PAYMENT
+const handleSuccessfulOfferPayment = async (paymentIntent) => {
+  let session;
+  try {
+    const metadata = paymentIntent.metadata;
+    
+    // Check if this is an offer payment
+    if (metadata.type !== 'offer_payment') {
+      console.log('Not an offer payment, skipping');
+      return;
+    }
+
+    const { listingId, buyerId, sellerId } = metadata;
+    
+    if (!listingId || !buyerId) {
+      console.error('Missing metadata in payment intent');
+      return;
+    }
+
+    console.log(`🎯 Processing successful offer payment: ${paymentIntent.id}`);
+
+    // ✅ START TRANSACTION
+    session = await mongoose.startSession();
+    session.startTransaction();
+
+    // Check if offer already exists
+    const existingOffer = await Offer.findOne({
+      paymentIntentId: paymentIntent.id,
+      status: 'paid'
+    }).session(session);
+
+    if (existingOffer) {
+      console.log('✅ Offer already exists, skipping:', existingOffer._id);
+      await session.abortTransaction();
+      return;
+    }
+
+    // ✅ CREATE OFFER
+    const offerData = {
+      buyerId: buyerId,
+      listingId: listingId,
+      amount: parseFloat(paymentIntent.amount) / 100,
+      message: metadata.message || '',
+      paymentIntentId: paymentIntent.id,
+      status: 'paid',
+      requirements: metadata.requirements || '',
+      expectedDelivery: metadata.expectedDelivery ? new Date(metadata.expectedDelivery) : null,
+      paidAt: new Date()
+    };
+
+    const offer = new Offer(offerData);
+    await offer.save({ session });
+
+    // ✅ CREATE ORDER
+    const order = new Order({
+      buyerId: buyerId,
+      sellerId: sellerId,
+      listingId: listingId,
+      offerId: offer._id,
+      orderType: 'accepted_offer',
+      amount: offer.amount,
+      status: 'paid',
+      stripePaymentIntentId: paymentIntent.id,
+      paidAt: new Date(),
+      revisions: 0,
+      maxRevisions: 3,
+      paymentReleased: false,
+      orderDate: new Date(),
+      requirements: offer.requirements,
+      metadata: {
+        paymentMethod: paymentIntent.payment_method_types?.[0] || 'card',
+        offerAmount: offer.amount,
+        buyerNote: offer.message || ''
+      }
+    });
+
+    await order.save({ session });
+
+    // ✅ UPDATE LISTING
+    await MarketplaceListing.findByIdAndUpdate(
+      listingId,
+      { 
+        lastOrderAt: new Date(),
+        $inc: { totalOrders: 1 }
+      },
+      { session }
+    );
+
+    await session.commitTransaction();
+    console.log(`✅ Offer and order created via webhook: ${offer._id}, ${order._id}`);
+
+    // ✅ NOTIFY USERS (You can trigger email notifications here)
+    // This would be similar to the notification logic in confirm-offer-payment
+
+  } catch (error) {
+    console.error('❌ Error in webhook handler:', error);
+    if (session) {
+      await session.abortTransaction();
+    }
+  } finally {
+    if (session) {
+      session.endSession();
+    }
+  }
+};
 module.exports = router;
