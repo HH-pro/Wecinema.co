@@ -1,4 +1,4 @@
-// routes/offerRoutes.js - Updated Version with Payment Validation
+// routes/offerRoutes.js - Complete Fixed Version
 const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
@@ -8,7 +8,7 @@ const Order = require("../../models/marketplace/order");
 const Chat = require("../../models/marketplace/Chat");
 const Message = require("../../models/marketplace/messages");
 const { authenticateMiddleware } = require("../../utils");
-const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
 const emailService = require('../../../services/emailService');
 const admin = require('firebase-admin');
 
@@ -327,11 +327,75 @@ const sendOrderDetailsWithChatLink = async (order, offer, buyer, seller) => {
   }
 };
 
+// ✅ CLEANUP EXPIRED TEMPORARY OFFERS
+const cleanupExpiredOffers = async () => {
+  try {
+    const expiredOffers = await Offer.find({
+      status: 'pending_payment',
+      expiresAt: { $lt: new Date() },
+      isTemporary: true
+    });
+
+    let cleanedCount = 0;
+    
+    for (const offer of expiredOffers) {
+      try {
+        console.log(`🗑️ Cleaning up expired offer: ${offer._id}`);
+        
+        // Cancel Stripe payment intent if exists
+        if (offer.paymentIntentId) {
+          try {
+            await stripe.paymentIntents.cancel(offer.paymentIntentId);
+            console.log(`✅ Cancelled Stripe payment intent: ${offer.paymentIntentId}`);
+          } catch (stripeError) {
+            // If payment intent is already cancelled or doesn't exist, continue
+            if (stripeError.code !== 'resource_missing') {
+              console.error(`❌ Failed to cancel payment intent: ${offer.paymentIntentId}`, stripeError.message);
+            }
+          }
+        }
+        
+        // Delete the expired offer
+        await Offer.findByIdAndDelete(offer._id);
+        cleanedCount++;
+        console.log(`✅ Deleted expired offer: ${offer._id}`);
+        
+      } catch (offerError) {
+        console.error(`❌ Error cleaning up offer ${offer._id}:`, offerError.message);
+      }
+    }
+    
+    if (cleanedCount > 0) {
+      console.log(`✅ Cleaned up ${cleanedCount} expired offers`);
+    }
+    
+    return cleanedCount;
+  } catch (error) {
+    console.error('❌ Error in cleanupExpiredOffers:', error.message);
+    return 0;
+  }
+};
+
 // ============================
 // ROUTES START HERE
 // ============================
 
-// ✅ NEW: CHECK IF USER HAS PENDING OFFER
+// ✅ HEALTH CHECK ENDPOINT
+router.get("/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Offer routes are healthy",
+    timestamp: new Date().toISOString(),
+    services: {
+      database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+      stripe: "configured",
+      firebase: admin.apps.length > 0 ? "initialized" : "not_initialized",
+      emailService: process.env.GMAIL_USER ? "configured" : "not_configured"
+    }
+  });
+});
+
+// ✅ CHECK IF USER HAS PENDING OFFER
 router.get("/check-pending-offer/:listingId", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
@@ -357,7 +421,7 @@ router.get("/check-pending-offer/:listingId", authenticateMiddleware, async (req
       buyerId: new mongoose.Types.ObjectId(userId),
       status: { $in: ['pending', 'pending_payment', 'paid', 'accepted'] }
     })
-    .select('_id status amount createdAt paymentIntentId')
+    .select('_id status amount createdAt paymentIntentId isTemporary expiresAt')
     .lean();
 
     if (pendingOffer) {
@@ -376,7 +440,7 @@ router.get("/check-pending-offer/:listingId", authenticateMiddleware, async (req
     });
 
   } catch (error) {
-    console.error('Error checking pending offer:', error);
+    console.error('❌ Error checking pending offer:', error.message);
     res.status(500).json({
       success: false,
       error: 'Failed to check pending offer'
@@ -384,7 +448,251 @@ router.get("/check-pending-offer/:listingId", authenticateMiddleware, async (req
   }
 });
 
-// ✅ CONFIRM OFFER PAYMENT WITH PROFESSIONAL EMAILS
+// ✅ MAKE OFFER WITH TEMPORARY PAYMENT SESSION
+router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), async (req, res) => {
+  let session;
+  let stripePaymentIntent = null;
+  let temporaryOffer = null;
+  
+  try {
+    console.log("=== MAKE OFFER WITH TEMPORARY SESSION ===");
+    
+    const { listingId, amount, message, requirements, expectedDelivery } = req.body;
+    const userId = req.user.id || req.user._id || req.user.userId;
+
+    // ✅ COMPREHENSIVE VALIDATION
+    if (!userId) {
+      return res.status(401).json({ 
+        success: false,
+        error: 'Authentication required' 
+      });
+    }
+
+    if (!listingId || !amount) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Listing ID and amount are required' 
+      });
+    }
+
+    if (!validateObjectId(listingId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Invalid listing ID format' 
+      });
+    }
+
+    const offerAmount = parseFloat(amount);
+    if (!validateAmount(amount)) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Valid amount is required (minimum $0.50)' 
+      });
+    }
+
+    // ✅ START TRANSACTION
+    session = await mongoose.startSession();
+    session.startTransaction();
+
+    // ✅ FIND LISTING WITH TRANSACTION
+    const listing = await MarketplaceListing.findById(listingId).session(session);
+    if (!listing) {
+      await session.abortTransaction();
+      return res.status(404).json({ 
+        success: false,
+        error: 'Listing not found' 
+      });
+    }
+
+    if (listing.status !== 'active') {
+      await session.abortTransaction();
+      return res.status(400).json({ 
+        success: false,
+        error: 'Listing is not available for offers' 
+      });
+    }
+
+    // Check if user is not the seller
+    if (listing.sellerId.toString() === userId.toString()) {
+      await session.abortTransaction();
+      return res.status(400).json({ 
+        success: false,
+        error: 'Cannot make offer on your own listing' 
+      });
+    }
+
+    // ✅ CHECK FOR EXISTING OFFERS BEFORE CREATING ANYTHING
+    const existingOffer = await Offer.findOne({
+      listingId,
+      buyerId: userId,
+      status: { $in: ['pending', 'pending_payment', 'paid', 'accepted'] }
+    }).session(session);
+
+    if (existingOffer) {
+      await session.abortTransaction();
+      
+      // Check if existing offer has a payment intent that needs to be completed
+      if (existingOffer.status === 'pending_payment' && existingOffer.paymentIntentId) {
+        try {
+          const paymentIntent = await stripe.paymentIntents.retrieve(existingOffer.paymentIntentId);
+          
+          // Return existing payment intent if it's still valid
+          if (paymentIntent.status === 'requires_payment_method' || 
+              paymentIntent.status === 'requires_confirmation' ||
+              paymentIntent.status === 'requires_action') {
+            
+            return res.status(200).json({
+              success: true,
+              message: 'You have an existing offer that needs payment completion',
+              data: {
+                offer: {
+                  _id: existingOffer._id,
+                  amount: existingOffer.amount,
+                  status: existingOffer.status,
+                  paymentIntentId: existingOffer.paymentIntentId,
+                  createdAt: existingOffer.createdAt,
+                  expiresAt: existingOffer.expiresAt,
+                  isTemporary: existingOffer.isTemporary
+                },
+                clientSecret: paymentIntent.client_secret,
+                paymentIntentId: paymentIntent.id,
+                amount: existingOffer.amount,
+                isExistingOffer: true,
+                nextSteps: 'Complete payment for your existing offer'
+              }
+            });
+          }
+        } catch (stripeError) {
+          console.error('❌ Error retrieving existing payment intent:', stripeError.message);
+        }
+      }
+      
+      return res.status(400).json({ 
+        success: false,
+        error: 'You already have a pending offer for this listing',
+        existingOfferId: existingOffer._id,
+        existingOfferStatus: existingOffer.status
+      });
+    }
+
+    // ✅ CREATE STRIPE PAYMENT INTENT
+    console.log("💳 Creating Stripe payment intent...");
+    
+    try {
+      stripePaymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(offerAmount * 100),
+        currency: 'usd',
+        metadata: {
+          listingId: listingId.toString(),
+          buyerId: userId.toString(),
+          sellerId: listing.sellerId.toString(),
+          type: 'offer_payment',
+          temporary: 'true'
+        },
+        automatic_payment_methods: { 
+          enabled: true,
+          allow_redirects: 'never'
+        },
+        description: `Offer for: ${listing.title}`,
+        // Using automatic capture (default)
+      });
+
+      console.log("✅ Stripe payment intent created:", stripePaymentIntent.id);
+      console.log("💳 Payment intent status:", stripePaymentIntent.status);
+
+    } catch (stripeError) {
+      await session.abortTransaction();
+      console.error('❌ Stripe payment intent creation failed:', stripeError);
+      
+      return res.status(400).json({ 
+        success: false,
+        error: 'Payment processing error',
+        details: stripeError.message,
+        stripeErrorCode: stripeError.code
+      });
+    }
+
+    // ✅ CREATE TEMPORARY OFFER IN DATABASE
+    const offerData = {
+      buyerId: userId,
+      listingId,
+      amount: offerAmount,
+      message: message || '',
+      paymentIntentId: stripePaymentIntent.id,
+      status: 'pending_payment',
+      requirements: requirements || '',
+      expectedDelivery: expectedDelivery ? new Date(expectedDelivery) : null,
+      isTemporary: true,
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000) // 30 minutes
+    };
+
+    temporaryOffer = new Offer(offerData);
+    await temporaryOffer.save({ session });
+
+    console.log("✅ Temporary offer saved to database:", temporaryOffer._id);
+
+    // ✅ COMMIT TRANSACTION
+    await session.commitTransaction();
+
+    res.status(201).json({
+      success: true,
+      message: 'Please complete payment to submit your offer. Offer will expire in 30 minutes if not paid.',
+      data: {
+        offer: {
+          _id: temporaryOffer._id,
+          amount: temporaryOffer.amount,
+          status: temporaryOffer.status,
+          paymentIntentId: temporaryOffer.paymentIntentId,
+          createdAt: temporaryOffer.createdAt,
+          expiresAt: temporaryOffer.expiresAt,
+          isTemporary: true
+        },
+        clientSecret: stripePaymentIntent.client_secret,
+        paymentIntentId: stripePaymentIntent.id,
+        amount: offerAmount,
+        stripeStatus: stripePaymentIntent.status,
+        nextSteps: 'Complete payment to submit your offer. If payment is not completed within 30 minutes, this offer will be automatically cancelled.'
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error making offer:', error);
+    
+    // ✅ IMPORTANT: Cleanup if error occurs
+    try {
+      // Cancel Stripe payment intent if created
+      if (stripePaymentIntent && stripePaymentIntent.id) {
+        await stripe.paymentIntents.cancel(stripePaymentIntent.id);
+        console.log("✅ Cleaned up Stripe payment intent:", stripePaymentIntent.id);
+      }
+      
+      // Delete temporary offer if created
+      if (temporaryOffer && temporaryOffer._id) {
+        await Offer.findByIdAndDelete(temporaryOffer._id);
+        console.log("✅ Cleaned up temporary offer:", temporaryOffer._id);
+      }
+    } catch (cleanupError) {
+      console.error('❌ Error during cleanup:', cleanupError.message);
+    }
+    
+    if (session) {
+      await session.abortTransaction();
+    }
+
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to make offer',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      errorCode: error.code
+    });
+  } finally {
+    if (session) {
+      session.endSession();
+    }
+  }
+});
+
+// ✅ CONFIRM OFFER PAYMENT
 router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) => {
   console.log("🔍 Confirm Offer Payment Request DETAILS:", {
     body: req.body,
@@ -477,20 +785,21 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
       console.log("💳 Stripe Payment Intent Status:", paymentIntent.status);
       
-      // ✅ CRITICAL FIX: If status is requires_capture, capture it first
+      // ✅ FIXED: Handle different payment statuses
       if (paymentIntent.status === 'requires_capture') {
-        console.log("🔄 Capturing payment intent...");
+        console.log("🔄 Payment requires capture, capturing now...");
         paymentIntent = await stripe.paymentIntents.capture(paymentIntentId);
-        console.log("✅ Payment captured successfully, new status:", paymentIntent.status);
+        console.log("✅ Payment captured, new status:", paymentIntent.status);
       }
       
     } catch (stripeError) {
       await session.abortTransaction();
-      console.error('Stripe retrieval/capture error:', stripeError);
+      console.error('❌ Stripe retrieval/capture error:', stripeError);
       return res.status(400).json({
         success: false,
         error: 'Payment verification failed',
-        details: stripeError.message
+        details: stripeError.message,
+        stripeCode: stripeError.code
       });
     }
 
@@ -501,17 +810,18 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       return res.status(400).json({
         success: false,
         error: 'Payment not completed',
-        details: `Current status: ${paymentIntent.status}`,
-        allowedStatuses: successfulStatuses
+        details: `Current status: ${paymentIntent.status}. Please complete the payment first.`,
+        allowedStatuses: successfulStatuses,
+        currentStatus: paymentIntent.status
       });
     }
 
-    // ✅ UPDATE OFFER STATUS AND REMOVE TEMPORARY FLAG
+    // ✅ UPDATE OFFER STATUS
     offer.status = 'paid';
     offer.paidAt = new Date();
     offer.paymentIntentId = paymentIntentId;
-    offer.isTemporary = false; // Remove temporary flag
-    offer.expiresAt = null; // Remove expiration
+    offer.isTemporary = false;
+    offer.expiresAt = null;
     await offer.save({ session });
 
     console.log("✅ Offer status updated to paid:", offer._id);
@@ -565,7 +875,7 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     await order.save({ session });
     console.log("✅ Order created:", order._id);
 
-    // ✅ UPDATE LISTING - KEEP ACTIVE, ONLY UPDATE ORDER COUNT
+    // ✅ UPDATE LISTING
     await MarketplaceListing.findByIdAndUpdate(
       offer.listingId._id, 
       { 
@@ -575,13 +885,13 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       { session }
     );
 
-    console.log("✅ Listing order count updated, listing remains active");
+    console.log("✅ Listing order count updated");
 
-    // ✅ COMMIT TRANSACTION FIRST
+    // ✅ COMMIT TRANSACTION
     await session.commitTransaction();
     console.log("🎉 Database transaction completed successfully");
 
-    // ✅ NOW SEND PROFESSIONAL MESSAGES WITH CHAT LINKS
+    // ✅ SEND PROFESSIONAL MESSAGES WITH CHAT LINKS
     let notificationResults = {};
     let chatLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/messages?order=${order._id}`;
     
@@ -596,7 +906,7 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       
       console.log("✅ Order notification messages sent");
       
-      // ✅ SEND PROFESSIONAL GMAIL EMAILS
+      // ✅ SEND PROFESSIONAL EMAILS
       try {
         console.log("📧 Starting professional email notifications...");
         
@@ -610,7 +920,7 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
         await emailService.sendOrderConfirmationToBuyer(order, buyer, seller, chatLink);
         console.log("✅ Professional email sent to buyer:", buyer.email);
         
-        console.log("✅ Professional email notifications sent successfully to BOTH parties");
+        console.log("✅ Professional email notifications sent successfully");
         notificationResults.emails = {
           seller: true,
           buyer: true,
@@ -628,16 +938,16 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       }
       
     } catch (notificationError) {
-      console.error('❌ Notification sending failed:', notificationError);
+      console.error('❌ Notification sending failed:', notificationError.message);
       notificationResults.error = notificationError.message;
     }
 
-    // ✅ SUCCESS RESPONSE WITH ALL DETAILS
+    // ✅ SUCCESS RESPONSE
     res.status(200).json({
       success: true,
       message: paymentIntent.status === 'requires_capture' 
         ? 'Payment authorized! Order created pending capture.' 
-        : 'Payment confirmed successfully! Check your email for professional order details.',
+        : 'Payment confirmed successfully! Check your email for order details.',
       data: {
         orderId: order._id,
         redirectUrl: `/orders/${order._id}`,
@@ -651,18 +961,14 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
           chatLink: chatLink,
           emailsSent: notificationResults.emails?.status === 'sent',
           buyerEmail: buyer.email,
-          sellerEmail: seller.email,
-          emailStatus: notificationResults.emails?.status === 'sent' ? 
-            'Professional emails sent to both buyer and seller' : 
-            'Email sending failed - check logs'
+          sellerEmail: seller.email
         },
         orderDetails: {
           amount: order.amount,
           sellerName: seller.username,
           buyerName: buyer.username,
           listingTitle: offer.listingId?.title,
-          orderDate: order.orderDate,
-          requirements: order.requirements || 'None specified'
+          orderDate: order.orderDate
         }
       }
     });
@@ -686,291 +992,8 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     }
   }
 });
-// ✅ MAKE OFFER WITH TEMPORARY PAYMENT SESSION (UPDATED - FIXED)
-router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), async (req, res) => {
-  let session;
-  let stripePaymentIntent = null;
-  let temporaryOffer = null;
-  
-  try {
-    console.log("=== MAKE OFFER WITH TEMPORARY SESSION ===");
-    
-    const { listingId, amount, message, requirements, expectedDelivery } = req.body;
-    const userId = req.user.id || req.user._id || req.user.userId;
 
-    // ✅ COMPREHENSIVE VALIDATION
-    if (!userId) {
-      return res.status(401).json({ 
-        success: false,
-        error: 'Authentication required' 
-      });
-    }
-
-    if (!listingId || !amount) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'Listing ID and amount are required' 
-      });
-    }
-
-    if (!validateObjectId(listingId)) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'Invalid listing ID format' 
-      });
-    }
-
-    const offerAmount = parseFloat(amount);
-    if (!validateAmount(amount)) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'Valid amount is required (minimum $0.50)' 
-      });
-    }
-
-    // ✅ START TRANSACTION
-    session = await mongoose.startSession();
-    session.startTransaction();
-
-    // ✅ FIND LISTING WITH TRANSACTION
-    const listing = await MarketplaceListing.findById(listingId).session(session);
-    if (!listing) {
-      await session.abortTransaction();
-      return res.status(404).json({ 
-        success: false,
-        error: 'Listing not found' 
-      });
-    }
-
-    if (listing.status !== 'active') {
-      await session.abortTransaction();
-      return res.status(400).json({ 
-        success: false,
-        error: 'Listing is not available for offers' 
-      });
-    }
-
-    // Check if user is not the seller
-    if (listing.sellerId.toString() === userId.toString()) {
-      await session.abortTransaction();
-      return res.status(400).json({ 
-        success: false,
-        error: 'Cannot make offer on your own listing' 
-      });
-    }
-
-    // ✅ CRITICAL FIX: Check for existing offers BEFORE creating anything
-    const existingOffer = await Offer.findOne({
-      listingId,
-      buyerId: userId,
-      status: { $in: ['pending', 'pending_payment', 'paid', 'accepted'] }
-    }).session(session);
-
-    if (existingOffer) {
-      await session.abortTransaction();
-      
-      // Check if existing offer has a payment intent that needs to be completed
-      if (existingOffer.status === 'pending_payment' && existingOffer.paymentIntentId) {
-        try {
-          const paymentIntent = await stripe.paymentIntents.retrieve(existingOffer.paymentIntentId);
-          
-          // Return existing payment intent if it's still valid
-          if (paymentIntent.status === 'requires_payment_method' || 
-              paymentIntent.status === 'requires_confirmation' ||
-              paymentIntent.status === 'requires_action' ||
-              paymentIntent.status === 'requires_capture') {
-            
-            return res.status(200).json({
-              success: true,
-              message: 'You have an existing offer that needs payment completion',
-              data: {
-                offer: {
-                  _id: existingOffer._id,
-                  amount: existingOffer.amount,
-                  status: existingOffer.status,
-                  paymentIntentId: existingOffer.paymentIntentId,
-                  createdAt: existingOffer.createdAt,
-                  expiresAt: existingOffer.expiresAt,
-                  isTemporary: existingOffer.isTemporary
-                },
-                clientSecret: paymentIntent.client_secret,
-                paymentIntentId: paymentIntent.id,
-                amount: existingOffer.amount,
-                isExistingOffer: true,
-                nextSteps: 'Complete payment for your existing offer'
-              }
-            });
-          }
-        } catch (stripeError) {
-          console.error('Error retrieving existing payment intent:', stripeError);
-        }
-      }
-      
-      return res.status(400).json({ 
-        success: false,
-        error: 'You already have a pending offer for this listing',
-        existingOfferId: existingOffer._id,
-        existingOfferStatus: existingOffer.status
-      });
-    }
-
-    // ✅ CREATE STRIPE PAYMENT INTENT FIRST (BEFORE CREATING OFFER)
-    console.log("💳 Creating Stripe payment intent...");
-    
-    try {
-      // ✅ FIXED: Remove capture_method or set to automatic
-      stripePaymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(offerAmount * 100),
-        currency: 'usd',
-        metadata: {
-          listingId: listingId.toString(),
-          buyerId: userId.toString(),
-          sellerId: listing.sellerId.toString(),
-          type: 'offer_payment',
-          temporary: 'true' // Mark as temporary until payment confirmed
-        },
-        automatic_payment_methods: { 
-          enabled: true,
-          allow_redirects: 'never' // Prevents redirect-based payment methods
-        },
-        description: `Offer for: ${listing.title}`,
-        // ✅ REMOVED: payment_method_options with manual capture
-        // Using default automatic capture instead
-      });
-
-      console.log("✅ Stripe payment intent created:", stripePaymentIntent.id);
-      console.log("💳 Payment intent status:", stripePaymentIntent.status);
-
-    } catch (stripeError) {
-      await session.abortTransaction();
-      console.error('❌ Stripe payment intent creation failed:', stripeError);
-      
-      return res.status(400).json({ 
-        success: false,
-        error: 'Payment processing error',
-        details: stripeError.message,
-        stripeErrorCode: stripeError.code
-      });
-    }
-
-    // ✅ CREATE TEMPORARY OFFER IN DATABASE
-    const offerData = {
-      buyerId: userId,
-      listingId,
-      amount: offerAmount,
-      message: message || '',
-      paymentIntentId: stripePaymentIntent.id,
-      status: 'pending_payment',
-      requirements: requirements || '',
-      expectedDelivery: expectedDelivery ? new Date(expectedDelivery) : null,
-      isTemporary: true, // Mark as temporary
-      expiresAt: new Date(Date.now() + 30 * 60 * 1000) // Expires in 30 minutes if not paid
-    };
-
-    temporaryOffer = new Offer(offerData);
-    await temporaryOffer.save({ session });
-
-    console.log("✅ Temporary offer saved to database:", temporaryOffer._id);
-
-    // ✅ COMMIT TRANSACTION
-    await session.commitTransaction();
-
-    res.status(201).json({
-      success: true,
-      message: 'Please complete payment to submit your offer. Offer will expire in 30 minutes if not paid.',
-      data: {
-        offer: {
-          _id: temporaryOffer._id,
-          amount: temporaryOffer.amount,
-          status: temporaryOffer.status,
-          paymentIntentId: temporaryOffer.paymentIntentId,
-          createdAt: temporaryOffer.createdAt,
-          expiresAt: temporaryOffer.expiresAt,
-          isTemporary: true
-        },
-        clientSecret: stripePaymentIntent.client_secret,
-        paymentIntentId: stripePaymentIntent.id,
-        amount: offerAmount,
-        stripeStatus: stripePaymentIntent.status,
-        nextSteps: 'Complete payment to submit your offer. If payment is not completed within 30 minutes, this offer will be automatically cancelled.'
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Error making offer:', error);
-    
-    // ✅ IMPORTANT: Cleanup if error occurs
-    try {
-      // Cancel Stripe payment intent if created
-      if (stripePaymentIntent && stripePaymentIntent.id) {
-        await stripe.paymentIntents.cancel(stripePaymentIntent.id);
-        console.log("✅ Cleaned up Stripe payment intent:", stripePaymentIntent.id);
-      }
-      
-      // Delete temporary offer if created
-      if (temporaryOffer && temporaryOffer._id) {
-        await Offer.findByIdAndDelete(temporaryOffer._id);
-        console.log("✅ Cleaned up temporary offer:", temporaryOffer._id);
-      }
-    } catch (cleanupError) {
-      console.error('❌ Error during cleanup:', cleanupError);
-    }
-    
-    if (session) {
-      await session.abortTransaction();
-    }
-
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to make offer',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
-      errorCode: error.code
-    });
-  } finally {
-    if (session) {
-      session.endSession();
-    }
-  }
-});
-
-// ✅ NEW: CLEANUP EXPIRED TEMPORARY OFFERS
-const cleanupExpiredOffers = async () => {
-  try {
-    const expiredOffers = await Offer.find({
-      status: 'pending_payment',
-      expiresAt: { $lt: new Date() }
-    });
-
-    for (const offer of expiredOffers) {
-      try {
-        console.log(`🗑️ Cleaning up expired offer: ${offer._id}`);
-        
-        // Cancel Stripe payment intent if exists
-        if (offer.paymentIntentId) {
-          try {
-            await stripe.paymentIntents.cancel(offer.paymentIntentId);
-            console.log(`✅ Cancelled Stripe payment intent: ${offer.paymentIntentId}`);
-          } catch (stripeError) {
-            console.error(`❌ Failed to cancel payment intent: ${offer.paymentIntentId}`, stripeError);
-          }
-        }
-        
-        // Delete the expired offer
-        await Offer.findByIdAndDelete(offer._id);
-        console.log(`✅ Deleted expired offer: ${offer._id}`);
-        
-      } catch (offerError) {
-        console.error(`❌ Error cleaning up offer ${offer._id}:`, offerError);
-      }
-    }
-    
-    console.log(`✅ Cleaned up ${expiredOffers.length} expired offers`);
-  } catch (error) {
-    console.error('❌ Error in cleanupExpiredOffers:', error);
-  }
-};
-
-// ✅ NEW: CANCEL TEMPORARY OFFER (for when user goes back without paying)
+// ✅ CANCEL TEMPORARY OFFER
 router.post("/cancel-temporary-offer/:offerId", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
@@ -1003,7 +1026,7 @@ router.post("/cancel-temporary-offer/:offerId", authenticateMiddleware, async (r
         await stripe.paymentIntents.cancel(offer.paymentIntentId);
         console.log(`✅ Cancelled payment intent: ${offer.paymentIntentId}`);
       } catch (stripeError) {
-        console.error('Error cancelling payment intent:', stripeError);
+        console.error('❌ Error cancelling payment intent:', stripeError.message);
       }
     }
 
@@ -1021,7 +1044,7 @@ router.post("/cancel-temporary-offer/:offerId", authenticateMiddleware, async (r
     });
 
   } catch (error) {
-    console.error('Error cancelling temporary offer:', error);
+    console.error('❌ Error cancelling temporary offer:', error.message);
     res.status(500).json({ 
       success: false,
       error: 'Failed to cancel temporary offer' 
@@ -1029,7 +1052,7 @@ router.post("/cancel-temporary-offer/:offerId", authenticateMiddleware, async (r
   }
 });
 
-// ✅ NEW: GET OFFER PAYMENT STATUS
+// ✅ GET OFFER PAYMENT STATUS
 router.get("/payment-status/:offerId", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
@@ -1045,7 +1068,7 @@ router.get("/payment-status/:offerId", authenticateMiddleware, async (req, res) 
     const offer = await Offer.findOne({
       _id: offerId,
       buyerId: userId
-    }).select('status paymentIntentId isTemporary expiresAt');
+    }).select('status paymentIntentId isTemporary expiresAt amount listingId');
 
     if (!offer) {
       return res.status(404).json({ 
@@ -1055,12 +1078,14 @@ router.get("/payment-status/:offerId", authenticateMiddleware, async (req, res) 
     }
 
     let stripeStatus = null;
+    let paymentIntent = null;
+    
     if (offer.paymentIntentId) {
       try {
-        const paymentIntent = await stripe.paymentIntents.retrieve(offer.paymentIntentId);
+        paymentIntent = await stripe.paymentIntents.retrieve(offer.paymentIntentId);
         stripeStatus = paymentIntent.status;
       } catch (stripeError) {
-        console.error('Error retrieving Stripe status:', stripeError);
+        console.error('❌ Error retrieving Stripe status:', stripeError.message);
       }
     }
 
@@ -1073,12 +1098,17 @@ router.get("/payment-status/:offerId", authenticateMiddleware, async (req, res) 
         isTemporary: offer.isTemporary,
         expiresAt: offer.expiresAt,
         isExpired: offer.expiresAt && offer.expiresAt < new Date(),
-        paymentIntentId: offer.paymentIntentId
+        paymentIntentId: offer.paymentIntentId,
+        amount: offer.amount,
+        canContinuePayment: stripeStatus === 'requires_payment_method' || 
+                           stripeStatus === 'requires_confirmation' ||
+                           stripeStatus === 'requires_action',
+        requiresCapture: stripeStatus === 'requires_capture'
       }
     });
 
   } catch (error) {
-    console.error('Error getting payment status:', error);
+    console.error('❌ Error getting payment status:', error.message);
     res.status(500).json({ 
       success: false,
       error: 'Failed to get payment status' 
@@ -1115,7 +1145,7 @@ router.get("/received-offers", authenticateMiddleware, logRequest("RECEIVED_OFFE
       count: offers.length
     });
   } catch (error) {
-    console.error('Error fetching received offers:', error);
+    console.error('❌ Error fetching received offers:', error.message);
     res.status(500).json({ 
       success: false,
       error: 'Failed to fetch offers' 
@@ -1157,7 +1187,7 @@ router.get("/my-offers", authenticateMiddleware, logRequest("MY_OFFERS"), async 
       .sort({ createdAt: -1 })
       .lean();
 
-    // Transform the data for better frontend consumption
+    // Transform the data
     const transformedOffers = offers.map(offer => ({
       ...offer,
       listing: offer.listingId,
@@ -1175,9 +1205,8 @@ router.get("/my-offers", authenticateMiddleware, logRequest("MY_OFFERS"), async 
       }
     });
   } catch (error) {
-    console.error('Error fetching my offers:', error);
+    console.error('❌ Error fetching my offers:', error);
     
-    // More specific error messages
     let errorMessage = 'Failed to fetch offers';
     let statusCode = 500;
     
@@ -1269,7 +1298,7 @@ router.get("/:id", authenticateMiddleware, logRequest("GET_OFFER"), async (req, 
     });
 
   } catch (error) {
-    console.error('Error fetching offer:', error);
+    console.error('❌ Error fetching offer:', error.message);
     res.status(500).json({ 
       success: false,
       error: 'Failed to fetch offer' 
@@ -1364,7 +1393,7 @@ router.put("/accept-offer/:id", authenticateMiddleware, logRequest("ACCEPT_OFFER
     await MarketplaceListing.findByIdAndUpdate(
       offer.listingId._id, 
       { 
-        status: 'reserved',  // Only reserve when seller accepts
+        status: 'reserved',
         reservedUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
         soldAt: new Date()
       },
@@ -1410,7 +1439,7 @@ router.put("/accept-offer/:id", authenticateMiddleware, logRequest("ACCEPT_OFFER
     });
 
   } catch (error) {
-    console.error('Error accepting offer:', error);
+    console.error('❌ Error accepting offer:', error);
     
     if (session) {
       await session.abortTransaction();
@@ -1518,7 +1547,7 @@ router.put("/reject-offer/:id", authenticateMiddleware, logRequest("REJECT_OFFER
           });
           console.log("✅ Payment refunded for rejected offer:", offer._id, refund.id);
         } catch (refundError) {
-          console.error('Refund error:', refundError);
+          console.error('❌ Refund error:', refundError.message);
         }
       }
     }
@@ -1545,7 +1574,7 @@ router.put("/reject-offer/:id", authenticateMiddleware, logRequest("REJECT_OFFER
       }
     });
   } catch (error) {
-    console.error('Error rejecting offer:', error);
+    console.error('❌ Error rejecting offer:', error.message);
     
     if (session) {
       await session.abortTransaction();
@@ -1642,7 +1671,7 @@ router.put("/cancel-offer/:id", authenticateMiddleware, logRequest("CANCEL_OFFER
         await stripe.paymentIntents.cancel(offer.paymentIntentId);
         console.log("✅ Payment intent cancelled for offer:", offer._id);
       } catch (stripeError) {
-        console.error('Payment cancellation error:', stripeError);
+        console.error('❌ Payment cancellation error:', stripeError.message);
       }
     }
 
@@ -1668,7 +1697,7 @@ router.put("/cancel-offer/:id", authenticateMiddleware, logRequest("CANCEL_OFFER
       }
     });
   } catch (error) {
-    console.error('Error cancelling offer:', error);
+    console.error('❌ Error cancelling offer:', error.message);
     
     if (session) {
       await session.abortTransaction();
@@ -1782,16 +1811,12 @@ router.post("/create-direct-payment", authenticateMiddleware, logRequest("DIRECT
 
     await chat.save({ session });
 
-    // ✅ DO NOT RESERVE LISTING - KEEP IT ACTIVE
-    // Listing remains active even after direct purchase initiation
-    // Only update order count
+    // ✅ UPDATE LISTING
     await MarketplaceListing.findByIdAndUpdate(
       listingId,
       { 
-        // status: 'active' remains unchanged
         lastOrderAt: new Date(),
         $inc: { totalOrders: 1 }
-        // Do NOT set reservedUntil
       },
       { session }
     );
@@ -1878,7 +1903,7 @@ router.get("/chat-link/:orderId", authenticateMiddleware, async (req, res) => {
       });
     }
     
-    const chatLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/chat/${chat.firebaseChatId}?order=${orderId}`;
+    const chatLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/chat/${chat.firebaseChatId}?order=${orderId}`;
     
     res.status(200).json({
       success: true,
@@ -1891,7 +1916,7 @@ router.get("/chat-link/:orderId", authenticateMiddleware, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error getting chat link:', error);
+    console.error('❌ Error getting chat link:', error.message);
     res.status(500).json({ 
       success: false,
       error: 'Failed to get chat link' 
@@ -1918,7 +1943,7 @@ router.get("/test-stripe", logRequest("TEST_STRIPE"), async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Stripe test failed:', error);
+    console.error('❌ Stripe test failed:', error);
     res.status(500).json({
       success: false,
       error: 'Stripe test failed',
@@ -1970,7 +1995,7 @@ router.get("/stats/overview", authenticateMiddleware, logRequest("OFFER_STATS"),
       data: stats
     });
   } catch (error) {
-    console.error('Error fetching offer stats:', error);
+    console.error('❌ Error fetching offer stats:', error.message);
     res.status(500).json({ 
       success: false,
       error: 'Failed to fetch offer statistics' 
@@ -2029,7 +2054,7 @@ router.get("/messages/:orderId", authenticateMiddleware, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error fetching order messages:', error);
+    console.error('❌ Error fetching order messages:', error.message);
     res.status(500).json({ 
       success: false,
       error: 'Failed to fetch messages' 
@@ -2037,32 +2062,73 @@ router.get("/messages/:orderId", authenticateMiddleware, async (req, res) => {
   }
 });
 
-// ✅ DELETE ALL OFFERS (TESTING ONLY)
-router.delete("/delete-all-offers", async (req, res) => {
+// ✅ CAPTURE PAYMENT MANUALLY (for requires_capture status)
+router.post("/capture-payment/:orderId", authenticateMiddleware, async (req, res) => {
   try {
-    const result = await Offer.deleteMany({});
-    console.log(`🗑️ Deleted ${result.deletedCount} offers from the database.`);
+    const { orderId } = req.params;
+    const userId = req.user?.id || req.user?._id || req.user?.userId;
+
+    const order = await Order.findOne({
+      _id: orderId,
+      buyerId: userId,
+      status: 'pending_capture'
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: 'Order not found or not ready for capture'
+      });
+    }
+
+    // Capture the payment
+    const paymentIntent = await stripe.paymentIntents.capture(order.stripePaymentIntentId);
+    
+    // Update order status
+    order.status = 'paid';
+    order.metadata.captured = true;
+    order.metadata.capturedAt = new Date();
+    await order.save();
+
+    // Update offer status if exists
+    if (order.offerId) {
+      await Offer.findByIdAndUpdate(order.offerId, {
+        status: 'paid',
+        isTemporary: false
+      });
+    }
 
     res.status(200).json({
       success: true,
-      message: `All offers deleted successfully (${result.deletedCount} offers removed).`
+      message: 'Payment captured successfully',
+      data: {
+        orderId: order._id,
+        paymentStatus: paymentIntent.status,
+        capturedAt: new Date()
+      }
     });
+
   } catch (error) {
-    console.error("❌ Error deleting all offers:", error);
-    res.status(500).json({ error: "Failed to delete all offers" });
+    console.error('❌ Capture payment error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to capture payment',
+      details: error.message
+    });
   }
 });
 
-// ✅ NEW: CLEANUP EXPIRED OFFERS CRON JOB ENDPOINT
+// ✅ CLEANUP EXPIRED OFFERS CRON JOB ENDPOINT
 router.post("/cleanup-expired-offers", async (req, res) => {
   try {
-    await cleanupExpiredOffers();
+    const cleanedCount = await cleanupExpiredOffers();
     res.status(200).json({
       success: true,
-      message: "Expired offers cleanup completed"
+      message: "Expired offers cleanup completed",
+      cleanedCount: cleanedCount
     });
   } catch (error) {
-    console.error("Error in cleanup endpoint:", error);
+    console.error("❌ Error in cleanup endpoint:", error.message);
     res.status(500).json({
       success: false,
       error: "Cleanup failed"
@@ -2070,25 +2136,44 @@ router.post("/cleanup-expired-offers", async (req, res) => {
   }
 });
 
-// ✅ HEALTH CHECK ENDPOINT
-router.get("/health", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "Offer routes are healthy",
-    timestamp: new Date().toISOString(),
-    services: {
-      database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
-      stripe: "configured",
-      firebase: admin.apps.length > 0 ? "initialized" : "not_initialized",
-      emailService: process.env.GMAIL_USER ? "configured" : "not_configured"
+// ✅ DELETE ALL OFFERS (TESTING ONLY)
+router.delete("/delete-all-offers", async (req, res) => {
+  try {
+    // First, find all offers with payment intents
+    const offersWithPayments = await Offer.find({ paymentIntentId: { $exists: true } });
+    
+    // Cancel all Stripe payment intents
+    for (const offer of offersWithPayments) {
+      try {
+        await stripe.paymentIntents.cancel(offer.paymentIntentId);
+        console.log(`✅ Cancelled payment intent: ${offer.paymentIntentId}`);
+      } catch (stripeError) {
+        console.error(`❌ Failed to cancel payment intent: ${offer.paymentIntentId}`, stripeError.message);
+      }
     }
-  });
+    
+    // Delete all offers
+    const result = await Offer.deleteMany({});
+    console.log(`🗑️ Deleted ${result.deletedCount} offers from the database.`);
+
+    res.status(200).json({
+      success: true,
+      message: `All offers deleted successfully (${result.deletedCount} offers removed).`,
+      cancelledPaymentIntents: offersWithPayments.length
+    });
+  } catch (error) {
+    console.error("❌ Error deleting all offers:", error);
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to delete all offers" 
+    });
+  }
 });
 
-// ✅ SCHEDULE CLEANUP JOB (RUN EVERY HOUR)
+// ✅ SCHEDULE CLEANUP JOB (RUN EVERY 30 MINUTES)
 setInterval(() => {
   console.log("🕐 Running scheduled cleanup of expired offers...");
   cleanupExpiredOffers();
-}, 60 * 60 * 1000); // Run every hour
+}, 30 * 60 * 1000); // Run every 30 minutes
 
 module.exports = router;
