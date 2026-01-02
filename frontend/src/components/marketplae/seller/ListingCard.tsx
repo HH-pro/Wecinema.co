@@ -1,8 +1,8 @@
 import React from 'react';
 import { FiUser, FiCreditCard, FiPlay, FiVideo, FiImage } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
-import { Listing } from '../../types/marketplace';
-import marketplaceApi from '../../api/marketplaceApi';
+import { Listing } from '../../../types/marketplace';
+import marketplaceApi from '../../../api/marketplaceApi';
 
 // Constants
 const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1579546929662-711aa81148cf?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
