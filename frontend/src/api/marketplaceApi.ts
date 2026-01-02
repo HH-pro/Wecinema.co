@@ -1239,7 +1239,7 @@ export const offersApi = {
   }>> => {
     try {
       const response = await axios.get(
-        `${API_BASE_URL}/my-offers`,
+        `${API_BASE_URL}/marketplace/offers/my-offers`,
         getHeaders()
       );
       return normalizeResponse(response);
