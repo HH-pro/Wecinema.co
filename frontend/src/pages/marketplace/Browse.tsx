@@ -83,7 +83,6 @@ const Browse: React.FC = () => {
       setError('');
       setImageErrors({});
       
-      // ✅ FIXED: Proper params passing to API
       const params: any = {};
       
       if (filters.type) params.type = filters.type;
@@ -186,6 +185,120 @@ const Browse: React.FC = () => {
     if (videoRef.current) {
       videoRef.current.pause();
       videoRef.current.currentTime = 0;
+    }
+  };
+
+  // Helper functions from ListingsTab
+  const isVideoUrl = (url: string): boolean => {
+    if (!url) return false;
+    const videoExtensions = ['.mp4', '.mov', '.avi', '.wmv', '.flv', '.mkv', '.webm'];
+    const urlLower = url.toLowerCase();
+    return videoExtensions.some(ext => urlLower.endsWith(ext));
+  };
+
+  const isImageUrl = (url: string): boolean => {
+    if (!url) return false;
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'];
+    const urlLower = url.toLowerCase();
+    return imageExtensions.some(ext => urlLower.endsWith(ext));
+  };
+
+  const getFirstMediaUrl = (mediaUrls: string[]): { url: string; isVideo: boolean; isImage: boolean } => {
+    if (!mediaUrls || mediaUrls.length === 0) {
+      return { url: '', isVideo: false, isImage: false };
+    }
+    
+    // Try to find an image first
+    for (const url of mediaUrls) {
+      if (isImageUrl(url)) {
+        return { url, isVideo: false, isImage: true };
+      }
+    }
+    
+    // Then try to find a video
+    for (const url of mediaUrls) {
+      if (isVideoUrl(url)) {
+        return { url, isVideo: true, isImage: false };
+      }
+    }
+    
+    // Return first URL as fallback
+    return { 
+      url: mediaUrls[0], 
+      isVideo: isVideoUrl(mediaUrls[0]), 
+      isImage: isImageUrl(mediaUrls[0]) 
+    };
+  };
+
+  const getThumbnailUrl = (listing: Listing): string => {
+    const listingId = listing._id || 'unknown';
+    
+    if (imageErrors[listingId]) {
+      return ERROR_IMAGE;
+    }
+    
+    if (listing.thumbnail && listing.thumbnail.trim() !== '') {
+      return listing.thumbnail;
+    }
+    
+    if (listing.mediaUrls && listing.mediaUrls.length > 0) {
+      const { url, isImage } = getFirstMediaUrl(listing.mediaUrls);
+      if (isImage) {
+        return url;
+      }
+    }
+    
+    return VIDEO_PLACEHOLDER;
+  };
+
+  const handleImageError = (listingId: string) => {
+    setImageErrors(prev => ({
+      ...prev,
+      [listingId]: true
+    }));
+  };
+
+  const getQualityBadge = (quality?: string) => {
+    if (!quality) return { color: 'bg-gradient-to-r from-yellow-400 to-yellow-300 text-gray-800', label: '' };
+    
+    switch (quality.toLowerCase()) {
+      case '4k':
+      case 'ultra hd':
+        return { color: 'bg-gradient-to-r from-yellow-500 to-amber-500 text-white', label: '4K' };
+      case 'hd':
+      case '1080p':
+        return { color: 'bg-gradient-to-r from-blue-500 to-blue-400 text-white', label: 'HD' };
+      default:
+        return { color: 'bg-gradient-to-r from-yellow-400 to-yellow-300 text-gray-800', label: '' };
+    }
+  };
+
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+    }).format(amount || 0);
+  };
+
+  const formatDate = (dateString: string): string => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+      return 'Today';
+    } else if (diffDays === 1) {
+      return 'Yesterday';
+    } else if (diffDays < 7) {
+      return `${diffDays} days ago`;
+    } else {
+      return date.toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: diffDays > 365 ? 'numeric' : undefined
+      });
     }
   };
 
@@ -332,170 +445,6 @@ const Browse: React.FC = () => {
     setError('');
   };
 
-  const isVideoUrl = (url: string): boolean => {
-    if (!url || typeof url !== 'string') return false;
-    
-    const videoExtensions = /\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v|ogg|ogv|3gp|3g2)$/i;
-    
-    if (videoExtensions.test(url)) {
-      return true;
-    }
-    
-    if (url.includes('cloudinary.com') && url.includes('/video/')) {
-      return true;
-    }
-    
-    // ✅ Check for video URLs in mediaUrls
-    if (url.includes('/video/') || url.includes('.mp4') || url.includes('.mov')) {
-      return true;
-    }
-    
-    return false;
-  };
-
-  const getFirstVideoUrl = (listing: Listing): string => {
-    if (!listing.mediaUrls || listing.mediaUrls.length === 0) return '';
-    
-    // ✅ First check for video URLs
-    const videoUrl = listing.mediaUrls.find(url => isVideoUrl(url));
-    if (videoUrl) return videoUrl;
-    
-    // ✅ If listing has a videoUrl field
-    if (listing.videoUrl && isVideoUrl(listing.videoUrl)) {
-      return listing.videoUrl;
-    }
-    
-    return '';
-  };
-
-  const generateVideoThumbnail = (videoUrl: string): string => {
-    if (!videoUrl) return VIDEO_PLACEHOLDER;
-    
-    console.log('🔍 Generating thumbnail for:', videoUrl);
-    
-    if (videoUrl.includes('cloudinary.com') && videoUrl.includes('/video/')) {
-      try {
-        let thumbnailUrl = videoUrl.replace('/video/upload/', '/image/upload/w_400,h_225,c_fill,q_auto,f_auto/');
-        thumbnailUrl = thumbnailUrl.replace(/\.(mp4|mov|avi|webm)$/i, '.jpg');
-        console.log('📸 Generated Cloudinary thumbnail:', thumbnailUrl);
-        return thumbnailUrl;
-      } catch (error) {
-        console.error('Error generating thumbnail:', error);
-        return VIDEO_PLACEHOLDER;
-      }
-    }
-    
-    if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
-      const videoId = videoUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
-      if (videoId) {
-        return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-      }
-    }
-    
-    if (videoUrl.includes('vimeo.com')) {
-      const videoId = videoUrl.match(/vimeo\.com\/(\d+)/)?.[1];
-      if (videoId) {
-        return `https://vumbnail.com/${videoId}.jpg`;
-      }
-    }
-    
-    // ✅ For direct video URLs, return placeholder
-    if (isVideoUrl(videoUrl)) {
-      return VIDEO_PLACEHOLDER;
-    }
-    
-    return videoUrl; // Return the URL itself if it's not a video (might be an image)
-  };
-
-  const getThumbnailUrl = (listing: Listing): string => {
-    const listingId = listing._id || 'unknown';
-    
-    if (imageErrors[listingId]) {
-      return ERROR_IMAGE;
-    }
-    
-    // ✅ FIXED: Check listing.thumbnail first
-    if (listing.thumbnail && listing.thumbnail.trim() !== '') {
-      console.log('📸 Using listing thumbnail:', listing.thumbnail);
-      return listing.thumbnail;
-    }
-    
-    // ✅ Check mediaUrls for images or videos
-    if (listing.mediaUrls && listing.mediaUrls.length > 0) {
-      // First try to find an image
-      const imageUrl = listing.mediaUrls.find(url => 
-        url && url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
-      );
-      
-      if (imageUrl) {
-        console.log('📸 Found image URL:', imageUrl);
-        return imageUrl;
-      }
-      
-      // Then try to find video and generate thumbnail
-      const videoUrl = listing.mediaUrls.find(url => isVideoUrl(url));
-      if (videoUrl) {
-        const thumbnail = generateVideoThumbnail(videoUrl);
-        console.log('📸 Generated video thumbnail:', thumbnail);
-        return thumbnail;
-      }
-      
-      // Return first media URL if nothing else works
-      const firstUrl = listing.mediaUrls[0];
-      if (firstUrl) {
-        console.log('📸 Using first media URL:', firstUrl);
-        return firstUrl;
-      }
-    }
-    
-    console.log('📸 Using default placeholder');
-    return VIDEO_PLACEHOLDER;
-  };
-
-  const handleImageError = (listingId: string) => {
-    console.error('🖼️ Image failed to load for listing:', listingId);
-    setImageErrors(prev => ({
-      ...prev,
-      [listingId]: true
-    }));
-  };
-
-  const getMediaType = (listing: Listing): 'image' | 'video' | 'none' => {
-    if (!listing.mediaUrls || listing.mediaUrls.length === 0) {
-      return 'none';
-    }
-    
-    const videoUrl = listing.mediaUrls.find(url => isVideoUrl(url));
-    if (videoUrl) {
-      return 'video';
-    }
-    
-    const imageUrl = listing.mediaUrls.find(url => 
-      url && url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
-    );
-    
-    if (imageUrl) {
-      return 'image';
-    }
-    
-    return 'none';
-  };
-
-  const getQualityBadge = (quality?: string) => {
-    if (!quality) return { color: 'bg-gradient-to-r from-yellow-400 to-yellow-300 text-gray-800', label: '' };
-    
-    switch (quality.toLowerCase()) {
-      case '4k':
-      case 'ultra hd':
-        return { color: 'bg-gradient-to-r from-yellow-500 to-amber-500 text-white', label: '4K' };
-      case 'hd':
-      case '1080p':
-        return { color: 'bg-gradient-to-r from-blue-500 to-blue-400 text-white', label: 'HD' };
-      default:
-        return { color: 'bg-gradient-to-r from-yellow-400 to-yellow-300 text-gray-800', label: '' };
-    }
-  };
-
   // Handle search with debounce
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -571,7 +520,6 @@ const Browse: React.FC = () => {
               <div className="flex flex-col sm:flex-row gap-3">
                 {marketplaceApi.utils.checkAuth() && (
                   <>
-                    {/* ✅ FIXED: Yellow-White Gradient Button */}
                     <button 
                       onClick={() => navigate('/marketplace/create')}
                       className="group relative inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-yellow-500 via-yellow-400 to-yellow-300 text-gray-800 font-semibold rounded-xl shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 overflow-hidden border border-yellow-200"
@@ -657,7 +605,7 @@ const Browse: React.FC = () => {
             </div>
             <div className="bg-white border border-gray-200 rounded-xl p-5 text-center shadow-sm">
               <div className="text-2xl font-bold text-gray-900 mb-1">
-                {listings.filter(l => getMediaType(l) === 'video').length}
+                {listings.filter(l => getFirstMediaUrl(l.mediaUrls || []).isVideo).length}
               </div>
               <div className="text-gray-600 text-sm font-medium">Video Content</div>
             </div>
@@ -669,7 +617,7 @@ const Browse: React.FC = () => {
             </div>
           </div>
 
-          {/* Filters Section - FIXED: Videos Category and Price Range */}
+          {/* Filters Section */}
           {showFilters && (
             <div className="mb-8 bg-white rounded-2xl shadow-lg border border-gray-200 p-6 animate-fadeIn">
               <div className="flex items-center justify-between mb-6">
@@ -820,7 +768,7 @@ const Browse: React.FC = () => {
             </div>
           </div>
 
-          {/* Listings Grid - Enhanced with Video Player like ListingsTab */}
+          {/* Listings Grid - Using ListingsTab video display */}
           {listings.length === 0 ? (
             <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-12 text-center">
               <div className="max-w-md mx-auto">
@@ -853,10 +801,8 @@ const Browse: React.FC = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {listings.map(listing => {
-                const videoUrl = getFirstVideoUrl(listing);
-                const isVideo = isVideoUrl(videoUrl);
+                const { url: mediaUrl, isVideo, isImage } = getFirstMediaUrl(listing.mediaUrls || []);
                 const thumbnailUrl = getThumbnailUrl(listing);
-                const mediaType = getMediaType(listing);
                 const qualityBadge = getQualityBadge(listing.quality);
                 
                 return (
@@ -866,22 +812,22 @@ const Browse: React.FC = () => {
                     onMouseEnter={() => setHoveredListing(listing._id)}
                     onMouseLeave={() => setHoveredListing(null)}
                   >
-                    {/* Media Thumbnail - Enhanced like ListingsTab */}
+                    {/* Media Thumbnail - EXACTLY like ListingsTab */}
                     <div className="h-48 bg-gradient-to-br from-gray-50 to-gray-100 relative overflow-hidden">
-                      {thumbnailUrl ? (
+                      {mediaUrl ? (
                         isVideo ? (
-                          // Video thumbnail with play button like ListingsTab
+                          // Video thumbnail with play button - SAME as ListingsTab
                           <div 
                             className="relative w-full h-full cursor-pointer"
-                            onClick={() => handleVideoClick(videoUrl, listing.title, listing)}
+                            onClick={() => handleVideoClick(mediaUrl, listing.title, listing)}
                           >
-                            <img
-                              src={thumbnailUrl}
-                              alt={listing.title}
+                            <video
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                              loading="lazy"
-                              onError={() => handleImageError(listing._id)}
-                            />
+                              preload="metadata"
+                              poster={listing.mediaUrls?.find(url => isImageUrl(url)) || ''}
+                            >
+                              <source src={mediaUrl} type="video/mp4" />
+                            </video>
                             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition-all duration-300">
                               <div className="w-12 h-12 bg-white bg-opacity-90 rounded-full flex items-center justify-center transform scale-0 group-hover:scale-100 transition-transform duration-300">
                                 <svg className="w-6 h-6 text-gray-900" fill="currentColor" viewBox="0 0 24 24">
@@ -898,8 +844,8 @@ const Browse: React.FC = () => {
                               </span>
                             </div>
                           </div>
-                        ) : mediaType === 'image' ? (
-                          // Image thumbnail
+                        ) : isImage ? (
+                          // Image thumbnail - SAME as ListingsTab
                           <div className="relative w-full h-full">
                             <img
                               src={thumbnailUrl}
@@ -911,7 +857,7 @@ const Browse: React.FC = () => {
                             <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                           </div>
                         ) : (
-                          // Generic media
+                          // Generic media - SAME as ListingsTab
                           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 group-hover:from-blue-100 group-hover:to-blue-200 transition-all duration-300">
                             <div className="text-center transform group-hover:scale-110 transition-transform duration-300">
                               <svg className="w-12 h-12 text-blue-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -922,7 +868,7 @@ const Browse: React.FC = () => {
                           </div>
                         )
                       ) : (
-                        // No media
+                        // No media - SAME as ListingsTab
                         <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 group-hover:from-gray-200 group-hover:to-gray-300 transition-all duration-300">
                           <div className="text-center transform group-hover:scale-110 transition-transform duration-300">
                             <svg className="w-12 h-12 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -940,24 +886,16 @@ const Browse: React.FC = () => {
                         </div>
                       )}
                       
-                      {/* Price Tag - Like ListingsTab */}
+                      {/* Price Tag - SAME as ListingsTab */}
                       <div className="absolute bottom-3 left-3">
                         <div className="bg-gradient-to-r from-green-600 to-green-700 text-white px-3 py-1.5 rounded-lg shadow-md">
-                          <p className="text-lg font-bold">{marketplaceApi.utils.formatCurrency(listing.price)}</p>
+                          <p className="text-lg font-bold">{formatCurrency(listing.price)}</p>
                         </div>
                       </div>
-                      
-                      {/* Video Indicator */}
-                      {isVideo && (
-                        <div className="absolute top-3 right-12 z-10 px-2 py-1 rounded bg-black/60 text-white text-xs font-medium flex items-center gap-1">
-                          <FiVideo size={10} />
-                          Video
-                        </div>
-                      )}
                     </div>
                     
                     {/* Listing Info */}
-                    <div className="p-4">
+                    <div className="p-5">
                       <div className="mb-4">
                         <h3 
                           className="font-semibold text-gray-900 mb-2 truncate group-hover:text-blue-600 transition-colors cursor-pointer"
@@ -973,7 +911,11 @@ const Browse: React.FC = () => {
                         
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center space-x-2">
-                            <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${listing.category === 'service' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
+                              listing.category === 'service' ? 'bg-purple-100 text-purple-800' : 
+                              listing.category === 'music' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-blue-100 text-blue-800'
+                            }`}>
                               {listing.category || 'Video'}
                             </span>
                             <span className="text-xs text-gray-500 flex items-center">
@@ -983,10 +925,7 @@ const Browse: React.FC = () => {
                           </div>
                           
                           <div className="text-xs text-gray-500">
-                            {new Date(listing.createdAt || '').toLocaleDateString('en-IN', {
-                              day: 'numeric',
-                              month: 'short'
-                            })}
+                            {formatDate(listing.createdAt || '')}
                           </div>
                         </div>
                       </div>
@@ -1011,8 +950,8 @@ const Browse: React.FC = () => {
                         </div>
                       )}
                       
-                      {/* Action Buttons */}
-                      <div className="pt-3 border-t border-gray-100">
+                      {/* Action Buttons - For Buyers */}
+                      <div className="pt-4 border-t border-gray-100">
                         <div className="flex flex-col sm:flex-row gap-2">
                           <button
                             onClick={() => handleViewDetails(listing._id)}
@@ -1033,7 +972,7 @@ const Browse: React.FC = () => {
                       </div>
                       
                       {/* Seller Info */}
-                      <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+                      <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-200">
                             {listing.sellerId?.avatar ? (
@@ -1049,15 +988,17 @@ const Browse: React.FC = () => {
                               <FiUser size={14} className="text-gray-600" />
                             )}
                           </div>
-                          <span className="text-xs text-gray-700 truncate max-w-[80px]">
+                          <span className="text-xs text-gray-700 truncate max-w-[100px]">
                             {listing.sellerId?.username || 'Seller'}
                           </span>
                         </div>
                         
-                        <div className="text-xs text-gray-500 flex items-center gap-1">
-                          <FiClock size={10} />
-                          {listing.duration || 'N/A'}
-                        </div>
+                        {listing.duration && (
+                          <div className="text-xs text-gray-500 flex items-center gap-1">
+                            <FiClock size={10} />
+                            {listing.duration}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
