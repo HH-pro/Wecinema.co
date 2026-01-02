@@ -476,9 +476,17 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     try {
       paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
       console.log("💳 Stripe Payment Intent Status:", paymentIntent.status);
+      
+      // ✅ CRITICAL FIX: If status is requires_capture, capture it first
+      if (paymentIntent.status === 'requires_capture') {
+        console.log("🔄 Capturing payment intent...");
+        paymentIntent = await stripe.paymentIntents.capture(paymentIntentId);
+        console.log("✅ Payment captured successfully, new status:", paymentIntent.status);
+      }
+      
     } catch (stripeError) {
       await session.abortTransaction();
-      console.error('Stripe retrieval error:', stripeError);
+      console.error('Stripe retrieval/capture error:', stripeError);
       return res.status(400).json({
         success: false,
         error: 'Payment verification failed',
@@ -486,20 +494,24 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       });
     }
 
-    // ✅ CHECK PAYMENT STATUS
-    if (paymentIntent.status !== 'succeeded') {
+    // ✅ CHECK PAYMENT STATUS (UPDATED)
+    const successfulStatuses = ['succeeded', 'requires_capture'];
+    if (!successfulStatuses.includes(paymentIntent.status)) {
       await session.abortTransaction();
       return res.status(400).json({
         success: false,
         error: 'Payment not completed',
-        details: `Current status: ${paymentIntent.status}`
+        details: `Current status: ${paymentIntent.status}`,
+        allowedStatuses: successfulStatuses
       });
     }
 
-    // ✅ UPDATE OFFER STATUS
+    // ✅ UPDATE OFFER STATUS AND REMOVE TEMPORARY FLAG
     offer.status = 'paid';
     offer.paidAt = new Date();
     offer.paymentIntentId = paymentIntentId;
+    offer.isTemporary = false; // Remove temporary flag
+    offer.expiresAt = null; // Remove expiration
     await offer.save({ session });
 
     console.log("✅ Offer status updated to paid:", offer._id);
@@ -526,7 +538,7 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       offerId: offer._id,
       orderType: 'accepted_offer',
       amount: offer.amount,
-      status: 'paid',
+      status: paymentIntent.status === 'requires_capture' ? 'pending_capture' : 'paid',
       stripePaymentIntentId: paymentIntentId,
       paidAt: new Date(),
       revisions: 0,
@@ -536,7 +548,9 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       metadata: {
         paymentMethod: paymentIntent.payment_method_types?.[0] || 'card',
         offerAmount: offer.amount,
-        buyerNote: offer.message || ''
+        buyerNote: offer.message || '',
+        paymentStatus: paymentIntent.status,
+        captured: paymentIntent.status === 'succeeded'
       }
     };
 
@@ -555,10 +569,8 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     await MarketplaceListing.findByIdAndUpdate(
       offer.listingId._id, 
       { 
-        // DO NOT change status - keep it active
         lastOrderAt: new Date(),
         $inc: { totalOrders: 1 }
-        // Do NOT set reservedUntil or change status
       },
       { session }
     );
@@ -623,12 +635,16 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     // ✅ SUCCESS RESPONSE WITH ALL DETAILS
     res.status(200).json({
       success: true,
-      message: 'Payment confirmed successfully! Check your email for professional order details.',
+      message: paymentIntent.status === 'requires_capture' 
+        ? 'Payment authorized! Order created pending capture.' 
+        : 'Payment confirmed successfully! Check your email for professional order details.',
       data: {
         orderId: order._id,
         redirectUrl: `/orders/${order._id}`,
         chatUrl: chatLink,
         offerId: offer._id,
+        paymentStatus: paymentIntent.status,
+        requiresCapture: paymentIntent.status === 'requires_capture',
         notifications: {
           messagesSent: notificationResults.messages?.success || false,
           firebaseChatId: notificationResults.messages?.firebaseChatId,
@@ -670,8 +686,7 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     }
   }
 });
-
-// ✅ MAKE OFFER WITH TEMPORARY PAYMENT SESSION (UPDATED)
+// ✅ MAKE OFFER WITH TEMPORARY PAYMENT SESSION (UPDATED - FIXED)
 router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), async (req, res) => {
   let session;
   let stripePaymentIntent = null;
@@ -758,8 +773,13 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
       if (existingOffer.status === 'pending_payment' && existingOffer.paymentIntentId) {
         try {
           const paymentIntent = await stripe.paymentIntents.retrieve(existingOffer.paymentIntentId);
-          if (paymentIntent.status === 'requires_payment_method' || paymentIntent.status === 'requires_confirmation') {
-            // Payment intent exists but not completed - return it for completion
+          
+          // Return existing payment intent if it's still valid
+          if (paymentIntent.status === 'requires_payment_method' || 
+              paymentIntent.status === 'requires_confirmation' ||
+              paymentIntent.status === 'requires_action' ||
+              paymentIntent.status === 'requires_capture') {
+            
             return res.status(200).json({
               success: true,
               message: 'You have an existing offer that needs payment completion',
@@ -769,10 +789,13 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
                   amount: existingOffer.amount,
                   status: existingOffer.status,
                   paymentIntentId: existingOffer.paymentIntentId,
-                  createdAt: existingOffer.createdAt
+                  createdAt: existingOffer.createdAt,
+                  expiresAt: existingOffer.expiresAt,
+                  isTemporary: existingOffer.isTemporary
                 },
                 clientSecret: paymentIntent.client_secret,
                 paymentIntentId: paymentIntent.id,
+                amount: existingOffer.amount,
                 isExistingOffer: true,
                 nextSteps: 'Complete payment for your existing offer'
               }
@@ -795,6 +818,7 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
     console.log("💳 Creating Stripe payment intent...");
     
     try {
+      // ✅ FIXED: Remove capture_method or set to automatic
       stripePaymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(offerAmount * 100),
         currency: 'usd',
@@ -805,16 +829,17 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
           type: 'offer_payment',
           temporary: 'true' // Mark as temporary until payment confirmed
         },
-        automatic_payment_methods: { enabled: true },
+        automatic_payment_methods: { 
+          enabled: true,
+          allow_redirects: 'never' // Prevents redirect-based payment methods
+        },
         description: `Offer for: ${listing.title}`,
-        payment_method_options: {
-          card: {
-            capture_method: 'manual', // Don't capture until confirmed
-          }
-        }
+        // ✅ REMOVED: payment_method_options with manual capture
+        // Using default automatic capture instead
       });
 
       console.log("✅ Stripe payment intent created:", stripePaymentIntent.id);
+      console.log("💳 Payment intent status:", stripePaymentIntent.status);
 
     } catch (stripeError) {
       await session.abortTransaction();
@@ -823,7 +848,8 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
       return res.status(400).json({ 
         success: false,
         error: 'Payment processing error',
-        details: stripeError.message
+        details: stripeError.message,
+        stripeErrorCode: stripeError.code
       });
     }
 
@@ -865,6 +891,7 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
         clientSecret: stripePaymentIntent.client_secret,
         paymentIntentId: stripePaymentIntent.id,
         amount: offerAmount,
+        stripeStatus: stripePaymentIntent.status,
         nextSteps: 'Complete payment to submit your offer. If payment is not completed within 30 minutes, this offer will be automatically cancelled.'
       }
     });
@@ -896,7 +923,8 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
     res.status(500).json({ 
       success: false,
       error: 'Failed to make offer',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      errorCode: error.code
     });
   } finally {
     if (session) {
