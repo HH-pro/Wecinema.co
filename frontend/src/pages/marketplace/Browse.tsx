@@ -1,3 +1,4 @@
+// src/pages/marketplace/Browse.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import MarketplaceLayout from '../../components/Layout';
 import { Listing } from '../../types/marketplace';
@@ -5,7 +6,7 @@ import {
   FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiAlertCircle, 
   FiLoader, FiUser, FiPlay, FiClock, FiShoppingBag, FiTag,
   FiTarget, FiTrendingUp, FiDollarSign, FiEye, FiHeart, FiVideo,
-  FiImage, FiFileText
+  FiEdit, FiTrash2, FiPause, FiRefresh
 } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import marketplaceApi from '../../api/marketplaceApi';
@@ -13,9 +14,9 @@ import VideoPlayerModal from '../../components/marketplae/VideoPlayerModal';
 import PaymentModal from '../../components/marketplae/PaymentModal';
 import OfferModal from '../../components/marketplae/OfferModal';
 
-// Constants for placeholder images
+// Constants for placeholder images - Light theme friendly
 const VIDEO_PLACEHOLDER = 'https://images.unsplash.com/photo-1579546929662-711aa81148cf?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
-const DEFAULT_THUMBNAIL = 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
+const ERROR_IMAGE = 'https://via.placeholder.com/300x200/F3F4F6/6B7280?text=Video+Preview';
 
 const Browse: React.FC = () => {
   const [listings, setListings] = useState<Listing[]>([]);
@@ -36,9 +37,8 @@ const Browse: React.FC = () => {
   const [videoListing, setVideoListing] = useState<Listing | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('');
   
-  // Image loading states
+  // New state for image loading errors
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
-  const [imageLoading, setImageLoading] = useState<Record<string, boolean>>({});
   const navigate = useNavigate();
 
   const [filters, setFilters] = useState({
@@ -56,7 +56,11 @@ const Browse: React.FC = () => {
     expectedDelivery: ''
   });
 
-  // Fetch listings and user data
+  // Video player ref
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [hoveredListing, setHoveredListing] = useState<string | null>(null);
+
+  // Fetch listings and user data on component mount
   useEffect(() => {
     fetchListings();
     fetchCurrentUser();
@@ -78,7 +82,6 @@ const Browse: React.FC = () => {
       setLoading(true);
       setError('');
       setImageErrors({});
-      setImageLoading({});
       
       const params: any = {};
       
@@ -89,6 +92,8 @@ const Browse: React.FC = () => {
       if (filters.sortBy) params.sortBy = filters.sortBy;
       if (searchQuery) params.search = searchQuery;
       
+      console.log('📡 Fetching listings with params:', params);
+
       const response = await marketplaceApi.listings.getAllListings(params);
       
       if (!response.success) {
@@ -97,7 +102,9 @@ const Browse: React.FC = () => {
 
       const listingsData = response.data?.listings || [];
       
-      // Apply local filtering
+      console.log('✅ Listings fetched:', listingsData.length);
+      
+      // Apply local filtering for active category
       let filteredData = listingsData;
       
       if (activeCategory && activeCategory !== 'all') {
@@ -163,6 +170,7 @@ const Browse: React.FC = () => {
   };
 
   const handleVideoClick = (videoUrl: string, title: string, listing: Listing) => {
+    console.log('🎬 Opening video:', videoUrl);
     setSelectedVideo(videoUrl);
     setVideoTitle(title);
     setVideoListing(listing);
@@ -174,6 +182,124 @@ const Browse: React.FC = () => {
     setSelectedVideo('');
     setVideoTitle('');
     setVideoListing(null);
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
+  };
+
+  // Helper functions from ListingsTab
+  const isVideoUrl = (url: string): boolean => {
+    if (!url) return false;
+    const videoExtensions = ['.mp4', '.mov', '.avi', '.wmv', '.flv', '.mkv', '.webm'];
+    const urlLower = url.toLowerCase();
+    return videoExtensions.some(ext => urlLower.endsWith(ext));
+  };
+
+  const isImageUrl = (url: string): boolean => {
+    if (!url) return false;
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'];
+    const urlLower = url.toLowerCase();
+    return imageExtensions.some(ext => urlLower.endsWith(ext));
+  };
+
+  const getFirstMediaUrl = (mediaUrls: string[]): { url: string; isVideo: boolean; isImage: boolean } => {
+    if (!mediaUrls || mediaUrls.length === 0) {
+      return { url: '', isVideo: false, isImage: false };
+    }
+    
+    // Try to find an image first
+    for (const url of mediaUrls) {
+      if (isImageUrl(url)) {
+        return { url, isVideo: false, isImage: true };
+      }
+    }
+    
+    // Then try to find a video
+    for (const url of mediaUrls) {
+      if (isVideoUrl(url)) {
+        return { url, isVideo: true, isImage: false };
+      }
+    }
+    
+    // Return first URL as fallback
+    return { 
+      url: mediaUrls[0], 
+      isVideo: isVideoUrl(mediaUrls[0]), 
+      isImage: isImageUrl(mediaUrls[0]) 
+    };
+  };
+
+  const getThumbnailUrl = (listing: Listing): string => {
+    const listingId = listing._id || 'unknown';
+    
+    if (imageErrors[listingId]) {
+      return ERROR_IMAGE;
+    }
+    
+    if (listing.thumbnail && listing.thumbnail.trim() !== '') {
+      return listing.thumbnail;
+    }
+    
+    if (listing.mediaUrls && listing.mediaUrls.length > 0) {
+      const { url, isImage } = getFirstMediaUrl(listing.mediaUrls);
+      if (isImage) {
+        return url;
+      }
+    }
+    
+    return VIDEO_PLACEHOLDER;
+  };
+
+  const handleImageError = (listingId: string) => {
+    setImageErrors(prev => ({
+      ...prev,
+      [listingId]: true
+    }));
+  };
+
+  const getQualityBadge = (quality?: string) => {
+    if (!quality) return { color: 'bg-gradient-to-r from-yellow-400 to-yellow-300 text-gray-800', label: '' };
+    
+    switch (quality.toLowerCase()) {
+      case '4k':
+      case 'ultra hd':
+        return { color: 'bg-gradient-to-r from-yellow-500 to-amber-500 text-white', label: '4K' };
+      case 'hd':
+      case '1080p':
+        return { color: 'bg-gradient-to-r from-blue-500 to-blue-400 text-white', label: 'HD' };
+      default:
+        return { color: 'bg-gradient-to-r from-yellow-400 to-yellow-300 text-gray-800', label: '' };
+    }
+  };
+
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+    }).format(amount || 0);
+  };
+
+  const formatDate = (dateString: string): string => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+      return 'Today';
+    } else if (diffDays === 1) {
+      return 'Yesterday';
+    } else if (diffDays < 7) {
+      return `${diffDays} days ago`;
+    } else {
+      return date.toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: diffDays > 365 ? 'numeric' : undefined
+      });
+    }
   };
 
   const handleOfferFormChange = (field: string, value: string) => {
@@ -319,129 +445,6 @@ const Browse: React.FC = () => {
     setError('');
   };
 
-  const isVideoUrl = (url: string): boolean => {
-    if (!url || typeof url !== 'string') return false;
-    
-    const videoExtensions = /\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v|ogg|ogv|3gp|3g2)$/i;
-    
-    if (videoExtensions.test(url)) {
-      return true;
-    }
-    
-    if (url.includes('cloudinary.com') && url.includes('/video/')) {
-      return true;
-    }
-    
-    if (url.includes('/video/') || url.includes('.mp4') || url.includes('.mov')) {
-      return true;
-    }
-    
-    return false;
-  };
-
-  const isImageUrl = (url: string): boolean => {
-    if (!url || typeof url !== 'string') return false;
-    
-    const imageExtensions = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i;
-    return imageExtensions.test(url);
-  };
-
-  const getFirstVideoUrl = (listing: Listing): string => {
-    if (!listing.mediaUrls || listing.mediaUrls.length === 0) return '';
-    
-    const videoUrl = listing.mediaUrls.find(url => isVideoUrl(url));
-    if (videoUrl) return videoUrl;
-    
-    if (listing.videoUrl && isVideoUrl(listing.videoUrl)) {
-      return listing.videoUrl;
-    }
-    
-    return '';
-  };
-
-  const getFirstImageUrl = (listing: Listing): string => {
-    if (!listing.mediaUrls || listing.mediaUrls.length === 0) return '';
-    
-    const imageUrl = listing.mediaUrls.find(url => isImageUrl(url));
-    if (imageUrl) return imageUrl;
-    
-    return '';
-  };
-
-  const getMediaType = (listing: Listing): 'video' | 'image' | 'document' | 'none' => {
-    if (!listing.mediaUrls || listing.mediaUrls.length === 0) {
-      return 'none';
-    }
-    
-    if (listing.mediaUrls.some(url => isVideoUrl(url))) {
-      return 'video';
-    }
-    
-    if (listing.mediaUrls.some(url => isImageUrl(url))) {
-      return 'image';
-    }
-    
-    return 'document';
-  };
-
-  const getThumbnailUrl = (listing: Listing): string => {
-    const listingId = listing._id || 'unknown';
-    
-    if (imageErrors[listingId]) {
-      return DEFAULT_THUMBNAIL;
-    }
-    
-    // Use listing thumbnail if available
-    if (listing.thumbnail && listing.thumbnail.trim() !== '') {
-      return listing.thumbnail;
-    }
-    
-    // Use first image from mediaUrls
-    const imageUrl = getFirstImageUrl(listing);
-    if (imageUrl) {
-      return imageUrl;
-    }
-    
-    // For videos, return video placeholder
-    if (getMediaType(listing) === 'video') {
-      return VIDEO_PLACEHOLDER;
-    }
-    
-    return DEFAULT_THUMBNAIL;
-  };
-
-  const handleImageError = (listingId: string) => {
-    setImageErrors(prev => ({
-      ...prev,
-      [listingId]: true
-    }));
-  };
-
-  const handleImageLoad = (listingId: string) => {
-    setImageLoading(prev => ({
-      ...prev,
-      [listingId]: false
-    }));
-  };
-
-  const getQualityBadge = (quality?: string) => {
-    if (!quality) return { color: 'bg-gradient-to-r from-yellow-400 to-yellow-300 text-gray-800', label: '' };
-    
-    switch (quality.toLowerCase()) {
-      case '4k':
-      case 'ultra hd':
-        return { color: 'bg-gradient-to-r from-yellow-500 to-amber-500 text-white', label: '4K' };
-      case 'hd':
-      case '1080p':
-        return { color: 'bg-gradient-to-r from-blue-500 to-blue-400 text-white', label: 'HD' };
-      case 'sd':
-      case 'standard':
-        return { color: 'bg-gradient-to-r from-gray-500 to-gray-400 text-white', label: 'SD' };
-      default:
-        return { color: 'bg-gradient-to-r from-yellow-400 to-yellow-300 text-gray-800', label: '' };
-    }
-  };
-
   // Handle search with debounce
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -453,7 +456,6 @@ const Browse: React.FC = () => {
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
 
-  // Loading state
   if (loading) {
     return (
       <MarketplaceLayout>
@@ -474,14 +476,14 @@ const Browse: React.FC = () => {
   return (
     <MarketplaceLayout>
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-8">
-        {/* Animated Background Effects */}
+        {/* Animated Background Effects - Light version */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-0 left-1/4 w-72 h-72 bg-yellow-100 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"></div>
           <div className="absolute bottom-0 right-1/4 w-72 h-72 bg-amber-100 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse delay-1000"></div>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          {/* Error Banner */}
+          {/* Error Banner - Light theme */}
           {error && (
             <div className="mb-6 bg-gradient-to-r from-yellow-50 to-amber-50 backdrop-blur-xl border-l-4 border-yellow-500 rounded-r-lg shadow-lg p-6 animate-slideIn">
               <div className="flex items-center gap-4">
@@ -503,7 +505,7 @@ const Browse: React.FC = () => {
             </div>
           )}
 
-          {/* Header Section */}
+          {/* Header Section - Clean Light Design */}
           <div className="mb-10">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
               <div className="space-y-4">
@@ -570,7 +572,7 @@ const Browse: React.FC = () => {
               ))}
             </div>
 
-            {/* Search Bar */}
+            {/* Search Bar - Clean Design */}
             <div className="mt-8 max-w-3xl">
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -595,7 +597,7 @@ const Browse: React.FC = () => {
             </div>
           </div>
 
-          {/* Simple Stats */}
+          {/* Simple Stats - Clean Design */}
           <div className="mb-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white border border-gray-200 rounded-xl p-5 text-center shadow-sm">
               <div className="text-2xl font-bold text-gray-900 mb-1">{listings.length}</div>
@@ -603,7 +605,7 @@ const Browse: React.FC = () => {
             </div>
             <div className="bg-white border border-gray-200 rounded-xl p-5 text-center shadow-sm">
               <div className="text-2xl font-bold text-gray-900 mb-1">
-                {listings.filter(l => getMediaType(l) === 'video').length}
+                {listings.filter(l => getFirstMediaUrl(l.mediaUrls || []).isVideo).length}
               </div>
               <div className="text-gray-600 text-sm font-medium">Video Content</div>
             </div>
@@ -766,7 +768,7 @@ const Browse: React.FC = () => {
             </div>
           </div>
 
-          {/* Listings Grid */}
+          {/* Listings Grid - Using ListingsTab video display */}
           {listings.length === 0 ? (
             <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-12 text-center">
               <div className="max-w-md mx-auto">
@@ -799,82 +801,83 @@ const Browse: React.FC = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {listings.map(listing => {
+                const { url: mediaUrl, isVideo, isImage } = getFirstMediaUrl(listing.mediaUrls || []);
                 const thumbnailUrl = getThumbnailUrl(listing);
-                const videoUrl = getFirstVideoUrl(listing);
-                const mediaType = getMediaType(listing);
-                const isVideo = mediaType === 'video';
                 const qualityBadge = getQualityBadge(listing.quality);
-                const listingId = listing._id || 'unknown';
-                const isLoading = imageLoading[listingId] !== false;
                 
                 return (
-                  <div key={listingId} className="group bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-300 border border-gray-200 overflow-hidden hover:-translate-y-1">
-                    {/* Media Thumbnail - Updated */}
+                  <div 
+                    key={listing._id} 
+                    className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-xl transition-all duration-300 group bg-white"
+                    onMouseEnter={() => setHoveredListing(listing._id)}
+                    onMouseLeave={() => setHoveredListing(null)}
+                  >
+                    {/* Media Thumbnail - EXACTLY like ListingsTab */}
                     <div className="h-48 bg-gradient-to-br from-gray-50 to-gray-100 relative overflow-hidden">
-                      {isVideo && videoUrl ? (
-                        // Video thumbnail with play button
-                        <div 
-                          className="relative w-full h-full cursor-pointer"
-                          onClick={() => handleVideoClick(videoUrl, listing.title, listing)}
-                        >
-                          {/* Video element for preview */}
-                          <video
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            preload="metadata"
-                            poster={getFirstImageUrl(listing) || thumbnailUrl}
-                            muted
+                      {mediaUrl ? (
+                        isVideo ? (
+                          // Video thumbnail with play button - SAME as ListingsTab
+                          <div 
+                            className="relative w-full h-full cursor-pointer"
+                            onClick={() => handleVideoClick(mediaUrl, listing.title, listing)}
                           >
-                            <source src={videoUrl} type="video/mp4" />
-                          </video>
-                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition-all duration-300">
-                            <div className="w-12 h-12 bg-white bg-opacity-90 rounded-full flex items-center justify-center transform scale-0 group-hover:scale-100 transition-transform duration-300">
-                              <FiPlay className="text-gray-900" size={20} />
+                            <video
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              preload="metadata"
+                              poster={listing.mediaUrls?.find(url => isImageUrl(url)) || ''}
+                            >
+                              <source src={mediaUrl} type="video/mp4" />
+                            </video>
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition-all duration-300">
+                              <div className="w-12 h-12 bg-white bg-opacity-90 rounded-full flex items-center justify-center transform scale-0 group-hover:scale-100 transition-transform duration-300">
+                                <svg className="w-6 h-6 text-gray-900" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M8 5v14l11-7z" />
+                                </svg>
+                              </div>
+                            </div>
+                            <div className="absolute top-3 left-3">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M8 5v14l11-7z" />
+                                </svg>
+                                Video
+                              </span>
                             </div>
                           </div>
-                          <div className="absolute top-3 left-3">
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
-                              <FiVideo className="w-3 h-3 mr-1" />
-                              Video
-                            </span>
+                        ) : isImage ? (
+                          // Image thumbnail - SAME as ListingsTab
+                          <div className="relative w-full h-full">
+                            <img
+                              src={thumbnailUrl}
+                              alt={listing.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              loading="lazy"
+                              onError={() => handleImageError(listing._id)}
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                           </div>
-                        </div>
+                        ) : (
+                          // Generic media - SAME as ListingsTab
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 group-hover:from-blue-100 group-hover:to-blue-200 transition-all duration-300">
+                            <div className="text-center transform group-hover:scale-110 transition-transform duration-300">
+                              <svg className="w-12 h-12 text-blue-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              <p className="text-sm text-blue-600 mt-2">Media File</p>
+                            </div>
+                          </div>
+                        )
                       ) : (
-                        // Image thumbnail
-                        <div className="relative w-full h-full">
-                          {isLoading && (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="animate-spin rounded-full h-8 w-8 border-2 border-transparent border-t-yellow-500 border-r-amber-500"></div>
-                            </div>
-                          )}
-                          <img
-                            src={thumbnailUrl}
-                            alt={listing.title}
-                            className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
-                            onError={() => handleImageError(listingId)}
-                            onLoad={() => handleImageLoad(listingId)}
-                            loading="lazy"
-                          />
-                          
-                          {/* Media type badge */}
-                          <div className="absolute top-3 left-3">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${
-                              mediaType === 'image' 
-                                ? 'bg-green-100 text-green-800 border-green-200'
-                                : mediaType === 'document'
-                                ? 'bg-blue-100 text-blue-800 border-blue-200'
-                                : 'bg-gray-100 text-gray-800 border-gray-200'
-                            }`}>
-                              {mediaType === 'image' && <FiImage className="w-3 h-3 mr-1" />}
-                              {mediaType === 'document' && <FiFileText className="w-3 h-3 mr-1" />}
-                              {mediaType === 'video' && <FiVideo className="w-3 h-3 mr-1" />}
-                              {mediaType.charAt(0).toUpperCase() + mediaType.slice(1)}
-                            </span>
+                        // No media - SAME as ListingsTab
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 group-hover:from-gray-200 group-hover:to-gray-300 transition-all duration-300">
+                          <div className="text-center transform group-hover:scale-110 transition-transform duration-300">
+                            <svg className="w-12 h-12 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <p className="text-sm text-gray-500 mt-2">No Media</p>
                           </div>
                         </div>
                       )}
-                      
-                      {/* Gradient Overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent"></div>
                       
                       {/* Quality Badge */}
                       {qualityBadge.label && (
@@ -882,72 +885,119 @@ const Browse: React.FC = () => {
                           {qualityBadge.label}
                         </div>
                       )}
+                      
+                      {/* Price Tag - SAME as ListingsTab */}
+                      <div className="absolute bottom-3 left-3">
+                        <div className="bg-gradient-to-r from-green-600 to-green-700 text-white px-3 py-1.5 rounded-lg shadow-md">
+                          <p className="text-lg font-bold">{formatCurrency(listing.price)}</p>
+                        </div>
+                      </div>
                     </div>
-
-                    {/* Content */}
-                    <div className="p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-semibold text-gray-900 truncate text-sm group-hover:text-yellow-600 transition-colors">
+                    
+                    {/* Listing Info */}
+                    <div className="p-5">
+                      <div className="mb-4">
+                        <h3 
+                          className="font-semibold text-gray-900 mb-2 truncate group-hover:text-blue-600 transition-colors cursor-pointer"
+                          title={listing.title}
+                          onClick={() => handleViewDetails(listing._id)}
+                        >
                           {listing.title}
                         </h3>
+                        
+                        <p className="text-sm text-gray-600 line-clamp-2 mb-3" title={listing.description}>
+                          {listing.description}
+                        </p>
+                        
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-2">
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${
+                              listing.category === 'service' ? 'bg-purple-100 text-purple-800' : 
+                              listing.category === 'music' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-blue-100 text-blue-800'
+                            }`}>
+                              {listing.category || 'Video'}
+                            </span>
+                            <span className="text-xs text-gray-500 flex items-center">
+                              <FiEye className="w-3 h-3 mr-1" />
+                              {listing.views || 0} views
+                            </span>
+                          </div>
+                          
+                          <div className="text-xs text-gray-500">
+                            {formatDate(listing.createdAt || '')}
+                          </div>
+                        </div>
                       </div>
                       
-                      <p className="text-gray-600 text-xs mb-3 line-clamp-2">
-                        {listing.description}
-                      </p>
+                      {/* Tags */}
+                      {listing.tags && listing.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-4">
+                          {listing.tags.slice(0, 3).map((tag, index) => (
+                            <span 
+                              key={index} 
+                              className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gradient-to-r from-gray-50 to-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200 transition-colors cursor-default"
+                              title={tag}
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                          {listing.tags.length > 3 && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-200 text-gray-600 border border-gray-300">
+                              +{listing.tags.length - 3}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       
-                      <div className="flex items-center justify-between mb-3">
+                      {/* Action Buttons - For Buyers */}
+                      <div className="pt-4 border-t border-gray-100">
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <button
+                            onClick={() => handleViewDetails(listing._id)}
+                            className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-medium py-2.5 px-3 rounded-lg transition-all duration-200 flex items-center justify-center hover:shadow-md"
+                          >
+                            <FiEye className="w-4 h-4 mr-2" />
+                            View Details
+                          </button>
+                          
+                          <button
+                            onClick={() => handleMakeOffer(listing)}
+                            className="flex-1 bg-gradient-to-r from-yellow-500 via-yellow-400 to-yellow-300 hover:from-yellow-600 hover:via-yellow-500 hover:to-yellow-400 text-gray-800 text-sm font-medium py-2.5 px-3 rounded-lg transition-all duration-200 flex items-center justify-center hover:shadow-md border border-yellow-200"
+                          >
+                            <FiDollarSign className="w-4 h-4 mr-2" />
+                            Buy Now
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* Seller Info */}
+                      <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-200">
+                          <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-200">
                             {listing.sellerId?.avatar ? (
                               <img 
                                 src={listing.sellerId.avatar} 
                                 alt={listing.sellerId.username}
                                 className="w-full h-full object-cover"
                                 onError={(e) => {
-                                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/24/F3F4F6/9CA3AF?text=U';
+                                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/32/F3F4F6/9CA3AF?text=U';
                                 }}
                               />
                             ) : (
-                              <FiUser size={12} className="text-gray-600" />
+                              <FiUser size={14} className="text-gray-600" />
                             )}
                           </div>
-                          <span className="text-xs text-gray-700 truncate max-w-[80px]">
+                          <span className="text-xs text-gray-700 truncate max-w-[100px]">
                             {listing.sellerId?.username || 'Seller'}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <FiEye size={12} className="text-gray-400" />
-                          <span className="text-xs text-gray-500">{listing.views || 0}</span>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="text-xs text-gray-500">
-                          <FiClock className="inline mr-1" size={10} />
-                          {listing.duration || 'N/A'}
-                        </div>
-                        <div className="text-green-600 font-bold text-sm">
-                          {marketplaceApi.utils.formatCurrency(listing.price)}
-                        </div>
-                      </div>
-                      
-                      {/* Action Buttons */}
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleMakeOffer(listing)}
-                          className="flex-1 bg-gradient-to-r from-yellow-500 via-yellow-400 to-yellow-300 hover:from-yellow-600 hover:via-yellow-500 hover:to-yellow-400 text-gray-800 text-sm py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 group/btn font-medium border border-yellow-200 shadow-sm hover:shadow"
-                        >
-                          <FiDollarSign size={14} className="group-hover/btn:scale-110 transition-transform" />
-                          Buy Now
-                        </button>
-                        {isVideo && videoUrl && (
-                          <button
-                            onClick={() => handleVideoClick(videoUrl, listing.title, listing)}
-                            className="px-3 bg-gradient-to-r from-gray-100 to-gray-50 hover:from-gray-200 hover:to-gray-100 text-gray-700 text-sm py-2.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-1 font-medium border border-gray-300 shadow-sm hover:shadow"
-                          >
-                            <FiPlay size={14} />
-                          </button>
+                        
+                        {listing.duration && (
+                          <div className="text-xs text-gray-500 flex items-center gap-1">
+                            <FiClock size={10} />
+                            {listing.duration}
+                          </div>
                         )}
                       </div>
                     </div>
