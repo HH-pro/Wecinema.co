@@ -18,11 +18,6 @@ const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "p
 // Initialize Stripe
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 
-// Constants for placeholder images
-const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1579546929662-711aa81148cf?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
-const VIDEO_PLACEHOLDER = 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
-const ERROR_IMAGE = 'https://via.placeholder.com/300x200/cccccc/ffffff?text=Preview+Unavailable';
-
 const Browse: React.FC = () => {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -177,10 +172,6 @@ const Browse: React.FC = () => {
       default:
         return sortedData;
     }
-  };
-
-  const handleViewDetails = (listingId: string) => {
-    navigate(`/marketplace/listings/${listingId}`);
   };
 
   const handleMakeOffer = (listing: Listing) => {
@@ -390,75 +381,6 @@ const Browse: React.FC = () => {
     }));
   };
 
-  // Get first video URL from listing
-  const getFirstVideoUrl = (listing: Listing): string => {
-    if (!listing.mediaUrls || listing.mediaUrls.length === 0) return '';
-    
-    // Find first video URL
-    const videoUrl = listing.mediaUrls.find(url => 
-      isVideoUrl(url)
-    );
-    
-    return videoUrl || '';
-  };
-
-  // Generate video thumbnail from video URL
-  const generateVideoThumbnail = (videoUrl: string): string => {
-    // If it's a YouTube URL, generate thumbnail
-    if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
-      const videoId = videoUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
-      if (videoId) {
-        return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-      }
-    }
-    
-    // For Vimeo URLs
-    if (videoUrl.includes('vimeo.com')) {
-      const videoId = videoUrl.match(/vimeo\.com\/(\d+)/)?.[1];
-      if (videoId) {
-        return `https://vumbnail.com/${videoId}.jpg`;
-      }
-    }
-    
-    // For direct video files, use video placeholder
-    return VIDEO_PLACEHOLDER;
-  };
-
-  // Get thumbnail URL with better error handling
-  const getThumbnailUrl = (listing: Listing): string => {
-    const listingId = listing._id || 'unknown';
-    
-    // Check if this image has previously failed to load
-    if (imageErrors[listingId]) {
-      return ERROR_IMAGE;
-    }
-    
-    if (!listing.mediaUrls || listing.mediaUrls.length === 0) {
-      return PLACEHOLDER_IMAGE;
-    }
-    
-    // Try to find an image first
-    const imageUrl = listing.mediaUrls.find(url => 
-      url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
-    );
-    
-    if (imageUrl) return imageUrl;
-    
-    // Check if there's a video URL
-    const videoUrl = getFirstVideoUrl(listing);
-    if (videoUrl) {
-      return generateVideoThumbnail(videoUrl);
-    }
-    
-    // Default to the first media URL
-    const firstUrl = listing.mediaUrls[0];
-    if (firstUrl) {
-      return firstUrl;
-    }
-    
-    return PLACEHOLDER_IMAGE;
-  };
-
   // Handle image loading error
   const handleImageError = (listingId: string) => {
     setImageErrors(prev => ({
@@ -491,30 +413,6 @@ const Browse: React.FC = () => {
     ];
     
     return videoDomains.some(domain => url.includes(domain));
-  };
-
-  // Get media type for a listing
-  const getMediaType = (listing: Listing): 'image' | 'video' | 'none' => {
-    if (!listing.mediaUrls || listing.mediaUrls.length === 0) {
-      return 'none';
-    }
-    
-    // Check for video
-    const videoUrl = listing.mediaUrls.find(url => isVideoUrl(url));
-    if (videoUrl) {
-      return 'video';
-    }
-    
-    // Check for image
-    const imageUrl = listing.mediaUrls.find(url => 
-      url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
-    );
-    
-    if (imageUrl) {
-      return 'image';
-    }
-    
-    return 'none';
   };
 
   if (loading) {
@@ -742,140 +640,16 @@ const Browse: React.FC = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredListings.map(listing => {
-                const thumbnailUrl = getThumbnailUrl(listing);
-                const videoUrl = getFirstVideoUrl(listing);
-                const isVideo = isVideoUrl(videoUrl);
-                const mediaType = getMediaType(listing);
-                
-                return (
-                  <div key={listing._id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 border border-gray-200 group">
-                    {/* Video/Image Preview */}
-                    <div 
-                      className="relative h-48 bg-gray-900 cursor-pointer overflow-hidden"
-                      onClick={() => {
-                        if (isVideo && videoUrl) {
-                          handleVideoClick(videoUrl, listing.title);
-                        }
-                      }}
-                    >
-                      {/* Thumbnail Image with fallback */}
-                      <div className="relative w-full h-full">
-                        <img
-                          src={thumbnailUrl}
-                          alt={listing.title}
-                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          onError={() => handleImageError(listing._id)}
-                          loading="lazy"
-                        />
-                        
-                        {/* Loading skeleton */}
-                        <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>
-                        
-                        {/* Play Button Overlay for Videos */}
-                        {mediaType === 'video' && (
-                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                            <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-2 border-white/30 transform group-hover:scale-110 transition-transform duration-300">
-                              <FiPlay className="text-white ml-1" size={28} />
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Media Type Badge */}
-                        <div className={`absolute top-2 right-2 text-white text-xs px-2 py-1 rounded-md flex items-center gap-1 backdrop-blur-sm ${mediaType === 'video' ? 'bg-red-500/80' : 'bg-blue-500/80'}`}>
-                          {mediaType === 'video' ? (
-                            <>
-                              <FiVideo size={10} />
-                              VIDEO
-                            </>
-                          ) : mediaType === 'image' ? (
-                            <>
-                              <FiImage size={10} />
-                              IMAGE
-                            </>
-                          ) : (
-                            <>
-                              <FiImage size={10} />
-                              MEDIA
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Category Badge */}
-                      <div className="absolute bottom-2 left-2">
-                        <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded-md backdrop-blur-sm bg-yellow-500/90">
-                          {listing.category}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Content */}
-                    <div className="p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-semibold text-gray-900 truncate text-sm group-hover:text-yellow-600 transition-colors">
-                          {listing.title}
-                        </h3>
-                        <div className="text-xs text-gray-500">
-                          {listing.duration || 'N/A'}
-                        </div>
-                      </div>
-                      
-                      <p className="text-gray-600 text-xs mb-3 line-clamp-2">
-                        {listing.description}
-                      </p>
-                      
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                            {listing.sellerId?.avatar ? (
-                              <img 
-                                src={listing.sellerId.avatar} 
-                                alt={listing.sellerId.username}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/24/cccccc/ffffff?text=U';
-                                }}
-                              />
-                            ) : (
-                              <FiUser size={12} className="text-gray-600" />
-                            )}
-                          </div>
-                          <span className="text-xs text-gray-700 truncate max-w-[80px]">
-                            {listing.sellerId?.username || 'Seller'}
-                          </span>
-                        </div>
-                        <div className="text-green-600 font-bold">
-                          {marketplaceApi.utils.formatCurrency(listing.price)}
-                        </div>
-                      </div>
-                      
-                      {/* Action Buttons */}
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleMakeOffer(listing)}
-                          className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white text-sm py-2 px-3 rounded-md transition-colors duration-200 flex items-center justify-center gap-2 group/btn"
-                        >
-                          <FiCreditCard size={14} className="group-hover/btn:scale-110 transition-transform" />
-                          Make Offer
-                        </button>
-                        {mediaType === 'video' && videoUrl && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleVideoClick(videoUrl, listing.title);
-                            }}
-                            className="px-3 bg-gray-800 hover:bg-gray-900 text-white text-sm py-2 rounded-md transition-colors duration-200 flex items-center gap-2 group/play"
-                          >
-                            <FiPlay size={14} className="group-hover/play:scale-110 transition-transform" />
-                            Play
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              {filteredListings.map(listing => (
+                <ListingCard
+                  key={listing._id}
+                  listing={listing}
+                  onMakeOffer={handleMakeOffer}
+                  onVideoClick={handleVideoClick}
+                  imageErrors={imageErrors}
+                  onImageError={handleImageError}
+                />
+              ))}
             </div>
           )}
 
@@ -914,28 +688,61 @@ const Browse: React.FC = () => {
             {/* Video Player */}
             <div className="relative w-full h-[70vh] bg-black flex items-center justify-center">
               {isVideoUrl(selectedVideo) ? (
-                <video
-                  ref={videoRef}
-                  src={selectedVideo}
-                  controls
-                  autoPlay
-                  className="w-full h-full object-contain bg-black"
-                  onError={(e) => {
-                    console.error('Video playback error:', e);
-                    const videoElement = e.target as HTMLVideoElement;
-                    videoElement.controls = false;
-                    videoElement.innerHTML = `
-                      <div class="flex flex-col items-center justify-center h-full text-white p-8 text-center">
-                        <FiAlertCircle class="text-red-500 mb-4" size={48} />
-                        <h4 class="text-xl font-semibold mb-2">Unable to Play Video</h4>
-                        <p class="text-gray-300">The video format is not supported or the URL is invalid.</p>
-                        <p class="text-sm text-gray-400 mt-2">URL: ${selectedVideo}</p>
-                      </div>
-                    `;
-                  }}
-                >
-                  Your browser does not support the video tag.
-                </video>
+                <>
+                  {/* YouTube Embed */}
+                  {selectedVideo.includes('youtube.com') || selectedVideo.includes('youtu.be') ? (
+                    <div className="w-full h-full">
+                      <iframe
+                        src={`https://www.youtube.com/embed/${
+                          selectedVideo.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1]
+                        }?autoplay=1&rel=0`}
+                        title={videoTitle}
+                        className="w-full h-full border-0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      ></iframe>
+                    </div>
+                  ) : 
+                  /* Vimeo Embed */
+                  selectedVideo.includes('vimeo.com') ? (
+                    <div className="w-full h-full">
+                      <iframe
+                        src={`https://player.vimeo.com/video/${
+                          selectedVideo.match(/vimeo\.com\/(\d+)/)?.[1]
+                        }?autoplay=1&title=0&byline=0&portrait=0`}
+                        title={videoTitle}
+                        className="w-full h-full border-0"
+                        allow="autoplay; fullscreen; picture-in-picture"
+                        allowFullScreen
+                      ></iframe>
+                    </div>
+                  ) : 
+                  /* Direct Video File */}
+                  (
+                    <video
+                      ref={videoRef}
+                      src={selectedVideo}
+                      controls
+                      autoPlay
+                      className="w-full h-full object-contain bg-black"
+                      onError={(e) => {
+                        console.error('Video playback error:', e);
+                        const videoElement = e.target as HTMLVideoElement;
+                        videoElement.controls = false;
+                        videoElement.innerHTML = `
+                          <div class="flex flex-col items-center justify-center h-full text-white p-8 text-center">
+                            <FiAlertCircle class="text-red-500 mb-4" size={48} />
+                            <h4 class="text-xl font-semibold mb-2">Unable to Play Video</h4>
+                            <p class="text-gray-300">The video format is not supported or the URL is invalid.</p>
+                            <p class="text-sm text-gray-400 mt-2 break-all max-w-full">${selectedVideo}</p>
+                          </div>
+                        `;
+                      }}
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  )}
+                </>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-white p-8 text-center">
                   <FiAlertCircle className="text-red-500 mb-4" size={48} />
@@ -951,7 +758,7 @@ const Browse: React.FC = () => {
               <div className="flex justify-center gap-4">
                 <button
                   onClick={() => {
-                    if (videoRef.current) {
+                    if (videoRef.current && !selectedVideo.includes('youtube') && !selectedVideo.includes('vimeo')) {
                       if (videoRef.current.paused) {
                         videoRef.current.play();
                       } else {
@@ -977,11 +784,12 @@ const Browse: React.FC = () => {
                 </button>
                 <button
                   onClick={() => {
-                    if (videoRef.current) {
+                    const videoContainer = document.querySelector('.relative.w-full.h-[70vh]');
+                    if (videoContainer) {
                       if (document.fullscreenElement) {
                         document.exitFullscreen();
                       } else {
-                        videoRef.current.requestFullscreen();
+                        videoContainer.requestFullscreen();
                       }
                     }
                   }}
@@ -1020,20 +828,14 @@ const Browse: React.FC = () => {
               {/* Listing Preview */}
               <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg shadow-sm flex items-start gap-3">
                 <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg overflow-hidden border border-blue-300 flex-shrink-0 bg-gray-100">
-                  {getThumbnailUrl(selectedListing) ? (
-                    <img
-                      src={getThumbnailUrl(selectedListing)}
-                      alt={selectedListing.title}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = ERROR_IMAGE;
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                      <FiImage className="text-gray-400" size={20} />
-                    </div>
-                  )}
+                  <img
+                    src={selectedListing.mediaUrls?.[0] || 'https://via.placeholder.com/150'}
+                    alt={selectedListing.title}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150/cccccc/ffffff?text=No+Image';
+                    }}
+                  />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h4 className="font-semibold text-gray-900 text-sm sm:text-base truncate">{selectedListing.title}</h4>
@@ -1192,20 +994,14 @@ const Browse: React.FC = () => {
                       <div className="mt-3 pt-3 border-t border-yellow-300">
                         <div className="flex items-start gap-3">
                           <div className="w-12 h-12 rounded-lg overflow-hidden border border-gray-300 flex-shrink-0 bg-gray-100">
-                            {getThumbnailUrl(offerData.listing) ? (
-                              <img
-                                src={getThumbnailUrl(offerData.listing)}
-                                alt={offerData.listing.title}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src = ERROR_IMAGE;
-                                }}
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                                <FiImage className="text-gray-400" size={16} />
-                              </div>
-                            )}
+                            <img
+                              src={offerData.listing.mediaUrls?.[0] || 'https://via.placeholder.com/150'}
+                              alt={offerData.listing.title}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150/cccccc/ffffff?text=No+Image';
+                              }}
+                            />
                           </div>
                           <div className="flex-1 min-w-0">
                             <h4 className="font-semibold text-gray-900 text-sm truncate">
@@ -1270,7 +1066,7 @@ const Browse: React.FC = () => {
   );
 };
 
-// Payment Form Component
+// Payment Form Component (keep as is)
 const PaymentForm = ({ 
   offerData, 
   onSuccess, 
