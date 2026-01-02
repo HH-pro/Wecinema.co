@@ -32,8 +32,8 @@ import {
   CreditCard,
   Lock
 } from '@mui/icons-material';
-import marketplaceApi, { Offer } from '../api/marketplaceApi';
-import { formatCurrency } from '../utils/formatters';
+import marketplaceApi, { Offer } from '../../api/marketplaceApi';
+import { formatCurrency } from '../../utilities/helperfFunction';
 
 // Replace process.env with direct Stripe key
 // Get this from your .env file or hardcode for testing
