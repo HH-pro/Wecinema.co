@@ -645,12 +645,15 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
 router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), async (req, res) => {
   try {
     console.log("=== MAKE OFFER WITH PAYMENT REQUIRED ===");
+    console.log("Request Body:", req.body);
+    console.log("User ID:", req.user.id || req.user._id || req.user.userId);
     
     const { listingId, amount, message, requirements, expectedDelivery } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
 
     // ✅ COMPREHENSIVE VALIDATION
     if (!userId) {
+      console.error("❌ Authentication failed: No user ID found");
       return res.status(401).json({ 
         success: false,
         error: 'Authentication required' 
@@ -658,6 +661,7 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
     }
 
     if (!listingId || !amount) {
+      console.error("❌ Validation failed: Missing listingId or amount");
       return res.status(400).json({ 
         success: false,
         error: 'Listing ID and amount are required' 
@@ -665,6 +669,7 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
     }
 
     if (!validateObjectId(listingId)) {
+      console.error("❌ Validation failed: Invalid listing ID format");
       return res.status(400).json({ 
         success: false,
         error: 'Invalid listing ID format' 
@@ -673,6 +678,7 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
 
     const offerAmount = parseFloat(amount);
     if (!validateAmount(amount)) {
+      console.error("❌ Validation failed: Invalid amount", amount);
       return res.status(400).json({ 
         success: false,
         error: 'Valid amount is required (minimum $0.50)' 
@@ -680,8 +686,10 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
     }
 
     // ✅ FIND LISTING
+    console.log("🔍 Finding listing:", listingId);
     const listing = await MarketplaceListing.findById(listingId);
     if (!listing) {
+      console.error("❌ Listing not found:", listingId);
       return res.status(404).json({ 
         success: false,
         error: 'Listing not found' 
@@ -689,6 +697,7 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
     }
 
     if (listing.status !== 'active') {
+      console.error("❌ Listing not active:", listing.status);
       return res.status(400).json({ 
         success: false,
         error: 'Listing is not available for offers' 
@@ -697,6 +706,7 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
 
     // Check if user is not the seller
     if (listing.sellerId.toString() === userId.toString()) {
+      console.error("❌ User is seller:", userId);
       return res.status(400).json({ 
         success: false,
         error: 'Cannot make offer on your own listing' 
@@ -704,6 +714,7 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
     }
 
     // ✅ CHECK FOR EXISTING OFFERS (ONLY CHECK COMPLETED/ACTIVE ONES)
+    console.log("🔍 Checking existing offers...");
     const existingOffer = await Offer.findOne({
       listingId,
       buyerId: userId,
@@ -711,19 +722,27 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
     });
 
     if (existingOffer) {
+      console.error("❌ Existing offer found:", existingOffer._id);
       return res.status(400).json({ 
         success: false,
         error: 'You already have an active offer for this listing',
-        existingOfferId: existingOffer._id
+        existingOfferId: existingOffer._id,
+        existingStatus: existingOffer.status
       });
     }
+
+    console.log("✅ All validations passed");
 
     // ✅ CREATE STRIPE PAYMENT INTENT FOR OFFER
     console.log("💳 Creating Stripe payment intent for offer payment...");
     
     let paymentIntent;
     try {
-      paymentIntent = await stripe.paymentIntents.create({
+      // Test Stripe connection first
+      console.log("🔧 Testing Stripe connection...");
+      console.log("Stripe Key Available:", process.env.STRIPE_SECRET_KEY ? 'Yes' : 'No');
+      
+      const createParams = {
         amount: Math.round(offerAmount * 100),
         currency: 'usd',
         metadata: {
@@ -731,36 +750,79 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
           buyerId: userId.toString(),
           sellerId: listing.sellerId.toString(),
           type: 'offer_payment',
-          // Store offer details in metadata instead of creating DB record
           offerAmount: offerAmount.toString(),
           requirements: requirements || '',
           expectedDelivery: expectedDelivery || '',
-          message: message || ''
+          message: message || '',
+          listingTitle: listing.title || 'Untitled Listing'
         },
-        automatic_payment_methods: { enabled: true },
-        description: `Offer for: ${listing.title}`,
-        // Set up webhook for payment confirmation
-        payment_method_options: {
-          card: {
-            request_three_d_secure: 'automatic'
-          }
-        }
+        automatic_payment_methods: { 
+          enabled: true,
+          allow_redirects: 'always'
+        },
+        description: `Offer payment for: ${listing.title || 'Listing'}`,
+        capture_method: 'automatic',
+      };
+
+      console.log("Creating payment intent with params:", {
+        amount: createParams.amount,
+        currency: createParams.currency,
+        metadata: createParams.metadata
       });
 
-      console.log("✅ Stripe payment intent created:", paymentIntent.id);
+      paymentIntent = await stripe.paymentIntents.create(createParams);
+
+      console.log("✅ Stripe payment intent created successfully!");
+      console.log("Payment Intent ID:", paymentIntent.id);
+      console.log("Client Secret:", paymentIntent.client_secret ? "Received" : "Missing");
+      console.log("Status:", paymentIntent.status);
+      console.log("Amount:", paymentIntent.amount);
+      console.log("Currency:", paymentIntent.currency);
 
     } catch (stripeError) {
       console.error('❌ Stripe payment intent creation failed:', stripeError);
+      console.error('Stripe Error Type:', stripeError.type);
+      console.error('Stripe Error Code:', stripeError.code);
+      console.error('Stripe Error Message:', stripeError.message);
       
       return res.status(400).json({ 
         success: false,
         error: 'Payment processing error',
-        details: stripeError.message
+        details: stripeError.message,
+        code: stripeError.code || 'STRIPE_ERROR'
       });
     }
 
-    // ✅ DO NOT CREATE OFFER IN DATABASE YET
-    // We'll create it only when payment is confirmed via webhook or confirm-offer-payment endpoint
+    // ✅ Verify client secret is present
+    if (!paymentIntent.client_secret) {
+      console.error("❌ CRITICAL: No client secret in payment intent!");
+      console.error("Payment Intent:", paymentIntent);
+      
+      return res.status(500).json({ 
+        success: false,
+        error: 'Payment setup failed - no client secret',
+        paymentIntentId: paymentIntent.id,
+        status: paymentIntent.status
+      });
+    }
+
+    // ✅ TEMPORARY: Store payment intent details (optional, for debugging)
+    // In production, you might want to store this in Redis or a temporary collection
+    const tempOfferRecord = {
+      paymentIntentId: paymentIntent.id,
+      listingId: listingId,
+      buyerId: userId,
+      sellerId: listing.sellerId,
+      amount: offerAmount,
+      requirements: requirements,
+      expectedDelivery: expectedDelivery,
+      message: message,
+      status: 'payment_pending',
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000) // 30 minutes expiry
+    };
+    
+    console.log("📝 Temporary offer record created for payment intent:", paymentIntent.id);
 
     res.status(200).json({
       success: true,
@@ -770,7 +832,8 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
           paymentIntentId: paymentIntent.id,
           clientSecret: paymentIntent.client_secret,
           amount: offerAmount,
-          currency: 'usd'
+          currency: 'usd',
+          status: paymentIntent.status
         },
         offerDetails: {
           listingId: listingId,
@@ -782,17 +845,23 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
           message: message
         },
         nextSteps: 'Complete payment to submit your offer. Once paid, the seller will be notified automatically.',
-        note: 'No offer record has been created yet. Offer will be created only after successful payment.'
+        note: 'No offer record has been created yet. Offer will be created only after successful payment.',
+        debug: {
+          stripeKeyConfigured: !!process.env.STRIPE_SECRET_KEY,
+          amountInCents: Math.round(offerAmount * 100)
+        }
       }
     });
 
   } catch (error) {
     console.error('❌ Error processing offer request:', error);
+    console.error('Error Stack:', error.stack);
     
     res.status(500).json({ 
       success: false,
       error: 'Failed to process offer request',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      code: error.code || 'INTERNAL_ERROR'
     });
   }
 });
