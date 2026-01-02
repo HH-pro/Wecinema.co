@@ -1,103 +1,227 @@
-.auth-wrapper {
-  min-height: 90vh;
+/* ---------------- RESET ---------------- */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+}
+
+/* ---------------- BANNER ---------------- */
+.banner-small {
+  background: linear-gradient(90deg, #ff0080, #7928ca);
+  color: #fff;
+  text-align: center;
+  padding: 14px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+/* ---------------- MAIN CONTAINER ---------------- */
+.main-container-small {
+  max-width: 1100px;
+  margin: 40px auto;
+  padding: 20px;
+}
+
+/* ---------------- TOGGLE ---------------- */
+.toggle-button-small {
+  background: transparent;
+  border: none;
+  color: #7928ca;
+  font-size: 15px;
+  cursor: pointer;
+  margin-bottom: 25px;
+  font-weight: 600;
+}
+
+/* ---------------- USER TYPE ---------------- */
+.user-type-selector-small {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 30px;
+}
+
+.user-type-button-small {
+  flex: 1;
+  padding: 14px;
+  border-radius: 12px;
+  border: 2px solid #ddd;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.3s;
+}
+
+.user-type-button-small.active-small {
+  border-color: #7928ca;
+  background: #f4f0ff;
+  color: #7928ca;
+}
+
+/* ---------------- SUBSCRIPTIONS ---------------- */
+.cards-container-small {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.subscription-box-small {
+  border-radius: 20px;
+  padding: 26px;
+  background: #ffffff;
+  border: 2px solid #eee;
+  cursor: pointer;
+  position: relative;
+  transition: 0.3s ease;
+}
+
+.subscription-box-small:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.08);
+}
+
+.subscription-box-small.selected-small {
+  border-color: #7928ca;
+  box-shadow: 0 18px 50px rgba(121, 40, 202, 0.25);
+}
+
+/* ---------------- TITLES ---------------- */
+.subscription-title-small {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.subscription-price-small {
+  font-size: 28px;
+  font-weight: 800;
+  color: #7928ca;
+  margin-bottom: 10px;
+}
+
+.subscription-description-small {
+  color: #666;
+  font-size: 14px;
+}
+
+/* ---------------- FEATURES ---------------- */
+.features-list-small {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0;
+}
+
+.features-list-small li {
+  margin-bottom: 10px;
+  font-size: 14px;
+  color: #444;
+}
+
+/* ---------------- AUTH ---------------- */
+.auth-section-small {
+  margin-top: 20px;
+}
+
+.subscription-button-small {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  background: linear-gradient(90deg, #7928ca, #ff0080);
+  color: #fff;
+  transition: 0.3s;
+}
+
+.subscription-button-small:hover {
+  opacity: 0.9;
+}
+
+.google-auth-button-small {
   display: flex;
   justify-content: center;
   align-items: center;
-  background: radial-gradient(circle at top, #0f172a, #020617);
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
-.auth-card {
-  width: 380px;
-  padding: 35px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(18px);
-  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6);
-  text-align: center;
-  animation: float 4s ease-in-out infinite;
-}
-
-@keyframes float {
-  0% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-  100% { transform: translateY(0); }
-}
-
-.auth-title {
-  color: #fff;
-  font-size: 26px;
-  margin-bottom: 20px;
-}
-
-.auth-input {
-  width: 100%;
-  padding: 14px;
-  margin-bottom: 14px;
-  border-radius: 12px;
-  border: none;
-  background: rgba(255, 255, 255, 0.15);
-  color: #fff;
-}
-
-.auth-input::placeholder {
-  color: #cbd5f5;
-}
-
-.auth-primary-btn {
-  width: 100%;
-  padding: 14px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #6366f1, #22d3ee);
-  color: #fff;
-  border: none;
-  cursor: pointer;
-}
-
-.divider {
-  margin: 18px 0;
-  color: #94a3b8;
-}
-
-.google-btn {
-  width: 100%;
-  padding: 13px;
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.3);
-  background: transparent;
-  color: #fff;
-  cursor: pointer;
-}
-
-.google-btn span {
+.google-icon-small {
   background: #fff;
   color: #000;
-  border-radius: 50%;
-  padding: 3px 7px;
-  margin-right: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-weight: 800;
 }
 
-.auth-toggle {
-  margin-top: 16px;
-  color: #93c5fd;
-  cursor: pointer;
+/* ---------------- DIVIDER ---------------- */
+.auth-divider-small {
+  text-align: center;
+  font-size: 13px;
+  color: #aaa;
+  margin: 12px 0;
 }
 
-.user-type {
+/* ---------------- FORMS ---------------- */
+.email-form-small {
   display: flex;
-  gap: 10px;
-  margin-bottom: 14px;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.user-type button {
-  flex: 1;
-  padding: 10px;
+.form-input-small {
+  padding: 14px;
   border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  background: rgba(255,255,255,0.15);
-  color: #fff;
+  border: 1px solid #ddd;
+  font-size: 14px;
 }
 
-.user-type .active {
-  background: linear-gradient(135deg, #22d3ee, #6366f1);
+.form-input-small:focus {
+  outline: none;
+  border-color: #7928ca;
+}
+
+/* ---------------- POPUP ---------------- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 999;
+}
+
+.popup-small {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  padding: 30px;
+  border-radius: 16px;
+  z-index: 1000;
+  width: 90%;
+  max-width: 420px;
+  text-align: center;
+}
+
+.popup-small p {
+  font-size: 16px;
+  margin-bottom: 20px;
+  font-weight: 600;
+}
+
+/* ---------------- RESPONSIVE ---------------- */
+@media (max-width: 768px) {
+  .subscription-title-small {
+    font-size: 20px;
+  }
+
+  .subscription-price-small {
+    font-size: 24px;
+  }
+
+  .main-container-small {
+    margin: 20px auto;
+  }
 }
