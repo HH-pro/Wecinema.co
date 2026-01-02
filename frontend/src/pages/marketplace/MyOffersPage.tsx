@@ -34,8 +34,8 @@ import {
   Lock,
   NavigateNext
 } from '@mui/icons-material';
-import marketplaceApi, { Offer } from '../api/marketplaceApi';
-import { formatCurrency } from '../utils/formatters';
+import marketplaceApi, { Offer } from '../../api/marketplaceApi';
+import { formatCurrency } from '../../utilities/helperfFunction';
 
 // Payment Modal Component
 const PaymentModal: React.FC<{
