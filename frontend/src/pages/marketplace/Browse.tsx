@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import ListingCard from '../../components/marketplae/ListingCard';
 import MarketplaceLayout from '../../components/Layout';
 import { Listing } from '../../types/marketplace';
 import { 
   FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiCheck, FiAlertCircle, 
-  FiLoader, FiUser, FiCalendar, FiMail, FiPlay, FiPause, FiVolume2, 
-  FiVolumeX, FiMaximize, FiEye, FiHeart, FiImage, FiVideo 
+  FiLoader, FiUser, FiPlay, FiPause, FiVolume2, 
+  FiVolumeX, FiMaximize, FiEye, FiHeart, FiImage, FiVideo,
+  FiClock, FiDollarSign, FiStar, FiShoppingCart, FiTag
 } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { loadStripe } from '@stripe/stripe-js';
@@ -21,7 +21,18 @@ const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 // Constants for placeholder images
 const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1579546929662-711aa81148cf?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
 const VIDEO_PLACEHOLDER = 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
-const ERROR_IMAGE = 'https://via.placeholder.com/300x200/cccccc/ffffff?text=Preview+Unavailable';
+const ERROR_IMAGE = 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
+
+// Professional color scheme
+const COLORS = {
+  primary: '#3B82F6',    // Blue
+  secondary: '#10B981',  // Emerald
+  accent: '#F59E0B',     // Amber
+  dark: '#1F2937',       // Gray-800
+  light: '#F9FAFB',      // Gray-50
+  danger: '#EF4444',     // Red-500
+  success: '#10B981',    // Green-500
+};
 
 const Browse: React.FC = () => {
   const [listings, setListings] = useState<Listing[]>([]);
@@ -39,6 +50,7 @@ const Browse: React.FC = () => {
   const [showVideoPopup, setShowVideoPopup] = useState<boolean>(false);
   const [selectedVideo, setSelectedVideo] = useState<string>('');
   const [videoTitle, setVideoTitle] = useState<string>('');
+  const [videoLoading, setVideoLoading] = useState<boolean>(false);
   const [billingDetails, setBillingDetails] = useState({
     name: '',
     email: '',
@@ -53,7 +65,7 @@ const Browse: React.FC = () => {
     }
   });
   
-  // New state for image loading errors
+  // Track image loading errors
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const navigate = useNavigate();
 
@@ -62,7 +74,9 @@ const Browse: React.FC = () => {
     category: '',
     minPrice: '',
     maxPrice: '',
-    sortBy: 'newest'
+    sortBy: 'newest',
+    duration: '',
+    resolution: ''
   });
 
   const [offerForm, setOfferForm] = useState({
@@ -74,12 +88,26 @@ const Browse: React.FC = () => {
 
   // Video player ref
   const videoRef = useRef<HTMLVideoElement>(null);
+  const videoContainerRef = useRef<HTMLDivElement>(null);
 
   // Fetch listings and user data on component mount
   useEffect(() => {
     fetchListings();
     fetchCurrentUser();
   }, [filters]);
+
+  // Close video popup when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showVideoPopup && videoContainerRef.current && 
+          !videoContainerRef.current.contains(event.target as Node)) {
+        handleCloseVideoPopup();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showVideoPopup]);
 
   const fetchCurrentUser = async () => {
     try {
@@ -136,6 +164,16 @@ const Browse: React.FC = () => {
         // Filter by status - only show active listings
         if (listing.status !== 'active') return false;
         
+        // Additional filters
+        if (filters.duration && listing.duration) {
+          const duration = parseDuration(listing.duration);
+          const filterDuration = filters.duration;
+          
+          if (filterDuration === 'short' && duration > 300) return false; // > 5 minutes
+          if (filterDuration === 'medium' && (duration <= 300 || duration > 900)) return false; // 5-15 minutes
+          if (filterDuration === 'long' && duration <= 900) return false; // > 15 minutes
+        }
+        
         return true;
       });
 
@@ -149,6 +187,20 @@ const Browse: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper function to parse duration string to seconds
+  const parseDuration = (duration: string): number => {
+    if (!duration) return 0;
+    
+    const parts = duration.split(':').reverse();
+    let seconds = 0;
+    
+    if (parts[0]) seconds += parseInt(parts[0]) || 0; // seconds
+    if (parts[1]) seconds += (parseInt(parts[1]) || 0) * 60; // minutes
+    if (parts[2]) seconds += (parseInt(parts[2]) || 0) * 3600; // hours
+    
+    return seconds;
   };
 
   // Local sorting function
@@ -173,6 +225,12 @@ const Browse: React.FC = () => {
           const ratingA = a.sellerId?.sellerRating || 0;
           const ratingB = b.sellerId?.sellerRating || 0;
           return ratingB - ratingA;
+        });
+      case 'popular':
+        return sortedData.sort((a, b) => {
+          const viewsA = a.views || 0;
+          const viewsB = b.views || 0;
+          return viewsB - viewsA;
         });
       default:
         return sortedData;
@@ -199,7 +257,22 @@ const Browse: React.FC = () => {
   const handleVideoClick = (videoUrl: string, title: string) => {
     setSelectedVideo(videoUrl);
     setVideoTitle(title);
+    setVideoLoading(true);
     setShowVideoPopup(true);
+    
+    // Preload video
+    const video = new Audio();
+    video.src = videoUrl;
+    video.preload = 'auto';
+    
+    video.onloadeddata = () => {
+      setVideoLoading(false);
+    };
+    
+    video.onerror = () => {
+      setVideoLoading(false);
+      setError('Failed to load video. Please check the URL.');
+    };
   };
 
   // Close video popup
@@ -207,9 +280,39 @@ const Browse: React.FC = () => {
     setShowVideoPopup(false);
     setSelectedVideo('');
     setVideoTitle('');
+    setVideoLoading(false);
     if (videoRef.current) {
       videoRef.current.pause();
       videoRef.current.currentTime = 0;
+    }
+  };
+
+  // Handle video player controls
+  const handlePlayPause = () => {
+    if (videoRef.current) {
+      if (videoRef.current.paused) {
+        videoRef.current.play();
+      } else {
+        videoRef.current.pause();
+      }
+    }
+  };
+
+  const handleToggleMute = () => {
+    if (videoRef.current) {
+      videoRef.current.muted = !videoRef.current.muted;
+    }
+  };
+
+  const handleToggleFullscreen = () => {
+    if (!videoContainerRef.current) return;
+    
+    if (!document.fullscreenElement) {
+      videoContainerRef.current.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen();
     }
   };
 
@@ -369,7 +472,9 @@ const Browse: React.FC = () => {
       category: '',
       minPrice: '',
       maxPrice: '',
-      sortBy: 'newest'
+      sortBy: 'newest',
+      duration: '',
+      resolution: ''
     });
     setSearchQuery('');
     setError('');
@@ -404,6 +509,8 @@ const Browse: React.FC = () => {
 
   // Generate video thumbnail from video URL
   const generateVideoThumbnail = (videoUrl: string): string => {
+    if (!videoUrl) return VIDEO_PLACEHOLDER;
+    
     // If it's a YouTube URL, generate thumbnail
     if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
       const videoId = videoUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
@@ -421,6 +528,7 @@ const Browse: React.FC = () => {
     }
     
     // For direct video files, use video placeholder
+    // Note: For direct video files, you would need server-side thumbnail generation
     return VIDEO_PLACEHOLDER;
   };
 
@@ -437,14 +545,21 @@ const Browse: React.FC = () => {
       return PLACEHOLDER_IMAGE;
     }
     
-    // Try to find an image first
+    // First, check if there's a dedicated thumbnail
+    const thumbnailUrl = listing.mediaUrls.find(url => 
+      url.includes('thumbnail') || url.includes('thumb') || url.includes('cover')
+    );
+    
+    if (thumbnailUrl) return thumbnailUrl;
+    
+    // Try to find an image
     const imageUrl = listing.mediaUrls.find(url => 
       url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
     );
     
     if (imageUrl) return imageUrl;
     
-    // Check if there's a video URL
+    // Check if there's a video URL and generate thumbnail
     const videoUrl = getFirstVideoUrl(listing);
     if (videoUrl) {
       return generateVideoThumbnail(videoUrl);
@@ -460,7 +575,9 @@ const Browse: React.FC = () => {
   };
 
   // Handle image loading error
-  const handleImageError = (listingId: string) => {
+  const handleImageError = (listingId: string, e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    const img = e.target as HTMLImageElement;
+    img.src = ERROR_IMAGE;
     setImageErrors(prev => ({
       ...prev,
       [listingId]: true
@@ -517,13 +634,28 @@ const Browse: React.FC = () => {
     return 'none';
   };
 
+  // Format price
+  const formatPrice = (price: number): string => {
+    return marketplaceApi.utils.formatCurrency(price);
+  };
+
+  // Format duration
+  const formatDuration = (duration: string): string => {
+    if (!duration) return 'N/A';
+    return duration;
+  };
+
   if (loading) {
     return (
       <MarketplaceLayout>
-        <div className="min-h-screen flex items-center justify-center">
+        <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-yellow-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600 text-lg">Loading listings...</p>
+            <div className="relative">
+              <div className="w-20 h-20 border-4 border-blue-200 rounded-full"></div>
+              <div className="absolute top-0 left-0 w-20 h-20 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+            <p className="mt-6 text-gray-600 text-lg font-medium">Loading premium content...</p>
+            <p className="mt-2 text-gray-400 text-sm">Discover amazing videos and creative assets</p>
           </div>
         </div>
       </MarketplaceLayout>
@@ -532,211 +664,263 @@ const Browse: React.FC = () => {
 
   return (
     <MarketplaceLayout>
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+        {/* Gradient Header */}
+        <div className="relative bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600">
+          <div className="absolute inset-0 bg-black/20"></div>
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div className="text-center">
+              <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+                Premium Video Marketplace
+              </h1>
+              <p className="text-xl text-blue-100 max-w-3xl mx-auto">
+                Discover and trade high-quality video content, scripts, and creative assets from top creators
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Error Banner */}
           {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="mb-8 bg-gradient-to-r from-red-50 to-pink-50 border-l-4 border-red-500 shadow-sm rounded-lg p-4">
               <div className="flex items-center gap-3">
-                <FiAlertCircle className="text-red-500 flex-shrink-0" size={20} />
+                <div className="flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                    <FiAlertCircle className="text-red-600" size={20} />
+                  </div>
+                </div>
                 <div className="flex-1">
-                  <p className="text-red-800 text-sm font-medium">{error}</p>
+                  <h3 className="text-sm font-semibold text-red-800">Attention Required</h3>
+                  <p className="text-red-700 text-sm mt-1">{error}</p>
                 </div>
                 <button
                   onClick={() => setError('')}
-                  className="text-red-500 hover:text-red-700 p-1"
+                  className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition-colors"
                 >
-                  <FiX size={16} />
+                  <FiX size={18} />
                 </button>
               </div>
             </div>
           )}
 
-          {/* Header Section */}
+          {/* Search and Controls */}
           <div className="mb-8">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Video Marketplace</h1>
-                <p className="mt-2 text-gray-600">
-                  Discover amazing video content, scripts, and creative assets
-                </p>
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+              {/* Search Bar */}
+              <div className="flex-1 max-w-2xl">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <FiSearch className="text-gray-400" size={20} />
+                  </div>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search videos, animations, scripts, or assets..."
+                    className="block w-full pl-12 pr-4 py-3.5 border border-gray-200 rounded-xl bg-white shadow-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center"
+                    >
+                      <FiX className="text-gray-400 hover:text-gray-600" size={18} />
+                    </button>
+                  )}
+                </div>
               </div>
-              
-              <div className="flex flex-col sm:flex-row gap-3">
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap gap-3">
                 {marketplaceApi.utils.checkAuth() && (
                   <>
                     <button 
                       onClick={() => navigate('/marketplace/create')}
-                      className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-transparent text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                      className="inline-flex items-center justify-center px-5 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium rounded-xl shadow-md hover:shadow-lg transition-all duration-200"
                     >
                       <FiPlus className="mr-2" size={18} />
-                      <span className="hidden sm:inline">Create Listing</span>
-                      <span className="sm:hidden">Create</span>
+                      Create Listing
                     </button>
                     <button 
                       onClick={() => navigate('/marketplace/my-orders')}
-                      className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                      className="inline-flex items-center justify-center px-5 py-3 border-2 border-gray-200 text-gray-700 hover:bg-gray-50 font-medium rounded-xl shadow-sm hover:shadow transition-all duration-200"
                     >
-                      <FiCreditCard className="mr-2" size={18} />
-                      <span className="hidden sm:inline">My Offers</span>
-                      <span className="sm:hidden">Offers</span>
+                      <FiShoppingCart className="mr-2" size={18} />
+                      My Orders
                     </button>
                   </>
                 )}
                 
                 <button 
                   onClick={() => setShowFilters(!showFilters)}
-                  className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                  className={`inline-flex items-center justify-center px-5 py-3 font-medium rounded-xl shadow-sm transition-all duration-200 ${
+                    showFilters 
+                      ? 'bg-blue-100 text-blue-700 border-2 border-blue-200' 
+                      : 'bg-white text-gray-700 border-2 border-gray-200 hover:bg-gray-50'
+                  }`}
                 >
                   <FiFilter className="mr-2" size={18} />
-                  <span className="hidden sm:inline">Filters</span>
-                  <span className="sm:hidden">Filter</span>
+                  Filters {showFilters ? '(Hide)' : ''}
                 </button>
-              </div>
-            </div>
-
-            {/* Search Bar */}
-            <div className="mt-6 max-w-2xl">
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FiSearch className="text-gray-400" size={20} />
-                </div>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search videos, scripts, or creative assets..."
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm sm:text-base"
-                />
               </div>
             </div>
           </div>
 
           {/* Filters Section */}
           {showFilters && (
-            <div className="mb-8 bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Filters</h3>
+            <div className="mb-8 bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Advanced Filters</h3>
+                  <p className="text-gray-500 text-sm mt-1">Refine your search with precision</p>
+                </div>
                 <button
                   onClick={clearFilters}
-                  className="text-sm text-yellow-600 hover:text-yellow-500 font-medium"
+                  className="text-sm text-blue-600 hover:text-blue-800 font-medium px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
                 >
-                  Clear all
+                  Clear all filters
                 </button>
               </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Listing Type
+                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                    <FiTag className="inline mr-2" size={14} />
+                    Category
                   </label>
                   <select 
-                    value={filters.type}
-                    onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm"
+                    value={filters.category}
+                    onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white"
                   >
-                    <option value="">All Types</option>
-                    <option value="for_sale">For Sale</option>
-                    <option value="licensing">Licensing</option>
-                    <option value="adaptation_rights">Adaptation Rights</option>
-                    <option value="commission">Commission</option>
+                    <option value="">All Categories</option>
+                    <option value="animation">Animation</option>
+                    <option value="commercial">Commercial</option>
+                    <option value="documentary">Documentary</option>
+                    <option value="educational">Educational</option>
+                    <option value="entertainment">Entertainment</option>
+                    <option value="music">Music Video</option>
+                    <option value="short-film">Short Film</option>
+                    <option value="stock">Stock Footage</option>
+                    <option value="vlog">Vlog</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Category
+                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                    <FiClock className="inline mr-2" size={14} />
+                    Duration
                   </label>
-                  <input
-                    type="text"
-                    value={filters.category}
-                    onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
-                    placeholder="Video, Script, Music, Animation..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm"
-                  />
+                  <select 
+                    value={filters.duration}
+                    onChange={(e) => setFilters(prev => ({ ...prev, duration: e.target.value }))}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white"
+                  >
+                    <option value="">Any Duration</option>
+                    <option value="short">Short (&lt; 5 min)</option>
+                    <option value="medium">Medium (5-15 min)</option>
+                    <option value="long">Long (&gt; 15 min)</option>
+                  </select>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Min Price
+                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                    <FiDollarSign className="inline mr-2" size={14} />
+                    Price Range
                   </label>
-                  <input
-                    type="number"
-                    placeholder="$0"
-                    value={filters.minPrice}
-                    onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm"
-                  />
+                  <div className="flex gap-3">
+                    <input
+                      type="number"
+                      placeholder="Min"
+                      value={filters.minPrice}
+                      onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    />
+                    <input
+                      type="number"
+                      placeholder="Max"
+                      value={filters.maxPrice}
+                      onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: e.target.value }))}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    />
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                    <FiStar className="inline mr-2" size={14} />
                     Sort By
                   </label>
                   <select 
                     value={filters.sortBy}
                     onChange={(e) => setFilters(prev => ({ ...prev, sortBy: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white"
                   >
                     <option value="newest">Newest First</option>
                     <option value="oldest">Oldest First</option>
                     <option value="price_low">Price: Low to High</option>
                     <option value="price_high">Price: High to Low</option>
                     <option value="rating">Highest Rated</option>
+                    <option value="popular">Most Popular</option>
                   </select>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Results Count */}
-          <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <p className="text-gray-600 text-sm sm:text-base">
-              Showing <span className="font-semibold">{filteredListings.length}</span> listings
-              {searchQuery && (
-                <span> for "<span className="font-semibold">{searchQuery}</span>"</span>
+          {/* Results Summary */}
+          <div className="mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {searchQuery ? `Search Results for "${searchQuery}"` : 'Featured Content'}
+                </h2>
+                <p className="text-gray-600 mt-2">
+                  Found <span className="font-bold text-blue-600">{filteredListings.length}</span> premium listings
+                  {filters.category && (
+                    <span> in <span className="font-semibold text-purple-600">{filters.category}</span></span>
+                  )}
+                </p>
+              </div>
+              
+              {filteredListings.length > 0 && (
+                <div className="flex items-center gap-4">
+                  <div className="text-sm text-gray-500">
+                    Showing 1-{Math.min(filteredListings.length, 12)} of {filteredListings.length}
+                  </div>
+                </div>
               )}
-            </p>
-            
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="text-sm text-yellow-600 hover:text-yellow-500 font-medium self-start sm:self-auto"
-              >
-                Clear search
-              </button>
-            )}
+            </div>
           </div>
 
           {/* Listings Grid */}
           {filteredListings.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 sm:p-12 text-center">
+            <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
               <div className="max-w-md mx-auto">
-                <div className="w-16 h-16 sm:w-24 sm:h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                  <FiSearch size={24} className="text-gray-400 sm:w-8 sm:h-8" />
+                <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
+                  <FiSearch size={32} className="text-blue-600" />
                 </div>
-                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">
                   {searchQuery || Object.values(filters).some(Boolean) 
-                    ? 'No listings found' 
+                    ? 'No content found' 
                     : 'No listings yet'
                   }
                 </h3>
-                <p className="text-gray-600 text-sm sm:text-base mb-6">
+                <p className="text-gray-600 mb-8">
                   {searchQuery || Object.values(filters).some(Boolean)
-                    ? 'Try adjusting your search or filters to find what you\'re looking for.'
-                    : 'Be the first to create a listing and start trading!'
+                    ? 'Try different keywords or adjust your filters.'
+                    : 'Be the first to share your creative work!'
                   }
                 </p>
                 {marketplaceApi.utils.checkAuth() && (
-                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                    <button 
-                      onClick={() => navigate('/marketplace/create')}
-                      className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-transparent text-sm sm:text-base font-medium rounded-md text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
-                    >
-                      <FiPlus className="mr-2" size={18} />
-                      Create First Listing
-                    </button>
-                  </div>
+                  <button 
+                    onClick={() => navigate('/marketplace/create')}
+                    className="inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:-translate-y-0.5"
+                  >
+                    <FiPlus className="mr-3" size={20} />
+                    Upload Your First Video
+                  </button>
                 )}
               </div>
             </div>
@@ -747,128 +931,179 @@ const Browse: React.FC = () => {
                 const videoUrl = getFirstVideoUrl(listing);
                 const isVideo = isVideoUrl(videoUrl);
                 const mediaType = getMediaType(listing);
+                const hasVideo = videoUrl && isVideo;
                 
                 return (
-                  <div key={listing._id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 border border-gray-200 group">
+                  <div 
+                    key={listing._id} 
+                    className="group bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-blue-200 relative"
+                  >
+                    {/* Premium Badge */}
+                    {listing.price > 1000 && (
+                      <div className="absolute top-3 left-3 z-10">
+                        <span className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-md">
+                          PREMIUM
+                        </span>
+                      </div>
+                    )}
+
                     {/* Video/Image Preview */}
                     <div 
-                      className="relative h-48 bg-gray-900 cursor-pointer overflow-hidden"
+                      className="relative h-56 bg-gradient-to-br from-gray-900 to-black cursor-pointer overflow-hidden"
                       onClick={() => {
-                        if (isVideo && videoUrl) {
+                        if (hasVideo) {
                           handleVideoClick(videoUrl, listing.title);
                         }
                       }}
                     >
-                      {/* Thumbnail Image with fallback */}
+                      {/* Thumbnail Image */}
                       <div className="relative w-full h-full">
                         <img
                           src={thumbnailUrl}
                           alt={listing.title}
-                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          onError={() => handleImageError(listing._id)}
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                          onError={(e) => handleImageError(listing._id, e)}
                           loading="lazy"
                         />
                         
-                        {/* Loading skeleton */}
-                        <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>
+                        {/* Gradient Overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                         
                         {/* Play Button Overlay for Videos */}
-                        {mediaType === 'video' && (
-                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                            <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-2 border-white/30 transform group-hover:scale-110 transition-transform duration-300">
-                              <FiPlay className="text-white ml-1" size={28} />
+                        {hasVideo && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border-2 border-white/30 transform scale-95 group-hover:scale-105 transition-transform duration-300">
+                              <div className="w-14 h-14 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center shadow-lg">
+                                <FiPlay className="text-white ml-1" size={24} />
+                              </div>
                             </div>
                           </div>
                         )}
                         
                         {/* Media Type Badge */}
-                        <div className={`absolute top-2 right-2 text-white text-xs px-2 py-1 rounded-md flex items-center gap-1 backdrop-blur-sm ${mediaType === 'video' ? 'bg-red-500/80' : 'bg-blue-500/80'}`}>
+                        <div className={`absolute top-3 right-3 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg backdrop-blur-sm flex items-center gap-1.5 ${
+                          mediaType === 'video' ? 'bg-red-500/90' : 'bg-blue-500/90'
+                        }`}>
                           {mediaType === 'video' ? (
                             <>
-                              <FiVideo size={10} />
+                              <FiVideo size={12} />
                               VIDEO
-                            </>
-                          ) : mediaType === 'image' ? (
-                            <>
-                              <FiImage size={10} />
-                              IMAGE
                             </>
                           ) : (
                             <>
-                              <FiImage size={10} />
-                              MEDIA
+                              <FiImage size={12} />
+                              IMAGE
                             </>
                           )}
                         </div>
-                      </div>
-                      
-                      {/* Category Badge */}
-                      <div className="absolute bottom-2 left-2">
-                        <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded-md backdrop-blur-sm bg-yellow-500/90">
-                          {listing.category}
-                        </span>
+                        
+                        {/* Duration Badge for Videos */}
+                        {listing.duration && hasVideo && (
+                          <div className="absolute bottom-3 right-3 bg-black/80 text-white text-xs px-2 py-1 rounded-md backdrop-blur-sm">
+                            <FiClock className="inline mr-1" size={10} />
+                            {formatDuration(listing.duration)}
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     {/* Content */}
-                    <div className="p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-semibold text-gray-900 truncate text-sm group-hover:text-yellow-600 transition-colors">
-                          {listing.title}
-                        </h3>
-                        <div className="text-xs text-gray-500">
-                          {listing.duration || 'N/A'}
+                    <div className="p-5">
+                      {/* Title and Category */}
+                      <div className="mb-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="font-bold text-gray-900 text-lg leading-tight group-hover:text-blue-600 transition-colors line-clamp-2">
+                            {listing.title}
+                          </h3>
+                        </div>
+                        
+                        {/* Category Tag */}
+                        <div className="mt-2">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {listing.category || 'Uncategorized'}
+                          </span>
                         </div>
                       </div>
                       
-                      <p className="text-gray-600 text-xs mb-3 line-clamp-2">
+                      {/* Description */}
+                      <p className="text-gray-600 text-sm mb-5 line-clamp-2 leading-relaxed">
                         {listing.description}
                       </p>
                       
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                            {listing.sellerId?.avatar ? (
-                              <img 
-                                src={listing.sellerId.avatar} 
-                                alt={listing.sellerId.username}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/24/cccccc/ffffff?text=U';
-                                }}
-                              />
-                            ) : (
-                              <FiUser size={12} className="text-gray-600" />
+                      {/* Seller and Rating */}
+                      <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center gap-3">
+                          <div className="relative">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-100 to-purple-100 flex items-center justify-center overflow-hidden ring-2 ring-white shadow-sm">
+                              {listing.sellerId?.avatar ? (
+                                <img 
+                                  src={listing.sellerId.avatar} 
+                                  alt={listing.sellerId.username}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${listing.sellerId.username}&background=3B82F6&color=fff`;
+                                  }}
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
+                                  <span className="text-white font-bold text-sm">
+                                    {listing.sellerId?.username?.charAt(0).toUpperCase() || 'S'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            {listing.sellerId?.verified && (
+                              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                                <FiCheck size={10} className="text-white" />
+                              </div>
                             )}
                           </div>
-                          <span className="text-xs text-gray-700 truncate max-w-[80px]">
-                            {listing.sellerId?.username || 'Seller'}
-                          </span>
+                          <div>
+                            <div className="font-medium text-gray-900 text-sm">
+                              {listing.sellerId?.username || 'Seller'}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <FiStar size={12} className="text-yellow-400 fill-current" />
+                              <span className="text-xs text-gray-600">
+                                {listing.sellerId?.sellerRating?.toFixed(1) || 'New'}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-green-600 font-bold">
-                          {marketplaceApi.utils.formatCurrency(listing.price)}
+                        
+                        {/* Price */}
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-gray-900">
+                            {formatPrice(listing.price)}
+                          </div>
+                          {listing.originalPrice && listing.originalPrice > listing.price && (
+                            <div className="text-sm text-gray-500 line-through">
+                              {formatPrice(listing.originalPrice)}
+                            </div>
+                          )}
                         </div>
                       </div>
                       
                       {/* Action Buttons */}
-                      <div className="flex gap-2">
+                      <div className="flex gap-3">
                         <button
                           onClick={() => handleMakeOffer(listing)}
-                          className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white text-sm py-2 px-3 rounded-md transition-colors duration-200 flex items-center justify-center gap-2 group/btn"
+                          className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 group/btn"
                         >
-                          <FiCreditCard size={14} className="group-hover/btn:scale-110 transition-transform" />
+                          <FiCreditCard size={16} className="group-hover/btn:scale-110 transition-transform" />
                           Make Offer
                         </button>
-                        {mediaType === 'video' && videoUrl && (
+                        
+                        {hasVideo && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleVideoClick(videoUrl, listing.title);
                             }}
-                            className="px-3 bg-gray-800 hover:bg-gray-900 text-white text-sm py-2 rounded-md transition-colors duration-200 flex items-center gap-2 group/play"
+                            className="px-4 py-3 bg-gradient-to-r from-gray-800 to-gray-900 hover:from-gray-900 hover:to-black text-white font-medium rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
                           >
-                            <FiPlay size={14} className="group-hover/play:scale-110 transition-transform" />
-                            Play
+                            <FiPlay size={16} />
+                            <span className="hidden sm:inline">Preview</span>
                           </button>
                         )}
                       </div>
@@ -881,111 +1116,102 @@ const Browse: React.FC = () => {
 
           {/* Load More */}
           {filteredListings.length > 0 && filteredListings.length >= 12 && (
-            <div className="mt-8 sm:mt-12 text-center">
+            <div className="mt-12 text-center">
               <button 
                 onClick={fetchListings}
-                className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                className="inline-flex items-center justify-center px-8 py-4 border-2 border-gray-200 text-gray-700 hover:text-gray-900 hover:border-gray-300 font-medium rounded-xl bg-white hover:bg-gray-50 shadow-sm hover:shadow transition-all duration-200 transform hover:-translate-y-0.5"
               >
-                Load more listings
+                Load More Content
+                <FiPlus className="ml-2" size={18} />
               </button>
             </div>
           )}
         </div>
       </div>
 
-      {/* Video Popup Modal */}
-      {showVideoPopup && selectedVideo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-4xl max-h-[90vh] bg-black rounded-xl overflow-hidden shadow-2xl">
+      {/* Video Popup Modal - Professional */}
+      {showVideoPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-4">
+          <div 
+            ref={videoContainerRef}
+            className="relative w-full max-w-6xl bg-black rounded-3xl overflow-hidden shadow-2xl"
+          >
             {/* Header */}
-            <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 to-transparent p-4 flex justify-between items-center">
-              <div className="text-white truncate max-w-[80%]">
-                <h3 className="text-lg font-semibold truncate">{videoTitle}</h3>
-                <p className="text-sm text-gray-300 truncate">{selectedVideo}</p>
+            <div className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/90 to-transparent p-6 flex justify-between items-center">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-xl font-bold text-white truncate">{videoTitle}</h3>
+                <p className="text-gray-300 text-sm truncate">{selectedVideo}</p>
               </div>
               <button
                 onClick={handleCloseVideoPopup}
-                className="text-white hover:text-gray-300 p-2 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"
+                className="ml-4 p-3 rounded-full hover:bg-white/10 text-white hover:text-gray-300 transition-colors flex-shrink-0"
               >
                 <FiX size={24} />
               </button>
             </div>
             
             {/* Video Player */}
-            <div className="relative w-full h-[70vh] bg-black flex items-center justify-center">
-              {isVideoUrl(selectedVideo) ? (
+            <div className="relative w-full aspect-video bg-black flex items-center justify-center">
+              {videoLoading ? (
+                <div className="flex flex-col items-center justify-center">
+                  <div className="relative">
+                    <div className="w-16 h-16 border-4 border-blue-200 rounded-full"></div>
+                    <div className="absolute top-0 left-0 w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                  <p className="mt-4 text-white text-lg font-medium">Loading video...</p>
+                  <p className="text-gray-400 text-sm mt-1">Please wait</p>
+                </div>
+              ) : selectedVideo && isVideoUrl(selectedVideo) ? (
                 <video
                   ref={videoRef}
                   src={selectedVideo}
                   controls
                   autoPlay
                   className="w-full h-full object-contain bg-black"
+                  onLoadedData={() => setVideoLoading(false)}
                   onError={(e) => {
                     console.error('Video playback error:', e);
-                    const videoElement = e.target as HTMLVideoElement;
-                    videoElement.controls = false;
-                    videoElement.innerHTML = `
-                      <div class="flex flex-col items-center justify-center h-full text-white p-8 text-center">
-                        <FiAlertCircle class="text-red-500 mb-4" size={48} />
-                        <h4 class="text-xl font-semibold mb-2">Unable to Play Video</h4>
-                        <p class="text-gray-300">The video format is not supported or the URL is invalid.</p>
-                        <p class="text-sm text-gray-400 mt-2">URL: ${selectedVideo}</p>
-                      </div>
-                    `;
+                    setVideoLoading(false);
                   }}
                 >
                   Your browser does not support the video tag.
                 </video>
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-white p-8 text-center">
-                  <FiAlertCircle className="text-red-500 mb-4" size={48} />
-                  <h4 className="text-xl font-semibold mb-2">Invalid Video URL</h4>
-                  <p className="text-gray-300">The provided URL is not a valid video source.</p>
-                  <p className="text-sm text-gray-400 mt-2 break-all max-w-full">{selectedVideo}</p>
+                <div className="flex flex-col items-center justify-center p-8 text-center">
+                  <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center mb-6">
+                    <FiAlertCircle className="text-red-600" size={32} />
+                  </div>
+                  <h4 className="text-2xl font-bold text-white mb-3">Unable to Play Video</h4>
+                  <p className="text-gray-300 mb-4 max-w-md">
+                    The video format is not supported or the URL is invalid.
+                  </p>
+                  <p className="text-sm text-gray-400 break-all max-w-xl">
+                    {selectedVideo}
+                  </p>
                 </div>
               )}
             </div>
             
-            {/* Footer Actions */}
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
-              <div className="flex justify-center gap-4">
+            {/* Custom Controls */}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-6">
+              <div className="flex items-center justify-center gap-6">
                 <button
-                  onClick={() => {
-                    if (videoRef.current) {
-                      if (videoRef.current.paused) {
-                        videoRef.current.play();
-                      } else {
-                        videoRef.current.pause();
-                      }
-                    }
-                  }}
-                  className="text-white hover:text-yellow-400 p-3 rounded-full hover:bg-white/10 transition-colors"
+                  onClick={handlePlayPause}
+                  className="p-4 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
                   title="Play/Pause"
                 >
                   <FiPlay size={20} />
                 </button>
                 <button
-                  onClick={() => {
-                    if (videoRef.current) {
-                      videoRef.current.muted = !videoRef.current.muted;
-                    }
-                  }}
-                  className="text-white hover:text-yellow-400 p-3 rounded-full hover:bg-white/10 transition-colors"
+                  onClick={handleToggleMute}
+                  className="p-4 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
                   title="Mute/Unmute"
                 >
                   <FiVolume2 size={20} />
                 </button>
                 <button
-                  onClick={() => {
-                    if (videoRef.current) {
-                      if (document.fullscreenElement) {
-                        document.exitFullscreen();
-                      } else {
-                        videoRef.current.requestFullscreen();
-                      }
-                    }
-                  }}
-                  className="text-white hover:text-yellow-400 p-3 rounded-full hover:bg-white/10 transition-colors"
+                  onClick={handleToggleFullscreen}
+                  className="p-4 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
                   title="Fullscreen"
                 >
                   <FiMaximize size={20} />
@@ -996,31 +1222,32 @@ const Browse: React.FC = () => {
         </div>
       )}
 
-      {/* Offer Modal */}
+      {/* Offer Modal - Professional */}
       {showOfferModal && selectedListing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto">
-          <div className="bg-white w-full max-w-md sm:max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden scale-95 sm:scale-100 transition-transform duration-200 ease-out">
-            
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden">
             {/* Header */}
-            <div className="sticky top-100 z-10 bg-gradient-to-r from-yellow-50 to-white border-b border-gray-200 p-3 sm:p-4 flex justify-between items-center">
-              <div>
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900">Make an Offer</h3>
-                <p className="text-xs text-gray-600">Submit your offer for this listing</p>
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-bold text-white">Make an Offer</h3>
+                  <p className="text-blue-100 mt-1">Submit your offer for this premium content</p>
+                </div>
+                <button
+                  onClick={() => setShowOfferModal(false)}
+                  className="p-2 rounded-full hover:bg-white/20 text-white transition-colors"
+                >
+                  <FiX size={20} />
+                </button>
               </div>
-              <button
-                onClick={() => setShowOfferModal(false)}
-                className="p-1 rounded-md hover:bg-gray-100 transition-colors"
-              >
-                <FiX size={18} className="text-gray-600" />
-              </button>
             </div>
 
-            {/* Scrollable Body */}
-            <div className="flex-1 overflow-y-auto px-3 sm:px-5 py-3 space-y-4">
+            {/* Content */}
+            <div className="p-6 space-y-6">
               {/* Listing Preview */}
-              <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg shadow-sm flex items-start gap-3">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg overflow-hidden border border-blue-300 flex-shrink-0 bg-gray-100">
-                  {getThumbnailUrl(selectedListing) ? (
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5">
+                <div className="flex items-start gap-5">
+                  <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-white shadow-md flex-shrink-0">
                     <img
                       src={getThumbnailUrl(selectedListing)}
                       alt={selectedListing.title}
@@ -1029,57 +1256,54 @@ const Browse: React.FC = () => {
                         (e.target as HTMLImageElement).src = ERROR_IMAGE;
                       }}
                     />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                      <FiImage className="text-gray-400" size={20} />
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold text-gray-900 text-sm sm:text-base truncate">{selectedListing.title}</h4>
-                  <p className="text-gray-600 text-xs mt-1 line-clamp-2">{selectedListing.description}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-green-600 text-base sm:text-lg font-bold">
-                      {marketplaceApi.utils.formatCurrency(selectedListing.price)}
-                    </span>
-                    <span className="bg-blue-100 text-blue-800 text-[10px] font-medium px-2 py-0.5 rounded-full">
-                      {selectedListing.category}
-                    </span>
                   </div>
-                  
-                  {/* Seller Info */}
-                  <div className="flex items-center gap-1 mt-2 text-xs text-gray-500">
-                    <FiUser size={12} />
-                    <span>Seller: {selectedListing.sellerId?.username || 'Seller'}</span>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-bold text-gray-900 text-lg">{selectedListing.title}</h4>
+                    <p className="text-gray-600 text-sm mt-2 line-clamp-2">{selectedListing.description}</p>
+                    <div className="flex items-center gap-4 mt-3">
+                      <div className="text-2xl font-bold text-gray-900">
+                        {formatPrice(selectedListing.price)}
+                      </div>
+                      <span className="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1.5 rounded-full">
+                        {selectedListing.category}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Offer Form */}
-              <form onSubmit={handleSubmitOffer} className="space-y-3">
+              <form onSubmit={handleSubmitOffer} className="space-y-5">
                 {/* Amount */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-800 mb-1.5">Offer Amount</label>
-                  <input
-                    type="number"
-                    required
-                    min="0.50"
-                    step="0.01"
-                    value={offerForm.amount}
-                    onChange={(e) => setOfferForm({ ...offerForm, amount: e.target.value })}
-                    className="w-full px-2.5 py-1.5 sm:py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none text-xs sm:text-sm"
-                    placeholder="Enter your offer amount"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Minimum offer: $0.50</p>
+                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                    Offer Amount <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                    <input
+                      type="number"
+                      required
+                      min="0.50"
+                      step="0.01"
+                      value={offerForm.amount}
+                      onChange={(e) => setOfferForm({ ...offerForm, amount: e.target.value })}
+                      className="w-full pl-10 pr-4 py-3.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                      placeholder="Enter your offer amount"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">Minimum offer: $0.50</p>
                 </div>
 
                 {/* Message */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-800 mb-1.5">Message to Seller</label>
+                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                    Message to Creator
+                  </label>
                   <textarea
                     value={offerForm.message}
                     onChange={(e) => setOfferForm({ ...offerForm, message: e.target.value })}
-                    className="w-full px-2.5 py-1.5 sm:py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 resize-none outline-none text-xs sm:text-sm"
+                    className="w-full px-4 py-3.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all duration-200"
                     rows={3}
                     placeholder="Introduce yourself and explain your requirements..."
                   />
@@ -1087,57 +1311,60 @@ const Browse: React.FC = () => {
 
                 {/* Date */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-800 mb-1.5">Expected Delivery Date</label>
+                  <label className="block text-sm font-semibold text-gray-800 mb-2">
+                    Expected Delivery Date <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="date"
                     required
                     value={offerForm.expectedDelivery}
                     onChange={(e) => setOfferForm({ ...offerForm, expectedDelivery: e.target.value })}
-                    className="w-full px-2.5 py-1.5 sm:py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none text-xs sm:text-sm"
+                    className="w-full px-4 py-3.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                     min={new Date().toISOString().split('T')[0]}
                   />
                 </div>
 
-                {/* Info Box */}
-                <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 text-xs text-yellow-700 flex gap-2 items-start">
-                  <FiCreditCard className="text-yellow-600 mt-0.5" size={14} />
-                  <p>
-                    Payment will be processed immediately and securely held in escrow until the seller accepts your offer.
-                  </p>
-                </div>
-
-                {/* Error Display */}
-                {error && (
-                  <div className="bg-red-50 border border-red-200 rounded-md p-3 text-xs text-red-700 flex gap-2 items-start">
-                    <FiAlertCircle className="text-red-600 mt-0.5" size={14} />
-                    <p>{error}</p>
+                {/* Security Note */}
+                <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
+                      <FiCreditCard className="text-yellow-600" size={18} />
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-yellow-800 mb-1">Secure Payment Protection</h5>
+                      <p className="text-yellow-700 text-sm">
+                        Your payment is securely held in escrow until the creator accepts your offer and delivers the content.
+                      </p>
+                    </div>
                   </div>
-                )}
+                </div>
               </form>
             </div>
 
-            {/* Sticky Footer */}
-            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-3 flex flex-col sm:flex-row gap-2">
-              <button
-                onClick={() => setShowOfferModal(false)}
-                className="flex-1 py-2 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-100 transition-all text-xs sm:text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmitOffer}
-                disabled={paymentStatus === 'processing'}
-                className="flex-1 py-2 rounded-md bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-400 text-white transition-all text-xs sm:text-sm font-medium flex items-center justify-center gap-2"
-              >
-                {paymentStatus === 'processing' ? (
-                  <>
-                    <FiLoader className="animate-spin" size={14} />
-                    Processing...
-                  </>
-                ) : (
-                  `Submit Offer & Pay $${offerForm.amount || '0.00'}`
-                )}
-              </button>
+            {/* Footer */}
+            <div className="bg-gray-50 px-6 py-5 border-t border-gray-200">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => setShowOfferModal(false)}
+                  className="flex-1 py-3.5 px-6 border-2 border-gray-300 text-gray-700 hover:text-gray-900 hover:border-gray-400 font-medium rounded-xl transition-all duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitOffer}
+                  disabled={paymentStatus === 'processing'}
+                  className="flex-1 py-3.5 px-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-medium rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
+                >
+                  {paymentStatus === 'processing' ? (
+                    <>
+                      <FiLoader className="animate-spin" size={18} />
+                      Processing...
+                    </>
+                  ) : (
+                    `Submit Offer & Pay $${offerForm.amount || '0.00'}`
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1145,124 +1372,30 @@ const Browse: React.FC = () => {
 
       {/* Payment Modal */}
       {showPaymentModal && clientSecret && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-2 sm:p-4 overflow-y-auto">
-          <div className="w-full max-w-md sm:max-w-lg mx-4">
-            <div className="bg-white rounded-lg shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
-              {/* Header */}
-              <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {offerData?.type === 'direct_purchase' ? 'Complete Purchase' : 'Complete Offer Payment'}
-                  </h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {offerData?.type === 'direct_purchase' ? 'Complete your purchase securely' : 'Complete payment for your offer'}
-                  </p>
-                </div>
-                <button 
-                  onClick={handlePaymentClose}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={paymentStatus === 'processing'}
-                >
-                  <FiX size={20} className="text-gray-600" />
-                </button>
-              </div>
-              
-              {/* Scrollable Content */}
-              <div className="flex-1 overflow-y-auto">
-                <div className="p-4 sm:p-6">
-                  {/* Payment Summary */}
-                  <div className="mb-6 bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-yellow-500 flex items-center justify-center">
-                          <FiCreditCard className="text-white" size={18} />
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium text-gray-700">
-                            {offerData?.type === 'direct_purchase' ? 'Purchase Amount' : 'Offer Amount'}
-                          </div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {marketplaceApi.utils.formatCurrency(offerData?.amount)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {offerData?.listing && (
-                      <div className="mt-3 pt-3 border-t border-yellow-300">
-                        <div className="flex items-start gap-3">
-                          <div className="w-12 h-12 rounded-lg overflow-hidden border border-gray-300 flex-shrink-0 bg-gray-100">
-                            {getThumbnailUrl(offerData.listing) ? (
-                              <img
-                                src={getThumbnailUrl(offerData.listing)}
-                                alt={offerData.listing.title}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src = ERROR_IMAGE;
-                                }}
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                                <FiImage className="text-gray-400" size={16} />
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-semibold text-gray-900 text-sm truncate">
-                              {offerData.listing.title}
-                            </h4>
-                            <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                              {offerData.listing.description}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Payment Form */}
-                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                    <Elements stripe={stripePromise} options={{ 
-                      clientSecret,
-                      appearance: {
-                        theme: 'stripe',
-                        variables: {
-                          colorPrimary: '#ca8a04',
-                          borderRadius: '0.5rem',
-                          fontFamily: 'Inter, system-ui, sans-serif',
-                        }
-                      }
-                    }}>
-                      <PaymentForm 
-                        offerData={offerData}
-                        onSuccess={handlePaymentSuccess}
-                        onClose={handlePaymentClose}
-                        paymentStatus={paymentStatus}
-                        setPaymentStatus={setPaymentStatus}
-                        billingDetails={billingDetails}
-                        onBillingDetailsChange={handleBillingDetailsChange}
-                        currentUser={currentUser}
-                      />
-                    </Elements>
-                  </div>
-
-                  {/* Security Info */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                        <FiCheck className="text-blue-600" size={14} />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium text-blue-900 mb-1">Secure Payment</h4>
-                        <p className="text-xs text-blue-700">
-                          Your payment is processed securely via Stripe. Your funds are held in escrow until the order is completed.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg">
+            <Elements stripe={stripePromise} options={{ 
+              clientSecret,
+              appearance: {
+                theme: 'stripe',
+                variables: {
+                  colorPrimary: '#3B82F6',
+                  borderRadius: '1rem',
+                  fontFamily: 'Inter, system-ui, sans-serif',
+                }
+              }
+            }}>
+              <PaymentForm 
+                offerData={offerData}
+                onSuccess={handlePaymentSuccess}
+                onClose={handlePaymentClose}
+                paymentStatus={paymentStatus}
+                setPaymentStatus={setPaymentStatus}
+                billingDetails={billingDetails}
+                onBillingDetailsChange={handleBillingDetailsChange}
+                currentUser={currentUser}
+              />
+            </Elements>
           </div>
         </div>
       )}
@@ -1441,217 +1574,144 @@ const PaymentForm = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* User Information */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-            <FiUser size={14} />
-            Billing Information
-          </h4>
-          <button
-            type="button"
-            onClick={() => setShowBillingForm(!showBillingForm)}
-            className="text-xs text-yellow-600 hover:text-yellow-500"
+    <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-bold text-white">
+              {offerData?.type === 'direct_purchase' ? 'Complete Purchase' : 'Complete Offer Payment'}
+            </h3>
+            <p className="text-blue-100 mt-1">Secure payment processing</p>
+          </div>
+          <button 
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-white/20 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={paymentStatus === 'processing'}
           >
-            {showBillingForm ? 'Hide' : 'Edit'}
+            <FiX size={20} />
           </button>
         </div>
-        
-        {showBillingForm ? (
-          <div className="space-y-4">
-            {/* Name Input */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Full Name
-              </label>
-              <input
-                type="text"
-                value={billingDetails.name || currentUser?.username || ''}
-                onChange={(e) => onBillingDetailsChange({ name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
-                placeholder="Enter your full name"
-                required
-              />
+      </div>
+      
+      {/* Content */}
+      <div className="p-6">
+        {/* Payment Summary */}
+        <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center shadow-md">
+                <FiCreditCard className="text-white" size={20} />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-gray-700">
+                  {offerData?.type === 'direct_purchase' ? 'Purchase Amount' : 'Offer Amount'}
+                </div>
+                <div className="text-2xl font-bold text-gray-900">
+                  {marketplaceApi.utils.formatCurrency(offerData?.amount)}
+                </div>
+              </div>
             </div>
+          </div>
+        </div>
 
-            {/* Email Input */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Email Address
+        {/* Payment Form */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Payment Element */}
+          <div className="bg-gray-50 rounded-xl border border-gray-200 p-5">
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <FiCreditCard size={16} />
+                Payment Details
               </label>
-              <input
-                type="email"
-                value={billingDetails.email || currentUser?.email || ''}
-                onChange={(e) => onBillingDetailsChange({ email: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
-                placeholder="Enter your email"
-                required
-              />
-            </div>
-
-            {/* Phone Input (Optional) */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Phone Number (Optional)
-              </label>
-              <input
-                type="tel"
-                value={billingDetails.phone || ''}
-                onChange={(e) => onBillingDetailsChange({ phone: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
-                placeholder="Enter your phone number"
-              />
-            </div>
-
-            {/* Address Element */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Billing Address
-              </label>
-              <div className="border border-gray-300 rounded-md overflow-hidden">
-                <AddressElement 
+              <div className="min-h-[220px]">
+                <PaymentElement 
                   options={{
-                    mode: 'billing',
-                    allowedCountries: ['US', 'CA', 'GB', 'AU', 'IN'],
+                    layout: 'tabs',
+                    wallets: {
+                      applePay: 'auto',
+                      googlePay: 'auto'
+                    },
                     fields: {
-                      phone: 'always'
-                    },
-                    validation: {
-                      phone: {
-                        required: 'never'
-                      }
-                    },
-                    defaultValues: {
-                      name: billingDetails.name || currentUser?.username || '',
-                      phone: billingDetails.phone || '',
-                      address: {
-                        line1: billingDetails.address.line1 || '',
-                        line2: billingDetails.address.line2 || '',
-                        city: billingDetails.address.city || '',
-                        state: billingDetails.address.state || '',
-                        postal_code: billingDetails.address.postal_code || '',
-                        country: billingDetails.address.country || 'US'
+                      billingDetails: {
+                        name: 'auto',
+                        email: 'auto',
+                        phone: 'auto',
+                        address: {
+                          country: 'auto',
+                          postalCode: 'auto'
+                        }
                       }
                     }
                   }}
-                  onChange={handleAddressChange}
                 />
               </div>
             </div>
           </div>
-        ) : (
-          <div className="text-sm text-gray-600">
-            <div className="flex items-center gap-2 mb-2">
-              <FiUser size={14} />
-              <span>{billingDetails.name || currentUser?.username || 'Not provided'}</span>
+          
+          {/* Error/Success Messages */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                  <FiAlertCircle className="text-red-600" size={18} />
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-semibold text-red-800 mb-1">Payment Error</h4>
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <FiMail size={14} />
-              <span>{billingDetails.email || currentUser?.email || 'Not provided'}</span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Payment Element */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <label className="block text-sm font-semibold text-gray-800 flex items-center gap-2">
-              <FiCreditCard size={14} />
-              Payment Details
-            </label>
-            <div className="flex items-center gap-1">
-              <div className="w-6 h-4 bg-blue-500 rounded-sm"></div>
-              <div className="w-6 h-4 bg-red-500 rounded-sm"></div>
-              <div className="w-6 h-4 bg-yellow-500 rounded-sm"></div>
-            </div>
-          </div>
-          <div className="min-h-[200px]">
-            <PaymentElement 
-              options={{
-                layout: 'tabs',
-                wallets: {
-                  applePay: 'auto',
-                  googlePay: 'auto'
-                },
-                fields: {
-                  billingDetails: {
-                    name: 'auto',
-                    email: 'auto',
-                    phone: 'auto',
-                    address: {
-                      country: 'auto',
-                      postalCode: 'auto'
-                    }
-                  }
-                }
-              }}
-            />
-          </div>
-        </div>
-      </div>
-      
-      {/* Error/Success Messages */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <FiAlertCircle className="text-red-500 mt-0.5 flex-shrink-0" size={18} />
-            <div className="flex-1">
-              <h4 className="text-sm font-semibold text-red-800 mb-1">Payment Error</h4>
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {paymentStatus === 'success' && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-              <FiCheck className="text-green-600" size={16} />
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold text-green-800">Payment Successful!</h4>
-              <p className="text-sm text-green-700">Redirecting to your orders...</p>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={paymentStatus === 'processing' || paymentStatus === 'success' || isSubmitting}
-          className="flex-1 py-3 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 transition-colors text-sm font-medium flex items-center justify-center gap-2"
-        >
-          <FiX size={16} />
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={!stripe || paymentStatus === 'processing' || paymentStatus === 'success' || isSubmitting}
-          className="flex-1 py-3 px-4 bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-700 hover:to-yellow-600 disabled:from-gray-400 disabled:to-gray-400 text-white rounded-lg transition-all flex items-center justify-center gap-2 text-sm font-medium shadow-sm hover:shadow disabled:shadow-none"
-        >
-          {paymentStatus === 'processing' || isSubmitting ? (
-            <>
-              <FiLoader className="animate-spin" size={16} />
-              Processing...
-            </>
-          ) : paymentStatus === 'success' ? (
-            <>
-              <FiCheck size={16} />
-              Success!
-            </>
-          ) : (
-            `Pay ${marketplaceApi.utils.formatCurrency(offerData?.amount)}`
           )}
-        </button>
+          
+          {paymentStatus === 'success' && (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-5">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                  <FiCheck className="text-green-600" size={20} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-green-800">Payment Successful!</h4>
+                  <p className="text-sm text-green-700 mt-1">Redirecting to your orders...</p>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={paymentStatus === 'processing' || paymentStatus === 'success' || isSubmitting}
+              className="flex-1 py-3.5 px-6 border-2 border-gray-300 text-gray-700 hover:text-gray-900 hover:border-gray-400 font-medium rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
+            >
+              <FiX size={16} />
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!stripe || paymentStatus === 'processing' || paymentStatus === 'success' || isSubmitting}
+              className="flex-1 py-3.5 px-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 text-white font-medium rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
+            >
+              {paymentStatus === 'processing' || isSubmitting ? (
+                <>
+                  <FiLoader className="animate-spin" size={18} />
+                  Processing...
+                </>
+              ) : paymentStatus === 'success' ? (
+                <>
+                  <FiCheck size={18} />
+                  Success!
+                </>
+              ) : (
+                `Pay ${marketplaceApi.utils.formatCurrency(offerData?.amount)}`
+              )}
+            </button>
+          </div>
+        </form>
       </div>
-    </form>
+    </div>
   );
 };
 
