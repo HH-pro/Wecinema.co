@@ -137,16 +137,24 @@ const Browse: React.FC = () => {
       const sortedData = sortListings(filteredData, filters.sortBy);
       
       // Debug: Check video detection for all listings
-      console.log('🎬 Video detection results:');
+      console.log('🎬 ========== VIDEO DETECTION DEBUG ==========');
       sortedData.forEach((listing, index) => {
+        console.log(`\n📊 Listing ${index + 1}: ${listing.title}`);
+        console.log('📁 Media URLs:', listing.mediaUrls);
+        
+        // Check each URL
+        listing.mediaUrls?.forEach((url, urlIndex) => {
+          const isVideo = isVideoUrl(url);
+          console.log(`   URL ${urlIndex + 1}: ${url}`);
+          console.log(`   Is Video? ${isVideo}`);
+        });
+        
         const videoUrl = getFirstVideoUrl(listing);
         const mediaType = getMediaType(listing);
-        console.log(`${index + 1}. ${listing.title}`);
-        console.log('   Media URLs:', listing.mediaUrls);
-        console.log('   Video URL found:', videoUrl);
-        console.log('   Media Type:', mediaType);
-        console.log('   Is Video?', mediaType === 'video');
+        console.log('🎯 First video URL found:', videoUrl || 'None');
+        console.log('🎯 Media Type:', mediaType);
       });
+      console.log('🎬 ==========================================\n');
       
       setListings(sortedData);
     } catch (error: any) {
@@ -410,83 +418,112 @@ const Browse: React.FC = () => {
   };
 
   // ============================================
-  // IMPROVED VIDEO DETECTION LOGIC WITH CLOUDINARY SUPPORT
+  // SIMPLE BUT EFFECTIVE VIDEO DETECTION
   // ============================================
 
-  // Check if media is a video - IMPROVED CLOUDINARY SUPPORT
+  // Check if media is a video - SIMPLE AND RELIABLE
   const isVideoUrl = (url: string): boolean => {
-    if (!url || typeof url !== 'string') return false;
+    if (!url || typeof url !== 'string') {
+      console.log('❌ Invalid URL:', url);
+      return false;
+    }
     
+    console.log('🔍 Checking URL for video:', url);
+    
+    // Convert to lowercase for case-insensitive matching
     const urlLower = url.toLowerCase();
     
-    // Common video file extensions
-    const videoExtensions = /\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v|ogg|ogv|3gp|3g2|mpeg|mpg|m2v|m4p|m4v|svi|3gpp|3gpp2|mxf|roq|nsv|flv|f4v|f4p|f4a|f4b)$/i;
+    // 1. Check for video file extensions FIRST (most reliable)
+    const videoExtensions = /\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v|ogg|ogv|3gp|3g2|mpeg|mpg)$/i;
     
     if (videoExtensions.test(url)) {
+      console.log('✅ Video detected by file extension');
       return true;
     }
     
-    // Video hosting platforms with Cloudinary support
+    // 2. Check for Cloudinary video patterns
+    if (urlLower.includes('cloudinary.com')) {
+      // Cloudinary video patterns
+      if (urlLower.includes('/video/') || 
+          urlLower.includes('.mp4') ||
+          urlLower.includes('.mov') ||
+          urlLower.includes('.avi') ||
+          urlLower.includes('.webm')) {
+        console.log('✅ Cloudinary video detected');
+        return true;
+      }
+      
+      // Also check for upload paths that might be videos
+      if (urlLower.includes('/upload/')) {
+        // Check if it has a video file extension in the path
+        const path = urlLower.split('/upload/')[1] || '';
+        if (path.match(/\.(mp4|mov|avi|webm)$/)) {
+          console.log('✅ Cloudinary upload video detected');
+          return true;
+        }
+      }
+    }
+    
+    // 3. Check for other video hosting platforms
     const videoDomains = [
       'youtube.com',
       'youtu.be',
       'vimeo.com',
-      'dailymotion.com',
-      'twitch.tv',
-      'streamable.com',
-      'cloudinary.com/video',
-      'cloudinary.com/upload/video',
-      'cloudinary.com/upload/v',
-      'res.cloudinary.com/video'
+      'dailymotion.com'
     ];
     
-    // Check if URL contains any video domain
     for (const domain of videoDomains) {
       if (urlLower.includes(domain)) {
+        console.log(`✅ Video detected by domain: ${domain}`);
         return true;
       }
     }
     
-    // Special Cloudinary video detection
-    if (urlLower.includes('cloudinary.com')) {
-      // Check if it's a Cloudinary video upload
-      if (urlLower.includes('/video/') || 
-          urlLower.includes('/upload/video/') ||
-          urlLower.includes('/upload/v') ||
-          urlLower.match(/\.(mp4|mov|avi|webm)$/)) {
-        return true;
-      }
-    }
-    
+    console.log('❌ Not a video URL');
     return false;
   };
 
   // Get first video URL from listing
   const getFirstVideoUrl = (listing: Listing): string => {
     if (!listing.mediaUrls || !Array.isArray(listing.mediaUrls) || listing.mediaUrls.length === 0) {
+      console.log('📭 No media URLs for listing:', listing.title);
       return '';
     }
     
+    console.log(`🎬 Searching for video in "${listing.title}":`);
+    
     // Find first video URL
     for (const url of listing.mediaUrls) {
-      if (isVideoUrl(url)) {
+      const isVideo = isVideoUrl(url);
+      console.log(`   URL: ${url}`);
+      console.log(`   Is Video? ${isVideo}`);
+      
+      if (isVideo) {
         console.log('✅ Found video URL:', url);
         return url;
       }
     }
     
+    console.log('❌ No video URL found in this listing');
     return '';
   };
 
-  // Generate video thumbnail from video URL - IMPROVED FOR CLOUDINARY
+  // Generate video thumbnail from video URL
   const generateVideoThumbnail = (videoUrl: string): string => {
-    if (!videoUrl) return VIDEO_PLACEHOLDER;
+    if (!videoUrl) {
+      console.log('❌ No video URL provided for thumbnail');
+      return VIDEO_PLACEHOLDER;
+    }
+    
+    console.log('🖼️ Generating thumbnail for:', videoUrl);
     
     // If it's a YouTube URL, generate thumbnail
     if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
       const videoId = videoUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
       if (videoId) {
-        return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+        const thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+        console.log('📺 YouTube thumbnail:', thumbnail);
+        return thumbnail;
       }
     }
     
@@ -494,47 +531,29 @@ const Browse: React.FC = () => {
     if (videoUrl.includes('vimeo.com')) {
       const videoId = videoUrl.match(/vimeo\.com\/(\d+)/)?.[1];
       if (videoId) {
-        return `https://vumbnail.com/${videoId}.jpg`;
+        const thumbnail = `https://vumbnail.com/${videoId}.jpg`;
+        console.log('🎬 Vimeo thumbnail:', thumbnail);
+        return thumbnail;
       }
     }
     
     // For Cloudinary videos - generate thumbnail
     if (videoUrl.includes('cloudinary.com')) {
-      // Extract Cloudinary public ID
-      const cloudinaryMatch = videoUrl.match(/cloudinary\.com\/[^\/]+\/(video|upload)\/(.*?)\/([^\.]+)\./);
+      console.log('☁️ Cloudinary video detected, generating thumbnail');
       
-      if (cloudinaryMatch) {
-        const publicId = cloudinaryMatch[3];
-        
-        // Generate thumbnail URL for Cloudinary video
-        // Replace video/upload with image/upload and add thumbnail parameters
-        const thumbnailUrl = videoUrl
-          .replace('/video/upload/', '/image/upload/')
-          .replace('/upload/video/', '/upload/')
-          .replace(/(\/upload\/.*?\/)([^\/]+)$/, '$1w_600,h_400,c_fill,q_auto,f_auto/$2.jpg');
-        
-        return thumbnailUrl;
-      }
-      
-      // Alternative method for Cloudinary thumbnails
-      if (videoUrl.includes('/upload/')) {
-        const baseUrl = videoUrl.split('/upload/')[0];
-        const path = videoUrl.split('/upload/')[1];
-        
-        if (path) {
-          // Remove any file extension and add thumbnail parameters
-          const pathWithoutExt = path.replace(/\.(mp4|mov|avi|webm)$/i, '');
-          const thumbnail = `${baseUrl}/image/upload/w_600,h_400,c_fill,q_auto,f_auto/${pathWithoutExt}.jpg`;
-          return thumbnail;
-        }
-      }
+      // Simple method: just use the video URL but ensure it's treated as an image
+      // Cloudinary can serve video frames as images
+      const thumbnailUrl = videoUrl.replace('/video/upload/', '/image/upload/') + '.jpg';
+      console.log('📸 Generated Cloudinary thumbnail:', thumbnailUrl);
+      return thumbnailUrl;
     }
     
     // For direct video files, use video placeholder
+    console.log('📹 Using generic video placeholder');
     return VIDEO_PLACEHOLDER;
   };
 
-  // Get thumbnail URL with better error handling - OPTIMIZED FOR CLOUDINARY
+  // Get thumbnail URL with better error handling
   const getThumbnailUrl = (listing: Listing): string => {
     const listingId = listing._id || 'unknown';
     
@@ -547,82 +566,89 @@ const Browse: React.FC = () => {
       return PLACEHOLDER_IMAGE;
     }
     
-    // Check for Cloudinary media first (for better detection)
-    const cloudinaryMedia = listing.mediaUrls.find(url => 
-      url.includes('cloudinary.com')
-    );
+    console.log(`📸 Getting thumbnail for: ${listing.title}`);
+    console.log('📁 Media URLs:', listing.mediaUrls);
     
-    if (cloudinaryMedia) {
-      // Check if it's a video
-      const isVideo = isVideoUrl(cloudinaryMedia);
-      
-      if (isVideo) {
-        // Generate thumbnail for Cloudinary video
-        return generateVideoThumbnail(cloudinaryMedia);
-      } else {
-        // It's already a Cloudinary image, return as is
-        return cloudinaryMedia;
-      }
+    // First, check if there's a video
+    const videoUrl = getFirstVideoUrl(listing);
+    if (videoUrl) {
+      console.log('🎥 Found video, generating thumbnail');
+      return generateVideoThumbnail(videoUrl);
     }
     
-    // Try to find a regular image
+    // If no video, try to find an image
     const imageUrl = listing.mediaUrls.find(url => 
       url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
     );
     
-    if (imageUrl) return imageUrl;
-    
-    // Check if there's a video URL
-    const videoUrl = getFirstVideoUrl(listing);
-    if (videoUrl) {
-      return generateVideoThumbnail(videoUrl);
+    if (imageUrl) {
+      console.log('🖼️ Using image URL:', imageUrl);
+      return imageUrl;
     }
     
     // Default to the first media URL
     const firstUrl = listing.mediaUrls[0];
     if (firstUrl) {
+      console.log('📄 Using first URL:', firstUrl);
       return firstUrl;
     }
     
+    console.log('⚠️ Using placeholder');
     return PLACEHOLDER_IMAGE;
   };
 
   // Handle image loading error
   const handleImageError = (listingId: string) => {
+    console.error('❌ Image load error for listing:', listingId);
     setImageErrors(prev => ({
       ...prev,
       [listingId]: true
     }));
   };
 
-  // Get media type for a listing - IMPROVED FOR CLOUDINARY
+  // Get media type for a listing - SIMPLE AND RELIABLE
   const getMediaType = (listing: Listing): 'image' | 'video' | 'none' => {
     if (!listing.mediaUrls || !Array.isArray(listing.mediaUrls) || listing.mediaUrls.length === 0) {
       return 'none';
     }
     
+    console.log(`🔍 Getting media type for: ${listing.title}`);
+    
     // Check for video first
-    for (const url of listing.mediaUrls) {
-      if (isVideoUrl(url)) {
-        return 'video';
-      }
+    const videoUrl = getFirstVideoUrl(listing);
+    if (videoUrl) {
+      console.log(`✅ ${listing.title} is a VIDEO`);
+      return 'video';
     }
     
     // Check for image
     for (const url of listing.mediaUrls) {
       if (url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)) {
+        console.log(`✅ ${listing.title} is an IMAGE`);
         return 'image';
       }
     }
     
-    // Check for Cloudinary URLs that might be images
-    for (const url of listing.mediaUrls) {
-      if (url.includes('cloudinary.com') && !isVideoUrl(url)) {
-        return 'image';
-      }
-    }
-    
+    console.log(`❌ ${listing.title} has no recognizable media type`);
     return 'none';
+  };
+
+  // Debug function to check all listings
+  const debugListings = () => {
+    console.log('🔍 ========== DEBUG ALL LISTINGS ==========');
+    filteredListings.forEach((listing, index) => {
+      const videoUrl = getFirstVideoUrl(listing);
+      const mediaType = getMediaType(listing);
+      const thumbnailUrl = getThumbnailUrl(listing);
+      
+      console.log(`\n📊 ${index + 1}. ${listing.title}`);
+      console.log('   Media URLs:', listing.mediaUrls);
+      console.log('   Video URL:', videoUrl);
+      console.log('   Media Type:', mediaType);
+      console.log('   Thumbnail URL:', thumbnailUrl);
+      console.log('   Is Video?', mediaType === 'video');
+    });
+    console.log('🔍 =========================================\n');
   };
 
   if (loading) {
@@ -699,6 +725,14 @@ const Browse: React.FC = () => {
                   <FiFilter className="mr-2" size={18} />
                   <span className="hidden sm:inline">Filters</span>
                   <span className="sm:hidden">Filter</span>
+                </button>
+                
+                {/* Debug Button */}
+                <button
+                  onClick={debugListings}
+                  className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors duration-200"
+                >
+                  Debug Videos
                 </button>
               </div>
             </div>
@@ -856,14 +890,28 @@ const Browse: React.FC = () => {
                 const mediaType = getMediaType(listing);
                 const isVideo = mediaType === 'video';
                 
+                // Log each listing for debugging
+                console.log(`\n🎬 Rendering Listing: ${listing.title}`);
+                console.log(`   Thumbnail URL: ${thumbnailUrl}`);
+                console.log(`   Video URL: ${videoUrl}`);
+                console.log(`   Media Type: ${mediaType}`);
+                console.log(`   Is Video? ${isVideo}`);
+                console.log(`   Has Play Button? ${isVideo && videoUrl}`);
+                
                 return (
                   <div key={listing._id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 border border-gray-200 group">
                     {/* Video/Image Preview */}
                     <div 
                       className="relative h-48 bg-gray-900 cursor-pointer overflow-hidden"
                       onClick={() => {
+                        console.log(`🖱️ Clicked on: ${listing.title}`);
+                        console.log(`   Is Video? ${isVideo}`);
+                        console.log(`   Video URL: ${videoUrl}`);
+                        
                         if (isVideo && videoUrl) {
                           handleVideoClick(videoUrl, listing.title, listing);
+                        } else {
+                          console.log('⚠️ Not a video or no video URL available');
                         }
                       }}
                     >
@@ -881,15 +929,17 @@ const Browse: React.FC = () => {
                         <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>
                         
                         {/* Play Button Overlay for Videos */}
-                        {isVideo && (
-                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                            <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-2 border-white/30 transform group-hover:scale-110 transition-transform duration-300">
-                              <FiPlay className="text-white ml-1" size={28} />
+                        {isVideo && videoUrl && (
+                          <>
+                            <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                              <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-2 border-white/30 transform group-hover:scale-110 transition-transform duration-300">
+                                <FiPlay className="text-white ml-1" size={28} />
+                              </div>
                             </div>
                             <div className="absolute bottom-2 left-2 text-white text-xs bg-black/50 px-2 py-1 rounded">
                               Click to play
                             </div>
-                          </div>
+                          </>
                         )}
                         
                         {/* Media Type Badge */}
@@ -920,10 +970,10 @@ const Browse: React.FC = () => {
                         </span>
                       </div>
                       
-                      {/* Cloudinary Badge if Cloudinary URL */}
-                      {thumbnailUrl.includes('cloudinary.com') && (
-                        <div className="absolute top-2 left-2 bg-green-600/80 text-white text-[10px] px-2 py-1 rounded backdrop-blur-sm">
-                          CLOUDINARY
+                      {/* Debug Info Badge */}
+                      {process.env.NODE_ENV === 'development' && (
+                        <div className="absolute top-2 left-2 bg-black/70 text-white text-[10px] px-2 py-1 rounded">
+                          {isVideo ? '🎬 Video' : '🖼️ Image'}
                         </div>
                       )}
                     </div>
@@ -981,6 +1031,7 @@ const Browse: React.FC = () => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              console.log('▶️ Play button clicked for:', listing.title);
                               handleVideoClick(videoUrl, listing.title, listing);
                             }}
                             className="px-3 bg-gray-800 hover:bg-gray-900 text-white text-sm py-2 rounded-md transition-colors duration-200 flex items-center gap-2 group/play"
