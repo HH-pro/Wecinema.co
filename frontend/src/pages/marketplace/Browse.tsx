@@ -11,9 +11,9 @@ import ListingCard from '../../components/marketplae/ListingCard';
 import MarketplaceLayout from '../../components/Layout';
 import { Listing } from '../../types/marketplace';
 import marketplaceApi from '../../api/marketplaceApi';
-import VideoPlayerModal from './components/VideoPlayerModal';
-import PaymentModal from './components/PaymentModal';
-import OfferModal from './components/OfferModal';
+import VideoPlayerModal from '../../components/marketplae/VideoPlayerModal';
+import PaymentModal from '../../components/marketplae/paymentModal';
+import OfferModal from '../../components/marketplae/OfferModal';
 
 // Constants
 const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "pk_test_51SKw7ZHYamYyPYbDUlqbeydcW1hVGrHOvCZ8mBwSU1gw77TIRyzng31iSqAvPIQzTYKG8UWfDew7kdKgBxsw7vtq00WTLU3YCZ";
