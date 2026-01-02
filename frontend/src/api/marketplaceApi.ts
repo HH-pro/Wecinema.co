@@ -1644,7 +1644,7 @@ export const paymentsApi = {
   }>> => {
     try {
       const response = await axios.post(
-        `${API_BASE_URL}/payments/create-offer-payment-intent`,
+        `${API_BASE_URL}/marketplace/payments/create-payment-intent`,
         { offerId },
         getHeaders()
       );
