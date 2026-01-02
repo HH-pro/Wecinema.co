@@ -136,18 +136,6 @@ const Browse: React.FC = () => {
       // Apply sorting
       const sortedData = sortListings(filteredData, filters.sortBy);
       
-      // Debug: Check video detection for all listings
-      console.log('🎬 Video detection results:');
-      sortedData.forEach((listing, index) => {
-        const videoUrl = getFirstVideoUrl(listing);
-        const mediaType = getMediaType(listing);
-        console.log(`${index + 1}. ${listing.title}`);
-        console.log('   Media URLs:', listing.mediaUrls);
-        console.log('   Video URL found:', videoUrl);
-        console.log('   Media Type:', mediaType);
-        console.log('   Is Video?', mediaType === 'video');
-      });
-      
       setListings(sortedData);
     } catch (error: any) {
       console.error('Error fetching listings:', error);
@@ -204,7 +192,6 @@ const Browse: React.FC = () => {
   // Handle video click - open popup
   const handleVideoClick = (videoUrl: string, title: string, listing: Listing) => {
     console.log('🎬 Opening video:', videoUrl);
-    console.log('📁 Listing media URLs:', listing.mediaUrls);
     
     setSelectedVideo(videoUrl);
     setVideoTitle(title);
@@ -410,59 +397,31 @@ const Browse: React.FC = () => {
   };
 
   // ============================================
-  // IMPROVED VIDEO DETECTION LOGIC
+  // SIMPLE VIDEO DETECTION LOGIC (Old working style)
   // ============================================
 
-  // Check if media is a video - IMPROVED VERSION
+  // Check if media is a video - SIMPLE VERSION
   const isVideoUrl = (url: string): boolean => {
     if (!url || typeof url !== 'string') return false;
     
-    // Convert to lowercase for case-insensitive matching
-    const urlLower = url.toLowerCase();
-    
     // Common video file extensions
-    const videoExtensions = /\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v|ogg|ogv|3gp|3g2|mpeg|mpg|m2v|m4p|m4v|svi|3gpp|3gpp2|mxf|roq|nsv|flv|f4v|f4p|f4a|f4b)$/i;
+    const videoExtensions = /\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v|ogg|ogv|3gp|3g2)$/i;
     
     if (videoExtensions.test(url)) {
-      console.log('✅ Video detected by extension:', url);
       return true;
     }
     
-    // Video hosting platforms - check if URL contains these domains
+    // Video hosting platforms
     const videoDomains = [
       'youtube.com',
       'youtu.be',
       'vimeo.com',
       'dailymotion.com',
-      'twitch.tv',
-      'streamable.com',
-      'cloudinary.com',
-      'vidyard.com',
-      'wistia.com',
-      'brightcove.com',
-      'jwplayer.com',
-      'kaltura.com'
+      'cloudinary.com'
     ];
     
-    for (const domain of videoDomains) {
-      if (urlLower.includes(domain)) {
-        console.log('✅ Video detected by domain:', domain, 'in URL:', url);
-        return true;
-      }
-    }
-    
-    // Check for video-specific patterns in URL
-    if (urlLower.includes('/video/') || 
-        urlLower.includes('/videos/') || 
-        urlLower.includes('/v/') ||
-        urlLower.includes('.mp4') ||
-        urlLower.includes('.mov') ||
-        urlLower.includes('.avi')) {
-      console.log('✅ Video detected by pattern in URL:', url);
-      return true;
-    }
-    
-    return false;
+    // Check if URL contains any video domain
+    return videoDomains.some(domain => url.includes(domain));
   };
 
   // Get first video URL from listing
@@ -548,7 +507,7 @@ const Browse: React.FC = () => {
     }));
   };
 
-  // Get media type for a listing - IMPROVED VERSION
+  // Get media type for a listing - SIMPLE AND RELIABLE
   const getMediaType = (listing: Listing): 'image' | 'video' | 'none' => {
     if (!listing.mediaUrls || !Array.isArray(listing.mediaUrls) || listing.mediaUrls.length === 0) {
       return 'none';
@@ -557,7 +516,6 @@ const Browse: React.FC = () => {
     // Check for video first
     for (const url of listing.mediaUrls) {
       if (isVideoUrl(url)) {
-        console.log(`✅ ${listing.title} is a VIDEO:`, url);
         return 'video';
       }
     }
@@ -569,8 +527,15 @@ const Browse: React.FC = () => {
       }
     }
     
-    console.log(`❌ ${listing.title} has no recognizable media type`);
     return 'none';
+  };
+
+  // Get listing for the selected video
+  const getListingForVideo = (videoUrl: string): Listing | undefined => {
+    return listings.find(listing => {
+      const listingVideoUrl = getFirstVideoUrl(listing);
+      return listingVideoUrl === videoUrl;
+    });
   };
 
   if (loading) {
@@ -764,7 +729,7 @@ const Browse: React.FC = () => {
             )}
           </div>
 
-          {/* Listings Grid - CHANGED TO 3 PER ROW */}
+          {/* Listings Grid */}
           {filteredListings.length === 0 ? (
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 sm:p-12 text-center">
               <div className="max-w-md mx-auto">
@@ -797,19 +762,12 @@ const Browse: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6"> {/* Changed to 3 columns */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredListings.map(listing => {
                 const thumbnailUrl = getThumbnailUrl(listing);
                 const videoUrl = getFirstVideoUrl(listing);
                 const mediaType = getMediaType(listing);
                 const isVideo = mediaType === 'video';
-                
-                // Debug for each listing
-                console.log(`📊 Rendering: ${listing.title}`);
-                console.log(`   Media Type: ${mediaType}`);
-                console.log(`   Video URL: ${videoUrl}`);
-                console.log(`   Thumbnail URL: ${thumbnailUrl}`);
-                console.log(`   Is Video? ${isVideo}`);
                 
                 return (
                   <div key={listing._id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 border border-gray-200 group">
@@ -817,14 +775,8 @@ const Browse: React.FC = () => {
                     <div 
                       className="relative h-48 bg-gray-900 cursor-pointer overflow-hidden"
                       onClick={() => {
-                        console.log('🖱️ Clicked listing:', listing.title);
-                        console.log('🎬 Is video?', isVideo);
-                        console.log('🎬 Video URL:', videoUrl);
-                        
                         if (isVideo && videoUrl) {
                           handleVideoClick(videoUrl, listing.title, listing);
-                        } else {
-                          console.log('⚠️ Not a video or no video URL');
                         }
                       }}
                     >
@@ -846,9 +798,6 @@ const Browse: React.FC = () => {
                           <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                             <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border-2 border-white/30 transform group-hover:scale-110 transition-transform duration-300">
                               <FiPlay className="text-white ml-1" size={28} />
-                            </div>
-                            <div className="absolute bottom-2 left-2 text-white text-xs bg-black/50 px-2 py-1 rounded">
-                              Click to play
                             </div>
                           </div>
                         )}
@@ -880,13 +829,6 @@ const Browse: React.FC = () => {
                           {listing.category}
                         </span>
                       </div>
-                      
-                      {/* Debug Info - only show in development */}
-                      {process.env.NODE_ENV === 'development' && (
-                        <div className="absolute top-2 left-2 bg-black/70 text-white text-[10px] px-2 py-1 rounded">
-                          {isVideo ? '🎬 Video' : '🖼️ Image'}
-                        </div>
-                      )}
                     </div>
 
                     {/* Content */}
@@ -942,7 +884,6 @@ const Browse: React.FC = () => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              console.log('▶️ Play button clicked for:', listing.title);
                               handleVideoClick(videoUrl, listing.title, listing);
                             }}
                             className="px-3 bg-gray-800 hover:bg-gray-900 text-white text-sm py-2 rounded-md transition-colors duration-200 flex items-center gap-2 group/play"
@@ -952,18 +893,6 @@ const Browse: React.FC = () => {
                           </button>
                         )}
                       </div>
-                      
-                      {/* Debug Media URLs */}
-                      {process.env.NODE_ENV === 'development' && listing.mediaUrls && (
-                        <div className="mt-2 pt-2 border-t border-gray-100">
-                          <div className="text-[10px] text-gray-500">
-                            Media URLs: {listing.mediaUrls.length}
-                            {listing.mediaUrls.map((url, idx) => (
-                              <div key={idx} className="truncate">{url}</div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 );
