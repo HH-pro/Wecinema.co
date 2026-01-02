@@ -31,7 +31,8 @@ import {
   Settings,
   Scripts,
   OrderDetailsPage,
-  About
+  About,
+  
   
 
 } from "../pages";
@@ -46,7 +47,7 @@ import Browse from "../pages/marketplace/Browse";
 import CreateListing from "../pages/marketplace/CreateListing";
 import SellerDashboard from "../pages/marketplace/SellerDashboard";
 import BuyerDashboard from "../components/marketplae/BuyerDashboard/BuyerDashboard";
-
+import MyOffers from '../pages/marketplace/MyOffers';
 import MyOrders from "../pages/marketplace/MyOrders";
 import OrderDetails from "../pages/marketplace/OrderDetails";
 import Messages from "../pages/marketplace/Messages";
@@ -93,7 +94,7 @@ const Router: React.FC = () => {
           <Route path="/marketplace/messages/:orderId" element={<Messages />} />
           <Route path="/marketplace/my-orders" element={<MyOrders />} />
           <Route path="/marketplace/orders/:orderId" element={<OrderDetails />} />
-           <Route path="/marketplace/offers/my-offers" element={<MyOffersPage />} />
+           <Route path="/marketplace/offers/my-offers" element={<MyOffers />} />
       <Route path="/marketplace/orders/stats/buyer" element={<BuyerStatsPage />} />
           {/* ========== ADMIN ROUTES ========== */}
           <Route element={<ProtectedRoute />}>
