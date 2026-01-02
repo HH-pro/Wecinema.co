@@ -1233,20 +1233,49 @@ export const offersApi = {
   },
 
   // Get offers made (as buyer)
-  getMyOffers: async (): Promise<ApiResponse<{ 
-    offers: Offer[]; 
-    count: number;
-  }>> => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/offers/my-offers`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error as AxiosError, 'Failed to fetch my offers');
+ getMyOffers: async (): Promise<ApiResponse<{ 
+  offers: Offer[]; 
+  count: number;
+}>> => {
+  try {
+    // Add cache busting parameter
+    const timestamp = Date.now();
+    
+    const response = await axios.get(
+      `${API_BASE_URL}/marketplace/offers/my-offers`,
+      {
+        ...getHeaders(),
+        params: {
+          _: timestamp, // Cache busting parameter
+          refresh: true // Optional: explicit refresh flag
+        }
+      }
+    );
+    
+    // Log response for debugging
+    console.log('My offers response status:', response.status);
+    console.log('My offers count:', response.data?.data?.count || 0);
+    
+    return normalizeResponse(response);
+  } catch (error) {
+    console.error('Error fetching my offers:', error);
+    
+    // Check if it's a 304 Not Modified error
+    const axiosError = error as AxiosError;
+    if (axiosError.response?.status === 304) {
+      console.warn('Received 304 Not Modified. Cache issue detected.');
+      
+      // Return a custom error or retry without cache
+      return {
+        success: false,
+        error: 'Data might be cached. Please refresh.',
+        data: null
+      } as ApiResponse<{ offers: Offer[]; count: number }>;
     }
-  },
+    
+    return handleApiError(axiosError, 'Failed to fetch my offers');
+  }
+},
 
   // Get single offer details
   getOfferDetails: async (offerId: string): Promise<ApiResponse<{ 
