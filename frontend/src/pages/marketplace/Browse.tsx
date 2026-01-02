@@ -889,7 +889,7 @@ const Browse: React.FC = () => {
                       {/* Price Tag - SAME as ListingsTab */}
                       <div className="absolute bottom-3 left-3">
                         <div className="bg-gradient-to-r from-green-600 to-green-700 text-white px-3 py-1.5 rounded-lg shadow-md">
-                          <p className="text-lg font-bold">{formatCurrency(listing)}</p>
+                          <p className="text-lg font-bold">{formatCurrency(listing.price)}</p>
                         </div>
                       </div>
                     </div>
