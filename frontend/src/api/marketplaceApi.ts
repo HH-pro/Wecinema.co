@@ -1233,46 +1233,20 @@ export const offersApi = {
   },
 
   // Get offers made (as buyer)
- getMyOffers: async (retry: boolean = false): Promise<ApiResponse<{ 
-  offers: Offer[]; 
-  count: number;
-}>> => {
-  try {
-    const headers = {
-      ...getHeaders(),
-      'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache'
-    };
-    
-    // For retry, add a different cache busting parameter
-    const cacheBuster = retry ? `retry_${Date.now()}` : `init_${Date.now()}`;
-    
-    const response = await axios.get(
-      `${API_BASE_URL}/marketplace/offers/my-offers`,
-      {
-        headers,
-        params: {
-          cacheBuster,
-          t: Date.now()
-        }
-      }
-    );
-    
-    return normalizeResponse(response);
-    
-  } catch (error) {
-    const axiosError = error as AxiosError;
-    
-    // If first attempt fails with 304, retry once with different cache buster
-    if (!retry && axiosError.response?.status === 304) {
-      console.log('304 received, retrying without cache...');
-      return getMyOffers(true); // Retry
+  getMyOffers: async (): Promise<ApiResponse<{ 
+    offers: Offer[]; 
+    count: number;
+  }>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/offers/my-offers`,
+        getHeaders()
+      );
+      return normalizeResponse(response);
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to fetch my offers');
     }
-    
-    console.error('Error fetching my offers:', axiosError.response?.status, axiosError.message);
-    return handleApiError(axiosError, 'Failed to fetch my offers');
-  }
-},
+  },
 
   // Get single offer details
   getOfferDetails: async (offerId: string): Promise<ApiResponse<{ 
