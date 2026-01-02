@@ -5,7 +5,8 @@ import {
   FiCreditCard, FiCheck, FiX, FiAlertCircle, FiLoader, 
   FiClock, FiCheckCircle, FiXCircle, FiEye, FiDollarSign,
   FiCalendar, FiMessageSquare, FiPackage, FiUser, FiTag,
-  FiShoppingBag, FiRefreshCw, FiExternalLink, FiInfo
+  FiShoppingBag, FiRefreshCw, FiExternalLink, FiInfo, FiLock,
+  FiPlay, FiVideo, FiImage
 } from 'react-icons/fi';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { loadStripe } from '@stripe/stripe-js';
@@ -33,6 +34,9 @@ interface Offer {
       email?: string;
       avatar?: string;
     };
+    type?: string;
+    condition?: string;
+    location?: string;
   };
   buyerId: {
     _id: string;
@@ -55,9 +59,6 @@ interface Offer {
   rejectedAt?: string;
   cancelledAt?: string;
   rejectionReason?: string;
-  // For backward compatibility
-  listing?: any;
-  buyer?: any;
 }
 
 const MyOffers: React.FC = () => {
@@ -71,24 +72,24 @@ const MyOffers: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'paid' | 'accepted' | 'rejected'>('all');
   const [refreshing, setRefreshing] = useState<boolean>(false);
-  const navigate = useNavigate();
-  const location = useLocation();
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const navigate = useLocation();
 
   // Check for success message from location state
   useEffect(() => {
-    if (location.state?.message) {
-      setSuccessMessage(location.state.message);
+    if (navigate.state?.message) {
+      setSuccessMessage(navigate.state.message);
       setTimeout(() => setSuccessMessage(''), 5000);
     }
     
-    if (location.state?.paymentSuccess) {
+    if (navigate.state?.paymentSuccess) {
       setSuccessMessage('Payment completed successfully!');
       setTimeout(() => {
         fetchOffers();
         window.history.replaceState({}, document.title);
       }, 2000);
     }
-  }, [location]);
+  }, [navigate]);
 
   // Fetch offers on component mount
   useEffect(() => {
@@ -101,8 +102,6 @@ const MyOffers: React.FC = () => {
       setError('');
       console.log('🔄 Fetching offers...');
       
-      // Force fresh data with cache busting
-      const timestamp = Date.now();
       const response = await marketplaceApi.offers.getMyOffers();
       
       console.log('📦 Offers API Response:', response);
@@ -121,7 +120,6 @@ const MyOffers: React.FC = () => {
       
       // Normalize the offer data
       const normalizedOffers = offersData.map((offer: any) => {
-        // Handle different data structures
         const listing = offer.listingId || offer.listing || {};
         const buyer = offer.buyerId || offer.buyer || {};
         
@@ -138,7 +136,10 @@ const MyOffers: React.FC = () => {
               _id: '',
               username: 'Unknown Seller',
               email: ''
-            }
+            },
+            type: listing.type,
+            condition: listing.condition,
+            location: listing.location
           },
           buyerId: {
             _id: buyer._id || buyer.id || '',
@@ -183,9 +184,17 @@ const MyOffers: React.FC = () => {
     fetchOffers();
   };
 
-  // Handle view listing
-  const handleViewListing = (listingId: string) => {
-    navigate(`/marketplace/listings/${listingId}`);
+  // Handle click on offer card - opens payment modal for pending offers
+  const handleOfferClick = async (offer: Offer) => {
+    console.log('🎯 Offer clicked:', offer._id, 'Status:', offer.status);
+    
+    // Only open payment modal for pending or pending_payment offers
+    if (offer.status === 'pending' || offer.status === 'pending_payment') {
+      await handlePayOffer(offer);
+    } else {
+      // For other statuses, show details or navigate
+      navigate(`/marketplace/listings/${offer.listingId._id}`);
+    }
   };
 
   // Handle payment for pending payment offer
@@ -201,77 +210,46 @@ const MyOffers: React.FC = () => {
       console.log('💰 Offer amount:', offer.amount);
       console.log('📝 Offer status:', offer.status);
 
-      let paymentResponse;
-      
-      if (offer.status === 'pending_payment') {
-        // Try to create payment intent for pending payment offer
-        try {
-          // First try offer-specific endpoint
-          paymentResponse = await marketplaceApi.payments.createOfferPaymentIntent(offer._id);
-        } catch (firstError) {
-          console.log('⚠️ First endpoint failed:', firstError);
-          
-          // Fallback to general endpoint
-          try {
-            paymentResponse = await marketplaceApi.payments.createPaymentIntent({
-              offerId: offer._id,
-              amount: offer.amount,
-              currency: 'usd'
-            });
-          } catch (secondError) {
-            console.log('⚠️ Second endpoint failed:', secondError);
-            
-            // Last fallback - try orders API
-            try {
-              const orderResponse = await marketplaceApi.orders.createOrder({
-                offerId: offer._id,
-                listingId: offer.listingId._id,
-                buyerId: offer.buyerId._id,
-                sellerId: offer.sellerId,
-                amount: offer.amount,
-                paymentMethod: 'stripe'
-              });
-              
-              if (orderResponse.success && orderResponse.data?.order?.stripePaymentIntentId) {
-                // If order already has payment intent, use it
-                console.log('✅ Found existing payment intent in order');
-              }
-            } catch (thirdError) {
-              console.log('❌ All endpoints failed:', thirdError);
-            }
-          }
-        }
-      } else if (offer.status === 'pending') {
-        // For pending offers, we need to create a payment
-        try {
-          paymentResponse = await marketplaceApi.offers.makeOffer({
-            listingId: offer.listingId._id,
-            amount: offer.amount,
-            message: offer.message,
-            requirements: offer.requirements,
-            expectedDelivery: offer.expectedDelivery
-          });
-        } catch (makeOfferError) {
-          console.error('❌ Make offer failed:', makeOfferError);
-          throw new Error('Cannot process payment for this offer. Please contact support.');
-        }
-      } else {
-        throw new Error('This offer is not ready for payment.');
-      }
+      // Simulate API call for testing - remove this in production
+      // setTimeout(() => {
+      //   setClientSecret('pi_3Lt6tq2eZvKYlo2C1rIq0FwL_secret_mZ4o7t6X9Q8j3r5t7y9u0i1o2p3');
+      //   console.log('✅ Mock client secret set for testing');
+      // }, 1000);
 
-      if (paymentResponse && !paymentResponse.success) {
-        throw new Error(paymentResponse.error || 'Failed to create payment');
-      }
+      // Real API call - uncomment this in production
+      try {
+        const response = await marketplaceApi.payments.createOfferPaymentIntent(offer._id);
+        
+        if (!response.success) {
+          throw new Error(response.error || 'Failed to create payment intent');
+        }
 
-      if (paymentResponse?.data?.clientSecret) {
-        setClientSecret(paymentResponse.data.clientSecret);
-        console.log('✅ Payment intent created, clientSecret received');
-      } else {
-        // Try to get client secret from existing payment intent
-        if (offer.paymentIntentId || offer.stripePaymentIntentId) {
-          console.log('ℹ️ Offer already has payment intent ID, skipping client secret setup');
+        if (response.data?.clientSecret) {
+          setClientSecret(response.data.clientSecret);
+          console.log('✅ Payment intent created, clientSecret received');
         } else {
-          throw new Error('No payment setup available. Please try making the offer again.');
+          throw new Error('No client secret received from server');
+        }
+      } catch (apiError: any) {
+        console.error('❌ API Error:', apiError);
+        
+        // Fallback: Try general payment intent endpoint
+        try {
+          const fallbackResponse = await marketplaceApi.payments.createPaymentIntent({
+            offerId: offer._id,
+            amount: offer.amount,
+            currency: 'usd'
+          });
+          
+          if (fallbackResponse.success && fallbackResponse.data?.clientSecret) {
+            setClientSecret(fallbackResponse.data.clientSecret);
+            console.log('✅ Fallback payment intent created');
+          } else {
+            throw new Error('Payment setup failed');
+          }
+        } catch (fallbackError) {
+          console.error('❌ Fallback also failed:', fallbackError);
+          throw new Error('Unable to setup payment. Please try again later.');
         }
       }
       
@@ -305,7 +283,9 @@ const MyOffers: React.FC = () => {
   };
 
   // Cancel offer
-  const handleCancelOffer = async (offerId: string) => {
+  const handleCancelOffer = async (offerId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering offer click
+    
     if (!window.confirm('Are you sure you want to cancel this offer? This action cannot be undone.')) return;
 
     try {
@@ -325,41 +305,6 @@ const MyOffers: React.FC = () => {
       setError(error.message || 'Failed to cancel offer. Please try again.');
     }
   };
-
-  // View order details (if offer became an order)
-  const handleViewOrder = async (offerId: string) => {
-    try {
-      // Try to get associated order
-      const response = await marketplaceApi.offers.getOfferDetails(offerId);
-      
-      if (response.success && response.data?.associatedOrder) {
-        navigate(`/marketplace/orders/${response.data.associatedOrder._id}`);
-      } else {
-        // Check if there's a direct order associated
-        const ordersResponse = await marketplaceApi.orders.getMyOrders();
-        if (ordersResponse.success) {
-          const order = ordersResponse.data?.orders?.find((o: any) => o.offerId === offerId);
-          if (order) {
-            navigate(`/marketplace/orders/${order._id}`);
-          } else {
-            throw new Error('No order found for this offer');
-          }
-        }
-      }
-    } catch (error: any) {
-      setError(error.message || 'No order details available yet.');
-    }
-  };
-
-  // Filter offers based on active tab
-  const filteredOffers = offers.filter(offer => {
-    if (activeTab === 'all') return true;
-    if (activeTab === 'pending') return ['pending', 'pending_payment'].includes(offer.status);
-    if (activeTab === 'paid') return offer.status === 'paid';
-    if (activeTab === 'accepted') return offer.status === 'accepted';
-    if (activeTab === 'rejected') return ['rejected', 'cancelled', 'expired'].includes(offer.status);
-    return true;
-  });
 
   // Get status badge color
   const getStatusColor = (status: string) => {
@@ -421,23 +366,42 @@ const MyOffers: React.FC = () => {
     }
   };
 
-  // Get thumbnail URL
+  // Get thumbnail URL with video support
   const getThumbnailUrl = (listing: any): string => {
     if (!listing?.mediaUrls || listing.mediaUrls.length === 0) {
-      return 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=300&h=200&fit=crop';
+      return 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400&h=300&fit=crop';
     }
     
-    const firstImage = listing.mediaUrls[0];
-    if (firstImage.startsWith('http')) {
-      return firstImage;
+    const firstMedia = listing.mediaUrls[0];
+    if (firstMedia.startsWith('http')) {
+      return firstMedia;
     }
     
     // If it's a relative path, make it absolute
-    if (firstImage.startsWith('/')) {
-      return `http://localhost:3000${firstImage}`;
+    if (firstMedia.startsWith('/')) {
+      return `http://localhost:3000${firstMedia}`;
     }
     
-    return 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=300&h=200&fit=crop';
+    return 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400&h=300&fit=crop';
+  };
+
+  // Check if media is a video
+  const isVideo = (url: string): boolean => {
+    const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi'];
+    return videoExtensions.some(ext => url.toLowerCase().endsWith(ext));
+  };
+
+  // Check if media is an image
+  const isImage = (url: string): boolean => {
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
+    return imageExtensions.some(ext => url.toLowerCase().endsWith(ext));
+  };
+
+  // Get media type icon
+  const getMediaTypeIcon = (url: string) => {
+    if (isVideo(url)) return <FiVideo className="text-white" size={20} />;
+    if (isImage(url)) return <FiImage className="text-white" size={20} />;
+    return null;
   };
 
   // Format date
@@ -451,9 +415,7 @@ const MyOffers: React.FC = () => {
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+        day: 'numeric'
       });
     } catch (error) {
       return 'Invalid date';
@@ -472,6 +434,12 @@ const MyOffers: React.FC = () => {
     if (diffDays < 7) return `${diffDays} days ago`;
     if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
     return `${Math.floor(diffDays / 30)} months ago`;
+  };
+
+  // Handle image preview
+  const handleImagePreview = (url: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPreviewImage(url);
   };
 
   if (loading) {
@@ -559,7 +527,7 @@ const MyOffers: React.FC = () => {
                   )}
                 </button>
                 <button 
-                  onClick={() => navigate('/marketplace')}
+                  onClick={() => window.location.href = '/marketplace'}
                   className="inline-flex items-center justify-center px-4 py-3 sm:px-6 border border-transparent rounded-xl text-base font-medium text-white bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-700 hover:to-yellow-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-all duration-200 shadow-sm hover:shadow"
                 >
                   <FiShoppingBag className="mr-2" />
@@ -689,7 +657,7 @@ const MyOffers: React.FC = () => {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <button 
-                    onClick={() => navigate('/marketplace')}
+                    onClick={() => window.location.href = '/marketplace'}
                     className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-xl text-white bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-700 hover:to-yellow-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-all duration-200 shadow-sm hover:shadow"
                   >
                     <FiShoppingBag className="mr-2" />
@@ -707,369 +675,340 @@ const MyOffers: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-6">
-              {filteredOffers.map((offer, index) => (
-                <div 
-                  key={offer._id || index} 
-                  className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-300"
-                >
-                  <div className="p-6">
-                    <div className="flex flex-col lg:flex-row gap-6">
-                      {/* Thumbnail */}
-                      <div className="w-full lg:w-48 flex-shrink-0">
-                        <div 
-                          className="relative w-full h-48 rounded-lg overflow-hidden border border-gray-200 cursor-pointer group"
-                          onClick={() => handleViewListing(offer.listingId._id)}
-                        >
-                          <img
-                            src={getThumbnailUrl(offer.listingId)}
-                            alt={offer.listingId.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=300&h=200&fit=crop';
-                            }}
-                          />
-                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-300"></div>
-                          <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
-                            View Listing
-                          </div>
-                        </div>
-                      </div>
+              {offers.map((offer, index) => {
+                // Filter offers based on active tab
+                if (activeTab !== 'all') {
+                  if (activeTab === 'pending' && !['pending', 'pending_payment'].includes(offer.status)) return null;
+                  if (activeTab === 'paid' && offer.status !== 'paid') return null;
+                  if (activeTab === 'accepted' && offer.status !== 'accepted') return null;
+                  if (activeTab === 'rejected' && !['rejected', 'cancelled', 'expired'].includes(offer.status)) return null;
+                }
 
-                      {/* Offer Details */}
-                      <div className="flex-1">
-                        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                          <div className="flex-1">
-                            <div className="flex flex-wrap items-center gap-3 mb-3">
-                              <h3 className="text-xl font-semibold text-gray-900">
-                                {offer.listingId.title}
-                              </h3>
-                              <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(offer.status)} flex items-center gap-1`}>
-                                {getStatusIcon(offer.status)}
-                                {getStatusText(offer.status)}
-                              </span>
-                            </div>
-                            
-                            <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                              {offer.listingId.description}
-                            </p>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                              <div className="flex items-center gap-2">
-                                <FiTag className="text-gray-400 flex-shrink-0" size={16} />
-                                <span className="text-sm text-gray-700">{offer.listingId.category}</span>
+                return (
+                  <div 
+                    key={offer._id || index} 
+                    className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all duration-300 cursor-pointer ${
+                      (offer.status === 'pending' || offer.status === 'pending_payment') 
+                        ? 'hover:border-yellow-400' 
+                        : 'hover:border-gray-300'
+                    }`}
+                    onClick={() => handleOfferClick(offer)}
+                  >
+                    <div className="p-6">
+                      <div className="flex flex-col lg:flex-row gap-6">
+                        {/* Thumbnail with Media Type */}
+                        <div className="w-full lg:w-64 flex-shrink-0">
+                          <div className="relative w-full h-64 rounded-xl overflow-hidden border border-gray-200 group">
+                            {offer.listingId.mediaUrls && offer.listingId.mediaUrls.length > 0 ? (
+                              <>
+                                {isVideo(offer.listingId.mediaUrls[0]) ? (
+                                  <div className="relative w-full h-full">
+                                    <video
+                                      className="w-full h-full object-cover"
+                                      poster={getThumbnailUrl(offer.listingId)}
+                                      controls
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <source src={offer.listingId.mediaUrls[0]} type="video/mp4" />
+                                      Your browser does not support the video tag.
+                                    </video>
+                                    <div className="absolute top-2 left-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
+                                      <FiVideo size={12} />
+                                      Video
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <img
+                                    src={getThumbnailUrl(offer.listingId)}
+                                    alt={offer.listingId.title}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                    onClick={(e) => handleImagePreview(getThumbnailUrl(offer.listingId), e)}
+                                  />
+                                )}
+                              </>
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                                <FiImage className="text-gray-400" size={48} />
                               </div>
-                              
-                              <div className="flex items-center gap-2">
-                                <FiUser className="text-gray-400 flex-shrink-0" size={16} />
-                                <span className="text-sm text-gray-700">
-                                  Seller: <span className="font-medium">{offer.listingId.sellerId.username}</span>
-                                </span>
-                              </div>
-                              
-                              <div className="flex items-center gap-2">
-                                <FiCalendar className="text-gray-400 flex-shrink-0" size={16} />
-                                <span className="text-sm text-gray-700">
-                                  Offered: <span className="font-medium">{getTimeSince(offer.createdAt)}</span>
-                                </span>
-                              </div>
-                              
-                              {offer.expectedDelivery && (
-                                <div className="flex items-center gap-2">
-                                  <FiCalendar className="text-gray-400 flex-shrink-0" size={16} />
-                                  <span className="text-sm text-gray-700">
-                                    Expected: <span className="font-medium">{formatDate(offer.expectedDelivery)}</span>
-                                  </span>
-                                </div>
-                              )}
-                            </div>
+                            )}
                             
-                            {offer.message && (
-                              <div className="mb-4">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <FiMessageSquare className="text-gray-400" size={14} />
-                                  <span className="text-sm font-medium text-gray-700">Your Message:</span>
-                                </div>
-                                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                                  <p className="text-sm text-gray-600">{offer.message}</p>
+                            {/* Media Gallery Count */}
+                            {offer.listingId.mediaUrls && offer.listingId.mediaUrls.length > 1 && (
+                              <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+                                +{offer.listingId.mediaUrls.length - 1} more
+                              </div>
+                            )}
+                            
+                            {/* Click to Pay Overlay for Pending Offers */}
+                            {(offer.status === 'pending' || offer.status === 'pending_payment') && (
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                <div className="text-center p-4">
+                                  <div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center mx-auto mb-3">
+                                    <FiCreditCard className="text-white" size={24} />
+                                  </div>
+                                  <h4 className="text-white font-semibold text-lg mb-1">
+                                    Complete Payment
+                                  </h4>
+                                  <p className="text-yellow-200 text-sm">
+                                    Click to pay {marketplaceApi.utils.formatCurrency(offer.amount)}
+                                  </p>
                                 </div>
                               </div>
                             )}
                           </div>
                           
-                          {/* Price and Actions */}
-                          <div className="md:w-56 flex-shrink-0">
-                            <div className="text-center md:text-right mb-4">
-                              <div className="text-2xl font-bold text-green-600 mb-1">
-                                {marketplaceApi.utils.formatCurrency(offer.amount)}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                Original: {marketplaceApi.utils.formatCurrency(offer.listingId.price)}
-                              </div>
-                              <div className="text-xs text-gray-400 mt-1">
-                                Offer ID: {offer._id.substring(0, 8)}...
-                              </div>
-                            </div>
-                            
-                            <div className="space-y-2">
-                              {/* View Listing Button */}
-                              <button
-                                onClick={() => handleViewListing(offer.listingId._id)}
-                                className="w-full px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium flex items-center justify-center gap-2 shadow-sm"
-                              >
-                                <FiEye size={14} />
-                                View Listing
-                              </button>
-                              
-                              {/* Action Buttons based on status */}
-                              {offer.status === 'pending_payment' && (
-                                <button
-                                  onClick={() => handlePayOffer(offer)}
-                                  className="w-full px-4 py-2.5 bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-700 hover:to-yellow-600 text-white rounded-lg transition-all text-sm font-medium flex items-center justify-center gap-2 shadow-sm hover:shadow"
+                          {/* Media Thumbnails Gallery */}
+                          {offer.listingId.mediaUrls && offer.listingId.mediaUrls.length > 1 && (
+                            <div className="flex gap-2 mt-3 overflow-x-auto pb-2">
+                              {offer.listingId.mediaUrls.slice(0, 4).map((url, idx) => (
+                                <div 
+                                  key={idx}
+                                  className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200 flex-shrink-0 cursor-pointer hover:border-yellow-500 transition-colors"
+                                  onClick={(e) => handleImagePreview(url, e)}
                                 >
-                                  <FiCreditCard size={14} />
-                                  Complete Payment
-                                </button>
-                              )}
-                              
-                              {offer.status === 'pending' && (
-                                <button
-                                  onClick={() => handlePayOffer(offer)}
-                                  className="w-full px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white rounded-lg transition-all text-sm font-medium flex items-center justify-center gap-2 shadow-sm hover:shadow"
-                                >
-                                  <FiCreditCard size={14} />
-                                  Make Payment
-                                </button>
-                              )}
-                              
-                              {(offer.status === 'pending' || offer.status === 'pending_payment') && (
-                                <button
-                                  onClick={() => handleCancelOffer(offer._id)}
-                                  className="w-full px-4 py-2.5 bg-gradient-to-r from-gray-600 to-gray-500 hover:from-gray-700 hover:to-gray-600 text-white rounded-lg transition-all text-sm font-medium flex items-center justify-center gap-2 shadow-sm hover:shadow"
-                                >
-                                  <FiX size={14} />
-                                  Cancel Offer
-                                </button>
-                              )}
-                              
-                              {offer.status === 'paid' && (
-                                <>
-                                  <div className="text-center py-2 px-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                    <div className="text-sm text-blue-700 font-medium mb-1">
-                                      Awaiting Seller Acceptance
+                                  {isVideo(url) ? (
+                                    <div className="w-full h-full bg-gray-900 flex items-center justify-center">
+                                      <FiVideo className="text-white" size={16} />
                                     </div>
-                                    <div className="text-xs text-blue-600">
-                                      Paid on {formatDate(offer.paidAt)}
-                                    </div>
-                                  </div>
-                                  <button
-                                    onClick={() => handleViewOrder(offer._id)}
-                                    className="w-full px-4 py-2.5 border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium flex items-center justify-center gap-2"
-                                  >
-                                    <FiExternalLink size={14} />
-                                    View Order Details
-                                  </button>
-                                </>
-                              )}
-                              
-                              {offer.status === 'accepted' && (
-                                <>
-                                  <div className="text-center py-2 px-3 bg-green-50 border border-green-200 rounded-lg">
-                                    <div className="text-sm text-green-700 font-medium mb-1">
-                                      Offer Accepted!
-                                    </div>
-                                    <div className="text-xs text-green-600">
-                                      Accepted on {formatDate(offer.acceptedAt)}
-                                    </div>
-                                  </div>
-                                  <button
-                                    onClick={() => handleViewOrder(offer._id)}
-                                    className="w-full px-4 py-2.5 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white rounded-lg transition-all text-sm font-medium flex items-center justify-center gap-2 shadow-sm hover:shadow"
-                                  >
-                                    <FiExternalLink size={14} />
-                                    Go to Order
-                                  </button>
-                                </>
-                              )}
-                              
-                              {['rejected', 'cancelled', 'expired'].includes(offer.status) && (
-                                <div className="text-center py-3 px-3 bg-red-50 border border-red-200 rounded-lg">
-                                  <div className="text-sm text-red-700 font-medium mb-1">
-                                    {offer.status.charAt(0).toUpperCase() + offer.status.slice(1)}
-                                  </div>
-                                  <div className="text-xs text-red-600">
-                                    {offer.rejectedAt && `Rejected on ${formatDate(offer.rejectedAt)}`}
-                                    {offer.cancelledAt && `Cancelled on ${formatDate(offer.cancelledAt)}`}
-                                    {offer.status === 'expired' && 'Offer expired'}
-                                  </div>
-                                  {offer.rejectionReason && (
-                                    <div className="mt-2 text-xs text-red-600">
-                                      Reason: {offer.rejectionReason}
+                                  ) : (
+                                    <img
+                                      src={url.startsWith('http') ? url : `http://localhost:3000${url}`}
+                                      alt={`${offer.listingId.title} - ${idx + 1}`}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  )}
+                                  {idx === 3 && offer.listingId.mediaUrls.length > 4 && (
+                                    <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
+                                      <span className="text-white text-xs font-bold">
+                                        +{offer.listingId.mediaUrls.length - 4}
+                                      </span>
                                     </div>
                                   )}
                                 </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Offer Details */}
+                        <div className="flex-1">
+                          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex flex-wrap items-center gap-3 mb-3">
+                                <h3 className="text-xl font-semibold text-gray-900">
+                                  {offer.listingId.title}
+                                </h3>
+                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(offer.status)} flex items-center gap-1`}>
+                                  {getStatusIcon(offer.status)}
+                                  {getStatusText(offer.status)}
+                                </span>
+                              </div>
+                              
+                              <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                                {offer.listingId.description}
+                              </p>
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div className="flex items-center gap-2">
+                                  <FiTag className="text-gray-400 flex-shrink-0" size={16} />
+                                  <span className="text-sm text-gray-700">
+                                    {offer.listingId.category || 'Uncategorized'}
+                                  </span>
+                                </div>
+                                
+                                <div className="flex items-center gap-2">
+                                  <FiUser className="text-gray-400 flex-shrink-0" size={16} />
+                                  <span className="text-sm text-gray-700">
+                                    Seller: <span className="font-medium">{offer.listingId.sellerId.username}</span>
+                                  </span>
+                                </div>
+                                
+                                {offer.listingId.type && (
+                                  <div className="flex items-center gap-2">
+                                    <FiPackage className="text-gray-400 flex-shrink-0" size={16} />
+                                    <span className="text-sm text-gray-700">{offer.listingId.type}</span>
+                                  </div>
+                                )}
+                                
+                                <div className="flex items-center gap-2">
+                                  <FiCalendar className="text-gray-400 flex-shrink-0" size={16} />
+                                  <span className="text-sm text-gray-700">
+                                    Offered: <span className="font-medium">{getTimeSince(offer.createdAt)}</span>
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              {offer.message && (
+                                <div className="mb-4">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <FiMessageSquare className="text-gray-400" size={14} />
+                                    <span className="text-sm font-medium text-gray-700">Your Message:</span>
+                                  </div>
+                                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                                    <p className="text-sm text-gray-600">{offer.message}</p>
+                                  </div>
+                                </div>
                               )}
+                            </div>
+                            
+                            {/* Price and Actions */}
+                            <div className="md:w-56 flex-shrink-0">
+                              <div className="text-center md:text-right mb-4">
+                                <div className="text-2xl font-bold text-green-600 mb-1">
+                                  {marketplaceApi.utils.formatCurrency(offer.amount)}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  Original: {marketplaceApi.utils.formatCurrency(offer.listingId.price)}
+                                </div>
+                                <div className="text-xs text-gray-400 mt-1">
+                                  Offer ID: {offer._id.substring(0, 8)}...
+                                </div>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                {/* Status Specific Content */}
+                                {(offer.status === 'pending' || offer.status === 'pending_payment') && (
+                                  <>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handlePayOffer(offer);
+                                      }}
+                                      className="w-full px-4 py-2.5 bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-700 hover:to-yellow-600 text-white rounded-lg transition-all text-sm font-medium flex items-center justify-center gap-2 shadow-sm hover:shadow"
+                                    >
+                                      <FiCreditCard size={14} />
+                                      {offer.status === 'pending_payment' ? 'Complete Payment' : 'Make Payment'}
+                                    </button>
+                                    
+                                    <button
+                                      onClick={(e) => handleCancelOffer(offer._id, e)}
+                                      className="w-full px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                                    >
+                                      <FiX size={14} />
+                                      Cancel Offer
+                                    </button>
+                                    
+                                    <div className="text-xs text-gray-500 text-center mt-2">
+                                      Click anywhere on the card to open payment
+                                    </div>
+                                  </>
+                                )}
+                                
+                                {offer.status === 'paid' && (
+                                  <div className="text-center py-3 px-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                    <div className="text-sm text-blue-700 font-medium mb-1">
+                                      ✅ Payment Completed
+                                    </div>
+                                    <div className="text-xs text-blue-600">
+                                      Awaiting seller acceptance
+                                    </div>
+                                    {offer.paidAt && (
+                                      <div className="text-xs text-blue-500 mt-1">
+                                        Paid on {formatDate(offer.paidAt)}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                
+                                {offer.status === 'accepted' && (
+                                  <div className="text-center py-3 px-3 bg-green-50 border border-green-200 rounded-lg">
+                                    <div className="text-sm text-green-700 font-medium mb-1">
+                                      🎉 Offer Accepted!
+                                    </div>
+                                    <div className="text-xs text-green-600">
+                                      Your offer has been accepted
+                                    </div>
+                                    {offer.acceptedAt && (
+                                      <div className="text-xs text-green-500 mt-1">
+                                        Accepted on {formatDate(offer.acceptedAt)}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                
+                                {['rejected', 'cancelled', 'expired'].includes(offer.status) && (
+                                  <div className="text-center py-3 px-3 bg-red-50 border border-red-200 rounded-lg">
+                                    <div className="text-sm text-red-700 font-medium mb-1">
+                                      {offer.status === 'rejected' && '❌ Offer Rejected'}
+                                      {offer.status === 'cancelled' && '🚫 Offer Cancelled'}
+                                      {offer.status === 'expired' && '⏰ Offer Expired'}
+                                    </div>
+                                    {offer.rejectionReason && (
+                                      <div className="text-xs text-red-600 mt-1">
+                                        Reason: {offer.rejectionReason}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       </div>
 
-      {/* Payment Modal */}
-      {showPaymentModal && selectedOffer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-2 sm:p-4 overflow-y-auto animate-fade-in">
-          <div className="w-full max-w-md sm:max-w-lg mx-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
-              {/* Header */}
-              <div className="flex-shrink-0 bg-gradient-to-r from-yellow-50 to-yellow-100 border-b border-yellow-200 px-4 sm:px-6 py-4 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Complete Offer Payment
-                  </h3>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Complete payment for your offer on "{selectedOffer.listingId.title}"
-                  </p>
-                </div>
-                <button 
-                  onClick={handleClosePaymentModal}
-                  className="p-2 hover:bg-yellow-200 rounded-full transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={paymentStatus === 'processing'}
-                >
-                  <FiX size={20} className="text-gray-700" />
-                </button>
-              </div>
-              
-              {/* Scrollable Content */}
-              <div className="flex-1 overflow-y-auto">
-                <div className="p-4 sm:p-6">
-                  {/* Payment Summary */}
-                  <div className="mb-6 bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-xl p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-r from-yellow-500 to-yellow-400 flex items-center justify-center">
-                          <FiCreditCard className="text-white" size={18} />
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium text-gray-700">
-                            Offer Amount
-                          </div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {marketplaceApi.utils.formatCurrency(selectedOffer.amount)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-4 pt-4 border-t border-yellow-300">
-                      <div className="flex items-start gap-3">
-                        <div className="w-12 h-12 rounded-lg overflow-hidden border border-gray-300 flex-shrink-0">
-                          <img
-                            src={getThumbnailUrl(selectedOffer.listingId)}
-                            alt={selectedOffer.listingId.title}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=300&h=200&fit=crop';
-                            }}
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-gray-900 text-sm truncate">
-                            {selectedOffer.listingId.title}
-                          </h4>
-                          <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                            {selectedOffer.listingId.description}
-                          </p>
-                          <div className="mt-2 text-xs text-gray-500">
-                            <div className="flex items-center gap-1">
-                              <FiUser size={10} />
-                              <span>Seller: {selectedOffer.listingId.sellerId.username}</span>
-                            </div>
-                            {selectedOffer.expectedDelivery && (
-                              <div className="flex items-center gap-1 mt-1">
-                                <FiCalendar size={10} />
-                                <span>Expected: {formatDate(selectedOffer.expectedDelivery)}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Payment Form */}
-                  {clientSecret ? (
-                    <div className="mb-6">
-                      <Elements stripe={stripePromise} options={{ 
-                        clientSecret,
-                        appearance: {
-                          theme: 'stripe',
-                          variables: {
-                            colorPrimary: '#ca8a04',
-                            borderRadius: '0.75rem',
-                            fontFamily: 'Inter, system-ui, sans-serif',
-                          }
-                        }
-                      }}>
-                        <OfferPaymentForm 
-                          offer={selectedOffer}
-                          clientSecret={clientSecret}
-                          onSuccess={handlePaymentSuccess}
-                          onClose={handleClosePaymentModal}
-                          paymentStatus={paymentStatus}
-                          setPaymentStatus={setPaymentStatus}
-                          setError={setError}
-                        />
-                      </Elements>
-                    </div>
-                  ) : (
-                    <div className="bg-gray-50 rounded-xl p-8 mb-4 text-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600 mx-auto mb-4"></div>
-                      <p className="text-gray-600 font-medium mb-2">Setting up payment...</p>
-                      <p className="text-gray-500 text-sm">Please wait while we prepare your payment details</p>
-                    </div>
-                  )}
-
-                  {/* Security Info */}
-                  <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-blue-400 flex items-center justify-center flex-shrink-0">
-                        <FiCheck className="text-white" size={14} />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium text-blue-900 mb-1">Secure Payment</h4>
-                        <p className="text-xs text-blue-800">
-                          Your payment is processed securely via Stripe. Funds are held in escrow until the seller accepts your offer.
-                          All transactions are protected by our buyer protection policy.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90 p-4" onClick={() => setPreviewImage(null)}>
+          <div className="relative max-w-4xl max-h-[90vh]">
+            <button 
+              className="absolute top-4 right-4 text-white bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full p-2 z-10"
+              onClick={() => setPreviewImage(null)}
+            >
+              <FiX size={24} />
+            </button>
+            <img 
+              src={previewImage} 
+              alt="Preview" 
+              className="max-w-full max-h-[90vh] object-contain"
+            />
           </div>
         </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && selectedOffer && (
+        <PaymentModal
+          offer={selectedOffer}
+          clientSecret={clientSecret}
+          paymentStatus={paymentStatus}
+          onSuccess={handlePaymentSuccess}
+          onClose={handleClosePaymentModal}
+          setPaymentStatus={setPaymentStatus}
+          setError={setError}
+        />
       )}
     </MarketplaceLayout>
   );
 };
 
-// Offer Payment Form Component
-const OfferPaymentForm = ({ 
-  offer, 
+// Payment Modal Component
+interface PaymentModalProps {
+  offer: Offer;
+  clientSecret: string;
+  paymentStatus: 'idle' | 'processing' | 'success' | 'failed';
+  onSuccess: () => void;
+  onClose: () => void;
+  setPaymentStatus: (status: 'idle' | 'processing' | 'success' | 'failed') => void;
+  setError: (error: string) => void;
+}
+
+const PaymentModal: React.FC<PaymentModalProps> = ({
+  offer,
   clientSecret,
-  onSuccess, 
-  onClose, 
-  paymentStatus, 
+  paymentStatus,
+  onSuccess,
+  onClose,
   setPaymentStatus,
   setError
-}: any) => {
+}) => {
   const stripe = useStripe();
   const elements = useElements();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1135,19 +1074,13 @@ const OfferPaymentForm = ({
           } catch (apiError: any) {
             console.error('❌ API error:', apiError);
             
-            // If API fails but Stripe succeeded, still show success but warn user
+            // If API fails but Stripe succeeded, still show success
             setLocalError('Payment succeeded but there was an issue updating the offer status. Please contact support.');
             setPaymentStatus('success');
             setTimeout(() => {
               onSuccess();
             }, 3000);
           }
-        } else if (paymentIntent.status === 'requires_action') {
-          setLocalError('Payment requires additional authentication. Please complete the verification.');
-          setPaymentStatus('failed');
-        } else if (paymentIntent.status === 'requires_payment_method') {
-          setLocalError('Payment method failed. Please try a different payment method.');
-          setPaymentStatus('failed');
         } else {
           throw new Error(`Payment status: ${paymentIntent.status}`);
         }
@@ -1169,107 +1102,285 @@ const OfferPaymentForm = ({
     }
   };
 
+  // Get thumbnail with video support
+  const getThumbnailUrl = (listing: any): string => {
+    if (!listing?.mediaUrls || listing.mediaUrls.length === 0) {
+      return 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400&h=300&fit=crop';
+    }
+    
+    const firstMedia = listing.mediaUrls[0];
+    if (firstMedia.startsWith('http')) {
+      return firstMedia;
+    }
+    
+    return firstMedia.startsWith('/') 
+      ? `http://localhost:3000${firstMedia}`
+      : 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400&h=300&fit=crop';
+  };
+
+  // Check if media is a video
+  const isVideo = (url: string): boolean => {
+    return ['.mp4', '.webm', '.ogg', '.mov', '.avi'].some(ext => url.toLowerCase().endsWith(ext));
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Payment Element */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <label className="block text-sm font-semibold text-gray-800 flex items-center gap-2">
-              <FiCreditCard size={14} />
-              Payment Details
-            </label>
-            <div className="flex items-center gap-1">
-              <div className="w-6 h-4 bg-blue-500 rounded-sm"></div>
-              <div className="w-6 h-4 bg-red-500 rounded-sm"></div>
-              <div className="w-6 h-4 bg-yellow-500 rounded-sm"></div>
-            </div>
-          </div>
-          <div className="min-h-[200px] border border-gray-300 rounded-lg p-3 bg-gray-50">
-            <PaymentElement 
-              options={{
-                layout: 'tabs',
-                wallets: {
-                  applePay: 'auto',
-                  googlePay: 'auto'
-                },
-                fields: {
-                  billingDetails: {
-                    name: 'auto',
-                    email: 'auto',
-                    phone: 'auto',
-                    address: {
-                      country: 'auto',
-                      postalCode: 'auto'
-                    }
-                  }
-                }
-              }}
-            />
-          </div>
-        </div>
-      </div>
-      
-      {/* Error/Success Messages */}
-      {localError && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-          <div className="flex items-start gap-3">
-            <FiAlertCircle className="text-red-500 mt-0.5 flex-shrink-0" size={18} />
-            <div className="flex-1">
-              <h4 className="text-sm font-semibold text-red-800 mb-1">Payment Error</h4>
-              <p className="text-sm text-red-700">{localError}</p>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {paymentStatus === 'success' && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-green-500 to-green-400 flex items-center justify-center">
-              <FiCheck className="text-white" size={16} />
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-2 sm:p-4 overflow-y-auto animate-fade-in">
+      <div className="w-full max-w-md sm:max-w-lg mx-4">
+        <div className="bg-white rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+          {/* Header */}
+          <div className="flex-shrink-0 bg-gradient-to-r from-yellow-50 to-yellow-100 border-b border-yellow-200 px-4 sm:px-6 py-4 flex items-center justify-between">
             <div>
-              <h4 className="text-sm font-semibold text-green-800">Payment Successful!</h4>
-              <p className="text-sm text-green-700">Your offer has been submitted to the seller.</p>
-              <p className="text-xs text-green-600 mt-1">Redirecting to offers page...</p>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Complete Offer Payment
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Complete payment for your offer
+              </p>
+            </div>
+            <button 
+              onClick={onClose}
+              className="p-2 hover:bg-yellow-200 rounded-full transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={paymentStatus === 'processing'}
+            >
+              <FiX size={20} className="text-gray-700" />
+            </button>
+          </div>
+          
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-4 sm:p-6">
+              {/* Listing Preview with Video Support */}
+              <div className="mb-6 bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-xl p-4">
+                <div className="flex items-start gap-4">
+                  <div className="w-24 h-24 rounded-lg overflow-hidden border border-gray-300 flex-shrink-0">
+                    {offer.listingId.mediaUrls && offer.listingId.mediaUrls.length > 0 && isVideo(offer.listingId.mediaUrls[0]) ? (
+                      <div className="relative w-full h-full">
+                        <video
+                          className="w-full h-full object-cover"
+                          poster={getThumbnailUrl(offer.listingId)}
+                          controls
+                        >
+                          <source src={offer.listingId.mediaUrls[0]} type="video/mp4" />
+                          Your browser does not support the video tag.
+                        </video>
+                        <div className="absolute bottom-1 right-1 bg-black bg-opacity-60 rounded-full p-1">
+                          <FiPlay size={12} className="text-white" />
+                        </div>
+                      </div>
+                    ) : (
+                      <img
+                        src={getThumbnailUrl(offer.listingId)}
+                        alt={offer.listingId.title}
+                        className="w-full h-full object-cover"
+                      />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-semibold text-gray-900 text-sm mb-1">
+                      {offer.listingId.title}
+                    </h4>
+                    <p className="text-xs text-gray-600 mb-2 line-clamp-2">
+                      {offer.listingId.description}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <FiUser size={10} />
+                      <span>Seller: {offer.listingId.sellerId.username}</span>
+                    </div>
+                    {offer.expectedDelivery && (
+                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                        <FiCalendar size={10} />
+                        <span>Expected: {new Date(offer.expectedDelivery).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Offer Details */}
+                <div className="mt-4 pt-4 border-t border-gray-300">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="text-center">
+                      <div className="text-sm font-medium text-gray-700">Offer Amount</div>
+                      <div className="text-2xl font-bold text-green-600">
+                        {marketplaceApi.utils.formatCurrency(offer.amount)}
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm font-medium text-gray-700">Original Price</div>
+                      <div className="text-lg text-gray-500 line-through">
+                        {marketplaceApi.utils.formatCurrency(offer.listingId.price)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Form */}
+              {clientSecret ? (
+                <div className="mb-6">
+                  <Elements stripe={stripePromise} options={{ 
+                    clientSecret,
+                    appearance: {
+                      theme: 'stripe',
+                      variables: {
+                        colorPrimary: '#ca8a04',
+                        borderRadius: '0.75rem',
+                        fontFamily: 'Inter, system-ui, sans-serif',
+                      }
+                    }
+                  }}>
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                      {/* Payment Element */}
+                      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+                        <div className="mb-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <label className="block text-sm font-semibold text-gray-800 flex items-center gap-2">
+                              <FiCreditCard size={14} />
+                              Payment Details
+                            </label>
+                            <div className="flex items-center gap-1">
+                              <div className="w-6 h-4 bg-blue-500 rounded-sm"></div>
+                              <div className="w-6 h-4 bg-red-500 rounded-sm"></div>
+                              <div className="w-6 h-4 bg-yellow-500 rounded-sm"></div>
+                            </div>
+                          </div>
+                          <div className="min-h-[200px] border border-gray-300 rounded-lg p-3 bg-gray-50">
+                            <PaymentElement 
+                              options={{
+                                layout: 'tabs',
+                                wallets: {
+                                  applePay: 'auto',
+                                  googlePay: 'auto'
+                                },
+                                fields: {
+                                  billingDetails: {
+                                    name: 'auto',
+                                    email: 'auto',
+                                    phone: 'auto',
+                                    address: {
+                                      country: 'auto',
+                                      postalCode: 'auto'
+                                    }
+                                  }
+                                }
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Error/Success Messages */}
+                      {localError && (
+                        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                          <div className="flex items-start gap-3">
+                            <FiAlertCircle className="text-red-500 mt-0.5 flex-shrink-0" size={18} />
+                            <div className="flex-1">
+                              <h4 className="text-sm font-semibold text-red-800 mb-1">Payment Error</h4>
+                              <p className="text-sm text-red-700">{localError}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {paymentStatus === 'success' && (
+                        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-green-500 to-green-400 flex items-center justify-center">
+                              <FiCheck className="text-white" size={16} />
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-semibold text-green-800">Payment Successful!</h4>
+                              <p className="text-sm text-green-700">Your offer has been submitted to the seller.</p>
+                              <p className="text-xs text-green-600 mt-1">Redirecting to offers page...</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Action Buttons */}
+                      <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
+                        <button
+                          type="button"
+                          onClick={onClose}
+                          disabled={paymentStatus === 'processing' || paymentStatus === 'success' || isSubmitting}
+                          className="flex-1 py-3 px-4 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 transition-all text-sm font-medium flex items-center justify-center gap-2 shadow-sm hover:shadow"
+                        >
+                          <FiX size={16} />
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={!stripe || paymentStatus === 'processing' || paymentStatus === 'success' || isSubmitting}
+                          className="flex-1 py-3 px-4 bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-700 hover:to-yellow-600 disabled:from-gray-400 disabled:to-gray-400 text-white rounded-xl transition-all flex items-center justify-center gap-2 text-sm font-medium shadow-sm hover:shadow disabled:shadow-none"
+                        >
+                          {paymentStatus === 'processing' || isSubmitting ? (
+                            <>
+                              <FiLoader className="animate-spin" size={16} />
+                              Processing...
+                            </>
+                          ) : paymentStatus === 'success' ? (
+                            <>
+                              <FiCheck size={16} />
+                              Success!
+                            </>
+                          ) : (
+                            `Pay ${marketplaceApi.utils.formatCurrency(offer.amount)}`
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  </Elements>
+                </div>
+              ) : (
+                <div className="bg-gray-50 rounded-xl p-8 mb-4 text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600 font-medium mb-2">Setting up payment...</p>
+                  <p className="text-gray-500 text-sm">Please wait while we prepare your payment details</p>
+                </div>
+              )}
+
+              {/* Security Info */}
+              <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-blue-400 flex items-center justify-center flex-shrink-0">
+                    <FiLock className="text-white" size={14} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium text-blue-900 mb-1">Secure Payment</h4>
+                    <p className="text-xs text-blue-800">
+                      • Your payment is processed securely via Stripe<br/>
+                      • Funds are held in escrow until the seller accepts your offer<br/>
+                      • All transactions are protected by our buyer protection policy<br/>
+                      • 256-bit SSL encryption for all data
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      )}
-      
-      {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={paymentStatus === 'processing' || paymentStatus === 'success' || isSubmitting}
-          className="flex-1 py-3 px-4 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 transition-all text-sm font-medium flex items-center justify-center gap-2 shadow-sm hover:shadow"
-        >
-          <FiX size={16} />
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={!stripe || paymentStatus === 'processing' || paymentStatus === 'success' || isSubmitting}
-          className="flex-1 py-3 px-4 bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-700 hover:to-yellow-600 disabled:from-gray-400 disabled:to-gray-400 text-white rounded-xl transition-all flex items-center justify-center gap-2 text-sm font-medium shadow-sm hover:shadow disabled:shadow-none"
-        >
-          {paymentStatus === 'processing' || isSubmitting ? (
-            <>
-              <FiLoader className="animate-spin" size={16} />
-              Processing...
-            </>
-          ) : paymentStatus === 'success' ? (
-            <>
-              <FiCheck size={16} />
-              Success!
-            </>
-          ) : (
-            `Pay ${marketplaceApi.utils.formatCurrency(offer.amount)}`
-          )}
-        </button>
       </div>
-    </form>
+    </div>
+  );
+};
+
+// Filter offers function (moved inside component for proper closure)
+const MyOffersWithFilter: React.FC = () => {
+  const [offers, setOffers] = useState<Offer[]>([]);
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'paid' | 'accepted' | 'rejected'>('all');
+
+  // Fetch offers logic here...
+
+  const filteredOffers = offers.filter(offer => {
+    if (activeTab === 'all') return true;
+    if (activeTab === 'pending') return ['pending', 'pending_payment'].includes(offer.status);
+    if (activeTab === 'paid') return offer.status === 'paid';
+    if (activeTab === 'accepted') return offer.status === 'accepted';
+    if (activeTab === 'rejected') return ['rejected', 'cancelled', 'expired'].includes(offer.status);
+    return true;
+  });
+
+  return (
+    <MyOffers />
   );
 };
 
