@@ -1,15 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ListingCard from '../../components/marketplae/ListingCard';
 import MarketplaceLayout from '../../components/Layout';
 import { Listing } from '../../types/marketplace';
-import { FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiCheck, FiAlertCircle, FiLoader, FiUser, FiCalendar, FiMail } from 'react-icons/fi';
+import { 
+  FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiCheck, FiAlertCircle, 
+  FiLoader, FiUser, FiCalendar, FiMail, FiPlay, FiPause, FiVolume2, 
+  FiVolumeX, FiMaximize, FiMinimize, FiDownload, FiHeart, FiShare2 
+} from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements, AddressElement } from '@stripe/react-stripe-js';
 import marketplaceApi from '../../api/marketplaceApi';
 
 // Get Stripe key from environment variable
-const STRIPE_PUBLISHABLE_KEY = "pk_test_51SKw7ZHYamYyPYbDUlqbeydcW1hVGrHOvCZ8mBwSU1gw77TIRyzng31iSqAvPIQzTYKG8UWfDew7kdKgBxsw7vtq00WTLU3YCZ";
+const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "pk_test_51SKw7ZHYamYyPYbDUlqbeydcW1hVGrHOvCZ8mBwSU1gw77TIRyzng31iSqAvPIQzTYKG8UWfDew7kdKgBxsw7vtq00WTLU3YCZ";
 
 // Initialize Stripe
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
@@ -27,6 +31,9 @@ const Browse: React.FC = () => {
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success' | 'failed'>('idle');
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [error, setError] = useState<string>('');
+  const [showVideoPopup, setShowVideoPopup] = useState<boolean>(false);
+  const [selectedVideo, setSelectedVideo] = useState<string>('');
+  const [videoTitle, setVideoTitle] = useState<string>('');
   const [billingDetails, setBillingDetails] = useState({
     name: '',
     email: '',
@@ -56,6 +63,9 @@ const Browse: React.FC = () => {
     requirements: '',
     expectedDelivery: ''
   });
+
+  // Video player ref
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   // Fetch listings and user data on component mount
   useEffect(() => {
@@ -174,6 +184,24 @@ const Browse: React.FC = () => {
     });
     setShowOfferModal(true);
     setError('');
+  };
+
+  // Handle video click - open popup
+  const handleVideoClick = (videoUrl: string, title: string) => {
+    setSelectedVideo(videoUrl);
+    setVideoTitle(title);
+    setShowVideoPopup(true);
+  };
+
+  // Close video popup
+  const handleCloseVideoPopup = () => {
+    setShowVideoPopup(false);
+    setSelectedVideo('');
+    setVideoTitle('');
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
   };
 
   // Handle offer submission
@@ -353,6 +381,37 @@ const Browse: React.FC = () => {
     }));
   };
 
+  // Get first video URL from listing
+  const getFirstVideoUrl = (listing: Listing): string => {
+    if (!listing.mediaUrls || listing.mediaUrls.length === 0) return '';
+    
+    // Find first video URL
+    const videoUrl = listing.mediaUrls.find(url => 
+      url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v)$/i)
+    );
+    
+    return videoUrl || listing.mediaUrls[0];
+  };
+
+  // Get thumbnail URL (first image or first media URL)
+  const getThumbnailUrl = (listing: Listing): string => {
+    if (!listing.mediaUrls || listing.mediaUrls.length === 0) {
+      return 'https://via.placeholder.com/300x200?text=No+Preview';
+    }
+    
+    // Try to find an image first
+    const imageUrl = listing.mediaUrls.find(url => 
+      url.match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
+    );
+    
+    return imageUrl || listing.mediaUrls[0];
+  };
+
+  // Check if media is a video
+  const isVideoUrl = (url: string): boolean => {
+    return url.match(/\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v)$/i) !== null;
+  };
+
   if (loading) {
     return (
       <MarketplaceLayout>
@@ -392,9 +451,9 @@ const Browse: React.FC = () => {
           <div className="mb-8">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Marketplace</h1>
+                <h1 className="text-3xl font-bold text-gray-900">Video Marketplace</h1>
                 <p className="mt-2 text-gray-600">
-                  Discover and trade amazing video content and scripts
+                  Discover amazing video content, scripts, and creative assets
                 </p>
               </div>
               
@@ -431,7 +490,7 @@ const Browse: React.FC = () => {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search listings by title, description, or tags..."
+                  placeholder="Search videos, scripts, or creative assets..."
                   className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm sm:text-base"
                 />
               </div>
@@ -477,7 +536,7 @@ const Browse: React.FC = () => {
                     type="text"
                     value={filters.category}
                     onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
-                    placeholder="Video, Script, Music..."
+                    placeholder="Video, Script, Music, Animation..."
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors duration-200 text-sm"
                   />
                 </div>
@@ -567,17 +626,122 @@ const Browse: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 xs:grid-cols-1 md:grid-cols-1 lg:grid-cols-1 xl:grid-cols-4 gap-4 sm:gap-6">
-              {filteredListings.map(listing => (
-                <div key={listing._id} className="flex justify-center">
-                  <ListingCard
-                    listing={listing}
-                    onViewDetails={handleViewDetails}
-                    onMakeOffer={handleMakeOffer}
-                    onDirectPayment={handleDirectPayment}
-                  />
-                </div>
-              ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredListings.map(listing => {
+                const thumbnailUrl = getThumbnailUrl(listing);
+                const videoUrl = getFirstVideoUrl(listing);
+                const isVideo = isVideoUrl(videoUrl);
+                
+                return (
+                  <div key={listing._id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                    {/* Video/Image Preview */}
+                    <div 
+                      className="relative h-48 bg-gray-900 cursor-pointer group"
+                      onClick={() => {
+                        if (isVideo && videoUrl) {
+                          handleVideoClick(videoUrl, listing.title);
+                        }
+                      }}
+                    >
+                      {isVideo && videoUrl ? (
+                        <>
+                          {/* Video Thumbnail */}
+                          <div className="relative w-full h-full">
+                            <img
+                              src={thumbnailUrl}
+                              alt={listing.title}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Video+Preview';
+                              }}
+                            />
+                            {/* Play Button Overlay */}
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                              <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                                <FiPlay className="text-white" size={28} />
+                              </div>
+                            </div>
+                            {/* Video Badge */}
+                            <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-md flex items-center gap-1">
+                              <FiPlay size={10} />
+                              VIDEO
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        // Image Thumbnail
+                        <div className="relative w-full h-full">
+                          <img
+                            src={thumbnailUrl}
+                            alt={listing.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=No+Preview';
+                            }}
+                          />
+                          <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-md">
+                            IMAGE
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Category Badge */}
+                      <div className="absolute bottom-2 left-2">
+                        <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded-md">
+                          {listing.category}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-semibold text-gray-900 truncate text-sm">
+                          {listing.title}
+                        </h3>
+                      </div>
+                      
+                      <p className="text-gray-600 text-xs mb-3 line-clamp-2">
+                        {listing.description}
+                      </p>
+                      
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
+                            <FiUser size={12} className="text-gray-600" />
+                          </div>
+                          <span className="text-xs text-gray-700">
+                            {listing.sellerId?.username || 'Seller'}
+                          </span>
+                        </div>
+                        <div className="text-green-600 font-bold">
+                          {marketplaceApi.utils.formatCurrency(listing.price)}
+                        </div>
+                      </div>
+                      
+                      {/* Action Buttons */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleMakeOffer(listing)}
+                          className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white text-sm py-2 px-3 rounded-md transition-colors duration-200 flex items-center justify-center gap-2"
+                        >
+                          <FiCreditCard size={14} />
+                          Make Offer
+                        </button>
+                        {isVideo && videoUrl && (
+                          <button
+                            onClick={() => handleVideoClick(videoUrl, listing.title)}
+                            className="px-3 bg-gray-800 hover:bg-gray-900 text-white text-sm py-2 rounded-md transition-colors duration-200 flex items-center gap-2"
+                          >
+                            <FiPlay size={14} />
+                            Play
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -594,6 +758,83 @@ const Browse: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Video Popup Modal */}
+      {showVideoPopup && selectedVideo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4">
+          <div className="relative w-full max-w-4xl max-h-[90vh] bg-black rounded-xl overflow-hidden">
+            {/* Header */}
+            <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 to-transparent p-4 flex justify-between items-center">
+              <div className="text-white">
+                <h3 className="text-lg font-semibold truncate">{videoTitle}</h3>
+              </div>
+              <button
+                onClick={handleCloseVideoPopup}
+                className="text-white hover:text-gray-300 p-2 rounded-full hover:bg-white/10 transition-colors"
+              >
+                <FiX size={24} />
+              </button>
+            </div>
+            
+            {/* Video Player */}
+            <div className="relative w-full h-[70vh]">
+              <video
+                ref={videoRef}
+                src={selectedVideo}
+                controls
+                autoPlay
+                className="w-full h-full object-contain bg-black"
+                onError={(e) => {
+                  console.error('Video playback error:', e);
+                  alert('Unable to play video. Please check the video URL.');
+                }}
+              >
+                Your browser does not support the video tag.
+              </video>
+            </div>
+            
+            {/* Footer Actions */}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+              <div className="flex justify-center gap-4">
+                <button
+                  onClick={() => {
+                    if (videoRef.current) {
+                      videoRef.current.paused 
+                        ? videoRef.current.play() 
+                        : videoRef.current.pause();
+                    }
+                  }}
+                  className="text-white hover:text-yellow-400 p-2 rounded-full hover:bg-white/10"
+                >
+                  <FiPlay size={20} />
+                </button>
+                <button
+                  onClick={() => {
+                    if (videoRef.current) {
+                      videoRef.current.muted = !videoRef.current.muted;
+                    }
+                  }}
+                  className="text-white hover:text-yellow-400 p-2 rounded-full hover:bg-white/10"
+                >
+                  <FiVolume2 size={20} />
+                </button>
+                <button
+                  onClick={() => {
+                    if (videoRef.current) {
+                      if (videoRef.current.requestFullscreen) {
+                        videoRef.current.requestFullscreen();
+                      }
+                    }
+                  }}
+                  className="text-white hover:text-yellow-400 p-2 rounded-full hover:bg-white/10"
+                >
+                  <FiMaximize size={20} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Offer Modal */}
       {showOfferModal && selectedListing && (
@@ -619,11 +860,14 @@ const Browse: React.FC = () => {
               {/* Listing Preview */}
               <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg shadow-sm flex items-start gap-3">
                 <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg overflow-hidden border border-blue-300 flex-shrink-0">
-                  {selectedListing.mediaUrls?.[0] ? (
+                  {getThumbnailUrl(selectedListing) ? (
                     <img
-                      src={selectedListing.mediaUrls[0]}
+                      src={getThumbnailUrl(selectedListing)}
                       alt={selectedListing.title}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Preview';
+                      }}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gray-100">
@@ -788,11 +1032,14 @@ const Browse: React.FC = () => {
                       <div className="mt-3 pt-3 border-t border-yellow-300">
                         <div className="flex items-start gap-3">
                           <div className="w-12 h-12 rounded-lg overflow-hidden border border-gray-300 flex-shrink-0">
-                            {offerData.listing.mediaUrls?.[0] ? (
+                            {getThumbnailUrl(offerData.listing) ? (
                               <img
-                                src={offerData.listing.mediaUrls[0]}
+                                src={getThumbnailUrl(offerData.listing)}
                                 alt={offerData.listing.title}
                                 className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Preview';
+                                }}
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center bg-gray-100">
@@ -1178,9 +1425,9 @@ const PaymentForm = ({
                       country: 'auto',
                       postalCode: 'auto'
                     }
-                  }
                 }
-              }}
+              }
+            }}
             />
           </div>
         </div>
