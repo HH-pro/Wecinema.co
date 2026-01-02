@@ -8,23 +8,24 @@ const { authenticateMiddleware } = require("../../utils");
 // ===================================================
 // ✅ PUBLIC ROUTE — Get all active listings (USD Only)
 // ===================================================
-router.get("/", async (req, res) => {  // ✅ CHANGED: from "/listings" to "/"
+router.get("/", async (req, res) => {
   try {
+    console.log('📡 GET /marketplace/listings called with params:', req.query);
+    
     const { 
-      category, 
+      category = 'all', 
       minPrice, 
       maxPrice, 
-      type, 
+      type = 'all', 
       search, 
       page = 1, 
-      limit = 12,
+      limit = 20,
       sortBy = 'createdAt',
       sortOrder = 'desc',
       status = 'active'
     } = req.query;
     
-    console.log('📡 GET /marketplace/listings called with params:', req.query);
-    
+    // Build filter
     const filter = { status: status };
     
     // Apply filters
@@ -45,11 +46,12 @@ router.get("/", async (req, res) => {  // ✅ CHANGED: from "/listings" to "/"
     }
     
     // Search filter
-    if (search) {
+    if (search && search.trim() !== '') {
       filter.$or = [
         { title: { $regex: search, $options: 'i' } },
         { description: { $regex: search, $options: 'i' } },
-        { tags: { $regex: search, $options: 'i' } }
+        { tags: { $regex: search, $options: 'i' } },
+        { category: { $regex: search, $options: 'i' } }
       ];
     }
 
@@ -59,61 +61,85 @@ router.get("/", async (req, res) => {  // ✅ CHANGED: from "/listings" to "/"
     const skip = (pageNum - 1) * limitNum;
     
     // Sort options
-    const sortOptions = {};
+    let sortOptions = {};
     if (sortBy === 'price_low') {
-      sortOptions.price = 1; // Ascending
+      sortOptions.price = 1;
     } else if (sortBy === 'price_high') {
-      sortOptions.price = -1; // Descending
+      sortOptions.price = -1;
     } else if (sortBy === 'newest' || sortBy === 'createdAt') {
       sortOptions.createdAt = -1;
     } else if (sortBy === 'oldest') {
       sortOptions.createdAt = 1;
+    } else if (sortBy === 'updatedAt') {
+      sortOptions.updatedAt = -1;
     } else {
       sortOptions.createdAt = -1; // Default
     }
 
     console.log('🔍 Filter criteria:', filter);
-    console.log('📊 Pagination:', { page: pageNum, limit: limitNum, skip });
+    console.log('📊 Sorting:', sortOptions);
     
+    // Get listings with seller population
     const listings = await MarketplaceListing.find(filter)
-      .populate("sellerId", "username avatar sellerRating email")
+      .populate({
+        path: "sellerId",
+        select: "username avatar sellerRating email phoneNumber"
+      })
       .sort(sortOptions)
       .skip(skip)
       .limit(limitNum)
-      .lean(); // Use lean for better performance
+      .lean();
 
     const total = await MarketplaceListing.countDocuments(filter);
     
     console.log(`✅ Found ${listings.length} listings out of ${total} total`);
     
-    // ✅ Format listings
+    // ✅ Format listings properly
     const formattedListings = listings.map(listing => {
-      // Ensure mediaUrls is an array
+      // Ensure arrays
       const mediaUrls = Array.isArray(listing.mediaUrls) ? listing.mediaUrls : [];
+      const tags = Array.isArray(listing.tags) ? listing.tags : [];
+      
+      // Get seller info
+      let sellerInfo = {
+        _id: listing.sellerId?._id || listing.sellerId || null,
+        username: listing.sellerId?.username || 'Unknown Seller',
+        avatar: listing.sellerId?.avatar || null,
+        sellerRating: listing.sellerId?.sellerRating || 0,
+        email: listing.sellerEmail || listing.sellerId?.email || null
+      };
       
       return {
-        ...listing,
         _id: listing._id.toString(),
-        mediaUrls,
-        thumbnail: mediaUrls.length > 0 ? mediaUrls[0] : null,
-        formattedPrice: `$${listing.price?.toFixed(2) || '0.00'}`,
+        sellerId: sellerInfo,
+        title: listing.title || 'Untitled',
+        description: listing.description || '',
         price: listing.price || 0,
+        formattedPrice: `$${(listing.price || 0).toFixed(2)}`,
         currency: listing.currency || 'USD',
-        // Format dates
+        type: listing.type || 'for_sale',
+        category: listing.category || 'Uncategorized',
+        mediaUrls: mediaUrls,
+        thumbnail: mediaUrls.length > 0 ? mediaUrls[0] : null,
+        status: listing.status || 'active',
+        tags: tags,
+        sellerEmail: listing.sellerEmail || sellerInfo.email,
+        views: listing.viewCount || 0,
+        favoriteCount: listing.favoriteCount || 0,
+        purchaseCount: listing.purchaseCount || 0,
+        createdAt: listing.createdAt,
+        updatedAt: listing.updatedAt,
         createdAtFormatted: new Date(listing.createdAt).toLocaleDateString('en-US', {
           year: 'numeric',
           month: 'short',
           day: 'numeric'
         }),
-        updatedAtFormatted: new Date(listing.updatedAt).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        }),
-        // Status badge
         statusColor: listing.status === 'active' ? 'green' : 
                     listing.status === 'sold' ? 'blue' : 
-                    listing.status === 'pending' ? 'orange' : 'gray'
+                    listing.status === 'pending' ? 'orange' : 'gray',
+        isDigital: listing.isDigital !== false, // Default to true
+        // Frontend specific fields
+        seller: sellerInfo
       };
     });
 
@@ -127,8 +153,8 @@ router.get("/", async (req, res) => {  // ✅ CHANGED: from "/listings" to "/"
         pages: Math.ceil(total / limitNum)
       },
       filters: {
-        category: category || 'all',
-        type: type || 'all',
+        category: category,
+        type: type,
         minPrice: minPrice || '',
         maxPrice: maxPrice || '',
         search: search || '',
@@ -137,7 +163,8 @@ router.get("/", async (req, res) => {  // ✅ CHANGED: from "/listings" to "/"
         status
       },
       currency: "USD",
-      timestamp: new Date().getTime()
+      timestamp: new Date().getTime(),
+      message: `Found ${total} listing${total !== 1 ? 's' : ''}`
     });
   } catch (error) {
     console.error("❌ Error fetching listings:", error);
@@ -150,21 +177,121 @@ router.get("/", async (req, res) => {  // ✅ CHANGED: from "/listings" to "/"
 });
 
 // ===================================================
-// ✅ GET USER'S LISTINGS (My Listings) - USD Only
+// ✅ GET SINGLE LISTING DETAILS
+// ===================================================
+router.get("/:id", async (req, res) => {
+  try {
+    const listingId = req.params.id;
+    
+    console.log('📡 GET /marketplace/listings/:id called with ID:', listingId);
+    
+    if (!mongoose.Types.ObjectId.isValid(listingId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: "Invalid listing ID format" 
+      });
+    }
+    
+    const listing = await MarketplaceListing.findById(listingId)
+      .populate({
+        path: "sellerId",
+        select: "username avatar sellerRating email phoneNumber"
+      })
+      .lean();
+
+    if (!listing) {
+      return res.status(404).json({ 
+        success: false,
+        error: "Listing not found" 
+      });
+    }
+    
+    // Increment view count
+    await MarketplaceListing.findByIdAndUpdate(listingId, {
+      $inc: { viewCount: 1 }
+    });
+    
+    // Format response
+    const mediaUrls = Array.isArray(listing.mediaUrls) ? listing.mediaUrls : [];
+    const tags = Array.isArray(listing.tags) ? listing.tags : [];
+    
+    const formattedListing = {
+      _id: listing._id.toString(),
+      sellerId: listing.sellerId || null,
+      title: listing.title || 'Untitled',
+      description: listing.description || '',
+      price: listing.price || 0,
+      formattedPrice: `$${(listing.price || 0).toFixed(2)}`,
+      currency: listing.currency || 'USD',
+      type: listing.type || 'for_sale',
+      category: listing.category || 'Uncategorized',
+      mediaUrls: mediaUrls,
+      thumbnail: mediaUrls.length > 0 ? mediaUrls[0] : null,
+      status: listing.status || 'active',
+      tags: tags,
+      sellerEmail: listing.sellerEmail || listing.sellerId?.email,
+      views: (listing.viewCount || 0) + 1, // Include the increment
+      favoriteCount: listing.favoriteCount || 0,
+      purchaseCount: listing.purchaseCount || 0,
+      createdAt: listing.createdAt,
+      updatedAt: listing.updatedAt,
+      createdAtFormatted: new Date(listing.createdAt).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      }),
+      statusColor: listing.status === 'active' ? 'green' : 
+                  listing.status === 'sold' ? 'blue' : 
+                  listing.status === 'pending' ? 'orange' : 'gray',
+      isDigital: listing.isDigital !== false,
+      seller: listing.sellerId ? {
+        _id: listing.sellerId._id,
+        username: listing.sellerId.username,
+        avatar: listing.sellerId.avatar,
+        sellerRating: listing.sellerId.sellerRating,
+        email: listing.sellerId.email
+      } : null
+    };
+    
+    console.log('✅ Returning listing details for:', listing.title);
+    
+    res.status(200).json({ 
+      success: true,
+      listing: formattedListing
+    });
+    
+  } catch (error) {
+    console.error("❌ Error fetching listing details:", error);
+    
+    if (error.name === 'CastError') {
+      return res.status(400).json({ 
+        success: false,
+        error: "Invalid listing ID format" 
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to fetch listing details",
+      message: error.message 
+    });
+  }
+});
+
+// ===================================================
+// ✅ GET USER'S LISTINGS (My Listings)
 // ===================================================
 router.get("/my-listings", authenticateMiddleware, async (req, res) => {
   try {
     console.log("🎯 /my-listings endpoint hit");
-    console.log("User ID from token:", req.user?._id);
     
     const sellerId = req.user._id;
     
-    // Parse query parameters
     const { 
-      status, 
+      status = 'all', 
       page = 1, 
       limit = 10,
-      category,
+      category = 'all',
       search,
       sortBy = 'updatedAt',
       sortOrder = 'desc'
@@ -181,7 +308,7 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
       filter.category = category;
     }
     
-    if (search) {
+    if (search && search.trim() !== '') {
       filter.$or = [
         { title: { $regex: search, $options: 'i' } },
         { description: { $regex: search, $options: 'i' } },
@@ -189,7 +316,7 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
       ];
     }
     
-    console.log("🔍 Filter criteria:", JSON.stringify(filter, null, 2));
+    console.log("🔍 Filter criteria:", filter);
     
     // Parse pagination
     const pageNum = Math.max(1, parseInt(page));
@@ -200,9 +327,8 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
     const sortOptions = {};
     sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
     
-    // Get listings with pagination
+    // Get listings
     const listings = await MarketplaceListing.find(filter)
-      .select("title price status mediaUrls description category tags createdAt updatedAt views sellerId isActive type currency")
       .populate({
         path: "sellerId",
         select: "username avatar sellerRating email phoneNumber"
@@ -214,66 +340,46 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
     
     console.log("📊 Found listings count:", listings.length);
     
-    // If no listings found
-    if (listings.length === 0) {
-      console.log("ℹ️ No listings found for user:", sellerId);
-      
-      return res.status(200).json({
-        success: true,
-        listings: [],
-        message: "No listings found",
-        pagination: {
-          page: pageNum,
-          limit: limitNum,
-          total: 0,
-          pages: 0
-        },
-        timestamp: new Date().getTime(),
-        currency: "USD"
-      });
-    }
-    
-    // Count total documents
     const total = await MarketplaceListing.countDocuments(filter);
-    console.log("Total documents matching filter:", total);
     
     // Format listings
     const formattedListings = listings.map(listing => {
-      // Ensure mediaUrls is an array
       const mediaUrls = Array.isArray(listing.mediaUrls) ? listing.mediaUrls : [];
-      
-      // Get thumbnail (first image)
-      const thumbnail = mediaUrls.length > 0 ? mediaUrls[0] : null;
+      const tags = Array.isArray(listing.tags) ? listing.tags : [];
       
       return {
-        ...listing,
         _id: listing._id.toString(),
-        mediaUrls,
-        thumbnail,
-        formattedPrice: listing.price ? `$${listing.price.toFixed(2)}` : "N/A",
+        sellerId: listing.sellerId,
+        title: listing.title || 'Untitled',
+        description: listing.description || '',
         price: listing.price || 0,
+        formattedPrice: `$${(listing.price || 0).toFixed(2)}`,
         currency: listing.currency || 'USD',
-        // Format date
+        type: listing.type || 'for_sale',
+        category: listing.category || 'Uncategorized',
+        mediaUrls: mediaUrls,
+        thumbnail: mediaUrls.length > 0 ? mediaUrls[0] : null,
+        status: listing.status || 'active',
+        tags: tags,
+        createdAt: listing.createdAt,
+        updatedAt: listing.updatedAt,
         createdAtFormatted: new Date(listing.createdAt).toLocaleDateString('en-US', {
           year: 'numeric',
           month: 'short',
           day: 'numeric'
         }),
-        // Add status badge color
+        views: listing.viewCount || 0,
         statusColor: listing.status === 'active' ? 'green' : 
                     listing.status === 'sold' ? 'blue' : 
-                    listing.status === 'pending' ? 'orange' : 'gray'
+                    listing.status === 'pending' ? 'orange' : 'gray',
+        seller: listing.sellerId ? {
+          _id: listing.sellerId._id,
+          username: listing.sellerId.username,
+          avatar: listing.sellerId.avatar,
+          sellerRating: listing.sellerId.sellerRating
+        } : null
       };
     });
-    
-    // Set response headers
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('Content-Type', 'application/json');
-    
-    // Log successful response
-    console.log(`✅ Successfully returned ${formattedListings.length} listings`);
     
     res.status(200).json({
       success: true,
@@ -285,11 +391,9 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
         pages: Math.ceil(total / limitNum)
       },
       filters: {
-        status: status || 'all',
-        category: category || 'all',
-        search: search || '',
-        sortBy,
-        sortOrder
+        status: status,
+        category: category,
+        search: search || ''
       },
       timestamp: new Date().getTime(),
       currency: "USD",
@@ -298,150 +402,89 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
     
   } catch (error) {
     console.error("❌ Error fetching my listings:", error);
-    console.error("Error stack:", error.stack);
-    
-    // Send detailed error response
-    const errorResponse = {
+    res.status(500).json({ 
       success: false,
       error: "Failed to fetch my listings",
-      message: error.message,
-      code: error.code || 'SERVER_ERROR'
-    };
-    
-    // Add stack trace in development
-    if (process.env.NODE_ENV === 'development') {
-      errorResponse.stack = error.stack;
-    }
-    
-    // Check for specific errors
-    if (error.name === 'CastError') {
-      errorResponse.message = "Invalid user ID format";
-      errorResponse.code = 'INVALID_ID';
-      return res.status(400).json(errorResponse);
-    }
-    
-    if (error.name === 'ValidationError') {
-      errorResponse.message = "Validation error";
-      errorResponse.code = 'VALIDATION_ERROR';
-      errorResponse.details = error.errors;
-      return res.status(400).json(errorResponse);
-    }
-    
-    res.status(500).json(errorResponse);
+      message: error.message
+    });
   }
 });
 
 // ===================================================
-// ✅ CREATE LISTING (USD Only - Simple)
+// ✅ CREATE LISTING
 // ===================================================
 router.post("/create-listing", authenticateMiddleware, async (req, res) => {
   try {
     console.log("=== CREATE LISTING REQUEST ===");
+    console.log("User:", req.user._id);
     console.log("Body:", req.body);
-
-    if (!req.user || !req.user._id) {
-      return res.status(401).json({
-        success: false,
-        error: "User not authenticated"
-      });
-    }
 
     const { title, description, price, type, category, tags, mediaUrls } = req.body;
     const sellerId = req.user._id;
 
-    // Enhanced validation
+    // Validation
     if (!title || !description || !price || !type) {
       return res.status(400).json({ 
         success: false,
-        error: "Missing required fields",
-        required: ["title", "description", "price", "type"]
+        error: "Missing required fields: title, description, price, type"
       });
     }
 
-    // Validate price
     const priceNumber = parseFloat(price);
     if (isNaN(priceNumber) || priceNumber <= 0) {
       return res.status(400).json({
         success: false,
-        error: "Price must be a positive number",
-        received: price
+        error: "Price must be a positive number"
       });
     }
-
-    // Normalize data
-    const tagsArray = Array.isArray(tags) ? tags : (tags ? [tags] : []);
-    const mediaArray = Array.isArray(mediaUrls) ? mediaUrls : (mediaUrls ? [mediaUrls] : []);
-    const actualCategory = category || 'uncategorized';
 
     // Get seller info
-    let sellerEmail = null;
-    let seller = null;
-    
-    try {
-      seller = await User.findById(sellerId).select('email username').exec();
-      if (seller) {
-        sellerEmail = seller.email;
-      } else {
-        return res.status(404).json({
-          success: false,
-          error: "User account not found"
-        });
-      }
-    } catch (emailError) {
-      console.error("❌ Error fetching seller:", emailError.message);
-      return res.status(500).json({
+    const seller = await User.findById(sellerId).select('email username').exec();
+    if (!seller) {
+      return res.status(404).json({
         success: false,
-        error: "Could not retrieve user information"
+        error: "User account not found"
       });
     }
 
-    // Validate email format
-    if (sellerEmail && !isValidEmail(sellerEmail)) {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid email format in user account"
-      });
-    }
-
-    // ✅ Simple listing data - price in USD
+    // Prepare listing data
     const listingData = {
       sellerId: sellerId,
-      sellerEmail: sellerEmail,
+      sellerEmail: seller.email,
       title: title.trim(),
       description: description.trim(),
-      price: parseFloat(priceNumber.toFixed(2)), // Store in USD
-      currency: 'USD', // Explicitly set currency
+      price: parseFloat(priceNumber.toFixed(2)),
+      currency: 'USD',
       type: type,
-      category: actualCategory.trim(),
-      tags: tagsArray.map(tag => tag.trim()).filter(tag => tag),
-      mediaUrls: mediaArray,
-      status: "active"
+      category: (category || 'uncategorized').trim(),
+      tags: Array.isArray(tags) ? tags.map(tag => tag.trim()).filter(tag => tag) : [],
+      mediaUrls: Array.isArray(mediaUrls) ? mediaUrls : (mediaUrls ? [mediaUrls] : []),
+      status: "active",
+      isDigital: true
     };
 
-    console.log("📝 Creating listing in USD:", {
-      title: listingData.title,
-      price: `$${listingData.price}`
-    });
+    console.log("📝 Creating listing:", listingData.title);
 
     // Create the listing
     const listing = await MarketplaceListing.create(listingData);
 
-    // Prepare response
+    // Format response
     const response = {
       success: true,
       message: "Listing created successfully", 
       listing: {
-        id: listing._id,
+        _id: listing._id,
         title: listing.title,
-        price: listing.price, // USD amount
-        formattedPrice: `$${listing.price.toFixed(2)}`, // With $ sign
-        currency: listing.currency, // USD
+        price: listing.price,
+        formattedPrice: `$${listing.price.toFixed(2)}`,
+        currency: listing.currency,
         type: listing.type,
         category: listing.category,
         status: listing.status,
+        mediaUrls: listing.mediaUrls,
         createdAt: listing.createdAt,
         seller: {
-          id: seller._id,
+          _id: seller._id,
           username: seller.username
         }
       }
@@ -481,96 +524,15 @@ router.post("/create-listing", authenticateMiddleware, async (req, res) => {
 });
 
 // ===================================================
-// ✅ GET SINGLE LISTING DETAILS (USD Only)
-// ===================================================
-router.get("/:id", async (req, res) => {  // ✅ CHANGED: from "/listing/:id" to "/:id"
-  try {
-    const listingId = req.params.id;
-    
-    console.log('📡 GET /marketplace/listings/:id called with ID:', listingId);
-    
-    if (!mongoose.Types.ObjectId.isValid(listingId)) {
-      return res.status(400).json({ 
-        success: false,
-        error: "Invalid listing ID format" 
-      });
-    }
-    
-    const listing = await MarketplaceListing.findById(listingId)
-      .populate("sellerId", "username avatar sellerRating email phone")
-      .select("title description price type category tags mediaUrls status sellerId createdAt updatedAt views currency");
-    
-    if (!listing) {
-      return res.status(404).json({ 
-        success: false,
-        error: "Listing not found" 
-      });
-    }
-    
-    // Increment view count
-    listing.views = (listing.views || 0) + 1;
-    await listing.save();
-    
-    // Format response
-    const formattedListing = {
-      ...listing.toObject(),
-      _id: listing._id.toString(),
-      formattedPrice: `$${listing.price.toFixed(2)}`, // Add $ sign
-      currency: listing.currency || 'USD',
-      mediaUrls: Array.isArray(listing.mediaUrls) ? listing.mediaUrls : [],
-      thumbnail: listing.mediaUrls?.[0] || null,
-      seller: listing.sellerId ? {
-        _id: listing.sellerId._id,
-        username: listing.sellerId.username,
-        avatar: listing.sellerId.avatar,
-        sellerRating: listing.sellerId.sellerRating,
-        email: listing.sellerId.email,
-        phone: listing.sellerId.phone
-      } : null
-    };
-    
-    // Remove the populated sellerId to avoid duplication
-    delete formattedListing.sellerId;
-    
-    console.log('✅ Returning listing details for:', listing.title);
-    
-    res.status(200).json({ 
-      success: true,
-      listing: formattedListing
-    });
-    
-  } catch (error) {
-    console.error("❌ Error fetching listing details:", error);
-    
-    if (error.name === 'CastError') {
-      return res.status(400).json({ 
-        success: false,
-        error: "Invalid listing ID format" 
-      });
-    }
-    
-    res.status(500).json({ 
-      success: false,
-      error: "Failed to fetch listing details",
-      message: error.message 
-    });
-  }
-});
-
-// ===================================================
-// ✅ EDIT/UPDATE LISTING (USD Only)
+// ✅ UPDATE LISTING
 // ===================================================
 router.put("/:id", authenticateMiddleware, async (req, res) => {
   try {
-    console.log("=== EDIT LISTING REQUEST ===");
-    console.log("Params:", req.params);
-    console.log("Body:", req.body);
-
-    const { title, description, price, type, category, tags, mediaUrls } = req.body;
+    const { title, description, price, type, category, tags, mediaUrls, status } = req.body;
     const listingId = req.params.id;
     const sellerId = req.user._id;
 
-    // Check if listing exists and user owns it
+    // Check ownership
     const existingListing = await MarketplaceListing.findOne({
       _id: listingId,
       sellerId: sellerId
@@ -583,131 +545,46 @@ router.put("/:id", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    // Build update object
+    // Build update
     const updateData = {};
-    let hasUpdates = false;
-    
-    // Handle price update
+    if (title !== undefined) updateData.title = title.trim();
+    if (description !== undefined) updateData.description = description.trim();
     if (price !== undefined) {
-      hasUpdates = true;
-      
-      if (price === null || price === '') {
-        return res.status(400).json({
-          success: false,
-          error: "Price is required",
-          field: "price"
-        });
-      }
-      
       const priceNum = parseFloat(price);
       if (isNaN(priceNum) || priceNum <= 0) {
         return res.status(400).json({
           success: false,
-          error: "Price must be a valid positive number",
-          field: "price"
+          error: "Price must be a valid positive number"
         });
       }
-
-      // ✅ Store price in USD
       updateData.price = parseFloat(priceNum.toFixed(2));
     }
-    
-    // Other fields
-    if (title !== undefined && title.trim() !== existingListing.title) {
-      hasUpdates = true;
-      updateData.title = title.trim();
-    }
-    
-    if (description !== undefined && description.trim() !== existingListing.description) {
-      hasUpdates = true;
-      updateData.description = description.trim();
-    }
-    
-    if (type !== undefined && type !== existingListing.type) {
-      hasUpdates = true;
-      updateData.type = type;
-    }
-    
-    if (category !== undefined && category?.trim() !== existingListing.category) {
-      hasUpdates = true;
-      updateData.category = category?.trim() || 'uncategorized';
-    }
-    
-    if (tags !== undefined) {
-      hasUpdates = true;
-      const tagsArray = Array.isArray(tags) ? tags : (tags ? [tags] : []);
-      updateData.tags = tagsArray.map(tag => tag?.trim()).filter(tag => tag);
-    }
-    
-    if (mediaUrls !== undefined) {
-      hasUpdates = true;
-      const mediaArray = Array.isArray(mediaUrls) ? mediaUrls : (mediaUrls ? [mediaUrls] : []);
-      updateData.mediaUrls = mediaArray;
-    }
-    
-    if (!hasUpdates) {
-      return res.status(400).json({
-        success: false,
-        error: "No changes provided for update"
-      });
-    }
+    if (type !== undefined) updateData.type = type;
+    if (category !== undefined) updateData.category = category.trim();
+    if (tags !== undefined) updateData.tags = Array.isArray(tags) ? tags : [];
+    if (mediaUrls !== undefined) updateData.mediaUrls = Array.isArray(mediaUrls) ? mediaUrls : [];
+    if (status !== undefined) updateData.status = status;
     
     updateData.updatedAt = new Date();
 
-    // Update the listing
+    // Update
     const updatedListing = await MarketplaceListing.findByIdAndUpdate(
       listingId,
       { $set: updateData },
-      { 
-        new: true, 
-        runValidators: true
-      }
-    );
+      { new: true, runValidators: true }
+    ).populate('sellerId', 'username avatar');
 
-    if (!updatedListing) {
-      return res.status(404).json({ 
-        success: false,
-        error: "Failed to update listing" 
-      });
-    }
-
-    // Prepare response
-    const response = {
+    res.status(200).json({
       success: true,
       message: "Listing updated successfully", 
       listing: {
         ...updatedListing.toObject(),
-        _id: updatedListing._id.toString(),
-        formattedPrice: `$${updatedListing.price.toFixed(2)}`, // Add $ sign
-        currency: 'USD'
+        formattedPrice: `$${updatedListing.price.toFixed(2)}`
       }
-    };
-
-    res.status(200).json(response);
+    });
 
   } catch (error) {
     console.error("❌ Error updating listing:", error);
-    
-    if (error.name === 'CastError') {
-      return res.status(400).json({ 
-        success: false,
-        error: "Invalid listing ID format" 
-      });
-    }
-    
-    if (error.name === 'ValidationError') {
-      const errors = {};
-      Object.keys(error.errors).forEach(key => {
-        errors[key] = error.errors[key].message;
-      });
-      
-      return res.status(400).json({
-        success: false,
-        error: "Validation failed",
-        details: errors
-      });
-    }
-    
     res.status(500).json({ 
       success: false,
       error: "Failed to update listing",
@@ -717,7 +594,47 @@ router.put("/:id", authenticateMiddleware, async (req, res) => {
 });
 
 // ===================================================
-// ✅ TOGGLE LISTING STATUS
+// ✅ DELETE LISTING
+// ===================================================
+router.delete("/:id", authenticateMiddleware, async (req, res) => {
+  try {
+    const listingId = req.params.id;
+    const userId = req.user._id;
+    
+    const listing = await MarketplaceListing.findOne({
+      _id: listingId,
+      sellerId: userId
+    });
+    
+    if (!listing) {
+      return res.status(404).json({ 
+        success: false,
+        error: "Listing not found or no permission"
+      });
+    }
+    
+    await MarketplaceListing.findByIdAndDelete(listingId);
+    
+    res.status(200).json({ 
+      success: true,
+      message: "Listing deleted successfully", 
+      deletedListing: {
+        _id: listing._id,
+        title: listing.title,
+        formattedPrice: `$${listing.price.toFixed(2)}`
+      }
+    });
+  } catch (error) {
+    console.error("❌ Error deleting listing:", error);
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to delete listing"
+    });
+  }
+});
+
+// ===================================================
+// ✅ TOGGLE STATUS
 // ===================================================
 router.patch("/:id/toggle-status", authenticateMiddleware, async (req, res) => {
   try {
@@ -740,10 +657,7 @@ router.patch("/:id/toggle-status", authenticateMiddleware, async (req, res) => {
     
     const updatedListing = await MarketplaceListing.findByIdAndUpdate(
       listingId,
-      { 
-        status: newStatus,
-        updatedAt: new Date()
-      },
+      { status: newStatus, updatedAt: new Date() },
       { new: true }
     );
 
@@ -752,21 +666,12 @@ router.patch("/:id/toggle-status", authenticateMiddleware, async (req, res) => {
       message: `Listing ${newStatus === "active" ? "activated" : "deactivated"} successfully`,
       listing: {
         ...updatedListing.toObject(),
-        _id: updatedListing._id.toString(),
         formattedPrice: `$${updatedListing.price.toFixed(2)}`
       }
     });
 
   } catch (error) {
     console.error("❌ Error toggling listing status:", error);
-    
-    if (error.name === 'CastError') {
-      return res.status(400).json({ 
-        success: false,
-        error: "Invalid listing ID format" 
-      });
-    }
-    
     res.status(500).json({ 
       success: false,
       error: "Failed to toggle listing status" 
@@ -775,70 +680,12 @@ router.patch("/:id/toggle-status", authenticateMiddleware, async (req, res) => {
 });
 
 // ===================================================
-// ✅ DELETE LISTING
-// ===================================================
-router.delete("/:id", authenticateMiddleware, async (req, res) => {
-  try {
-    const listingId = req.params.id;
-    const userId = req.user._id;
-    
-    if (!mongoose.Types.ObjectId.isValid(listingId)) {
-      return res.status(400).json({ 
-        success: false,
-        error: "Invalid listing ID format" 
-      });
-    }
-    
-    const listing = await MarketplaceListing.findById(listingId);
-    
-    if (!listing) {
-      return res.status(404).json({ 
-        success: false,
-        error: "Listing not found"
-      });
-    }
-    
-    if (!listing.sellerId.equals(userId)) {
-      return res.status(403).json({ 
-        success: false,
-        error: "No permission to delete this listing" 
-      });
-    }
-    
-    await MarketplaceListing.findByIdAndDelete(listingId);
-    
-    res.status(200).json({ 
-      success: true,
-      message: "Listing deleted successfully", 
-      deletedListing: {
-        _id: listing._id,
-        title: listing.title,
-        formattedPrice: `$${listing.price.toFixed(2)}`,
-        status: listing.status
-      }
-    });
-  } catch (error) {
-    console.error("❌ Error deleting listing:", error);
-    res.status(500).json({ 
-      success: false,
-      error: "Failed to delete listing"
-    });
-  }
-});
-
-// ===================================================
-// ✅ Get listings by specific user ID (USD Only)
+// ✅ GET LISTINGS BY USER
 // ===================================================
 router.get("/user/:userId/listings", async (req, res) => {
   try {
     const { userId } = req.params;
-    const { status, page = 1, limit = 20 } = req.query;
-    
-    const filter = { sellerId: userId };
-    if (status) filter.status = status;
-    else filter.status = 'active';
-
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const { status = 'active', page = 1, limit = 20 } = req.query;
     
     // Verify user exists
     const user = await User.findById(userId).select('username avatar sellerRating');
@@ -849,20 +696,22 @@ router.get("/user/:userId/listings", async (req, res) => {
       });
     }
 
+    const filter = { sellerId: userId, status: status };
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
     const listings = await MarketplaceListing.find(filter)
-      .select("title price status mediaUrls description category tags createdAt updatedAt currency type")
       .sort({ updatedAt: -1 })
       .skip(skip)
-      .limit(parseInt(limit));
+      .limit(parseInt(limit))
+      .lean();
 
     const total = await MarketplaceListing.countDocuments(filter);
 
-    // Format listings - add $ sign
+    // Format listings
     const formattedListings = listings.map(listing => ({
-      ...listing.toObject(),
+      ...listing,
       _id: listing._id.toString(),
-      formattedPrice: `$${listing.price.toFixed(2)}`, // Add $ sign
-      currency: 'USD',
+      formattedPrice: `$${listing.price.toFixed(2)}`,
       mediaUrls: Array.isArray(listing.mediaUrls) ? listing.mediaUrls : [],
       thumbnail: listing.mediaUrls?.[0] || null
     }));
@@ -871,7 +720,7 @@ router.get("/user/:userId/listings", async (req, res) => {
       success: true,
       listings: formattedListings,
       user: {
-        id: user._id,
+        _id: user._id,
         username: user.username,
         avatar: user.avatar,
         sellerRating: user.sellerRating
@@ -894,13 +743,13 @@ router.get("/user/:userId/listings", async (req, res) => {
 });
 
 // ===================================================
-// ✅ SEARCH LISTINGS (Optional)
+// ✅ SEARCH LISTINGS
 // ===================================================
 router.get("/search", async (req, res) => {
   try {
     const { q, category, minPrice, maxPrice, page = 1, limit = 12 } = req.query;
     
-    if (!q) {
+    if (!q || q.trim() === '') {
       return res.status(400).json({
         success: false,
         error: "Search query is required"
@@ -921,13 +770,8 @@ router.get("/search", async (req, res) => {
       filter.category = category;
     }
     
-    if (minPrice) {
-      filter.price = { ...filter.price, $gte: parseFloat(minPrice) };
-    }
-    
-    if (maxPrice) {
-      filter.price = { ...filter.price, $lte: parseFloat(maxPrice) };
-    }
+    if (minPrice) filter.price = { ...filter.price, $gte: parseFloat(minPrice) };
+    if (maxPrice) filter.price = { ...filter.price, $lte: parseFloat(maxPrice) };
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
@@ -935,18 +779,24 @@ router.get("/search", async (req, res) => {
       .populate("sellerId", "username avatar sellerRating email")
       .sort({ updatedAt: -1 })
       .skip(skip)
-      .limit(parseInt(limit));
+      .limit(parseInt(limit))
+      .lean();
 
     const total = await MarketplaceListing.countDocuments(filter);
     
     // Format listings
     const formattedListings = listings.map(listing => ({
-      ...listing.toObject(),
+      ...listing,
       _id: listing._id.toString(),
       formattedPrice: `$${listing.price.toFixed(2)}`,
-      currency: 'USD',
       mediaUrls: Array.isArray(listing.mediaUrls) ? listing.mediaUrls : [],
-      thumbnail: listing.mediaUrls?.[0] || null
+      thumbnail: listing.mediaUrls?.[0] || null,
+      seller: listing.sellerId ? {
+        _id: listing.sellerId._id,
+        username: listing.sellerId.username,
+        avatar: listing.sellerId.avatar,
+        sellerRating: listing.sellerId.sellerRating
+      } : null
     }));
 
     res.status(200).json({
@@ -960,11 +810,8 @@ router.get("/search", async (req, res) => {
       },
       search: {
         query: q,
-        category,
-        minPrice,
-        maxPrice
-      },
-      currency: "USD"
+        results: total
+      }
     });
   } catch (error) {
     console.error("❌ Error searching listings:", error);
@@ -980,12 +827,12 @@ router.get("/search", async (req, res) => {
 // ===================================================
 router.get("/health", async (req, res) => {
   try {
-    const count = await MarketplaceListing.countDocuments();
+    const count = await MarketplaceListing.countDocuments({ status: 'active' });
     res.status(200).json({
       success: true,
       message: "Marketplace API is healthy",
       stats: {
-        totalListings: count,
+        activeListings: count,
         timestamp: new Date().toISOString()
       }
     });
@@ -996,11 +843,5 @@ router.get("/health", async (req, res) => {
     });
   }
 });
-
-// Email validation helper function
-function isValidEmail(email) {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-}
 
 module.exports = router;
