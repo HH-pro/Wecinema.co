@@ -1,7 +1,7 @@
 import React from 'react';
 import { FiCreditCard, FiPlay, FiUser, FiVideo, FiImage, FiDollarSign, FiClock } from 'react-icons/fi';
-import { Listing } from '../../types/marketplace';
-import marketplaceApi from '../../api/marketplaceApi';
+import { Listing } from '../../../types/marketplace';
+import marketplaceApi from '../../../api/marketplaceApi';
 
 interface ListingCardProps {
   listing: Listing;
