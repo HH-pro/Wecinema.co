@@ -1,14 +1,8 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
+import axios from 'axios';
 import { Layout } from "../components";
-import { useNavigate } from "react-router-dom";
-import {
-  getAuth,
-  signInWithPopup,
-  signOut,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-} from "firebase/auth";
+import { useNavigate } from 'react-router-dom';
+import { getAuth, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { googleProvider } from "../firebase/config";
 import { motion } from "framer-motion";
 import Confetti from "react-confetti";
@@ -16,283 +10,450 @@ import "../css/HypeModeProfile.css";
 
 const HypeModeProfile = () => {
   const navigate = useNavigate();
-  const auth = getAuth();
-
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [popupMessage, setPopupMessage] = useState('');
+  const [showPopup, setShowPopup] = useState(false);
   const [isSignup, setIsSignup] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
+  const [userId, setUserId] = useState('');
+  const [showFireworks, setShowFireworks] = useState(false);
+  const [selectedSubscription, setSelectedSubscription] = useState<"user" | "studio" | null>(null);
+  const [userType, setUserType] = useState<"buyer" | "seller">("buyer");
   const [isLoading, setIsLoading] = useState(false);
 
-  const [popupMessage, setPopupMessage] = useState("");
-  const [showPopup, setShowPopup] = useState(false);
+  // Register user with backend
+  const registerUser = async (username: string, email: string, avatar: string, userType: string) => {
+    try {
+      const res = await axios.post('https://wecinema.co/api/user/signup', {
+        username,
+        email,
+        avatar,
+        userType,
+        dob: "--------"
+      });
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [username, setUsername] = useState("");
+      const token = res.data.token;
+      const userId = res.data.id;
 
-  const [userId, setUserId] = useState("");
-  const [userType, setUserType] = useState("buyer");
-  const [selectedSubscription, setSelectedSubscription] = useState(null);
+      setPopupMessage(`Registration successful as ${userType}!`);
+      setShowPopup(true);
 
-  const [showFireworks, setShowFireworks] = useState(false);
-  const [windowSize, setWindowSize] = useState({
-    width: window.innerWidth,
-    height: window.innerHeight,
-  });
-
-  /* ---------------- UTIL ---------------- */
-  const showMessage = (msg) => {
-    setPopupMessage(msg);
-    setShowPopup(true);
-    setIsLoading(false);
+      if (token) {
+        localStorage.setItem('token', token);
+        setIsLoggedIn(true);
+        setUserId(userId);
+        return true;
+      }
+    } catch (error: any) {
+      if (error.response && error.response.data && error.response.data.error === 'Email already exists.') {
+        setPopupMessage('Email already exists. Please sign in.');
+      } else {
+        setPopupMessage('Registration failed. Please try again.');
+      }
+      setShowPopup(true);
+      return false;
+    }
   };
 
-  /* ---------------- BACKEND AUTH ---------------- */
-  const registerUser = async (username, email, avatar) => {
-    const res = await axios.post("https://wecinema.co/api/user/signup", {
-      username,
-      email,
-      avatar,
-      userType,
-      dob: "--------",
-    });
+  // Login user with backend
+  const loginUser = async (email: string) => {
+    try {
+      const res = await axios.post('https://wecinema.co/api/user/signin', { email });
+      const backendToken = res.data.token;
+      const userId = res.data.id;
 
-    localStorage.setItem("token", res.data.token);
-    setUserId(res.data.id);
-    setIsLoggedIn(true);
+      if (backendToken) {
+        localStorage.setItem('token', backendToken);
+        setIsLoggedIn(true);
+        setUserId(userId);
+        setPopupMessage('Login successful!');
+        setShowPopup(true);
+        return true;
+      }
+    } catch (error: any) {
+      if (error.response) {
+        setPopupMessage(error.response.data.message || 'Login failed.');
+      } else {
+        setPopupMessage('Login failed.');
+      }
+      setShowPopup(true);
+      return false;
+    }
   };
 
-  const loginUser = async (email) => {
-    const res = await axios.post("https://wecinema.co/api/user/signin", { email });
-    localStorage.setItem("token", res.data.token);
-    setUserId(res.data.id);
-    setIsLoggedIn(true);
-  };
-
-  /* ---------------- AUTH SUCCESS ---------------- */
-  const onAuthSuccess = async (firebaseUser) => {
-    const profile = firebaseUser.providerData[0];
+  // Handle successful authentication
+  const onLoginSuccess = async (user: any, isEmailAuth: boolean = false) => {
+    const profile = user.providerData[0];
     const email = profile.email;
-    const name = profile.displayName || email.split("@")[0];
-    const avatar =
-      profile.photoURL ||
-      `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}`;
+    const username = profile.displayName || email.split('@')[0];
+    const avatar = profile.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`;
 
     try {
       if (isSignup) {
-        await registerUser(name, email, avatar);
-        showMessage("Registration successful 🎉");
+        const success = await registerUser(username, email, avatar, userType);
+        if (success) {
+          navigateToPayment();
+        }
       } else {
-        await loginUser(email);
-        showMessage("Login successful ✅");
+        const success = await loginUser(email);
+        if (success) {
+          navigateToPayment();
+        }
       }
-
-      setTimeout(() => {
-        navigate("/payment", {
-          state: {
-            subscriptionType: selectedSubscription,
-            amount: selectedSubscription === "user" ? 5 : 10,
-            userId,
-            userType,
-          },
-        });
-      }, 1500);
-    } catch (err) {
-      showMessage("Authentication failed. Try again.");
+    } catch (error) {
+      setPopupMessage('Authentication failed. Please try again.');
+      setShowPopup(true);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  /* ---------------- GOOGLE AUTH ---------------- */
+  const navigateToPayment = () => {
+    setTimeout(() => {
+      setShowPopup(false);
+      navigate('/payment', { 
+        state: { 
+          subscriptionType: selectedSubscription, 
+          amount: selectedSubscription === 'user' ? 5 : 10, 
+          userId,
+          userType 
+        } 
+      });
+    }, 2000);
+  };
+
+  // Google Signin
   const handleGoogleLogin = async () => {
     if (!selectedSubscription) {
-      return showMessage("Please select a subscription first.");
+      setPopupMessage("Please select a subscription first.");
+      setShowPopup(true);
+      return;
     }
 
+    setIsLoading(true);
+    const auth = getAuth();
     try {
-      setIsLoading(true);
       const result = await signInWithPopup(auth, googleProvider);
-      await onAuthSuccess(result.user);
-    } catch {
-      showMessage("Google authentication failed.");
+      const user = result.user;
+      await onLoginSuccess(user);
+    } catch (error: any) {
+      setIsLoading(false);
+      setPopupMessage('Google login failed. Please try again.');
+      setShowPopup(true);
     }
   };
 
-  /* ---------------- EMAIL AUTH ---------------- */
-  const handleEmailAuth = async () => {
+  // Email Signup
+  const handleEmailSignup = async () => {
     if (!selectedSubscription) {
-      return showMessage("Please select a subscription.");
+      setPopupMessage("Please select a subscription first.");
+      setShowPopup(true);
+      return;
     }
 
-    if (!email || !password || (isSignup && !username)) {
-      return showMessage("Please fill all fields.");
+    if (!email || !password || !username) {
+      setPopupMessage("Please enter username, email and password.");
+      setShowPopup(true);
+      return;
     }
 
     if (password.length < 6) {
-      return showMessage("Password must be at least 6 characters.");
+      setPopupMessage("Password should be at least 6 characters long.");
+      setShowPopup(true);
+      return;
     }
 
+    setIsLoading(true);
+    const auth = getAuth();
     try {
-      setIsLoading(true);
-      let userCredential;
-
-      if (isSignup) {
-        userCredential = await createUserWithEmailAndPassword(
-          auth,
-          email,
-          password
-        );
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      await onLoginSuccess(user, true);
+    } catch (error: any) {
+      setIsLoading(false);
+      if (error.code === 'auth/email-already-in-use') {
+        setPopupMessage('Email already in use. Please try logging in.');
+      } else if (error.code === 'auth/weak-password') {
+        setPopupMessage('Password should be at least 6 characters.');
+      } else if (error.code === 'auth/invalid-email') {
+        setPopupMessage('Invalid email address.');
       } else {
-        userCredential = await signInWithEmailAndPassword(
-          auth,
-          email,
-          password
-        );
+        setPopupMessage('Email signup failed. Please try again.');
       }
-
-      await onAuthSuccess(userCredential.user);
-    } catch (err) {
-      showMessage("Email authentication failed.");
+      setShowPopup(true);
     }
   };
 
-  /* ---------------- LOGOUT ---------------- */
-  const handleLogout = async () => {
-    await signOut(auth);
-    localStorage.removeItem("token");
-    setIsLoggedIn(false);
-    showMessage("Logged out successfully.");
+  // Email Login
+  const handleEmailLogin = async () => {
+    if (!selectedSubscription) {
+      setPopupMessage("Please select a subscription first.");
+      setShowPopup(true);
+      return;
+    }
+
+    if (!email || !password) {
+      setPopupMessage("Please enter both email and password.");
+      setShowPopup(true);
+      return;
+    }
+
+    setIsLoading(true);
+    const auth = getAuth();
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      await onLoginSuccess(user, true);
+    } catch (error: any) {
+      setIsLoading(false);
+      if (error.code === 'auth/user-not-found') {
+        setPopupMessage('No user found with this email. Please sign up.');
+      } else if (error.code === 'auth/wrong-password') {
+        setPopupMessage('Incorrect password. Please try again.');
+      } else if (error.code === 'auth/invalid-email') {
+        setPopupMessage('Invalid email address.');
+      } else {
+        setPopupMessage('Email login failed. Please try again.');
+      }
+      setShowPopup(true);
+    }
   };
 
-  /* ---------------- EFFECTS ---------------- */
+  // Google Logout
+  const handleGoogleLogout = async () => {
+    const auth = getAuth();
+    try {
+      await signOut(auth);
+      localStorage.removeItem('token');
+      setIsLoggedIn(false);
+      setPopupMessage('Logout successful.');
+      setShowPopup(true);
+    } catch (error) {
+      setPopupMessage('Logout failed. Please try again.');
+      setShowPopup(true);
+    }
+  };
+
+  const handleEmailSubmit = () => {
+    if (isSignup) {
+      handleEmailSignup();
+    } else {
+      handleEmailLogin();
+    }
+  };
+
+  const closePopup = () => {
+    setShowPopup(false);
+    setIsLoading(false);
+  };
+
+  const handleSubscriptionClick = (subscriptionType: "user" | "studio") => {
+    setSelectedSubscription(subscriptionType);
+  };
+
+  const toggleSignupSignin = () => {
+    setIsSignup(!isSignup);
+    setEmail('');
+    setPassword('');
+    setUsername('');
+    setSelectedSubscription(null);
+  };
+
   useEffect(() => {
     setShowFireworks(true);
-    setTimeout(() => setShowFireworks(false), 1200);
-
-    const resize = () =>
-      setWindowSize({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
-
-    window.addEventListener("resize", resize);
-    return () => window.removeEventListener("resize", resize);
+    setTimeout(() => setShowFireworks(false), 1000);
   }, []);
 
-  /* ---------------- UI ---------------- */
   return (
-    <Layout expand={false} hasHeader>
-      <div className="banner-small">🔥 HypeMode is Here! 🔥</div>
+    <Layout expand={false} hasHeader={true}>
+      <div className="banner-small">
+        🔥 HypeMode is Here! Exclusive Features Await! 🔥
+      </div>
 
       {showFireworks && (
         <motion.div
-          className="absolute inset-0"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1 }}
+          className="absolute inset-0 flex justify-center items-center"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 1.2 }}
+          transition={{ duration: 1.5, ease: "easeOut" }}
         >
-          <Confetti
-            width={windowSize.width}
-            height={windowSize.height}
-            recycle={false}
-            numberOfPieces={200}
-          />
+          <div className="relative w-full h-full pointer-events-none">
+            <Confetti width={window.innerWidth} height={window.innerHeight} numberOfPieces={200} recycle={false} />
+          </div>
         </motion.div>
       )}
 
       <div className="main-container-small">
-        <button
-          className="toggle-button-small"
-          onClick={() => setIsSignup(!isSignup)}
-          disabled={isLoading}
-        >
-          {isSignup ? "Already have an account? Sign in" : "Create new account"}
+        <button className="toggle-button-small" onClick={toggleSignupSignin} disabled={isLoading}>
+          {isSignup ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
         </button>
 
-        {!isLoggedIn && isSignup && (
-          <div className="user-type-selector-small">
-            {["buyer", "seller"].map((type) => (
-              <button
-                key={type}
-                className={`user-type-button-small ${
-                  userType === type ? "active-small" : ""
-                }`}
-                onClick={() => setUserType(type)}
-              >
-                {type === "buyer" ? "👤 Buyer" : "🏪 Seller"}
-              </button>
-            ))}
+        {isLoggedIn ? (
+          <div className="cards-container-small">
+            
           </div>
-        )}
+        ) : (
+          <>
+            {isSignup && (
+              <div className="user-type-selector-small">
+                <button 
+                  className={`user-type-button-small ${userType === "buyer" ? "active-small" : ""}`}
+                  onClick={() => setUserType("buyer")}
+                  disabled={isLoading}
+                >
+                  👤 Buyer
+                </button>
+                <button 
+                  className={`user-type-button-small ${userType === "seller" ? "active-small" : ""}`}
+                  onClick={() => setUserType("seller")}
+                  disabled={isLoading}
+                >
+                  🏪 Seller
+                </button>
+              </div>
+            )}
 
-        <div className="cards-container-small">
-          {["user", "studio"].map((plan) => (
-            <div
-              key={plan}
-              className={`subscription-box-small ${
-                selectedSubscription === plan ? "selected-small" : ""
-              }`}
-              onClick={() => setSelectedSubscription(plan)}
-            >
-              <h3>{plan === "user" ? "Basic Plan" : "Pro Plan"}</h3>
-              <div className="subscription-price-small">
-                ${plan === "user" ? "5" : "10"}/month
+            <div className="cards-container-small">
+              {/* Basic Plan */}
+              <div
+                className={`subscription-box-small ${selectedSubscription === "user" ? "selected-small" : ""}`}
+                onClick={() => !isLoading && handleSubscriptionClick("user")}
+              >
+                <div className="premium-badge-small">Popular</div>
+                <h3 className="subscription-title-small">Basic Plan</h3>
+                <div className="subscription-price-small">$5/month</div>
+                <p className="subscription-description-small">Perfect for individual users</p>
+                
+                <ul className="features-list-small">
+                  <li>Buy Films & Scripts</li>
+                  <li>Sell Your Content</li>
+                  <li>Basic Support</li>
+                  <li>Access to Community</li>
+                  <li>5GB Storage</li>
+                </ul>
+
+                {selectedSubscription === "user" && (
+                  <div className="auth-section-small">
+                    <button className="subscription-button-small google-auth-button-small" onClick={handleGoogleLogin} disabled={isLoading}>
+                      <span className="google-icon-small">G</span>
+                      {isLoading ? "Processing..." : (isSignup ? "Google Sign up" : "Google Sign in")}
+                    </button>
+
+                    <div className="auth-divider-small">
+                      <span>or</span>
+                    </div>
+
+                    <div className="email-form-small">
+                      {isSignup && (
+                        <input
+                          type="text"
+                          className="form-input-small"
+                          placeholder="Username"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          disabled={isLoading}
+                        />
+                      )}
+                      <input
+                        type="email"
+                        className="form-input-small"
+                        placeholder="Email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        disabled={isLoading}
+                      />
+                      <input
+                        type="password"
+                        className="form-input-small"
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disabled={isLoading}
+                      />
+                      <button className="subscription-button-small email-submit-button-small" onClick={handleEmailSubmit} disabled={isLoading}>
+                        {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {selectedSubscription === plan && (
-                <div className="auth-section-small">
-                  <button
-                    className="subscription-button-small google-auth-button-small"
-                    onClick={handleGoogleLogin}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Processing..." : "Google Login"}
-                  </button>
+              {/* Pro Plan */}
+              <div
+                className={`subscription-box-small ${selectedSubscription === "studio" ? "selected-small" : ""}`}
+                onClick={() => !isLoading && handleSubscriptionClick("studio")}
+              >
+                <div className="premium-badge-small">Pro</div>
+                <h3 className="subscription-title-small">Pro Plan</h3>
+                <div className="subscription-price-small">$10/month</div>
+                <p className="subscription-description-small">Advanced features for professionals</p>
+                
+                <ul className="features-list-small">
+                  <li>All Basic Features</li>
+                  <li>Early Feature Access</li>
+                  <li>Priority Support</li>
+                  <li>Team Collaboration</li>
+                </ul>
 
-                  <div className="auth-divider-small">or</div>
+                {selectedSubscription === "studio" && (
+                  <div className="auth-section-small">
+                    <button className="subscription-button-small google-auth-button-small" onClick={handleGoogleLogin} disabled={isLoading}>
+                      <span className="google-icon-small">G</span>
+                      {isLoading ? "Processing..." : (isSignup ? "Google Sign up" : "Google Sign in")}
+                    </button>
 
-                  {isSignup && (
-                    <input
-                      className="form-input-small"
-                      placeholder="Username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                    />
-                  )}
+                    <div className="auth-divider-small">
+                      <span>or</span>
+                    </div>
 
-                  <input
-                    className="form-input-small"
-                    placeholder="Email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-
-                  <input
-                    className="form-input-small"
-                    placeholder="Password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-
-                  <button
-                    className="subscription-button-small"
-                    onClick={handleEmailAuth}
-                    disabled={isLoading}
-                  >
-                    {isSignup ? "Create Account" : "Sign In"}
-                  </button>
-                </div>
-              )}
+                    <div className="email-form-small">
+                      {isSignup && (
+                        <input
+                          type="text"
+                          className="form-input-small"
+                          placeholder="Username"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          disabled={isLoading}
+                        />
+                      )}
+                      <input
+                        type="email"
+                        className="form-input-small"
+                        placeholder="Email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        disabled={isLoading}
+                      />
+                      <input
+                        type="password"
+                        className="form-input-small"
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disabled={isLoading}
+                      />
+                      <button className="subscription-button-small email-submit-button-small" onClick={handleEmailSubmit} disabled={isLoading}>
+                        {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          ))}
-        </div>
+          </>
+        )}
       </div>
 
       {showPopup && (
         <>
-          <div className="overlay" onClick={() => setShowPopup(false)} />
+          <div className="overlay" onClick={closePopup} />
           <div className="popup-small">
-            <p>{popupMessage}</p>
-            <button onClick={() => setShowPopup(false)}>Close</button>
+            <p className="popup-text-small">{popupMessage}</p>
+            <button className="subscription-button-small" onClick={closePopup}>Close</button>
           </div>
         </>
       )}
