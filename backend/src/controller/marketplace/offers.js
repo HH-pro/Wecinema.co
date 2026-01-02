@@ -1,4 +1,4 @@
-// routes/offerRoutes.js - Complete Version with Improved User Experience
+// routes/offerRoutes.js - Listing Status Only Changes by Seller
 const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
@@ -8,7 +8,7 @@ const Order = require("../../models/marketplace/order");
 const Chat = require("../../models/marketplace/Chat");
 const Message = require("../../models/marketplace/messages");
 const { authenticateMiddleware } = require("../../utils");
-const stripe = require('stripe')('sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_51SKw7ZHYamYyPYbD4KfVeIgt0svaqOxEsZV7q9yimnXamBHrNw3afZfDSdUlFlR3Yt9gKl5fF75J7nYtnXJEtjem001m4yyRKa');
 const emailService = require('../../../services/emailService');
 const admin = require('firebase-admin');
 
@@ -38,7 +38,6 @@ const validateAmount = (amount) => {
 // ✅ FORMAT RESPONSE MESSAGES
 const formatMessage = (type, data = {}) => {
   const messages = {
-    // User-friendly messages
     'offer_exists': {
       title: 'Offer Already Exists',
       message: `You already have an offer for "${data.listingTitle}"`,
@@ -142,7 +141,7 @@ const checkExistingOffer = async (buyerId, listingId) => {
   }
 };
 
-// ✅ CHECK LISTING AVAILABILITY WITH DETAILED INFO
+// ✅ CHECK LISTING AVAILABILITY - LISTING STATUS NEVER AUTO-CHANGES
 const checkListingAvailability = async (listingId, userId) => {
   try {
     const listing = await MarketplaceListing.findById(listingId)
@@ -161,7 +160,7 @@ const checkListingAvailability = async (listingId, userId) => {
     // Check if user is seller
     const isOwner = listing.sellerId._id.toString() === userId.toString();
     
-    // Check listing status
+    // Check listing status - NO AUTO-RENEW, status only changes when seller updates
     let available = false;
     let message = '';
     let userFriendlyMessage = '';
@@ -180,20 +179,11 @@ const checkListingAvailability = async (listingId, userId) => {
         break;
         
       case 'reserved':
-        // Check if reservation is expired
-        const isExpired = listing.reservedUntil && listing.reservedUntil < new Date();
-        available = isExpired && !isOwner;
-        message = isExpired 
-          ? 'Listing reservation expired, now available' 
-          : 'Listing is currently reserved';
-        
-        if (isExpired) {
-          userFriendlyMessage = 'This listing is now available! The previous reservation has expired.';
-          actions = ['Make Offer', 'Message Seller'];
-        } else {
-          userFriendlyMessage = 'This listing is currently reserved for another order. Please check back later.';
-          actions = ['Browse Similar Listings', 'Save for Notifications'];
-        }
+        // ❌ NO AUTO-RENEW - Status stays reserved until seller changes it
+        available = false;
+        message = 'Listing is currently reserved';
+        userFriendlyMessage = 'This listing is currently reserved for another order. Please check back later.';
+        actions = ['Browse Similar Listings', 'Save for Notifications'];
         break;
         
       case 'sold':
@@ -245,11 +235,7 @@ const checkListingAvailability = async (listingId, userId) => {
         price: listing.price,
         sellerName: listing.sellerId.username
       },
-      reservation: {
-        isReserved: listing.status === 'reserved',
-        reservedUntil: listing.reservedUntil,
-        isExpired: listing.reservedUntil && listing.reservedUntil < new Date()
-      }
+      isReserved: listing.status === 'reserved'
     };
   } catch (error) {
     console.error('Check listing availability error:', error);
@@ -260,74 +246,6 @@ const checkListingAvailability = async (listingId, userId) => {
       userFriendlyMessage: 'Sorry, we encountered an error. Please try again.',
       actions: ['Try Again', 'Contact Support']
     };
-  }
-};
-
-// ✅ UPDATE LISTING STATUS
-const updateListingStatus = async (listingId, status, orderId = null) => {
-  try {
-    const updateData = { status };
-    
-    if (status === 'reserved') {
-      updateData.reservedUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-      updateData.currentOrderId = orderId;
-      updateData.lastOrderAt = new Date();
-    } else if (status === 'active') {
-      updateData.reservedUntil = null;
-      updateData.currentOrderId = null;
-    } else if (status === 'sold') {
-      updateData.reservedUntil = null;
-      updateData.currentOrderId = orderId;
-      updateData.soldAt = new Date();
-    } else if (status === 'inactive') {
-      updateData.inactiveAt = new Date();
-    }
-    
-    const updatedListing = await MarketplaceListing.findByIdAndUpdate(
-      listingId,
-      updateData,
-      { new: true }
-    );
-    
-    console.log(`✅ Listing ${listingId} status updated to: ${status}`);
-    return updatedListing;
-  } catch (error) {
-    console.error('Update listing status error:', error);
-    return null;
-  }
-};
-
-// ✅ AUTO-RENEW EXPIRED RESERVATIONS
-const autoRenewExpiredReservations = async () => {
-  try {
-    const expiredReservations = await MarketplaceListing.find({
-      status: 'reserved',
-      reservedUntil: { $lt: new Date() }
-    });
-    
-    let renewedCount = 0;
-    for (const listing of expiredReservations) {
-      // Check if there's still an active order
-      const activeOrder = await Order.findOne({
-        listingId: listing._id,
-        status: { $in: ['pending_payment', 'paid', 'in_progress', 'pending_delivery'] }
-      });
-      
-      if (!activeOrder) {
-        await updateListingStatus(listing._id, 'active');
-        renewedCount++;
-        console.log(`🔄 Auto-renewed listing: ${listing._id}`);
-      }
-    }
-    
-    if (renewedCount > 0) {
-      console.log(`✅ Auto-renewed ${renewedCount} expired reservations`);
-    }
-    
-    return renewedCount;
-  } catch (error) {
-    console.error('Auto-renew reservations error:', error);
-    return 0;
   }
 };
 
@@ -494,7 +412,7 @@ router.get("/health", (req, res) => {
   });
 });
 
-// ✅ CHECK LISTING STATUS WITH FRIENDLY MESSAGES
+// ✅ CHECK LISTING STATUS - NO AUTO STATUS CHANGES
 router.get("/check-listing-status/:listingId", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -508,7 +426,7 @@ router.get("/check-listing-status/:listingId", authenticateMiddleware, async (re
       });
     }
 
-    // Check listing availability
+    // Check listing availability (NO AUTO-RENEW)
     const availability = await checkListingAvailability(listingId, userId);
     
     // Check for existing order
@@ -532,7 +450,7 @@ router.get("/check-listing-status/:listingId", authenticateMiddleware, async (re
         orderId: existingOrder._id,
         orderStatus: existingOrder.status
       });
-      statusCode = 200; // Not an error, just informational
+      statusCode = 200;
     } else if (hasOffer) {
       mainMessage = formatMessage('offer_exists', {
         listingTitle: existingOffer.listingId?.title || 'Listing',
@@ -543,16 +461,10 @@ router.get("/check-listing-status/:listingId", authenticateMiddleware, async (re
     } else if (!availability.available) {
       switch (availability.status) {
         case 'reserved':
-          if (availability.reservation.isExpired) {
-            mainMessage = formatMessage('success_offer', {
-              listingTitle: availability.listing.title
-            });
-          } else {
-            mainMessage = formatMessage('listing_reserved', {
-              listingTitle: availability.listing.title
-            });
-            statusCode = 200;
-          }
+          mainMessage = formatMessage('listing_reserved', {
+            listingTitle: availability.listing.title
+          });
+          statusCode = 200;
           break;
         case 'sold':
           mainMessage = formatMessage('listing_sold', {
@@ -624,7 +536,7 @@ router.get("/check-listing-status/:listingId", authenticateMiddleware, async (re
   }
 });
 
-// ✅ MAKE OFFER WITH IMPROVED USER EXPERIENCE
+// ✅ MAKE OFFER - DOES NOT CHANGE LISTING STATUS
 router.post("/make-offer", authenticateMiddleware, async (req, res) => {
   let session;
   let stripePaymentIntent = null;
@@ -663,8 +575,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    // ✅ CHECK LISTING AVAILABILITY WITH AUTO-RENEW
-    await autoRenewExpiredReservations();
+    // ✅ CHECK LISTING AVAILABILITY - NO AUTO-RENEW
     const availability = await checkListingAvailability(listingId, userId);
     
     if (!availability.available) {
@@ -763,18 +674,21 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
       });
     }
 
-    // Double-check listing status
+    // Double-check listing status - NO AUTO STATUS CHANGES
     if (listing.status !== 'active') {
       await session.abortTransaction();
       let userMessage = 'This listing is not available for offers.';
       let actions = ['Browse Listings'];
       
       if (listing.status === 'reserved') {
-        userMessage = 'This listing is currently reserved for another order.';
+        userMessage = 'This listing is currently reserved. Only the seller can change this status.';
         actions = ['Browse Similar Listings', 'Save for Notifications'];
       } else if (listing.status === 'sold') {
         userMessage = 'This item has been sold.';
         actions = ['Browse Similar Listings', 'Contact Seller'];
+      } else if (listing.status === 'inactive') {
+        userMessage = 'This listing is currently inactive.';
+        actions = ['Browse Active Listings'];
       }
       
       return res.status(400).json({ 
@@ -893,7 +807,7 @@ router.post("/make-offer", authenticateMiddleware, async (req, res) => {
   }
 });
 
-// ✅ CONFIRM OFFER PAYMENT WITH IMPROVED MESSAGES
+// ✅ CONFIRM OFFER PAYMENT - DOES NOT CHANGE LISTING STATUS
 router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) => {
   console.log("🔍 Confirm Offer Payment:", req.body);
   
@@ -1095,7 +1009,7 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       });
     }
 
-    // ✅ CREATE ORDER
+    // ✅ CREATE ORDER - LISTING STATUS REMAINS UNCHANGED
     const orderData = {
       buyerId: userId,
       sellerId: offer.listingId.sellerId,
@@ -1127,15 +1041,14 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     const order = new Order(orderData);
     await order.save({ session });
 
-    // ✅ UPDATE LISTING STATUS TO 'RESERVED'
-    await updateListingStatus(offer.listingId._id, 'reserved', order._id);
-
-    // Increase listing order count
+    // ✅ IMPORTANT: LISTING STATUS DOES NOT CHANGE AUTOMATICALLY
+    // Only increase order count, status remains as is
     await MarketplaceListing.findByIdAndUpdate(
       offer.listingId._id, 
       { 
         lastOrderAt: new Date(),
         $inc: { totalOrders: 1 }
+        // ❌ NO status change here - seller must manually update status
       },
       { session }
     );
@@ -1143,24 +1056,25 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     // Commit transaction
     await session.commitTransaction();
     console.log("✅ Order created successfully:", order._id);
+    console.log("ℹ️ Listing status remains unchanged:", offer.listingId.status);
 
     // Send notifications (async)
     sendOrderNotifications(order, offer, buyer, seller).catch(console.error);
 
-    // ✅ SUCCESS RESPONSE WITH FRIENDLY MESSAGES
+    // ✅ SUCCESS RESPONSE - MENTION LISTING STATUS UNCHANGED
     const successMessage = formatMessage('success_payment');
     
     res.status(200).json({
       success: true,
       message: successMessage.title,
       userMessage: 'Payment confirmed successfully!',
-      detailedMessage: 'Your order has been created and the seller has been notified.',
+      detailedMessage: 'Your order has been created and the seller has been notified. Note: The listing status remains unchanged until the seller updates it.',
       data: {
         orderId: order._id,
         redirectUrl: `/myorder/${order._id}`,
         chatUrl: `/chat/order_${order._id}`,
         paymentStatus: paymentIntent.status,
-        listingStatus: 'reserved',
+        listingStatus: offer.listingId.status, // Current listing status
         listingId: offer.listingId._id,
         orderDetails: {
           amount: order.amount,
@@ -1176,7 +1090,8 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
         'You will receive an email confirmation shortly',
         'The seller will contact you to discuss details',
         'Use the chat to communicate with the seller',
-        'Track your order status in "My Orders"'
+        'Track your order status in "My Orders"',
+        'Note: Listing status update is handled by seller'
       ]
     });
 
@@ -1206,12 +1121,206 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
   }
 });
 
-// ✅ CANCEL TEMPORARY OFFER WITH FRIENDLY MESSAGES
-router.post("/cancel-temporary-offer/:offerId", authenticateMiddleware, async (req, res) => {
+// ✅ ACCEPT OFFER (SELLER) - ONLY SELLER CAN CHANGE STATUS
+router.put("/accept-offer/:id", authenticateMiddleware, async (req, res) => {
+  let session;
   try {
     const userId = req.user.id;
-    const { offerId } = req.params;
+    const offerId = req.params.id;
+    
+    if (!validateObjectId(offerId)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid offer ID',
+        userMessage: 'The offer information is invalid.',
+        actions: ['View Your Offers', 'Try Again']
+      });
+    }
 
+    session = await mongoose.startSession();
+    session.startTransaction();
+
+    const offer = await Offer.findById(offerId)
+      .populate('listingId')
+      .populate('buyerId', 'username email')
+      .session(session);
+
+    if (!offer) {
+      await session.abortTransaction();
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Offer not found',
+        userMessage: 'Sorry, we couldn\'t find this offer.',
+        actions: ['View Offers', 'Browse Listings']
+      });
+    }
+
+    // Check if user is seller
+    if (offer.listingId.sellerId.toString() !== userId.toString()) {
+      await session.abortTransaction();
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Not authorized',
+        userMessage: 'You are not authorized to accept this offer.',
+        actions: ['View Your Listings']
+      });
+    }
+
+    // Check if offer is paid
+    if (offer.status !== 'paid') {
+      await session.abortTransaction();
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Offer must be paid before acceptance',
+        userMessage: 'This offer has not been paid yet.',
+        actions: ['View Offer Details']
+      });
+    }
+
+    // Check if order already exists
+    const existingOrder = await Order.findOne({ offerId: offer._id }).session(session);
+    if (existingOrder) {
+      // Update existing order
+      existingOrder.status = 'in_progress';
+      existingOrder.acceptedAt = new Date();
+      await existingOrder.save({ session });
+      
+      // ✅ OPTIONAL: SELLER CAN CHOOSE TO UPDATE LISTING STATUS HERE
+      // This is optional - seller decides
+      const shouldUpdateListing = req.body.updateListingStatus === true;
+      
+      if (shouldUpdateListing) {
+        await MarketplaceListing.findByIdAndUpdate(
+          offer.listingId._id,
+          { 
+            status: 'reserved',
+            reservedUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            currentOrderId: existingOrder._id,
+            lastOrderAt: new Date()
+          },
+          { session }
+        );
+      }
+      
+      await session.commitTransaction();
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Offer accepted!',
+        userMessage: 'Offer accepted successfully!',
+        detailedMessage: shouldUpdateListing 
+          ? 'Order updated and listing status changed to reserved.' 
+          : 'Order updated. Listing status remains unchanged.',
+        data: {
+          orderId: existingOrder._id,
+          redirectUrl: `/myorder/${existingOrder._id}`,
+          listingStatus: shouldUpdateListing ? 'reserved' : offer.listingId.status,
+          listingUpdated: shouldUpdateListing
+        },
+        actions: ['View Order', 'Message Buyer']
+      });
+    }
+
+    // Update offer
+    offer.status = 'accepted';
+    offer.acceptedAt = new Date();
+    await offer.save({ session });
+
+    // Create order
+    const order = new Order({
+      buyerId: offer.buyerId._id,
+      sellerId: offer.listingId.sellerId,
+      listingId: offer.listingId._id,
+      offerId: offer._id,
+      orderType: 'accepted_offer',
+      amount: offer.amount,
+      status: 'in_progress',
+      paidAt: offer.paidAt,
+      acceptedAt: new Date(),
+      revisions: 0,
+      maxRevisions: 3,
+      paymentReleased: false,
+      orderDate: new Date(),
+      requirements: offer.requirements,
+      expectedDelivery: offer.expectedDelivery
+    });
+    
+    await order.save({ session });
+
+    // ✅ OPTIONAL: SELLER CAN CHOOSE TO UPDATE LISTING STATUS
+    const shouldUpdateListing = req.body.updateListingStatus === true;
+    
+    if (shouldUpdateListing) {
+      await MarketplaceListing.findByIdAndUpdate(
+        offer.listingId._id,
+        { 
+          status: 'reserved',
+          reservedUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          currentOrderId: order._id,
+          lastOrderAt: new Date()
+        },
+        { session }
+      );
+    }
+
+    // Reject other offers on same listing
+    await Offer.updateMany(
+      { 
+        listingId: offer.listingId._id, 
+        _id: { $ne: offer._id },
+        status: { $in: ['pending', 'pending_payment', 'paid'] }
+      },
+      { 
+        status: 'rejected',
+        rejectedAt: new Date(),
+        rejectionReason: 'Another offer was accepted'
+      },
+      { session }
+    );
+
+    await session.commitTransaction();
+
+    res.status(200).json({ 
+      success: true,
+      message: 'Offer accepted!',
+      userMessage: 'Offer accepted successfully!',
+      detailedMessage: shouldUpdateListing 
+        ? 'Order created and listing status changed to reserved.' 
+        : 'Order created. Listing status remains unchanged.',
+      data: {
+        offerId: offer._id,
+        orderId: order._id,
+        redirectUrl: `/myorder/${order._id}`,
+        listingStatus: shouldUpdateListing ? 'reserved' : offer.listingId.status,
+        listingUpdated: shouldUpdateListing
+      },
+      actions: ['View Order', 'Message Buyer']
+    });
+
+  } catch (error) {
+    console.error('Accept offer error:', error);
+    if (session) await session.abortTransaction();
+    
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to accept offer',
+      userMessage: 'Sorry, we couldn\'t process your request.',
+      detailedMessage: 'Please try again or contact support.',
+      actions: ['Try Again', 'Contact Support']
+    });
+  } finally {
+    if (session) session.endSession();
+  }
+});
+
+// ✅ REJECT OFFER - DOES NOT AUTO CHANGE LISTING STATUS
+router.put("/reject-offer/:id", authenticateMiddleware, async (req, res) => {
+  let session;
+  try {
+    const userId = req.user.id;
+    const offerId = req.params.id;
+    const { rejectionReason } = req.body;
+    
     if (!validateObjectId(offerId)) {
       return res.status(400).json({ 
         success: false, 
@@ -1221,199 +1330,321 @@ router.post("/cancel-temporary-offer/:offerId", authenticateMiddleware, async (r
       });
     }
 
-    const offer = await Offer.findOne({
-      _id: offerId,
-      buyerId: userId,
-      status: 'pending_payment',
-      isTemporary: true
-    }).populate('listingId', 'title');
+    session = await mongoose.startSession();
+    session.startTransaction();
 
+    const offer = await Offer.findById(offerId)
+      .populate('listingId')
+      .session(session);
+    
     if (!offer) {
+      await session.abortTransaction();
       return res.status(404).json({ 
         success: false, 
-        error: 'Temporary offer not found',
-        userMessage: 'We couldn\'t find your pending offer.',
-        detailedMessage: 'The offer may have already been cancelled or expired.',
-        actions: ['View Your Offers', 'Browse Listings']
+        error: 'Offer not found',
+        userMessage: 'We couldn\'t find this offer.',
+        actions: ['View Offers', 'Browse Listings']
       });
     }
 
-    // Cancel Stripe payment intent
-    if (offer.paymentIntentId) {
+    // Check if user is seller
+    if (offer.listingId.sellerId.toString() !== userId.toString()) {
+      await session.abortTransaction();
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Not authorized',
+        userMessage: 'You are not authorized to reject this offer.',
+        actions: ['View Your Listings']
+      });
+    }
+
+    if (!['pending', 'paid', 'pending_payment'].includes(offer.status)) {
+      await session.abortTransaction();
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Cannot reject offer in current state',
+        userMessage: 'This offer cannot be rejected in its current state.',
+        actions: ['View Offer Details']
+      });
+    }
+
+    // Update offer
+    offer.status = 'rejected';
+    offer.rejectedAt = new Date();
+    offer.rejectionReason = rejectionReason || 'Seller rejected offer';
+    await offer.save({ session });
+
+    // Refund if paid
+    if (offer.status === 'paid' && offer.paymentIntentId) {
       try {
-        await stripe.paymentIntents.cancel(offer.paymentIntentId);
-      } catch (stripeError) {
-        console.error('Cancel payment error:', stripeError.message);
+        await stripe.refunds.create({ payment_intent: offer.paymentIntentId });
+      } catch (refundError) {
+        console.error('Refund error:', refundError.message);
       }
     }
 
-    // Delete offer
-    await Offer.findByIdAndDelete(offerId);
+    // ✅ OPTIONAL: SELLER CAN CHOOSE TO UPDATE LISTING STATUS
+    const shouldUpdateListing = req.body.updateListingStatus === true;
+    
+    if (shouldUpdateListing) {
+      // Check if there are other active orders
+      const activeOrder = await Order.findOne({
+        listingId: offer.listingId._id,
+        status: { $in: ['pending_payment', 'paid', 'in_progress', 'pending_delivery'] }
+      }).session(session);
+
+      if (!activeOrder) {
+        await MarketplaceListing.findByIdAndUpdate(
+          offer.listingId._id,
+          { status: 'active' },
+          { session }
+        );
+      }
+    }
+
+    await session.commitTransaction();
+
+    res.status(200).json({ 
+      success: true,
+      message: 'Offer rejected',
+      userMessage: 'Offer rejected successfully.',
+      detailedMessage: shouldUpdateListing 
+        ? 'Offer rejected and listing status updated.' 
+        : 'Offer rejected. Listing status remains unchanged.',
+      data: {
+        listingStatus: shouldUpdateListing ? 'active' : offer.listingId.status,
+        listingUpdated: shouldUpdateListing,
+        refundInitiated: offer.status === 'paid' && offer.paymentIntentId
+      },
+      actions: ['View Other Offers', 'Browse Listings']
+    });
+  } catch (error) {
+    console.error('Reject offer error:', error);
+    if (session) await session.abortTransaction();
+    
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to reject offer',
+      userMessage: 'Sorry, we couldn\'t process your request.',
+      detailedMessage: 'Please try again or contact support.',
+      actions: ['Try Again', 'Contact Support']
+    });
+  } finally {
+    if (session) session.endSession();
+  }
+});
+
+// ✅ SELLER MANUAL LISTING STATUS UPDATE
+router.put("/update-listing-status/:listingId", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { listingId } = req.params;
+    const { status, currentOrderId } = req.body;
+    
+    if (!validateObjectId(listingId)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid listing ID',
+        userMessage: 'The listing information is invalid.',
+        actions: ['View Your Listings']
+      });
+    }
+
+    // Allowed status changes
+    const allowedStatuses = ['active', 'reserved', 'sold', 'inactive', 'draft'];
+    if (!status || !allowedStatuses.includes(status)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid status',
+        userMessage: 'Please provide a valid listing status.',
+        actions: ['Try Again']
+      });
+    }
+
+    // Find listing
+    const listing = await MarketplaceListing.findById(listingId);
+    if (!listing) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Listing not found',
+        userMessage: 'We couldn\'t find this listing.',
+        actions: ['View Your Listings']
+      });
+    }
+
+    // Check if user is seller
+    if (listing.sellerId.toString() !== userId.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Not authorized',
+        userMessage: 'You are not authorized to update this listing.',
+        actions: ['View Your Listings']
+      });
+    }
+
+    // Prepare update data
+    const updateData = { status };
+    
+    if (status === 'reserved') {
+      updateData.reservedUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      updateData.currentOrderId = currentOrderId || listing.currentOrderId;
+      updateData.lastOrderAt = new Date();
+    } else if (status === 'active') {
+      updateData.reservedUntil = null;
+      updateData.currentOrderId = null;
+    } else if (status === 'sold') {
+      updateData.reservedUntil = null;
+      updateData.currentOrderId = currentOrderId || listing.currentOrderId;
+      updateData.soldAt = new Date();
+    }
+
+    // Update listing
+    const updatedListing = await MarketplaceListing.findByIdAndUpdate(
+      listingId,
+      updateData,
+      { new: true }
+    );
 
     res.status(200).json({
       success: true,
-      message: 'Offer Cancelled',
-      userMessage: `Your offer for "${offer.listingId?.title}" has been cancelled.`,
-      detailedMessage: 'You can make a new offer anytime.',
-      actions: ['Make New Offer', 'Browse Listings'],
+      message: 'Listing status updated',
+      userMessage: 'Listing status updated successfully!',
       data: {
-        cancelledAt: new Date(),
-        listingTitle: offer.listingId?.title
-      }
+        listing: {
+          _id: updatedListing._id,
+          title: updatedListing.title,
+          status: updatedListing.status,
+          currentOrderId: updatedListing.currentOrderId,
+          reservedUntil: updatedListing.reservedUntil,
+          soldAt: updatedListing.soldAt
+        }
+      },
+      actions: ['View Listing', 'Edit Listing']
     });
   } catch (error) {
-    console.error('Cancel offer error:', error);
+    console.error('Update listing status error:', error);
     res.status(500).json({ 
       success: false, 
-      error: 'Failed to cancel offer',
-      userMessage: 'Sorry, we couldn\'t cancel your offer.',
+      error: 'Failed to update listing status',
+      userMessage: 'Sorry, we couldn\'t update the listing status.',
       detailedMessage: 'Please try again or contact support.',
       actions: ['Try Again', 'Contact Support']
     });
   }
 });
 
-// ✅ GET MY OFFERS WITH FRIENDLY FORMAT
-router.get("/my-offers", authenticateMiddleware, async (req, res) => {
+// ✅ GET LISTING STATUS (FOR SELLER TO MANAGE)
+router.get("/seller-listing-status/:listingId", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id;
-    
-    const offers = await Offer.find({ 
-      buyerId: userId,
-      status: { $ne: 'pending_payment' }
-    })
-    .populate({
-      path: 'listingId',
-      select: 'title price mediaUrls status sellerId',
-      populate: { 
-        path: 'sellerId', 
-        select: 'username avatar rating' 
-      }
-    })
-    .populate('buyerId', 'username avatar email')
-    .sort({ createdAt: -1 })
-    .lean();
+    const { listingId } = req.params;
 
-    const offersWithOrderCheck = await Promise.all(
-      offers.map(async (offer) => {
-        const order = await Order.findOne({ offerId: offer._id })
-          .select('status _id createdAt');
-        const listing = await MarketplaceListing.findById(offer.listingId._id)
-          .select('status currentOrderId title');
-        
-        // Format status for display
-        let statusDisplay = offer.status;
-        let statusColor = 'gray';
-        let statusMessage = '';
-        
-        switch (offer.status) {
-          case 'pending':
-            statusDisplay = 'Pending Review';
-            statusColor = 'yellow';
-            statusMessage = 'Waiting for seller response';
-            break;
-          case 'paid':
-            statusDisplay = 'Paid';
-            statusColor = 'blue';
-            statusMessage = 'Payment completed, waiting for seller acceptance';
-            break;
-          case 'accepted':
-            statusDisplay = 'Accepted';
-            statusColor = 'green';
-            statusMessage = 'Offer accepted by seller';
-            break;
-          case 'rejected':
-            statusDisplay = 'Rejected';
-            statusColor = 'red';
-            statusMessage = offer.rejectionReason || 'Offer was rejected';
-            break;
-          case 'cancelled':
-            statusDisplay = 'Cancelled';
-            statusColor = 'gray';
-            statusMessage = 'Offer was cancelled';
-            break;
-        }
-        
-        return {
-          ...offer,
-          statusDisplay,
-          statusColor,
-          statusMessage,
-          associatedOrder: order,
-          listingStatus: listing?.status || 'unknown',
-          listingTitle: listing?.title || 'Unknown',
-          actions: getOfferActions(offer.status, !!order)
-        };
-      })
-    );
+    if (!validateObjectId(listingId)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid listing ID',
+        userMessage: 'The listing information is invalid.'
+      });
+    }
+
+    // Get listing with active orders
+    const listing = await MarketplaceListing.findById(listingId)
+      .populate('sellerId', 'username');
+    
+    if (!listing) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Listing not found',
+        userMessage: 'We couldn\'t find this listing.'
+      });
+    }
+
+    // Check if user is seller
+    if (listing.sellerId._id.toString() !== userId.toString()) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Not authorized',
+        userMessage: 'You are not authorized to view this listing.'
+      });
+    }
+
+    // Get active orders for this listing
+    const activeOrders = await Order.find({
+      listingId: listingId,
+      status: { $in: ['pending_payment', 'paid', 'in_progress', 'pending_delivery'] }
+    }).select('_id status amount buyerId createdAt')
+      .populate('buyerId', 'username');
+
+    // Get offers for this listing
+    const offers = await Offer.find({
+      listingId: listingId,
+      status: { $in: ['pending', 'pending_payment', 'paid'] }
+    }).select('_id status amount buyerId createdAt')
+      .populate('buyerId', 'username');
 
     res.status(200).json({
       success: true,
       data: {
-        offers: offersWithOrderCheck,
-        summary: {
-          total: offersWithOrderCheck.length,
-          pending: offersWithOrderCheck.filter(o => o.status === 'pending').length,
-          paid: offersWithOrderCheck.filter(o => o.status === 'paid').length,
-          accepted: offersWithOrderCheck.filter(o => o.status === 'accepted').length,
-          active: offersWithOrderCheck.filter(o => ['pending', 'paid', 'accepted'].includes(o.status)).length
-        }
+        listing: {
+          _id: listing._id,
+          title: listing.title,
+          status: listing.status,
+          currentOrderId: listing.currentOrderId,
+          reservedUntil: listing.reservedUntil,
+          soldAt: listing.soldAt,
+          totalOrders: listing.totalOrders,
+          lastOrderAt: listing.lastOrderAt
+        },
+        activeOrders,
+        offers,
+        canChangeStatus: true,
+        availableStatuses: ['active', 'reserved', 'sold', 'inactive']
       },
-      count: offersWithOrderCheck.length,
-      message: offersWithOrderCheck.length === 0 
-        ? 'You haven\'t made any offers yet.' 
-        : `You have ${offersWithOrderCheck.length} offer(s)`,
-      actions: ['Browse Listings', 'View Orders']
+      message: 'Listing status information',
+      userMessage: 'Here is the current status of your listing.',
+      actions: ['Update Status', 'View Orders', 'View Offers']
     });
-
   } catch (error) {
-    console.error('My offers error:', error);
+    console.error('Get seller listing status error:', error);
     res.status(500).json({ 
       success: false, 
-      error: 'Failed to fetch offers',
-      userMessage: 'Sorry, we couldn\'t load your offers.',
+      error: 'Failed to get listing status',
+      userMessage: 'Sorry, we couldn\'t retrieve the listing status.',
       actions: ['Try Again', 'Contact Support']
     });
   }
 });
 
-// Helper function for offer actions
-const getOfferActions = (status, hasOrder) => {
-  const actions = {
-    pending: ['View Details', 'Cancel Offer'],
-    paid: ['View Details', 'Message Seller'],
-    accepted: hasOrder ? ['View Order', 'Message Seller'] : ['View Details', 'Contact Seller'],
-    rejected: ['Make New Offer', 'Browse Similar'],
-    cancelled: ['Make New Offer', 'Browse Listings']
-  };
-  
-  return actions[status] || ['View Details'];
+// ✅ CLEANUP EXPIRED OFFERS
+const cleanupExpiredOffers = async () => {
+  try {
+    const expiredOffers = await Offer.find({
+      status: 'pending_payment',
+      expiresAt: { $lt: new Date() },
+      isTemporary: true
+    });
+
+    for (const offer of expiredOffers) {
+      if (offer.paymentIntentId) {
+        try {
+          await stripe.paymentIntents.cancel(offer.paymentIntentId);
+        } catch (stripeError) {}
+      }
+      await Offer.findByIdAndDelete(offer._id);
+    }
+    
+    return expiredOffers.length;
+  } catch (error) {
+    console.error('Cleanup error:', error);
+    return 0;
+  }
 };
 
-// ✅ AUTO-RENEW EXPIRED RESERVATIONS ENDPOINT
-router.post("/auto-renew-reservations", async (req, res) => {
-  try {
-    const renewedCount = await autoRenewExpiredReservations();
-    res.status(200).json({
-      success: true,
-      message: "Auto-renew completed",
-      renewedCount,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error("Auto-renew error:", error);
-    res.status(500).json({ 
-      success: false, 
-      error: "Auto-renew failed" 
-    });
-  }
-});
-
-// ✅ SCHEDULED CLEANUP & AUTO-RENEW
+// ✅ SCHEDULED CLEANUP (NO AUTO-RENEW)
 setInterval(() => {
-  console.log("🕐 Running scheduled tasks...");
+  console.log("🕐 Running scheduled cleanup...");
   cleanupExpiredOffers().catch(console.error);
-  autoRenewExpiredReservations().catch(console.error);
-}, 30 * 60 * 1000); // Every 30 minutes
+  // ❌ NO auto-renew of listings - seller must manually update
+}, 30 * 60 * 1000);
 
 module.exports = router;
