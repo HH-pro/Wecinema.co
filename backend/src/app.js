@@ -1,3 +1,4 @@
+require('dotenv').config(); // Add this at the VERY TOP
 const express = require("express");
 const Sentry = require("@sentry/node");
 const Tracing = require("@sentry/tracing");
@@ -9,7 +10,7 @@ const {
   listingRoutes,
   orderRoutes, 
   offerRoutes,
-  chatRoutes,  // ✅ This is what you imported
+  chatRoutes,
   paymentRoutes,
   stripeRoutes,
 } = require("./controller");
@@ -25,12 +26,12 @@ const app = express();
 
 // ✅ Initialize Sentry
 Sentry.init({
-  dsn: "https://ffba1b70eb56e50557f3a75a5899e7ab@o4509361947148288.ingest.us.sentry.io/4509361953177600",
+  dsn: process.env.SENTRY_DSN || "https://ffba1b70eb56e50557f3a75a5899e7ab@o4509361947148288.ingest.us.sentry.io/4509361953177600",
   integrations: [
     new Sentry.Integrations.Http({ tracing: true }),
     new Tracing.Integrations.Express({ app }),
   ],
-  tracesSampleRate: 1.0, // Adjust in production
+  tracesSampleRate: 1.0,
 });
 
 // ✅ Request handler must be the first middleware
@@ -47,7 +48,7 @@ app.use((req, res, next) => {
 app.use(morgan("dev"));
 
 // 🆕 STRIPE WEBHOOK KE LIYE IMPORTANT: Raw body parser pehle use karein
-app.use("/webhook/stripe", express.raw({type: 'application/json'})); // 🆕 Stripe webhook ke liye
+app.use("/webhook/stripe", express.raw({type: 'application/json'}));
 
 // Baaki sab routes ke liye JSON parser
 app.use(express.json());
@@ -74,7 +75,7 @@ const corsOptions = {
       callback(new Error("Not allowed by CORS"));
     }
   },
-  credentials: true, // ✅ Allow credentials/cookies
+  credentials: true,
 };
 
 app.use(cors(corsOptions));
@@ -114,32 +115,32 @@ app.use("/user", UserController);
 app.use("/domain", domainController);
 app.use("/sentry", sentryRouter);
 
-// ✅ Marketplace Routes - Fixed the variable name
-app.use("/marketplace/listings", listingRoutes);        // 🆕 API prefix add karein
-app.use("/marketplace/orders", orderRoutes);           // 🆕 API prefix add karein  
-app.use("/marketplace/offers", offerRoutes);           // 🆕 API prefix add karein
-app.use("/marketplace/chat", chatRoutes);             // ✅ FIXED: Changed messageRoutes to chatRoutes
+// ✅ Marketplace Routes
+app.use("/marketplace/listings", listingRoutes);
+app.use("/marketplace/orders", orderRoutes);  
+app.use("/marketplace/offers", offerRoutes);
+app.use("/marketplace/chat", chatRoutes);
 app.use("/marketplace/payments", paymentRoutes);      
-app.use("/marketplace/stripe", stripeRoutes);         // 🆕 API prefix add karein
+app.use("/marketplace/stripe", stripeRoutes);
 
-// 🆕 STRIPE WEBHOOK ROUTE (Raw body parser ke baath)
-app.use("/webhook/stripe", paymentRoutes); // 🆕 Stripe webhook ke liye alag route
+// 🆕 STRIPE WEBHOOK ROUTE
+app.use("/webhook/stripe", paymentRoutes);
 
-// ✅ Error handler (Sentry first, then fallback)
+// ✅ Error handler
 app.use(Sentry.Handlers.errorHandler());
 app.use((err, req, res, next) => {
   console.error("Custom Error Handler:", err);
   res.status(500).json({ error: "Internal Server Error" });
 });
 
-// ✅ MongoDB connection
-connectDB(
-  "mongodb+srv://hamzamanzoor046:oYisNcp2tHTWlQue@wecinema.15sml.mongodb.net/database_name?retryWrites=true&w=majority"
-);
-console.log("connected db");
+// ✅ MongoDB connection using .env
+const MONGODB_URI = process.env.MONGODB_URI;
+
+connectDB(MONGODB_URI);
+console.log("Connected to database:", process.env.MONGODB_URI ? "Using .env URI" : "Using fallback URI");
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on http://localhost:${PORT}`);
-  console.log(`🏪 Marketplace API: http://localhost:${PORT}/api/marketplace`); // 🆕 Marketplace info
+  console.log(`🏪 Marketplace API: http://localhost:${PORT}/marketplace`);
 });
