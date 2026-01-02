@@ -10,7 +10,7 @@ import { Elements, PaymentElement, useStripe, useElements, AddressElement } from
 import marketplaceApi, { listingsApi, ordersApi } from '../../api/marketplaceApi';
 
 // Stripe key from environment variable
-const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLIC_KEY || "pk_test_51SKw7ZHYamYyPYbDUlqbeydcW1hVGrHOvCZ8mBwSU1gw77TIRyzng31iSqAvPIQzTYKG8UWfDew7kdKgBxsw7vtq00WTLU3YCZ");
+const stripePromise = loadStripe("pk_test_51SKw7ZHYamYyPYbDUlqbeydcW1hVGrHOvCZ8mBwSU1gw77TIRyzng31iSqAvPIQzTYKG8UWfDew7kdKgBxsw7vtq00WTLU3YCZ");
 
 const Browse: React.FC = () => {
   const [listings, setListings] = useState<Listing[]>([]);
