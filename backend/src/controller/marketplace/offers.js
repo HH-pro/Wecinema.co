@@ -331,7 +331,7 @@ const sendOrderDetailsWithChatLink = async (order, offer, buyer, seller) => {
 // ROUTES START HERE
 // ============================
 
-// ✅ CONFIRM OFFER PAYMENT AND CREATE OFFER + ORDER
+// ✅ CONFIRM OFFER PAYMENT WITH PROFESSIONAL EMAILS
 router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) => {
   console.log("🔍 Confirm Offer Payment Request DETAILS:", {
     body: req.body,
@@ -340,14 +340,14 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
 
   let session;
   try {
-    const { paymentIntentId, listingId, amount, requirements, expectedDelivery, message } = req.body;
+    const { offerId, paymentIntentId } = req.body;
     const userId = req.user?.id || req.user?._id || req.user?.userId;
 
     // ✅ VALIDATION
-    if (!paymentIntentId || !listingId || !amount) {
+    if (!offerId || !paymentIntentId) {
       return res.status(400).json({
         success: false,
-        error: 'Payment Intent ID, Listing ID, and amount are required'
+        error: 'Offer ID and Payment Intent ID are required'
       });
     }
 
@@ -358,27 +358,73 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       });
     }
 
-    if (!validateObjectId(listingId)) {
+    if (!validateObjectId(offerId)) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid Listing ID format'
+        error: 'Invalid Offer ID format'
       });
     }
 
-    const offerAmount = parseFloat(amount);
-    if (!validateAmount(amount)) {
-      return res.status(400).json({
+    // ✅ START TRANSACTION
+    session = await mongoose.startSession();
+    session.startTransaction();
+
+    console.log("🔍 Searching for offer:", offerId, "for user:", userId);
+
+    // ✅ FIND OFFER
+    const offer = await Offer.findOne({
+      _id: new mongoose.Types.ObjectId(offerId),
+      buyerId: new mongoose.Types.ObjectId(userId)
+    })
+    .populate('listingId')
+    .populate('buyerId', 'username email avatar')
+    .session(session);
+
+    if (!offer) {
+      await session.abortTransaction();
+      console.log("❌ Offer not found or access denied");
+      return res.status(404).json({ 
         success: false,
-        error: 'Valid amount is required (minimum $0.50)'
+        error: 'Offer not found or access denied'
       });
     }
 
-    // ✅ VERIFY STRIPE PAYMENT FIRST
+    console.log("✅ Offer found:", offer._id, "Status:", offer.status);
+
+    // ✅ CHECK IF ALREADY PROCESSED
+    if (offer.status === 'paid') {
+      console.log("ℹ️ Offer already paid, finding existing order...");
+      
+      const existingOrder = await Order.findOne({ offerId: offer._id }).session(session);
+      await session.abortTransaction();
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Payment already confirmed',
+        data: {
+          orderId: existingOrder?._id,
+          redirectUrl: `/orders/${existingOrder?._id}`
+        }
+      });
+    }
+
+    // ✅ VERIFY PAYMENT STATUS
+    if (offer.status !== 'pending_payment') {
+      await session.abortTransaction();
+      return res.status(400).json({
+        success: false,
+        error: 'Offer is not in pending payment status',
+        currentStatus: offer.status
+      });
+    }
+
+    // ✅ VERIFY STRIPE PAYMENT
     let paymentIntent;
     try {
       paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
       console.log("💳 Stripe Payment Intent Status:", paymentIntent.status);
     } catch (stripeError) {
+      await session.abortTransaction();
       console.error('Stripe retrieval error:', stripeError);
       return res.status(400).json({
         success: false,
@@ -389,6 +435,7 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
 
     // ✅ CHECK PAYMENT STATUS
     if (paymentIntent.status !== 'succeeded') {
+      await session.abortTransaction();
       return res.status(400).json({
         success: false,
         error: 'Payment not completed',
@@ -396,85 +443,17 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       });
     }
 
-    // ✅ CHECK IF PAYMENT IS FOR THIS USER AND LISTING
-    if (paymentIntent.metadata.buyerId !== userId.toString() || 
-        paymentIntent.metadata.listingId !== listingId.toString()) {
-      return res.status(400).json({
-        success: false,
-        error: 'Payment verification failed - mismatch in payment details'
-      });
-    }
-
-    // ✅ START TRANSACTION
-    session = await mongoose.startSession();
-    session.startTransaction();
-
-    console.log("🔍 Starting transaction for offer creation...");
-
-    // ✅ FIND LISTING
-    const listing = await MarketplaceListing.findById(listingId).session(session);
-    if (!listing) {
-      await session.abortTransaction();
-      return res.status(404).json({ 
-        success: false,
-        error: 'Listing not found' 
-      });
-    }
-
-    if (listing.status !== 'active') {
-      await session.abortTransaction();
-      return res.status(400).json({ 
-        success: false,
-        error: 'Listing is not available for offers' 
-      });
-    }
-
-    // Check if user is not the seller
-    if (listing.sellerId.toString() === userId.toString()) {
-      await session.abortTransaction();
-      return res.status(400).json({ 
-        success: false,
-        error: 'Cannot make offer on your own listing' 
-      });
-    }
-
-    // ✅ CHECK FOR EXISTING OFFERS
-    const existingOffer = await Offer.findOne({
-      listingId,
-      buyerId: userId,
-      status: { $in: ['paid', 'accepted', 'pending_payment'] }
-    }).session(session);
-
-    if (existingOffer) {
-      await session.abortTransaction();
-      return res.status(400).json({ 
-        success: false,
-        error: 'You already have an active offer for this listing',
-        existingOfferId: existingOffer._id
-      });
-    }
-
-    // ✅ CREATE OFFER IN DATABASE
-    const offerData = {
-      buyerId: userId,
-      listingId,
-      amount: offerAmount,
-      message: message || '',
-      paymentIntentId: paymentIntent.id,
-      status: 'paid', // Directly set as paid since payment is confirmed
-      requirements: requirements || '',
-      expectedDelivery: expectedDelivery ? new Date(expectedDelivery) : null,
-      paidAt: new Date()
-    };
-
-    const offer = new Offer(offerData);
+    // ✅ UPDATE OFFER STATUS
+    offer.status = 'paid';
+    offer.paidAt = new Date();
+    offer.paymentIntentId = paymentIntentId;
     await offer.save({ session });
 
-    console.log("✅ Offer created in database:", offer._id, "Status:", offer.status);
+    console.log("✅ Offer status updated to paid:", offer._id);
 
     // ✅ GET BUYER AND SELLER DETAILS
     const buyer = await mongoose.model('User').findById(userId).select('username email avatar').session(session);
-    const seller = await mongoose.model('User').findById(listing.sellerId).select('username email avatar').session(session);
+    const seller = await mongoose.model('User').findById(offer.listingId.sellerId).select('username email avatar').session(session);
 
     if (!buyer || !seller) {
       await session.abortTransaction();
@@ -489,13 +468,13 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     // ✅ CREATE ORDER
     const orderData = {
       buyerId: userId,
-      sellerId: listing.sellerId,
-      listingId: listing._id,
+      sellerId: offer.listingId.sellerId,
+      listingId: offer.listingId._id,
       offerId: offer._id,
       orderType: 'accepted_offer',
       amount: offer.amount,
       status: 'paid',
-      stripePaymentIntentId: paymentIntent.id,
+      stripePaymentIntentId: paymentIntentId,
       paidAt: new Date(),
       revisions: 0,
       maxRevisions: 3,
@@ -521,17 +500,19 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
 
     // ✅ UPDATE LISTING - KEEP ACTIVE, ONLY UPDATE ORDER COUNT
     await MarketplaceListing.findByIdAndUpdate(
-      listing._id, 
+      offer.listingId._id, 
       { 
+        // DO NOT change status - keep it active
         lastOrderAt: new Date(),
         $inc: { totalOrders: 1 }
+        // Do NOT set reservedUntil or change status
       },
       { session }
     );
 
     console.log("✅ Listing order count updated, listing remains active");
 
-    // ✅ COMMIT TRANSACTION
+    // ✅ COMMIT TRANSACTION FIRST
     await session.commitTransaction();
     console.log("🎉 Database transaction completed successfully");
 
@@ -589,17 +570,12 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     // ✅ SUCCESS RESPONSE WITH ALL DETAILS
     res.status(200).json({
       success: true,
-      message: 'Payment confirmed and offer created successfully! Check your email for professional order details.',
+      message: 'Payment confirmed successfully! Check your email for professional order details.',
       data: {
-        offer: {
-          _id: offer._id,
-          amount: offer.amount,
-          status: offer.status,
-          createdAt: offer.createdAt
-        },
         orderId: order._id,
         redirectUrl: `/orders/${order._id}`,
         chatUrl: chatLink,
+        offerId: offer._id,
         notifications: {
           messagesSent: notificationResults.messages?.success || false,
           firebaseChatId: notificationResults.messages?.firebaseChatId,
@@ -615,7 +591,7 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
           amount: order.amount,
           sellerName: seller.username,
           buyerName: buyer.username,
-          listingTitle: listing.title,
+          listingTitle: offer.listingId?.title,
           orderDate: order.orderDate,
           requirements: order.requirements || 'None specified'
         }
@@ -641,284 +617,183 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     }
   }
 });
-// ✅ MAKE OFFER WITH PAYMENT REQUIRED FIRST - FIXED VERSION
+
+// ✅ MAKE OFFER WITH IMMEDIATE PAYMENT
 router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), async (req, res) => {
-  console.log("🔍 MAKE OFFER REQUEST RECEIVED ====================");
-  
+  let session;
   try {
-    // Log complete request details
-    console.log("📦 Request Body:", JSON.stringify(req.body, null, 2));
-    console.log("👤 User from auth:", {
-      id: req.user.id,
-      _id: req.user._id,
-      userId: req.user.userId,
-      email: req.user.email
-    });
+    console.log("=== MAKE OFFER WITH IMMEDIATE PAYMENT ===");
     
     const { listingId, amount, message, requirements, expectedDelivery } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
 
-    // ✅ COMPREHENSIVE VALIDATION WITH BETTER LOGGING
+    // ✅ COMPREHENSIVE VALIDATION
     if (!userId) {
-      console.error("❌ AUTH ERROR: No user ID found in request");
-      console.error("User object:", req.user);
       return res.status(401).json({ 
         success: false,
-        error: 'Authentication required. Please login again.',
-        code: 'AUTH_REQUIRED'
+        error: 'Authentication required' 
       });
     }
 
     if (!listingId || !amount) {
-      console.error("❌ VALIDATION ERROR: Missing required fields");
-      console.error("Received:", { listingId, amount });
       return res.status(400).json({ 
         success: false,
-        error: 'Listing ID and amount are required',
-        code: 'MISSING_FIELDS'
+        error: 'Listing ID and amount are required' 
       });
     }
 
     if (!validateObjectId(listingId)) {
-      console.error("❌ VALIDATION ERROR: Invalid listing ID format");
-      console.error("Listing ID:", listingId);
       return res.status(400).json({ 
         success: false,
-        error: 'Invalid listing ID format',
-        code: 'INVALID_LISTING_ID'
+        error: 'Invalid listing ID format' 
       });
     }
 
     const offerAmount = parseFloat(amount);
-    if (isNaN(offerAmount) || offerAmount < 0.5) {
-      console.error("❌ VALIDATION ERROR: Invalid amount");
-      console.error("Amount:", amount, "Parsed:", offerAmount);
+    if (!validateAmount(amount)) {
       return res.status(400).json({ 
         success: false,
-        error: 'Valid amount is required (minimum $0.50)',
-        code: 'INVALID_AMOUNT',
-        minAmount: 0.5
+        error: 'Valid amount is required (minimum $0.50)' 
       });
     }
 
-    console.log("✅ Basic validation passed");
+    // ✅ START TRANSACTION
+    session = await mongoose.startSession();
+    session.startTransaction();
 
-    // ✅ FIND LISTING WITH ERROR HANDLING
-    console.log("🔍 Looking for listing:", listingId);
-    let listing;
-    try {
-      listing = await MarketplaceListing.findById(listingId).lean();
-      if (!listing) {
-        console.error("❌ LISTING NOT FOUND:", listingId);
-        return res.status(404).json({ 
-          success: false,
-          error: 'Listing not found',
-          code: 'LISTING_NOT_FOUND'
-        });
-      }
-      console.log("✅ Listing found:", listing.title);
-    } catch (dbError) {
-      console.error("❌ DATABASE ERROR finding listing:", dbError.message);
-      return res.status(500).json({ 
+    // ✅ FIND LISTING WITH TRANSACTION
+    const listing = await MarketplaceListing.findById(listingId).session(session);
+    if (!listing) {
+      await session.abortTransaction();
+      return res.status(404).json({ 
         success: false,
-        error: 'Database error',
-        code: 'DB_ERROR'
+        error: 'Listing not found' 
       });
     }
 
     if (listing.status !== 'active') {
-      console.error("❌ LISTING NOT ACTIVE:", listing.status);
+      await session.abortTransaction();
       return res.status(400).json({ 
         success: false,
-        error: 'Listing is not available for offers',
-        code: 'LISTING_INACTIVE',
-        currentStatus: listing.status
+        error: 'Listing is not available for offers' 
       });
     }
 
     // Check if user is not the seller
     if (listing.sellerId.toString() === userId.toString()) {
-      console.error("❌ USER IS SELLER:", userId);
+      await session.abortTransaction();
       return res.status(400).json({ 
         success: false,
-        error: 'Cannot make offer on your own listing',
-        code: 'OWN_LISTING'
+        error: 'Cannot make offer on your own listing' 
       });
     }
-
-    console.log("✅ Listing validation passed");
 
     // ✅ CHECK FOR EXISTING OFFERS
-    console.log("🔍 Checking for existing offers...");
-    try {
-      const existingOffer = await Offer.findOne({
-        listingId,
-        buyerId: userId,
-        status: { $in: ['paid', 'accepted', 'pending_payment'] }
-      }).lean();
+    const existingOffer = await Offer.findOne({
+      listingId,
+      buyerId: userId,
+      status: { $in: ['pending', 'pending_payment', 'accepted', 'paid'] }
+    }).session(session);
 
-      if (existingOffer) {
-        console.error("❌ EXISTING OFFER FOUND:", existingOffer._id);
-        return res.status(400).json({ 
-          success: false,
-          error: 'You already have an active offer for this listing',
-          code: 'DUPLICATE_OFFER',
-          existingOfferId: existingOffer._id,
-          existingStatus: existingOffer.status
-        });
-      }
-      console.log("✅ No existing offers found");
-    } catch (dbError) {
-      console.error("❌ DATABASE ERROR checking offers:", dbError.message);
-      return res.status(500).json({ 
+    if (existingOffer) {
+      await session.abortTransaction();
+      return res.status(400).json({ 
         success: false,
-        error: 'Database error checking offers',
-        code: 'DB_ERROR_OFFERS'
+        error: 'You already have a pending offer for this listing',
+        existingOfferId: existingOffer._id
       });
     }
 
-    console.log("✅ All validations passed successfully");
-
     // ✅ CREATE STRIPE PAYMENT INTENT
-    console.log("💳 Creating Stripe payment intent...");
-    console.log("Stripe Secret Key available:", process.env.STRIPE_SECRET_KEY ? "YES" : "NO");
-    console.log("Amount in cents:", Math.round(offerAmount * 100));
+    console.log("💳 Creating Stripe payment intent for immediate payment...");
     
     let paymentIntent;
     try {
-      // IMPORTANT: Make sure Stripe is properly initialized
-      if (!stripe) {
-        throw new Error('Stripe not initialized');
-      }
-
-      // Create payment intent with minimal required params first
-      const createParams = {
-        amount: Math.round(offerAmount * 100), // Convert to cents
+      paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(offerAmount * 100),
         currency: 'usd',
         metadata: {
           listingId: listingId.toString(),
           buyerId: userId.toString(),
           sellerId: listing.sellerId.toString(),
-          type: 'offer_payment',
-          offerAmount: offerAmount.toString(),
-          listingTitle: listing.title || 'Untitled Listing'
+          type: 'offer_payment'
         },
-        automatic_payment_methods: {
-          enabled: true
-        },
-        description: `Offer for: ${listing.title || 'Listing'}`
-      };
+        automatic_payment_methods: { enabled: true },
+        description: `Offer for: ${listing.title}`,
+      });
 
-      // Add optional fields if they exist
-      if (requirements) createParams.metadata.requirements = requirements;
-      if (expectedDelivery) createParams.metadata.expectedDelivery = expectedDelivery;
-      if (message) createParams.metadata.message = message;
-
-      console.log("📋 Stripe create params:", JSON.stringify(createParams, null, 2));
-
-      paymentIntent = await stripe.paymentIntents.create(createParams);
-      
-      console.log("✅ STRIPE PAYMENT INTENT CREATED SUCCESSFULLY!");
-      console.log("Payment Intent ID:", paymentIntent.id);
-      console.log("Client Secret Present:", !!paymentIntent.client_secret);
-      console.log("Status:", paymentIntent.status);
-      console.log("Amount (cents):", paymentIntent.amount);
-      console.log("Amount (dollars):", paymentIntent.amount / 100);
+      console.log("✅ Stripe payment intent created:", paymentIntent.id);
 
     } catch (stripeError) {
-      console.error("❌ STRIPE ERROR DETAILS:");
-      console.error("Type:", stripeError.type);
-      console.error("Code:", stripeError.code);
-      console.error("Message:", stripeError.message);
-      console.error("Stack:", stripeError.stack);
+      await session.abortTransaction();
+      console.error('❌ Stripe payment intent creation failed:', stripeError);
       
-      // Check for specific Stripe errors
-      if (stripeError.type === 'StripeInvalidRequestError') {
-        console.error("Stripe Invalid Request - check API key and parameters");
-      }
-      
-      if (stripeError.code === 'resource_missing') {
-        console.error("Stripe resource missing - check API key");
-      }
-
-      return res.status(500).json({ 
+      return res.status(400).json({ 
         success: false,
-        error: 'Payment system error',
-        details: stripeError.message,
-        code: stripeError.code || 'STRIPE_ERROR',
-        stripeErrorType: stripeError.type
+        error: 'Payment processing error',
+        details: stripeError.message
       });
     }
 
-    // ✅ VERIFY CLIENT SECRET IS PRESENT
-    if (!paymentIntent.client_secret) {
-      console.error("❌ CRITICAL: No client secret in payment intent response!");
-      console.error("Payment Intent Object:", paymentIntent);
-      
-      // Try to debug why client_secret might be missing
-      console.error("Check if payment intent is in correct status:", paymentIntent.status);
-      console.error("Payment intent created_at:", paymentIntent.created);
-      
-      return res.status(500).json({ 
-        success: false,
-        error: 'Payment setup failed - no client secret returned',
-        code: 'NO_CLIENT_SECRET',
-        paymentIntentId: paymentIntent.id,
-        paymentIntentStatus: paymentIntent.status,
-        note: 'Please check Stripe configuration and webhook settings'
-      });
-    }
-
-    console.log("🎉 SUCCESS: Payment intent created with client secret");
-
-    // ✅ CREATE RESPONSE
-    const responseData = {
-      success: true,
-      message: 'Payment intent created successfully. Please complete payment to submit your offer.',
-      data: {
-        payment: {
-          paymentIntentId: paymentIntent.id,
-          clientSecret: paymentIntent.client_secret,
-          publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
-          amount: offerAmount,
-          currency: 'usd',
-          status: paymentIntent.status
-        },
-        offerDetails: {
-          listingId: listingId,
-          listingTitle: listing.title,
-          amount: offerAmount,
-          requirements: requirements || '',
-          expectedDelivery: expectedDelivery || '',
-          message: message || ''
-        },
-        nextSteps: [
-          'Complete payment using the client secret above',
-          'Once payment is successful, offer will be automatically created',
-          'Seller will be notified immediately'
-        ]
-      }
+    // ✅ CREATE OFFER IN DATABASE
+    const offerData = {
+      buyerId: userId,
+      listingId,
+      amount: offerAmount,
+      message: message || '',
+      paymentIntentId: paymentIntent.id,
+      status: 'pending_payment',
+      requirements: requirements || '',
+      expectedDelivery: expectedDelivery ? new Date(expectedDelivery) : null
     };
 
-    console.log("📤 Sending response with client secret...");
-    console.log("Response contains clientSecret:", !!responseData.data.payment.clientSecret);
+    const offer = new Offer(offerData);
+    await offer.save({ session });
 
-    res.status(200).json(responseData);
+    console.log("✅ Offer saved to database:", offer._id);
+
+    // ✅ DO NOT RESERVE LISTING - KEEP IT ACTIVE
+    // Listing remains active so other users can see it
+
+    // ✅ COMMIT TRANSACTION
+    await session.commitTransaction();
+
+    res.status(201).json({
+      success: true,
+      message: 'Please complete payment to submit your offer.',
+      data: {
+        offer: {
+          _id: offer._id,
+          amount: offer.amount,
+          status: offer.status,
+          paymentIntentId: offer.paymentIntentId,
+          createdAt: offer.createdAt,
+          requirements: offer.requirements,
+          expectedDelivery: offer.expectedDelivery
+        },
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        amount: offerAmount,
+        nextSteps: 'Complete payment to submit your offer. Once paid, the seller will be notified automatically.'
+      }
+    });
 
   } catch (error) {
-    console.error("❌ UNEXPECTED ERROR IN MAKE OFFER ENDPOINT:");
-    console.error("Error Name:", error.name);
-    console.error("Error Message:", error.message);
-    console.error("Error Stack:", error.stack);
-    console.error("Full Error Object:", error);
+    console.error('❌ Error making offer:', error);
+    
+    if (session) {
+      await session.abortTransaction();
+    }
 
     res.status(500).json({ 
       success: false,
-      error: 'Internal server error processing offer',
-      code: 'INTERNAL_SERVER_ERROR',
-      details: process.env.NODE_ENV === 'development' ? error.message : 'Please try again later',
-      timestamp: new Date().toISOString()
+      error: 'Failed to make offer',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
+  } finally {
+    if (session) {
+      session.endSession();
+    }
   }
 });
 
@@ -1857,141 +1732,5 @@ router.get("/health", (req, res) => {
     }
   });
 });
-// ✅ STRIPE WEBHOOK FOR OFFER PAYMENTS
-router.post("/stripe-webhook", express.raw({ type: 'application/json' }), async (req, res) => {
-  const sig = req.headers['stripe-signature'];
-  let event;
 
-  try {
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-  } catch (err) {
-    console.error('❌ Webhook signature verification failed:', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-
-  // Handle the event
-  switch (event.type) {
-    case 'payment_intent.succeeded':
-      const paymentIntent = event.data.object;
-      await handleSuccessfulOfferPayment(paymentIntent);
-      break;
-    case 'payment_intent.payment_failed':
-      console.log('❌ Payment failed:', event.data.object.id);
-      break;
-    default:
-      console.log(`Unhandled event type ${event.type}`);
-  }
-
-  res.json({ received: true });
-});
-
-// ✅ HANDLE SUCCESSFUL OFFER PAYMENT
-const handleSuccessfulOfferPayment = async (paymentIntent) => {
-  let session;
-  try {
-    const metadata = paymentIntent.metadata;
-    
-    // Check if this is an offer payment
-    if (metadata.type !== 'offer_payment') {
-      console.log('Not an offer payment, skipping');
-      return;
-    }
-
-    const { listingId, buyerId, sellerId } = metadata;
-    
-    if (!listingId || !buyerId) {
-      console.error('Missing metadata in payment intent');
-      return;
-    }
-
-    console.log(`🎯 Processing successful offer payment: ${paymentIntent.id}`);
-
-    // ✅ START TRANSACTION
-    session = await mongoose.startSession();
-    session.startTransaction();
-
-    // Check if offer already exists
-    const existingOffer = await Offer.findOne({
-      paymentIntentId: paymentIntent.id,
-      status: 'paid'
-    }).session(session);
-
-    if (existingOffer) {
-      console.log('✅ Offer already exists, skipping:', existingOffer._id);
-      await session.abortTransaction();
-      return;
-    }
-
-    // ✅ CREATE OFFER
-    const offerData = {
-      buyerId: buyerId,
-      listingId: listingId,
-      amount: parseFloat(paymentIntent.amount) / 100,
-      message: metadata.message || '',
-      paymentIntentId: paymentIntent.id,
-      status: 'paid',
-      requirements: metadata.requirements || '',
-      expectedDelivery: metadata.expectedDelivery ? new Date(metadata.expectedDelivery) : null,
-      paidAt: new Date()
-    };
-
-    const offer = new Offer(offerData);
-    await offer.save({ session });
-
-    // ✅ CREATE ORDER
-    const order = new Order({
-      buyerId: buyerId,
-      sellerId: sellerId,
-      listingId: listingId,
-      offerId: offer._id,
-      orderType: 'accepted_offer',
-      amount: offer.amount,
-      status: 'paid',
-      stripePaymentIntentId: paymentIntent.id,
-      paidAt: new Date(),
-      revisions: 0,
-      maxRevisions: 3,
-      paymentReleased: false,
-      orderDate: new Date(),
-      requirements: offer.requirements,
-      metadata: {
-        paymentMethod: paymentIntent.payment_method_types?.[0] || 'card',
-        offerAmount: offer.amount,
-        buyerNote: offer.message || ''
-      }
-    });
-
-    await order.save({ session });
-
-    // ✅ UPDATE LISTING
-    await MarketplaceListing.findByIdAndUpdate(
-      listingId,
-      { 
-        lastOrderAt: new Date(),
-        $inc: { totalOrders: 1 }
-      },
-      { session }
-    );
-
-    await session.commitTransaction();
-    console.log(`✅ Offer and order created via webhook: ${offer._id}, ${order._id}`);
-
-    // ✅ NOTIFY USERS (You can trigger email notifications here)
-    // This would be similar to the notification logic in confirm-offer-payment
-
-  } catch (error) {
-    console.error('❌ Error in webhook handler:', error);
-    if (session) {
-      await session.abortTransaction();
-    }
-  } finally {
-    if (session) {
-      session.endSession();
-    }
-  }
-};
 module.exports = router;
