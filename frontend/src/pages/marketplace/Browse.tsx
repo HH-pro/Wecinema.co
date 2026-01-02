@@ -2,21 +2,15 @@ import React, { useState, useEffect } from 'react';
 import ListingCard from '../../components/marketplae/ListingCard';
 import MarketplaceLayout from '../../components/Layout';
 import { Listing } from '../../types/marketplace';
-import { FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiCheck, FiMail, FiAlertCircle, FiLoader, FiUser, FiCalendar } from 'react-icons/fi';
+import { FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiCheck, FiAlertCircle, FiLoader, FiUser } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements, AddressElement } from '@stripe/react-stripe-js';
-import emailjs from '@emailjs/browser';
+import marketplaceApi, { listingsApi, ordersApi } from '../../api/marketplaceApi';
 
-// Initialize EmailJS with your credentials
-emailjs.init("MIfBtNPcnoqBFU0LR");
-
-// Stripe test key for development
-const stripePromise = loadStripe("pk_test_51SKw7ZHYamYyPYbDUlqbeydcW1hVGrHOvCZ8mBwSU1gw77TIRyzng31iSqAvPIQzTYKG8UWfDew7kdKgBxsw7vtq00WTLU3YCZ");
-
-// API base URL
-const API_BASE_URL = 'http://localhost:3000';
+// Stripe key from environment variable
+const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLIC_KEY || "pk_test_51SKw7ZHYamYyPYbDUlqbeydcW1hVGrHOvCZ8mBwSU1gw77TIRyzng31iSqAvPIQzTYKG8UWfDew7kdKgBxsw7vtq00WTLU3YCZ");
 
 const Browse: React.FC = () => {
   const [listings, setListings] = useState<Listing[]>([]);
@@ -61,73 +55,28 @@ const Browse: React.FC = () => {
     expectedDelivery: ''
   });
 
-  // Enhanced axios instance with better error handling
-  const api = axios.create({
-    baseURL: API_BASE_URL,
-    timeout: 30000, // 30 second timeout
-  });
-
-  // Request interceptor to add auth token
-  api.interceptors.request.use(
-    (config) => {
-      const token = localStorage.getItem('token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      config.headers['Content-Type'] = 'application/json';
-      return config;
-    },
-    (error) => {
-      console.error('Request interceptor error:', error);
-      return Promise.reject(error);
-    }
-  );
-
-  // Response interceptor for error handling
-  api.interceptors.response.use(
-    (response) => response,
-    (error) => {
-      console.error('API Error:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        url: error.config?.url
-      });
-      return Promise.reject(error);
-    }
-  );
-
   // Fetch listings and user data on component mount
   useEffect(() => {
     fetchListings();
     fetchCurrentUser();
   }, [filters]);
 
-  const fetchCurrentUser = async () => {
+  const fetchCurrentUser = () => {
     try {
-      const token = localStorage.getItem('token');
-      if (token) {
-        // Get user info from token
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        const userData = {
-          id: payload.userId || payload.id,
-          username: payload.username || 'Buyer',
-          email: payload.email,
-          phone: payload.phone || ''
-        };
-        
-        setCurrentUser(userData);
+      const user = marketplaceApi.utils.getCurrentUser();
+      if (user) {
+        setCurrentUser(user);
         
         // Set billing details from user data
         setBillingDetails(prev => ({
           ...prev,
-          name: payload.username || 'Customer',
-          email: payload.email || '',
-          phone: payload.phone || ''
+          name: user.username || 'Customer',
+          email: user.email || '',
+          phone: user.phone || ''
         }));
         
         // Store in localStorage for payment form
-        localStorage.setItem('currentUser', JSON.stringify(userData));
+        localStorage.setItem('currentUser', JSON.stringify(user));
       }
     } catch (error) {
       console.error('Error fetching current user:', error);
@@ -139,46 +88,52 @@ const Browse: React.FC = () => {
       setLoading(true);
       setError('');
       
-      const response = await api.get('/marketplace/listings/listings');
+      const params: any = {};
       
-      let filteredData = response.data;
-      
-      // Apply local filters
-      if (filters.type) {
-        filteredData = filteredData.filter((listing: Listing) => listing.type === filters.type);
+      // Apply filters to API params
+      if (filters.type) params.type = filters.type;
+      if (filters.category) params.category = filters.category;
+      if (filters.minPrice) params.minPrice = parseFloat(filters.minPrice);
+      if (filters.maxPrice) params.maxPrice = parseFloat(filters.maxPrice);
+      if (filters.sortBy) {
+        switch (filters.sortBy) {
+          case 'newest':
+            params.sortBy = 'createdAt';
+            params.sortOrder = 'desc';
+            break;
+          case 'oldest':
+            params.sortBy = 'createdAt';
+            params.sortOrder = 'asc';
+            break;
+          case 'price_low':
+            params.sortBy = 'price';
+            params.sortOrder = 'asc';
+            break;
+          case 'price_high':
+            params.sortBy = 'price';
+            params.sortOrder = 'desc';
+            break;
+        }
       }
       
-      if (filters.category) {
-        filteredData = filteredData.filter((listing: Listing) => 
-          listing.category.toLowerCase().includes(filters.category.toLowerCase())
-        );
+      const response = await listingsApi.getAllListings(params);
+      
+      if (response.success && response.data?.listings) {
+        setListings(response.data.listings);
+      } else {
+        setError(response.error || 'Failed to load listings');
+        setListings([]);
       }
-      
-      if (filters.minPrice) {
-        filteredData = filteredData.filter((listing: Listing) => 
-          listing.price >= parseFloat(filters.minPrice)
-        );
-      }
-      
-      if (filters.maxPrice) {
-        filteredData = filteredData.filter((listing: Listing) => 
-          listing.price <= parseFloat(filters.maxPrice)
-        );
-      }
-      
-      // Apply sorting
-      filteredData = sortListings(filteredData, filters.sortBy);
-      
-      setListings(filteredData);
     } catch (error: any) {
       console.error('Error fetching listings:', error);
       setError('Failed to load listings. Please try again.');
+      setListings([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Local sorting function
+  // Local sorting function for UI
   const sortListings = (data: Listing[], sortBy: string) => {
     const sortedData = [...data];
     
@@ -222,61 +177,12 @@ const Browse: React.FC = () => {
     setError('');
   };
 
-  // Function to extract seller email from listing data
-  const getSellerEmail = (listing: Listing): string => {
-    // Check if sellerId is populated and has email
-    if (listing.sellerId && typeof listing.sellerId === 'object' && 'email' in listing.sellerId) {
-      return (listing.sellerId as any).email;
-    }
-    
-    // Check if sellerEmail is directly on the listing
-    if ((listing as any).sellerEmail) {
-      return (listing as any).sellerEmail;
-    }
-    
-    console.warn('Seller email not found for listing:', listing._id);
-    return ''; // Return empty string if no email found
-  };
-
   // Function to extract seller name from listing data
   const getSellerName = (listing: Listing): string => {
     if (listing.sellerId && typeof listing.sellerId === 'object' && 'username' in listing.sellerId) {
       return (listing.sellerId as any).username;
     }
     return 'Seller';
-  };
-
-  // Function to send email notification to seller
-  const sendSellerNotification = async (type: 'offer' | 'direct_purchase', data: any) => {
-    try {
-      const templateParams = {
-        to_email: data.sellerEmail,
-        to_name: data.sellerName,
-        buyer_name: data.buyerName,
-        listing_title: data.listingTitle,
-        amount: data.amount,
-        message: data.message || 'No message provided',
-        expected_delivery: data.expectedDelivery || 'Not specified',
-        requirements: data.requirements || 'No specific requirements',
-        order_id: data.orderId,
-        offer_id: data.offerId,
-        type: type,
-        date: new Date().toLocaleDateString(),
-        dashboard_url: `${window.location.origin}/marketplace/seller/dashboard`
-      };
-
-      console.log('📧 Sending email with data:', templateParams);
-
-      const serviceID = 'service_pykwrta';
-      const templateID = type === 'offer' ? 'template_xtnsrmg' : 'template_h4gtoxd';
-
-      const result = await emailjs.send(serviceID, templateID, templateParams);
-      console.log(`✅ ${type === 'offer' ? 'Offer' : 'Purchase'} notification email sent successfully:`, result);
-      
-    } catch (error) {
-      console.error('❌ Failed to send email notification:', error);
-      // Don't throw error here - email failure shouldn't block the main flow
-    }
   };
 
   // Handle offer submission with better error handling
@@ -291,12 +197,17 @@ const Browse: React.FC = () => {
       
       console.log('🔄 Submitting offer with payment...');
 
-      const response = await api.post('/marketplace/offers/make-offer', {
+      const response = await axios.post('/marketplace/offers/make-offer', {
         listingId: selectedListing._id,
         amount: parseFloat(offerForm.amount),
         message: offerForm.message,
         requirements: offerForm.requirements,
         expectedDelivery: offerForm.expectedDelivery
+      }, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
       });
 
       console.log('✅ Offer with payment response:', response.data);
@@ -350,8 +261,13 @@ const Browse: React.FC = () => {
       
       console.log('🔄 Creating direct payment for listing:', listing._id);
 
-      const response = await api.post('/marketplace/offers/create-direct-payment', {
+      const response = await axios.post('/marketplace/offers/create-direct-payment', {
         listingId: listing._id
+      }, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
       });
 
       console.log('✅ Direct payment response:', response.data);
@@ -387,56 +303,8 @@ const Browse: React.FC = () => {
     }
   };
   
-  // Handle payment success with proper email extraction
-  const handlePaymentSuccess = async () => {
-    try {
-      const buyerName = currentUser?.username || 'A buyer';
-
-      // Send email notification based on payment type
-      if (offerData?.type === 'direct_purchase' && offerData?.listing) {
-        const sellerEmail = getSellerEmail(offerData.listing);
-        const sellerName = getSellerName(offerData.listing);
-        
-        if (sellerEmail) {
-          await sendSellerNotification('direct_purchase', {
-            sellerEmail: sellerEmail,
-            sellerName: sellerName,
-            buyerName: buyerName,
-            listingTitle: offerData.listing.title,
-            amount: offerData.amount,
-            orderId: offerData.order?._id,
-            type: 'direct_purchase'
-          });
-        } else {
-          console.warn('No seller email found for direct purchase notification');
-        }
-      } else if (offerData?.offer) {
-        // For offers - extract seller info from offer data
-        const sellerEmail = offerData.offer.sellerId?.email || getSellerEmail(offerData.offer.listingId);
-        const sellerName = offerData.offer.sellerId?.username || getSellerName(offerData.offer.listingId);
-        
-        if (sellerEmail) {
-          await sendSellerNotification('offer', {
-            sellerEmail: sellerEmail,
-            sellerName: sellerName,
-            buyerName: buyerName,
-            listingTitle: offerData.offer.listingId?.title,
-            amount: offerData.amount,
-            message: offerForm.message,
-            expectedDelivery: offerForm.expectedDelivery,
-            requirements: offerForm.requirements,
-            offerId: offerData.offer._id,
-            type: 'offer'
-          });
-        } else {
-          console.warn('No seller email found for offer notification');
-        }
-      }
-
-    } catch (error) {
-      console.error('Failed to send notification email:', error);
-    }
-
+  // Handle payment success
+  const handlePaymentSuccess = () => {
     setShowPaymentModal(false);
     setSelectedListing(null);
     setClientSecret('');
@@ -772,13 +640,10 @@ const Browse: React.FC = () => {
                     </span>
                   </div>
                   
-                  {/* Seller Email Info */}
+                  {/* Seller Info */}
                   <div className="flex items-center gap-1 mt-2 text-xs text-gray-500">
-                    <FiMail size={12} />
+                    <FiUser size={12} />
                     <span>Seller: {getSellerName(selectedListing)}</span>
-                    {getSellerEmail(selectedListing) && (
-                      <span className="text-gray-400">({getSellerEmail(selectedListing)})</span>
-                    )}
                   </div>
                 </div>
               </div>
@@ -1010,153 +875,153 @@ const PaymentForm = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showBillingForm, setShowBillingForm] = useState(false);
 
- // PaymentForm component में handleSubmit function को update करें:
-const handleSubmit = async (event: React.FormEvent) => {
-  event.preventDefault();
-  
-  if (!stripe || !elements) {
-    setError('Payment system not ready. Please refresh the page and try again.');
-    return;
-  }
-
-  setIsSubmitting(true);
-  setPaymentStatus('processing');
-  setError('');
-
-  try {
-    console.log('🔄 Confirming payment...');
-    console.log('📦 Offer Data for confirmation:', offerData);
-
-    // Get user info
-    const userInfo = {
-      name: currentUser?.username || billingDetails.name || 'Customer',
-      email: currentUser?.email || billingDetails.email || '',
-      phone: billingDetails.phone || ''
-    };
-
-    // Prepare billing details for confirmPayment
-    const billingDetailsForStripe = {
-      name: userInfo.name,
-      email: userInfo.email || undefined,
-      phone: userInfo.phone || undefined,
-      address: {
-        line1: billingDetails.address.line1 || 'N/A',
-        line2: billingDetails.address.line2 || undefined,
-        city: billingDetails.address.city || 'N/A',
-        state: billingDetails.address.state || 'N/A',
-        postal_code: billingDetails.address.postal_code || '00000',
-        country: billingDetails.address.country || 'US'
-      }
-    };
-
-    console.log('📋 Billing details for Stripe:', billingDetailsForStripe);
-
-    // DIRECT CONFIRMATION WITHOUT submit()
-    const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        return_url: `${window.location.origin}/marketplace/payment/success`,
-        payment_method_data: {
-          billing_details: billingDetailsForStripe
-        }
-      },
-      redirect: 'if_required'
-    });
-
-    if (stripeError) {
-      console.error('❌ Stripe payment error:', stripeError);
-      setError(stripeError.message || 'Payment failed. Please try again.');
-      setPaymentStatus('failed');
-      setIsSubmitting(false);
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    
+    if (!stripe || !elements) {
+      setError('Payment system not ready. Please refresh the page and try again.');
       return;
     }
 
-    console.log('✅ Stripe payment successful:', {
-      paymentIntentId: paymentIntent?.id,
-      status: paymentIntent?.status
-    });
+    setIsSubmitting(true);
+    setPaymentStatus('processing');
+    setError('');
 
-    // Prepare confirmation data with proper validation
-    let confirmationPayload;
-    let confirmationEndpoint;
+    try {
+      console.log('🔄 Confirming payment...');
+      console.log('📦 Offer Data for confirmation:', offerData);
 
-    if (offerData?.type === 'direct_purchase') {
-      confirmationEndpoint = '/marketplace/payments/confirm-payment';
-      confirmationPayload = {
-        orderId: offerData.order?._id,
-        paymentIntentId: paymentIntent?.id,
-        billingDetails: billingDetailsForStripe
+      // Get user info
+      const userInfo = {
+        name: currentUser?.username || billingDetails.name || 'Customer',
+        email: currentUser?.email || billingDetails.email || '',
+        phone: billingDetails.phone || ''
       };
-    } else {
-      confirmationEndpoint = '/marketplace/offers/confirm-offer-payment';
-      confirmationPayload = {
-        offerId: offerData?.offer?._id || offerData?.offerId,
-        paymentIntentId: paymentIntent?.id,
-        billingDetails: billingDetailsForStripe
+
+      // Prepare billing details for confirmPayment
+      const billingDetailsForStripe = {
+        name: userInfo.name,
+        email: userInfo.email || undefined,
+        phone: userInfo.phone || undefined,
+        address: {
+          line1: billingDetails.address.line1 || 'N/A',
+          line2: billingDetails.address.line2 || undefined,
+          city: billingDetails.address.city || 'N/A',
+          state: billingDetails.address.state || 'N/A',
+          postal_code: billingDetails.address.postal_code || '00000',
+          country: billingDetails.address.country || 'US'
+        }
       };
-    }
 
-    console.log('📤 Sending confirmation to server:', {
-      endpoint: confirmationEndpoint,
-      payload: confirmationPayload
-    });
+      console.log('📋 Billing details for Stripe:', billingDetailsForStripe);
 
-    // Validate required fields
-    if (!confirmationPayload.offerId && !confirmationPayload.orderId) {
-      throw new Error('Missing offerId or orderId for confirmation');
-    }
+      // DIRECT CONFIRMATION WITHOUT submit()
+      const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/marketplace/payment/success`,
+          payment_method_data: {
+            billing_details: billingDetailsForStripe
+          }
+        },
+        redirect: 'if_required'
+      });
 
-    if (!confirmationPayload.paymentIntentId) {
-      throw new Error('Missing paymentIntentId for confirmation');
-    }
-
-    // Send confirmation to server
-    const response = await axios.post(
-      `http://localhost:3000${confirmationEndpoint}`,
-      confirmationPayload,
-      { 
-        headers: { 
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        } 
+      if (stripeError) {
+        console.error('❌ Stripe payment error:', stripeError);
+        setError(stripeError.message || 'Payment failed. Please try again.');
+        setPaymentStatus('failed');
+        setIsSubmitting(false);
+        return;
       }
-    );
 
-    console.log('✅ Server confirmation successful:', response.data);
-    setPaymentStatus('success');
-    
-    // Wait a moment before redirecting to show success state
-    setTimeout(() => {
-      onSuccess();
-    }, 1500);
+      console.log('✅ Stripe payment successful:', {
+        paymentIntentId: paymentIntent?.id,
+        status: paymentIntent?.status
+      });
 
-  } catch (err: any) {
-    console.error('❌ Payment processing error:', {
-      message: err.message,
-      response: err.response?.data,
-      status: err.response?.status,
-      config: err.config
-    });
-    
-    // Enhanced error message
-    let errorMessage = 'Payment failed. Please try again.';
-    
-    if (err.response?.data?.error) {
-      errorMessage = err.response.data.error;
-    } else if (err.response?.data?.details) {
-      errorMessage = Array.isArray(err.response.data.details) 
-        ? err.response.data.details.join(', ')
-        : err.response.data.details;
-    } else if (err.message) {
-      errorMessage = err.message;
+      // Prepare confirmation data with proper validation
+      let confirmationPayload;
+      let confirmationEndpoint;
+
+      if (offerData?.type === 'direct_purchase') {
+        confirmationEndpoint = '/marketplace/payments/confirm-payment';
+        confirmationPayload = {
+          orderId: offerData.order?._id,
+          paymentIntentId: paymentIntent?.id,
+          billingDetails: billingDetailsForStripe
+        };
+      } else {
+        confirmationEndpoint = '/marketplace/offers/confirm-offer-payment';
+        confirmationPayload = {
+          offerId: offerData?.offer?._id || offerData?.offerId,
+          paymentIntentId: paymentIntent?.id,
+          billingDetails: billingDetailsForStripe
+        };
+      }
+
+      console.log('📤 Sending confirmation to server:', {
+        endpoint: confirmationEndpoint,
+        payload: confirmationPayload
+      });
+
+      // Validate required fields
+      if (!confirmationPayload.offerId && !confirmationPayload.orderId) {
+        throw new Error('Missing offerId or orderId for confirmation');
+      }
+
+      if (!confirmationPayload.paymentIntentId) {
+        throw new Error('Missing paymentIntentId for confirmation');
+      }
+
+      // Send confirmation to server
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_URL || 'http://localhost:3000'}${confirmationEndpoint}`,
+        confirmationPayload,
+        { 
+          headers: { 
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          } 
+        }
+      );
+
+      console.log('✅ Server confirmation successful:', response.data);
+      setPaymentStatus('success');
+      
+      // Wait a moment before redirecting to show success state
+      setTimeout(() => {
+        onSuccess();
+      }, 1500);
+
+    } catch (err: any) {
+      console.error('❌ Payment processing error:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        config: err.config
+      });
+      
+      // Enhanced error message
+      let errorMessage = 'Payment failed. Please try again.';
+      
+      if (err.response?.data?.error) {
+        errorMessage = err.response.data.error;
+      } else if (err.response?.data?.details) {
+        errorMessage = Array.isArray(err.response.data.details) 
+          ? err.response.data.details.join(', ')
+          : err.response.data.details;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      setError(errorMessage);
+      setPaymentStatus('failed');
+    } finally {
+      setIsSubmitting(false);
     }
+  };
 
-    setError(errorMessage);
-    setPaymentStatus('failed');
-  } finally {
-    setIsSubmitting(false);
-  }
-};
   const handleAddressChange = (event: any) => {
     if (event.complete) {
       const address = event.value.address;
@@ -1280,7 +1145,7 @@ const handleSubmit = async (event: React.FormEvent) => {
               <span>{billingDetails.name || currentUser?.username || 'Not provided'}</span>
             </div>
             <div className="flex items-center gap-2">
-              <FiMail size={14} />
+              <FiUser size={14} />
               <span>{billingDetails.email || currentUser?.email || 'Not provided'}</span>
             </div>
           </div>
