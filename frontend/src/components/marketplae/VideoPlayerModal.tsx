@@ -2,46 +2,43 @@ import React, { useRef } from 'react';
 import { FiX, FiPlay, FiPause, FiVolume2, FiVolumeX, FiMaximize, FiAlertCircle } from 'react-icons/fi';
 
 interface VideoPlayerModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+  show: boolean;
   videoUrl: string;
   videoTitle: string;
+  onClose: () => void;
 }
 
-const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  videoUrl, 
-  videoTitle 
+const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
+  show,
+  videoUrl,
+  videoTitle,
+  onClose
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  if (!isOpen) return null;
+  if (!show || !videoUrl) return null;
 
   const isVideoUrl = (url: string): boolean => {
     if (!url) return false;
+    
     const videoExtensions = /\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v|ogg|ogv|3gp|3g2)$/i;
+    if (videoExtensions.test(url)) {
+      return true;
+    }
+    
     const videoDomains = [
-      'youtube.com', 'youtu.be', 'vimeo.com', 'dailymotion.com',
-      'twitch.tv', 'streamable.com', 'cloudinary.com'
+      'youtube.com',
+      'youtu.be',
+      'vimeo.com',
+      'dailymotion.com',
+      'twitch.tv',
+      'streamable.com',
+      'cloudinary.com',
+      'vidyard.com',
+      'wistia.com'
     ];
-    return videoExtensions.test(url) || videoDomains.some(domain => url.includes(domain));
-  };
-
-  const handlePlayPause = () => {
-    if (videoRef.current) {
-      if (videoRef.current.paused) {
-        videoRef.current.play();
-      } else {
-        videoRef.current.pause();
-      }
-    }
-  };
-
-  const handleMuteToggle = () => {
-    if (videoRef.current) {
-      videoRef.current.muted = !videoRef.current.muted;
-    }
+    
+    return videoDomains.some(domain => url.includes(domain));
   };
 
   const handleFullscreen = () => {
@@ -81,6 +78,7 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
               autoPlay
               className="w-full h-full object-contain bg-black"
               onError={(e) => {
+                console.error('Video playback error:', e);
                 const videoElement = e.target as HTMLVideoElement;
                 videoElement.controls = false;
                 videoElement.innerHTML = `
@@ -88,6 +86,7 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                     <FiAlertCircle class="text-red-500 mb-4" size={48} />
                     <h4 class="text-xl font-semibold mb-2">Unable to Play Video</h4>
                     <p class="text-gray-300">The video format is not supported or the URL is invalid.</p>
+                    <p class="text-sm text-gray-400 mt-2">URL: ${videoUrl}</p>
                   </div>
                 `;
               }}
@@ -108,14 +107,26 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
           <div className="flex justify-center gap-4">
             <button
-              onClick={handlePlayPause}
+              onClick={() => {
+                if (videoRef.current) {
+                  if (videoRef.current.paused) {
+                    videoRef.current.play();
+                  } else {
+                    videoRef.current.pause();
+                  }
+                }
+              }}
               className="text-white hover:text-yellow-400 p-3 rounded-full hover:bg-white/10 transition-colors"
               title="Play/Pause"
             >
               <FiPlay size={20} />
             </button>
             <button
-              onClick={handleMuteToggle}
+              onClick={() => {
+                if (videoRef.current) {
+                  videoRef.current.muted = !videoRef.current.muted;
+                }
+              }}
               className="text-white hover:text-yellow-400 p-3 rounded-full hover:bg-white/10 transition-colors"
               title="Mute/Unmute"
             >
