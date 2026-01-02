@@ -3,20 +3,20 @@ import MarketplaceLayout from '../../components/Layout';
 import { Listing } from '../../types/marketplace';
 import { 
   FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiAlertCircle, 
-  FiLoader, FiUser, FiMail, FiPlay, FiImage, FiVideo, FiEye, FiHeart,
-  FiTrendingUp, FiZap, FiStar, FiClock, FiShoppingBag, FiTag, FiAward,
-  FiTrendingDown, FiGlobe, FiTarget, FiBarChart2
+  FiLoader, FiUser, FiPlay, FiImage, FiVideo, FiEye, FiHeart,
+  FiTrendingUp, FiZap, FiClock, FiShoppingBag, FiTag,
+  FiTarget, FiBarChart2, FiDollarSign, FiVideoOff, FiCheckCircle
 } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import marketplaceApi from '../../api/marketplaceApi';
 import VideoPlayerModal from '../../components/marketplae/VideoPlayerModal';
-import PaymentModal from '../../components/marketplae/paymentModal';
+import PaymentModal from '../../components/marketplae/PaymentModal';
 import OfferModal from '../../components/marketplae/OfferModal';
 
 // Constants for placeholder images
-const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1579546929662-711aa81148cf?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
+const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1611224923853-80b023f02d71?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
 const VIDEO_PLACEHOLDER = 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80';
-const ERROR_IMAGE = 'https://via.placeholder.com/300x200/cccccc/ffffff?text=Preview+Unavailable';
+const ERROR_IMAGE = 'https://via.placeholder.com/300x200/333333/ffffff?text=Preview+Unavailable';
 
 const Browse: React.FC = () => {
   const [listings, setListings] = useState<Listing[]>([]);
@@ -35,10 +35,7 @@ const Browse: React.FC = () => {
   const [selectedVideo, setSelectedVideo] = useState<string>('');
   const [videoTitle, setVideoTitle] = useState<string>('');
   const [videoListing, setVideoListing] = useState<Listing | null>(null);
-  const [trendingTags, setTrendingTags] = useState<string[]>([
-    'VIRAL', 'TRENDING', 'HOT', 'LIMITED', 'EXCLUSIVE', 'PREMIUM'
-  ]);
-  const [activeTag, setActiveTag] = useState<string>('');
+  const [activeCategory, setActiveCategory] = useState<string>('');
   
   // New state for image loading errors
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
@@ -49,7 +46,7 @@ const Browse: React.FC = () => {
     category: '',
     minPrice: '',
     maxPrice: '',
-    sortBy: 'trending'
+    sortBy: 'latest'
   });
 
   const [offerForm, setOfferForm] = useState({
@@ -109,10 +106,8 @@ const Browse: React.FC = () => {
           if (!matchesSearch) return false;
         }
         
-        if (activeTag) {
-          if (listing.tags && !listing.tags.some(tag => tag.toLowerCase() === activeTag.toLowerCase())) {
-            return false;
-          }
+        if (activeCategory && listing.category !== activeCategory) {
+          return false;
         }
         
         if (listing.status !== 'active') return false;
@@ -124,8 +119,6 @@ const Browse: React.FC = () => {
       
       setListings(sortedData);
       
-      // Update trending tags based on listings
-      updateTrendingTags(listingsData);
     } catch (error: any) {
       console.error('Error fetching listings:', error);
       setError(error.message || 'Failed to load listings. Please try again.');
@@ -134,35 +127,11 @@ const Browse: React.FC = () => {
     }
   };
 
-  const updateTrendingTags = (data: Listing[]) => {
-    const tagFrequency: Record<string, number> = {};
-    data.forEach(listing => {
-      if (listing.tags) {
-        listing.tags.forEach(tag => {
-          tagFrequency[tag] = (tagFrequency[tag] || 0) + 1;
-        });
-      }
-    });
-    
-    const topTags = Object.entries(tagFrequency)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 6)
-      .map(([tag]) => tag.toUpperCase());
-    
-    setTrendingTags(prev => [...new Set([...topTags, ...prev])].slice(0, 6));
-  };
-
   const sortListings = (data: Listing[], sortBy: string) => {
     const sortedData = [...data];
     
     switch (sortBy) {
-      case 'trending':
-        return sortedData.sort((a, b) => {
-          const viewsA = a.views || 0;
-          const viewsB = b.views || 0;
-          return viewsB - viewsA;
-        });
-      case 'newest':
+      case 'latest':
         return sortedData.sort((a, b) => 
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
@@ -170,11 +139,11 @@ const Browse: React.FC = () => {
         return sortedData.sort((a, b) => a.price - b.price);
       case 'price_high':
         return sortedData.sort((a, b) => b.price - a.price);
-      case 'rating':
+      case 'popular':
         return sortedData.sort((a, b) => {
-          const ratingA = a.sellerId?.sellerRating || 0;
-          const ratingB = b.sellerId?.sellerRating || 0;
-          return ratingB - ratingA;
+          const viewsA = a.views || 0;
+          const viewsB = b.views || 0;
+          return viewsB - viewsA;
         });
       default:
         return sortedData;
@@ -352,10 +321,10 @@ const Browse: React.FC = () => {
       category: '',
       minPrice: '',
       maxPrice: '',
-      sortBy: 'trending'
+      sortBy: 'latest'
     });
     setSearchQuery('');
-    setActiveTag('');
+    setActiveCategory('');
     setError('');
   };
 
@@ -390,6 +359,7 @@ const Browse: React.FC = () => {
       try {
         let thumbnailUrl = videoUrl.replace('/video/upload/', '/image/upload/w_600,h_400,c_fill,q_auto,f_auto/');
         thumbnailUrl = thumbnailUrl.replace(/\.(mp4|mov|avi|webm)$/i, '.jpg');
+        console.log('📸 Generated Cloudinary thumbnail:', thumbnailUrl);
         return thumbnailUrl;
       } catch (error) {
         console.error('Error generating thumbnail:', error);
@@ -484,24 +454,33 @@ const Browse: React.FC = () => {
     return 'none';
   };
 
-  const getTrendingLevel = (views: number = 0) => {
-    if (views > 1000) return { color: 'from-red-500 to-pink-600', icon: <FiZap />, label: 'HOT' };
-    if (views > 500) return { color: 'from-orange-500 to-red-500', icon: <FiTrendingUp />, label: 'TRENDING' };
-    if (views > 100) return { color: 'from-yellow-500 to-orange-500', icon: <FiBarChart2 />, label: 'POPULAR' };
-    return { color: 'from-blue-500 to-purple-500', icon: <FiEye />, label: 'NEW' };
+  const getQualityBadge = (quality?: string) => {
+    switch (quality?.toLowerCase()) {
+      case '4k':
+      case 'ultra hd':
+        return { color: 'bg-gradient-to-r from-purple-600 to-pink-600', label: '4K' };
+      case 'hd':
+      case '1080p':
+        return { color: 'bg-gradient-to-r from-blue-600 to-cyan-500', label: 'HD' };
+      case 'sd':
+      case '720p':
+        return { color: 'bg-gradient-to-r from-green-600 to-emerald-500', label: 'SD' };
+      default:
+        return { color: 'bg-gradient-to-r from-gray-600 to-gray-500', label: 'STD' };
+    }
   };
 
   if (loading) {
     return (
       <MarketplaceLayout>
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center p-4">
+        <div className="min-h-screen bg-black flex items-center justify-center p-4">
           <div className="text-center">
             <div className="relative inline-block">
-              <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-purple-600 to-pink-600 opacity-30 rounded-full blur-xl"></div>
-              <div className="relative animate-spin rounded-full h-24 w-24 border-4 border-transparent border-t-purple-500 border-r-pink-500 mx-auto"></div>
+              <div className="absolute inset-0 animate-pulse bg-yellow-500 opacity-20 rounded-full blur-xl"></div>
+              <div className="relative animate-spin rounded-full h-24 w-24 border-4 border-transparent border-t-yellow-500 border-r-yellow-400 mx-auto"></div>
             </div>
-            <p className="mt-8 text-white text-xl font-bold tracking-wider">LOADING MARKETPLACE...</p>
-            <p className="mt-2 text-gray-400 text-sm">Discovering exclusive content from top creators</p>
+            <p className="mt-8 text-white text-xl font-bold tracking-wider">LOADING PREMIUM CONTENT</p>
+            <p className="mt-2 text-gray-400 text-sm">Discovering exclusive videos and creative assets</p>
           </div>
         </div>
       </MarketplaceLayout>
@@ -510,21 +489,21 @@ const Browse: React.FC = () => {
 
   return (
     <MarketplaceLayout>
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 py-8">
+      <div className="min-h-screen bg-black py-8">
         {/* Animated Background Effects */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 left-1/4 w-72 h-72 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
-          <div className="absolute bottom-0 right-1/4 w-72 h-72 bg-pink-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse delay-1000"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-pulse delay-500"></div>
+          <div className="absolute top-0 left-1/4 w-72 h-72 bg-yellow-600 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-pulse"></div>
+          <div className="absolute bottom-0 right-1/4 w-72 h-72 bg-yellow-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-pulse delay-1000"></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-amber-600 rounded-full mix-blend-multiply filter blur-3xl opacity-5 animate-pulse delay-500"></div>
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           {/* Error Banner */}
           {error && (
-            <div className="mb-6 bg-gradient-to-r from-red-900/50 to-red-800/30 backdrop-blur-xl border-l-4 border-red-500 rounded-r-lg shadow-2xl p-6 animate-slideIn">
+            <div className="mb-6 bg-gradient-to-r from-yellow-900/50 to-amber-900/30 backdrop-blur-xl border-l-4 border-yellow-500 rounded-r-lg shadow-2xl p-6 animate-slideIn">
               <div className="flex items-center gap-4">
                 <div className="flex-shrink-0">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-r from-red-600 to-red-500 flex items-center justify-center animate-pulse">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-r from-yellow-600 to-amber-500 flex items-center justify-center animate-pulse">
                     <FiAlertCircle className="text-white" size={24} />
                   </div>
                 </div>
@@ -533,7 +512,7 @@ const Browse: React.FC = () => {
                 </div>
                 <button
                   onClick={() => setError('')}
-                  className="text-red-300 hover:text-white p-2 hover:bg-red-900/50 rounded-lg transition-all"
+                  className="text-yellow-300 hover:text-white p-2 hover:bg-yellow-900/50 rounded-lg transition-all"
                 >
                   <FiX size={20} />
                 </button>
@@ -541,27 +520,27 @@ const Browse: React.FC = () => {
             </div>
           )}
 
-          {/* Header Section with Hype Elements */}
+          {/* Header Section */}
           <div className="mb-12">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full animate-pulse">
-                    <span className="text-white text-sm font-bold tracking-wider">🔥 TRENDING NOW</span>
+                  <div className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-amber-500 rounded-full animate-pulse">
+                    <span className="text-black text-sm font-bold tracking-wider">PREMIUM MARKETPLACE</span>
                   </div>
                   <div className="px-3 py-1 bg-yellow-500/20 border border-yellow-500/30 rounded-full">
-                    <span className="text-yellow-300 text-xs font-bold">🚀 HYPE MODE</span>
+                    <span className="text-yellow-300 text-xs font-bold">⚡ HIGH QUALITY</span>
                   </div>
                 </div>
                 
                 <h1 className="text-5xl md:text-6xl font-bold tracking-tight">
-                  <span className="bg-gradient-to-r from-purple-400 via-pink-500 to-yellow-500 bg-clip-text text-transparent animate-gradient">
-                    HYPER MARKETPLACE
+                  <span className="bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-500 bg-clip-text text-transparent animate-gradient">
+                    VIDEO VAULT
                   </span>
                 </h1>
                 <p className="text-gray-300 text-xl max-w-2xl">
-                  Discover <span className="text-yellow-400 font-bold">exclusive</span> content from top creators. 
-                  Limited deals, viral videos, premium assets - <span className="text-pink-400 font-bold">Grab them before they're gone!</span>
+                  Premium <span className="text-yellow-400 font-bold">video content</span> from top creators. 
+                  Direct downloads, instant access, exclusive rights
                 </p>
               </div>
               
@@ -570,46 +549,46 @@ const Browse: React.FC = () => {
                   <>
                     <button 
                       onClick={() => navigate('/marketplace/create')}
-                      className="group relative inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-2xl shadow-2xl hover:shadow-3xl transform hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+                      className="group relative inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-yellow-500 to-amber-500 text-black font-bold rounded-2xl shadow-2xl hover:shadow-3xl transform hover:-translate-y-1 transition-all duration-300 overflow-hidden"
                     >
-                      <div className="absolute inset-0 bg-gradient-to-r from-purple-700 to-pink-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                      <div className="absolute inset-0 bg-gradient-to-r from-yellow-600 to-amber-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                       <FiPlus className="relative mr-3" size={20} />
-                      <span className="relative tracking-wider">CREATE LISTING</span>
-                      <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-yellow-400 to-orange-400 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></div>
+                      <span className="relative tracking-wider">UPLOAD VIDEO</span>
+                      <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-orange-500 to-red-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></div>
                     </button>
                     <button 
                       onClick={() => navigate('/marketplace/my-orders')}
-                      className="group relative inline-flex items-center justify-center px-6 py-3 border-2 border-purple-500/50 text-white font-semibold rounded-xl backdrop-blur-sm bg-purple-900/20 hover:bg-purple-900/40 shadow-lg hover:shadow-xl transition-all duration-300"
+                      className="group relative inline-flex items-center justify-center px-6 py-3 border-2 border-yellow-500/50 text-white font-semibold rounded-xl backdrop-blur-sm bg-yellow-900/20 hover:bg-yellow-900/40 shadow-lg hover:shadow-xl transition-all duration-300"
                     >
                       <FiCreditCard className="mr-3" size={18} />
-                      MY OFFERS
-                      <div className="absolute inset-0 border-2 border-transparent group-hover:border-purple-400/30 rounded-xl transition-all duration-300"></div>
+                      MY ORDERS
+                      <div className="absolute inset-0 border-2 border-transparent group-hover:border-yellow-400/30 rounded-xl transition-all duration-300"></div>
                     </button>
                   </>
                 )}
               </div>
             </div>
 
-            {/* Trending Tags Bar */}
+            {/* Quick Categories */}
             <div className="mt-8 flex flex-wrap gap-3">
               <div className="flex items-center gap-2 text-gray-300">
-                <FiTrendingUp className="text-yellow-500" />
-                <span className="font-semibold">TRENDING NOW:</span>
+                <FiFilter className="text-yellow-500" />
+                <span className="font-semibold">QUICK FILTERS:</span>
               </div>
-              {trendingTags.map((tag, index) => (
+              {['All', 'Video', 'Music', 'Animation', 'Templates', 'Scripts'].map((category) => (
                 <button
-                  key={tag}
+                  key={category}
                   onClick={() => {
-                    setActiveTag(activeTag === tag.toLowerCase() ? '' : tag.toLowerCase());
+                    setActiveCategory(activeCategory === category.toLowerCase() ? '' : category.toLowerCase());
                     setSearchQuery('');
                   }}
                   className={`px-4 py-2 rounded-full text-sm font-bold transition-all duration-300 transform hover:scale-105 ${
-                    activeTag === tag.toLowerCase()
-                      ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-lg shadow-yellow-500/30'
-                      : 'bg-gradient-to-r from-gray-800 to-gray-900 text-gray-300 border border-gray-700 hover:border-yellow-500/50'
+                    activeCategory === category.toLowerCase()
+                      ? 'bg-gradient-to-r from-yellow-500 to-amber-500 text-black shadow-lg shadow-yellow-500/30'
+                      : 'bg-gradient-to-r from-gray-900 to-gray-800 text-gray-300 border border-gray-700 hover:border-yellow-500/50'
                   }`}
                 >
-                  #{tag}
+                  {category.toUpperCase()}
                 </button>
               ))}
             </div>
@@ -617,17 +596,17 @@ const Browse: React.FC = () => {
             {/* Search Bar */}
             <div className="mt-10 max-w-4xl mx-auto relative">
               <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-pink-600/20 blur-xl rounded-3xl group-hover:blur-2xl transition-all duration-300"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/10 to-amber-500/10 blur-xl rounded-3xl group-hover:blur-2xl transition-all duration-300"></div>
                 <div className="relative flex items-center">
                   <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                    <FiSearch className="text-purple-400 group-focus-within:text-yellow-400 transition-colors duration-300" size={22} />
+                    <FiSearch className="text-yellow-400 group-focus-within:text-amber-400 transition-colors duration-300" size={22} />
                   </div>
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search for viral videos, exclusive content, premium assets..."
-                    className="flex-1 pl-14 pr-6 py-5 border-2 border-purple-500/30 rounded-2xl bg-gray-900/80 backdrop-blur-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white shadow-xl transition-all duration-300 text-base"
+                    placeholder="Search for 4K videos, animations, music, templates..."
+                    className="flex-1 pl-14 pr-6 py-5 border-2 border-yellow-500/30 rounded-2xl bg-gray-900/80 backdrop-blur-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent text-white shadow-xl transition-all duration-300 text-base"
                   />
                   {searchQuery && (
                     <button
@@ -642,27 +621,23 @@ const Browse: React.FC = () => {
             </div>
           </div>
 
-          {/* Stats Bar */}
-          <div className="mb-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+          {/* Simple Stats */}
+          <div className="mb-8 grid grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="bg-gradient-to-br from-gray-900/50 to-gray-800/30 backdrop-blur-sm border border-gray-700 rounded-2xl p-6 text-center">
               <div className="text-3xl font-bold text-white mb-2">{listings.length}</div>
-              <div className="text-gray-400 text-sm font-semibold">ACTIVE LISTINGS</div>
+              <div className="text-gray-400 text-sm font-semibold">PREMIUM LISTINGS</div>
             </div>
-            <div className="bg-gradient-to-br from-purple-900/30 to-purple-800/20 backdrop-blur-sm border border-purple-700/30 rounded-2xl p-6 text-center">
-              <div className="text-3xl font-bold text-white mb-2">{listings.filter(l => l.views > 100).length}</div>
-              <div className="text-purple-300 text-sm font-semibold">TRENDING NOW</div>
-            </div>
-            <div className="bg-gradient-to-br from-pink-900/30 to-pink-800/20 backdrop-blur-sm border border-pink-700/30 rounded-2xl p-6 text-center">
+            <div className="bg-gradient-to-br from-yellow-900/30 to-amber-800/20 backdrop-blur-sm border border-yellow-700/30 rounded-2xl p-6 text-center">
               <div className="text-3xl font-bold text-white mb-2">
-                ${listings.reduce((sum, l) => sum + l.price, 0).toLocaleString()}
+                {listings.filter(l => getMediaType(l) === 'video').length}
               </div>
-              <div className="text-pink-300 text-sm font-semibold">TOTAL VALUE</div>
+              <div className="text-yellow-300 text-sm font-semibold">VIDEO CONTENT</div>
             </div>
-            <div className="bg-gradient-to-br from-yellow-900/30 to-yellow-800/20 backdrop-blur-sm border border-yellow-700/30 rounded-2xl p-6 text-center">
+            <div className="bg-gradient-to-br from-amber-900/30 to-orange-800/20 backdrop-blur-sm border border-amber-700/30 rounded-2xl p-6 text-center">
               <div className="text-3xl font-bold text-white mb-2">
                 {new Set(listings.map(l => l.sellerId?._id)).size}
               </div>
-              <div className="text-yellow-300 text-sm font-semibold">ACTIVE SELLERS</div>
+              <div className="text-amber-300 text-sm font-semibold">CREATORS</div>
             </div>
           </div>
 
@@ -671,12 +646,12 @@ const Browse: React.FC = () => {
             <div className="mb-8 bg-gradient-to-br from-gray-900/80 to-gray-800/50 backdrop-blur-xl border border-gray-700 rounded-3xl shadow-2xl p-8 animate-fadeIn">
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-600/20 to-pink-600/20 flex items-center justify-center border border-purple-500/30">
-                    <FiFilter className="text-purple-400" size={24} />
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-yellow-600/20 to-amber-600/20 flex items-center justify-center border border-yellow-500/30">
+                    <FiFilter className="text-yellow-400" size={24} />
                   </div>
                   <div>
                     <h3 className="text-2xl font-bold text-white">ADVANCED FILTERS</h3>
-                    <p className="text-gray-400 text-sm">Refine your search to find exclusive content</p>
+                    <p className="text-gray-400 text-sm">Refine your search to find perfect content</p>
                   </div>
                 </div>
                 <button
@@ -691,37 +666,36 @@ const Browse: React.FC = () => {
                 <div className="space-y-3">
                   <label className="block text-sm font-bold text-gray-300">
                     <FiShoppingBag className="inline mr-2" />
-                    LISTING TYPE
+                    CONTENT TYPE
                   </label>
                   <select 
                     value={filters.type}
                     onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
-                    className="w-full px-4 py-4 border-2 border-purple-500/30 rounded-xl bg-gray-900/50 text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all duration-300"
+                    className="w-full px-4 py-4 border-2 border-yellow-500/30 rounded-xl bg-gray-900/50 text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none transition-all duration-300"
                   >
                     <option value="" className="bg-gray-900">ALL TYPES</option>
-                    <option value="for_sale" className="bg-gray-900">🔥 FOR SALE</option>
-                    <option value="licensing" className="bg-gray-900">⚡ LICENSING</option>
-                    <option value="adaptation_rights" className="bg-gray-900">✨ ADAPTATION RIGHTS</option>
-                    <option value="commission" className="bg-gray-900">🎯 COMMISSION</option>
+                    <option value="video" className="bg-gray-900">🎥 VIDEO</option>
+                    <option value="music" className="bg-gray-900">🎵 MUSIC</option>
+                    <option value="animation" className="bg-gray-900">✨ ANIMATION</option>
+                    <option value="template" className="bg-gray-900">📁 TEMPLATE</option>
+                    <option value="script" className="bg-gray-900">📝 SCRIPT</option>
                   </select>
                 </div>
 
                 <div className="space-y-3">
                   <label className="block text-sm font-bold text-gray-300">
                     <FiTag className="inline mr-2" />
-                    CATEGORY
+                    QUALITY
                   </label>
                   <select 
                     value={filters.category}
                     onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
-                    className="w-full px-4 py-4 border-2 border-purple-500/30 rounded-xl bg-gray-900/50 text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all duration-300"
+                    className="w-full px-4 py-4 border-2 border-yellow-500/30 rounded-xl bg-gray-900/50 text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none transition-all duration-300"
                   >
-                    <option value="" className="bg-gray-900">ALL CATEGORIES</option>
-                    <option value="video" className="bg-gray-900">🎥 VIDEO</option>
-                    <option value="script" className="bg-gray-900">📝 SCRIPT</option>
-                    <option value="music" className="bg-gray-900">🎵 MUSIC</option>
-                    <option value="animation" className="bg-gray-900">✨ ANIMATION</option>
-                    <option value="template" className="bg-gray-900">📁 TEMPLATE</option>
+                    <option value="" className="bg-gray-900">ALL QUALITY</option>
+                    <option value="4k" className="bg-gray-900">🎬 4K ULTRA HD</option>
+                    <option value="hd" className="bg-gray-900">📹 FULL HD</option>
+                    <option value="sd" className="bg-gray-900">📽️ STANDARD</option>
                   </select>
                 </div>
 
@@ -733,13 +707,12 @@ const Browse: React.FC = () => {
                   <select 
                     value={filters.sortBy}
                     onChange={(e) => setFilters(prev => ({ ...prev, sortBy: e.target.value }))}
-                    className="w-full px-4 py-4 border-2 border-purple-500/30 rounded-xl bg-gray-900/50 text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all duration-300"
+                    className="w-full px-4 py-4 border-2 border-yellow-500/30 rounded-xl bg-gray-900/50 text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none transition-all duration-300"
                   >
-                    <option value="trending">🔥 TRENDING</option>
-                    <option value="newest">✨ NEWEST</option>
+                    <option value="latest">✨ LATEST</option>
+                    <option value="popular">🔥 POPULAR</option>
                     <option value="price_low">💰 PRICE: LOW TO HIGH</option>
                     <option value="price_high">💰 PRICE: HIGH TO LOW</option>
-                    <option value="rating">⭐ HIGHEST RATED</option>
                   </select>
                 </div>
 
@@ -756,7 +729,7 @@ const Browse: React.FC = () => {
                         placeholder="MIN"
                         value={filters.minPrice}
                         onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))}
-                        className="w-full pl-10 pr-4 py-3 border-2 border-purple-500/30 rounded-xl bg-gray-900/50 text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all duration-300"
+                        className="w-full pl-10 pr-4 py-3 border-2 border-yellow-500/30 rounded-xl bg-gray-900/50 text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none transition-all duration-300"
                       />
                     </div>
                     <div className="relative flex-1">
@@ -766,7 +739,7 @@ const Browse: React.FC = () => {
                         placeholder="MAX"
                         value={filters.maxPrice}
                         onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: e.target.value }))}
-                        className="w-full pl-10 pr-4 py-3 border-2 border-purple-500/30 rounded-xl bg-gray-900/50 text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all duration-300"
+                        className="w-full pl-10 pr-4 py-3 border-2 border-yellow-500/30 rounded-xl bg-gray-900/50 text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent outline-none transition-all duration-300"
                       />
                     </div>
                   </div>
@@ -783,7 +756,7 @@ const Browse: React.FC = () => {
             >
               <FiFilter className="mr-3" size={20} />
               {showFilters ? 'HIDE FILTERS' : 'SHOW ADVANCED FILTERS'}
-              <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-purple-500 to-pink-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></div>
+              <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-yellow-500 to-amber-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></div>
             </button>
           </div>
 
@@ -791,29 +764,29 @@ const Browse: React.FC = () => {
           {listings.length === 0 ? (
             <div className="bg-gradient-to-br from-gray-900/50 to-gray-800/30 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-700 p-16 text-center">
               <div className="max-w-md mx-auto">
-                <div className="w-32 h-32 mx-auto mb-8 bg-gradient-to-br from-purple-600/20 to-pink-600/20 rounded-full flex items-center justify-center border border-purple-500/30 shadow-2xl">
-                  <FiSearch size={48} className="text-purple-400" />
+                <div className="w-32 h-32 mx-auto mb-8 bg-gradient-to-br from-yellow-600/20 to-amber-600/20 rounded-full flex items-center justify-center border border-yellow-500/30 shadow-2xl">
+                  <FiVideoOff size={48} className="text-yellow-400" />
                 </div>
                 <h3 className="text-3xl font-bold text-white mb-4">
-                  {searchQuery || activeTag || Object.values(filters).some(Boolean) 
-                    ? 'NO EXCLUSIVE CONTENT FOUND' 
-                    : 'WELCOME TO HYPER MARKETPLACE!'
+                  {searchQuery || activeCategory || Object.values(filters).some(Boolean) 
+                    ? 'NO CONTENT FOUND' 
+                    : 'WELCOME TO VIDEO VAULT!'
                   }
                 </h3>
                 <p className="text-gray-400 text-lg mb-10">
-                  {searchQuery || activeTag || Object.values(filters).some(Boolean)
-                    ? 'Try different filters or browse trending categories'
-                    : 'Be the first to list exclusive content and join the hype!'
+                  {searchQuery || activeCategory || Object.values(filters).some(Boolean)
+                    ? 'Try different filters or browse categories'
+                    : 'Upload your first premium video content and start earning!'
                   }
                 </p>
                 {marketplaceApi.utils.checkAuth() && (
                   <button 
                     onClick={() => navigate('/marketplace/create')}
-                    className="group relative inline-flex items-center justify-center px-10 py-5 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-2xl shadow-2xl hover:shadow-3xl transform hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+                    className="group relative inline-flex items-center justify-center px-10 py-5 bg-gradient-to-r from-yellow-500 to-amber-500 text-black font-bold rounded-2xl shadow-2xl hover:shadow-3xl transform hover:-translate-y-1 transition-all duration-300 overflow-hidden"
                   >
                     <FiPlus className="mr-3" size={22} />
-                    CREATE EXCLUSIVE LISTING
-                    <div className="absolute inset-0 bg-gradient-to-r from-purple-700 to-pink-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    UPLOAD FIRST VIDEO
+                    <div className="absolute inset-0 bg-gradient-to-r from-yellow-600 to-amber-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                   </button>
                 )}
               </div>
@@ -825,37 +798,42 @@ const Browse: React.FC = () => {
                 const videoUrl = getFirstVideoUrl(listing);
                 const mediaType = getMediaType(listing);
                 const isVideo = mediaType === 'video';
-                const trendingLevel = getTrendingLevel(listing.views);
+                const qualityBadge = getQualityBadge(listing.quality);
                 
                 return (
                   <div 
                     key={listing._id} 
                     className="group relative bg-gradient-to-br from-gray-900/50 to-gray-800/30 backdrop-blur-sm border border-gray-700 rounded-3xl shadow-2xl hover:shadow-3xl transition-all duration-500 overflow-hidden hover:-translate-y-2"
                   >
-                    {/* Trending Badge */}
-                    <div className={`absolute top-4 left-4 z-10 px-3 py-1.5 rounded-full bg-gradient-to-r ${trendingLevel.color} text-white text-xs font-bold flex items-center gap-1.5 shadow-lg`}>
-                      {trendingLevel.icon}
-                      {trendingLevel.label}
+                    {/* Quality Badge */}
+                    <div className={`absolute top-4 left-4 z-10 px-3 py-1.5 rounded-full ${qualityBadge.color} text-white text-xs font-bold flex items-center gap-1.5 shadow-lg`}>
+                      {qualityBadge.label}
                     </div>
                     
-                    {/* Views Counter */}
-                    <div className="absolute top-4 right-4 z-10 px-3 py-1.5 rounded-full bg-gray-900/80 backdrop-blur-sm text-white text-xs font-bold flex items-center gap-1.5 border border-gray-600">
-                      <FiEye size={10} />
-                      {listing.views || 0}
-                    </div>
+                    {/* Video Indicator */}
+                    {isVideo && (
+                      <div className="absolute top-4 right-4 z-10 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-sm text-white text-xs font-bold flex items-center gap-1.5 border border-yellow-500/30">
+                        <FiVideo size={10} />
+                        VIDEO
+                      </div>
+                    )}
                     
                     {/* Media Container */}
                     <div className="relative h-64 overflow-hidden">
                       {/* Glow Effect */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-purple-600/10 to-pink-600/10 group-hover:opacity-50 transition-opacity duration-500"></div>
+                      <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/5 to-amber-500/5 group-hover:opacity-20 transition-opacity duration-500"></div>
                       
-                      {/* Thumbnail */}
+                      {/* Thumbnail with improved loading */}
                       <img
                         src={thumbnailUrl}
                         alt={listing.title}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                         onError={() => handleImageError(listing._id)}
                         loading="lazy"
+                        onLoad={(e) => {
+                          // Image loaded successfully
+                          console.log(`✅ Thumbnail loaded for: ${listing.title}`);
+                        }}
                       />
                       
                       {/* Gradient Overlay */}
@@ -866,14 +844,15 @@ const Browse: React.FC = () => {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            console.log('▶️ Play button clicked for:', listing.title, 'URL:', videoUrl);
                             handleVideoClick(videoUrl, listing.title, listing);
                           }}
                           className="absolute inset-0 flex items-center justify-center group/play"
                         >
                           <div className="relative">
-                            <div className="absolute inset-0 animate-ping bg-gradient-to-r from-purple-600 to-pink-600 rounded-full opacity-30"></div>
-                            <div className="relative w-20 h-20 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 flex items-center justify-center border-4 border-white/20 shadow-2xl transform group-hover/play:scale-110 transition-all duration-300">
-                              <FiPlay className="text-white ml-2" size={28} />
+                            <div className="absolute inset-0 animate-ping bg-gradient-to-r from-yellow-500 to-amber-500 rounded-full opacity-30"></div>
+                            <div className="relative w-20 h-20 rounded-full bg-gradient-to-r from-yellow-500 to-amber-500 flex items-center justify-center border-4 border-white/20 shadow-2xl transform group-hover/play:scale-110 transition-all duration-300">
+                              <FiPlay className="text-black ml-2" size={28} />
                             </div>
                           </div>
                         </button>
@@ -881,7 +860,7 @@ const Browse: React.FC = () => {
                       
                       {/* Price Tag */}
                       <div className="absolute bottom-4 left-4">
-                        <div className="px-4 py-2 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-bold text-lg shadow-2xl">
+                        <div className="px-4 py-2 rounded-xl bg-gradient-to-r from-yellow-500 to-amber-500 text-black font-bold text-lg shadow-2xl">
                           {marketplaceApi.utils.formatCurrency(listing.price)}
                         </div>
                       </div>
@@ -889,7 +868,7 @@ const Browse: React.FC = () => {
                     
                     {/* Content */}
                     <div className="p-5">
-                      {/* Title and Category */}
+                      {/* Title and Duration */}
                       <div className="mb-4">
                         <h3 className="font-bold text-white text-lg mb-2 group-hover:text-yellow-400 transition-colors line-clamp-1">
                           {listing.title}
@@ -914,7 +893,7 @@ const Browse: React.FC = () => {
                       <div className="flex items-center justify-between mb-5">
                         <div className="flex items-center gap-3">
                           <div className="relative">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 p-0.5">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-r from-yellow-500 to-amber-500 p-0.5">
                               {listing.sellerId?.avatar ? (
                                 <img 
                                   src={listing.sellerId.avatar} 
@@ -928,8 +907,8 @@ const Browse: React.FC = () => {
                               )}
                             </div>
                             {listing.sellerId?.verified && (
-                              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center border-2 border-gray-900">
-                                <FiAward size={10} className="text-white" />
+                              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-yellow-500 rounded-full flex items-center justify-center border-2 border-gray-900">
+                                <FiCheckCircle size={10} className="text-black" />
                               </div>
                             )}
                           </div>
@@ -937,9 +916,8 @@ const Browse: React.FC = () => {
                             <div className="text-white text-sm font-semibold">
                               {listing.sellerId?.username || 'Anonymous'}
                             </div>
-                            <div className="flex items-center gap-1 text-xs text-gray-400">
-                              <FiStar className="text-yellow-500" size={10} />
-                              <span>{listing.sellerId?.sellerRating?.toFixed(1) || 'N/A'}</span>
+                            <div className="text-xs text-gray-400">
+                              {listing.sellerId?.salesCount || 0} sales
                             </div>
                           </div>
                         </div>
@@ -949,13 +927,13 @@ const Browse: React.FC = () => {
                       <div className="flex gap-3">
                         <button
                           onClick={() => handleMakeOffer(listing)}
-                          className="flex-1 group/offer relative bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-3 rounded-xl transition-all duration-300 overflow-hidden"
+                          className="flex-1 group/offer relative bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-black font-bold py-3 rounded-xl transition-all duration-300 overflow-hidden"
                         >
                           <span className="relative z-10 flex items-center justify-center gap-2">
-                            <FiCreditCard size={16} />
-                            MAKE OFFER
+                            <FiDollarSign size={16} />
+                            BUY NOW
                           </span>
-                          <div className="absolute inset-0 bg-gradient-to-r from-purple-700 to-pink-700 opacity-0 group-hover/offer:opacity-100 transition-opacity duration-300"></div>
+                          <div className="absolute inset-0 bg-gradient-to-r from-yellow-600 to-amber-600 opacity-0 group-hover/offer:opacity-100 transition-opacity duration-300"></div>
                         </button>
                         
                         {isVideo && videoUrl && (
@@ -967,7 +945,7 @@ const Browse: React.FC = () => {
                             className="px-5 bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-xl border border-gray-700 transition-all duration-300 flex items-center gap-2 group/play"
                           >
                             <FiPlay size={16} className="group-hover/play:scale-110 transition-transform" />
-                            PLAY
+                            PREVIEW
                           </button>
                         )}
                       </div>
@@ -986,8 +964,8 @@ const Browse: React.FC = () => {
                 className="group relative inline-flex items-center justify-center px-10 py-5 bg-gradient-to-r from-gray-800 to-gray-900 text-white font-bold rounded-2xl border border-gray-700 shadow-2xl hover:shadow-3xl transform hover:-translate-y-1 transition-all duration-300"
               >
                 <FiPlus className="mr-3" size={20} />
-                LOAD MORE EXCLUSIVE CONTENT
-                <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-purple-500 to-pink-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></div>
+                LOAD MORE PREMIUM CONTENT
+                <div className="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-yellow-500 to-amber-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></div>
               </button>
             </div>
           )}
@@ -996,24 +974,24 @@ const Browse: React.FC = () => {
           <div className="mt-16 text-center">
             <div className="mb-6">
               <h2 className="text-3xl font-bold text-white mb-3">
-                READY TO JOIN THE HYPE?
+                READY TO ACCESS PREMIUM CONTENT?
               </h2>
               <p className="text-gray-400 text-lg">
-                Start buying or selling exclusive content today
+                Start downloading premium videos today or upload your own
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button 
                 onClick={() => navigate('/marketplace/create')}
-                className="px-10 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-2xl shadow-2xl hover:shadow-3xl transform hover:-translate-y-1 transition-all duration-300"
+                className="px-10 py-4 bg-gradient-to-r from-yellow-500 to-amber-500 text-black font-bold rounded-2xl shadow-2xl hover:shadow-3xl transform hover:-translate-y-1 transition-all duration-300"
               >
-                START SELLING NOW
+                START UPLOADING
               </button>
               <button 
                 onClick={() => setShowFilters(true)}
                 className="px-10 py-4 bg-gradient-to-r from-gray-800 to-gray-900 text-white font-bold rounded-2xl border border-gray-700 shadow-2xl hover:shadow-3xl transform hover:-translate-y-1 transition-all duration-300"
               >
-                BROWSE EXCLUSIVE CONTENT
+                BROWSE CATALOG
               </button>
             </div>
           </div>
@@ -1043,18 +1021,17 @@ const Browse: React.FC = () => {
       />
 
       {/* Payment Modal */}
-      {/* Payment Modal */}
-<PaymentModal
-  show={showPaymentModal}
-  clientSecret={clientSecret}
-  offerData={offerData}
-  onClose={handlePaymentClose}
-  onSuccess={handlePaymentSuccess}
-  paymentStatus={paymentStatus}
-  setPaymentStatus={setPaymentStatus}
-  currentUser={currentUser}
-  getThumbnailUrl={getThumbnailUrl}
-/>
+      <PaymentModal
+        show={showPaymentModal}
+        clientSecret={clientSecret}
+        offerData={offerData}
+        onClose={handlePaymentClose}
+        onSuccess={handlePaymentSuccess}
+        paymentStatus={paymentStatus}
+        setPaymentStatus={setPaymentStatus}
+        currentUser={currentUser}
+        getThumbnailUrl={getThumbnailUrl}
+      />
     </MarketplaceLayout>
   );
 };
