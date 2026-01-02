@@ -1002,7 +1002,7 @@ const Browse: React.FC = () => {
           <div className="bg-white w-full max-w-md sm:max-w-lg rounded-xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden scale-95 sm:scale-100 transition-transform duration-200 ease-out">
             
             {/* Header */}
-            <div className="sticky top-0 z-10 bg-gradient-to-r from-yellow-50 to-white border-b border-gray-200 p-3 sm:p-4 flex justify-between items-center">
+            <div className="sticky top-50 z-10 bg-gradient-to-r from-yellow-50 to-white border-b border-gray-200 p-3 sm:p-4 flex justify-between items-center">
               <div>
                 <h3 className="text-base sm:text-lg font-semibold text-gray-900">Make an Offer</h3>
                 <p className="text-xs text-gray-600">Submit your offer for this listing</p>
