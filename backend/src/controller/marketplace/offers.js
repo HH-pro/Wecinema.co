@@ -641,109 +641,159 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     }
   }
 });
-// ✅ MAKE OFFER WITH PAYMENT REQUIRED FIRST
+// ✅ MAKE OFFER WITH PAYMENT REQUIRED FIRST - FIXED VERSION
 router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), async (req, res) => {
+  console.log("🔍 MAKE OFFER REQUEST RECEIVED ====================");
+  
   try {
-    console.log("=== MAKE OFFER WITH PAYMENT REQUIRED ===");
-    console.log("Request Body:", req.body);
-    console.log("User ID:", req.user.id || req.user._id || req.user.userId);
+    // Log complete request details
+    console.log("📦 Request Body:", JSON.stringify(req.body, null, 2));
+    console.log("👤 User from auth:", {
+      id: req.user.id,
+      _id: req.user._id,
+      userId: req.user.userId,
+      email: req.user.email
+    });
     
     const { listingId, amount, message, requirements, expectedDelivery } = req.body;
     const userId = req.user.id || req.user._id || req.user.userId;
 
-    // ✅ COMPREHENSIVE VALIDATION
+    // ✅ COMPREHENSIVE VALIDATION WITH BETTER LOGGING
     if (!userId) {
-      console.error("❌ Authentication failed: No user ID found");
+      console.error("❌ AUTH ERROR: No user ID found in request");
+      console.error("User object:", req.user);
       return res.status(401).json({ 
         success: false,
-        error: 'Authentication required' 
+        error: 'Authentication required. Please login again.',
+        code: 'AUTH_REQUIRED'
       });
     }
 
     if (!listingId || !amount) {
-      console.error("❌ Validation failed: Missing listingId or amount");
+      console.error("❌ VALIDATION ERROR: Missing required fields");
+      console.error("Received:", { listingId, amount });
       return res.status(400).json({ 
         success: false,
-        error: 'Listing ID and amount are required' 
+        error: 'Listing ID and amount are required',
+        code: 'MISSING_FIELDS'
       });
     }
 
     if (!validateObjectId(listingId)) {
-      console.error("❌ Validation failed: Invalid listing ID format");
+      console.error("❌ VALIDATION ERROR: Invalid listing ID format");
+      console.error("Listing ID:", listingId);
       return res.status(400).json({ 
         success: false,
-        error: 'Invalid listing ID format' 
+        error: 'Invalid listing ID format',
+        code: 'INVALID_LISTING_ID'
       });
     }
 
     const offerAmount = parseFloat(amount);
-    if (!validateAmount(amount)) {
-      console.error("❌ Validation failed: Invalid amount", amount);
+    if (isNaN(offerAmount) || offerAmount < 0.5) {
+      console.error("❌ VALIDATION ERROR: Invalid amount");
+      console.error("Amount:", amount, "Parsed:", offerAmount);
       return res.status(400).json({ 
         success: false,
-        error: 'Valid amount is required (minimum $0.50)' 
+        error: 'Valid amount is required (minimum $0.50)',
+        code: 'INVALID_AMOUNT',
+        minAmount: 0.5
       });
     }
 
-    // ✅ FIND LISTING
-    console.log("🔍 Finding listing:", listingId);
-    const listing = await MarketplaceListing.findById(listingId);
-    if (!listing) {
-      console.error("❌ Listing not found:", listingId);
-      return res.status(404).json({ 
+    console.log("✅ Basic validation passed");
+
+    // ✅ FIND LISTING WITH ERROR HANDLING
+    console.log("🔍 Looking for listing:", listingId);
+    let listing;
+    try {
+      listing = await MarketplaceListing.findById(listingId).lean();
+      if (!listing) {
+        console.error("❌ LISTING NOT FOUND:", listingId);
+        return res.status(404).json({ 
+          success: false,
+          error: 'Listing not found',
+          code: 'LISTING_NOT_FOUND'
+        });
+      }
+      console.log("✅ Listing found:", listing.title);
+    } catch (dbError) {
+      console.error("❌ DATABASE ERROR finding listing:", dbError.message);
+      return res.status(500).json({ 
         success: false,
-        error: 'Listing not found' 
+        error: 'Database error',
+        code: 'DB_ERROR'
       });
     }
 
     if (listing.status !== 'active') {
-      console.error("❌ Listing not active:", listing.status);
+      console.error("❌ LISTING NOT ACTIVE:", listing.status);
       return res.status(400).json({ 
         success: false,
-        error: 'Listing is not available for offers' 
+        error: 'Listing is not available for offers',
+        code: 'LISTING_INACTIVE',
+        currentStatus: listing.status
       });
     }
 
     // Check if user is not the seller
     if (listing.sellerId.toString() === userId.toString()) {
-      console.error("❌ User is seller:", userId);
+      console.error("❌ USER IS SELLER:", userId);
       return res.status(400).json({ 
         success: false,
-        error: 'Cannot make offer on your own listing' 
+        error: 'Cannot make offer on your own listing',
+        code: 'OWN_LISTING'
       });
     }
 
-    // ✅ CHECK FOR EXISTING OFFERS (ONLY CHECK COMPLETED/ACTIVE ONES)
-    console.log("🔍 Checking existing offers...");
-    const existingOffer = await Offer.findOne({
-      listingId,
-      buyerId: userId,
-      status: { $in: ['paid', 'accepted', 'pending_payment'] }
-    });
+    console.log("✅ Listing validation passed");
 
-    if (existingOffer) {
-      console.error("❌ Existing offer found:", existingOffer._id);
-      return res.status(400).json({ 
+    // ✅ CHECK FOR EXISTING OFFERS
+    console.log("🔍 Checking for existing offers...");
+    try {
+      const existingOffer = await Offer.findOne({
+        listingId,
+        buyerId: userId,
+        status: { $in: ['paid', 'accepted', 'pending_payment'] }
+      }).lean();
+
+      if (existingOffer) {
+        console.error("❌ EXISTING OFFER FOUND:", existingOffer._id);
+        return res.status(400).json({ 
+          success: false,
+          error: 'You already have an active offer for this listing',
+          code: 'DUPLICATE_OFFER',
+          existingOfferId: existingOffer._id,
+          existingStatus: existingOffer.status
+        });
+      }
+      console.log("✅ No existing offers found");
+    } catch (dbError) {
+      console.error("❌ DATABASE ERROR checking offers:", dbError.message);
+      return res.status(500).json({ 
         success: false,
-        error: 'You already have an active offer for this listing',
-        existingOfferId: existingOffer._id,
-        existingStatus: existingOffer.status
+        error: 'Database error checking offers',
+        code: 'DB_ERROR_OFFERS'
       });
     }
 
-    console.log("✅ All validations passed");
+    console.log("✅ All validations passed successfully");
 
-    // ✅ CREATE STRIPE PAYMENT INTENT FOR OFFER
-    console.log("💳 Creating Stripe payment intent for offer payment...");
+    // ✅ CREATE STRIPE PAYMENT INTENT
+    console.log("💳 Creating Stripe payment intent...");
+    console.log("Stripe Secret Key available:", process.env.STRIPE_SECRET_KEY ? "YES" : "NO");
+    console.log("Amount in cents:", Math.round(offerAmount * 100));
     
     let paymentIntent;
     try {
-      // Test Stripe connection first
-      console.log("🔧 Testing Stripe connection...");
-      console.log("Stripe Key Available:", process.env.STRIPE_SECRET_KEY ? 'Yes' : 'No');
-      
+      // IMPORTANT: Make sure Stripe is properly initialized
+      if (!stripe) {
+        throw new Error('Stripe not initialized');
+      }
+
+      // Create payment intent with minimal required params first
       const createParams = {
-        amount: Math.round(offerAmount * 100),
+        amount: Math.round(offerAmount * 100), // Convert to cents
         currency: 'usd',
         metadata: {
           listingId: listingId.toString(),
@@ -751,86 +801,85 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
           sellerId: listing.sellerId.toString(),
           type: 'offer_payment',
           offerAmount: offerAmount.toString(),
-          requirements: requirements || '',
-          expectedDelivery: expectedDelivery || '',
-          message: message || '',
           listingTitle: listing.title || 'Untitled Listing'
         },
-        automatic_payment_methods: { 
-          enabled: true,
-          allow_redirects: 'always'
+        automatic_payment_methods: {
+          enabled: true
         },
-        description: `Offer payment for: ${listing.title || 'Listing'}`,
-        capture_method: 'automatic',
+        description: `Offer for: ${listing.title || 'Listing'}`
       };
 
-      console.log("Creating payment intent with params:", {
-        amount: createParams.amount,
-        currency: createParams.currency,
-        metadata: createParams.metadata
-      });
+      // Add optional fields if they exist
+      if (requirements) createParams.metadata.requirements = requirements;
+      if (expectedDelivery) createParams.metadata.expectedDelivery = expectedDelivery;
+      if (message) createParams.metadata.message = message;
+
+      console.log("📋 Stripe create params:", JSON.stringify(createParams, null, 2));
 
       paymentIntent = await stripe.paymentIntents.create(createParams);
-
-      console.log("✅ Stripe payment intent created successfully!");
+      
+      console.log("✅ STRIPE PAYMENT INTENT CREATED SUCCESSFULLY!");
       console.log("Payment Intent ID:", paymentIntent.id);
-      console.log("Client Secret:", paymentIntent.client_secret ? "Received" : "Missing");
+      console.log("Client Secret Present:", !!paymentIntent.client_secret);
       console.log("Status:", paymentIntent.status);
-      console.log("Amount:", paymentIntent.amount);
-      console.log("Currency:", paymentIntent.currency);
+      console.log("Amount (cents):", paymentIntent.amount);
+      console.log("Amount (dollars):", paymentIntent.amount / 100);
 
     } catch (stripeError) {
-      console.error('❌ Stripe payment intent creation failed:', stripeError);
-      console.error('Stripe Error Type:', stripeError.type);
-      console.error('Stripe Error Code:', stripeError.code);
-      console.error('Stripe Error Message:', stripeError.message);
+      console.error("❌ STRIPE ERROR DETAILS:");
+      console.error("Type:", stripeError.type);
+      console.error("Code:", stripeError.code);
+      console.error("Message:", stripeError.message);
+      console.error("Stack:", stripeError.stack);
       
-      return res.status(400).json({ 
+      // Check for specific Stripe errors
+      if (stripeError.type === 'StripeInvalidRequestError') {
+        console.error("Stripe Invalid Request - check API key and parameters");
+      }
+      
+      if (stripeError.code === 'resource_missing') {
+        console.error("Stripe resource missing - check API key");
+      }
+
+      return res.status(500).json({ 
         success: false,
-        error: 'Payment processing error',
+        error: 'Payment system error',
         details: stripeError.message,
-        code: stripeError.code || 'STRIPE_ERROR'
+        code: stripeError.code || 'STRIPE_ERROR',
+        stripeErrorType: stripeError.type
       });
     }
 
-    // ✅ Verify client secret is present
+    // ✅ VERIFY CLIENT SECRET IS PRESENT
     if (!paymentIntent.client_secret) {
-      console.error("❌ CRITICAL: No client secret in payment intent!");
-      console.error("Payment Intent:", paymentIntent);
+      console.error("❌ CRITICAL: No client secret in payment intent response!");
+      console.error("Payment Intent Object:", paymentIntent);
+      
+      // Try to debug why client_secret might be missing
+      console.error("Check if payment intent is in correct status:", paymentIntent.status);
+      console.error("Payment intent created_at:", paymentIntent.created);
       
       return res.status(500).json({ 
         success: false,
-        error: 'Payment setup failed - no client secret',
+        error: 'Payment setup failed - no client secret returned',
+        code: 'NO_CLIENT_SECRET',
         paymentIntentId: paymentIntent.id,
-        status: paymentIntent.status
+        paymentIntentStatus: paymentIntent.status,
+        note: 'Please check Stripe configuration and webhook settings'
       });
     }
 
-    // ✅ TEMPORARY: Store payment intent details (optional, for debugging)
-    // In production, you might want to store this in Redis or a temporary collection
-    const tempOfferRecord = {
-      paymentIntentId: paymentIntent.id,
-      listingId: listingId,
-      buyerId: userId,
-      sellerId: listing.sellerId,
-      amount: offerAmount,
-      requirements: requirements,
-      expectedDelivery: expectedDelivery,
-      message: message,
-      status: 'payment_pending',
-      createdAt: new Date(),
-      expiresAt: new Date(Date.now() + 30 * 60 * 1000) // 30 minutes expiry
-    };
-    
-    console.log("📝 Temporary offer record created for payment intent:", paymentIntent.id);
+    console.log("🎉 SUCCESS: Payment intent created with client secret");
 
-    res.status(200).json({
+    // ✅ CREATE RESPONSE
+    const responseData = {
       success: true,
-      message: 'Please complete payment to submit your offer.',
+      message: 'Payment intent created successfully. Please complete payment to submit your offer.',
       data: {
         payment: {
           paymentIntentId: paymentIntent.id,
           clientSecret: paymentIntent.client_secret,
+          publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
           amount: offerAmount,
           currency: 'usd',
           status: paymentIntent.status
@@ -838,30 +887,37 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
         offerDetails: {
           listingId: listingId,
           listingTitle: listing.title,
-          buyerId: userId,
           amount: offerAmount,
-          requirements: requirements,
-          expectedDelivery: expectedDelivery,
-          message: message
+          requirements: requirements || '',
+          expectedDelivery: expectedDelivery || '',
+          message: message || ''
         },
-        nextSteps: 'Complete payment to submit your offer. Once paid, the seller will be notified automatically.',
-        note: 'No offer record has been created yet. Offer will be created only after successful payment.',
-        debug: {
-          stripeKeyConfigured: !!process.env.STRIPE_SECRET_KEY,
-          amountInCents: Math.round(offerAmount * 100)
-        }
+        nextSteps: [
+          'Complete payment using the client secret above',
+          'Once payment is successful, offer will be automatically created',
+          'Seller will be notified immediately'
+        ]
       }
-    });
+    };
+
+    console.log("📤 Sending response with client secret...");
+    console.log("Response contains clientSecret:", !!responseData.data.payment.clientSecret);
+
+    res.status(200).json(responseData);
 
   } catch (error) {
-    console.error('❌ Error processing offer request:', error);
-    console.error('Error Stack:', error.stack);
-    
+    console.error("❌ UNEXPECTED ERROR IN MAKE OFFER ENDPOINT:");
+    console.error("Error Name:", error.name);
+    console.error("Error Message:", error.message);
+    console.error("Error Stack:", error.stack);
+    console.error("Full Error Object:", error);
+
     res.status(500).json({ 
       success: false,
-      error: 'Failed to process offer request',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
-      code: error.code || 'INTERNAL_ERROR'
+      error: 'Internal server error processing offer',
+      code: 'INTERNAL_SERVER_ERROR',
+      details: process.env.NODE_ENV === 'development' ? error.message : 'Please try again later',
+      timestamp: new Date().toISOString()
     });
   }
 });
