@@ -617,7 +617,7 @@ const Browse: React.FC = () => {
             </div>
           </div>
 
-          {/* Filters Section - FIXED: Price Range in ₹ (Indian Rupees) */}
+          {/* Filters Section - FIXED: Price Range in $ (Indian Rupees) */}
           {showFilters && (
             <div className="mb-8 bg-white rounded-2xl shadow-lg border border-gray-200 p-6 animate-fadeIn">
               <div className="flex items-center justify-between mb-6">
@@ -699,13 +699,13 @@ const Browse: React.FC = () => {
 
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-800">
-                    Price Range (₹)
+                    Price Range ($)
                   </label>
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <span className="text-gray-500 text-sm">Min:</span>
                       <div className="relative flex-1">
-                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">₹</div>
+                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">$</div>
                         <input
                           type="number"
                           placeholder="0"
@@ -719,7 +719,7 @@ const Browse: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <span className="text-gray-500 text-sm">Max:</span>
                       <div className="relative flex-1">
-                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">₹</div>
+                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">$</div>
                         <input
                           type="number"
                           placeholder="10000"
