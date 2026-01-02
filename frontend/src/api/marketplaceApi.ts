@@ -198,7 +198,7 @@ export const listingsApi = {
     sortOrder?: string;
   }): Promise<ApiResponse<{ listings: Listing[] }>> => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/marketplace/listings`, {
+      const response = await axios.get(`${API_BASE_URL}/marketplace/listings/my-listings`, {
         params,
         ...getHeaders()
       });
