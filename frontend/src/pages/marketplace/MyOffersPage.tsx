@@ -449,16 +449,7 @@ const MyOffersPage: React.FC = () => {
             </Typography>
           </Paper>
         </Grid>
-        <Grid item xs={6} sm={3}>
-          <Paper sx={{ p: 2, text-align: 'center' }}>
-            <Typography variant="h5" color="error.main" fontWeight="bold">
-              {cancelledOffers.length}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Cancelled
-            </Typography>
-          </Paper>
-        </Grid>
+      
       </Grid>
 
       {/* Offers List */}
