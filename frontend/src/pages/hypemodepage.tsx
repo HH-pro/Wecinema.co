@@ -1,8 +1,14 @@
 import { useState, useEffect } from "react";
-import axios from 'axios';
+import axios from "axios";
 import { Layout } from "../components";
-import { useNavigate } from 'react-router-dom';
-import { getAuth, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import { useNavigate } from "react-router-dom";
+import {
+  getAuth,
+  signInWithPopup,
+  signOut,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
 import { googleProvider } from "../firebase/config";
 import { motion } from "framer-motion";
 import Confetti from "react-confetti";
@@ -10,450 +16,218 @@ import "../css/HypeModeProfile.css";
 
 const HypeModeProfile = () => {
   const navigate = useNavigate();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [popupMessage, setPopupMessage] = useState('');
-  const [showPopup, setShowPopup] = useState(false);
+  const auth = getAuth();
+
   const [isSignup, setIsSignup] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [username, setUsername] = useState('');
-  const [userId, setUserId] = useState('');
-  const [showFireworks, setShowFireworks] = useState(false);
-  const [selectedSubscription, setSelectedSubscription] = useState<"user" | "studio" | null>(null);
-  const [userType, setUserType] = useState<"buyer" | "seller">("buyer");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
+  const [popupMessage, setPopupMessage] = useState("");
+  const [showPopup, setShowPopup] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-
-  // Register user with backend
-  const registerUser = async (username: string, email: string, avatar: string, userType: string) => {
-    try {
-      const res = await axios.post('https://wecinema.co/api/user/signup', {
-        username,
-        email,
-        avatar,
-        userType,
-        dob: "--------"
-      });
-
-      const token = res.data.token;
-      const userId = res.data.id;
-
-      setPopupMessage(`Registration successful as ${userType}!`);
-      setShowPopup(true);
-
-      if (token) {
-        localStorage.setItem('token', token);
-        setIsLoggedIn(true);
-        setUserId(userId);
-        return true;
-      }
-    } catch (error: any) {
-      if (error.response && error.response.data && error.response.data.error === 'Email already exists.') {
-        setPopupMessage('Email already exists. Please sign in.');
-      } else {
-        setPopupMessage('Registration failed. Please try again.');
-      }
-      setShowPopup(true);
-      return false;
-    }
-  };
-
-  // Login user with backend
-  const loginUser = async (email: string) => {
-    try {
-      const res = await axios.post('https://wecinema.co/api/user/signin', { email });
-      const backendToken = res.data.token;
-      const userId = res.data.id;
-
-      if (backendToken) {
-        localStorage.setItem('token', backendToken);
-        setIsLoggedIn(true);
-        setUserId(userId);
-        setPopupMessage('Login successful!');
-        setShowPopup(true);
-        return true;
-      }
-    } catch (error: any) {
-      if (error.response) {
-        setPopupMessage(error.response.data.message || 'Login failed.');
-      } else {
-        setPopupMessage('Login failed.');
-      }
-      setShowPopup(true);
-      return false;
-    }
-  };
-
-  // Handle successful authentication
-  const onLoginSuccess = async (user: any, isEmailAuth: boolean = false) => {
-    const profile = user.providerData[0];
-    const email = profile.email;
-    const username = profile.displayName || email.split('@')[0];
-    const avatar = profile.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`;
-
-    try {
-      if (isSignup) {
-        const success = await registerUser(username, email, avatar, userType);
-        if (success) {
-          navigateToPayment();
-        }
-      } else {
-        const success = await loginUser(email);
-        if (success) {
-          navigateToPayment();
-        }
-      }
-    } catch (error) {
-      setPopupMessage('Authentication failed. Please try again.');
-      setShowPopup(true);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const navigateToPayment = () => {
-    setTimeout(() => {
-      setShowPopup(false);
-      navigate('/payment', { 
-        state: { 
-          subscriptionType: selectedSubscription, 
-          amount: selectedSubscription === 'user' ? 5 : 10, 
-          userId,
-          userType 
-        } 
-      });
-    }, 2000);
-  };
-
-  // Google Signin
-  const handleGoogleLogin = async () => {
-    if (!selectedSubscription) {
-      setPopupMessage("Please select a subscription first.");
-      setShowPopup(true);
-      return;
-    }
-
-    setIsLoading(true);
-    const auth = getAuth();
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-      await onLoginSuccess(user);
-    } catch (error: any) {
-      setIsLoading(false);
-      setPopupMessage('Google login failed. Please try again.');
-      setShowPopup(true);
-    }
-  };
-
-  // Email Signup
-  const handleEmailSignup = async () => {
-    if (!selectedSubscription) {
-      setPopupMessage("Please select a subscription first.");
-      setShowPopup(true);
-      return;
-    }
-
-    if (!email || !password || !username) {
-      setPopupMessage("Please enter username, email and password.");
-      setShowPopup(true);
-      return;
-    }
-
-    if (password.length < 6) {
-      setPopupMessage("Password should be at least 6 characters long.");
-      setShowPopup(true);
-      return;
-    }
-
-    setIsLoading(true);
-    const auth = getAuth();
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      await onLoginSuccess(user, true);
-    } catch (error: any) {
-      setIsLoading(false);
-      if (error.code === 'auth/email-already-in-use') {
-        setPopupMessage('Email already in use. Please try logging in.');
-      } else if (error.code === 'auth/weak-password') {
-        setPopupMessage('Password should be at least 6 characters.');
-      } else if (error.code === 'auth/invalid-email') {
-        setPopupMessage('Invalid email address.');
-      } else {
-        setPopupMessage('Email signup failed. Please try again.');
-      }
-      setShowPopup(true);
-    }
-  };
-
-  // Email Login
-  const handleEmailLogin = async () => {
-    if (!selectedSubscription) {
-      setPopupMessage("Please select a subscription first.");
-      setShowPopup(true);
-      return;
-    }
-
-    if (!email || !password) {
-      setPopupMessage("Please enter both email and password.");
-      setShowPopup(true);
-      return;
-    }
-
-    setIsLoading(true);
-    const auth = getAuth();
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      await onLoginSuccess(user, true);
-    } catch (error: any) {
-      setIsLoading(false);
-      if (error.code === 'auth/user-not-found') {
-        setPopupMessage('No user found with this email. Please sign up.');
-      } else if (error.code === 'auth/wrong-password') {
-        setPopupMessage('Incorrect password. Please try again.');
-      } else if (error.code === 'auth/invalid-email') {
-        setPopupMessage('Invalid email address.');
-      } else {
-        setPopupMessage('Email login failed. Please try again.');
-      }
-      setShowPopup(true);
-    }
-  };
-
-  // Google Logout
-  const handleGoogleLogout = async () => {
-    const auth = getAuth();
-    try {
-      await signOut(auth);
-      localStorage.removeItem('token');
-      setIsLoggedIn(false);
-      setPopupMessage('Logout successful.');
-      setShowPopup(true);
-    } catch (error) {
-      setPopupMessage('Logout failed. Please try again.');
-      setShowPopup(true);
-    }
-  };
-
-  const handleEmailSubmit = () => {
-    if (isSignup) {
-      handleEmailSignup();
-    } else {
-      handleEmailLogin();
-    }
-  };
-
-  const closePopup = () => {
-    setShowPopup(false);
-    setIsLoading(false);
-  };
-
-  const handleSubscriptionClick = (subscriptionType: "user" | "studio") => {
-    setSelectedSubscription(subscriptionType);
-  };
-
-  const toggleSignupSignin = () => {
-    setIsSignup(!isSignup);
-    setEmail('');
-    setPassword('');
-    setUsername('');
-    setSelectedSubscription(null);
-  };
+  const [showFireworks, setShowFireworks] = useState(false);
+  const [selectedSubscription, setSelectedSubscription] = useState<
+    "user" | "studio"
+  >("user");
+  const [userType, setUserType] = useState<"buyer" | "seller">("buyer");
 
   useEffect(() => {
     setShowFireworks(true);
     setTimeout(() => setShowFireworks(false), 1000);
   }, []);
 
-  return (
-    <Layout expand={false} hasHeader={true}>
-      <div className="banner-small">
-        🔥 HypeMode is Here! Exclusive Features Await! 🔥
-      </div>
+  /* ================= BACKEND ================= */
 
+  const registerUser = async (
+    username: string,
+    email: string,
+    avatar: string
+  ) => {
+    const res = await axios.post("https://wecinema.co/api/user/signup", {
+      username,
+      email,
+      avatar,
+      userType,
+      dob: "--------",
+    });
+    localStorage.setItem("token", res.data.token);
+    return true;
+  };
+
+  const loginUser = async (email: string) => {
+    const res = await axios.post("https://wecinema.co/api/user/signin", { email });
+    localStorage.setItem("token", res.data.token);
+    return true;
+  };
+
+  const handleSuccess = async (user: any, isEmail = false) => {
+    const profile = user.providerData[0];
+    const email = profile?.email || user.email;
+    const name =
+      profile?.displayName || email.split("@")[0];
+    const avatar =
+      profile?.photoURL ||
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}`;
+
+    if (isSignup) {
+      await registerUser(name, email, avatar);
+    } else {
+      await loginUser(email);
+    }
+
+    setPopupMessage("Authentication successful!");
+    setShowPopup(true);
+
+    setTimeout(() => {
+      navigate("/payment", {
+        state: {
+          subscriptionType: selectedSubscription,
+          amount: selectedSubscription === "user" ? 5 : 10,
+          userType,
+        },
+      });
+    }, 1500);
+  };
+
+  /* ================= AUTH ================= */
+
+  const handleGoogleLogin = async () => {
+    try {
+      setIsLoading(true);
+      const result = await signInWithPopup(auth, googleProvider);
+      await handleSuccess(result.user);
+    } catch {
+      setPopupMessage("Google authentication failed");
+      setShowPopup(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEmailSubmit = async () => {
+    try {
+      setIsLoading(true);
+      if (isSignup) {
+        const res = await createUserWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+        await handleSuccess(res.user, true);
+      } else {
+        const res = await signInWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+        await handleSuccess(res.user, true);
+      }
+    } catch (err: any) {
+      setPopupMessage(err.message || "Authentication failed");
+      setShowPopup(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Layout expand={false} hasHeader>
       {showFireworks && (
-        <motion.div
-          className="absolute inset-0 flex justify-center items-center"
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 1.2 }}
-          transition={{ duration: 1.5, ease: "easeOut" }}
-        >
-          <div className="relative w-full h-full pointer-events-none">
-            <Confetti width={window.innerWidth} height={window.innerHeight} numberOfPieces={200} recycle={false} />
-          </div>
-        </motion.div>
+        <Confetti
+          width={window.innerWidth}
+          height={window.innerHeight}
+          recycle={false}
+        />
       )}
 
-      <div className="main-container-small">
-        <button className="toggle-button-small" onClick={toggleSignupSignin} disabled={isLoading}>
-          {isSignup ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
-        </button>
+      <div className="auth-wrapper">
+        <motion.div
+          className="auth-card"
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+        >
+          <h2 className="auth-title">
+            {isSignup ? "Create Account" : "Welcome Back"}
+          </h2>
 
-        {isLoggedIn ? (
-          <div className="cards-container-small">
-            
-          </div>
-        ) : (
-          <>
-            {isSignup && (
-              <div className="user-type-selector-small">
-                <button 
-                  className={`user-type-button-small ${userType === "buyer" ? "active-small" : ""}`}
+          {isSignup && (
+            <>
+              <div className="user-type">
+                <button
+                  className={userType === "buyer" ? "active" : ""}
                   onClick={() => setUserType("buyer")}
-                  disabled={isLoading}
                 >
-                  👤 Buyer
+                  Buyer
                 </button>
-                <button 
-                  className={`user-type-button-small ${userType === "seller" ? "active-small" : ""}`}
+                <button
+                  className={userType === "seller" ? "active" : ""}
                   onClick={() => setUserType("seller")}
-                  disabled={isLoading}
                 >
-                  🏪 Seller
+                  Seller
                 </button>
               </div>
-            )}
 
-            <div className="cards-container-small">
-              {/* Basic Plan */}
-              <div
-                className={`subscription-box-small ${selectedSubscription === "user" ? "selected-small" : ""}`}
-                onClick={() => !isLoading && handleSubscriptionClick("user")}
-              >
-                <div className="premium-badge-small">Popular</div>
-                <h3 className="subscription-title-small">Basic Plan</h3>
-                <div className="subscription-price-small">$5/month</div>
-                <p className="subscription-description-small">Perfect for individual users</p>
-                
-                <ul className="features-list-small">
-                  <li>Buy Films & Scripts</li>
-                  <li>Sell Your Content</li>
-                  <li>Basic Support</li>
-                  <li>Access to Community</li>
-                  <li>5GB Storage</li>
-                </ul>
+              <input
+                className="auth-input"
+                placeholder="Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
+            </>
+          )}
 
-                {selectedSubscription === "user" && (
-                  <div className="auth-section-small">
-                    <button className="subscription-button-small google-auth-button-small" onClick={handleGoogleLogin} disabled={isLoading}>
-                      <span className="google-icon-small">G</span>
-                      {isLoading ? "Processing..." : (isSignup ? "Google Sign up" : "Google Sign in")}
-                    </button>
+          <input
+            className="auth-input"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
 
-                    <div className="auth-divider-small">
-                      <span>or</span>
-                    </div>
+          <input
+            type="password"
+            className="auth-input"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
 
-                    <div className="email-form-small">
-                      {isSignup && (
-                        <input
-                          type="text"
-                          className="form-input-small"
-                          placeholder="Username"
-                          value={username}
-                          onChange={(e) => setUsername(e.target.value)}
-                          disabled={isLoading}
-                        />
-                      )}
-                      <input
-                        type="email"
-                        className="form-input-small"
-                        placeholder="Email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        disabled={isLoading}
-                      />
-                      <input
-                        type="password"
-                        className="form-input-small"
-                        placeholder="Password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        disabled={isLoading}
-                      />
-                      <button className="subscription-button-small email-submit-button-small" onClick={handleEmailSubmit} disabled={isLoading}>
-                        {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+          <button
+            className="auth-primary-btn"
+            onClick={handleEmailSubmit}
+            disabled={isLoading}
+          >
+            {isLoading
+              ? "Processing..."
+              : isSignup
+              ? "Sign Up"
+              : "Sign In"}
+          </button>
 
-              {/* Pro Plan */}
-              <div
-                className={`subscription-box-small ${selectedSubscription === "studio" ? "selected-small" : ""}`}
-                onClick={() => !isLoading && handleSubscriptionClick("studio")}
-              >
-                <div className="premium-badge-small">Pro</div>
-                <h3 className="subscription-title-small">Pro Plan</h3>
-                <div className="subscription-price-small">$10/month</div>
-                <p className="subscription-description-small">Advanced features for professionals</p>
-                
-                <ul className="features-list-small">
-                  <li>All Basic Features</li>
-                  <li>Early Feature Access</li>
-                  <li>Priority Support</li>
-                  <li>Team Collaboration</li>
-                </ul>
+          <div className="divider">OR</div>
 
-                {selectedSubscription === "studio" && (
-                  <div className="auth-section-small">
-                    <button className="subscription-button-small google-auth-button-small" onClick={handleGoogleLogin} disabled={isLoading}>
-                      <span className="google-icon-small">G</span>
-                      {isLoading ? "Processing..." : (isSignup ? "Google Sign up" : "Google Sign in")}
-                    </button>
+          <button
+            className="google-btn"
+            onClick={handleGoogleLogin}
+            disabled={isLoading}
+          >
+            <span>G</span> Continue with Google
+          </button>
 
-                    <div className="auth-divider-small">
-                      <span>or</span>
-                    </div>
-
-                    <div className="email-form-small">
-                      {isSignup && (
-                        <input
-                          type="text"
-                          className="form-input-small"
-                          placeholder="Username"
-                          value={username}
-                          onChange={(e) => setUsername(e.target.value)}
-                          disabled={isLoading}
-                        />
-                      )}
-                      <input
-                        type="email"
-                        className="form-input-small"
-                        placeholder="Email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        disabled={isLoading}
-                      />
-                      <input
-                        type="password"
-                        className="form-input-small"
-                        placeholder="Password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        disabled={isLoading}
-                      />
-                      <button className="subscription-button-small email-submit-button-small" onClick={handleEmailSubmit} disabled={isLoading}>
-                        {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </>
-        )}
+          <p className="auth-toggle" onClick={() => setIsSignup(!isSignup)}>
+            {isSignup
+              ? "Already have an account? Sign in"
+              : "Don’t have an account? Sign up"}
+          </p>
+        </motion.div>
       </div>
 
       {showPopup && (
         <>
-          <div className="overlay" onClick={closePopup} />
+          <div className="overlay" onClick={() => setShowPopup(false)} />
           <div className="popup-small">
-            <p className="popup-text-small">{popupMessage}</p>
-            <button className="subscription-button-small" onClick={closePopup}>Close</button>
+            <p>{popupMessage}</p>
+            <button onClick={() => setShowPopup(false)}>Close</button>
           </div>
         </>
       )}
