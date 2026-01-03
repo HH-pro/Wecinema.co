@@ -560,46 +560,7 @@ const Browse: React.FC = () => {
               </div>
             </div>
 
-            {/* Content Type Categories - Professional Cards */}
-            <div className="mt-8">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <span className="bg-gradient-to-r from-yellow-500 to-amber-500 w-1 h-6 rounded-full"></span>
-                Browse Content Types
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {CONTENT_TYPES.map((type) => (
-                  <button
-                    key={type.id}
-                    onClick={() => {
-                      setActiveCategory(activeCategory === type.id ? '' : type.id);
-                    }}
-                    className={`relative group overflow-hidden rounded-xl p-5 transition-all duration-300 ${
-                      activeCategory === type.id
-                        ? `bg-gradient-to-r ${type.color} text-white shadow-lg transform scale-[1.02] border-2 border-white/30`
-                        : 'bg-white text-gray-800 border-2 border-gray-200 hover:border-gray-300 hover:shadow-lg'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{type.icon}</span>
-                      <div className="text-left">
-                        <h4 className="font-semibold text-sm">{type.label}</h4>
-                        <p className={`text-xs mt-1 ${activeCategory === type.id ? 'text-white/90' : 'text-gray-600'}`}>
-                          {activeCategory === type.id 
-                            ? 'Active filter • Click to clear'
-                            : 'Click to filter'
-                          }
-                        </p>
-                      </div>
-                    </div>
-                    {activeCategory === type.id && (
-                      <div className="absolute top-2 right-2">
-                        <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
+           
 
             {/* Search Bar - Professional Design */}
             <div className="mt-8 max-w-3xl">
