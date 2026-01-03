@@ -12,6 +12,7 @@ interface WithdrawTabProps {
   onPageChange: (page: number) => void;
   onWithdrawRequest?: (amountInDollars: number) => Promise<void>;
   onRefresh?: () => Promise<void>;
+  formatCurrency?: (amountInCents: number) => string;
 }
 
 const WithdrawTab: React.FC<WithdrawTabProps> = ({
