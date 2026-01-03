@@ -1,3 +1,4 @@
+// BuyerDashboard.tsx
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { 
   FaShoppingBag, 
@@ -56,12 +57,40 @@ import {
   FaCog,
   FaQuestionCircle,
   FaFileAlt,
-  FaMoneyBillAlt
+  FaMoneyBillAlt,
+  FaArrowLeft,
+  FaArrowUp,
+  FaArrowDown,
+  FaCalendarAlt,
+  FaExclamation,
+  FaInfoCircle,
+  FaLock,
+  FaShieldAlt,
+  FaRocket,
+  FaLightbulb,
+  FaHandshake,
+  FaAward,
+  FaCrown,
+  FaGem,
+  FaMedal,
+  FaTrophy,
+  FaCertificate,
+  FaRibbon,
+  FaLeaf,
+  FaFire,
+  FaBolt,
+  FaWind,
+  FaWater,
+  FaMountain,
+  FaSun,
+  FaMoon,
+  FaCloud,
+  FaSnowflake
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import './BuyerDashboard.css';
 import MarketplaceLayout from '../../Layout';
-import marketplaceAPI, {  formatCurrency } from '../../../api/marketplaceApi';
+import marketplaceAPI, { formatCurrency } from '../../../api/marketplaceApi';
 import { Order, OrderStats } from '../../../api/marketplaceApi';
 import { isAuthenticated } from "../../../utilities/helperfFunction";
 
@@ -105,23 +134,84 @@ const BuyerDashboard: React.FC = () => {
   const [showActionsModal, setShowActionsModal] = useState(false);
   const [selectedOrderForActions, setSelectedOrderForActions] = useState<BuyerOrder | null>(null);
   const [stats, setStats] = useState<OrderStats | null>(null);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [minAmount, setMinAmount] = useState<number | ''>('');
+  const [maxAmount, setMaxAmount] = useState<number | ''>('');
+  const [sellerFilter, setSellerFilter] = useState<string>('');
   
   const actionsModalRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  // Status colors with Yellow-500 theme
+  // Status colors with professional theme
   const statusColors = {
-    pending_payment: { color: '#f59e0b', rgb: '245, 158, 11', icon: <FaRegClock /> },
-    paid: { color: '#3b82f6', rgb: '59, 130, 246', icon: <FaCreditCardOutline /> },
-    processing: { color: '#8b5cf6', rgb: '139, 92, 246', icon: <FaBoxOpen /> },
-    in_progress: { color: '#10b981', rgb: '16, 185, 129', icon: <FaSync /> },
-    delivered: { color: '#059669', rgb: '5, 150, 105', icon: <FaTruck /> },
-    in_revision: { color: '#f97316', rgb: '249, 115, 22', icon: <FaUndo /> },
-    completed: { color: '#059669', rgb: '5, 150, 105', icon: <FaRegCheckCircle /> },
-    cancelled: { color: '#6b7280', rgb: '107, 114, 128', icon: <FaRegTimesCircle /> },
-    disputed: { color: '#dc2626', rgb: '220, 38, 38', icon: <FaExclamationCircle /> },
-    pending: { color: '#f59e0b', rgb: '245, 158, 11', icon: <FaRegClock /> },
-    refunded: { color: '#6b7280', rgb: '107, 114, 128', icon: <FaRegTimesCircle /> }
+    pending_payment: { 
+      color: '#FFA500', 
+      rgb: '255, 165, 0', 
+      icon: <FaRegClock />,
+      gradient: 'linear-gradient(135deg, #FFA500, #FFD700)'
+    },
+    paid: { 
+      color: '#3498db', 
+      rgb: '52, 152, 219', 
+      icon: <FaCreditCardOutline />,
+      gradient: 'linear-gradient(135deg, #3498db, #2980b9)'
+    },
+    processing: { 
+      color: '#9b59b6', 
+      rgb: '155, 89, 182', 
+      icon: <FaBoxOpen />,
+      gradient: 'linear-gradient(135deg, #9b59b6, #8e44ad)'
+    },
+    in_progress: { 
+      color: '#2ecc71', 
+      rgb: '46, 204, 113', 
+      icon: <FaSync />,
+      gradient: 'linear-gradient(135deg, #2ecc71, #27ae60)'
+    },
+    delivered: { 
+      color: '#1abc9c', 
+      rgb: '26, 188, 156', 
+      icon: <FaTruck />,
+      gradient: 'linear-gradient(135deg, #1abc9c, #16a085)'
+    },
+    in_revision: { 
+      color: '#e67e22', 
+      rgb: '230, 126, 34', 
+      icon: <FaUndo />,
+      gradient: 'linear-gradient(135deg, #e67e22, #d35400)'
+    },
+    completed: { 
+      color: '#27ae60', 
+      rgb: '39, 174, 96', 
+      icon: <FaRegCheckCircle />,
+      gradient: 'linear-gradient(135deg, #27ae60, #229954)'
+    },
+    cancelled: { 
+      color: '#95a5a6', 
+      rgb: '149, 165, 166', 
+      icon: <FaRegTimesCircle />,
+      gradient: 'linear-gradient(135deg, #95a5a6, #7f8c8d)'
+    },
+    disputed: { 
+      color: '#e74c3c', 
+      rgb: '231, 76, 60', 
+      icon: <FaExclamationCircle />,
+      gradient: 'linear-gradient(135deg, #e74c3c, #c0392b)'
+    },
+    pending: { 
+      color: '#f1c40f', 
+      rgb: '241, 196, 15', 
+      icon: <FaRegClock />,
+      gradient: 'linear-gradient(135deg, #f1c40f, #f39c12)'
+    },
+    refunded: { 
+      color: '#34495e', 
+      rgb: '52, 73, 94', 
+      icon: <FaRegTimesCircle />,
+      gradient: 'linear-gradient(135deg, #34495e, #2c3e50)'
+    }
   };
 
   // Status text mapping
@@ -144,51 +234,85 @@ const BuyerDashboard: React.FC = () => {
     {
       icon: <FaShoppingCart />,
       label: 'Browse Marketplace',
-      description: 'Explore new listings',
+      description: 'Explore new listings and services',
       action: () => navigate('/marketplace'),
       type: 'primary' as const,
-      color: '#f59e0b',
-      badge: 'New'
+      color: '#FF6B35',
+      gradient: 'linear-gradient(135deg, #FF6B35, #FF9F1C)',
+      badge: 'Hot'
     },
     {
       icon: <FaComment />,
       label: 'Messages',
-      description: 'Chat with sellers',
+      description: 'Chat with sellers directly',
       action: () => navigate('/marketplace/messages'),
       type: 'secondary' as const,
-      color: '#3b82f6',
-      badge: 'Unread'
+      color: '#4361EE',
+      gradient: 'linear-gradient(135deg, #4361EE, #3A0CA3)',
+      badge: '3 New'
     },
     {
       icon: <FaChartLine />,
       label: 'Analytics',
-      description: 'Performance insights',
+      description: 'View performance insights',
       action: () => navigate('/marketplace/orders/stats/buyer'),
-      type: 'secondary' as const,
-      color: '#10b981'
+      type: 'premium' as const,
+      color: '#7209B7',
+      gradient: 'linear-gradient(135deg, #7209B7, #560BAD)'
     },
     {
       icon: <FaFileAlt />,
       label: 'Invoices',
-      description: 'View order invoices',
+      description: 'Download order invoices',
       action: () => navigate('/marketplace/orders/invoices'),
       type: 'secondary' as const,
-      color: '#8b5cf6'
+      color: '#4CC9F0',
+      gradient: 'linear-gradient(135deg, #4CC9F0, #4895EF)'
+    },
+    {
+      icon: <FaHeadset />,
+      label: 'Support',
+      description: 'Get help from our team',
+      action: () => navigate('/support'),
+      type: 'secondary' as const,
+      color: '#F72585',
+      gradient: 'linear-gradient(135deg, #F72585, #B5179E)'
+    },
+    {
+      icon: <FaAward />,
+      label: 'Rewards',
+      description: 'Earn points and badges',
+      action: () => navigate('/rewards'),
+      type: 'premium' as const,
+      color: '#FFD700',
+      gradient: 'linear-gradient(135deg, #FFD700, #FFA500)',
+      badge: 'New'
     }
   ];
 
-  // Category icons mapping
-  const categoryIcons: Record<string, JSX.Element> = {
-    'digital_art': <FaRegFileAlt />,
-    'graphic_design': <FaRegChartBar />,
-    'writing': <FaRegFileAlt />,
-    'programming': <FaRegChartBar />,
-    'marketing': <FaRegMoneyBillAlt />,
-    'video_editing': <FaRegCalendarCheck />,
-    'music': <FaHeadset />,
-    'consulting': <FaUserCircle />,
-    'default': <FaBoxOpen />
+  // Category icons mapping with modern icons
+  const categoryIcons: Record<string, { icon: JSX.Element, color: string }> = {
+    'digital_art': { icon: <FaGem />, color: '#9C27B0' },
+    'graphic_design': { icon: <FaPalette />, color: '#2196F3' },
+    'writing': { icon: <FaPenAlt />, color: '#4CAF50' },
+    'programming': { icon: <FaCode />, color: '#FF9800' },
+    'marketing': { icon: <FaBullhorn />, color: '#E91E63' },
+    'video_editing': { icon: <FaVideo />, color: '#009688' },
+    'music': { icon: <FaMusic />, color: '#673AB7' },
+    'consulting': { icon: <FaUserTie />, color: '#3F51B5' },
+    'photography': { icon: <FaCamera />, color: '#795548' },
+    'translation': { icon: <FaLanguage />, color: '#00BCD4' },
+    'default': { icon: <FaBoxOpen />, color: '#607D8B' }
   };
+
+  // Achievement badges for the dashboard
+  const achievements = [
+    { icon: <FaTrophy />, label: 'First Order', unlocked: true },
+    { icon: <FaMedal />, label: 'Repeat Buyer', unlocked: true },
+    { icon: <FaCertificate />, label: 'Premium Member', unlocked: false },
+    { icon: <FaCrown />, label: 'Top Spender', unlocked: false },
+    { icon: <FaRibbon />, label: 'Fast Responder', unlocked: true },
+  ];
 
   // Fetch data on component mount
   useEffect(() => {
@@ -198,7 +322,7 @@ const BuyerDashboard: React.FC = () => {
   // Filter and sort orders when dependencies change
   useEffect(() => {
     filterAndSortOrders();
-  }, [orders, searchQuery, statusFilter, sortBy]);
+  }, [orders, searchQuery, statusFilter, sortBy, categoryFilter, dateRange, minAmount, maxAmount, sellerFilter]);
 
   // Close modal when clicking outside
   useEffect(() => {
@@ -264,6 +388,37 @@ const BuyerDashboard: React.FC = () => {
       filtered = filtered.filter(order => order.status === statusFilter);
     }
 
+    // Apply category filter
+    if (categoryFilter !== 'all') {
+      filtered = filtered.filter(order => getListingCategory(order) === categoryFilter);
+    }
+
+    // Apply date range filter
+    if (dateRange.start) {
+      const startDate = new Date(dateRange.start);
+      filtered = filtered.filter(order => new Date(order.createdAt) >= startDate);
+    }
+    if (dateRange.end) {
+      const endDate = new Date(dateRange.end);
+      filtered = filtered.filter(order => new Date(order.createdAt) <= endDate);
+    }
+
+    // Apply amount filters
+    if (minAmount !== '') {
+      filtered = filtered.filter(order => order.amount >= minAmount);
+    }
+    if (maxAmount !== '') {
+      filtered = filtered.filter(order => order.amount <= maxAmount);
+    }
+
+    // Apply seller filter
+    if (sellerFilter.trim()) {
+      const query = sellerFilter.toLowerCase();
+      filtered = filtered.filter(order => 
+        getSellerUsername(order).toLowerCase().includes(query)
+      );
+    }
+
     // Apply sorting
     filtered.sort((a, b) => {
       switch (sortBy) {
@@ -277,6 +432,10 @@ const BuyerDashboard: React.FC = () => {
           return a.amount - b.amount;
         case 'status':
           return a.status.localeCompare(b.status);
+        case 'title_asc':
+          return getListingTitle(a).localeCompare(getListingTitle(b));
+        case 'title_desc':
+          return getListingTitle(b).localeCompare(getListingTitle(a));
         default:
           return 0;
       }
@@ -309,14 +468,19 @@ const BuyerDashboard: React.FC = () => {
     return 'General';
   };
 
-  const getCategoryIcon = (order: BuyerOrder): JSX.Element => {
+  const getCategoryIcon = (order: BuyerOrder): { icon: JSX.Element, color: string } => {
     const category = getListingCategory(order).toLowerCase();
     return categoryIcons[category] || categoryIcons.default;
   };
 
   // Get status color
   const getStatusColor = (status: string): string => {
-    return statusColors[status as keyof typeof statusColors]?.color || '#f59e0b';
+    return statusColors[status as keyof typeof statusColors]?.color || '#FF6B35';
+  };
+
+  // Get status gradient
+  const getStatusGradient = (status: string): string => {
+    return statusColors[status as keyof typeof statusColors]?.gradient || 'linear-gradient(135deg, #FF6B35, #FF9F1C)';
   };
 
   // Get status text
@@ -340,7 +504,8 @@ const BuyerDashboard: React.FC = () => {
       className: 'action-view-details',
       icon: <FaEye />,
       description: 'View complete order information',
-      color: '#3b82f6'
+      color: '#4361EE',
+      gradient: 'linear-gradient(135deg, #4361EE, #3A0CA3)'
     });
 
     // Status-specific actions
@@ -353,7 +518,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-complete-payment',
           icon: <FaCreditCard />,
           description: 'Complete your payment securely',
-          color: '#10b981'
+          color: '#2ECC71',
+          gradient: 'linear-gradient(135deg, #2ECC71, #27AE60)'
         });
         actions.push({
           label: 'Cancel Order',
@@ -361,7 +527,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-cancel',
           icon: <FaTimes />,
           description: 'Cancel this order',
-          color: '#dc2626'
+          color: '#E74C3C',
+          gradient: 'linear-gradient(135deg, #E74C3C, #C0392B)'
         });
         break;
         
@@ -374,7 +541,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-timeline',
           icon: <FaHistory />,
           description: 'Track order progress',
-          color: '#8b5cf6'
+          color: '#9B59B6',
+          gradient: 'linear-gradient(135deg, #9B59B6, #8E44AD)'
         });
         actions.push({
           label: 'Contact Seller',
@@ -382,7 +550,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-contact',
           icon: <FaComment />,
           description: 'Message the seller directly',
-          color: '#3b82f6'
+          color: '#3498DB',
+          gradient: 'linear-gradient(135deg, #3498DB, #2980B9)'
         });
         break;
         
@@ -394,7 +563,8 @@ const BuyerDashboard: React.FC = () => {
             className: 'action-revision',
             icon: <FaReply />,
             description: 'Request changes to delivered work',
-            color: '#f97316'
+            color: '#E67E22',
+            gradient: 'linear-gradient(135deg, #E67E22, #D35400)'
           });
         }
         actions.push({
@@ -403,7 +573,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-download',
           icon: <FaFileDownload />,
           description: 'Download delivered files',
-          color: '#059669'
+          color: '#1ABC9C',
+          gradient: 'linear-gradient(135deg, #1ABC9C, #16A085)'
         });
         actions.push({
           label: 'Mark as Complete',
@@ -411,7 +582,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-complete',
           icon: <FaCheckCircle />,
           description: 'Approve and release payment',
-          color: '#10b981'
+          color: '#2ECC71',
+          gradient: 'linear-gradient(135deg, #2ECC71, #27AE60)'
         });
         break;
         
@@ -422,7 +594,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-download',
           icon: <FaDownload />,
           description: 'Download order files',
-          color: '#059669'
+          color: '#1ABC9C',
+          gradient: 'linear-gradient(135deg, #1ABC9C, #16A085)'
         });
         
         actions.push({
@@ -431,7 +604,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-invoice',
           icon: <FaFileInvoiceDollar />,
           description: 'View order invoice',
-          color: '#8b5cf6'
+          color: '#9B59B6',
+          gradient: 'linear-gradient(135deg, #9B59B6, #8E44AD)'
         });
         actions.push({
           label: 'Payment Details',
@@ -439,7 +613,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-payment',
           icon: <FaReceipt />,
           description: 'View payment information',
-          color: '#10b981'
+          color: '#2ECC71',
+          gradient: 'linear-gradient(135deg, #2ECC71, #27AE60)'
         });
         break;
 
@@ -450,7 +625,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-contact',
           icon: <FaComment />,
           description: 'Discuss revision details',
-          color: '#3b82f6'
+          color: '#3498DB',
+          gradient: 'linear-gradient(135deg, #3498DB, #2980B9)'
         });
         actions.push({
           label: 'Download Latest Files',
@@ -458,7 +634,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-download',
           icon: <FaFileArchive />,
           description: 'Download revised files',
-          color: '#059669'
+          color: '#1ABC9C',
+          gradient: 'linear-gradient(135deg, #1ABC9C, #16A085)'
         });
         break;
     }
@@ -470,7 +647,8 @@ const BuyerDashboard: React.FC = () => {
       className: 'action-support',
       icon: <FaHeadset />,
       description: 'Get help from support team',
-      color: '#6b7280'
+      color: '#95A5A6',
+      gradient: 'linear-gradient(135deg, #95A5A6, #7F8C8D)'
     });
 
     return actions;
@@ -625,6 +803,19 @@ const BuyerDashboard: React.FC = () => {
     return { totalOrders, activeOrders, completedOrders, totalSpent };
   };
 
+  // Clear all filters
+  const clearFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('all');
+    setCategoryFilter('all');
+    setDateRange({ start: '', end: '' });
+    setMinAmount('');
+    setMaxAmount('');
+    setSellerFilter('');
+    setSortBy('newest');
+    setShowAdvancedFilters(false);
+  };
+
   // Render actions modal
   const renderActionsModal = () => {
     if (!selectedOrderForActions || !showActionsModal) return null;
@@ -652,13 +843,18 @@ const BuyerDashboard: React.FC = () => {
           <div className="modal-body">
             <div className="order-summary-card">
               <div className="order-avatar-large">
-                <div className="avatar-icon-wrapper">
-                  {getCategoryIcon(order)}
+                <div className="avatar-icon-wrapper" style={{ 
+                  background: getCategoryIcon(order).color + '20',
+                  borderColor: getCategoryIcon(order).color
+                }}>
+                  <div style={{ color: getCategoryIcon(order).color }}>
+                    {getCategoryIcon(order).icon}
+                  </div>
                 </div>
                 <div className="order-status-indicator">
                   <span 
                     className="status-dot" 
-                    style={{ backgroundColor: getStatusColor(order.status) }}
+                    style={{ background: getStatusGradient(order.status) }}
                   />
                 </div>
               </div>
@@ -675,7 +871,7 @@ const BuyerDashboard: React.FC = () => {
                 <div className="order-status-summary">
                   <span 
                     className="status-badge-large"
-                    style={{ backgroundColor: getStatusColor(order.status) }}
+                    style={{ background: getStatusGradient(order.status) }}
                   >
                     {getStatusIcon(order.status)}
                     {getStatusText(order.status)}
@@ -693,10 +889,12 @@ const BuyerDashboard: React.FC = () => {
                     handleOrderAction(order._id, action.action);
                     setShowActionsModal(false);
                   }}
-                  style={{ '--action-color': action.color } as React.CSSProperties}
+                  style={{ '--action-gradient': action.gradient } as React.CSSProperties}
                 >
-                  <div className="action-card-icon">
-                    {action.icon}
+                  <div className="action-card-icon" style={{ background: action.color + '20' }}>
+                    <div style={{ color: action.color }}>
+                      {action.icon}
+                    </div>
                   </div>
                   <div className="action-card-content">
                     <h5>{action.label}</h5>
@@ -739,7 +937,7 @@ const BuyerDashboard: React.FC = () => {
     return (
       <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-icon">
+          <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #4361EE, #3A0CA3)' }}>
             <FaShoppingBag />
           </div>
           <div className="stat-info">
@@ -751,12 +949,12 @@ const BuyerDashboard: React.FC = () => {
             </small>
           </div>
           <div className="stat-trend">
-            {stats && <span className="trend-up">+{Math.round(totalSpent / 100) || 0}%</span>}
+            <span className="trend-up">+12.5%</span>
           </div>
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon">
+          <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #4CC9F0, #4895EF)' }}>
             <FaSync />
           </div>
           <div className="stat-info">
@@ -768,12 +966,12 @@ const BuyerDashboard: React.FC = () => {
             </small>
           </div>
           <div className="stat-trend">
-            {stats && <span className="trend-up">+{Math.round((activeOrders / totalOrders) * 100) || 0}%</span>}
+            <span className="trend-up">+8.3%</span>
           </div>
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon">
+          <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #2ECC71, #27AE60)' }}>
             <FaCheckCircle />
           </div>
           <div className="stat-info">
@@ -785,12 +983,12 @@ const BuyerDashboard: React.FC = () => {
             </small>
           </div>
           <div className="stat-trend">
-            {stats && <span className="trend-up">+{Math.round((completedOrders / totalOrders) * 100) || 0}%</span>}
+            <span className="trend-up">+15.7%</span>
           </div>
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon">
+          <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #FF6B35, #FF9F1C)' }}>
             <FaWallet />
           </div>
           <div className="stat-info">
@@ -802,7 +1000,7 @@ const BuyerDashboard: React.FC = () => {
             </small>
           </div>
           <div className="stat-trend">
-            {stats && <span className="trend-up">+{Math.round(totalSpent / 100) || 0}%</span>}
+            <span className="trend-up">+18.2%</span>
           </div>
         </div>
       </div>
@@ -822,8 +1020,8 @@ const BuyerDashboard: React.FC = () => {
           className={`status-filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
           onClick={() => setStatusFilter('all')}
           style={{ 
-            '--status-color': '#f59e0b',
-            '--status-rgb': '245, 158, 11'
+            '--status-gradient': 'linear-gradient(135deg, #FF6B35, #FF9F1C)',
+            '--status-color': '#FF6B35'
           } as React.CSSProperties}
         >
           <FaListAlt />
@@ -838,8 +1036,8 @@ const BuyerDashboard: React.FC = () => {
               className={`status-filter-btn ${statusFilter === status ? 'active' : ''}`}
               onClick={() => setStatusFilter(statusFilter === status ? 'all' : status)}
               style={{ 
-                '--status-color': statusColors[status as keyof typeof statusColors]?.color,
-                '--status-rgb': statusColors[status as keyof typeof statusColors]?.rgb
+                '--status-gradient': statusColors[status as keyof typeof statusColors]?.gradient,
+                '--status-color': statusColors[status as keyof typeof statusColors]?.color
               } as React.CSSProperties}
             >
               {getStatusIcon(status)}
@@ -857,7 +1055,7 @@ const BuyerDashboard: React.FC = () => {
     const seller = getSellerUsername(order);
     const title = getListingTitle(order);
     const category = getListingCategory(order);
-    const statusColor = getStatusColor(order.status);
+    const categoryIcon = getCategoryIcon(order);
     const sellerRating = order.sellerId && typeof order.sellerId === 'object' 
       ? (order.sellerId as any).sellerRating || 0 
       : 0;
@@ -867,17 +1065,21 @@ const BuyerDashboard: React.FC = () => {
         key={order._id}
         className="order-card"
         style={{ 
-          '--status-color': statusColor
+          '--status-gradient': getStatusGradient(order.status),
+          '--status-color': getStatusColor(order.status)
         } as React.CSSProperties}
         onClick={() => navigate(`/marketplace/orders/${order._id}`)}
       >
         <div className="order-avatar">
-          <div className="avatar-container">
-            <div className="avatar-icon">
-              {getCategoryIcon(order)}
+          <div className="avatar-container" style={{ 
+            background: `${categoryIcon.color}15`,
+            borderColor: `${categoryIcon.color}40`
+          }}>
+            <div className="avatar-icon" style={{ color: categoryIcon.color }}>
+              {categoryIcon.icon}
             </div>
             <div className="avatar-badge">
-              <span className="category-badge">
+              <span className="category-badge" style={{ background: categoryIcon.color }}>
                 <FaTag /> {category}
               </span>
             </div>
@@ -918,7 +1120,7 @@ const BuyerDashboard: React.FC = () => {
           
           <div className="order-seller-info">
             <p className="seller">
-              <FaUserCircle className="seller-icon" />
+              <FaUserCircle className="seller-icon" style={{ color: categoryIcon.color }} />
               <span className="seller-name">Seller: {seller}</span>
               {sellerRating > 0 && (
                 <span className="seller-rating">
@@ -934,15 +1136,21 @@ const BuyerDashboard: React.FC = () => {
                 className="progress-fill" 
                 style={{ 
                   width: getProgressWidth(order.status),
-                  backgroundColor: statusColor
+                  background: getStatusGradient(order.status)
                 }}
               />
             </div>
             <div className="progress-labels">
               <span className="progress-step active">Ordered</span>
-              <span className={`progress-step ${['processing', 'in_progress', 'delivered', 'completed'].includes(order.status) ? 'active' : ''}`}>Processing</span>
-              <span className={`progress-step ${['delivered', 'completed'].includes(order.status) ? 'active' : ''}`}>Delivered</span>
-              <span className={`progress-step ${order.status === 'completed' ? 'active' : ''}`}>Completed</span>
+              <span className={`progress-step ${['processing', 'in_progress', 'delivered', 'completed'].includes(order.status) ? 'active' : ''}`}>
+                Processing
+              </span>
+              <span className={`progress-step ${['delivered', 'completed'].includes(order.status) ? 'active' : ''}`}>
+                Delivered
+              </span>
+              <span className={`progress-step ${order.status === 'completed' ? 'active' : ''}`}>
+                Completed
+              </span>
             </div>
           </div>
           
@@ -980,10 +1188,7 @@ const BuyerDashboard: React.FC = () => {
           <div className="status-section">
             <div 
               className="status-badge"
-              style={{ 
-                backgroundColor: statusColor,
-                color: getContrastColor(statusColor)
-              }}
+              style={{ background: getStatusGradient(order.status) }}
             >
               {getStatusIcon(order.status)}
               <span>{getStatusText(order.status)}</span>
@@ -1065,27 +1270,17 @@ const BuyerDashboard: React.FC = () => {
     }
   };
 
-  const getContrastColor = (hexColor: string): string => {
-    // Convert hex to RGB
-    const r = parseInt(hexColor.slice(1, 3), 16);
-    const g = parseInt(hexColor.slice(3, 5), 16);
-    const b = parseInt(hexColor.slice(5, 7), 16);
-    
-    // Calculate luminance
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-    
-    // Return black or white based on luminance
-    return luminance > 0.5 ? '#000000' : '#FFFFFF';
-  };
-
   // Loading state
   if (loading && orders.length === 0) {
     return (
       <MarketplaceLayout>
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-            <p className="text-lg text-gray-800 font-medium">Loading your dashboard...</p>
+        <div className="buyer-dashboard loading-state">
+          <div className="loading-content">
+            <div className="loader-container">
+              <div className="loader-spinner"></div>
+              <div className="loader-text">Loading your dashboard...</div>
+              <div className="loader-subtext">Preparing your personalized experience</div>
+            </div>
           </div>
         </div>
       </MarketplaceLayout>
@@ -1169,15 +1364,152 @@ const BuyerDashboard: React.FC = () => {
                 <option value="oldest">Oldest First</option>
                 <option value="price_high">Price: High to Low</option>
                 <option value="price_low">Price: Low to High</option>
+                <option value="title_asc">Title: A-Z</option>
+                <option value="title_desc">Title: Z-A</option>
                 <option value="status">Status</option>
               </select>
               <FaChevronDown className="dropdown-arrow" />
             </div>
+            
+            <button 
+              className={`filter-toggle ${showAdvancedFilters ? 'active' : ''}`}
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              aria-expanded={showAdvancedFilters}
+            >
+              <FaFilter /> Advanced Filters
+            </button>
           </div>
         </div>
 
+        {/* Advanced Filters */}
+        {showAdvancedFilters && (
+          <div className="advanced-filters">
+            <div className="filter-row">
+              <div className="filter-group">
+                <label>Category</label>
+                <select 
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="filter-select"
+                >
+                  <option value="all">All Categories</option>
+                  <option value="digital_art">Digital Art</option>
+                  <option value="graphic_design">Graphic Design</option>
+                  <option value="writing">Writing</option>
+                  <option value="programming">Programming</option>
+                  <option value="marketing">Marketing</option>
+                  <option value="video_editing">Video Editing</option>
+                </select>
+              </div>
+              
+              <div className="filter-group">
+                <label>Date Range</label>
+                <div className="date-range-inputs">
+                  <input
+                    type="date"
+                    value={dateRange.start}
+                    onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                    className="date-input"
+                    placeholder="Start Date"
+                  />
+                  <span className="date-range-separator">to</span>
+                  <input
+                    type="date"
+                    value={dateRange.end}
+                    onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                    className="date-input"
+                    placeholder="End Date"
+                  />
+                </div>
+              </div>
+              
+              <div className="filter-group">
+                <label>Amount Range</label>
+                <div className="amount-range-inputs">
+                  <input
+                    type="number"
+                    value={minAmount}
+                    onChange={(e) => setMinAmount(e.target.value ? Number(e.target.value) : '')}
+                    className="amount-input"
+                    placeholder="Min"
+                    min="0"
+                  />
+                  <span className="amount-range-separator">-</span>
+                  <input
+                    type="number"
+                    value={maxAmount}
+                    onChange={(e) => setMaxAmount(e.target.value ? Number(e.target.value) : '')}
+                    className="amount-input"
+                    placeholder="Max"
+                    min="0"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="filter-row">
+              <div className="filter-group">
+                <label>Seller</label>
+                <div className="seller-search">
+                  <FaUser className="seller-search-icon" />
+                  <input
+                    type="text"
+                    value={sellerFilter}
+                    onChange={(e) => setSellerFilter(e.target.value)}
+                    className="seller-input"
+                    placeholder="Search by seller name..."
+                  />
+                </div>
+              </div>
+              
+              <div className="filter-actions">
+                <button className="clear-filters" onClick={clearFilters}>
+                  <FaTimes /> Clear All
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Statistics Overview */}
         {renderStats()}
+
+        {/* Achievements Section */}
+        <div className="achievements-section">
+          <div className="section-header">
+            <div className="section-title">
+              <h2><FaTrophy /> Your Achievements</h2>
+              <p className="section-subtitle">Unlock badges and rewards</p>
+            </div>
+            <div className="section-controls">
+              <button className="view-all-btn">
+                View All <FaArrowRight />
+              </button>
+            </div>
+          </div>
+          
+          <div className="achievements-grid">
+            {achievements.map((achievement, index) => (
+              <div 
+                key={index}
+                className={`achievement-card ${achievement.unlocked ? 'unlocked' : 'locked'}`}
+              >
+                <div className="achievement-icon">
+                  {achievement.icon}
+                </div>
+                <div className="achievement-content">
+                  <h4>{achievement.label}</h4>
+                  <p>{achievement.unlocked ? 'Unlocked' : 'Locked'}</p>
+                </div>
+                {achievement.unlocked && (
+                  <span className="achievement-badge">
+                    <FaCheckCircle />
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* Quick Actions */}
         <div className="quick-actions-section">
@@ -1199,14 +1531,12 @@ const BuyerDashboard: React.FC = () => {
                 key={index} 
                 className={`quick-action-card ${action.type}`}
                 onClick={action.action}
+                style={{ '--action-gradient': action.gradient } as React.CSSProperties}
               >
-                <div 
-                  className="action-icon-container"
-                  style={{ backgroundColor: `${action.color}20` }}
-                >
+                <div className="action-icon-container">
                   <div 
                     className="action-icon"
-                    style={{ color: action.color }}
+                    style={{ background: action.gradient }}
                   >
                     {action.icon}
                   </div>
@@ -1242,10 +1572,12 @@ const BuyerDashboard: React.FC = () => {
           <div className="section-header">
             <div className="section-title">
               <h2>Your Orders</h2>
-              <p className="section-subtitle">{filteredOrders.length} orders found • Total value: {formatCurrency(
-                filteredOrders.reduce((sum, order) => sum + order.amount, 0), 
-                'USD'
-              )}</p>
+              <p className="section-subtitle">
+                {filteredOrders.length} orders found • Total value: {formatCurrency(
+                  filteredOrders.reduce((sum, order) => sum + order.amount, 0), 
+                  'USD'
+                )}
+              </p>
             </div>
             <div className="section-controls">
               <div className="order-metrics">
@@ -1313,11 +1645,7 @@ const BuyerDashboard: React.FC = () => {
                       <>
                         <button 
                           className="secondary-action" 
-                          onClick={() => {
-                            setSearchQuery('');
-                            setStatusFilter('all');
-                            setSortBy('newest');
-                          }}
+                          onClick={clearFilters}
                           aria-label="Clear filters"
                         >
                           Clear Filters
