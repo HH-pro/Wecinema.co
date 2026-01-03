@@ -437,86 +437,40 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ UPDATED: Fetch orders for seller with cents handling
-  const fetchSellerOrders = async () => {
-    try {
-      setOrdersLoading(true);
+  // SellerDashboard.tsx میں fetchSellerOrders function میں logging شامل کریں
+
+const fetchSellerOrders = async () => {
+  try {
+    setOrdersLoading(true);
+    
+    console.log('📦 Fetching seller orders...');
+    const response = await ordersApi.getMySales();
+    
+    if (response.success && response.data) {
+      const ordersData = response.data.sales || [];
+      console.log(`✅ Found ${ordersData.length} orders`);
       
-      console.log('📦 Fetching seller orders...');
-      const response = await ordersApi.getMySales();
-      
-      if (response.success && response.data) {
-        const ordersData = response.data.sales || [];
-        console.log(`✅ Found ${ordersData.length} orders`);
-        
-        // Log sample order amounts for debugging
-        if (ordersData.length > 0) {
-          console.log('📊 Sample order amounts (in cents):', 
-            ordersData.slice(0, 3).map(o => ({
-              id: o._id,
-              amount: o.amount,
-              status: o.status,
-              amountInDollars: o.amount / 100
-            }))
-          );
-        }
-        
-        // Filter orders if needed
-        let filteredOrders = ordersData;
-        if (ordersFilter !== 'all') {
-          filteredOrders = ordersData.filter(order => order.status === ordersFilter);
-        }
-        
-        // Paginate
-        const startIndex = (ordersPage - 1) * ordersLimit;
-        const paginatedOrders = filteredOrders.slice(startIndex, startIndex + ordersLimit);
-        
-        // Update state
-        setOrders(paginatedOrders);
-        
-        // Calculate stats (already handles cents to dollars conversion)
-        const stats = calculateOrderStats(ordersData);
-        
-        // Merge with API stats if available
-        const apiStats = response.data.stats;
-        if (apiStats) {
-          const mergedStats: OrderStats = {
-            ...stats,
-            totalOrders: apiStats.total || stats.totalOrders,
-            totalRevenue: (apiStats.totalRevenue || 0) / 100, // Convert cents to dollars
-            pendingRevenue: (apiStats.pendingRevenue || 0) / 100, // Convert cents to dollars
-            thisMonthRevenue: (apiStats.thisMonthRevenue || 0) / 100 // Convert cents to dollars
-          };
-          setOrderStats(mergedStats);
-        } else {
-          setOrderStats(stats);
-        }
-      } else {
-        console.warn('⚠️ No orders found or API error:', response.error);
-        setOrders([]);
-        setOrderStats({
-          totalOrders: 0,
-          activeOrders: 0,
-          pendingPayment: 0,
-          processing: 0,
-          inProgress: 0,
-          delivered: 0,
-          completed: 0,
-          cancelled: 0,
-          totalRevenue: 0,
-          pendingRevenue: 0,
-          thisMonthOrders: 0,
-          thisMonthRevenue: 0,
-          availableBalance: 0
+      // ✅ DETAILED LOGGING FOR AMOUNTS
+      ordersData.forEach((order: Order, index: number) => {
+        console.log(`📊 Order ${index + 1}:`, {
+          id: order._id,
+          amount: order.amount,
+          amountInDollars: order.amount / 100,
+          status: order.status,
+          createdAt: order.createdAt,
+          listingTitle: typeof order.listingId === 'object' ? order.listingId.title : 'N/A'
         });
-      }
-    } catch (error: any) {
-      console.error('❌ Error fetching seller orders:', error);
-      setError('Failed to load orders. Please try again.');
-    } finally {
-      setOrdersLoading(false);
+      });
+      
+      // باقی کوڈ...
     }
-  };
+  } catch (error: any) {
+    console.error('❌ Error fetching seller orders:', error);
+    setError('Failed to load orders. Please try again.');
+  } finally {
+    setOrdersLoading(false);
+  }
+};
 
   // ✅ Fetch listings
   const fetchListings = async () => {
