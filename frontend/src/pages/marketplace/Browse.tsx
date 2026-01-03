@@ -5,7 +5,7 @@ import { Listing } from '../../types/marketplace';
 import { 
   FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiAlertCircle, 
   FiLoader, FiUser, FiPlay, FiClock, FiDollarSign, FiEye, FiVideo,
-  FiTrendingUp, FiTrendingDown, FiCalendar
+  FiTrendingUp, FiTrendingDown, FiCalendar, FiType, FiTag, FiDollarSign as FiDollar
 } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import marketplaceApi from '../../api/marketplaceApi';
@@ -19,10 +19,10 @@ const ERROR_IMAGE = 'https://via.placeholder.com/300x200/F3F4F6/6B7280?text=Vide
 
 // Content type categories
 const CONTENT_TYPES = [
-  { id: 'sale', label: 'For Sale', icon: '💰', color: 'from-green-500 to-emerald-600', hoverColor: 'hover:from-green-600 hover:to-emerald-700' },
-  { id: 'commission', label: 'Commission', icon: '🎨', color: 'from-purple-500 to-violet-600', hoverColor: 'hover:from-purple-600 hover:to-violet-700' },
-  { id: 'adaptation', label: 'Adaptation Rights', icon: '📜', color: 'from-blue-500 to-indigo-600', hoverColor: 'hover:from-blue-600 hover:to-indigo-700' },
-  { id: 'license', label: 'License', icon: '📋', color: 'from-amber-500 to-orange-600', hoverColor: 'hover:from-amber-600 hover:to-orange-700' }
+  { id: 'sale', label: 'For Sale', icon: '💰', color: 'bg-green-500', hoverColor: 'hover:bg-green-600' },
+  { id: 'commission', label: 'Commission', icon: '🎨', color: 'bg-purple-500', hoverColor: 'hover:bg-purple-600' },
+  { id: 'adaptation', label: 'Adaptation Rights', icon: '📜', color: 'bg-blue-500', hoverColor: 'hover:bg-blue-600' },
+  { id: 'license', label: 'License', icon: '📋', color: 'bg-amber-500', hoverColor: 'hover:bg-amber-600' }
 ];
 
 // Sort options
@@ -272,17 +272,17 @@ const Browse: React.FC = () => {
   };
 
   const getQualityBadge = (quality?: string) => {
-    if (!quality) return { color: 'bg-gradient-to-r from-yellow-400 to-yellow-300 text-gray-800', label: '' };
+    if (!quality) return { color: 'bg-yellow-400 text-gray-800', label: '' };
     
     switch (quality.toLowerCase()) {
       case '4k':
       case 'ultra hd':
-        return { color: 'bg-gradient-to-r from-yellow-500 to-amber-500 text-white', label: '4K' };
+        return { color: 'bg-yellow-500 text-white', label: '4K' };
       case 'hd':
       case '1080p':
-        return { color: 'bg-gradient-to-r from-blue-500 to-blue-400 text-white', label: 'HD' };
+        return { color: 'bg-blue-500 text-white', label: 'HD' };
       default:
-        return { color: 'bg-gradient-to-r from-yellow-400 to-yellow-300 text-gray-800', label: '' };
+        return { color: 'bg-yellow-400 text-gray-800', label: '' };
     }
   };
 
@@ -534,9 +534,8 @@ const Browse: React.FC = () => {
                   <>
                     <button 
                       onClick={() => navigate('/marketplace/create')}
-                      className="group relative inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-yellow-500 to-amber-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 overflow-hidden border border-yellow-200"
+                      className="group relative inline-flex items-center justify-center px-6 py-3 bg-yellow-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 overflow-hidden hover:bg-yellow-600 border border-yellow-500"
                     >
-                      <div className="absolute inset-0 bg-gradient-to-r from-yellow-600 to-amber-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
                       <FiPlus className="relative mr-2" size={18} />
                       <span className="relative">Upload Video</span>
                     </button>
@@ -559,8 +558,6 @@ const Browse: React.FC = () => {
                 </button>
               </div>
             </div>
-
-           
 
             {/* Search Bar - Professional Design */}
             <div className="mt-8 max-w-3xl">
@@ -633,7 +630,7 @@ const Browse: React.FC = () => {
             <div className="mb-8 bg-white rounded-2xl shadow-xl border border-gray-200 p-6 animate-fadeIn">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-yellow-500 to-amber-500 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-lg bg-yellow-500 flex items-center justify-center">
                     <FiFilter className="text-white" size={18} />
                   </div>
                   <div>
@@ -653,7 +650,7 @@ const Browse: React.FC = () => {
                 {/* Content Type Filter */}
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-800 flex items-center gap-2">
-                    <span className="text-yellow-500">●</span>
+                    <FiType className="text-yellow-500" size={16} />
                     Content Type
                   </label>
                   <select 
@@ -672,7 +669,7 @@ const Browse: React.FC = () => {
                 {/* Sort Options */}
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-800 flex items-center gap-2">
-                    <span className="text-yellow-500">●</span>
+                    <FiTag className="text-yellow-500" size={16} />
                     Sort By
                   </label>
                   <div className="grid grid-cols-2 gap-2">
@@ -699,7 +696,7 @@ const Browse: React.FC = () => {
                 {/* Price Range Filter */}
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-800 flex items-center gap-2">
-                    <span className="text-yellow-500">●</span>
+                    <FiDollar className="text-yellow-500" size={16} />
                     Price Range (₹)
                   </label>
                   <div className="space-y-3">
@@ -737,7 +734,7 @@ const Browse: React.FC = () => {
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <button
                   onClick={fetchListings}
-                  className="w-full py-3.5 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                  className="w-full py-3.5 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 border border-yellow-500"
                 >
                   Apply Filters & Refresh Results
                 </button>
@@ -814,7 +811,7 @@ const Browse: React.FC = () => {
                 {marketplaceApi.utils.checkAuth() && (
                   <button 
                     onClick={() => navigate('/marketplace/create')}
-                    className="inline-flex items-center justify-center px-6 py-3.5 bg-gradient-to-r from-yellow-500 to-amber-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 border border-yellow-200"
+                    className="inline-flex items-center justify-center px-6 py-3.5 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 border border-yellow-500"
                   >
                     <FiPlus className="mr-2" size={18} />
                     Upload Your First Video
@@ -914,7 +911,7 @@ const Browse: React.FC = () => {
                       {/* Content Type Badge */}
                       <div className="absolute top-3 left-3 z-10">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          contentType?.color ? `bg-gradient-to-r ${contentType.color.split(' ')[0]} ${contentType.color.split(' ')[1]}` : 'bg-gradient-to-r from-gray-600 to-gray-700'
+                          contentType?.color || 'bg-gray-600'
                         } text-white border border-white/30 shadow-sm`}>
                           <span className="mr-1">{contentType?.icon || '📁'}</span>
                           <span className="font-semibold">
@@ -925,7 +922,7 @@ const Browse: React.FC = () => {
                       
                       {/* Price Tag */}
                       <div className="absolute bottom-3 left-3">
-                        <div className="bg-gradient-to-r from-green-600 to-emerald-700 text-white px-3 py-1.5 rounded-lg shadow-lg">
+                        <div className="bg-green-600 text-white px-3 py-1.5 rounded-lg shadow-lg">
                           <p className="text-lg font-bold">{formatCurrency(listing.price)}</p>
                         </div>
                       </div>
@@ -973,7 +970,7 @@ const Browse: React.FC = () => {
                       <div className="pt-4 border-t border-gray-200">
                         <button
                           onClick={() => handleMakeOffer(listing)}
-                          className="w-full py-2.5 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-white text-sm font-semibold rounded-lg transition-all duration-200 flex items-center justify-center hover:shadow-lg transform hover:-translate-y-0.5 border border-yellow-200"
+                          className="w-full py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-semibold rounded-lg transition-all duration-200 flex items-center justify-center hover:shadow-lg transform hover:-translate-y-0.5 border border-yellow-500"
                         >
                           <FiDollarSign className="w-4 h-4 mr-2" />
                           Buy Now - {formatCurrency(listing.price)}
@@ -1021,7 +1018,7 @@ const Browse: React.FC = () => {
             <div className="mt-8 text-center">
               <button 
                 onClick={fetchListings}
-                className="inline-flex items-center justify-center px-6 py-3.5 bg-gradient-to-r from-gray-800 to-gray-900 hover:from-gray-900 hover:to-black text-white font-semibold rounded-xl border border-gray-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                className="inline-flex items-center justify-center px-6 py-3.5 bg-gray-800 hover:bg-gray-900 text-white font-semibold rounded-xl border border-gray-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
               >
                 <span>Load More Videos</span>
                 <FiPlus className="ml-2" size={18} />
@@ -1042,7 +1039,7 @@ const Browse: React.FC = () => {
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <button 
                   onClick={() => navigate('/marketplace/create')}
-                  className="px-8 py-3.5 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-600 hover:to-amber-600 text-white font-semibold rounded-xl border border-yellow-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
+                  className="px-8 py-3.5 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-xl border border-yellow-500 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
                 >
                   Start Selling Videos
                 </button>
