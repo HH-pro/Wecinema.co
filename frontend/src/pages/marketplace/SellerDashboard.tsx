@@ -1,4 +1,4 @@
-// src/pages/seller/SellerDashboard.tsx - COMPLETE UPDATED VERSION WITH PROPER API INTEGRATION
+// src/pages/seller/SellerDashboard.tsx - COMPLETE UPDATED VERSION WITH AUTO-REFRESH ON ACTIONS
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -157,6 +157,7 @@ const SellerDashboard: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showStripeSuccessAlert, setShowStripeSuccessAlert] = useState(false);
+  const [refreshCounter, setRefreshCounter] = useState(0); // ✅ NEW: For triggering refreshes
   const navigate = useNavigate();
   
   // Order stats
@@ -447,51 +448,50 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Fetch seller's listings
- // ✅ SIMPLE fetchListings - no params
-const fetchListings = async () => {
-  try {
-    setListingsLoading(true);
-    setError('');
-    
-    console.log('🏠 Fetching seller listings...');
-    
-    // ✅ SIMPLE: Call API without any params
-    const response = await listingsApi.getMyListings();
-    
-    console.log('📦 Listings Response:', {
-      success: response.success,
-      count: response.data?.listings?.length || 0,
-      error: response.error
-    });
-    
-    if (response.success && response.data) {
-      const listingsData = response.data.listings || [];
-      console.log(`✅ Successfully loaded ${listingsData.length} listings`);
-      setListings(listingsData);
+  // ✅ SIMPLE fetchListings - no params
+  const fetchListings = async () => {
+    try {
+      setListingsLoading(true);
+      setError('');
       
-      // Show success message if no listings
-      if (listingsData.length === 0) {
-        setSuccessMessage('No listings found. Create your first listing!');
+      console.log('🏠 Fetching seller listings...');
+      
+      // ✅ SIMPLE: Call API without any params
+      const response = await listingsApi.getMyListings();
+      
+      console.log('📦 Listings Response:', {
+        success: response.success,
+        count: response.data?.listings?.length || 0,
+        error: response.error
+      });
+      
+      if (response.success && response.data) {
+        const listingsData = response.data.listings || [];
+        console.log(`✅ Successfully loaded ${listingsData.length} listings`);
+        setListings(listingsData);
+        
+        // Show success message if no listings
+        if (listingsData.length === 0) {
+          setSuccessMessage('No listings found. Create your first listing!');
+        }
+      } else {
+        console.warn('⚠️ Failed to fetch listings:', response.error);
+        setListings([]);
+        setError(response.error || 'No listings found');
       }
-    } else {
-      console.warn('⚠️ Failed to fetch listings:', response.error);
+      
+    } catch (error: any) {
+      console.error('❌ Error in fetchListings:', error);
       setListings([]);
-      setError(response.error || 'No listings found');
+      
+      // Don't show error for empty listings
+      if (!error.message.includes('404')) {
+        setError('Failed to load listings');
+      }
+    } finally {
+      setListingsLoading(false);
     }
-    
-  } catch (error: any) {
-    console.error('❌ Error in fetchListings:', error);
-    setListings([]);
-    
-    // Don't show error for empty listings
-    if (!error.message.includes('404')) {
-      setError('Failed to load listings');
-    }
-  } finally {
-    setListingsLoading(false);
-  }
-};
+  };
 
   // ✅ Fetch offers received
   const fetchOffers = async () => {
@@ -568,6 +568,57 @@ const fetchListings = async () => {
     }
   };
 
+  // ✅ ✅ ✅ MAJOR UPDATE: Function to refresh specific data after actions
+  const refreshDataAfterAction = async (actionType: 'listing' | 'order' | 'offer' | 'stripe' | 'withdrawal') => {
+    console.log(`🔄 Refreshing data after ${actionType} action...`);
+    
+    try {
+      // Always refresh stats and Stripe status
+      await Promise.all([
+        fetchSellerStats(),
+        checkStripeAccountStatus()
+      ]);
+
+      // Refresh specific data based on action type
+      switch (actionType) {
+        case 'listing':
+          await fetchListings();
+          break;
+        case 'order':
+          await fetchSellerOrders();
+          break;
+        case 'offer':
+          await fetchOffers();
+          break;
+        case 'withdrawal':
+          await fetchWithdrawalHistory();
+          break;
+      }
+
+      // Also refresh current tab data
+      if (activeTab === 'overview') {
+        // For overview tab, refresh all relevant data
+        await Promise.all([
+          fetchSellerOrders(),
+          fetchListings(),
+          fetchOffers()
+        ]);
+      } else if (activeTab === 'listings') {
+        await fetchListings();
+      } else if (activeTab === 'orders') {
+        await fetchSellerOrders();
+      } else if (activeTab === 'offers') {
+        await fetchOffers();
+      } else if (activeTab === 'withdraw') {
+        await fetchWithdrawalHistory();
+      }
+
+      console.log(`✅ ${actionType} data refreshed successfully`);
+    } catch (error) {
+      console.error(`❌ Error refreshing ${actionType} data:`, error);
+    }
+  };
+
   // ✅ Fetch all dashboard data
   const fetchDashboardData = async () => {
     try {
@@ -603,7 +654,7 @@ const fetchListings = async () => {
     }
   };
 
-  // ✅ Handle withdrawal request
+  // ✅ Handle withdrawal request - UPDATED with auto-refresh
   const handleWithdrawRequest = async (amount: number) => {
     try {
       setRefreshing(true);
@@ -643,6 +694,12 @@ const fetchListings = async () => {
       
       setSuccessMessage(`Withdrawal request of $${amount.toFixed(2)} submitted successfully! Funds will arrive in 2-3 business days.`);
       
+      // ✅ AUTO-REFRESH after withdrawal
+      setTimeout(() => {
+        refreshDataAfterAction('withdrawal');
+        setRefreshCounter(prev => prev + 1);
+      }, 500);
+      
     } catch (error: any) {
       console.error('❌ Error processing withdrawal:', error);
       setError('Failed to process withdrawal. Please try again.');
@@ -651,7 +708,7 @@ const fetchListings = async () => {
     }
   };
 
-  // ✅ Handle Edit Listing
+  // ✅ Handle Edit Listing - UPDATED with auto-refresh
   const handleEditListing = (listing: Listing) => {
     setEditingListing(listing);
     setShowEditModal(true);
@@ -677,8 +734,12 @@ const fetchListings = async () => {
         setEditingListing(null);
         setSuccessMessage('Listing updated successfully!');
         
-        // Refresh listings
-        fetchListings();
+        // ✅ AUTO-REFRESH after edit
+        setTimeout(() => {
+          refreshDataAfterAction('listing');
+          setRefreshCounter(prev => prev + 1);
+        }, 300);
+        
       } else {
         setError(response.error || 'Failed to update listing. Please try again.');
       }
@@ -690,7 +751,7 @@ const fetchListings = async () => {
     }
   };
 
-  // ✅ Handle Delete Listing
+  // ✅ Handle Delete Listing - UPDATED with auto-refresh
   const handleDeleteListing = (listing: Listing) => {
     setDeletingListing(listing);
     setShowDeleteModal(true);
@@ -712,8 +773,12 @@ const fetchListings = async () => {
         setDeletingListing(null);
         setSuccessMessage('Listing deleted successfully!');
         
-        // Refresh listings
-        fetchListings();
+        // ✅ AUTO-REFRESH after delete
+        setTimeout(() => {
+          refreshDataAfterAction('listing');
+          setRefreshCounter(prev => prev + 1);
+        }, 300);
+        
       } else {
         setError(response.error || 'Failed to delete listing. Please try again.');
       }
@@ -725,7 +790,7 @@ const fetchListings = async () => {
     }
   };
 
-  // ✅ Handle Toggle Listing Status
+  // ✅ Handle Toggle Listing Status - UPDATED with auto-refresh
   const handleToggleListingStatus = async (listing: Listing) => {
     try {
       setListingActionLoading(`toggle-${listing._id}`);
@@ -741,6 +806,13 @@ const fetchListings = async () => {
         ));
         
         setSuccessMessage(`Listing ${updatedListing.status === 'active' ? 'activated' : 'deactivated'} successfully!`);
+        
+        // ✅ AUTO-REFRESH after status change
+        setTimeout(() => {
+          refreshDataAfterAction('listing');
+          setRefreshCounter(prev => prev + 1);
+        }, 300);
+        
       } else {
         setError(response.error || 'Failed to update listing status. Please try again.');
       }
@@ -753,7 +825,7 @@ const fetchListings = async () => {
     }
   };
 
-  // ✅ Order management functions
+  // ✅ Order management functions - ALL UPDATED with auto-refresh
   const handleSimpleStartProcessing = async (order: Order) => {
     try {
       setOrderActionLoading(order._id);
@@ -770,8 +842,12 @@ const fetchListings = async () => {
         
         setSuccessMessage('Order is now being processed!');
         
-        // Refresh stats
-        fetchSellerStats();
+        // ✅ AUTO-REFRESH after order status change
+        setTimeout(() => {
+          refreshDataAfterAction('order');
+          setRefreshCounter(prev => prev + 1);
+        }, 300);
+        
       } else {
         setError(response.error || 'Failed to start processing. Please try again.');
       }
@@ -797,7 +873,13 @@ const fetchListings = async () => {
         ));
         
         setSuccessMessage('Work started on order!');
-        fetchSellerStats();
+        
+        // ✅ AUTO-REFRESH after order status change
+        setTimeout(() => {
+          refreshDataAfterAction('order');
+          setRefreshCounter(prev => prev + 1);
+        }, 300);
+        
       } else {
         setError(response.error || 'Failed to start work. Please try again.');
       }
@@ -830,7 +912,13 @@ const fetchListings = async () => {
         ));
         
         setSuccessMessage('Order delivered successfully!');
-        fetchSellerStats();
+        
+        // ✅ AUTO-REFRESH after delivery
+        setTimeout(() => {
+          refreshDataAfterAction('order');
+          setRefreshCounter(prev => prev + 1);
+        }, 300);
+        
       } else {
         setError(response.error || 'Failed to deliver order. Please try again.');
       }
@@ -857,7 +945,13 @@ const fetchListings = async () => {
           ));
           
           setSuccessMessage('Order cancelled successfully!');
-          fetchSellerStats();
+          
+          // ✅ AUTO-REFRESH after cancellation
+          setTimeout(() => {
+            refreshDataAfterAction('order');
+            setRefreshCounter(prev => prev + 1);
+          }, 300);
+          
         } else {
           setError(response.error || 'Failed to cancel order. Please try again.');
         }
@@ -881,7 +975,7 @@ const fetchListings = async () => {
     setShowVideoModal(true);
   };
 
-  // ✅ Handle offer actions
+  // ✅ Handle offer actions - UPDATED with auto-refresh
   const handleOfferAction = async (offerId: string, action: 'accept' | 'reject') => {
     try {
       setOrderActionLoading(offerId);
@@ -898,13 +992,12 @@ const fetchListings = async () => {
         setOffers(prev => prev.filter(offer => offer._id !== offerId));
         setSuccessMessage(`Offer ${action}ed successfully!`);
         
-        // Refresh offers list
-        fetchOffers();
+        // ✅ AUTO-REFRESH after offer action
+        setTimeout(() => {
+          refreshDataAfterAction('offer');
+          setRefreshCounter(prev => prev + 1);
+        }, 300);
         
-        // If accepted, refresh orders
-        if (action === 'accept') {
-          fetchSellerOrders();
-        }
       } else {
         setError(response.error || `Failed to ${action} offer. Please try again.`);
       }
@@ -921,9 +1014,10 @@ const fetchListings = async () => {
     setShowStripeSuccessAlert(true);
     setSuccessMessage('Stripe account connected successfully! You can now receive payments.');
     
-    // Refresh Stripe status
+    // ✅ AUTO-REFRESH after Stripe setup
     setTimeout(() => {
-      checkStripeAccountStatus();
+      refreshDataAfterAction('stripe');
+      setRefreshCounter(prev => prev + 1);
     }, 1500);
   };
 
@@ -935,6 +1029,7 @@ const fetchListings = async () => {
     try {
       await fetchDashboardData();
       setSuccessMessage('Dashboard refreshed successfully!');
+      setRefreshCounter(prev => prev + 1);
     } catch (error) {
       console.error('❌ Refresh error:', error);
       setError('Failed to refresh data. Please try again.');
@@ -953,7 +1048,7 @@ const fetchListings = async () => {
     fetchDashboardData();
   }, []);
 
-  // ✅ Fetch data when tab changes
+  // ✅ Fetch data when tab changes OR when refreshCounter changes
   useEffect(() => {
     if (activeTab === 'listings') {
       fetchListings();
@@ -964,7 +1059,7 @@ const fetchListings = async () => {
     } else if (activeTab === 'withdraw') {
       fetchWithdrawalHistory();
     }
-  }, [activeTab, listingsPage, listingsStatusFilter, ordersPage, ordersFilter, withdrawalsPage]);
+  }, [activeTab, listingsPage, listingsStatusFilter, ordersPage, ordersFilter, withdrawalsPage, refreshCounter]); // ✅ Added refreshCounter dependency
 
   // Determine loading state
   const getCurrentLoadingState = () => {
@@ -998,6 +1093,20 @@ const fetchListings = async () => {
     availableBalance: orderStats.availableBalance || 0,
     totalWithdrawn: totalWithdrawn / 100 // Convert cents to dollars
   };
+
+  // ✅ NEW: Auto-refresh indicator
+  const [showAutoRefreshIndicator, setShowAutoRefreshIndicator] = useState(false);
+
+  // Show auto-refresh indicator briefly when refreshCounter changes
+  useEffect(() => {
+    if (refreshCounter > 0) {
+      setShowAutoRefreshIndicator(true);
+      const timer = setTimeout(() => {
+        setShowAutoRefreshIndicator(false);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [refreshCounter]);
 
   // Show loading only on initial load
   if (loading && !initialDataLoaded) {
@@ -1047,6 +1156,18 @@ const fetchListings = async () => {
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
+          {/* ✅ Auto-Refresh Indicator */}
+          {showAutoRefreshIndicator && (
+            <div className="fixed top-4 right-4 z-50 animate-bounce">
+              <div className="bg-green-100 border border-green-300 text-green-800 px-4 py-2 rounded-lg shadow-lg flex items-center">
+                <svg className="w-4 h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span className="text-sm font-medium">Data Updated!</span>
+              </div>
+            </div>
+          )}
+
           {/* ✅ Stripe Success Alert */}
           {showStripeSuccessAlert && (
             <SafeStripeSuccessAlert 
@@ -1083,7 +1204,7 @@ const fetchListings = async () => {
                   <div>
                     <h3 className="font-medium text-purple-800">Development Mode</h3>
                     <p className="text-sm text-purple-700">
-                      Using real API data. Mock payments available for testing.
+                      Using real API data. Auto-refresh enabled on all actions.
                     </p>
                   </div>
                 </div>
@@ -1283,8 +1404,6 @@ const fetchListings = async () => {
                   />
                 )}
 
-               
-
                 {/* Listings Tab */}
                 {activeTab === 'listings' && (
                   <SafeListingsTab
@@ -1383,6 +1502,7 @@ const fetchListings = async () => {
               onStatusUpdate={() => {
                 fetchSellerOrders();
                 fetchSellerStats();
+                setRefreshCounter(prev => prev + 1);
               }}
             />
           )}
