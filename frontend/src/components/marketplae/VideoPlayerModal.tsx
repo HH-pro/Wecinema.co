@@ -237,7 +237,7 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   if (!show || !videoUrl) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-2 sm:p-4">
+    <div className="fixed inset-0 top-20 z-50 flex items-center justify-center bg-black/95 p-2 sm:p-4">
       <div 
         ref={containerRef}
         className="relative w-full max-w-5xl max-h-[90vh] bg-gray-900 rounded-2xl overflow-hidden shadow-2xl"
