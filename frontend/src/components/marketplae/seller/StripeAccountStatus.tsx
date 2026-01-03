@@ -431,7 +431,6 @@ const StripeAccountStatus: React.FC<StripeAccountStatusProps> = ({
           </div>
           <div className={compact ? 'text-center' : ''}>
             <h3 className="text-lg font-semibold text-gray-900">
-              Ready to Start Earning?
             </h3>
             <p className="text-gray-600 mt-1">
               Connect your Stripe account to accept payments and withdraw your earnings.
