@@ -484,9 +484,20 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   };
   
   // Format currency
-  const formatCurrency = (amount: number): string => {
-    return marketplaceApi.formatCurrency(amount || 0);
-  };
+// Format currency - local function
+const formatCurrency = (amount: number): string => {
+  // If amount is less than 100, assume it's already in dollars
+  if (amount < 100) {
+    return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  
+  // Otherwise, assume it's cents and convert to dollars
+  const amountInDollars = amount / 100;
+  return `$${amountInDollars.toLocaleString('en-US', { 
+    minimumFractionDigits: 2, 
+    maximumFractionDigits: 2 
+  })}`;
+};
   
   // Format date
   const formatDate = (dateString: string | null): string => {
