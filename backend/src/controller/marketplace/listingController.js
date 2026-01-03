@@ -495,7 +495,6 @@ router.get("/offers/received-offers", authenticateMiddleware, async (req, res) =
   }
 });
 
-module.exports = router;
 // ===================================================
 // ✅ CREATE LISTING
 // ===================================================
