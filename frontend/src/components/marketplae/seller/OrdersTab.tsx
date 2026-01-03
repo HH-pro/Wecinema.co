@@ -1,6 +1,7 @@
-// src/components/marketplace/seller/OrdersTab.tsx - COMPLETE FIXED VERSION
-import React, { useState } from 'react';
-import { marketplaceAPI, getOrderStatusInfo, formatCurrencyshow, formatDate } from '../../../api';
+// src/components/marketplace/seller/OrdersTab.tsx - COMPLETE UPDATED VERSION
+import React, { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
+import marketplaceApi from '../../../api/marketplaceApi';
 import OrderStatusTracker from './OrderStatusTracker';
 import OrderActionGuide from './OrderActionGuide';
 import DeliveryModal from './DeliveryModal';
@@ -11,31 +12,45 @@ interface Order {
   status: string;
   amount: number;
   buyerId: {
+    _id: string;
     username: string;
+    email: string;
     avatar?: string;
-    email?: string;
     firstName?: string;
     lastName?: string;
   };
-  listingId: {
-    title: string;
-    mediaUrls?: string[];
-  };
-  sellerId?: {
+  sellerId: {
+    _id: string;
     username: string;
-    email?: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    avatar?: string;
   };
+  listingId: {
+    _id: string;
+    title: string;
+    price: number;
+    currency: string;
+    mediaUrls?: string[];
+    description?: string;
+    category?: string;
+  } | string;
   createdAt: string;
+  updatedAt: string;
   deliveredAt?: string;
   completedAt?: string;
   expectedDelivery?: string;
-  notes?: string;
+  buyerNotes?: string;
+  sellerNotes?: string;
   revisions?: number;
   maxRevisions?: number;
-  expectedDays?: number;
   deliveryMessage?: string;
   deliveryFiles?: string[];
-  payments?: any[];
+  attachments?: any[];
+  paymentStatus: string;
+  orderType: string;
+  requirements?: string;
 }
 
 interface OrdersTabProps {
@@ -46,19 +61,7 @@ interface OrdersTabProps {
   onViewOrderDetails: (orderId: string) => void;
   onPlayVideo?: (videoUrl: string, title: string) => void;
   onRefresh: () => void;
-  onStartProcessing?: (orderId: string) => void;
-  onStartWork?: (orderId: string) => void;
-  onDeliver?: (order: Order) => void;
-  onCancel?: (order: Order) => void;
-  onCompleteRevision?: (order: Order) => void;
   actionLoading?: string | null;
-  onActualDeliver?: (deliveryData: {
-    orderId: string;
-    message: string;
-    attachments: File[];
-    isFinal: boolean;
-    revisionsLeft?: number;
-  }) => Promise<void>;
 }
 
 const OrdersTab: React.FC<OrdersTabProps> = ({
@@ -69,19 +72,72 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
   onViewOrderDetails,
   onPlayVideo,
   onRefresh,
-  onStartProcessing,
-  onStartWork,
-  onDeliver,
-  onCancel,
-  onCompleteRevision,
-  actionLoading,
-  onActualDeliver
+  actionLoading
 }) => {
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const [selectedOrderForDelivery, setSelectedOrderForDelivery] = useState<Order | null>(null);
   const [isSubmittingDelivery, setIsSubmittingDelivery] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState<string | null>(null);
+  const [processingActions, setProcessingActions] = useState<Record<string, boolean>>({});
+
+  // Get order status info
+  const getOrderStatusInfo = (status: string) => {
+    const statusMap: Record<string, { text: string; icon: string; color: string }> = {
+      'pending_payment': { text: 'Pending Payment', icon: '⏳', color: 'yellow' },
+      'paid': { text: 'Paid', icon: '💰', color: 'green' },
+      'processing': { text: 'Processing', icon: '⚙️', color: 'blue' },
+      'in_progress': { text: 'In Progress', icon: '🛠️', color: 'purple' },
+      'delivered': { text: 'Delivered', icon: '📦', color: 'orange' },
+      'in_revision': { text: 'In Revision', icon: '🔄', color: 'red' },
+      'completed': { text: 'Completed', icon: '✅', color: 'green' },
+      'cancelled': { text: 'Cancelled', icon: '❌', color: 'red' },
+      'refunded': { text: 'Refunded', icon: '💸', color: 'gray' },
+      'disputed': { text: 'Disputed', icon: '⚠️', color: 'red' }
+    };
+    
+    return statusMap[status] || { text: status, icon: '❓', color: 'gray' };
+  };
+
+  // Format currency
+  const formatCurrencyShow = (amount: number, currency: string = 'USD'): string => {
+    if (typeof amount !== 'number' || isNaN(amount)) {
+      return '$0.00';
+    }
+    
+    // Check if amount is in cents or dollars
+    const valueInDollars = amount < 100 ? amount : amount / 100;
+    
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(valueInDollars);
+  };
+
+  // Format date
+  const formatDate = (dateString: string, includeTime: boolean = false): string => {
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Invalid date';
+      
+      const options: Intl.DateTimeFormatOptions = {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      };
+      
+      if (includeTime) {
+        options.hour = '2-digit';
+        options.minute = '2-digit';
+      }
+      
+      return date.toLocaleDateString('en-US', options);
+    } catch {
+      return 'Invalid date';
+    }
+  };
 
   const statusFilters = [
     { value: 'all', label: 'All Orders', count: orders.length },
@@ -102,19 +158,61 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
   };
 
+  // ✅ Handle Start Processing using marketplaceApi
+  const handleStartProcessing = async (orderId: string) => {
+    try {
+      setProcessingActions(prev => ({ ...prev, [orderId]: true }));
+      
+      const response = await marketplaceApi.orders.startProcessing(orderId);
+      
+      if (response.success) {
+        toast.success('Order processing started successfully!');
+        onRefresh();
+      } else {
+        toast.error(response.error || 'Failed to start processing');
+      }
+    } catch (error: any) {
+      console.error('Error starting processing:', error);
+      toast.error(error.message || 'Failed to start processing');
+    } finally {
+      setProcessingActions(prev => ({ ...prev, [orderId]: false }));
+    }
+  };
+
+  // ✅ Handle Start Work using marketplaceApi
+  const handleStartWork = async (orderId: string) => {
+    try {
+      setProcessingActions(prev => ({ ...prev, [orderId]: true }));
+      
+      const response = await marketplaceApi.orders.startWork(orderId);
+      
+      if (response.success) {
+        toast.success('Work started successfully!');
+        onRefresh();
+      } else {
+        toast.error(response.error || 'Failed to start work');
+      }
+    } catch (error: any) {
+      console.error('Error starting work:', error);
+      toast.error(error.message || 'Failed to start work');
+    } finally {
+      setProcessingActions(prev => ({ ...prev, [orderId]: false }));
+    }
+  };
+
+  // Handle Deliver Click
   const handleDeliverClick = (order: Order) => {
     setSelectedOrderForDelivery(order);
     setDeliveryModalOpen(true);
   };
 
-  // Determine if order can be cancelled
+  // ✅ Determine if order can be cancelled
   const canCancelOrder = (order: Order): boolean => {
-    // Only allow cancellation in these statuses (before work starts)
     const cancellableStatuses = ['pending_payment', 'paid', 'processing'];
     return cancellableStatuses.includes(order.status);
   };
 
-  // Get cancellation configuration
+  // ✅ Get cancellation configuration
   const getCancelConfig = (order: Order) => {
     switch (order.status) {
       case 'pending_payment':
@@ -191,18 +289,42 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     }
   };
 
-  // Handle cancel order with confirmation
-  const handleCancelOrder = (order: Order) => {
-    if (!canCancelOrder(order) || !onCancel) return;
-    setShowCancelConfirm(order._id);
+  // ✅ Handle Cancel Order using marketplaceApi
+  const handleCancelOrder = async (order: Order) => {
+    if (!canCancelOrder(order)) return;
+    
+    try {
+      setProcessingActions(prev => ({ ...prev, [order._id]: true }));
+      
+      const response = await marketplaceApi.orders.cancelOrderBySeller(order._id, 'Seller cancelled the order');
+      
+      if (response.success) {
+        toast.success('Order cancelled successfully!');
+        onRefresh();
+      } else {
+        toast.error(response.error || 'Failed to cancel order');
+      }
+    } catch (error: any) {
+      console.error('Error cancelling order:', error);
+      toast.error(error.message || 'Failed to cancel order');
+    } finally {
+      setProcessingActions(prev => ({ ...prev, [order._id]: false }));
+      setShowCancelConfirm(null);
+    }
   };
 
-  const confirmCancelOrder = (order: Order) => {
-    onCancel(order);
-    setShowCancelConfirm(null);
+  // ✅ Handle Complete Revision using marketplaceApi
+  const handleCompleteRevision = async (order: Order) => {
+    try {
+      setSelectedOrderForDelivery(order);
+      setDeliveryModalOpen(true);
+    } catch (error: any) {
+      console.error('Revision setup error:', error);
+      toast.error(error.message || 'Failed to start revision');
+    }
   };
 
-  // ✅ IMPROVED FILE UPLOAD FUNCTION WITHOUT TOASTS
+  // ✅ IMPROVED FILE UPLOAD FUNCTION WITH marketplaceApi
   const handleActualDeliver = async (deliveryData: {
     orderId: string;
     message: string;
@@ -217,44 +339,29 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
         orderId: deliveryData.orderId,
         messageLength: deliveryData.message?.length,
         filesCount: deliveryData.attachments?.length,
-        files: deliveryData.attachments?.map(f => ({
-          name: f.name,
-          type: f.type,
-          size: f.size,
-          extension: f.name.split('.').pop()?.toLowerCase()
-        }))
+        isFinal: deliveryData.isFinal
       });
 
-      let uploadedAttachments: Array<{
-        filename: string;
-        originalName: string;
-        mimeType: string;
-        size: number;
-        url: string;
-        path: string;
-      }> = [];
+      let uploadedAttachments: any[] = [];
 
       // Upload files if available
       if (deliveryData.attachments && deliveryData.attachments.length > 0) {
         console.log('📤 Uploading files...', deliveryData.attachments.length);
         
         try {
-          // ✅ Direct file upload with better handling
-          uploadedAttachments = await uploadFilesDirect(deliveryData.attachments);
+          // Use marketplaceApi for file upload
+          const uploadResponse = await marketplaceApi.orders.uploadDeliveryFiles(deliveryData.attachments);
           
-          console.log('✅ Files uploaded successfully:', uploadedAttachments);
+          if (uploadResponse.success && uploadResponse.data) {
+            uploadedAttachments = uploadResponse.data.files || [];
+            console.log('✅ Files uploaded successfully:', uploadedAttachments);
+          } else {
+            throw new Error(uploadResponse.error || 'File upload failed');
+          }
         } catch (uploadError: any) {
           console.error('❌ File upload error:', uploadError);
-          
-          // Check if it's a file type error
-          if (uploadError.message?.includes('File type') || uploadError.message?.includes('not supported')) {
-            console.error(`❌ ${uploadError.message}. Please use supported file types.`);
-          } else if (uploadError.message?.includes('size')) {
-            console.error('❌ File too large. Maximum size is 100MB.');
-          } else {
-            console.error(`❌ File upload failed: ${uploadError.message || 'Please try again'}`);
-          }
-          return; // Stop if file upload fails
+          toast.error(uploadError.message || 'Failed to upload files');
+          return;
         }
       }
 
@@ -264,43 +371,43 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
       
       try {
         if (isRevision) {
-          // Complete revision
-          console.log('🔄 Completing revision...');
-          await marketplaceAPI.orders.completeRevision(
+          // Complete revision using marketplaceApi
+          const response = await marketplaceApi.orders.completeRevision(
             deliveryData.orderId,
             {
               deliveryMessage: deliveryData.message,
+              deliveryFiles: uploadedAttachments.map(f => f.url),
               attachments: uploadedAttachments,
               isFinalDelivery: deliveryData.isFinal
-            },
-            setIsSubmittingDelivery
+            }
           );
-          console.log('✅ Revision completed successfully!');
+          
+          if (response.success) {
+            toast.success('Revision completed successfully!');
+          } else {
+            throw new Error(response.error || 'Failed to complete revision');
+          }
         } else {
-          // Initial delivery with email
-          console.log('📤 Delivering order with email...');
-          await marketplaceAPI.orders.deliverWithEmail(
+          // Initial delivery with email using marketplaceApi
+          const response = await marketplaceApi.orders.deliverOrder(
             deliveryData.orderId,
             {
               deliveryMessage: deliveryData.message,
+              deliveryFiles: uploadedAttachments.map(f => f.url),
               attachments: uploadedAttachments,
               isFinalDelivery: deliveryData.isFinal
-            },
-            setIsSubmittingDelivery
+            }
           );
-          console.log('✅ Order delivered successfully! Buyer has been notified via email.');
+          
+          if (response.success) {
+            toast.success('Order delivered successfully! Buyer has been notified.');
+          } else {
+            throw new Error(response.error || 'Failed to deliver order');
+          }
         }
       } catch (apiError: any) {
         console.error('❌ API Error:', apiError);
-        
-        // Handle specific API errors
-        if (apiError.message?.includes('Validation failed')) {
-          console.error('❌ Please check your delivery details and try again.');
-        } else if (apiError.message?.includes('not found')) {
-          console.error('❌ Order not found or you do not have permission.');
-        } else {
-          throw apiError; // Re-throw for outer catch
-        }
+        throw apiError;
       }
 
       // Success! Close modal and refresh
@@ -312,7 +419,6 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     } catch (error: any) {
       console.error('❌ Delivery error:', error);
       
-      // Show specific error messages in console only
       let errorMessage = 'Delivery failed. Please try again.';
       
       if (error.message?.includes('File type')) {
@@ -325,79 +431,13 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
         errorMessage = error.message;
       }
       
-      console.error(`❌ ${errorMessage}`);
+      toast.error(errorMessage);
     } finally {
       setIsSubmittingDelivery(false);
     }
   };
 
-  // ✅ DIRECT FILE UPLOAD FUNCTION WITHOUT TOASTS
-  const uploadFilesDirect = async (files: File[]) => {
-    try {
-      const formData = new FormData();
-      
-      // Log each file before uploading
-      files.forEach(file => {
-        console.log('📄 File to upload:', {
-          name: file.name,
-          type: file.type,
-          size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
-          extension: file.name.split('.').pop()?.toLowerCase()
-        });
-        formData.append('files', file);
-      });
-
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication required. Please login again.');
-      }
-
-      console.log('🌐 Sending file upload request...');
-      
-      const response = await fetch('http://localhost:3000/marketplace/orders/upload/delivery', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          // Don't set Content-Type for FormData, browser will set it automatically
-        },
-        body: formData,
-      });
-
-      console.log('📥 Upload response status:', response.status);
-      
-      const data = await response.json();
-      console.log('📦 Upload response:', data);
-
-      if (!response.ok) {
-        throw new Error(data.error || data.message || `Upload failed with status ${response.status}`);
-      }
-
-      if (data.success) {
-        return data.files;
-      } else {
-        throw new Error(data.error || 'Upload failed');
-      }
-    } catch (error: any) {
-      console.error('❌ Upload error details:', {
-        message: error.message,
-        name: error.name,
-        stack: error.stack
-      });
-      throw error;
-    }
-  };
-
-  // For revision completion:
-  const handleCompleteRevision = async (order: Order) => {
-    try {
-      setSelectedOrderForDelivery(order);
-      setDeliveryModalOpen(true);
-    } catch (error: any) {
-      console.error('❌ Revision setup error:', error);
-      console.error(`❌ ${error.message || 'Failed to start revision'}`);
-    }
-  };
-
+  // Get priority color
   const getPriorityColor = (status: string) => {
     switch (status) {
       case 'in_revision':
@@ -415,13 +455,14 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     }
   };
 
+  // Get status action
   const getStatusAction = (order: Order) => {
     switch (order.status) {
       case 'paid':
         return {
           text: 'Start Processing',
           color: 'yellow',
-          onClick: () => onStartProcessing?.(order._id),
+          onClick: () => handleStartProcessing(order._id),
           description: 'Begin preparing this order',
           icon: '⚙️'
         };
@@ -429,7 +470,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
         return {
           text: 'Start Work',
           color: 'green',
-          onClick: () => onStartWork?.(order._id),
+          onClick: () => handleStartWork(order._id),
           description: 'Begin working on deliverables',
           icon: '🛠️'
         };
@@ -462,6 +503,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     }
   };
 
+  // Calculate delivery date
   const calculateDeliveryDate = (createdAt: string, expectedDays?: number) => {
     if (!expectedDays) return null;
     const date = new Date(createdAt);
@@ -469,6 +511,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     return date;
   };
 
+  // Get days remaining
   const getDaysRemaining = (deliveryDate: Date) => {
     const today = new Date();
     const diffTime = deliveryDate.getTime() - today.getTime();
@@ -476,8 +519,18 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     return diffDays;
   };
 
+  // Get priority badge
   const getPriorityBadge = (order: Order) => {
-    const deliveryDate = calculateDeliveryDate(order.createdAt, order.expectedDays || 7);
+    // Use expectedDelivery from order or calculate
+    let deliveryDate: Date | null = null;
+    
+    if (order.expectedDelivery) {
+      deliveryDate = new Date(order.expectedDelivery);
+    } else {
+      // Default to 7 days if no expected delivery
+      deliveryDate = calculateDeliveryDate(order.createdAt, 7);
+    }
+    
     if (!deliveryDate) return null;
     
     const daysRemaining = getDaysRemaining(deliveryDate);
@@ -529,10 +582,18 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
 
     // Check file extension
     if (!allowedExtensions.includes(fileExtension)) {
-      return `File type "${fileExtension}" is not supported. Allowed: ${allowedExtensions.join(', ')}`;
+      return `File type "${fileExtension}" is not supported.`;
     }
 
     return null; // File is valid
+  };
+
+  // Get currency from order
+  const getOrderCurrency = (order: Order): string => {
+    if (typeof order.listingId === 'object' && order.listingId.currency) {
+      return order.listingId.currency;
+    }
+    return 'USD';
   };
 
   return (
@@ -576,12 +637,12 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
               <button
                 onClick={() => {
                   const order = orders.find(o => o._id === showCancelConfirm);
-                  if (order) confirmCancelOrder(order);
+                  if (order) handleCancelOrder(order);
                 }}
                 className="flex-1 px-4 py-2.5 text-white bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded-xl transition-all duration-200 font-medium shadow-sm hover:shadow"
-                disabled={actionLoading === showCancelConfirm}
+                disabled={processingActions[showCancelConfirm]}
               >
-                {actionLoading === showCancelConfirm ? (
+                {processingActions[showCancelConfirm] ? (
                   <>
                     <svg className="animate-spin h-4 w-4 inline mr-2" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -720,11 +781,11 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
             {filteredOrders.map(order => {
               const statusInfo = getOrderStatusInfo(order.status);
               const action = getStatusAction(order);
-              const deliveryDate = calculateDeliveryDate(order.createdAt, order.expectedDays || 7);
-              const daysRemaining = deliveryDate ? getDaysRemaining(deliveryDate) : null;
-              const isExpanded = expandedOrderId === order._id;
               const priorityBadge = getPriorityBadge(order);
               const cancelConfig = getCancelConfig(order);
+              const currency = getOrderCurrency(order);
+              const isExpanded = expandedOrderId === order._id;
+              const isLoading = processingActions[order._id] || false;
 
               return (
                 <div 
@@ -744,7 +805,9 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <h3 className="font-semibold text-gray-900">
-                              {order.listingId?.title || 'Order'}
+                              {typeof order.listingId === 'object' 
+                                ? order.listingId.title 
+                                : 'Order #' + order.orderNumber}
                             </h3>
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                               order.status === 'in_revision' ? 'bg-red-100 text-red-800' :
@@ -765,27 +828,23 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                           <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
                             <div className="flex items-center">
                               <span className="mr-1">👤</span>
-                              <span>{order.buyerId?.username || 'Buyer'}</span>
+                              <span>{order.buyerId?.username || order.buyerId?.email || 'Buyer'}</span>
                             </div>
                             <div className="flex items-center">
                               <span className="mr-1">💰</span>
-                              <span className="font-medium text-green-600">{formatCurrencyshow(order.amount || 0)}</span>
+                              <span className="font-medium text-green-600">
+                                {formatCurrencyShow(order.amount, currency)}
+                              </span>
                             </div>
                             <div className="flex items-center">
                               <span className="mr-1">📅</span>
                               <span>{formatDate(order.createdAt)}</span>
                             </div>
-                            {daysRemaining !== null && (
+                            {order.expectedDelivery && (
                               <div className="flex items-center">
                                 <span className="mr-1">⏳</span>
-                                <span className={
-                                  daysRemaining <= 0 ? 'text-red-600 font-medium' :
-                                  daysRemaining <= 2 ? 'text-orange-600 font-medium' :
-                                  'text-amber-600'
-                                }>
-                                  {daysRemaining <= 0 
-                                    ? 'Overdue!' 
-                                    : `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining`}
+                                <span className="text-amber-600">
+                                  Due: {formatDate(order.expectedDelivery)}
                                 </span>
                               </div>
                             )}
@@ -831,7 +890,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                     <div className="flex flex-col sm:flex-row lg:flex-col items-start sm:items-center lg:items-end gap-4 lg:gap-2">
                       <div className="text-right">
                         <p className="text-2xl font-bold text-green-600">
-                          {formatCurrencyshow(order.amount || 0)}
+                          {formatCurrencyShow(order.amount, currency)}
                         </p>
                         <p className="text-sm text-gray-500">
                           Order #{order.orderNumber || order._id.slice(-6)}
@@ -842,7 +901,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                         {action && action.onClick && (
                           <button
                             onClick={action.onClick}
-                            disabled={actionLoading === order._id || isSubmittingDelivery}
+                            disabled={isLoading || isSubmittingDelivery}
                             className={`px-4 py-2.5 text-sm font-medium text-white rounded-xl transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow flex items-center gap-2 ${
                               action.color === 'yellow' ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700' :
                               action.color === 'green' ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700' :
@@ -851,7 +910,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                               'bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700'
                             }`}
                           >
-                            {(actionLoading === order._id || isSubmittingDelivery) ? (
+                            {isLoading ? (
                               <>
                                 <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -868,12 +927,12 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                           </button>
                         )}
 
-                        {/* Cancel Button with Conditional Logic */}
-                        {cancelConfig.canCancel && onCancel && (
+                        {/* Cancel Button */}
+                        {cancelConfig.canCancel && (
                           <div className="relative group">
                             <button
-                              onClick={() => handleCancelOrder(order)}
-                              disabled={actionLoading === order._id || isSubmittingDelivery}
+                              onClick={() => setShowCancelConfirm(order._id)}
+                              disabled={isLoading || isSubmittingDelivery}
                               className="px-4 py-2.5 text-sm font-medium text-red-700 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 rounded-xl transition-all duration-200 disabled:opacity-50 border border-red-200 flex items-center gap-2 group-hover:shadow-sm"
                             >
                               <span>❌</span>
@@ -947,7 +1006,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                               {action.onClick && (
                                 <button
                                   onClick={action.onClick}
-                                  disabled={actionLoading === order._id || isSubmittingDelivery}
+                                  disabled={isLoading || isSubmittingDelivery}
                                   className="w-full px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 disabled:opacity-50 shadow-md flex items-center justify-center gap-2"
                                 >
                                   <span>{action.icon}</span>
@@ -967,17 +1026,10 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                               <span className="font-medium">{formatDate(order.createdAt)}</span>
                             </div>
                             
-                            {deliveryDate && (
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">Expected Delivery</span>
-                                <span className="font-medium">{formatDate(deliveryDate.toISOString())}</span>
-                              </div>
-                            )}
-                            
                             {order.expectedDelivery && (
                               <div className="flex justify-between">
-                                <span className="text-gray-600">Original ETA</span>
-                                <span className="font-medium">{order.expectedDelivery}</span>
+                                <span className="text-gray-600">Expected Delivery</span>
+                                <span className="font-medium">{formatDate(order.expectedDelivery)}</span>
                               </div>
                             )}
                             
@@ -993,41 +1045,22 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                               </div>
                             )}
                             
-                            {/* Cancellation Status */}
-                            <div className="mt-3 p-3 rounded-lg border ${
-                              cancelConfig.canCancel 
-                                ? 'bg-red-50 border-red-200' 
-                                : 'bg-gray-50 border-gray-200'
-                            }">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className={`font-medium ${
-                                    cancelConfig.canCancel ? 'text-red-800' : 'text-gray-800'
-                                  }`}>
-                                    {cancelConfig.canCancel ? '✅ Can be cancelled' : '❌ Cannot be cancelled'}
-                                  </p>
-                                  <p className="text-sm ${
-                                    cancelConfig.canCancel ? 'text-red-700' : 'text-gray-600'
-                                  }">
-                                    {cancelConfig.message}
-                                  </p>
-                                </div>
-                                {cancelConfig.canCancel && (
-                                  <button
-                                    onClick={() => handleCancelOrder(order)}
-                                    className="px-3 py-1.5 text-sm text-red-700 bg-white border border-red-300 hover:bg-red-50 rounded-lg transition-colors"
-                                  >
-                                    Cancel Now
-                                  </button>
-                                )}
-                              </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Payment Status</span>
+                              <span className={`font-medium ${
+                                order.paymentStatus === 'paid' ? 'text-green-600' :
+                                order.paymentStatus === 'pending' ? 'text-yellow-600' :
+                                'text-red-600'
+                              }`}>
+                                {order.paymentStatus?.replace('_', ' ') || 'N/A'}
+                              </span>
                             </div>
                             
-                            {order.notes && (
-                              <div className="mt-4 p-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+                            {order.requirements && (
+                              <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border border-blue-200">
                                 <p className="text-sm text-blue-800">
-                                  <span className="font-medium">Buyer Notes: </span>
-                                  {order.notes}
+                                  <span className="font-medium">Requirements: </span>
+                                  {order.requirements}
                                 </p>
                               </div>
                             )}
@@ -1045,16 +1078,22 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                                   View Full Details
                                 </button>
                                 <button
-                                  onClick={() => window.open(`/messages?order=${order._id}`, '_blank')}
+                                  onClick={() => window.open(`/marketplace/messages?order=${order._id}`, '_blank')}
                                   disabled={isSubmittingDelivery}
                                   className="px-3 py-1.5 text-xs bg-gradient-to-r from-green-50 to-green-100 text-green-700 rounded-lg hover:from-green-100 hover:to-green-200 transition-all duration-200 border border-green-200 flex items-center gap-1 disabled:opacity-50"
                                 >
                                   <span>💬</span>
                                   Message Buyer
                                 </button>
-                                {order.listingId?.mediaUrls?.[0] && onPlayVideo && (
+                                {typeof order.listingId === 'object' && 
+                                 order.listingId.mediaUrls && 
+                                 order.listingId.mediaUrls.length > 0 && 
+                                 onPlayVideo && (
                                   <button
-                                    onClick={() => onPlayVideo(order.listingId.mediaUrls![0], order.listingId.title)}
+                                    onClick={() => onPlayVideo(
+                                      order.listingId.mediaUrls![0], 
+                                      order.listingId.title
+                                    )}
                                     disabled={isSubmittingDelivery}
                                     className="px-3 py-1.5 text-xs bg-gradient-to-r from-purple-50 to-purple-100 text-purple-700 rounded-lg hover:from-purple-100 hover:to-purple-200 transition-all duration-200 border border-purple-200 flex items-center gap-1 disabled:opacity-50"
                                   >
@@ -1063,7 +1102,10 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                                   </button>
                                 )}
                                 <button
-                                  onClick={() => navigator.clipboard.writeText(order.orderNumber || order._id)}
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(order.orderNumber || order._id);
+                                    toast.success('Order ID copied to clipboard!');
+                                  }}
                                   disabled={isSubmittingDelivery}
                                   className="px-3 py-1.5 text-xs bg-gradient-to-r from-gray-50 to-gray-100 text-gray-700 rounded-lg hover:from-gray-100 hover:to-gray-200 transition-all duration-200 border border-gray-200 flex items-center gap-1 disabled:opacity-50"
                                 >
@@ -1084,27 +1126,6 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
         )}
       </div>
 
-      {/* Bulk Actions */}
-      {filteredOrders.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-yellow-200 p-6">
-          <h3 className="font-medium text-gray-900 mb-4">Bulk Actions</h3>
-          <div className="flex flex-wrap gap-3">
-            <button className="px-4 py-2.5 text-sm bg-gradient-to-r from-yellow-50 to-yellow-100 text-yellow-700 rounded-lg hover:from-yellow-100 hover:to-yellow-200 transition-all duration-200 border border-yellow-300 flex items-center gap-2">
-              <span>📊</span>
-              Export Orders (CSV)
-            </button>
-            <button className="px-4 py-2.5 text-sm bg-gradient-to-r from-green-50 to-green-100 text-green-700 rounded-lg hover:from-green-100 hover:to-green-200 transition-all duration-200 border border-green-300 flex items-center gap-2">
-              <span>📧</span>
-              Send Bulk Message
-            </button>
-            <button className="px-4 py-2.5 text-sm bg-gradient-to-r from-gray-50 to-gray-100 text-gray-700 rounded-lg hover:from-gray-100 hover:to-gray-200 transition-all duration-200 border border-gray-300 flex items-center gap-2">
-              <span>🖨️</span>
-              Print Order Summaries
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Delivery Modal */}
       {deliveryModalOpen && selectedOrderForDelivery && (
         <DeliveryModal
@@ -1115,8 +1136,8 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
           }}
           order={selectedOrderForDelivery}
           onDeliver={handleActualDeliver}
-          isLoading={actionLoading === selectedOrderForDelivery._id || isSubmittingDelivery}
-          validateFile={validateFileBeforeUpload} // ✅ Pass validation function to modal
+          isLoading={processingActions[selectedOrderForDelivery._id] || isSubmittingDelivery}
+          validateFile={validateFileBeforeUpload}
         />
       )}
     </div>
