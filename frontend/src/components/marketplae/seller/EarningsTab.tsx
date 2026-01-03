@@ -1,6 +1,6 @@
 // EarningsTab component میں (اگر آپ کا ہے):
 import React from 'react';
-import { SellerStats } from '../../api/marketplaceApi';
+import { SellerStats } from '../../../api/marketplaceApi';
 
 interface EarningsTabProps {
   sellerStats: SellerStats | null;
