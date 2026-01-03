@@ -85,42 +85,20 @@ interface WithdrawalHistory {
     pages: number;
   };
 }
-// SellerDashboard.tsx میں formatCurrency function
 
-const formatCurrency = (amount: number): string => {
-  if (amount === undefined || amount === null) return '$0.00';
+// For now, create a simple formatCurrency function
+const formatCurrency = (amount: number) => {
+  // If amount is less than 100, assume it's already in dollars
+  if (amount < 100) {
+    return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
   
-  // ✅ ALWAYS assume amount is in cents and convert to dollars
+  // Otherwise, assume it's cents and convert to dollars
   const amountInDollars = amount / 100;
-  
   return `$${amountInDollars.toLocaleString('en-US', { 
     minimumFractionDigits: 2, 
     maximumFractionDigits: 2 
   })}`;
-};
-
-// یا safe version بنائیں
-const safeFormatCurrency = (amount: number | undefined): string => {
-  if (amount === undefined || amount === null || isNaN(amount)) {
-    return '$0.00';
-  }
-  
-  // Determine if amount is in cents or dollars
-  // If amount is less than 1000 and has more than 2 decimal places in cents
-  if (amount < 1000 && amount % 1 !== 0) {
-    // Likely already in dollars (like 999.00)
-    return `$${amount.toLocaleString('en-US', { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 2 
-    })}`;
-  } else {
-    // Likely in cents (like 99900)
-    const amountInDollars = amount / 100;
-    return `$${amountInDollars.toLocaleString('en-US', { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 2 
-    })}`;
-  }
 };
 
 // Simple fallback components
@@ -272,59 +250,18 @@ const SellerDashboard: React.FC = () => {
     }
   ]);
 
-  // ✅ Calculate order stats from orders - UPDATED for cents to dollars
-const calculateOrderStats = useCallback((orders: Order[]): OrderStats => {
-  const now = new Date();
-  const thisMonth = now.getMonth();
-  const thisYear = now.getFullYear();
-  
-  const thisMonthOrders = orders.filter(order => {
-    const orderDate = new Date(order.createdAt);
-    return orderDate.getMonth() === thisMonth && 
-           orderDate.getFullYear() === thisYear;
-  });
+  // ✅ Calculate order stats from orders
+  const calculateOrderStats = useCallback((orders: Order[]): OrderStats => {
+    const now = new Date();
+    const thisMonth = now.getMonth();
+    const thisYear = now.getFullYear();
+    
+    const thisMonthOrders = orders.filter(order => {
+      const orderDate = new Date(order.createdAt);
+      return orderDate.getMonth() === thisMonth && 
+             orderDate.getFullYear() === thisYear;
+    });
 
-  // ✅ IMPORTANT: Convert cents to dollars when calculating
-  const completedRevenue = orders
-    .filter(order => order.status === 'completed')
-    .reduce((sum, order) => sum + (order.amount || 0), 0) / 100; // Convert to dollars
-
-  const pendingRevenue = orders
-    .filter(order => {
-      const excludedStatuses = ['completed', 'cancelled', 'refunded'];
-      return !excludedStatuses.includes(order.status);
-    })
-    .reduce((sum, order) => sum + (order.amount || 0), 0) / 100; // Convert to dollars
-
-  const thisMonthRevenue = thisMonthOrders
-    .filter(order => order.status === 'completed')
-    .reduce((sum, order) => sum + (order.amount || 0), 0) / 100; // Convert to dollars
-
-  const statusCounts = orders.reduce((acc, order) => {
-    acc[order.status] = (acc[order.status] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  return {
-    totalOrders: orders.length,
-    activeOrders: orders.filter(order => 
-      ['pending', 'pending_payment', 'paid', 'processing', 'in_progress', 
-       'delivered', 'in_revision', 'disputed'].includes(order.status)
-    ).length,
-    pendingPayment: statusCounts['pending_payment'] || 0,
-    processing: statusCounts['processing'] || 0,
-    inProgress: statusCounts['in_progress'] || 0,
-    delivered: statusCounts['delivered'] || 0,
-    completed: statusCounts['completed'] || 0,
-    cancelled: statusCounts['cancelled'] || 0,
-    totalRevenue: completedRevenue, // Already in dollars
-    pendingRevenue: pendingRevenue, // Already in dollars
-    thisMonthOrders: thisMonthOrders.length,
-    thisMonthRevenue: thisMonthRevenue, // Already in dollars
-    availableBalance: stripeStatus?.account?.charges_enabled ? 
-      (stripeStatus.account.balance || 0) / 100 : 0 // Convert cents to dollars
-  };
-}, [stripeStatus]);
     // Calculate total revenue (amount is in cents)
     const totalRevenue = orders
       .filter(order => order.status === 'completed')
