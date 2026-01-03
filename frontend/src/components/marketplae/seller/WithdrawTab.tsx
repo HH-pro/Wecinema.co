@@ -1,7 +1,7 @@
 // src/components/marketplace/seller/WithdrawTab.tsx - UPDATED VERSION
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import marketplaceApi, { formatCurrency as apiFormatCurrency } from '../../../api/marketplaceApi';
+import marketplaceApi from '../../../api/marketplaceApi';
 
 interface WithdrawTabProps {
   stripeStatus?: any;
@@ -24,18 +24,8 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
   onPageChange,
   onWithdrawRequest,
   onRefresh,
-  // ✅ DEFAULT VALUE SET FROM MARKETPLACE API
-  formatCurrency = marketplaceApi.utils?.formatCurrency || apiFormatCurrency || ((amount) => {
-    // Fallback if API formatCurrency is not available
-    if (amount === undefined || amount === null || isNaN(amount)) {
-      return '$0.00';
-    }
-    const amountInDollars = amount / 100;
-    return `$${amountInDollars.toLocaleString('en-US', { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 2 
-    })}`;
-  })
+  // ✅ STRICTLY USING MARKETPLACE API FORMATCURRENCY ONLY
+  formatCurrency = marketplaceApi.utils.formatCurrency
 }) => {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
@@ -536,7 +526,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
             <div>
               <p className="text-sm font-medium text-green-800">Available to Withdraw</p>
               <p className="text-3xl font-bold text-green-900 mt-2">
-                {/* ✅ USING MARKETPLACE API FORMATCURRENCY */}
+                {/* ✅ STRICTLY USING MARKETPLACE API FORMATCURRENCY */}
                 {formatCurrency(availableBalance)}
               </p>
               <p className="text-sm text-green-700 mt-2">
@@ -565,7 +555,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                 {withdrawalStats?.pendingOrders || 0}
               </p>
               <p className="text-sm text-blue-700 mt-2">
-                {/* ✅ USING MARKETPLACE API FORMATCURRENCY */}
+                {/* ✅ STRICTLY USING MARKETPLACE API FORMATCURRENCY */}
                 {formatCurrency((withdrawalStats?.pendingRevenue || 0) * 100)}
               </p>
             </div>
@@ -579,7 +569,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
             <div>
               <p className="text-sm font-medium text-purple-800">Total Withdrawn</p>
               <p className="text-3xl font-bold text-purple-900 mt-2">
-                {/* ✅ USING MARKETPLACE API FORMATCURRENCY */}
+                {/* ✅ STRICTLY USING MARKETPLACE API FORMATCURRENCY */}
                 {formatCurrency(totalWithdrawn)}
               </p>
               <p className="text-sm text-purple-700 mt-2">
@@ -599,7 +589,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
             <div className="bg-gray-50 rounded-xl p-4">
               <p className="text-sm font-medium text-gray-600">Total Revenue</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
-                {/* ✅ USING MARKETPLACE API FORMATCURRENCY */}
+                {/* ✅ STRICTLY USING MARKETPLACE API FORMATCURRENCY */}
                 {formatCurrency((withdrawalStats.totalRevenue || 0) * 100)}
               </p>
             </div>
@@ -618,7 +608,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
             <div className="bg-gray-50 rounded-xl p-4">
               <p className="text-sm font-medium text-gray-600">Platform Fee (10%)</p>
               <p className="text-lg font-bold text-gray-900 mt-1">
-                {/* ✅ USING MARKETPLACE API FORMATCURRENCY */}
+                {/* ✅ STRICTLY USING MARKETPLACE API FORMATCURRENCY */}
                 {formatCurrency(((withdrawalStats.totalRevenue || 0) * 0.1) * 100)}
               </p>
             </div>
@@ -888,7 +878,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
-                        {/* ✅ USING MARKETPLACE API FORMATCURRENCY */}
+                        {/* ✅ STRICTLY USING MARKETPLACE API FORMATCURRENCY */}
                         {formatCurrency(payout.amount)}
                       </div>
                     </td>
