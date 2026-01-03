@@ -324,119 +324,61 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
     }
   };
 
-  // ✅ IMPROVED FILE UPLOAD FUNCTION WITH marketplaceApi
-  const handleActualDeliver = async (deliveryData: {
-    orderId: string;
-    message: string;
-    attachments: File[];
-    isFinal: boolean;
-    revisionsLeft?: number;
-  }) => {
+ // ✅ TEST FUNCTION FOR DEBUGGING
+const testDeliveryFlow = async () => {
+  try {
+    console.log('🧪 Testing delivery flow...');
+    
+    // Test 1: Check auth token
+    const token = localStorage.getItem('token');
+    console.log('🔑 Token exists:', !!token);
+    
+    // Test 2: Check API base URL
+    console.log('🌐 API Base URL:', marketplaceApi.utils.getApiBaseUrl());
+    
+    // Test 3: Test file upload endpoint
+    console.log('📤 Testing file upload endpoint...');
     try {
-      setIsSubmittingDelivery(true);
-      
-      console.log('🚀 Starting delivery process...', {
-        orderId: deliveryData.orderId,
-        messageLength: deliveryData.message?.length,
-        filesCount: deliveryData.attachments?.length,
-        isFinal: deliveryData.isFinal
+      const testResponse = await fetch('http://localhost:3000/marketplace/orders/upload/delivery', {
+        method: 'OPTIONS',
       });
-
-      let uploadedAttachments: any[] = [];
-
-      // Upload files if available
-      if (deliveryData.attachments && deliveryData.attachments.length > 0) {
-        console.log('📤 Uploading files...', deliveryData.attachments.length);
-        
-        try {
-          // Use marketplaceApi for file upload
-          const uploadResponse = await marketplaceApi.orders.uploadDeliveryFiles(deliveryData.attachments);
-          
-          if (uploadResponse.success && uploadResponse.data) {
-            uploadedAttachments = uploadResponse.data.files || [];
-            console.log('✅ Files uploaded successfully:', uploadedAttachments);
-          } else {
-            throw new Error(uploadResponse.error || 'File upload failed');
-          }
-        } catch (uploadError: any) {
-          console.error('❌ File upload error:', uploadError);
-          toast.error(uploadError.message || 'Failed to upload files');
-          return;
-        }
-      }
-
-      // Determine if this is a revision or initial delivery
-      const isRevision = selectedOrderForDelivery?.status === 'in_revision';
-      console.log('🔄 Is revision?', isRevision);
-      
-      try {
-        if (isRevision) {
-          // Complete revision using marketplaceApi
-          const response = await marketplaceApi.orders.completeRevision(
-            deliveryData.orderId,
-            {
-              deliveryMessage: deliveryData.message,
-              deliveryFiles: uploadedAttachments.map(f => f.url),
-              attachments: uploadedAttachments,
-              isFinalDelivery: deliveryData.isFinal
-            }
-          );
-          
-          if (response.success) {
-            toast.success('Revision completed successfully!');
-          } else {
-            throw new Error(response.error || 'Failed to complete revision');
-          }
-        } else {
-          // Initial delivery with email using marketplaceApi
-          const response = await marketplaceApi.orders.deliverOrder(
-            deliveryData.orderId,
-            {
-              deliveryMessage: deliveryData.message,
-              deliveryFiles: uploadedAttachments.map(f => f.url),
-              attachments: uploadedAttachments,
-              isFinalDelivery: deliveryData.isFinal
-            }
-          );
-          
-          if (response.success) {
-            toast.success('Order delivered successfully! Buyer has been notified.');
-          } else {
-            throw new Error(response.error || 'Failed to deliver order');
-          }
-        }
-      } catch (apiError: any) {
-        console.error('❌ API Error:', apiError);
-        throw apiError;
-      }
-
-      // Success! Close modal and refresh
-      console.log('🎉 Delivery successful, refreshing orders...');
-      setDeliveryModalOpen(false);
-      setSelectedOrderForDelivery(null);
-      onRefresh();
-      
-    } catch (error: any) {
-      console.error('❌ Delivery error:', error);
-      
-      let errorMessage = 'Delivery failed. Please try again.';
-      
-      if (error.message?.includes('File type')) {
-        errorMessage = 'Invalid file type. Please check allowed file formats.';
-      } else if (error.message?.includes('size')) {
-        errorMessage = 'File too large. Maximum size is 100MB.';
-      } else if (error.message?.includes('network') || error.message?.includes('Network Error')) {
-        errorMessage = 'Network error. Please check your internet connection.';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      toast.error(errorMessage);
-    } finally {
-      setIsSubmittingDelivery(false);
+      console.log('✅ Upload endpoint accessible:', testResponse.ok);
+    } catch (error) {
+      console.error('❌ Upload endpoint not accessible:', error);
     }
-  };
+    
+    // Test 4: Test deliver endpoint
+    if (selectedOrderForDelivery) {
+      console.log('📦 Testing deliver endpoint for order:', selectedOrderForDelivery._id);
+      try {
+        const deliverResponse = await fetch(
+          `http://localhost:3000/marketplace/orders/${selectedOrderForDelivery._id}/deliver-with-email`,
+          { method: 'OPTIONS' }
+        );
+        console.log('✅ Deliver endpoint accessible:', deliverResponse.ok);
+      } catch (error) {
+        console.error('❌ Deliver endpoint not accessible:', error);
+      }
+    }
+    
+    console.log('✅ All tests completed');
+    
+  } catch (error) {
+    console.error('❌ Test failed:', error);
+  }
+};
 
+// OrdersTab mein call karein jab modal open ho
+useEffect(() => {
+  if (deliveryModalOpen && selectedOrderForDelivery) {
+    console.log('🔍 Debug info for delivery:', {
+      order: selectedOrderForDelivery,
+      status: selectedOrderForDelivery.status,
+      id: selectedOrderForDelivery._id
+    });
+    // testDeliveryFlow(); // Uncomment for debugging
+  }
+}, [deliveryModalOpen, selectedOrderForDelivery]);
   // Get priority color
   const getPriorityColor = (status: string) => {
     switch (status) {
