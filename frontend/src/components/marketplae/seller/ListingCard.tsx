@@ -135,7 +135,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
               {listing.sellerId?.username || 'Seller'}
             </span>
           </div>
-          <div className="text-green-600 font-bold flex items-center gap-1">
+          <div className="text-yellow-600 font-bold flex items-center gap-1">
             <FiDollarSign size={14} />
             {marketplaceApi.utils.formatCurrency(listing.price)}
           </div>
