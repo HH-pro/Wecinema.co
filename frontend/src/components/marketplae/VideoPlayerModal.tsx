@@ -1,11 +1,11 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { 
   FiX, FiPlay, FiPause, FiVolume2, FiVolumeX, FiMaximize, 
-  FiMinimize, FiDownload, FiInfo, FiClock, FiVolume, FiSkipBack, FiSkipForward 
+  FiMinimize, FiDownload, FiInfo, FiClock, FiSkipBack, FiSkipForward,
+  FiSettings, FiRotateCw, FiCornerUpRight
 } from 'react-icons/fi';
-import { BsFillPlayFill, BsFillPauseFill, BsFillVolumeUpFill, BsFillVolumeMuteFill } from 'react-icons/bs';
+import { BsFillPlayFill, BsFillPauseFill } from 'react-icons/bs';
 import { HiOutlineInformationCircle } from 'react-icons/hi';
-import { TbPlayerTrackNextFilled, TbPlayerTrackPrevFilled } from 'react-icons/tb';
 
 interface VideoPlayerModalProps {
   show: boolean;
@@ -37,33 +37,36 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const [showControls, setShowControls] = useState(true);
   const [videoSrc, setVideoSrc] = useState<string>('');
   const [isVideoHovered, setIsVideoHovered] = useState(false);
+  const [showQualityMenu, setShowQualityMenu] = useState(false);
+  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const controlsTimeoutRef = useRef<NodeJS.Timeout>();
   const lastClickTimeRef = useRef<number>(0);
 
+  // Auto-play when modal opens
   useEffect(() => {
     if (show && videoUrl) {
       // Lock body scroll
       document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.width = '100%';
-      document.body.style.height = '100%';
       
       // Reset and load video
       setIsLoading(true);
       setError('');
       setVideoSrc(videoUrl);
       
-      // Focus modal for keyboard shortcuts
-      setTimeout(() => {
-        modalRef.current?.focus();
-      }, 100);
+      // Auto-play after a short delay
+      const autoPlayTimer = setTimeout(() => {
+        const video = videoRef.current;
+        if (video && video.paused) {
+          video.play().catch(err => {
+            console.log('Auto-play blocked:', err);
+            // Don't show error for autoplay block
+          });
+        }
+      }, 300);
 
       return () => {
-        // Cleanup styles
+        clearTimeout(autoPlayTimer);
         document.body.style.overflow = '';
-        document.body.style.position = '';
-        document.body.style.width = '';
-        document.body.style.height = '';
       };
     }
   }, [show, videoUrl]);
@@ -89,13 +92,13 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     const handleLoadedMetadata = () => {
       setDuration(video.duration);
       setIsLoading(false);
-      // Set initial volume
       video.volume = volume;
       video.muted = isMuted;
     };
     
     const handleEnded = () => {
       setIsPlaying(false);
+      video.currentTime = 0;
     };
     
     const handleVolumeChange = () => {
@@ -103,21 +106,12 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       setVolume(video.volume);
     };
     
-    const handleError = (e: Event) => {
-      console.error('Video error:', e);
-      setError('Unable to play video. Please check the video format and try again.');
+    const handleError = () => {
+      setError('Unable to play video. Please check your connection.');
       setIsLoading(false);
     };
     
     const handleCanPlay = () => {
-      setIsLoading(false);
-    };
-
-    const handleWaiting = () => {
-      setIsLoading(true);
-    };
-
-    const handlePlaying = () => {
       setIsLoading(false);
     };
 
@@ -130,15 +124,12 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     video.addEventListener('volumechange', handleVolumeChange);
     video.addEventListener('error', handleError);
     video.addEventListener('canplay', handleCanPlay);
-    video.addEventListener('waiting', handleWaiting);
-    video.addEventListener('playing', handlePlaying);
 
     // Initialize video
     video.volume = volume;
     video.muted = isMuted;
 
     return () => {
-      // Remove event listeners
       video.removeEventListener('play', handlePlay);
       video.removeEventListener('pause', handlePause);
       video.removeEventListener('timeupdate', handleTimeUpdate);
@@ -147,8 +138,6 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       video.removeEventListener('volumechange', handleVolumeChange);
       video.removeEventListener('error', handleError);
       video.removeEventListener('canplay', handleCanPlay);
-      video.removeEventListener('waiting', handleWaiting);
-      video.removeEventListener('playing', handlePlaying);
     };
   }, [videoSrc, volume, isMuted]);
 
@@ -198,9 +187,8 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
       switch (e.key) {
         case ' ':
-        case 'Spacebar':
           e.preventDefault();
-          handleVideoClick(); // Video par click simulate karo
+          handleVideoClick();
           break;
         case 'f':
         case 'F':
@@ -254,15 +242,13 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Video par click handler (FIXED)
   const handleVideoClick = () => {
     const video = videoRef.current;
     if (!video) return;
     
     const now = Date.now();
-    const DOUBLE_CLICK_THRESHOLD = 300; // milliseconds
+    const DOUBLE_CLICK_THRESHOLD = 300;
     
-    // Double click check for fullscreen
     if (now - lastClickTimeRef.current < DOUBLE_CLICK_THRESHOLD) {
       handleFullscreen();
       lastClickTimeRef.current = 0;
@@ -271,16 +257,9 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     
     lastClickTimeRef.current = now;
     
-    // Single click - toggle play/pause
     try {
       if (video.paused || video.ended) {
-        const playPromise = video.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(err => {
-            console.log('Play error:', err);
-            // If autoplay is blocked, just show play button
-          });
-        }
+        video.play();
       } else {
         video.pause();
       }
@@ -291,8 +270,7 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     showControlsTemporarily();
   };
 
-  // Play/pause button handler (for button click only)
-  const handlePlayPauseButton = () => {
+  const handlePlayPause = () => {
     const video = videoRef.current;
     if (!video) return;
     
@@ -303,7 +281,7 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         video.pause();
       }
     } catch (error) {
-      console.error('Play/Pause button error:', error);
+      console.error('Play/Pause error:', error);
     }
     showControlsTemporarily();
   };
@@ -352,6 +330,10 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     
     video.muted = !video.muted;
     setIsMuted(video.muted);
+    if (!video.muted && volume === 0) {
+      video.volume = 0.5;
+      setVolume(0.5);
+    }
     showControlsTemporarily();
   };
 
@@ -361,6 +343,7 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     
     video.playbackRate = rate;
     setPlaybackRate(rate);
+    setShowSpeedMenu(false);
     showControlsTemporarily();
   };
 
@@ -384,7 +367,6 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       link.href = videoUrl;
       link.download = videoTitle || 'video.mp4';
       link.target = '_blank';
-      link.rel = 'noopener noreferrer';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -393,21 +375,10 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     }
   };
 
-  const isVideoUrl = (url: string): boolean => {
-    if (!url) return false;
-    
-    const videoExtensions = /\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v|ogg|ogv|3gp|3g2|mpg|mpeg)$/i;
-    return videoExtensions.test(url);
-  };
-
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       onClose();
     }
-  };
-
-  const handleModalClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
   };
 
   const handleVideoMouseEnter = () => {
@@ -419,88 +390,110 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     setIsVideoHovered(false);
   };
 
+  const restartVideo = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    
+    video.currentTime = 0;
+    if (video.paused) {
+      video.play();
+    }
+    showControlsTemporarily();
+  };
+
+  const isVideoUrl = (url: string): boolean => {
+    if (!url) return false;
+    const videoExtensions = /\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v|ogg|ogv|3gp|3g2|mpg|mpeg)$/i;
+    return videoExtensions.test(url);
+  };
+
+  // Close menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showQualityMenu || showSpeedMenu) {
+        setShowQualityMenu(false);
+        setShowSpeedMenu(false);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showQualityMenu, showSpeedMenu]);
+
   return (
     <div 
       ref={modalRef}
-      className="fixed inset-0 z-[10000] flex items-center justify-center bg-white/95 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/95 backdrop-blur-sm p-2 sm:p-4"
       onClick={handleBackdropClick}
       onMouseMove={showControlsTemporarily}
-      tabIndex={-1}
-      style={{ zIndex: 10000 }}
     >
-      {/* Modal Container - LIGHT THEME */}
+      {/* Modal Container */}
       <div 
-        className="relative w-full max-w-6xl max-h-[90vh] bg-white rounded-2xl overflow-hidden shadow-2xl border border-gray-200"
-        onClick={handleModalClick}
-        style={{ zIndex: 10001 }}
+        className="relative w-full max-w-6xl h-[90vh] sm:h-[85vh] bg-gradient-to-br from-gray-900 to-black rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl border border-gray-800"
+        onClick={(e) => e.stopPropagation()}
       >
-        {/* Header - LIGHT THEME */}
+        {/* Header */}
         <div 
-          className={`absolute top-0 left-0 right-0 z-30 bg-gradient-to-b from-white to-gray-50 p-4 border-b border-gray-200 transition-all duration-300 ${
+          className={`absolute top-0 left-0 right-0 z-30 bg-gradient-to-b from-black/95 to-transparent p-3 sm:p-4 transition-all duration-300 ${
             showControls ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10'
           }`}
         >
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-3 mb-1">
-                <div className="flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-lg border border-gray-200">
-                  <FiClock className="text-blue-600" size={14} />
-                  <span className="text-sm font-medium text-gray-800">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 bg-gray-800/80 px-3 py-1.5 rounded-lg border border-gray-700">
+                  <FiClock className="text-yellow-400" size={14} />
+                  <span className="text-sm font-medium text-white">
                     {formatTime(currentTime)} / {formatTime(duration)}
                   </span>
                 </div>
                 {playbackRate !== 1 && (
-                  <div className="bg-blue-100 px-2.5 py-1 rounded text-xs font-medium text-blue-700 border border-blue-200">
+                  <div className="bg-yellow-500/20 px-2.5 py-1 rounded text-xs font-medium text-yellow-300 border border-yellow-500/30">
                     {playbackRate}x
                   </div>
                 )}
               </div>
               
-              <h3 className="text-lg font-bold text-gray-900 truncate flex items-center gap-2">
-                <HiOutlineInformationCircle className="text-blue-600 flex-shrink-0" size={20} />
-                <span className="truncate">{videoTitle || 'Untitled Video'}</span>
+              <h3 className="text-base sm:text-lg font-bold text-white truncate flex items-center gap-2">
+                <HiOutlineInformationCircle className="text-yellow-400 flex-shrink-0" size={18} />
+                <span className="truncate">{videoTitle || 'Video Player'}</span>
               </h3>
-              
-              <div className="flex items-center gap-3 mt-1">
-                <div className="text-sm text-gray-600 truncate flex items-center gap-2 max-w-md">
-                  <span className="text-blue-500">●</span>
-                  <span className="truncate">{videoUrl}</span>
-                </div>
-              </div>
             </div>
             
-            <div className="flex items-center gap-2 ml-4">
-              {/* Download Button */}
+            <div className="flex items-center gap-1 sm:gap-2 ml-2">
               <button
-                onClick={handleDownload}
-                className="text-gray-700 hover:text-gray-900 p-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-300 transition-all duration-200 group"
-                title="Download Video"
+                onClick={restartVideo}
+                className="text-gray-300 hover:text-yellow-400 p-2 sm:p-2.5 rounded-lg hover:bg-white/10 transition-all duration-200 group"
+                title="Restart Video"
               >
-                <FiDownload size={18} className="group-hover:scale-110 transition-transform" />
+                <FiRotateCw size={16} className="sm:w-5 sm:h-5" />
               </button>
               
-              {/* Fullscreen Button */}
+              <button
+                onClick={handleDownload}
+                className="text-gray-300 hover:text-yellow-400 p-2 sm:p-2.5 rounded-lg hover:bg-white/10 transition-all duration-200 group"
+                title="Download"
+              >
+                <FiDownload size={16} className="sm:w-5 sm:h-5" />
+              </button>
+              
               <button
                 onClick={handleFullscreen}
-                className="text-gray-700 hover:text-gray-900 p-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-300 transition-all duration-200 group"
+                className="text-gray-300 hover:text-yellow-400 p-2 sm:p-2.5 rounded-lg hover:bg-white/10 transition-all duration-200 group"
                 title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
               >
                 {isFullscreen ? 
-                  <FiMinimize size={18} className="group-hover:scale-110 transition-transform" /> : 
-                  <FiMaximize size={18} className="group-hover:scale-110 transition-transform" />
+                  <FiMinimize size={16} className="sm:w-5 sm:h-5" /> : 
+                  <FiMaximize size={16} className="sm:w-5 sm:h-5" />
                 }
               </button>
               
-              {/* Close Button - LIGHT THEME */}
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClose();
-                }}
-                className="text-white hover:text-white p-2.5 rounded-lg bg-red-500 hover:bg-red-600 border border-red-600 transition-all duration-200 group shadow-md"
-                title="Close Player"
+                onClick={onClose}
+                className="text-white hover:text-white p-2 sm:p-2.5 rounded-lg bg-red-500 hover:bg-red-600 transition-all duration-200 group shadow-lg"
+                title="Close"
               >
-                <FiX size={22} className="group-hover:rotate-90 transition-transform duration-300" />
+                <FiX size={18} className="sm:w-6 sm:h-6" />
               </button>
             </div>
           </div>
@@ -509,31 +502,31 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         {/* Video Player Area */}
         <div 
           ref={videoContainerRef}
-          className="relative w-full h-[75vh] bg-gray-900 flex items-center justify-center"
+          className="relative w-full h-full bg-black flex items-center justify-center"
           onMouseEnter={handleVideoMouseEnter}
           onMouseLeave={handleVideoMouseLeave}
         >
           {error ? (
-            <div className="flex flex-col items-center justify-center h-full text-gray-800 p-8 text-center max-w-md bg-white rounded-xl m-4">
-              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-red-100 to-red-50 flex items-center justify-center mb-6 border border-red-200">
-                <FiX className="text-red-500" size={48} />
+            <div className="flex flex-col items-center justify-center h-full text-white p-4 sm:p-8 text-center max-w-md">
+              <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-red-500/20 flex items-center justify-center mb-4 sm:mb-6 border border-red-500/30">
+                <FiX className="text-red-400" size={32} />
               </div>
-              <h4 className="text-2xl font-bold text-gray-900 mb-3">Playback Error</h4>
-              <p className="text-gray-600 mb-6 text-lg">{error}</p>
-              <div className="flex gap-3">
+              <h4 className="text-xl sm:text-2xl font-bold text-white mb-2 sm:mb-3">Playback Error</h4>
+              <p className="text-gray-300 mb-4 sm:mb-6 text-sm sm:text-lg">{error}</p>
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                 <button
                   onClick={() => {
                     setError('');
                     setIsLoading(true);
                     setVideoSrc(videoUrl);
                   }}
-                  className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                  className="px-4 sm:px-6 py-2 sm:py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg transition-all duration-200"
                 >
-                  Retry Video
+                  Retry
                 </button>
                 <button
                   onClick={onClose}
-                  className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg transition-all duration-200 border border-gray-300"
+                  className="px-4 sm:px-6 py-2 sm:py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-lg transition-all duration-200"
                 >
                   Close
                 </button>
@@ -543,36 +536,22 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
             <>
               {/* Loading Overlay */}
               {isLoading && (
-                <div className="absolute inset-0 bg-gray-900 flex items-center justify-center z-20">
+                <div className="absolute inset-0 bg-black/90 flex items-center justify-center z-20">
                   <div className="text-center">
-                    <div className="relative inline-block mb-6">
-                      <div className="absolute inset-0 animate-pulse bg-blue-500/20 rounded-full blur-xl"></div>
-                      <div className="relative animate-spin rounded-full h-20 w-20 border-4 border-transparent border-t-blue-500 border-r-blue-400 border-b-blue-300 mx-auto"></div>
+                    <div className="relative inline-block mb-4 sm:mb-6">
+                      <div className="absolute inset-0 animate-pulse bg-yellow-500/20 rounded-full blur-xl"></div>
+                      <div className="relative animate-spin rounded-full h-12 w-12 sm:h-20 sm:w-20 border-4 border-transparent border-t-yellow-500 border-r-yellow-400 border-b-yellow-300 mx-auto"></div>
                     </div>
-                    <p className="text-white font-semibold text-lg mb-1">Loading Video...</p>
-                    <p className="text-gray-400 text-sm">Please wait while we prepare your video</p>
-                    <div className="mt-4 w-48 h-1.5 bg-gray-800 rounded-full overflow-hidden mx-auto">
-                      <div className="h-full bg-gradient-to-r from-blue-500 to-blue-400 animate-pulse"></div>
-                    </div>
+                    <p className="text-white font-semibold text-sm sm:text-lg mb-1">Loading Video...</p>
+                    <p className="text-gray-400 text-xs sm:text-sm">Please wait</p>
                   </div>
                 </div>
               )}
               
-              {/* Video Thumbnail */}
-              {videoThumbnail && !isPlaying && !isLoading && (
-                <div 
-                  className="absolute inset-0 bg-cover bg-center"
-                  style={{ 
-                    backgroundImage: `url(${videoThumbnail})`,
-                    filter: 'blur(20px) brightness(0.3)'
-                  }}
-                />
-              )}
-              
-              {/* Video Element - FIXED CLICK HANDLER */}
+              {/* Video Element */}
               {isVideoUrl(videoUrl) && videoSrc ? (
                 <div 
-                  className="relative w-full h-full cursor-pointer group"
+                  className="relative w-full h-full cursor-pointer"
                   onClick={handleVideoClick}
                 >
                   <video
@@ -583,59 +562,49 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                     preload="auto"
                     playsInline
                     controls={false}
-                    crossOrigin="anonymous"
+                    autoPlay
                   >
                     <source src={videoSrc} type="video/mp4" />
-                    <source src={videoSrc} type="video/webm" />
-                    <source src={videoSrc} type="video/ogg" />
                     Your browser does not support the video tag.
                   </video>
-                  
-                  {/* Video Overlay for Click Feedback */}
-                  <div className={`absolute inset-0 transition-all duration-300 ${
-                    isVideoHovered ? 'bg-black/10' : 'bg-transparent'
-                  }`} />
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-white p-8 text-center max-w-md">
-                  <div className="w-24 h-24 rounded-full bg-gray-800 flex items-center justify-center mb-6 border border-gray-700">
-                    <FiInfo className="text-gray-400" size={48} />
+                <div className="flex flex-col items-center justify-center h-full text-white p-4 sm:p-8 text-center max-w-md">
+                  <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-gray-800 flex items-center justify-center mb-4 sm:mb-6 border border-gray-700">
+                    <FiInfo className="text-gray-400" size={32} />
                   </div>
-                  <h4 className="text-2xl font-bold text-white mb-3">Invalid Video Source</h4>
-                  <p className="text-gray-300 mb-6 text-lg">The video URL is not valid or accessible.</p>
+                  <h4 className="text-xl sm:text-2xl font-bold text-white mb-2 sm:mb-3">Invalid Video</h4>
+                  <p className="text-gray-300 mb-4 sm:mb-6 text-sm sm:text-lg">Video URL is not valid</p>
                   <button
                     onClick={onClose}
-                    className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-lg transition-all duration-200 border border-gray-700"
+                    className="px-4 sm:px-6 py-2 sm:py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-lg transition-all duration-200"
                   >
-                    Close Player
+                    Close
                   </button>
                 </div>
               )}
               
-              {/* Center Play/Pause Button - Only shows when paused */}
+              {/* Center Play Button - YELLOW-500 */}
               {!isPlaying && !isLoading && !error && (
                 <button
-                  onClick={handlePlayPauseButton}
-                  className="absolute z-30 transform -translate-x-1/2 -translate-y-1/2 top-1/2 left-1/2 w-24 h-24 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 group"
-                  style={{ zIndex: 30 }}
+                  onClick={handlePlayPause}
+                  className="absolute z-30 transform -translate-x-1/2 -translate-y-1/2 top-1/2 left-1/2 w-16 h-16 sm:w-24 sm:h-24 bg-yellow-500 hover:bg-yellow-600 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 group"
                 >
-                  <BsFillPlayFill className="text-white ml-2" size={36} />
-                  <div className="absolute inset-0 border-4 border-white/30 rounded-full animate-ping"></div>
-                  <div className="absolute inset-0 border-4 border-white/20 rounded-full animate-ping animation-delay-300"></div>
+                  <BsFillPlayFill className="text-white ml-1 sm:ml-2" size={24} className="sm:w-9 sm:h-9" />
+                  <div className="absolute inset-0 border-4 border-yellow-400/30 rounded-full animate-ping"></div>
                 </button>
               )}
               
-              {/* Video Controls - LIGHT THEME */}
+              {/* Video Controls - FIXED VISIBILITY */}
               <div 
-                className={`absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black/90 via-black/80 to-transparent p-4 transition-all duration-300 ${
+                className={`absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black/95 via-black/80 to-transparent p-3 sm:p-4 transition-all duration-300 ${
                   showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
                 }`}
                 onClick={(e) => e.stopPropagation()}
-                style={{ zIndex: 30 }}
               >
                 {/* Progress Bar */}
-                <div className="mb-4">
-                  <div className="flex justify-between text-sm text-white mb-2">
+                <div className="mb-3 sm:mb-4">
+                  <div className="flex justify-between text-xs sm:text-sm text-gray-300 mb-1 sm:mb-2">
                     <span className="font-medium">{formatTime(currentTime)}</span>
                     <span className="font-medium">{formatTime(duration)}</span>
                   </div>
@@ -645,123 +614,183 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                     max={duration || 100}
                     value={currentTime}
                     onChange={handleSeek}
-                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer 
+                    className="w-full h-1.5 sm:h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer 
                       [&::-webkit-slider-thumb]:appearance-none 
-                      [&::-webkit-slider-thumb]:h-5 
-                      [&::-webkit-slider-thumb]:w-5 
+                      [&::-webkit-slider-thumb]:h-4 sm:h-5 
+                      [&::-webkit-slider-thumb]:w-4 sm:w-5 
                       [&::-webkit-slider-thumb]:rounded-full 
-                      [&::-webkit-slider-thumb]:bg-gradient-to-r 
-                      [&::-webkit-slider-thumb]:from-blue-500 
-                      [&::-webkit-slider-thumb]:to-blue-400
+                      [&::-webkit-slider-thumb]:bg-yellow-500
                       [&::-webkit-slider-thumb]:border-2
                       [&::-webkit-slider-thumb]:border-white
                       [&::-webkit-slider-thumb]:shadow-lg"
                   />
                 </div>
                 
-                {/* Control Buttons */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    {/* Seek Backward */}
-                    <button
-                      onClick={seekBackward}
-                      className="text-white hover:text-blue-300 p-2.5 rounded-lg hover:bg-white/10 transition-all duration-200 group"
-                      title="Seek Backward 10s"
-                    >
-                      <TbPlayerTrackPrevFilled size={20} className="group-hover:scale-110 transition-transform" />
-                    </button>
-                    
-                    {/* Play/Pause */}
-                    <button
-                      onClick={handlePlayPauseButton}
-                      className="text-white hover:text-white p-3 rounded-full bg-gradient-to-r from-blue-500/20 to-blue-600/20 hover:from-blue-500/30 hover:to-blue-600/30 border border-blue-400/30 transition-all duration-200 shadow-lg group"
-                      title={isPlaying ? "Pause" : "Play"}
-                    >
-                      {isPlaying ? 
-                        <BsFillPauseFill size={22} className="group-hover:scale-110 transition-transform" /> : 
-                        <BsFillPlayFill size={22} className="group-hover:scale-110 transition-transform" />
-                      }
-                    </button>
-                    
-                    {/* Seek Forward */}
-                    <button
-                      onClick={seekForward}
-                      className="text-white hover:text-blue-300 p-2.5 rounded-lg hover:bg-white/10 transition-all duration-200 group"
-                      title="Seek Forward 10s"
-                    >
-                      <TbPlayerTrackNextFilled size={20} className="group-hover:scale-110 transition-transform" />
-                    </button>
-                    
-                    {/* Volume Control */}
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={toggleMute}
-                        className="text-white hover:text-blue-300 p-2.5 rounded-lg hover:bg-white/10 transition-all duration-200 group"
-                        title={isMuted ? "Unmute" : "Mute"}
-                      >
-                        {isMuted || volume === 0 ? 
-                          <BsFillVolumeMuteFill size={18} className="group-hover:scale-110 transition-transform" /> : 
-                          <BsFillVolumeUpFill size={18} className="group-hover:scale-110 transition-transform" />
-                        }
-                      </button>
-                      <div className="flex items-center gap-2 w-32">
-                        <input
-                          type="range"
-                          min="0"
-                          max="1"
-                          step="0.1"
-                          value={volume}
-                          onChange={handleVolumeChange}
-                          className="flex-1 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer 
-                            [&::-webkit-slider-thumb]:appearance-none 
-                            [&::-webkit-slider-thumb]:h-4 
-                            [&::-webkit-slider-thumb]:w-4 
-                            [&::-webkit-slider-thumb]:rounded-full 
-                            [&::-webkit-slider-thumb]:bg-blue-500
-                            [&::-webkit-slider-thumb]:border
-                            [&::-webkit-slider-thumb]:border-white/50"
-                        />
-                        <span className="text-xs text-gray-300 w-8 text-center">
+                {/* Control Buttons with Labels */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center justify-between sm:justify-start sm:gap-4">
+                    {/* Left Controls */}
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      {/* Seek Backward with Label */}
+                      <div className="flex flex-col items-center">
+                        <button
+                          onClick={seekBackward}
+                          className="text-white hover:text-yellow-400 p-2 rounded-lg hover:bg-white/10 transition-all duration-200 group"
+                          title="Back 10s"
+                        >
+                          <FiSkipBack size={18} className="sm:w-5 sm:h-5" />
+                        </button>
+                        <span className="text-[10px] sm:text-xs text-gray-400 mt-1 hidden sm:block">10s</span>
+                      </div>
+                      
+                      {/* Play/Pause with Label */}
+                      <div className="flex flex-col items-center">
+                        <button
+                          onClick={handlePlayPause}
+                          className="text-white hover:text-white p-2.5 sm:p-3 rounded-full bg-yellow-500 hover:bg-yellow-600 border border-yellow-400 transition-all duration-200 shadow-lg group"
+                          title={isPlaying ? "Pause" : "Play"}
+                        >
+                          {isPlaying ? 
+                            <BsFillPauseFill size={18} className="sm:w-6 sm:h-6" /> : 
+                            <BsFillPlayFill size={18} className="sm:w-6 sm:h-6" />
+                          }
+                        </button>
+                        <span className="text-[10px] sm:text-xs text-gray-400 mt-1 hidden sm:block">
+                          {isPlaying ? "Pause" : "Play"}
+                        </span>
+                      </div>
+                      
+                      {/* Seek Forward with Label */}
+                      <div className="flex flex-col items-center">
+                        <button
+                          onClick={seekForward}
+                          className="text-white hover:text-yellow-400 p-2 rounded-lg hover:bg-white/10 transition-all duration-200 group"
+                          title="Forward 10s"
+                        >
+                          <FiSkipForward size={18} className="sm:w-5 sm:h-5" />
+                        </button>
+                        <span className="text-[10px] sm:text-xs text-gray-400 mt-1 hidden sm:block">10s</span>
+                      </div>
+                      
+                      {/* Volume with Label */}
+                      <div className="flex flex-col items-center">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={toggleMute}
+                            className="text-white hover:text-yellow-400 p-2 rounded-lg hover:bg-white/10 transition-all duration-200 group"
+                            title={isMuted ? "Unmute" : "Mute"}
+                          >
+                            {isMuted || volume === 0 ? 
+                              <FiVolumeX size={18} className="sm:w-5 sm:h-5" /> : 
+                              <FiVolume2 size={18} className="sm:w-5 sm:h-5" />
+                            }
+                          </button>
+                          <div className="w-20 sm:w-24">
+                            <input
+                              type="range"
+                              min="0"
+                              max="1"
+                              step="0.1"
+                              value={volume}
+                              onChange={handleVolumeChange}
+                              className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer 
+                                [&::-webkit-slider-thumb]:appearance-none 
+                                [&::-webkit-slider-thumb]:h-3 sm:h-4 
+                                [&::-webkit-slider-thumb]:w-3 sm:w-4 
+                                [&::-webkit-slider-thumb]:rounded-full 
+                                [&::-webkit-slider-thumb]:bg-yellow-500
+                                [&::-webkit-slider-thumb]:border
+                                [&::-webkit-slider-thumb]:border-white/50"
+                            />
+                          </div>
+                        </div>
+                        <span className="text-[10px] sm:text-xs text-gray-400 mt-1 hidden sm:block">
                           {Math.round(volume * 100)}%
                         </span>
                       </div>
                     </div>
                     
-                    {/* Time Display */}
-                    <div className="text-sm font-mono text-gray-300 bg-black/30 px-3 py-1.5 rounded-lg border border-gray-700/50">
-                      {formatTime(currentTime)} / {formatTime(duration)}
+                    {/* Current Time Display - Mobile Only */}
+                    <div className="sm:hidden text-xs text-gray-300 bg-black/50 px-2 py-1 rounded">
+                      {formatTime(currentTime)}
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-4">
-                    {/* Playback Speed */}
-                    <div className="relative group">
-                      <button className="text-sm text-white font-medium px-4 py-2.5 bg-gradient-to-r from-gray-800/50 to-gray-900/50 hover:from-gray-800/70 hover:to-gray-900/70 rounded-lg border border-gray-700 transition-all duration-200 flex items-center gap-2 shadow-lg">
-                        <span>{playbackRate}x</span>
-                        <span className="text-blue-300">▼</span>
+                  {/* Right Controls */}
+                  <div className="flex items-center justify-between sm:justify-end sm:gap-3">
+                    {/* Playback Speed with Label */}
+                    <div className="relative flex flex-col items-center">
+                      <button
+                        onClick={() => setShowSpeedMenu(!showSpeedMenu)}
+                        className="text-gray-300 hover:text-yellow-400 px-3 py-1.5 rounded-lg bg-gray-800/50 hover:bg-gray-700/50 transition-all duration-200 flex items-center gap-1.5 group"
+                        title="Playback Speed"
+                      >
+                        <FiCornerUpRight size={14} />
+                        <span className="text-xs sm:text-sm font-medium">{playbackRate}x</span>
                       </button>
-                      <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block animate-fadeIn">
-                        <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-700 rounded-lg shadow-2xl p-2 min-w-[140px] backdrop-blur-sm">
+                      <span className="text-[10px] sm:text-xs text-gray-400 mt-1 hidden sm:block">Speed</span>
+                      
+                      {showSpeedMenu && (
+                        <div className="absolute bottom-full right-0 mb-2 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl p-2 min-w-[120px] z-40">
                           {[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => (
                             <button
                               key={rate}
                               onClick={() => changePlaybackRate(rate)}
-                              className={`block w-full text-left px-4 py-2.5 text-sm rounded-lg transition-all duration-200 my-0.5 ${
+                              className={`block w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-800 transition-all duration-200 ${
                                 playbackRate === rate 
-                                  ? 'bg-gradient-to-r from-blue-500/20 to-blue-600/10 text-blue-300 border border-blue-500/30' 
-                                  : 'text-gray-300 hover:bg-gray-800/50 hover:text-white'
+                                  ? 'text-yellow-400 bg-gray-800' 
+                                  : 'text-gray-300'
                               }`}
                             >
-                              <div className="flex items-center justify-between">
-                                <span>{rate}x Speed</span>
-                                {playbackRate === rate && (
-                                  <span className="text-blue-300">✓</span>
-                                )}
-                              </div>
+                              {rate}x Speed
                             </button>
                           ))}
                         </div>
-                      </div>
+                      )}
+                    </div>
+                    
+                    {/* Quality Menu with Label */}
+                    <div className="relative flex flex-col items-center">
+                      <button
+                        onClick={() => setShowQualityMenu(!showQualityMenu)}
+                        className="text-gray-300 hover:text-yellow-400 px-3 py-1.5 rounded-lg bg-gray-800/50 hover:bg-gray-700/50 transition-all duration-200 flex items-center gap-1.5 group"
+                        title="Quality Settings"
+                      >
+                        <FiSettings size={14} />
+                        <span className="text-xs sm:text-sm font-medium">HD</span>
+                      </button>
+                      <span className="text-[10px] sm:text-xs text-gray-400 mt-1 hidden sm:block">Quality</span>
+                      
+                      {showQualityMenu && (
+                        <div className="absolute bottom-full right-0 mb-2 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl p-2 min-w-[120px] z-40">
+                          {['Auto', '360p', '480p', '720p HD', '1080p HD', '4K'].map((quality) => (
+                            <button
+                              key={quality}
+                              onClick={() => setShowQualityMenu(false)}
+                              className="block w-full text-left px-3 py-2 text-sm text-gray-300 rounded hover:bg-gray-800 hover:text-white transition-all duration-200"
+                            >
+                              {quality}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Fullscreen with Label */}
+                    <div className="flex flex-col items-center">
+                      <button
+                        onClick={handleFullscreen}
+                        className="text-gray-300 hover:text-yellow-400 p-2 rounded-lg hover:bg-white/10 transition-all duration-200 group"
+                        title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+                      >
+                        {isFullscreen ? 
+                          <FiMinimize size={18} className="sm:w-5 sm:h-5" /> : 
+                          <FiMaximize size={18} className="sm:w-5 sm:h-5" />
+                        }
+                      </button>
+                      <span className="text-[10px] sm:text-xs text-gray-400 mt-1 hidden sm:block">
+                        {isFullscreen ? "Exit" : "Full"}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -770,22 +799,22 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
           )}
         </div>
         
-        {/* Keyboard Shortcuts Info */}
-        <div className={`absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-gray-800/90 to-gray-900/90 backdrop-blur-sm text-white text-xs rounded-xl p-3 border border-gray-700 transition-all duration-300 ${
+        {/* Keyboard Shortcuts - Mobile Hidden */}
+        <div className={`absolute bottom-3 left-1/2 transform -translate-x-1/2 hidden sm:block bg-black/90 backdrop-blur-sm text-white text-xs rounded-lg p-2 transition-all duration-300 ${
           showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
         }`}>
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-2">
-              <kbd className="px-2.5 py-1 bg-gray-800 rounded font-mono text-xs border border-gray-700">Click</kbd>
-              <span className="text-gray-300">Play/Pause</span>
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1">
+              <kbd className="px-2 py-1 bg-gray-800 rounded text-xs border border-gray-700">Space</kbd>
+              <span className="text-gray-300 text-xs">Play/Pause</span>
             </span>
-            <span className="flex items-center gap-2">
-              <kbd className="px-2.5 py-1 bg-gray-800 rounded font-mono text-xs border border-gray-700">Space</kbd>
-              <span className="text-gray-300">Play/Pause</span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-2 py-1 bg-gray-800 rounded text-xs border border-gray-700">F</kbd>
+              <span className="text-gray-300 text-xs">Fullscreen</span>
             </span>
-            <span className="flex items-center gap-2">
-              <kbd className="px-2.5 py-1 bg-gray-800 rounded font-mono text-xs border border-gray-700">← →</kbd>
-              <span className="text-gray-300">Seek</span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-2 py-1 bg-gray-800 rounded text-xs border border-gray-700">← →</kbd>
+              <span className="text-gray-300 text-xs">Seek</span>
             </span>
           </div>
         </div>
