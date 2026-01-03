@@ -1,4 +1,4 @@
-// src/components/marketplace/seller/EarningsTab.tsx - UPDATED PROFESSIONAL VERSION
+// src/components/marketplace/seller/EarningsTab.tsx - UPDATED WITHOUT WITHDRAWAL SUMMARY
 import React, { useState } from 'react';
 import { SellerStats } from '../../../api/marketplaceApi';
 
@@ -35,6 +35,16 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
   const totalOrders = sellerStats?.totals?.totalOrders || 0;
   const completedOrders = sellerStats?.totals?.completedOrders?.count || 0;
   const pendingOrders = sellerStats?.totals?.pendingOrders?.count || 0;
+
+  // Get stats for other statuses
+  const refundedEarnings = sellerStats?.statsByStatus?.find(s => s._id === 'refunded')?.totalAmount || 0;
+  const refundedOrders = sellerStats?.statsByStatus?.find(s => s._id === 'refunded')?.count || 0;
+  
+  const inRevisionEarnings = sellerStats?.statsByStatus?.find(s => s._id === 'in_revision')?.totalAmount || 0;
+  const inRevisionOrders = sellerStats?.statsByStatus?.find(s => s._id === 'in_revision')?.count || 0;
+  
+  const disputedEarnings = sellerStats?.statsByStatus?.find(s => s._id === 'disputed')?.totalAmount || 0;
+  const disputedOrders = sellerStats?.statsByStatus?.find(s => s._id === 'disputed')?.count || 0;
 
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -102,8 +112,8 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
         </div>
       </div>
 
-      {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Key Metrics Grid - 3 Cards Now */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Total Earnings Card */}
         <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg transform hover:-translate-y-1 transition-transform duration-200">
           <div className="flex items-center justify-between mb-4">
@@ -140,28 +150,6 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
           <p className="text-sm text-gray-500 mt-3">Current monthly revenue</p>
         </div>
 
-        {/* Available Balance Card */}
-        <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-medium text-gray-700">Available Balance</h3>
-            <div className="w-10 h-10 bg-gradient-to-r from-yellow-100 to-amber-100 rounded-full flex items-center justify-center">
-              <span className="text-xl text-yellow-600">💳</span>
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-gray-900 mb-2">{formatCurrency(availableBalance)}</p>
-          <div className="mt-3">
-            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-gradient-to-r from-yellow-400 to-amber-500 rounded-full"
-                style={{ width: `${Math.min((availableBalance / totalEarnings) * 100, 100)}%` }}
-              ></div>
-            </div>
-            <p className="text-xs text-gray-500 mt-2">
-              {stripeStatus?.connected ? 'Ready to withdraw' : 'Connect Stripe to withdraw'}
-            </p>
-          </div>
-        </div>
-
         {/* Avg Order Value Card */}
         <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200">
           <div className="flex items-center justify-between mb-4">
@@ -181,193 +169,287 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
         </div>
       </div>
 
-      {/* Earnings Breakdown & Withdrawal Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Earnings Breakdown */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+      {/* Earnings Breakdown Full Width */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+          <div className="flex justify-between items-center">
+            <div>
               <h3 className="text-lg font-semibold text-gray-900">Earnings Breakdown</h3>
-              <p className="text-sm text-gray-600 mt-1">Detailed analysis of your revenue</p>
+              <p className="text-sm text-gray-600 mt-1">Detailed analysis of your revenue by order status</p>
             </div>
-            
-            <div className="p-6">
-              {/* Summary Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-green-700 font-medium">Completed</p>
-                      <p className="text-2xl font-bold text-green-900">{formatCurrency(completedEarnings)}</p>
-                    </div>
-                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                      <span className="text-xl text-green-600">✅</span>
-                    </div>
-                  </div>
+            <div className="text-sm text-gray-500">
+              {timeRange === 'all' ? 'All Time' : timeRange === 'month' ? 'This Month' : 'This Week'}
+            </div>
+          </div>
+        </div>
+        
+        <div className="p-6">
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-green-700 font-medium">Completed Earnings</p>
+                  <p className="text-2xl font-bold text-green-900">{formatCurrency(completedEarnings)}</p>
                   <p className="text-xs text-green-600 mt-2">{completedOrders} orders delivered</p>
                 </div>
-                
-                <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-yellow-700 font-medium">Pending</p>
-                      <p className="text-2xl font-bold text-yellow-900">{formatCurrency(pendingEarnings)}</p>
-                    </div>
-                    <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
-                      <span className="text-xl text-yellow-600">⏳</span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-yellow-600 mt-2">{pendingOrders} orders in progress</p>
+                <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center">
+                  <span className="text-2xl text-green-600">✅</span>
                 </div>
               </div>
+            </div>
+            
+            <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-yellow-700 font-medium">Pending Earnings</p>
+                  <p className="text-2xl font-bold text-yellow-900">{formatCurrency(pendingEarnings)}</p>
+                  <p className="text-xs text-yellow-600 mt-2">{pendingOrders} orders in progress</p>
+                </div>
+                <div className="w-14 h-14 bg-yellow-100 rounded-full flex items-center justify-center">
+                  <span className="text-2xl text-yellow-600">⏳</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-blue-700 font-medium">Available Balance</p>
+                  <p className="text-2xl font-bold text-blue-900">{formatCurrency(availableBalance)}</p>
+                  <p className="text-xs text-blue-600 mt-2">
+                    {stripeStatus?.connected ? 'Ready to withdraw' : 'Connect Stripe'}
+                  </p>
+                </div>
+                <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-2xl text-blue-600">💳</span>
+                </div>
+              </div>
+            </div>
+          </div>
 
-              {/* Detailed Breakdown */}
-              <div>
-                <h4 className="font-medium text-gray-700 mb-4">Revenue by Order Status</h4>
-                <div className="space-y-3">
-                  {sellerStats?.statsByStatus?.map((stat, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors duration-150 group">
-                      <div className="flex items-center">
-                        <div className={`w-3 h-3 rounded-full mr-3 ${
-                          stat._id === 'completed' ? 'bg-green-500' :
-                          stat._id === 'in_progress' ? 'bg-blue-500' :
-                          stat._id === 'pending_payment' ? 'bg-yellow-500' :
-                          'bg-gray-500'
-                        }`}></div>
-                        <span className="font-medium capitalize">
-                          {stat._id.replace('_', ' ')}
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-gray-900">
-                          ${(stat.totalAmount / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </p>
-                        <div className="flex items-center justify-end space-x-2">
-                          <p className="text-sm text-gray-500">{stat.count} orders</p>
-                          <span className="text-xs text-gray-400">•</span>
-                          <p className="text-sm text-gray-500">
-                            {totalOrders > 0 ? ((stat.count / totalOrders) * 100).toFixed(1) : 0}%
+          {/* Detailed Breakdown */}
+          <div className="space-y-6">
+            <h4 className="font-semibold text-gray-800 text-lg">Revenue by Order Status</h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Main Statuses */}
+              {sellerStats?.statsByStatus?.filter(stat => 
+                ['completed', 'in_progress', 'pending_payment', 'paid'].includes(stat._id)
+              ).map((stat, index) => (
+                <div key={index} className="bg-gray-50 hover:bg-gray-100 rounded-xl p-4 transition-colors duration-150">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center">
+                      <div className={`w-3 h-3 rounded-full mr-2 ${
+                        stat._id === 'completed' ? 'bg-green-500' :
+                        stat._id === 'in_progress' ? 'bg-blue-500' :
+                        stat._id === 'pending_payment' ? 'bg-yellow-500' :
+                        'bg-gray-500'
+                      }`}></div>
+                      <span className="font-medium capitalize">
+                        {stat._id.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <span className="text-sm text-gray-500">{stat.count} orders</span>
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900 mb-1">
+                    ${(stat.totalAmount / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </p>
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full ${
+                        stat._id === 'completed' ? 'bg-green-500' :
+                        stat._id === 'in_progress' ? 'bg-blue-500' :
+                        stat._id === 'pending_payment' ? 'bg-yellow-500' :
+                        'bg-gray-500'
+                      }`}
+                      style={{ width: `${totalOrders > 0 ? ((stat.count / totalOrders) * 100) : 0}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    {totalOrders > 0 ? ((stat.count / totalOrders) * 100).toFixed(1) : 0}% of total orders
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Other Statuses */}
+            {(refundedOrders > 0 || inRevisionOrders > 0 || disputedOrders > 0) && (
+              <div className="mt-8">
+                <h5 className="font-medium text-gray-700 mb-4">Other Statuses</h5>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Refunded */}
+                  {refundedOrders > 0 && (
+                    <div className="bg-gradient-to-r from-red-50 to-rose-50 border border-red-100 rounded-xl p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-red-700">Refunded</p>
+                          <p className="text-xl font-bold text-red-900">
+                            ${(refundedEarnings / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-red-600">{refundedOrders} orders</p>
+                          <p className="text-xs text-red-500">
+                            {totalOrders > 0 ? ((refundedOrders / totalOrders) * 100).toFixed(1) : 0}%
                           </p>
                         </div>
                       </div>
                     </div>
-                  ))}
+                  )}
+
+                  {/* In Revision */}
+                  {inRevisionOrders > 0 && (
+                    <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-100 rounded-xl p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-orange-700">In Revision</p>
+                          <p className="text-xl font-bold text-orange-900">
+                            ${(inRevisionEarnings / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-orange-600">{inRevisionOrders} orders</p>
+                          <p className="text-xs text-orange-500">
+                            {totalOrders > 0 ? ((inRevisionOrders / totalOrders) * 100).toFixed(1) : 0}%
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Disputed */}
+                  {disputedOrders > 0 && (
+                    <div className="bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-100 rounded-xl p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-purple-700">Disputed</p>
+                          <p className="text-xl font-bold text-purple-900">
+                            ${(disputedEarnings / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-purple-600">{disputedOrders} orders</p>
+                          <p className="text-xs text-purple-500">
+                            {totalOrders > 0 ? ((disputedOrders / totalOrders) * 100).toFixed(1) : 0}%
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Withdrawal Summary */}
-        <div className="lg:col-span-1">
-          <div className="bg-gradient-to-br from-gray-900 to-black rounded-2xl p-6 text-white shadow-lg h-full">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-lg font-semibold">Withdrawal Summary</h3>
-                <p className="text-sm text-gray-300 mt-1">Funds management</p>
-              </div>
-              <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-sm">
-                <span className="text-xl">💸</span>
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              {/* Total Withdrawn */}
-              <div>
-                <p className="text-sm text-gray-300 mb-2">Total Withdrawn</p>
-                <p className="text-3xl font-bold">{formatCurrency(totalWithdrawn)}</p>
-                <p className="text-xs text-gray-400 mt-2">All-time withdrawn funds</p>
-              </div>
-
-              {/* Available Balance */}
-              <div className="pt-4 border-t border-white/20">
-                <p className="text-sm text-gray-300 mb-2">Available Now</p>
-                <p className="text-2xl font-bold">{formatCurrency(availableBalance)}</p>
-                <p className="text-xs text-gray-400 mt-2">
-                  {stripeStatus?.connected 
-                    ? 'Ready for withdrawal' 
-                    : 'Connect Stripe to withdraw funds'
-                  }
-                </p>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="pt-4 border-t border-white/20">
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-300">Withdrawal Progress</span>
-                  <span className="font-medium">
-                    {totalEarnings > 0 
-                      ? `${((totalWithdrawn / totalEarnings) * 100).toFixed(1)}%`
-                      : '0%'
-                    }
-                  </span>
-                </div>
-                <div className="h-2 bg-white/20 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full"
-                    style={{ 
-                      width: `${totalEarnings > 0 
-                        ? Math.min((totalWithdrawn / totalEarnings) * 100, 100) 
-                        : 0
-                      }%` 
-                    }}
-                  ></div>
-                </div>
-                <p className="text-xs text-gray-400 mt-2">
-                  {totalEarnings > totalWithdrawn
-                    ? `${formatCurrency(totalEarnings - totalWithdrawn)} available to withdraw`
-                    : 'All earnings withdrawn'
-                  }
-                </p>
-              </div>
-
-              {/* Action Button */}
-              <div className="pt-4">
-                <button
-                  className={`w-full py-3 rounded-xl font-medium transition-all duration-200 ${
-                    stripeStatus?.connected && availableBalance > 0
-                      ? 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
-                      : 'bg-gray-800 text-gray-400 cursor-not-allowed'
-                  }`}
-                  disabled={!stripeStatus?.connected || availableBalance <= 0}
-                >
-                  {stripeStatus?.connected
-                    ? availableBalance > 0
-                      ? `Withdraw ${formatCurrency(availableBalance)}`
-                      : 'No funds available'
-                    : 'Connect Stripe Account'
-                  }
-                </button>
-                <p className="text-xs text-gray-400 text-center mt-3">
-                  Withdrawals processed within 2-3 business days
-                </p>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Stats Summary */}
+      {/* Performance Stats */}
       <div className="bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-2xl p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Summary</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Performance Summary</h3>
+            <p className="text-sm text-gray-600 mt-1">Key metrics for your business</p>
+          </div>
+          <div className="mt-3 md:mt-0">
+            <div className="flex items-center text-sm text-gray-500">
+              <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+              <span>Data updates in real-time</span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           <div className="text-center">
+            <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center">
+              <span className="text-2xl text-blue-600">📦</span>
+            </div>
             <p className="text-2xl font-bold text-gray-900">{totalOrders}</p>
             <p className="text-sm text-gray-600">Total Orders</p>
           </div>
+          
           <div className="text-center">
+            <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-green-100 to-emerald-100 rounded-full flex items-center justify-center">
+              <span className="text-2xl text-green-600">✅</span>
+            </div>
             <p className="text-2xl font-bold text-green-600">{completedOrders}</p>
             <p className="text-sm text-gray-600">Completed</p>
+            <p className="text-xs text-green-500 mt-1">
+              {totalOrders > 0 ? ((completedOrders / totalOrders) * 100).toFixed(1) : 0}% success rate
+            </p>
           </div>
+          
           <div className="text-center">
+            <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-yellow-100 to-amber-100 rounded-full flex items-center justify-center">
+              <span className="text-2xl text-yellow-600">⏳</span>
+            </div>
             <p className="text-2xl font-bold text-yellow-600">{pendingOrders}</p>
             <p className="text-sm text-gray-600">In Progress</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-gray-600">
-              {totalOrders > 0 ? ((completedOrders / totalOrders) * 100).toFixed(1) : 0}%
+            <p className="text-xs text-yellow-500 mt-1">
+              {totalOrders > 0 ? ((pendingOrders / totalOrders) * 100).toFixed(1) : 0}% of orders
             </p>
-            <p className="text-sm text-gray-600">Completion Rate</p>
+          </div>
+          
+          <div className="text-center">
+            <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-purple-100 to-violet-100 rounded-full flex items-center justify-center">
+              <span className="text-2xl text-purple-600">📊</span>
+            </div>
+            <p className="text-2xl font-bold text-purple-600">{formatCurrency(averageOrderValue)}</p>
+            <p className="text-sm text-gray-600">Avg Order Value</p>
+            <p className="text-xs text-purple-500 mt-1">
+              Per completed order
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tips & Guidance */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6">
+        <div className="flex items-center mb-4">
+          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-4">
+            <span className="text-xl text-blue-600">💡</span>
+          </div>
+          <div>
+            <h4 className="font-semibold text-blue-900">Tips to Increase Earnings</h4>
+            <p className="text-sm text-blue-700">Best practices for growing your revenue</p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-xl p-4 border border-blue-100">
+            <div className="flex items-center mb-2">
+              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                <span className="text-green-600">⭐</span>
+              </div>
+              <h5 className="font-medium text-gray-900">Optimize Listings</h5>
+            </div>
+            <p className="text-sm text-gray-600">
+              Use high-quality images and detailed descriptions to attract more buyers.
+            </p>
+          </div>
+          
+          <div className="bg-white rounded-xl p-4 border border-blue-100">
+            <div className="flex items-center mb-2">
+              <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center mr-3">
+                <span className="text-purple-600">⚡</span>
+              </div>
+              <h5 className="font-medium text-gray-900">Fast Delivery</h5>
+            </div>
+            <p className="text-sm text-gray-600">
+              Quick turnaround times lead to better reviews and more repeat customers.
+            </p>
+          </div>
+          
+          <div className="bg-white rounded-xl p-4 border border-blue-100">
+            <div className="flex items-center mb-2">
+              <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center mr-3">
+                <span className="text-amber-600">💬</span>
+              </div>
+              <h5 className="font-medium text-gray-900">Great Communication</h5>
+            </div>
+            <p className="text-sm text-gray-600">
+              Clear communication reduces revisions and increases customer satisfaction.
+            </p>
           </div>
         </div>
       </div>
@@ -380,15 +462,17 @@ const EarningsTab: React.FC<EarningsTabProps> = ({
           </div>
           <h3 className="text-xl font-semibold text-gray-900 mb-2">No Earnings Data Yet</h3>
           <p className="text-gray-600 max-w-md mx-auto mb-6">
-            Your earnings dashboard will display revenue data once you start receiving orders and payments.
+            Start selling to see your earnings dashboard fill up with revenue data.
           </p>
           <div className="flex justify-center space-x-4">
-            <button className="px-6 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200">
-              Create Listing
+            <button className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow-lg">
+              Create Your First Listing
             </button>
-            <button className="px-6 py-2 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-all duration-200">
-              View Tutorial
-            </button>
+            {!stripeStatus?.connected && (
+              <button className="px-6 py-3 bg-white border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-all duration-200">
+                Setup Payments
+              </button>
+            )}
           </div>
         </div>
       )}
