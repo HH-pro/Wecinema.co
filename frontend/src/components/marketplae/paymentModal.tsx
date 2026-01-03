@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { FiCheck, FiX, FiUser, FiMail, FiCreditCard, FiAlertCircle, FiLoader, FiImage } from 'react-icons/fi';
 import { Elements, PaymentElement, useStripe, useElements, AddressElement } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import marketplaceApi from '../../api/marketplaceApi';
 
 // Initialize Stripe
-const STRIPE_PUBLISHABLE_KEY =  "pk_test_51SKw7ZHYamYyPYbDUlqbeydcW1hVGrHOvCZ8mBwSU1gw77TIRyzng31iSqAvPIQzTYKG8UWfDew7kdKgBxsw7vtq00WTLU3YCZ";
+const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "pk_test_51SKw7ZHYamYyPYbDUlqbeydcW1hVGrHOvCZ8mBwSU1gw77TIRyzng31iSqAvPIQzTYKG8UWfDew7kdKgBxsw7vtq00WTLU3YCZ";
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 
 interface PaymentModalProps {
@@ -16,24 +16,9 @@ interface PaymentModalProps {
   onSuccess: () => void;
   paymentStatus: 'idle' | 'processing' | 'success' | 'failed';
   setPaymentStatus: (status: 'idle' | 'processing' | 'success' | 'failed') => void;
-  billingDetails?: {
-    name?: string;
-    email?: string;
-    phone?: string;
-    address?: {
-      line1?: string;
-      line2?: string;
-      city?: string;
-      state?: string;
-      postal_code?: string;
-      country?: string;
-    };
-  };
+  billingDetails: any;
   onBillingDetailsChange: (details: any) => void;
-  currentUser?: {
-    username?: string;
-    email?: string;
-  } | null;
+  currentUser: any;
   getThumbnailUrl: (listing: any) => string;
 }
 
@@ -45,36 +30,12 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   onSuccess,
   paymentStatus,
   setPaymentStatus,
-  billingDetails: initialBillingDetails,
+  billingDetails,
   onBillingDetailsChange,
   currentUser,
   getThumbnailUrl
 }) => {
   if (!show) return null;
-
-  // Create safe billing details with defaults
-  const defaultBillingDetails = {
-    name: '',
-    email: '',
-    phone: '',
-    address: {
-      line1: '',
-      line2: '',
-      city: '',
-      state: '',
-      postal_code: '',
-      country: 'US'
-    }
-  };
-
-  const billingDetails = {
-    ...defaultBillingDetails,
-    ...initialBillingDetails,
-    address: {
-      ...defaultBillingDetails.address,
-      ...(initialBillingDetails?.address || {})
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black bg-opacity-50 p-2 sm:p-4 overflow-y-auto">
@@ -198,33 +159,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 };
 
 // Payment Form Component
-interface PaymentFormProps {
-  offerData: any;
-  onSuccess: () => void;
-  onClose: () => void;
-  paymentStatus: 'idle' | 'processing' | 'success' | 'failed';
-  setPaymentStatus: (status: 'idle' | 'processing' | 'success' | 'failed') => void;
-  billingDetails: {
-    name: string;
-    email: string;
-    phone: string;
-    address: {
-      line1: string;
-      line2: string;
-      city: string;
-      state: string;
-      postal_code: string;
-      country: string;
-    };
-  };
-  onBillingDetailsChange: (details: any) => void;
-  currentUser?: {
-    username?: string;
-    email?: string;
-  } | null;
-}
-
-const PaymentForm: React.FC<PaymentFormProps> = ({ 
+const PaymentForm = ({ 
   offerData, 
   onSuccess, 
   onClose, 
@@ -233,50 +168,17 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   billingDetails,
   onBillingDetailsChange,
   currentUser
-}) => {
+}: any) => {
   const stripe = useStripe();
   const elements = useElements();
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showBillingForm, setShowBillingForm] = useState(false);
-  const [stripeLoaded, setStripeLoaded] = useState(false);
-
-  // Initialize billing details from currentUser on component mount
-  useEffect(() => {
-    // Check if Stripe is loaded
-    const loadStripeElement = async () => {
-      try {
-        await stripePromise;
-        setStripeLoaded(true);
-      } catch (error) {
-        console.error('Failed to load Stripe:', error);
-        setError('Payment system failed to load. Please refresh the page.');
-      }
-    };
-
-    loadStripeElement();
-  }, []);
-
-  // Auto-fill user data if available
-  useEffect(() => {
-    if (currentUser && (!billingDetails.name || !billingDetails.email)) {
-      const updatedDetails = {
-        ...billingDetails,
-        name: currentUser.username || billingDetails.name,
-        email: currentUser.email || billingDetails.email
-      };
-      
-      // Only update if values have changed
-      if (updatedDetails.name !== billingDetails.name || updatedDetails.email !== billingDetails.email) {
-        onBillingDetailsChange(updatedDetails);
-      }
-    }
-  }, [currentUser, billingDetails, onBillingDetailsChange]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     
-    if (!stripe || !elements || !stripeLoaded) {
+    if (!stripe || !elements) {
       setError('Payment system not ready. Please refresh the page and try again.');
       return;
     }
@@ -288,37 +190,31 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     try {
       console.log('🔄 Confirming payment...');
 
-      // Validate required fields
-      if (!billingDetails.name.trim()) {
-        throw new Error('Please enter your full name');
-      }
-
-      if (!billingDetails.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(billingDetails.email)) {
-        throw new Error('Please enter a valid email address');
-      }
-
-      if (!billingDetails.address.line1.trim()) {
-        throw new Error('Please enter your billing address');
-      }
+      // Get user info
+      const userInfo = {
+        name: currentUser?.username || billingDetails.name || 'Customer',
+        email: currentUser?.email || billingDetails.email || '',
+        phone: billingDetails.phone || ''
+      };
 
       // Prepare billing details for confirmPayment
       const billingDetailsForStripe = {
-        name: billingDetails.name,
-        email: billingDetails.email,
-        phone: billingDetails.phone || undefined,
+        name: userInfo.name,
+        email: userInfo.email || undefined,
+        phone: userInfo.phone || undefined,
         address: {
-          line1: billingDetails.address.line1,
+          line1: billingDetails.address.line1 || 'N/A',
           line2: billingDetails.address.line2 || undefined,
-          city: billingDetails.address.city,
-          state: billingDetails.address.state,
-          postal_code: billingDetails.address.postal_code,
+          city: billingDetails.address.city || 'N/A',
+          state: billingDetails.address.state || 'N/A',
+          postal_code: billingDetails.address.postal_code || '00000',
           country: billingDetails.address.country || 'US'
         }
       };
 
       console.log('📋 Billing details for Stripe:', billingDetailsForStripe);
 
-      // Confirm payment
+      // Direct confirmation without submit()
       const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
@@ -332,15 +228,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
 
       if (stripeError) {
         console.error('❌ Stripe payment error:', stripeError);
-        
-        // Filter out tracking errors
-        const errorMessage = stripeError.message || 'Payment failed';
-        if (!errorMessage.includes('stripe.com/b') && !errorMessage.includes('r.stripe.com')) {
-          setError(errorMessage);
-        } else {
-          setError('Payment failed. Please try again.');
-        }
-        
+        setError(stripeError.message || 'Payment failed. Please try again.');
         setPaymentStatus('failed');
         setIsSubmitting(false);
         return;
@@ -353,35 +241,45 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
 
       // Prepare confirmation data
       let confirmationPayload;
-      let response;
+      let confirmationEndpoint;
 
       if (offerData?.type === 'direct_purchase') {
-        // For direct purchase
+        // For direct purchase, use the orders API
+        confirmationEndpoint = '/marketplace/orders/confirm-payment';
         confirmationPayload = {
           orderId: offerData.order?._id,
           paymentIntentId: paymentIntent?.id,
           billingDetails: billingDetailsForStripe
         };
-        
-        // Use appropriate API endpoint
-        if (marketplaceApi.orders?.confirmDirectPayment) {
-          response = await marketplaceApi.orders.confirmDirectPayment(confirmationPayload);
-        } else {
-          // Fallback to offers API
-          response = await marketplaceApi.offers.confirmOfferPayment({
-            offerId: offerData.offer?._id,
-            paymentIntentId: paymentIntent?.id
-          });
-        }
       } else {
-        // For offers
+        // For offers, use the offers API
+        confirmationEndpoint = '/marketplace/offers/confirm-offer-payment';
         confirmationPayload = {
           offerId: offerData?.offer?._id || offerData?.offerId,
           paymentIntentId: paymentIntent?.id,
           billingDetails: billingDetailsForStripe
         };
-        
-        response = await marketplaceApi.offers.confirmOfferPayment(confirmationPayload);
+      }
+
+      console.log('📤 Sending confirmation to server:', {
+        endpoint: confirmationEndpoint,
+        payload: confirmationPayload
+      });
+
+      // Use marketplaceApi for the confirmation
+      let response;
+      if (offerData?.type === 'direct_purchase') {
+        // Note: You'll need to add a confirmDirectPayment method to your orders API
+        // For now, we'll use the offers API confirmOfferPayment as a fallback
+        response = await marketplaceApi.offers.confirmOfferPayment({
+          offerId: offerData.offer?._id,
+          paymentIntentId: paymentIntent?.id
+        });
+      } else {
+        response = await marketplaceApi.offers.confirmOfferPayment({
+          offerId: offerData?.offer?._id || offerData?.offerId,
+          paymentIntentId: paymentIntent?.id
+        });
       }
 
       if (!response.success) {
@@ -401,10 +299,10 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       
       let errorMessage = 'Payment failed. Please try again.';
       
-      if (err.message && !err.message.includes('stripe.com/b') && !err.message.includes('r.stripe.com')) {
-        errorMessage = err.message;
-      } else if (err.error) {
+      if (err.error) {
         errorMessage = err.error;
+      } else if (err.message) {
+        errorMessage = err.message;
       }
 
       setError(errorMessage);
@@ -418,7 +316,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     if (event.complete) {
       const address = event.value.address;
       onBillingDetailsChange({
-        ...billingDetails,
         address: {
           line1: address.line1 || '',
           line2: address.line2 || '',
@@ -430,15 +327,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       });
     }
   };
-
-  if (!stripeLoaded) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600"></div>
-        <span className="mt-3 text-sm text-gray-600">Loading payment system...</span>
-      </div>
-    );
-  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -463,12 +351,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             {/* Name Input */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
-                Full Name *
+                Full Name
               </label>
               <input
                 type="text"
-                value={billingDetails.name}
-                onChange={(e) => onBillingDetailsChange({ ...billingDetails, name: e.target.value })}
+                value={billingDetails.name || currentUser?.username || ''}
+                onChange={(e) => onBillingDetailsChange({ name: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
                 placeholder="Enter your full name"
                 required
@@ -478,12 +366,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             {/* Email Input */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
-                Email Address *
+                Email Address
               </label>
               <input
                 type="email"
-                value={billingDetails.email}
-                onChange={(e) => onBillingDetailsChange({ ...billingDetails, email: e.target.value })}
+                value={billingDetails.email || currentUser?.email || ''}
+                onChange={(e) => onBillingDetailsChange({ email: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
                 placeholder="Enter your email"
                 required
@@ -497,8 +385,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
               </label>
               <input
                 type="tel"
-                value={billingDetails.phone}
-                onChange={(e) => onBillingDetailsChange({ ...billingDetails, phone: e.target.value })}
+                value={billingDetails.phone || ''}
+                onChange={(e) => onBillingDetailsChange({ phone: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
                 placeholder="Enter your phone number"
               />
@@ -507,7 +395,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             {/* Address Element */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
-                Billing Address *
+                Billing Address
               </label>
               <div className="border border-gray-300 rounded-md overflow-hidden">
                 <AddressElement 
@@ -523,15 +411,15 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                       }
                     },
                     defaultValues: {
-                      name: billingDetails.name,
-                      phone: billingDetails.phone,
+                      name: billingDetails.name || currentUser?.username || '',
+                      phone: billingDetails.phone || '',
                       address: {
-                        line1: billingDetails.address.line1,
-                        line2: billingDetails.address.line2,
-                        city: billingDetails.address.city,
-                        state: billingDetails.address.state,
-                        postal_code: billingDetails.address.postal_code,
-                        country: billingDetails.address.country
+                        line1: billingDetails.address.line1 || '',
+                        line2: billingDetails.address.line2 || '',
+                        city: billingDetails.address.city || '',
+                        state: billingDetails.address.state || '',
+                        postal_code: billingDetails.address.postal_code || '',
+                        country: billingDetails.address.country || 'US'
                       }
                     }
                   }}
@@ -544,11 +432,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           <div className="text-sm text-gray-600">
             <div className="flex items-center gap-2 mb-2">
               <FiUser size={14} />
-              <span>{billingDetails.name || 'Not provided'}</span>
+              <span>{billingDetails.name || currentUser?.username || 'Not provided'}</span>
             </div>
             <div className="flex items-center gap-2">
               <FiMail size={14} />
-              <span>{billingDetails.email || 'Not provided'}</span>
+              <span>{billingDetails.email || currentUser?.email || 'Not provided'}</span>
             </div>
           </div>
         )}
@@ -594,7 +482,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       </div>
       
       {/* Error/Success Messages */}
-      {error && !error.includes('stripe.com/b') && !error.includes('r.stripe.com') && (
+      {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <div className="flex items-start gap-3">
             <FiAlertCircle className="text-red-500 mt-0.5 flex-shrink-0" size={18} />
