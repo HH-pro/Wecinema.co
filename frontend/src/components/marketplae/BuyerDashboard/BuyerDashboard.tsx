@@ -1434,20 +1434,7 @@ const BuyerDashboard: React.FC = () => {
         {/* Statistics Overview */}
         {renderStats()}
 
-        {/* Achievements Section */}
-        <div className="achievements-section">
-          <div className="section-header">
-            <div className="section-title">
-              <h2><FaTrophy /> Your Achievements</h2>
-              <p className="section-subtitle">Unlock badges and rewards</p>
-            </div>
-            <div className="section-controls">
-              <button className="view-all-btn">
-                View All <FaArrowRight />
-              </button>
-            </div>
-          </div>
-          
+       
           <div className="achievements-grid">
             {achievements.map((achievement, index) => (
               <div 
