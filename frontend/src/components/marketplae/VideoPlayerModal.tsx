@@ -18,6 +18,7 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   onClose
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -28,33 +29,73 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [showControls, setShowControls] = useState(true);
+  const [videoSrc, setVideoSrc] = useState<string>('');
   const controlsTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
-    if (show) {
+    if (show && videoUrl) {
       setIsLoading(true);
       setError('');
+      setVideoSrc(videoUrl);
+      
+      // Preload the video
+      const preloadVideo = document.createElement('video');
+      preloadVideo.src = videoUrl;
+      preloadVideo.preload = 'metadata';
+      
+      // Fix for browser video overlays
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      
+      return () => {
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.width = '';
+      };
     }
-  }, [show]);
+  }, [show, videoUrl]);
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !videoSrc) return;
 
-    const handlePlay = () => setIsPlaying(true);
+    const handlePlay = () => {
+      setIsPlaying(true);
+      setIsLoading(false);
+    };
+    
     const handlePause = () => setIsPlaying(false);
+    
     const handleTimeUpdate = () => setCurrentTime(video.currentTime);
+    
     const handleLoadedMetadata = () => {
       setDuration(video.duration);
       setIsLoading(false);
+      
+      // Auto-play if video is ready
+      if (!video.paused) {
+        video.play().catch(e => {
+          console.log('Auto-play prevented:', e);
+          setIsPlaying(false);
+        });
+      }
     };
+    
     const handleEnded = () => setIsPlaying(false);
+    
     const handleVolumeChange = () => {
       setIsMuted(video.muted);
       setVolume(video.volume);
     };
-    const handleError = () => {
-      setError('Unable to load video. The file may be corrupted or unsupported.');
+    
+    const handleError = (e: Event) => {
+      console.error('Video error:', e);
+      setError('Unable to load video. The file may be corrupted, unsupported, or inaccessible.');
+      setIsLoading(false);
+    };
+    
+    const handleCanPlay = () => {
       setIsLoading(false);
     };
 
@@ -65,17 +106,19 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     video.addEventListener('ended', handleEnded);
     video.addEventListener('volumechange', handleVolumeChange);
     video.addEventListener('error', handleError);
+    video.addEventListener('canplay', handleCanPlay);
 
     return () => {
       video.removeEventListener('play', handlePlay);
-      video.removeEventListener('pause', handlePause);
+      video.removeEventListener('pause', handlePlay);
       video.removeEventListener('timeupdate', handleTimeUpdate);
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('ended', handleEnded);
       video.removeEventListener('volumechange', handleVolumeChange);
       video.removeEventListener('error', handleError);
+      video.removeEventListener('canplay', handleCanPlay);
     };
-  }, []);
+  }, [videoSrc]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -111,32 +154,58 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     };
   }, [show, isPlaying]);
 
-  if (!show || !videoUrl) return null;
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const video = videoRef.current;
+      if (!video || !show) return;
 
-  const isVideoUrl = (url: string): boolean => {
-    if (!url) return false;
-    
-    const videoExtensions = /\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v|ogg|ogv|3gp|3g2)$/i;
-    if (videoExtensions.test(url)) {
-      return true;
+      switch (e.key) {
+        case ' ':
+        case 'Spacebar':
+          e.preventDefault();
+          handlePlayPause();
+          break;
+        case 'f':
+        case 'F':
+          e.preventDefault();
+          handleFullscreen();
+          break;
+        case 'm':
+        case 'M':
+          e.preventDefault();
+          toggleMute();
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          video.currentTime = Math.max(0, video.currentTime - 10);
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          video.currentTime = Math.min(video.duration, video.currentTime + 10);
+          break;
+        case 'Escape':
+          if (document.fullscreenElement) {
+            document.exitFullscreen();
+          } else {
+            onClose();
+          }
+          break;
+      }
+    };
+
+    if (show) {
+      document.addEventListener('keydown', handleKeyDown);
     }
-    
-    const videoDomains = [
-      'youtube.com',
-      'youtu.be',
-      'vimeo.com',
-      'dailymotion.com',
-      'twitch.tv',
-      'streamable.com',
-      'cloudinary.com',
-      'vidyard.com',
-      'wistia.com'
-    ];
-    
-    return videoDomains.some(domain => url.includes(domain));
-  };
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [show, videoRef.current]);
+
+  if (!show) return null;
 
   const formatTime = (seconds: number): string => {
+    if (isNaN(seconds)) return '0:00';
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = Math.floor(seconds % 60);
@@ -151,10 +220,27 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     const video = videoRef.current;
     if (!video) return;
     
-    if (video.paused) {
-      video.play();
-    } else {
-      video.pause();
+    try {
+      if (video.paused || video.ended) {
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              setIsPlaying(true);
+            })
+            .catch(error => {
+              console.error('Play failed:', error);
+              setIsPlaying(false);
+              setError('Playback failed. Please ensure the video format is supported and try again.');
+            });
+        }
+      } else {
+        video.pause();
+        setIsPlaying(false);
+      }
+    } catch (error) {
+      console.error('Play/Pause error:', error);
+      setError('Playback error occurred. Please try again.');
     }
     showControlsTemporarily();
   };
@@ -204,29 +290,63 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   };
 
   const handleFullscreen = () => {
-    const video = videoRef.current;
-    if (!video) return;
+    const element = modalRef.current || videoRef.current;
+    if (!element) return;
     
     if (document.fullscreenElement) {
       document.exitFullscreen();
     } else {
-      video.requestFullscreen();
+      element.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
     }
     showControlsTemporarily();
   };
 
   const handleDownload = () => {
-    const link = document.createElement('a');
-    link.href = videoUrl;
-    link.download = videoTitle || 'video.mp4';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const link = document.createElement('a');
+      link.href = videoUrl;
+      link.download = videoTitle || 'video.mp4';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Download failed:', error);
+      // Fallback to opening in new tab
+      window.open(videoUrl, '_blank');
+    }
+  };
+
+  const isVideoUrl = (url: string): boolean => {
+    if (!url) return false;
+    
+    const videoExtensions = /\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v|ogg|ogv|3gp|3g2|mpg|mpeg)$/i;
+    if (videoExtensions.test(url)) {
+      return true;
+    }
+    
+    const videoDomains = [
+      'youtube.com',
+      'youtu.be',
+      'vimeo.com',
+      'dailymotion.com',
+      'twitch.tv',
+      'streamable.com',
+      'cloudinary.com',
+      'vidyard.com',
+      'wistia.com'
+    ];
+    
+    return videoDomains.some(domain => url.includes(domain));
   };
 
   return (
     <div 
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md p-4 transition-all duration-300"
+      ref={modalRef}
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 backdrop-blur-md p-4 transition-all duration-300"
       onClick={() => setShowControls(true)}
       onMouseMove={showControlsTemporarily}
     >
@@ -234,7 +354,7 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       <div className="relative w-full max-w-6xl max-h-[90vh] bg-black/90 rounded-2xl overflow-hidden shadow-2xl border border-gray-800">
         {/* Header */}
         <div 
-          className={`absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/90 via-black/70 to-transparent p-4 transition-all duration-300 ${
+          className={`absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/95 via-black/80 to-transparent p-4 transition-all duration-300 ${
             showControls ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10'
           }`}
         >
@@ -245,7 +365,9 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                 <span className="truncate">{videoTitle}</span>
               </h3>
               <div className="text-sm text-gray-400 truncate mt-1 flex items-center gap-2">
-                <span className="px-2 py-0.5 bg-gray-800 rounded text-xs">{formatTime(duration)}</span>
+                {!isNaN(duration) && (
+                  <span className="px-2 py-0.5 bg-gray-800 rounded text-xs">{formatTime(duration)}</span>
+                )}
                 <span className="truncate">{videoUrl}</span>
               </div>
             </div>
@@ -284,47 +406,65 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
               </div>
               <h4 className="text-2xl font-semibold mb-3">Playback Error</h4>
               <p className="text-gray-300 mb-6">{error}</p>
-              <button
-                onClick={onClose}
-                className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-all duration-200"
-              >
-                Close Player
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setError('');
+                    setIsLoading(true);
+                    setVideoSrc(videoUrl);
+                  }}
+                  className="px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg transition-all duration-200"
+                >
+                  Retry
+                </button>
+                <button
+                  onClick={onClose}
+                  className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-all duration-200"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           ) : (
             <>
               {/* Loading Overlay */}
               {isLoading && (
-                <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10">
+                <div className="absolute inset-0 bg-black/90 flex items-center justify-center z-10">
                   <div className="text-center">
                     <div className="relative inline-block mb-4">
                       <div className="absolute inset-0 animate-pulse bg-yellow-400 opacity-20 rounded-full blur-xl"></div>
                       <div className="relative animate-spin rounded-full h-16 w-16 border-4 border-transparent border-t-yellow-500 border-r-amber-500 mx-auto"></div>
                     </div>
                     <p className="text-white font-medium">Loading video...</p>
-                    <p className="text-gray-400 text-sm mt-2">Please wait</p>
+                    <p className="text-gray-400 text-sm mt-2">This may take a moment</p>
                   </div>
                 </div>
               )}
               
               {/* Video Thumbnail */}
-              {videoThumbnail && !isPlaying && (
+              {videoThumbnail && !isPlaying && !isLoading && (
                 <div 
-                  className="absolute inset-0 bg-cover bg-center opacity-40"
+                  className="absolute inset-0 bg-cover bg-center opacity-30"
                   style={{ backgroundImage: `url(${videoThumbnail})` }}
                 />
               )}
               
               {/* Video Element */}
-              {isVideoUrl(videoUrl) ? (
+              {isVideoUrl(videoUrl) && videoSrc ? (
                 <video
                   ref={videoRef}
-                  src={videoUrl}
+                  src={videoSrc}
                   className="w-full h-full object-contain cursor-pointer"
                   onClick={handlePlayPause}
                   poster={videoThumbnail}
-                  preload="metadata"
+                  preload="auto"
+                  playsInline
+                  controls={false}
+                  crossOrigin="anonymous"
                 >
+                  <source src={videoSrc} type="video/mp4" />
+                  <source src={videoSrc} type="video/webm" />
+                  <source src={videoSrc} type="video/ogg" />
                   Your browser does not support the video tag.
                 </video>
               ) : (
@@ -333,16 +473,18 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                     <FiInfo className="text-gray-400" size={40} />
                   </div>
                   <h4 className="text-2xl font-semibold mb-3">Invalid Video Source</h4>
-                  <p className="text-gray-300 mb-6">The provided URL is not a supported video format.</p>
-                  <div className="bg-gray-900 rounded-lg p-4 w-full text-left">
-                    <p className="text-sm text-gray-400 mb-1">URL:</p>
-                    <p className="text-sm break-all">{videoUrl}</p>
-                  </div>
+                  <p className="text-gray-300 mb-6">The video URL is not valid or accessible.</p>
+                  <button
+                    onClick={onClose}
+                    className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-all duration-200"
+                  >
+                    Close Player
+                  </button>
                 </div>
               )}
               
               {/* Center Play Button */}
-              {!isPlaying && !isLoading && (
+              {!isPlaying && !isLoading && !error && (
                 <button
                   onClick={handlePlayPause}
                   className="absolute z-10 transform -translate-x-1/2 -translate-y-1/2 top-1/2 left-1/2 w-20 h-20 bg-yellow-500 hover:bg-yellow-600 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 group"
@@ -354,7 +496,7 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
               
               {/* Video Controls */}
               <div 
-                className={`absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/90 via-black/80 to-transparent p-4 transition-all duration-300 ${
+                className={`absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/95 via-black/85 to-transparent p-4 transition-all duration-300 ${
                   showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
                 }`}
                 onClick={(e) => e.stopPropagation()}
@@ -367,7 +509,7 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                     max={duration || 100}
                     value={currentTime}
                     onChange={handleSeek}
-                    className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-yellow-500"
+                    className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-yellow-500 [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-white/50"
                   />
                   <div className="flex justify-between text-xs text-gray-400 mt-1">
                     <span>{formatTime(currentTime)}</span>
@@ -435,11 +577,6 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                         </div>
                       </div>
                     </div>
-                    
-                    {/* Video Info */}
-                    <div className="text-xs text-gray-400 bg-black/50 px-3 py-1.5 rounded-lg">
-                      {videoRef.current?.videoWidth}x{videoRef.current?.videoHeight}
-                    </div>
                   </div>
                 </div>
               </div>
@@ -448,7 +585,7 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         </div>
         
         {/* Keyboard Shortcuts Info */}
-        <div className={`absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/80 backdrop-blur-sm text-white text-xs rounded-lg p-3 transition-all duration-300 ${
+        <div className={`absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/90 backdrop-blur-sm text-white text-xs rounded-lg p-3 transition-all duration-300 ${
           showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
         }`}>
           <div className="flex items-center gap-6">
@@ -465,8 +602,8 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
               <span className="text-gray-300">Mute</span>
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">← →</kbd>
-              <span className="text-gray-300">Seek</span>
+              <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">ESC</kbd>
+              <span className="text-gray-300">Close</span>
             </span>
           </div>
         </div>
@@ -474,7 +611,7 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       
       {/* Close on background click */}
       <div 
-        className="absolute inset-0 -z-10"
+        className="absolute inset-0 -z-10 cursor-pointer"
         onClick={onClose}
       />
     </div>
