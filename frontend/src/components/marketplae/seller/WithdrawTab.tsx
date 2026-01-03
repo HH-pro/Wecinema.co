@@ -12,8 +12,8 @@ interface WithdrawTabProps {
   onPageChange: (page: number) => void;
   onWithdrawRequest?: (amountInDollars: number) => Promise<void>;
   onRefresh?: () => Promise<void>;
-  formatCurrencyshow?: (amountInCents: number) => string;
 }
+
 
 const WithdrawTab: React.FC<WithdrawTabProps> = ({
   stripeStatus,
@@ -24,7 +24,6 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
   onPageChange,
   onWithdrawRequest,
   onRefresh,
-  formatCurrencyshow = marketplaceApi.utils.formatCurrencyshow
 }) => {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
@@ -37,7 +36,17 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
   const [selectedMethod, setSelectedMethod] = useState('stripe');
   const [payoutHistory, setPayoutHistory] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+ const formatCurrency = (
+  amount: number,
+  currency: string = 'USD'
+): string => {
+  const valueInDollars = (amount || 0) / 100;
 
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+  }).format(valueInDollars);
+};
   // Helper functions
   const dollarsToCents = (dollars: number): number => {
     return Math.round(dollars * 100);
@@ -51,7 +60,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
     const minWithdrawal = 500; // $5.00 minimum
     
     if (amountInCents < minWithdrawal) {
-      return { valid: false, error: `Minimum withdrawal amount is ${formatCurrencyshow(minWithdrawal)}` };
+      return { valid: false, error: `Minimum withdrawal amount is ${formatCurrency(minWithdrawal)}` };
     }
     
     if (amountInCents > availableBalance) {
@@ -316,7 +325,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
       };
       
       if (withdrawalData.success) {
-        const successMsg = `Withdrawal request of ${formatCurrencyshow(amountInCents)} submitted successfully!`;
+        const successMsg = `Withdrawal request of ${formatCurrency(amountInCents)} submitted successfully!`;
         setSuccessMessage(successMsg);
         toast.success(successMsg);
         
@@ -525,7 +534,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
             <div>
               <p className="text-sm font-medium text-green-800">Available to Withdraw</p>
               <p className="text-3xl font-bold text-green-900 mt-2">
-                {formatCurrencyshow(availableBalance)}
+                {formatCurrency(availableBalance)}
               </p>
               <p className="text-sm text-green-700 mt-2">
                 Ready for immediate withdrawal
@@ -553,7 +562,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                 {withdrawalStats?.pendingOrders || 0}
               </p>
               <p className="text-sm text-blue-700 mt-2">
-                {formatCurrencyshow((withdrawalStats?.pendingRevenue || 0) * 100)}
+                {formatCurrency((withdrawalStats?.pendingRevenue || 0) * 100)}
               </p>
             </div>
             <div className="text-4xl text-blue-600">⏳</div>
@@ -566,7 +575,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
             <div>
               <p className="text-sm font-medium text-purple-800">Total Withdrawn</p>
               <p className="text-3xl font-bold text-purple-900 mt-2">
-                {formatCurrencyshow(totalWithdrawn)}
+                {formatCurrency(totalWithdrawn)}
               </p>
               <p className="text-sm text-purple-700 mt-2">
                 All-time withdrawals
@@ -585,7 +594,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
             <div className="bg-gray-50 rounded-xl p-4">
               <p className="text-sm font-medium text-gray-600">Total Revenue</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
-                {formatCurrencyshow((withdrawalStats.totalRevenue || 0) * 100)}
+                {formatCurrency((withdrawalStats.totalRevenue || 0) * 100)}
               </p>
             </div>
             <div className="bg-gray-50 rounded-xl p-4">
@@ -603,7 +612,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
             <div className="bg-gray-50 rounded-xl p-4">
               <p className="text-sm font-medium text-gray-600">Platform Fee (10%)</p>
               <p className="text-lg font-bold text-gray-900 mt-1">
-                {formatCurrencyshow(((withdrawalStats.totalRevenue || 0) * 0.1) * 100)}
+                {formatCurrency(((withdrawalStats.totalRevenue || 0) * 0.1) * 100)}
               </p>
             </div>
           </div>
@@ -751,7 +760,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
             </div>
             <div className="flex justify-between items-center mt-2">
               <p className="text-sm text-gray-500">
-                Available: <span className="font-semibold">{formatCurrencyshow(availableBalance)}</span>
+                Available: <span className="font-semibold">{formatCurrency(availableBalance)}</span>
               </p>
               <p className="text-sm text-gray-500">
                 Minimum: <span className="font-semibold">$5.00</span>
@@ -872,7 +881,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
-                        {formatCurrencyshow(payout.amount)}
+                        {formatCurrency(payout.amount)}
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
