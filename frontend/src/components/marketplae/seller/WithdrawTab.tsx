@@ -13,6 +13,11 @@ interface WithdrawTabProps {
   onWithdrawRequest?: (amountInDollars: number) => Promise<void>;
   onRefresh?: () => Promise<void>;
   formatCurrency?: (amountInCents: number) => string;
+  // ✅ NEW PROPS FOR EARNINGS DATA
+  totalRevenue?: number;           // Total revenue in dollars
+  thisMonthRevenue?: number;       // This month revenue in dollars
+  pendingRevenue?: number;         // Pending revenue in dollars
+  completedRevenue?: number;       // Completed revenue in dollars
 }
 
 const WithdrawTab: React.FC<WithdrawTabProps> = ({
@@ -24,6 +29,11 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
   onPageChange,
   onWithdrawRequest,
   onRefresh,
+  // ✅ NEW: Earning props
+  totalRevenue = 0,
+  thisMonthRevenue = 0,
+  pendingRevenue = 0,
+  completedRevenue = 0,
   // ✅ STRICTLY USING MARKETPLACE API FORMATCURRENCY ONLY
   formatCurrency = marketplaceApi.utils.formatCurrency
 }) => {
@@ -62,77 +72,63 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
     return { valid: true };
   };
 
-  // ✅ FETCH AVAILABLE BALANCE FROM MARKETPLACE API
+  // ✅ FETCH AVAILABLE BALANCE - UPDATED TO USE PASSED PROPS
   const fetchAvailableBalance = async () => {
     try {
       setStatsLoading(true);
       
-      // Check seller earnings and balance
-      const earningsResponse = await marketplaceApi.orders.getSellerStats();
+      console.log('💰 WithdrawTab - Earning props received:', {
+        totalRevenue,
+        pendingRevenue,
+        completedRevenue,
+        thisMonthRevenue
+      });
       
-      if (earningsResponse.success && earningsResponse.data) {
-        const data = earningsResponse.data;
-        console.log('📊 Seller earnings data:', data);
-        
-        // Extract available balance from different possible locations
-        let balance = 0;
-        
-        if (data.totals?.pendingRevenue) {
-          // If we have pending revenue, that's already in dollars
-          balance = data.totals.pendingRevenue; // ALREADY IN DOLLARS
-        } else if (data.totals?.totalRevenue) {
-          // Use total revenue minus completed revenue
-          const completedRevenue = data.totals.completedOrders?.revenue || 0;
-          balance = (data.totals.totalRevenue - completedRevenue); // ALREADY IN DOLLARS
-        } else if (data.totals?.thisMonthRevenue) {
-          balance = data.totals.thisMonthRevenue; // ALREADY IN DOLLARS
-        }
-        
-        // Convert dollars to cents for formatCurrency
-        setAvailableBalance(balance * 100);
-        
-        // Set withdrawal stats (ALREADY IN DOLLARS)
-        setWithdrawalStats({
-          totalWithdrawn: data.totals?.completedOrders?.revenue || 0, // DOLLARS
-          availableBalance: balance, // DOLLARS
-          pendingOrders: data.totals?.pendingOrders?.count || 0,
-          pendingRevenue: data.totals?.pendingOrders?.revenue || 0, // DOLLARS
-          completedOrders: data.totals?.completedOrders?.count || 0,
-          totalRevenue: data.totals?.totalRevenue || 0 // DOLLARS
-        });
-        
-        return;
+      // ✅ PRIORITY 1: Use pendingRevenue prop (already in dollars)
+      let balanceInDollars = pendingRevenue || 0;
+      
+      // ✅ PRIORITY 2: Check stripe status balance
+      if (!balanceInDollars && stripeStatus?.availableBalance) {
+        balanceInDollars = centsToDollars(stripeStatus.availableBalance);
       }
       
-      // If seller stats not available, try orders endpoint
-      try {
-        const ordersResponse = await marketplaceApi.orders.getMySales();
-        if (ordersResponse.success && ordersResponse.data) {
-          const sales = ordersResponse.data.sales || [];
-          const completedSales = sales.filter((sale: any) => sale.status === 'completed');
-          const pendingSales = sales.filter((sale: any) => 
-            sale.status === 'paid' || sale.status === 'delivered' || sale.status === 'in_progress'
-          );
-          
-          const completedAmount = completedSales.reduce((sum: number, sale: any) => sum + sale.amount, 0);
-          const pendingAmount = pendingSales.reduce((sum: number, sale: any) => sum + sale.amount, 0);
-          
-          // Note: sale.amount is already in cents from API
-          // Convert cents to dollars for our internal representation
-          setAvailableBalance(pendingAmount); // Already in cents
-          
-          setWithdrawalStats({
-            totalWithdrawn: completedAmount / 100, // Convert cents to dollars
-            availableBalance: pendingAmount / 100, // Convert cents to dollars
-            pendingOrders: pendingSales.length,
-            pendingRevenue: pendingAmount / 100, // Convert cents to dollars
-            completedOrders: completedSales.length,
-            totalRevenue: (completedAmount + pendingAmount) / 100 // Convert cents to dollars
-          });
+      // ✅ PRIORITY 3: Fetch from API if props not provided
+      if (!balanceInDollars) {
+        try {
+          const earningsResponse = await marketplaceApi.orders.getSellerStats();
+          if (earningsResponse.success && earningsResponse.data) {
+            const totals = earningsResponse.data.totals || {};
+            balanceInDollars = totals.pendingRevenue || totals.availableBalance || 0;
+          }
+        } catch (apiError) {
+          console.error('API fetch failed, using local calculation:', apiError);
         }
-      } catch (orderError) {
-        console.error('Error fetching sales:', orderError);
       }
+      
+      // Convert dollars to cents for display
+      const balanceInCents = dollarsToCents(balanceInDollars);
+      setAvailableBalance(balanceInCents);
+      
+      // Set withdrawal stats
+      const stats = {
+        totalRevenue: totalRevenue || 0,
+        pendingRevenue: pendingRevenue || 0,
+        completedRevenue: completedRevenue || 0,
+        thisMonthRevenue: thisMonthRevenue || 0,
+        // Calculate derived stats
+        totalWithdrawn: completedRevenue || 0,
+        availableBalance: balanceInDollars,
+        pendingOrders: 0, // We'll get this from API if needed
+        completedOrders: 0
+      };
+      
+      setWithdrawalStats(stats);
+      
+      console.log('💰 WithdrawTab - Final stats:', {
+        availableBalanceCents: balanceInCents,
+        availableBalanceDollars: balanceInDollars,
+        stats
+      });
       
     } catch (error) {
       console.error('Error fetching available balance:', error);
@@ -249,29 +245,32 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
     return () => clearInterval(interval);
   }, []);
 
+  // ✅ UPDATE AVAILABLE BALANCE WHEN PROPS CHANGE
   useEffect(() => {
-    // Calculate available balance from multiple sources
-    let balance = 0;
+    console.log('🔄 WithdrawTab - Props updated, recalculating balance');
+    console.log('📊 New prop values:', {
+      pendingRevenue,
+      totalRevenue,
+      completedRevenue,
+      thisMonthRevenue
+    });
     
-    // Use calculated available balance first
-    if (availableBalance > 0) {
-      balance = availableBalance;
+    // Recalculate available balance from pending revenue
+    if (pendingRevenue !== undefined) {
+      const balanceInCents = dollarsToCents(pendingRevenue);
+      setAvailableBalance(balanceInCents);
+      
+      // Update withdrawal stats
+      setWithdrawalStats((prev: any) => ({
+        ...prev,
+        pendingRevenue: pendingRevenue,
+        availableBalance: pendingRevenue,
+        totalRevenue: totalRevenue || prev?.totalRevenue,
+        completedRevenue: completedRevenue || prev?.completedRevenue,
+        totalWithdrawn: completedRevenue || prev?.totalWithdrawn
+      }));
     }
-    // Check earnings balance
-    else if (earningsBalance?.availableBalance) {
-      balance = earningsBalance.availableBalance * 100; // Convert dollars to cents
-    } 
-    // Check stripe status
-    else if (stripeStatus?.balance?.available) {
-      balance = stripeStatus.balance.available; // Already in cents
-    }
-    // Check withdrawal stats
-    else if (withdrawalStats?.availableBalance) {
-      balance = withdrawalStats.availableBalance * 100; // Convert dollars to cents
-    }
-    
-    setAvailableBalance(balance);
-  }, [earningsBalance, stripeStatus, withdrawalStats, availableBalance]);
+  }, [pendingRevenue, totalRevenue, completedRevenue, thisMonthRevenue]);
 
   const handleWithdraw = async () => {
     if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) {
@@ -415,30 +414,33 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
 
   // ✅ CALCULATE TOTAL WITHDRAWN - FIXED
   const calculateTotalWithdrawn = () => {
+    // ✅ Priority 1: Use completedRevenue prop (already in dollars)
+    if (completedRevenue) {
+      return dollarsToCents(completedRevenue);
+    }
+    
+    // ✅ Priority 2: Use withdrawal stats
     if (withdrawalStats?.totalWithdrawn) {
       // totalWithdrawn is already in dollars, convert to cents
-      return withdrawalStats.totalWithdrawn * 100;
+      return dollarsToCents(withdrawalStats.totalWithdrawn);
     }
     
-    if (earningsBalance?.totalWithdrawn) {
-      // Convert dollars to cents
-      return earningsBalance.totalWithdrawn * 100;
-    }
-    
+    // ✅ Priority 3: Calculate from payout history
     if (payoutHistory.length > 0) {
-      return payoutHistory
+      const completedPayouts = payoutHistory
         .filter((w: any) => 
           w.status === 'completed' || 
           w.status === 'paid' ||
           w.status === 'success'
-        )
-        .reduce((sum: number, w: any) => sum + (w.amount || 0), 0);
+        );
+      
+      return completedPayouts.reduce((sum: number, w: any) => sum + (w.amount || 0), 0);
     }
     
     return 0;
   };
 
-  const totalWithdrawn = calculateTotalWithdrawn();
+  const totalWithdrawnCents = calculateTotalWithdrawn();
 
   // ✅ CALCULATE PENDING WITHDRAWALS
   const calculatePendingWithdrawals = () => {
@@ -515,99 +517,75 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
         </div>
       )}
 
-      {/* Balance Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Available to Withdraw Card */}
-        <div className="bg-gradient-to-r from-green-50 to-emerald-100 border border-green-200 rounded-2xl p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-green-800">Available to Withdraw</p>
-              <p className="text-3xl font-bold text-green-900 mt-2">
-                {/* ✅ CORRECT: availableBalance is in cents, formatCurrency expects cents */}
-                {formatCurrency(availableBalance)}
-              </p>
-              <p className="text-sm text-green-700 mt-2">
-                Ready for immediate withdrawal
-              </p>
-            </div>
-            <div className="text-4xl text-green-600">💰</div>
+      {/* ✅ EARNING SUMMARY SECTION - NEW */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Earnings Summary</h3>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4">
+            <p className="text-sm font-medium text-blue-800">Total Revenue</p>
+            <p className="text-2xl font-bold text-blue-900 mt-1">
+              {formatCurrency(dollarsToCents(totalRevenue || 0))}
+            </p>
+            <p className="text-xs text-blue-700 mt-1">All-time earnings</p>
           </div>
-          {statsLoading && (
-            <div className="mt-2 text-xs text-green-600">
-              <svg className="animate-spin inline w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Updating...
-            </div>
-          )}
-        </div>
-        
-        {/* Pending Orders Card */}
-        <div className="bg-gradient-to-r from-blue-50 to-cyan-100 border border-blue-200 rounded-2xl p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-blue-800">Pending Orders</p>
-              <p className="text-3xl font-bold text-blue-900 mt-2">
-                {withdrawalStats?.pendingOrders || 0}
-              </p>
-              <p className="text-sm text-blue-700 mt-2">
-                {/* ✅ CORRECT: Convert dollars to cents */}
-                {formatCurrency((withdrawalStats?.pendingRevenue || 0) * 100)}
-              </p>
-            </div>
-            <div className="text-4xl text-blue-600">⏳</div>
+          <div className="bg-gradient-to-r from-green-50 to-emerald-100 border border-green-200 rounded-xl p-4">
+            <p className="text-sm font-medium text-green-800">Available to Withdraw</p>
+            <p className="text-2xl font-bold text-green-900 mt-1">
+              {formatCurrency(availableBalance)}
+            </p>
+            <p className="text-xs text-green-700 mt-1">
+              Ready for withdrawal
+            </p>
           </div>
-        </div>
-        
-        {/* Total Withdrawn Card */}
-        <div className="bg-gradient-to-r from-purple-50 to-violet-100 border border-purple-200 rounded-2xl p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-purple-800">Total Withdrawn</p>
-              <p className="text-3xl font-bold text-purple-900 mt-2">
-                {/* ✅ CORRECT: totalWithdrawn is already in cents */}
-                {formatCurrency(totalWithdrawn)}
-              </p>
-              <p className="text-sm text-purple-700 mt-2">
-                All-time withdrawals
-              </p>
-            </div>
-            <div className="text-4xl text-purple-600">💸</div>
+          <div className="bg-gradient-to-r from-purple-50 to-violet-100 border border-purple-200 rounded-xl p-4">
+            <p className="text-sm font-medium text-purple-800">Completed Revenue</p>
+            <p className="text-2xl font-bold text-purple-900 mt-1">
+              {formatCurrency(dollarsToCents(completedRevenue || 0))}
+            </p>
+            <p className="text-xs text-purple-700 mt-1">Already withdrawn</p>
+          </div>
+          <div className="bg-gradient-to-r from-yellow-50 to-amber-100 border border-yellow-200 rounded-xl p-4">
+            <p className="text-sm font-medium text-yellow-800">This Month</p>
+            <p className="text-2xl font-bold text-yellow-900 mt-1">
+              {formatCurrency(dollarsToCents(thisMonthRevenue || 0))}
+            </p>
+            <p className="text-xs text-yellow-700 mt-1">Current month earnings</p>
           </div>
         </div>
       </div>
 
-      {/* Withdrawal Statistics - FIXED */}
+      {/* Withdrawal Statistics */}
       {withdrawalStats && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Earnings Statistics</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Withdrawal Statistics</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-gray-50 rounded-xl p-4">
-              <p className="text-sm font-medium text-gray-600">Total Revenue</p>
+              <p className="text-sm font-medium text-gray-600">Platform Fee</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
-                {/* ✅ CORRECT: Convert dollars to cents */}
-                {formatCurrency((withdrawalStats.totalRevenue || 0) * 100)}
+                {formatCurrency(dollarsToCents((totalRevenue || 0) * 0.1))}
               </p>
+              <p className="text-xs text-gray-500">10% of total revenue</p>
             </div>
             <div className="bg-gray-50 rounded-xl p-4">
-              <p className="text-sm font-medium text-gray-600">Completed Orders</p>
+              <p className="text-sm font-medium text-gray-600">Net Earnings</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
-                {withdrawalStats.completedOrders || 0}
+                {formatCurrency(dollarsToCents((totalRevenue || 0) * 0.9))}
               </p>
+              <p className="text-xs text-gray-500">After 10% fee</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-4">
+              <p className="text-sm font-medium text-gray-600">Pending Orders</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {formatCurrency(dollarsToCents(pendingRevenue || 0))}
+              </p>
+              <p className="text-xs text-gray-500">Awaiting completion</p>
             </div>
             <div className="bg-gray-50 rounded-xl p-4">
               <p className="text-sm font-medium text-gray-600">Pending Withdrawals</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
                 {pendingWithdrawalsCount}
               </p>
-            </div>
-            <div className="bg-gray-50 rounded-xl p-4">
-              <p className="text-sm font-medium text-gray-600">Platform Fee (10%)</p>
-              <p className="text-lg font-bold text-gray-900 mt-1">
-                {/* ✅ CORRECT: Calculate 10% of total revenue in cents */}
-                {formatCurrency(((withdrawalStats.totalRevenue || 0) * 0.1) * 100)}
-              </p>
+              <p className="text-xs text-gray-500">In processing</p>
             </div>
           </div>
         </div>
@@ -875,7 +853,6 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
-                        {/* ✅ payout.amount is already in cents */}
                         {formatCurrency(payout.amount)}
                       </div>
                     </td>
