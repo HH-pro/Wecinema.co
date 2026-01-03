@@ -2072,6 +2072,7 @@ const marketplaceApi = {
   utils: {
     formatCurrency,
     calculatePlatformFee,
+    formatCurrencyshow,
     calculateSellerPayout,
     checkAuth,
     getCurrentUser,
