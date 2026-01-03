@@ -467,9 +467,7 @@
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  box-shadow: 
-    0 4px 6px -1px rgba(0, 0, 0, 0.05),
-    0 2px 4px -1px rgba(0, 0, 0, 0.03);
+
   border: 1px solid #e5e7eb;
   transition: all 0.3s ease;
   position: relative;
@@ -490,7 +488,7 @@
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, #F97316 , #7C3AED);
+  background: linear-gradient(90deg, #F97316 , #C2410C);
 }
 
 .stat-icon {
