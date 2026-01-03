@@ -1,6 +1,7 @@
-// src/components/marketplace/seller/DeliveryModal.tsx
-import React, { useState, useRef } from 'react';
-import toast from 'react-hot-toast';
+// src/components/marketplace/seller/DeliveryModal.tsx - UPDATED VERSION
+import React, { useState, useRef, useEffect } from 'react';
+import { toast } from 'react-hot-toast';
+import marketplaceApi from '../../../api/marketplaceApi';
 
 interface DeliveryModalProps {
   isOpen: boolean;
@@ -8,15 +9,18 @@ interface DeliveryModalProps {
   order: {
     _id: string;
     orderNumber: string;
+    status: string;
     listingId: {
       title: string;
-    };
+    } | string;
     buyerId: {
       username: string;
+      email?: string;
     };
     revisions?: number;
     maxRevisions?: number;
-    notes?: string;
+    buyerNotes?: string;
+    requirements?: string;
   };
   onDeliver: (deliveryData: {
     orderId: string;
@@ -44,72 +48,129 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({
     message?: string;
     attachments?: string;
   }>({});
+  const [uploadProgress, setUploadProgress] = useState<number[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Reset form when modal opens/closes
+  useEffect(() => {
+    if (isOpen) {
+      setMessage('');
+      setAttachments([]);
+      setErrors({});
+      setUploadProgress([]);
+      setIsUploading(false);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
+  // ✅ IMPROVED FILE VALIDATION
+  const defaultValidateFile = (file: File): string | null => {
+    const maxSize = 100 * 1024 * 1024; // 100MB
+    
+    // Check file size
+    if (file.size > maxSize) {
+      return `"${file.name}" is too large (max 100MB)`;
+    }
+
+    // Check file type by extension (more reliable than MIME type)
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    const allowedExtensions = [
+      // Images
+      'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg',
+      // Videos
+      'mp4', 'mov', 'avi', 'webm', 'mkv',
+      // Documents
+      'pdf', 'txt', 'csv', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+      // Audio
+      'mp3', 'wav', 'ogg', 'm4a',
+      // Archives
+      'zip', 'rar', '7z'
+    ];
+
+    if (!extension || !allowedExtensions.includes(extension)) {
+      return `"${file.name}" has unsupported file type`;
+    }
+
+    return null;
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files);
+    if (!e.target.files) return;
+    
+    const files = Array.from(e.target.files);
+    const validFiles: File[] = [];
+    const validationErrors: string[] = [];
+    
+    files.forEach(file => {
+      // Use custom validation or default
+      const validationFunction = validateFile || defaultValidateFile;
+      const error = validationFunction(file);
       
-      // ✅ Validate each file before adding
-      const validFiles: File[] = [];
-      const validationErrors: string[] = [];
-      
-      files.forEach(file => {
-        // Use custom validation function if provided
-        if (validateFile) {
-          const error = validateFile(file);
-          if (error) {
-            validationErrors.push(error);
-          } else {
-            validFiles.push(file);
-          }
-        } else {
-          // Fallback to default validation
-          const validTypes = [
-            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-            'video/mp4', 'video/quicktime', 'video/x-msvideo',
-            'application/pdf', 'application/zip', 'application/x-rar-compressed',
-            'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'audio/mpeg', 'audio/wav', 'audio/ogg'
-          ];
-          
-          const maxSize = 100 * 1024 * 1024; // 100MB
-          
-          if (!validTypes.includes(file.type)) {
-            validationErrors.push(`File type not supported: ${file.name}`);
-            return;
-          }
-          
-          if (file.size > maxSize) {
-            validationErrors.push(`File too large (max 100MB): ${file.name}`);
-            return;
-          }
-          
-          validFiles.push(file);
-        }
+      if (error) {
+        validationErrors.push(error);
+      } else {
+        validFiles.push(file);
+      }
+    });
+    
+    // Show validation errors
+    if (validationErrors.length > 0) {
+      toast.error(`Validation failed: ${validationErrors.join(', ')}`, {
+        duration: 5000
       });
+    }
+    
+    // Add valid files
+    if (validFiles.length > 0) {
+      setAttachments(prev => [...prev, ...validFiles]);
+      setUploadProgress(prev => [...prev, ...Array(validFiles.length).fill(0)]);
+      setErrors(prev => ({ ...prev, attachments: undefined }));
       
-      // Show validation errors
-      if (validationErrors.length > 0) {
-        toast.error(`❌ ${validationErrors.join(', ')}`);
-      }
-      
-      // Add valid files
-      if (validFiles.length > 0) {
-        setAttachments(prev => [...prev, ...validFiles]);
-        setErrors(prev => ({ ...prev, attachments: undefined }));
-        toast.success(`✅ Added ${validFiles.length} file(s)`);
-      }
+      toast.success(`Added ${validFiles.length} file${validFiles.length > 1 ? 's' : ''}`, {
+        icon: '📎'
+      });
+    }
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
   const removeAttachment = (index: number) => {
+    const removedFile = attachments[index];
     setAttachments(prev => prev.filter((_, i) => i !== index));
-    toast.success('File removed');
+    setUploadProgress(prev => prev.filter((_, i) => i !== index));
+    
+    toast.success(`Removed "${removedFile.name}"`, {
+      icon: '🗑️'
+    });
   };
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const files = Array.from(e.dataTransfer.files);
+      
+      // Create a fake change event to reuse the same logic
+      const fakeEvent = {
+        target: { files: e.dataTransfer.files }
+      } as React.ChangeEvent<HTMLInputElement>;
+      
+      handleFileSelect(fakeEvent);
+    }
+  };
+
+  // ✅ IMPROVED SUBMIT HANDLER
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -117,20 +178,21 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({
     const newErrors: typeof errors = {};
     
     if (!message.trim()) {
-      newErrors.message = 'Delivery message is required';
+      newErrors.message = 'Please add a delivery message';
     }
     
     if (attachments.length === 0) {
-      newErrors.attachments = 'At least one attachment is required';
+      newErrors.attachments = 'Please add at least one file';
     }
     
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      toast.error('Please fix the errors before delivering');
+      toast.error('Please complete all required fields');
       return;
     }
-    
+
     try {
+      // Call parent handler
       await onDeliver({
         orderId: order._id,
         message: message.trim(),
@@ -141,16 +203,20 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({
           : undefined
       });
       
-      // Reset form on success
-      setMessage('');
-      setAttachments([]);
-      setIsFinalDelivery(true);
-      setErrors({});
-      toast.success('Work delivered successfully!');
-    } catch (error) {
-      // Error handling is done in parent component
-      console.error('Delivery failed:', error);
-      toast.error('Failed to deliver work. Please try again.');
+      // Success - don't reset form here, let parent handle it
+      toast.success('Work delivered successfully! ✅', {
+        duration: 4000
+      });
+      
+    } catch (error: any) {
+      console.error('Delivery submission error:', error);
+      
+      // Don't show toast here - parent component will handle it
+      // Just show modal error
+      setErrors(prev => ({
+        ...prev,
+        message: error.message || 'Failed to deliver. Please try again.'
+      }));
     }
   };
 
@@ -163,14 +229,63 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({
   };
 
   const getFileIcon = (file: File): string => {
-    if (file.type.startsWith('image/')) return '🖼️';
-    if (file.type.startsWith('video/')) return '🎥';
-    if (file.type.startsWith('audio/')) return '🎵';
-    if (file.type === 'application/pdf') return '📄';
-    if (file.type.includes('word') || file.type.includes('document')) return '📝';
-    if (file.type === 'application/zip' || file.type.includes('rar')) return '📦';
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    
+    // Images
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) {
+      return '🖼️';
+    }
+    
+    // Videos
+    if (['mp4', 'mov', 'avi', 'webm', 'mkv'].includes(extension || '')) {
+      return '🎥';
+    }
+    
+    // Audio
+    if (['mp3', 'wav', 'ogg', 'm4a'].includes(extension || '')) {
+      return '🎵';
+    }
+    
+    // PDF
+    if (extension === 'pdf') {
+      return '📄';
+    }
+    
+    // Documents
+    if (['doc', 'docx', 'txt'].includes(extension || '')) {
+      return '📝';
+    }
+    
+    // Spreadsheets
+    if (['xls', 'xlsx', 'csv'].includes(extension || '')) {
+      return '📊';
+    }
+    
+    // Archives
+    if (['zip', 'rar', '7z'].includes(extension || '')) {
+      return '📦';
+    }
+    
     return '📎';
   };
+
+  // Get listing title
+  const getListingTitle = () => {
+    if (typeof order.listingId === 'object') {
+      return order.listingId.title;
+    }
+    return 'Order #' + order.orderNumber;
+  };
+
+  // Calculate revisions remaining
+  const getRevisionsRemaining = () => {
+    if (order.maxRevisions !== undefined && order.revisions !== undefined) {
+      return order.maxRevisions - order.revisions;
+    }
+    return null;
+  };
+
+  const revisionsRemaining = getRevisionsRemaining();
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -182,20 +297,20 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({
       
       {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl border border-yellow-200">
+        <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl border border-yellow-200 max-h-[90vh] overflow-y-auto">
           {/* Header */}
-          <div className="bg-gradient-to-r from-yellow-50 to-amber-50 p-6 rounded-t-2xl border-b border-yellow-200">
+          <div className="sticky top-0 z-10 bg-gradient-to-r from-yellow-50 to-amber-50 p-6 rounded-t-2xl border-b border-yellow-200">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-bold text-gray-900">Deliver Work</h3>
                 <p className="text-gray-600 mt-1">
-                  Deliver completed work to {order.buyerId?.username || 'buyer'} for Order #{order.orderNumber}
+                  Deliver to {order.buyerId?.username || order.buyerId?.email || 'buyer'} • Order #{order.orderNumber}
                 </p>
               </div>
               <button
                 onClick={onClose}
                 className="text-gray-400 hover:text-gray-500 p-2 hover:bg-white rounded-lg transition-colors"
-                disabled={isLoading}
+                disabled={isLoading || isUploading}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -208,12 +323,17 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-500">Listing</p>
-                  <p className="font-medium text-gray-900">{order.listingId?.title || 'Order'}</p>
+                  <p className="font-medium text-gray-900 truncate">{getListingTitle()}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Revisions Used</p>
+                  <p className="text-sm text-gray-500">Revisions</p>
                   <p className="font-medium text-gray-900">
                     {order.revisions || 0} of {order.maxRevisions || 3}
+                    {revisionsRemaining !== null && revisionsRemaining > 0 && (
+                      <span className="ml-2 text-sm text-green-600">
+                        ({revisionsRemaining} remaining)
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -234,18 +354,18 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({
                     setMessage(e.target.value);
                     if (errors.message) setErrors(prev => ({ ...prev, message: undefined }));
                   }}
-                  placeholder="Add a message for the buyer. Explain what you've delivered and any important notes..."
+                  placeholder={`Hi ${order.buyerId?.username || 'there'}, here's your delivery...`}
                   rows={4}
                   className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 transition-colors ${
                     errors.message ? 'border-red-300' : 'border-gray-300'
                   }`}
-                  disabled={isLoading}
+                  disabled={isLoading || isUploading}
                 />
                 {errors.message && (
                   <p className="mt-1 text-sm text-red-600">{errors.message}</p>
                 )}
                 <p className="mt-2 text-sm text-gray-500">
-                  Be clear and detailed. This helps avoid misunderstandings and revision requests.
+                  Explain what you've delivered, include any instructions, and mention important files.
                 </p>
               </div>
               
@@ -259,8 +379,10 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({
                 <div 
                   className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer hover:bg-yellow-50 ${
                     errors.attachments ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                  }`}
-                  onClick={() => fileInputRef.current?.click()}
+                  } ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  onClick={() => !isUploading && fileInputRef.current?.click()}
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
                 >
                   <input
                     ref={fileInputRef}
@@ -268,17 +390,19 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({
                     multiple
                     onChange={handleFileSelect}
                     className="hidden"
-                    disabled={isLoading}
-                    accept="image/*,video/*,.pdf,.zip,.rar,.doc,.docx,.txt,.mp3,.wav,.ogg"
+                    disabled={isLoading || isUploading}
+                    accept=".jpg,.jpeg,.png,.gif,.webp,.svg,.mp4,.mov,.avi,.webm,.mkv,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.mp3,.wav,.ogg,.m4a,.zip,.rar,.7z"
                   />
                   
                   <div className="text-4xl mb-3">📎</div>
-                  <p className="font-medium text-gray-900">Click to upload files</p>
+                  <p className="font-medium text-gray-900">
+                    {isUploading ? 'Uploading files...' : 'Click or drag files here'}
+                  </p>
                   <p className="text-sm text-gray-500 mt-1">
-                    Drag and drop or click to browse. Max 100MB per file.
+                    Supported files up to 100MB each
                   </p>
                   <p className="text-xs text-gray-400 mt-2">
-                    Supported: Images, Videos, PDF, ZIP, Documents, Audio
+                    Images, Videos, Documents, Audio, Archives
                   </p>
                 </div>
                 
@@ -297,18 +421,33 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({
                         key={`${file.name}-${index}`}
                         className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
                       >
-                        <div className="flex items-center gap-3">
-                          <span className="text-xl">{getFileIcon(file)}</span>
-                          <div>
-                            <p className="font-medium text-gray-900 text-sm">{file.name}</p>
-                            <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="text-xl flex-shrink-0">{getFileIcon(file)}</span>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-gray-900 text-sm truncate">{file.name}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                              {uploadProgress[index] > 0 && uploadProgress[index] < 100 && (
+                                <div className="flex-1 max-w-xs">
+                                  <div className="w-full bg-gray-200 rounded-full h-1">
+                                    <div 
+                                      className="bg-green-500 h-1 rounded-full" 
+                                      style={{ width: `${uploadProgress[index]}%` }}
+                                    ></div>
+                                  </div>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    {uploadProgress[index]}%
+                                  </p>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => removeAttachment(index)}
-                          className="text-gray-400 hover:text-red-500 p-1"
-                          disabled={isLoading}
+                          className="text-gray-400 hover:text-red-500 p-1 flex-shrink-0"
+                          disabled={isLoading || isUploading}
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -327,8 +466,8 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({
                     <p className="font-medium text-gray-900">Final Delivery</p>
                     <p className="text-sm text-gray-600">
                       {isFinalDelivery 
-                        ? 'This will be marked as final delivery. Buyer can request revisions if available.'
-                        : 'Mark as draft delivery for review before final submission.'
+                        ? 'Mark as complete. Buyer can request revisions if available.'
+                        : 'Mark as draft for review before final submission.'
                       }
                     </p>
                   </div>
@@ -336,7 +475,7 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({
                     type="button"
                     onClick={() => setIsFinalDelivery(!isFinalDelivery)}
                     className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2"
-                    disabled={isLoading}
+                    disabled={isLoading || isUploading}
                     style={{
                       backgroundColor: isFinalDelivery ? '#f59e0b' : '#d1d5db'
                     }}
@@ -350,28 +489,46 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({
                   </button>
                 </div>
                 
-                {order.revisions !== undefined && order.maxRevisions && (
+                {revisionsRemaining !== null && (
                   <div className="mt-3 p-3 bg-white rounded-lg border border-gray-300">
-                    <p className="text-sm text-gray-700">
-                      <span className="font-medium">Revision Status:</span>{' '}
-                      {order.revisions} of {order.maxRevisions} revisions used.{' '}
-                      {order.maxRevisions - order.revisions > 0 ? (
-                        <span className="text-green-600">
-                          {order.maxRevisions - order.revisions} revision{order.maxRevisions - order.revisions !== 1 ? 's' : ''} remaining
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-700">
+                          <span className="font-medium">Revisions:</span>{' '}
+                          {order.revisions || 0} used, {revisionsRemaining} remaining
+                        </p>
+                        {revisionsRemaining === 0 && (
+                          <p className="text-xs text-red-600 mt-1">
+                            ⚠️ No revisions left. This delivery will be final.
+                          </p>
+                        )}
+                      </div>
+                      {revisionsRemaining > 0 && !isFinalDelivery && (
+                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                          Draft Mode
                         </span>
-                      ) : (
-                        <span className="text-red-600">No revisions remaining</span>
                       )}
-                    </p>
+                    </div>
                   </div>
                 )}
               </div>
               
               {/* Notes from Order */}
-              {order.notes && (
+              {(order.buyerNotes || order.requirements) && (
                 <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl border border-blue-200">
-                  <p className="font-medium text-blue-900 mb-1">Buyer's Notes</p>
-                  <p className="text-sm text-blue-800">{order.notes}</p>
+                  <p className="font-medium text-blue-900 mb-1">Order Details</p>
+                  {order.requirements && (
+                    <div className="mb-2">
+                      <p className="text-xs text-blue-800 font-medium">Requirements:</p>
+                      <p className="text-sm text-blue-800">{order.requirements}</p>
+                    </div>
+                  )}
+                  {order.buyerNotes && (
+                    <div>
+                      <p className="text-xs text-blue-800 font-medium">Buyer Notes:</p>
+                      <p className="text-sm text-blue-800">{order.buyerNotes}</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -380,16 +537,16 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <button
                 type="submit"
-                disabled={isLoading}
-                className="flex-1 px-6 py-3.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 disabled:opacity-50 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                disabled={isLoading || isUploading || attachments.length === 0 || !message.trim()}
+                className="flex-1 px-6 py-3.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg flex items-center justify-center gap-2"
               >
-                {isLoading ? (
+                {isLoading || isUploading ? (
                   <>
                     <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Delivering...
+                    {isUploading ? 'Uploading...' : 'Delivering...'}
                   </>
                 ) : (
                   <>
@@ -404,7 +561,7 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                disabled={isLoading}
+                disabled={isLoading || isUploading}
                 className="flex-1 px-6 py-3.5 bg-gradient-to-r from-gray-50 to-gray-100 text-gray-700 font-medium rounded-xl hover:from-gray-100 hover:to-gray-200 transition-all duration-200 disabled:opacity-50 border border-gray-300"
               >
                 Cancel
@@ -417,9 +574,15 @@ const DeliveryModal: React.FC<DeliveryModalProps> = ({
                 <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <p>
-                  <span className="font-medium">Important:</span> Once delivered, the buyer will have 3 days to review the work and request revisions if needed. Make sure all files are correct before delivery.
-                </p>
+                <div>
+                  <p className="font-medium text-gray-700">Important Information:</p>
+                  <ul className="mt-1 space-y-1">
+                    <li>• Buyer has 3 days to review and request revisions</li>
+                    <li>• Make sure all files are correct and complete</li>
+                    <li>• Large files may take longer to upload</li>
+                    <li>• Keep a backup of your delivered files</li>
+                  </ul>
+                </div>
               </div>
             </div>
           </form>
