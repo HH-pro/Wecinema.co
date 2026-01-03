@@ -93,7 +93,17 @@ import MarketplaceLayout from '../../Layout';
 import marketplaceAPI, { formatCurrency } from '../../../api/marketplaceApi';
 import { Order, OrderStats } from '../../../api/marketplaceApi';
 import { isAuthenticated } from "../../../utilities/helperfFunction";
-
+const {
+  FaPalette,
+  FaPenAlt,
+  FaCode,
+  FaBullhorn,
+  FaVideo,
+  FaMusic,
+  FaUserTie,
+  FaCamera,
+  FaLanguage
+} = require('react-icons/fa');
 // Extend Order interface for buyer dashboard specific needs
 interface BuyerOrder extends Order {
   orderNumber?: string;
