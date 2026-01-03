@@ -1,6 +1,6 @@
 // src/components/marketplace/seller/OrdersTab.tsx - COMPLETE FIXED VERSION
 import React, { useState } from 'react';
-import { marketplaceAPI, getOrderStatusInfo, formatCurrency, formatDate } from '../../../api';
+import { marketplaceAPI, getOrderStatusInfo, formatCurrencyshow, formatDate } from '../../../api';
 import OrderStatusTracker from './OrderStatusTracker';
 import OrderActionGuide from './OrderActionGuide';
 import DeliveryModal from './DeliveryModal';
@@ -769,7 +769,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                             </div>
                             <div className="flex items-center">
                               <span className="mr-1">💰</span>
-                              <span className="font-medium text-green-600">{formatCurrency(order.amount || 0)}</span>
+                              <span className="font-medium text-green-600">{formatCurrencyshow(order.amount || 0)}</span>
                             </div>
                             <div className="flex items-center">
                               <span className="mr-1">📅</span>
@@ -831,7 +831,7 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
                     <div className="flex flex-col sm:flex-row lg:flex-col items-start sm:items-center lg:items-end gap-4 lg:gap-2">
                       <div className="text-right">
                         <p className="text-2xl font-bold text-green-600">
-                          {formatCurrency(order.amount || 0)}
+                          {formatCurrencyshow(order.amount || 0)}
                         </p>
                         <p className="text-sm text-gray-500">
                           Order #{order.orderNumber || order._id.slice(-6)}
