@@ -55,11 +55,13 @@ interface OrderStats {
   delivered: number;
   completed: number;
   cancelled: number;
-  totalRevenue: number;
-  pendingRevenue: number;
+  totalRevenue: number;           // ✅ TOTAL revenue from completed orders (in dollars)
+  pendingRevenue: number;         // ✅ Pending revenue (in dollars)
   thisMonthOrders: number;
-  thisMonthRevenue: number;
+  thisMonthRevenue: number;       // ✅ This month revenue from completed orders (in dollars)
+  completedRevenue: number;       // ✅ NEW: Added for completed orders total
   availableBalance?: number;
+  completedOrdersCount?: number;  // ✅ NEW: Count of completed orders
 }
 
 interface Withdrawal {
@@ -124,6 +126,7 @@ const SimpleFallback = ({ name }: { name: string }) => (
 // Use simple checks for components
 const SafeDashboardHeader = (typeof DashboardHeader === 'function' || typeof DashboardHeader === 'object') ? DashboardHeader : () => <SimpleFallback name="DashboardHeader" />;
 const SafeTabNavigation = (typeof TabNavigation === 'function' || typeof TabNavigation === 'object') ? TabNavigation : () => <SimpleFallback name="TabNavigation" />;
+const SafeStatsGrid = (typeof StatsGrid === 'function' || typeof StatsGrid === 'object') ? StatsGrid : () => <SimpleFallback name="StatsGrid" />;
 const SafeWelcomeCard = (typeof WelcomeCard === 'function' || typeof WelcomeCard === 'object') ? WelcomeCard : () => <SimpleFallback name="WelcomeCard" />;
 const SafeRecentOrders = (typeof RecentOrders === 'function' || typeof RecentOrders === 'object') ? RecentOrders : () => <SimpleFallback name="RecentOrders" />;
 const SafeActionCard = (typeof ActionCard === 'function' || typeof ActionCard === 'object') ? ActionCard : () => <SimpleFallback name="ActionCard" />;
@@ -163,11 +166,13 @@ const SellerDashboard: React.FC = () => {
     delivered: 0,
     completed: 0,
     cancelled: 0,
-    totalRevenue: 0,
-    pendingRevenue: 0,
+    totalRevenue: 0,           // ✅ TOTAL revenue from completed orders
+    pendingRevenue: 0,         // ✅ Pending revenue
     thisMonthOrders: 0,
-    thisMonthRevenue: 0,
-    availableBalance: 0
+    thisMonthRevenue: 0,       // ✅ This month revenue from completed orders
+    completedRevenue: 0,       // ✅ NEW: Added for completed orders total
+    availableBalance: 0,
+    completedOrdersCount: 0    // ✅ NEW: Count of completed orders
   });
   
   // Seller stats from API
@@ -343,30 +348,37 @@ const SellerDashboard: React.FC = () => {
     }
   }, [activeTab, refreshAllData]);
 
-  // ✅ UPDATED: Calculate order stats from orders
+  // ✅ UPDATED: Calculate order stats from orders - COMPLETED ORDERS FOCUS
   const calculateOrderStats = useCallback((orders: Order[]): OrderStats => {
     const now = new Date();
     const thisMonth = now.getMonth();
     const thisYear = now.getFullYear();
     
+    // Filter completed orders
+    const completedOrders = orders.filter(order => order.status === 'completed');
+    
+    // Filter this month's orders
     const thisMonthOrders = orders.filter(order => {
       const orderDate = new Date(order.createdAt);
       return orderDate.getMonth() === thisMonth && 
              orderDate.getFullYear() === thisYear;
     });
 
-    const completedRevenue = orders
-      .filter(order => order.status === 'completed')
+    // ✅ Calculate revenue from COMPLETED orders (in dollars)
+    const completedRevenue = completedOrders
       .reduce((sum, order) => sum + (order.amount || 0), 0) / 100;
 
+    // Calculate pending revenue (not completed yet)
     const pendingRevenue = orders
       .filter(order => ['pending_payment', 'paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(order.status))
       .reduce((sum, order) => sum + (order.amount || 0), 0) / 100;
 
-    const thisMonthRevenue = thisMonthOrders
-      .filter(order => order.status === 'completed')
+    // ✅ Calculate this month's revenue from COMPLETED orders
+    const thisMonthCompletedOrders = thisMonthOrders.filter(order => order.status === 'completed');
+    const thisMonthRevenue = thisMonthCompletedOrders
       .reduce((sum, order) => sum + (order.amount || 0), 0) / 100;
 
+    // Count orders by status
     const statusCounts = orders.reduce((acc, order) => {
       acc[order.status] = (acc[order.status] || 0) + 1;
       return acc;
@@ -381,12 +393,14 @@ const SellerDashboard: React.FC = () => {
       processing: statusCounts['processing'] || 0,
       inProgress: statusCounts['in_progress'] || 0,
       delivered: statusCounts['delivered'] || 0,
-      completed: statusCounts['completed'] || 0,
+      completed: completedOrders.length,  // ✅ Count of completed orders
       cancelled: statusCounts['cancelled'] || 0,
-      totalRevenue: completedRevenue,
+      totalRevenue: completedRevenue,     // ✅ Total from completed orders
       pendingRevenue: pendingRevenue,
       thisMonthOrders: thisMonthOrders.length,
-      thisMonthRevenue: thisMonthRevenue,
+      thisMonthRevenue: thisMonthRevenue, // ✅ This month from completed orders
+      completedRevenue: completedRevenue, // ✅ Store separately for easy access
+      completedOrdersCount: completedOrders.length, // ✅ Count for display
       availableBalance: stripeStatus?.account?.charges_enabled ? 
         (stripeStatus.account.balance || 0) / 100 : 0
     };
@@ -440,7 +454,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ UPDATED: Fetch seller statistics
+  // ✅ UPDATED: Fetch seller statistics - FOCUS ON COMPLETED ORDERS
   const fetchSellerStats = async () => {
     try {
       setEarningsLoading(true);
@@ -462,30 +476,72 @@ const SellerDashboard: React.FC = () => {
         setSellerStats(response.data);
         
         const totals = response.data.totals || {};
+        const completedOrders = response.data.completedOrders || [];
         
-        console.log('💰 Raw amounts from API (in cents):', {
-          totalRevenue: totals.totalRevenue,
-          thisMonthRevenue: totals.thisMonthRevenue,
-          pendingRevenue: totals.pendingOrders?.revenue,
-          completedRevenue: totals.completedOrders?.revenue
+        console.log('💰 COMPLETED ORDERS DATA:', {
+          completedCount: completedOrders.length,
+          completedRevenue: totals.completedOrders?.revenue,
+          completedOrdersSample: completedOrders.slice(0, 3).map((order: any) => ({
+            id: order._id,
+            amount: order.amount,
+            amountInDollars: (order.amount || 0) / 100,
+            status: order.status,
+            createdAt: order.createdAt
+          }))
         });
         
+        // ✅ Calculate revenue from COMPLETED orders
+        let completedRevenueFromAPI = 0;
+        if (completedOrders.length > 0) {
+          completedRevenueFromAPI = completedOrders.reduce((sum: number, order: any) => {
+            return sum + (order.amount || 0);
+          }, 0) / 100;
+        } else if (totals.completedOrders?.revenue) {
+          completedRevenueFromAPI = totals.completedOrders.revenue / 100;
+        }
+        
+        // ✅ Calculate this month's completed revenue
+        let thisMonthCompletedRevenue = 0;
+        if (completedOrders.length > 0) {
+          const now = new Date();
+          const thisMonth = now.getMonth();
+          const thisYear = now.getFullYear();
+          
+          thisMonthCompletedRevenue = completedOrders
+            .filter((order: any) => {
+              const orderDate = new Date(order.createdAt || order.orderDate);
+              return orderDate.getMonth() === thisMonth && 
+                     orderDate.getFullYear() === thisYear;
+            })
+            .reduce((sum: number, order: any) => sum + (order.amount || 0), 0) / 100;
+        }
+        
+        console.log('💰 COMPLETED REVENUE CALCULATIONS:', {
+          completedRevenueFromAPI,
+          thisMonthCompletedRevenue,
+          completedOrdersCount: completedOrders.length || totals.completedOrders?.count || 0
+        });
+        
+        // ✅ Update order stats with COMPLETED orders data
         setOrderStats(prev => ({
           ...prev,
           totalOrders: totals.totalOrders || prev.totalOrders,
-          totalRevenue: (totals.totalRevenue || 0) / 100,
+          totalRevenue: completedRevenueFromAPI,  // ✅ Use calculated completed revenue
           pendingRevenue: (totals.pendingOrders?.revenue || 0) / 100,
-          thisMonthRevenue: (totals.thisMonthRevenue || 0) / 100,
-          completed: totals.completedOrders?.count || prev.completed,
+          thisMonthRevenue: thisMonthCompletedRevenue, // ✅ Use this month's completed revenue
+          completed: completedOrders.length || totals.completedOrders?.count || prev.completed,
+          completedRevenue: completedRevenueFromAPI, // ✅ Store separately
+          completedOrdersCount: completedOrders.length || totals.completedOrders?.count || 0, // ✅ Store count
           activeOrders: totals.pendingOrders?.count || prev.activeOrders,
           availableBalance: stripeStatus?.account?.charges_enabled ? 
             (stripeStatus.account.balance || 0) / 100 : 0
         }));
         
-        console.log('💰 Converted amounts (in dollars):', {
-          totalRevenue: (totals.totalRevenue || 0) / 100,
-          thisMonthRevenue: (totals.thisMonthRevenue || 0) / 100,
-          pendingRevenue: (totals.pendingOrders?.revenue || 0) / 100
+        console.log('💰 FINAL CONVERTED AMOUNTS (in dollars):', {
+          totalRevenue: completedRevenueFromAPI,
+          thisMonthRevenue: thisMonthCompletedRevenue,
+          pendingRevenue: (totals.pendingOrders?.revenue || 0) / 100,
+          completedOrdersCount: completedOrders.length || totals.completedOrders?.count || 0
         });
         
       } else {
@@ -520,16 +576,27 @@ const SellerDashboard: React.FC = () => {
         const ordersData = response.data.sales || [];
         console.log(`✅ Found ${ordersData.length} orders`);
         
-        ordersData.forEach((order: Order, index: number) => {
-          console.log(`📊 Order ${index + 1}:`, {
-            id: order._id,
-            amount: order.amount,
-            amountInDollars: order.amount / 100,
-            status: order.status,
-            createdAt: order.createdAt,
-            listingTitle: typeof order.listingId === 'object' ? order.listingId.title : 'N/A'
+        // ✅ Log completed orders specifically
+        const completedOrders = ordersData.filter((order: Order) => order.status === 'completed');
+        console.log(`✅ Completed orders: ${completedOrders.length}`);
+        
+        if (completedOrders.length > 0) {
+          console.log('💰 COMPLETED ORDERS DETAILS:');
+          completedOrders.forEach((order: Order, index: number) => {
+            console.log(`  ${index + 1}. Order ID: ${order._id}`);
+            console.log(`     Amount: ${order.amount} cents ($${order.amount / 100})`);
+            console.log(`     Created: ${order.createdAt}`);
+            if (typeof order.listingId === 'object') {
+              console.log(`     Listing: ${order.listingId.title || 'N/A'}`);
+            }
           });
-        });
+          
+          const totalCompletedRevenue = completedOrders.reduce((sum: number, order: Order) => {
+            return sum + (order.amount || 0);
+          }, 0) / 100;
+          
+          console.log(`💰 TOTAL COMPLETED REVENUE: $${totalCompletedRevenue.toFixed(2)}`);
+        }
         
         setOrders(ordersData);
         
@@ -587,17 +654,6 @@ const SellerDashboard: React.FC = () => {
         }
         
         console.log(`✅ Loaded ${listingsData.length} listings`);
-        
-        if (listingsData.length > 0) {
-          console.log('💰 Listing prices:', 
-            listingsData.slice(0, 3).map(l => ({
-              id: l._id,
-              price: l.price,
-              formattedPrice: l.formattedPrice,
-              priceInDollars: l.price / 100
-            }))
-          );
-        }
         
         setListings(listingsData);
         
@@ -1073,18 +1129,19 @@ const SellerDashboard: React.FC = () => {
     0
   ) || 0;
 
-  // ✅ UPDATED: Safe preparation of stats for grid
+  // ✅ UPDATED: Safe preparation of stats for grid - INCLUDING COMPLETED ORDERS DATA
   const statsForGrid = {
-    totalRevenue: orderStats.totalRevenue || 0,
+    totalRevenue: orderStats.totalRevenue || 0,           // ✅ Revenue from completed orders
     totalOrders: orderStats.totalOrders || 0,
     activeOrders: orderStats.activeOrders || 0,
     totalListings: totalListings || 0,
     activeListings: activeListings || 0,
-    thisMonthRevenue: orderStats.thisMonthRevenue || 0,
+    thisMonthRevenue: orderStats.thisMonthRevenue || 0,   // ✅ This month revenue from completed orders
     thisMonthOrders: orderStats.thisMonthOrders || 0,
     availableBalance: orderStats.availableBalance || 0,
     totalWithdrawn: totalWithdrawn / 100,
-    // ✅ REMOVED: Earning data moved to Earnings tab only
+    completedOrders: orderStats.completedOrdersCount || 0, // ✅ NEW: Completed orders count
+    completedRevenue: orderStats.completedRevenue || 0     // ✅ NEW: Revenue from completed orders
   };
 
   console.log('📊 Stats for grid prepared:', statsForGrid);
@@ -1298,7 +1355,7 @@ const SellerDashboard: React.FC = () => {
               </div>
             ) : (
               <>
-                {/* Overview Tab - UPDATED: Removed earning details */}
+                {/* Overview Tab - UPDATED: Added StatsGrid with completed orders data */}
                 {activeTab === 'overview' && (
                   <div className="space-y-8">
                     {/* Welcome Card */}
@@ -1316,8 +1373,47 @@ const SellerDashboard: React.FC = () => {
                       }}
                     />
 
-                    {/* Stats Grid - SIMPLIFIED: No earning details */}
-                   
+                    {/* ✅ Stats Grid - UPDATED: Shows completed orders revenue */}
+                    <SafeStatsGrid
+                      stats={[
+                        {
+                          title: 'Total Revenue',
+                          value: safeFormatCurrency(orderStats.totalRevenue),
+                          change: '+12.5%',
+                          trend: 'up',
+                          icon: '💰',
+                          description: 'From completed orders',
+                          tooltip: 'Total earnings from all completed orders'
+                        },
+                        {
+                          title: 'Completed Orders',
+                          value: orderStats.completedOrdersCount?.toString() || '0',
+                          change: null,
+                          trend: 'neutral',
+                          icon: '✅',
+                          description: 'Successfully delivered',
+                          tooltip: 'Total number of completed orders'
+                        },
+                        {
+                          title: 'Active Orders',
+                          value: orderStats.activeOrders.toString(),
+                          change: '+2',
+                          trend: 'up',
+                          icon: '📦',
+                          description: 'In progress',
+                          tooltip: 'Orders currently being processed'
+                        },
+                        {
+                          title: 'Active Listings',
+                          value: activeListings.toString(),
+                          change: null,
+                          trend: 'neutral',
+                          icon: '🏠',
+                          description: 'Live on marketplace',
+                          tooltip: 'Number of active listings'
+                        }
+                      ]}
+                    />
 
                     {/* Order Workflow Guide */}
                     <SafeOrderWorkflowGuide />
@@ -1383,7 +1479,7 @@ const SellerDashboard: React.FC = () => {
                   </div>
                 )}
 
-                {/* Earnings Tab - ENHANCED: Moved all earning details here */}
+                {/* Earnings Tab - ENHANCED: Shows detailed completed orders earnings */}
                 {activeTab === 'earnings' && (
                   <SafeEarningsTab
                     stripeStatus={{
@@ -1402,11 +1498,13 @@ const SellerDashboard: React.FC = () => {
                     onRefresh={() => {
                       refreshDataAfterAction('earnings');
                     }}
-                    // ✅ ADDED: Pass additional earning data
-                    totalEarnings={sellerStats?.totals?.totalRevenue ? sellerStats.totals.totalRevenue / 100 : 0}
+                    // ✅ ADDED: Pass completed orders data
+                    totalEarnings={orderStats.totalRevenue}
                     thisMonthEarnings={orderStats.thisMonthRevenue}
                     pendingEarnings={orderStats.pendingRevenue}
                     totalWithdrawn={totalWithdrawn / 100}
+                    completedOrdersCount={orderStats.completedOrdersCount || 0}
+                    completedRevenue={orderStats.completedRevenue || 0}
                   />
                 )}
 
@@ -1460,6 +1558,8 @@ const SellerDashboard: React.FC = () => {
                     onRefresh={() => {
                       refreshDataAfterAction('order');
                     }}
+                    // ✅ ADDED: Pass completed orders count for filtering
+                    completedOrdersCount={orderStats.completedOrdersCount || 0}
                   />
                 )}
 
@@ -1486,6 +1586,8 @@ const SellerDashboard: React.FC = () => {
                     totalRevenue={orderStats.totalRevenue}
                     thisMonthRevenue={orderStats.thisMonthRevenue}
                     pendingRevenue={orderStats.pendingRevenue}
+                    // ✅ ADDED: Pass completed revenue for context
+                    completedRevenue={orderStats.completedRevenue || 0}
                   />
                 )}
               </>
