@@ -51,7 +51,19 @@ const Browse: React.FC = () => {
   const [videoTitle, setVideoTitle] = useState<string>('');
   const [videoListing, setVideoListing] = useState<Listing | null>(null);
   const [activeCategory, setActiveCategory] = useState<string>('');
-  
+   const [billingDetails, setBillingDetails] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: {
+      line1: '',
+      line2: '',
+      city: '',
+      state: '',
+      postal_code: '',
+      country: 'US'
+    }
+  });
   // New state for image loading errors
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const navigate = useNavigate();
@@ -79,18 +91,31 @@ const Browse: React.FC = () => {
     fetchListings();
     fetchCurrentUser();
   }, [filters]);
-
-  const fetchCurrentUser = async () => {
+ const fetchCurrentUser = async () => {
     try {
       const user = marketplaceApi.utils.getCurrentUser();
       if (user) {
         setCurrentUser(user);
+        
+        // Set billing details from user data
+        setBillingDetails(prev => ({
+          ...prev,
+          name: user.username || 'Customer',
+          email: user.email || '',
+          phone: user.phone || ''
+        }));
       }
     } catch (error) {
       console.error('Error fetching current user:', error);
     }
   };
-
+ // Handle billing details change
+  const handleBillingDetailsChange = (details: any) => {
+    setBillingDetails(prev => ({
+      ...prev,
+      ...details
+    }));
+  };
   const fetchListings = async () => {
     try {
       setLoading(true);
