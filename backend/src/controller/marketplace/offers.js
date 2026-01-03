@@ -527,8 +527,7 @@ router.post("/make-offer", authenticateMiddleware, logRequest("MAKE_OFFER"), asy
     }
   }
 });
-
-// ✅ MODIFIED: CONFIRM OFFER PAYMENT WITH PROFESSIONAL EMAILS
+// ✅ MODIFIED: CONFIRM OFFER PAYMENT WITH PROFESSIONAL EMAILS - FIXED AMOUNT CONVERSION
 router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) => {
   console.log("🔍 Confirm Offer Payment Request DETAILS:", {
     body: req.body,
@@ -593,8 +592,13 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     let paymentIntent;
     try {
       paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-      console.log("💳 Stripe Payment Intent Status:", paymentIntent.status);
-      console.log("💳 Stripe Payment Intent Metadata:", paymentIntent.metadata);
+      console.log("💳 Stripe Payment Intent Details:", {
+        status: paymentIntent.status,
+        amount: paymentIntent.amount,
+        amountInDollars: paymentIntent.amount / 100,
+        metadata: paymentIntent.metadata,
+        currency: paymentIntent.currency
+      });
     } catch (stripeError) {
       await session.abortTransaction();
       console.error('Stripe retrieval error:', stripeError);
@@ -708,11 +712,49 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       });
     }
 
+    // ✅ CRITICAL FIX: PROPER AMOUNT CONVERSION
+    console.log("💰 Processing amount conversion for database storage...");
+    
+    // Stripe amount is already in cents (e.g., 30000 for $300)
+    const stripeAmountInCents = paymentIntent.amount;
+    const stripeAmountInDollars = stripeAmountInCents / 100;
+    
+    console.log(`💰 Stripe payment: ${stripeAmountInCents} cents ($${stripeAmountInDollars})`);
+    
+    // Determine the final amount to store
+    let finalAmountInDollars = stripeAmountInDollars;
+    let finalAmountInCents = stripeAmountInCents;
+    
+    // Check temp offer data for amount
+    if (tempOfferData && tempOfferData.amount) {
+      const tempAmount = tempOfferData.amount;
+      console.log(`💰 Temporary offer amount: $${tempAmount}`);
+      
+      // Convert temp amount to cents for comparison
+      const tempAmountInCents = Math.round(tempAmount * 100);
+      
+      // Verify amounts match (within $1 tolerance)
+      const amountDifference = Math.abs(tempAmountInCents - stripeAmountInCents);
+      if (amountDifference > 100) {
+        console.warn(`⚠️ Amount mismatch: Temp $${tempAmount} (${tempAmountInCents} cents) vs Stripe $${stripeAmountInDollars} (${stripeAmountInCents} cents)`);
+        // Use Stripe amount as source of truth
+        finalAmountInDollars = stripeAmountInDollars;
+        finalAmountInCents = stripeAmountInCents;
+      } else {
+        finalAmountInDollars = tempAmount;
+        finalAmountInCents = tempAmountInCents;
+      }
+    }
+    
+    console.log(`💰 Final amount for storage: $${finalAmountInDollars} (${finalAmountInCents} cents)`);
+
     // ✅ CREATE OFFER IN DATABASE (ONLY AFTER SUCCESSFUL PAYMENT)
+    // Store amount in dollars in Offer collection
     const offerData = {
       buyerId: userId,
       listingId: listingId,
-      amount: paymentIntent.amount / 100, // Convert from cents to dollars
+      amount: finalAmountInDollars, // Store in dollars
+      offeredPrice: finalAmountInDollars, // Additional field for consistency
       message: tempOfferData?.message || '',
       requirements: tempOfferData?.requirements || '',
       expectedDelivery: tempOfferData?.expectedDelivery || null,
@@ -724,11 +766,15 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     const offer = new Offer(offerData);
     await offer.save({ session });
 
-    console.log("✅ Offer created in database:", offer._id);
+    console.log("✅ Offer created in database:", {
+      id: offer._id,
+      amount: offer.amount,
+      amountInCents: finalAmountInCents
+    });
 
     // ✅ GET BUYER AND SELLER DETAILS
     const buyer = await mongoose.model('User').findById(userId).select('username email avatar').session(session);
-    const seller = await mongoose.model('User').findById(sellerId).select('username email avatar').session(session);
+    const seller = await mongoose.model('User').findById(sellerId).select('username email avatar stripeAccountId stripeAccountStatus').session(session);
 
     if (!buyer || !seller) {
       await session.abortTransaction();
@@ -740,34 +786,46 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
 
     console.log("✅ Buyer:", buyer.username, "Seller:", seller.username);
 
-    // ✅ CREATE ORDER
+    // ✅ CREATE ORDER WITH AMOUNT IN CENTS (CRITICAL FIX)
+    console.log("📦 Creating order with amount in cents...");
+    
     const orderData = {
       buyerId: userId,
       sellerId: sellerId,
       listingId: listingId,
       offerId: offer._id,
       orderType: 'accepted_offer',
-      amount: offer.amount,
+      amount: finalAmountInCents, // ✅ STORE IN CENTS
       status: 'paid',
       stripePaymentIntentId: paymentIntentId,
       paidAt: new Date(),
       revisions: 0,
-      maxRevisions: 3,
+      maxRevisions: listing.maxRevisions || 3,
       paymentReleased: false,
       orderDate: new Date(),
+      platformFee: calculatePlatformFee(finalAmountInCents), // Calculate in cents
+      sellerAmount: calculateSellerPayout(finalAmountInCents), // Calculate in cents
+      currency: 'USD',
       metadata: {
         paymentMethod: paymentIntent.payment_method_types?.[0] || 'card',
-        offerAmount: offer.amount,
-        buyerNote: offer.message || ''
+        offerAmountDollars: finalAmountInDollars,
+        offerAmountCents: finalAmountInCents,
+        buyerNote: offer.message || '',
+        source: 'offer_payment'
       }
     };
 
     // Add optional fields
     if (offer.requirements) orderData.requirements = offer.requirements;
     if (offer.expectedDelivery) orderData.expectedDelivery = offer.expectedDelivery;
-    if (offer.message) orderData.buyerNote = offer.message;
+    if (offer.message) orderData.buyerNotes = offer.message;
 
-    console.log("📦 Creating order with data:", orderData);
+    console.log("📦 Order data:", {
+      amountInCents: orderData.amount,
+      amountInDollars: orderData.amount / 100,
+      platformFee: orderData.platformFee,
+      sellerAmount: orderData.sellerAmount
+    });
 
     const order = new Order(orderData);
     await order.save({ session });
@@ -784,6 +842,19 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     );
 
     console.log("✅ Listing order count updated, listing remains active");
+
+    // ✅ UPDATE SELLER STATS
+    await mongoose.model('User').findByIdAndUpdate(
+      sellerId,
+      { 
+        $inc: { 
+          totalSales: 1,
+          totalEarnings: finalAmountInCents
+        },
+        $set: { lastSaleDate: new Date() }
+      },
+      { session }
+    );
 
     // ✅ COMMIT TRANSACTION FIRST
     await session.commitTransaction();
@@ -817,14 +888,22 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
       try {
         console.log("📧 Starting professional email notifications...");
         
+        // Prepare order data for emails (with dollar amounts)
+        const emailOrderData = {
+          ...order.toObject(),
+          amountInDollars: finalAmountInDollars,
+          platformFeeInDollars: calculatePlatformFee(finalAmountInCents) / 100,
+          sellerAmountInDollars: calculateSellerPayout(finalAmountInCents) / 100
+        };
+        
         // Send email to seller
         console.log(`📧 Sending email to seller: ${seller.email}`);
-        await emailService.sendOrderConfirmationToSeller(order, buyer, seller, chatLink);
+        await emailService.sendOrderConfirmationToSeller(emailOrderData, buyer, seller, chatLink);
         console.log("✅ Professional email sent to seller:", seller.email);
         
         // Send email to buyer
         console.log(`📧 Sending email to buyer: ${buyer.email}`);
-        await emailService.sendOrderConfirmationToBuyer(order, buyer, seller, chatLink);
+        await emailService.sendOrderConfirmationToBuyer(emailOrderData, buyer, seller, chatLink);
         console.log("✅ Professional email sent to buyer:", buyer.email);
         
         console.log("✅ Professional email notifications sent successfully to BOTH parties");
@@ -858,6 +937,13 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
         orderId: order._id,
         redirectUrl: `/orders/${order._id}`,
         chatUrl: chatLink,
+        amountDetails: {
+          amountInDollars: finalAmountInDollars,
+          amountInCents: finalAmountInCents,
+          platformFee: calculatePlatformFee(finalAmountInCents) / 100,
+          sellerPayout: calculateSellerPayout(finalAmountInCents) / 100,
+          message: `Order created with $${finalAmountInDollars} (${finalAmountInCents} cents)`
+        },
         notifications: {
           messagesSent: notificationResults.messages?.success || false,
           firebaseChatId: notificationResults.messages?.firebaseChatId,
@@ -870,12 +956,15 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
             'Email sending failed - check logs'
         },
         orderDetails: {
-          amount: order.amount,
+          amount: finalAmountInDollars,
+          amountInCents: finalAmountInCents,
           sellerName: seller.username,
           buyerName: buyer.username,
           listingTitle: listing.title,
           orderDate: order.orderDate,
-          requirements: order.requirements || 'None specified'
+          requirements: order.requirements || 'None specified',
+          orderNumber: order.orderNumber,
+          status: order.status
         }
       }
     });
@@ -904,6 +993,23 @@ router.post("/confirm-offer-payment", authenticateMiddleware, async (req, res) =
     }
   }
 });
+
+// ✅ ADD THESE HELPER FUNCTIONS (if not already present)
+const calculatePlatformFee = (amountInCents) => {
+  // 10% platform fee
+  const fee = Math.round(amountInCents * 0.10);
+  console.log(`💸 Platform fee: ${amountInCents} * 10% = ${fee} cents`);
+  return fee;
+};
+
+const calculateSellerPayout = (amountInCents) => {
+  const platformFee = calculatePlatformFee(amountInCents);
+  const sellerPayout = amountInCents - platformFee;
+  console.log(`💰 Seller payout: ${amountInCents} - ${platformFee} = ${sellerPayout} cents`);
+  return sellerPayout;
+};
+
+
 
 // ✅ NEW ROUTE: CANCEL TEMPORARY OFFER
 router.post("/cancel-temp-offer", authenticateMiddleware, logRequest("CANCEL_TEMP_OFFER"), async (req, res) => {
