@@ -1917,12 +1917,18 @@ export const paymentsApi = {
 // ============================================
 
 // Format currency
-export const formatCurrency = (amount: number, currency: string = 'USD'): string => {
+export const formatCurrency = (
+  amount: number,
+  currency: string = 'USD'
+): string => {
+  const valueInDollars = (amount || 0) / 100;
+
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: currency,
-  }).format(amount || 0);
+    currency,
+  }).format(valueInDollars);
 };
+
 
 // Calculate platform fee (10%)
 export const calculatePlatformFee = (amount: number): number => {
