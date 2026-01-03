@@ -448,77 +448,46 @@ const SellerDashboard: React.FC = () => {
   };
 
   // ✅ Fetch seller's listings
- // SellerDashboard.tsx में fetchListings function में
+ // ✅ SIMPLE fetchListings - no params
 const fetchListings = async () => {
   try {
     setListingsLoading(true);
+    setError('');
     
-    console.log('🏠 Fetching listings...');
+    console.log('🏠 Fetching seller listings...');
     
-    // Try API call
-    try {
-      const response = await listingsApi.getMyListings({
-        page: listingsPage,
-        limit: listingsLimit,
-        status: listingsStatusFilter
-      });
+    // ✅ SIMPLE: Call API without any params
+    const response = await listingsApi.getMyListings();
+    
+    console.log('📦 Listings Response:', {
+      success: response.success,
+      count: response.data?.listings?.length || 0,
+      error: response.error
+    });
+    
+    if (response.success && response.data) {
+      const listingsData = response.data.listings || [];
+      console.log(`✅ Successfully loaded ${listingsData.length} listings`);
+      setListings(listingsData);
       
-      if (response.success && response.data) {
-        console.log('✅ API Success');
-        setListings(response.data.listings || []);
-        return;
+      // Show success message if no listings
+      if (listingsData.length === 0) {
+        setSuccessMessage('No listings found. Create your first listing!');
       }
-    } catch (apiError: any) {
-      console.warn('API call failed:', apiError.message);
+    } else {
+      console.warn('⚠️ Failed to fetch listings:', response.error);
+      setListings([]);
+      setError(response.error || 'No listings found');
     }
-    
-    // If API fails, use mock data for development
-    console.log('🛠️ Using mock listings data');
-    
-    const mockListings: Listing[] = [
-      {
-        _id: '1',
-        title: 'Web Design Service',
-        description: 'Professional website design',
-        price: 299,
-        formattedPrice: '$299.00',
-        status: 'active',
-        type: 'service',
-        category: 'Design',
-        tags: ['web', 'design', 'responsive'],
-        currency: 'USD',
-        isDigital: true,
-        mediaUrls: ['https://via.placeholder.com/300'],
-        thumbnail: 'https://via.placeholder.com/300',
-        views: 45,
-        favoriteCount: 3,
-        purchaseCount: 2,
-        sellerId: {
-          _id: 'seller1',
-          username: 'You',
-          avatar: 'https://via.placeholder.com/50',
-          sellerRating: 4.5
-        },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        createdAtFormatted: 'Today'
-      },
-      // Add more mock listings...
-    ];
-    
-    // Apply filtering
-    let filteredListings = mockListings;
-    if (listingsStatusFilter) {
-      filteredListings = mockListings.filter(
-        l => l.status === listingsStatusFilter
-      );
-    }
-    
-    setListings(filteredListings);
     
   } catch (error: any) {
-    console.error('❌ Error:', error);
-    setError('Failed to load listings');
+    console.error('❌ Error in fetchListings:', error);
+    setListings([]);
+    
+    // Don't show error for empty listings
+    if (!error.message.includes('404')) {
+      setError('Failed to load listings');
+    }
   } finally {
     setListingsLoading(false);
   }
