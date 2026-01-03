@@ -1120,7 +1120,7 @@ const SellerDashboard: React.FC = () => {
           <SafeDashboardHeader
             title="Seller Dashboard"
             subtitle="Manage orders, track earnings, and grow your business"
-            earnings={safeFormatCurrency(orderStats.totalRevenue)}
+            earnings={safeFormatCurrency(orderStats)}
             onRefresh={handleRefresh}
             refreshing={refreshing}
             stripeStatus={{
