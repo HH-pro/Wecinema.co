@@ -12,8 +12,19 @@ interface WithdrawTabProps {
   onPageChange: (page: number) => void;
   onWithdrawRequest?: (amountInDollars: number) => Promise<void>;
   onRefresh?: () => Promise<void>;
+  formatCurrency?: (amountInCents: number) => string;
 }
+ const formatCurrency = (
+  amount: number,
+  currency: string = 'USD'
+): string => {
+  const valueInDollars = (amount || 0) / 100;
 
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+  }).format(valueInDollars);
+};
 
 const WithdrawTab: React.FC<WithdrawTabProps> = ({
   stripeStatus,
@@ -24,6 +35,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
   onPageChange,
   onWithdrawRequest,
   onRefresh,
+  formatCurrency = marketplaceApi.utils.formatCurrency
 }) => {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
@@ -36,17 +48,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
   const [selectedMethod, setSelectedMethod] = useState('stripe');
   const [payoutHistory, setPayoutHistory] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
- const formatCurrency = (
-  amount: number,
-  currency: string = 'USD'
-): string => {
-  const valueInDollars = (amount || 0) / 100;
 
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(valueInDollars);
-};
   // Helper functions
   const dollarsToCents = (dollars: number): number => {
     return Math.round(dollars * 100);
