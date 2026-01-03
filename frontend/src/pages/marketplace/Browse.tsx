@@ -1089,7 +1089,6 @@ const Browse: React.FC = () => {
         setPaymentStatus={setPaymentStatus}
         currentUser={currentUser}
         getThumbnailUrl={getThumbnailUrl}
-        
       />
     </MarketplaceLayout>
   );
