@@ -277,27 +277,9 @@ router.get("/:id", async (req, res) => {
     });
   }
 });
-// backend/routes/marketplace.js
-const express = require('express');
-const router = express.Router();
-const MarketplaceListing = require('../models/MarketplaceListing');
-const authenticateMiddleware = require('../middleware/auth');
-
-// ============================================
-// ✅ LISTINGS ROUTES
-// ============================================
-
-// Get all listings
-router.get("/listings", async (req, res) => {
-  try {
-    // Your existing code...
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
 
 // Get seller's own listings
-router.get("/listings/my-listings", authenticateMiddleware, async (req, res) => {
+router.get("/my-listings", authenticateMiddleware, async (req, res) => {
   try {
     console.log("🎯 GET /marketplace/listings/my-listings");
     
