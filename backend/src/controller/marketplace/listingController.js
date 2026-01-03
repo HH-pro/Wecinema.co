@@ -277,81 +277,225 @@ router.get("/:id", async (req, res) => {
     });
   }
 });
-// SellerDashboard.tsx में fetchListings function में
-const fetchListings = async () => {
+// backend/routes/marketplace.js
+const express = require('express');
+const router = express.Router();
+const MarketplaceListing = require('../models/MarketplaceListing');
+const authenticateMiddleware = require('../middleware/auth');
+
+// ============================================
+// ✅ LISTINGS ROUTES
+// ============================================
+
+// Get all listings
+router.get("/listings", async (req, res) => {
   try {
-    setListingsLoading(true);
-    
-    console.log('🏠 Fetching listings...');
-    
-    // Try API call
-    try {
-      const response = await listingsApi.getMyListings({
-        page: listingsPage,
-        limit: listingsLimit,
-        status: listingsStatusFilter
-      });
-      
-      if (response.success && response.data) {
-        console.log('✅ API Success');
-        setListings(response.data.listings || []);
-        return;
-      }
-    } catch (apiError: any) {
-      console.warn('API call failed:', apiError.message);
-    }
-    
-    // If API fails, use mock data for development
-    console.log('🛠️ Using mock listings data');
-    
-    const mockListings: Listing[] = [
-      {
-        _id: '1',
-        title: 'Web Design Service',
-        description: 'Professional website design',
-        price: 299,
-        formattedPrice: '$299.00',
-        status: 'active',
-        type: 'service',
-        category: 'Design',
-        tags: ['web', 'design', 'responsive'],
-        currency: 'USD',
-        isDigital: true,
-        mediaUrls: ['https://via.placeholder.com/300'],
-        thumbnail: 'https://via.placeholder.com/300',
-        views: 45,
-        favoriteCount: 3,
-        purchaseCount: 2,
-        sellerId: {
-          _id: 'seller1',
-          username: 'You',
-          avatar: 'https://via.placeholder.com/50',
-          sellerRating: 4.5
-        },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        createdAtFormatted: 'Today'
-      },
-      // Add more mock listings...
-    ];
-    
-    // Apply filtering
-    let filteredListings = mockListings;
-    if (listingsStatusFilter) {
-      filteredListings = mockListings.filter(
-        l => l.status === listingsStatusFilter
-      );
-    }
-    
-    setListings(filteredListings);
-    
-  } catch (error: any) {
-    console.error('❌ Error:', error);
-    setError('Failed to load listings');
-  } finally {
-    setListingsLoading(false);
+    // Your existing code...
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
-};
+});
+
+// Get seller's own listings
+router.get("/listings/my-listings", authenticateMiddleware, async (req, res) => {
+  try {
+    console.log("🎯 GET /marketplace/listings/my-listings");
+    
+    const sellerId = req.user._id;
+    console.log("👤 Seller ID:", sellerId);
+    
+    const { 
+      status = 'all', 
+      page = 1, 
+      limit = 10,
+      category = 'all',
+      search,
+      sortBy = 'updatedAt',
+      sortOrder = 'desc'
+    } = req.query;
+    
+    console.log("📋 Query params:", req.query);
+    
+    // Build filter
+    const filter = { sellerId: sellerId };
+    
+    if (status && status !== 'all') {
+      filter.status = status;
+    }
+    
+    if (category && category !== 'all') {
+      filter.category = category;
+    }
+    
+    if (search && search.trim() !== '') {
+      filter.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { tags: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    console.log("🔍 Filter:", JSON.stringify(filter, null, 2));
+    
+    // Parse pagination
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+    const skip = (pageNum - 1) * limitNum;
+    
+    // Sort options
+    const sortOptions = {};
+    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    
+    // Get listings
+    const listings = await MarketplaceListing.find(filter)
+      .populate({
+        path: "sellerId",
+        select: "username avatar sellerRating email phoneNumber"
+      })
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
+    
+    console.log(`📊 Found ${listings.length} listings`);
+    
+    const total = await MarketplaceListing.countDocuments(filter);
+    
+    // Format listings
+    const formattedListings = listings.map(listing => {
+      const mediaUrls = Array.isArray(listing.mediaUrls) ? listing.mediaUrls : [];
+      const tags = Array.isArray(listing.tags) ? listing.tags : [];
+      
+      return {
+        _id: listing._id.toString(),
+        sellerId: listing.sellerId,
+        title: listing.title || 'Untitled',
+        description: listing.description || '',
+        price: listing.price || 0,
+        formattedPrice: `$${(listing.price || 0).toFixed(2)}`,
+        currency: listing.currency || 'USD',
+        type: listing.type || 'for_sale',
+        category: listing.category || 'Uncategorized',
+        mediaUrls: mediaUrls,
+        thumbnail: mediaUrls.length > 0 ? mediaUrls[0] : null,
+        status: listing.status || 'active',
+        tags: tags,
+        createdAt: listing.createdAt,
+        updatedAt: listing.updatedAt,
+        createdAtFormatted: new Date(listing.createdAt).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        }),
+        views: listing.viewCount || 0,
+        statusColor: listing.status === 'active' ? 'green' : 
+                    listing.status === 'sold' ? 'blue' : 
+                    listing.status === 'pending' ? 'orange' : 'gray',
+        seller: listing.sellerId ? {
+          _id: listing.sellerId._id,
+          username: listing.sellerId.username,
+          avatar: listing.sellerId.avatar,
+          sellerRating: listing.sellerId.sellerRating
+        } : null
+      };
+    });
+    
+    // ✅ RESPONSE FORMAT THAT MATCHES FRONTEND EXPECTATIONS
+    res.status(200).json({
+      success: true,
+      data: {
+        listings: formattedListings,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          pages: Math.ceil(total / limitNum)
+        }
+      },
+      message: `Found ${total} listing${total !== 1 ? 's' : ''}`
+    });
+    
+  } catch (error) {
+    console.error("❌ Error in /listings/my-listings:", error);
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to fetch your listings",
+      message: error.message
+    });
+  }
+});
+
+// Get listing by ID
+router.get("/listings/:id", async (req, res) => {
+  try {
+    // Your existing code...
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// ✅ ORDERS ROUTES
+// ============================================
+
+router.get("/orders/my-sales", authenticateMiddleware, async (req, res) => {
+  try {
+    console.log("🎯 GET /marketplace/orders/my-sales");
+    
+    const sellerId = req.user._id;
+    
+    // Your orders logic here...
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        sales: orders,
+        stats: stats
+      },
+      message: `Found ${orders.length} sales`
+    });
+    
+  } catch (error) {
+    console.error("❌ Error in /orders/my-sales:", error);
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to fetch sales",
+      message: error.message
+    });
+  }
+});
+
+// ============================================
+// ✅ OFFERS ROUTES
+// ============================================
+
+router.get("/offers/received-offers", authenticateMiddleware, async (req, res) => {
+  try {
+    console.log("🎯 GET /marketplace/offers/received-offers");
+    
+    const sellerId = req.user._id;
+    
+    // Your offers logic here...
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        offers: offers
+      },
+      message: `Found ${offers.length} offers`
+    });
+    
+  } catch (error) {
+    console.error("❌ Error in /offers/received-offers:", error);
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to fetch offers",
+      message: error.message
+    });
+  }
+});
+
+module.exports = router;
 // ===================================================
 // ✅ CREATE LISTING
 // ===================================================
