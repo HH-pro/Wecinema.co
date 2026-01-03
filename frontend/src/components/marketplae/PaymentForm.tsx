@@ -9,7 +9,9 @@ import { loadStripe } from '@stripe/stripe-js';
 import { useStripePayment } from '../../hooks/useStripe'; // ✅ Fixed import path
 
 // Initialize Stripe
-const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY!);
+const STRIPE_PUBLISHABLE_KEY =  "pk_test_51SKw7ZHYamYyPYbDUlqbeydcW1hVGrHOvCZ8mBwSU1gw77TIRyzng31iSqAvPIQzTYKG8UWfDew7kdKgBxsw7vtq00WTLU3YCZ";
+const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
+
 
 interface PaymentFormProps {
   orderId: string;
