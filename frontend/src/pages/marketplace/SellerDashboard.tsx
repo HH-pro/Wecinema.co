@@ -1220,13 +1220,13 @@ const SellerDashboard: React.FC = () => {
               onClose={() => setShowStripeSuccessAlert(false)}
             />
           )}
+                    totalEarnings={orderStats.totalRevenue}
 
           {/* Header */}
           <SafeDashboardHeader
             title="Seller Dashboard"
             subtitle="Manage orders, track earnings, and grow your business"
             earnings={safeFormatCurrency(orderStats.totalRevenue)}
-            totalEarnings={formatCurrency(sellerStats?.totals?.totalRevenue || 0)}
             onRefresh={handleRefresh}
             refreshing={refreshing}
             stripeStatus={{
@@ -1456,6 +1456,7 @@ const SellerDashboard: React.FC = () => {
                       refreshDataAfterAction('earnings');
                     }}
                     // ✅ ADDED: Pass completed orders data
+                    totalEarnings={orderStats.totalRevenue}
                     thisMonthEarnings={orderStats.thisMonthRevenue}
                     pendingEarnings={orderStats.pendingRevenue}
                     totalWithdrawn={totalWithdrawn / 100}
