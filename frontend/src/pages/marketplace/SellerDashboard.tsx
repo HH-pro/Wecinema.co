@@ -448,51 +448,63 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ SIMPLE fetchListings - no params
-  const fetchListings = async () => {
-    try {
-      setListingsLoading(true);
-      setError('');
-      
-      console.log('🏠 Fetching seller listings...');
-      
-      // ✅ SIMPLE: Call API without any params
-      const response = await listingsApi.getMyListings();
-      
-      console.log('📦 Listings Response:', {
-        success: response.success,
-        count: response.data?.listings?.length || 0,
-        error: response.error
-      });
-      
-      if (response.success && response.data) {
-        const listingsData = response.data.listings || [];
-        console.log(`✅ Successfully loaded ${listingsData.length} listings`);
-        setListings(listingsData);
-        
-        // Show success message if no listings
-        if (listingsData.length === 0) {
-          setSuccessMessage('No listings found. Create your first listing!');
-        }
-      } else {
-        console.warn('⚠️ Failed to fetch listings:', response.error);
-        setListings([]);
-        setError(response.error || 'No listings found');
-      }
-      
-    } catch (error: any) {
-      console.error('❌ Error in fetchListings:', error);
-      setListings([]);
-      
-      // Don't show error for empty listings
-      if (!error.message.includes('404')) {
-        setError('Failed to load listings');
-      }
-    } finally {
-      setListingsLoading(false);
-    }
-  };
+  // SellerDashboard.tsx - SIMPLIFIED fetchListings
 
+const fetchListings = async () => {
+  try {
+    setListingsLoading(true);
+    setError('');
+    
+    console.log('🏠 Fetching seller listings...');
+    
+    const params = {
+      page: listingsPage,
+      limit: listingsLimit,
+      status: listingsStatusFilter || undefined
+    };
+    
+    console.log('📋 Fetch params:', params);
+    
+    const response = await listingsApi.getMyListings(params);
+    
+    console.log('📦 API Response:', {
+      success: response.success,
+      hasData: !!response.data,
+      hasListings: !!response.data?.listings || !!response.data?.data?.listings
+    });
+    
+    if (response.success) {
+      // ✅ Handle both response formats
+      let listingsData: Listing[] = [];
+      
+      if (response.data?.listings) {
+        // Direct format: { listings: [], pagination: {} }
+        listingsData = response.data.listings;
+      } else if (response.data?.data?.listings) {
+        // Nested format: { data: { listings: [], pagination: {} } }
+        listingsData = response.data.data.listings;
+      }
+      
+      console.log(`✅ Loaded ${listingsData.length} listings`);
+      setListings(listingsData);
+      
+      if (listingsData.length === 0) {
+        setSuccessMessage('No listings found. Create your first listing!');
+      }
+    } else {
+      console.warn('⚠️ API returned error:', response.error);
+      setListings([]);
+      setError(response.error || 'Failed to load listings');
+    }
+    
+  } catch (error: any) {
+    console.error('❌ Error in fetchListings:', error);
+    setListings([]);
+    setError('Failed to load listings');
+  } finally {
+    setListingsLoading(false);
+  }
+};
   // ✅ Fetch offers received
   const fetchOffers = async () => {
     try {
