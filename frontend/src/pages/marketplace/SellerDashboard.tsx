@@ -339,38 +339,61 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Fetch seller statistics - UPDATED to include earnings data
-  const fetchSellerStats = async () => {
-    try {
-      setEarningsLoading(true);
-      console.log('📊 Fetching seller stats and earnings...');
-      const response = await ordersApi.getSellerStats();
+ const fetchSellerStats = async () => {
+  try {
+    setEarningsLoading(true);
+    console.log('📊 Starting to fetch seller stats...');
+    
+    const response = await ordersApi.getSellerStats();
+    
+    console.log('📊 fetchSellerStats got response:', {
+      success: response.success,
+      error: response.error,
+      hasData: !!response.data,
+      dataType: response.data ? typeof response.data : 'none',
+      message: response.message
+    });
+    
+    if (response.success && response.data) {
+      console.log('✅ Setting seller stats:', response.data);
+      setSellerStats(response.data);
       
-      if (response.success && response.data) {
-        console.log('✅ Seller stats:', response.data);
-        setSellerStats(response.data);
-        
-        // Also update order stats with API data for consistency
-        if (response.data.stats) {
-          setOrderStats(prev => ({
-            ...prev,
-            totalOrders: response.data.stats.total || prev.totalOrders,
-            totalRevenue: (response.data.stats.totalRevenue || 0) / 100,
-            pendingRevenue: (response.data.stats.pendingRevenue || 0) / 100,
-            thisMonthRevenue: (response.data.stats.thisMonthRevenue || 0) / 100,
-            availableBalance: stripeStatus?.account?.charges_enabled ? (stripeStatus.account.balance || 0) / 100 : 0
-          }));
-        }
-      } else {
-        console.warn('⚠️ Seller stats API failed:', response.error);
+      // Convert amounts from cents to dollars
+      const totals = response.data.totals || {};
+      
+      setOrderStats(prev => ({
+        ...prev,
+        totalOrders: totals.totalOrders || prev.totalOrders,
+        totalRevenue: (totals.totalRevenue || 0) / 100,
+        pendingRevenue: (totals.pendingOrders?.revenue || 0) / 100,
+        thisMonthRevenue: (totals.thisMonthRevenue || 0) / 100,
+        completed: totals.completedOrders?.count || prev.completed,
+        activeOrders: totals.pendingOrders?.count || prev.activeOrders,
+        availableBalance: stripeStatus?.account?.charges_enabled ? 
+          (stripeStatus.account.balance || 0) / 100 : 0
+      }));
+      
+    } else {
+      console.warn('⚠️ Seller stats API failed, using fallback');
+      // Calculate from local orders
+      const localStats = calculateOrderStats(orders);
+      setOrderStats(localStats);
+      
+      if (response.error) {
+        setError(`Stats: ${response.error}`);
       }
-    } catch (err: any) {
-      console.error('❌ Error fetching seller stats:', err);
-    } finally {
-      setEarningsLoading(false);
     }
-  };
-
+    
+  } catch (err: any) {
+    console.error('❌ fetchSellerStats caught error:', err);
+    // Calculate from local orders as fallback
+    const localStats = calculateOrderStats(orders);
+    setOrderStats(localStats);
+    
+  } finally {
+    setEarningsLoading(false);
+  }
+};
   // ✅ Fetch orders for seller
   const fetchSellerOrders = async () => {
     try {
