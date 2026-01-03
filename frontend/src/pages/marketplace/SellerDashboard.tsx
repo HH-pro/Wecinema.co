@@ -1154,7 +1154,6 @@ console.log('📊 Stats for grid prepared:', statsForGrid);
             />
           )}
 
-        // SellerDashboard.tsx میں DashboardHeader کے call میں:
 <SafeDashboardHeader
   title="Seller Dashboard"
   subtitle="Manage orders, track earnings, and grow your business"
