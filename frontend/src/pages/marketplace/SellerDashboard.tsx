@@ -1208,22 +1208,23 @@ const SellerDashboard: React.FC = () => {
           )}
 
           {/* Header */}
-          <SafeDashboardHeader
-            title="Seller Dashboard"
-            subtitle="Manage orders, track earnings, and grow your business"
-            earnings={safeFormatCurrency(orderStats.totalRevenue)}
-            totalEarnings={formatCurrency(sellerStats?.totals?.totalRevenue || 0)} // ✅ Use formatCurrency for cents
-            onRefresh={handleRefresh}
-            refreshing={refreshing}
-            stripeStatus={{
-              connected: stripeStatus?.account?.charges_enabled || false,
-              chargesEnabled: stripeStatus?.account?.charges_enabled || false,
-              detailsSubmitted: stripeStatus?.account?.details_submitted || false,
-              status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive',
-              availableBalance: stripeStatus?.account?.balance || 0
-            }}
-            onCheckStripe={checkStripeAccountStatus}
-          />
+         // SellerDashboard.tsx میں
+<SafeDashboardHeader
+  title="Seller Dashboard"
+  subtitle="Manage orders, track earnings, and grow your business"
+  earnings={safeFormatCurrency(orderStats.totalRevenue)} // Already in dollars
+  totalEarnings={formatCurrency(sellerStats?.totals?.totalRevenue || 0)} // Converts cents to dollars
+  onRefresh={handleRefresh}
+  refreshing={refreshing}
+  stripeStatus={{
+    connected: stripeStatus?.account?.charges_enabled || false,
+    chargesEnabled: stripeStatus?.account?.charges_enabled || false,
+    detailsSubmitted: stripeStatus?.account?.details_submitted || false,
+    status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive',
+    availableBalance: stripeStatus?.account?.balance || 0 // In cents
+  }}
+  onCheckStripe={checkStripeAccountStatus}
+/>
 
           {/* ✅ Development Mode Banner */}
           {(process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') && (
