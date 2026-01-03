@@ -1434,7 +1434,10 @@ const BuyerDashboard: React.FC = () => {
         {/* Statistics Overview */}
         {renderStats()}
 
-       
+        {/* Achievements Section */}
+        <div className="achievements-section">
+        
+          
           <div className="achievements-grid">
             {achievements.map((achievement, index) => (
               <div 
