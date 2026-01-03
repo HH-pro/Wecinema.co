@@ -277,135 +277,81 @@ router.get("/:id", async (req, res) => {
     });
   }
 });
-router.get("/my-listings", authenticateMiddleware, async (req, res) => {
+// SellerDashboard.tsx में fetchListings function में
+const fetchListings = async () => {
   try {
-    console.log("🎯 /my-listings endpoint hit");
+    setListingsLoading(true);
     
-    const sellerId = req.user._id;
+    console.log('🏠 Fetching listings...');
     
-    const { 
-      status = 'all', 
-      page = 1, 
-      limit = 10,
-      category = 'all',
-      search,
-      sortBy = 'updatedAt',
-      sortOrder = 'desc'
-    } = req.query;
-    
-    // Build filter
-    const filter = { sellerId: sellerId };
-    
-    if (status && status !== 'all') {
-      filter.status = status;
-    }
-    
-    if (category && category !== 'all') {
-      filter.category = category;
-    }
-    
-    if (search && search.trim() !== '') {
-      filter.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { tags: { $regex: search, $options: 'i' } }
-      ];
-    }
-    
-    console.log("🔍 Filter criteria:", filter);
-    
-    // Parse pagination
-    const pageNum = Math.max(1, parseInt(page));
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
-    const skip = (pageNum - 1) * limitNum;
-    
-    // Sort options
-    const sortOptions = {};
-    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
-    
-    // Get listings
-    const listings = await MarketplaceListing.find(filter)
-      .populate({
-        path: "sellerId",
-        select: "username avatar sellerRating email phoneNumber"
-      })
-      .sort(sortOptions)
-      .skip(skip)
-      .limit(limitNum)
-      .lean();
-    
-    console.log("📊 Found listings count:", listings.length);
-    
-    const total = await MarketplaceListing.countDocuments(filter);
-    
-    // Format listings
-    const formattedListings = listings.map(listing => {
-      const mediaUrls = Array.isArray(listing.mediaUrls) ? listing.mediaUrls : [];
-      const tags = Array.isArray(listing.tags) ? listing.tags : [];
+    // Try API call
+    try {
+      const response = await listingsApi.getMyListings({
+        page: listingsPage,
+        limit: listingsLimit,
+        status: listingsStatusFilter
+      });
       
-      return {
-        _id: listing._id.toString(),
-        sellerId: listing.sellerId,
-        title: listing.title || 'Untitled',
-        description: listing.description || '',
-        price: listing.price || 0,
-        formattedPrice: `$${(listing.price || 0).toFixed(2)}`,
-        currency: listing.currency || 'USD',
-        type: listing.type || 'for_sale',
-        category: listing.category || 'Uncategorized',
-        mediaUrls: mediaUrls,
-        thumbnail: mediaUrls.length > 0 ? mediaUrls[0] : null,
-        status: listing.status || 'active',
-        tags: tags,
-        createdAt: listing.createdAt,
-        updatedAt: listing.updatedAt,
-        createdAtFormatted: new Date(listing.createdAt).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        }),
-        views: listing.viewCount || 0,
-        statusColor: listing.status === 'active' ? 'green' : 
-                    listing.status === 'sold' ? 'blue' : 
-                    listing.status === 'pending' ? 'orange' : 'gray',
-        seller: listing.sellerId ? {
-          _id: listing.sellerId._id,
-          username: listing.sellerId.username,
-          avatar: listing.sellerId.avatar,
-          sellerRating: listing.sellerId.sellerRating
-        } : null
-      };
-    });
+      if (response.success && response.data) {
+        console.log('✅ API Success');
+        setListings(response.data.listings || []);
+        return;
+      }
+    } catch (apiError: any) {
+      console.warn('API call failed:', apiError.message);
+    }
     
-    res.status(200).json({
-      success: true,
-      listings: formattedListings,
-      pagination: {
-        page: pageNum,
-        limit: limitNum,
-        total,
-        pages: Math.ceil(total / limitNum)
-      },
-      filters: {
-        status: status,
-        category: category,
-        search: search || ''
-      },
-      timestamp: new Date().getTime(),
-      currency: "USD",
-      message: `Found ${total} listing${total !== 1 ? 's' : ''}`
-    });
+    // If API fails, use mock data for development
+    console.log('🛠️ Using mock listings data');
     
-  } catch (error) {
-    console.error("❌ Error fetching my listings:", error);
-    res.status(500).json({ 
-      success: false,
-      error: "Failed to fetch my listings",
-      message: error.message
-    });
+    const mockListings: Listing[] = [
+      {
+        _id: '1',
+        title: 'Web Design Service',
+        description: 'Professional website design',
+        price: 299,
+        formattedPrice: '$299.00',
+        status: 'active',
+        type: 'service',
+        category: 'Design',
+        tags: ['web', 'design', 'responsive'],
+        currency: 'USD',
+        isDigital: true,
+        mediaUrls: ['https://via.placeholder.com/300'],
+        thumbnail: 'https://via.placeholder.com/300',
+        views: 45,
+        favoriteCount: 3,
+        purchaseCount: 2,
+        sellerId: {
+          _id: 'seller1',
+          username: 'You',
+          avatar: 'https://via.placeholder.com/50',
+          sellerRating: 4.5
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdAtFormatted: 'Today'
+      },
+      // Add more mock listings...
+    ];
+    
+    // Apply filtering
+    let filteredListings = mockListings;
+    if (listingsStatusFilter) {
+      filteredListings = mockListings.filter(
+        l => l.status === listingsStatusFilter
+      );
+    }
+    
+    setListings(filteredListings);
+    
+  } catch (error: any) {
+    console.error('❌ Error:', error);
+    setError('Failed to load listings');
+  } finally {
+    setListingsLoading(false);
   }
-});
-
+};
 // ===================================================
 // ✅ CREATE LISTING
 // ===================================================
