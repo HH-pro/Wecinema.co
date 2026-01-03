@@ -18,6 +18,7 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   onClose
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(0.8);
   const [isMuted, setIsMuted] = useState(false);
@@ -25,8 +26,10 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [showControls, setShowControls] = useState(true);
+  const [hasError, setHasError] = useState(false);
   const controlsTimeoutRef = useRef<NodeJS.Timeout>();
 
+  // Initialize video settings
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.volume = volume;
@@ -34,6 +37,7 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     }
   }, [volume, isMuted]);
 
+  // Handle fullscreen changes
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
@@ -45,12 +49,18 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     };
   }, []);
 
+  // Reset controls visibility when modal shows
   useEffect(() => {
     if (show) {
       setShowControls(true);
       resetControlsTimeout();
     }
   }, [show]);
+
+  // Reset error state when URL changes
+  useEffect(() => {
+    setHasError(false);
+  }, [videoUrl]);
 
   const resetControlsTimeout = () => {
     if (controlsTimeoutRef.current) {
@@ -90,12 +100,12 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   };
 
   const handleFullscreen = () => {
-    if (!videoRef.current) return;
+    if (!containerRef.current) return;
 
     if (document.fullscreenElement) {
       document.exitFullscreen();
     } else {
-      videoRef.current.requestFullscreen();
+      containerRef.current.requestFullscreen();
     }
   };
 
@@ -103,7 +113,10 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     if (!videoRef.current) return;
 
     if (videoRef.current.paused) {
-      videoRef.current.play();
+      videoRef.current.play().catch(err => {
+        console.error('Playback failed:', err);
+        setHasError(true);
+      });
       setIsPlaying(true);
     } else {
       videoRef.current.pause();
@@ -122,10 +135,8 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const handleMuteToggle = () => {
     setIsMuted(!isMuted);
     if (!isMuted) {
-      // Store previous volume before muting
       localStorage.setItem('lastVolume', volume.toString());
     } else {
-      // Restore to last volume or default
       const lastVolume = localStorage.getItem('lastVolume');
       setVolume(lastVolume ? parseFloat(lastVolume) : 0.8);
     }
@@ -134,7 +145,6 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const handleTimeUpdate = () => {
     if (videoRef.current) {
       setCurrentTime(videoRef.current.currentTime);
-      setDuration(videoRef.current.duration || 0);
     }
   };
 
@@ -167,116 +177,131 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     resetControlsTimeout();
   };
 
+  const handleVideoError = () => {
+    setHasError(true);
+  };
+
   if (!show || !videoUrl) return null;
 
   return (
     <div 
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm p-2 sm:p-4"
       onClick={onClose}
+      style={{ 
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh'
+      }}
     >
       <div 
-        className="relative w-full max-w-6xl max-h-[95vh] bg-black rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl transition-all duration-300"
+        ref={containerRef}
+        className="relative w-full max-w-5xl max-h-[90vh] bg-black rounded-lg sm:rounded-xl overflow-hidden shadow-2xl transition-all duration-300"
         onClick={(e) => e.stopPropagation()}
         onMouseMove={handleMouseMove}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          margin: 'auto'
+        }}
       >
-        {/* Header */}
-        <div 
-          className={`absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/90 to-transparent p-4 flex justify-between items-center transition-opacity duration-300 ${
-            showControls ? 'opacity-100' : 'opacity-0'
-          }`}
-        >
+        {/* Header - Always visible */}
+        <div className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/90 to-transparent p-3 sm:p-4 flex justify-between items-center">
           <div className="text-white truncate max-w-[70%] sm:max-w-[80%]">
-            <h3 className="text-base sm:text-lg font-semibold truncate">{videoTitle}</h3>
-            <p className="text-xs sm:text-sm text-gray-300 truncate hidden sm:block">{videoUrl}</p>
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold truncate">{videoTitle}</h3>
+            <p className="text-xs text-gray-300 truncate hidden sm:block">{videoUrl}</p>
           </div>
           <button
             onClick={onClose}
-            className="text-white hover:text-gray-300 p-2 rounded-full hover:bg-white/10 transition-all duration-200 flex-shrink-0"
+            className="text-white hover:text-red-400 p-2 rounded-full hover:bg-white/10 transition-all duration-200 flex-shrink-0"
             aria-label="Close"
           >
-            <FiX size={20} className="sm:w-6 sm:h-6" />
+            <FiX className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
         
-        {/* Video Player */}
-        <div className="relative w-full h-[50vh] sm:h-[70vh] bg-black">
-          {isVideoUrl(videoUrl) ? (
-            <video
-              ref={videoRef}
-              src={videoUrl}
-              className="w-full h-full object-contain cursor-pointer"
-              onClick={handleVideoClick}
-              onTimeUpdate={handleTimeUpdate}
-              onLoadedMetadata={handleLoadedMetadata}
-              onEnded={handleVideoEnd}
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
-              onError={(e) => {
-                console.error('Video playback error:', e);
-                const videoElement = e.target as HTMLVideoElement;
-                videoElement.controls = false;
-              }}
-            >
-              Your browser does not support the video tag.
-            </video>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-white p-4 sm:p-8 text-center">
-              <FiAlertCircle className="text-red-500 mb-3 sm:mb-4 w-10 h-10 sm:w-12 sm:h-12" />
-              <h4 className="text-lg sm:text-xl font-semibold mb-2">Invalid Video URL</h4>
-              <p className="text-sm sm:text-base text-gray-300">The provided URL is not a valid video source.</p>
-              <p className="text-xs sm:text-sm text-gray-400 mt-2 break-all max-w-full">{videoUrl}</p>
-            </div>
-          )}
+        {/* Video Player Area */}
+        <div className="relative w-full flex-1 min-h-[200px] bg-black flex items-center justify-center">
+          {isVideoUrl(videoUrl) && !hasError ? (
+            <>
+              <video
+                ref={videoRef}
+                src={videoUrl}
+                className="w-full h-full object-contain cursor-pointer"
+                onClick={handleVideoClick}
+                onTimeUpdate={handleTimeUpdate}
+                onLoadedMetadata={handleLoadedMetadata}
+                onEnded={handleVideoEnd}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onError={handleVideoError}
+                playsInline
+              >
+                Your browser does not support the video tag.
+              </video>
 
-          {/* Play/Pause Overlay */}
-          {isVideoUrl(videoUrl) && (
-            <button
-              onClick={handlePlayPause}
-              className={`absolute inset-0 m-auto w-16 h-16 sm:w-20 sm:h-20 bg-black/50 rounded-full flex items-center justify-center transition-all duration-300 transform hover:scale-110 ${
-                showControls ? 'opacity-100' : 'opacity-0'
-              } ${isPlaying ? 'invisible' : 'visible'}`}
-              aria-label={isPlaying ? "Pause" : "Play"}
-            >
-              <FiPlay size={32} className="text-white sm:w-10 sm:h-10" />
-            </button>
+              {/* Play/Pause Overlay Button */}
+              <button
+                onClick={handlePlayPause}
+                className={`absolute inset-0 m-auto w-16 h-16 bg-black/50 rounded-full flex items-center justify-center transition-all duration-300 transform hover:scale-110 ${
+                  showControls ? 'opacity-100' : 'opacity-0'
+                } ${isPlaying ? 'invisible' : 'visible'}`}
+                aria-label={isPlaying ? "Pause" : "Play"}
+              >
+                <FiPlay className="w-10 h-10 text-white" />
+              </button>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-white p-4 sm:p-6 text-center">
+              <FiAlertCircle className="text-red-500 mb-3 sm:mb-4 w-12 h-12 sm:w-16 sm:h-16" />
+              <h4 className="text-base sm:text-lg md:text-xl font-semibold mb-2">
+                {hasError ? "Video Playback Error" : "Invalid Video URL"}
+              </h4>
+              <p className="text-sm sm:text-base text-gray-300 mb-3">
+                {hasError ? "Unable to load the video" : "The provided URL is not a valid video source"}
+              </p>
+              <p className="text-xs sm:text-sm text-gray-400 break-all max-w-full px-4">
+                {videoUrl}
+              </p>
+            </div>
           )}
         </div>
         
-        {/* Video Controls */}
+        {/* Video Controls - Always visible but with opacity changes */}
         <div 
-          className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/80 to-transparent p-3 sm:p-4 transition-opacity duration-300 ${
-            showControls ? 'opacity-100' : 'opacity-0'
+          className={`bg-gradient-to-t from-black/95 via-black/80 to-transparent p-3 sm:p-4 transition-opacity duration-300 ${
+            showControls ? 'opacity-100' : 'opacity-20 hover:opacity-100'
           }`}
         >
-          {/* Progress Bar */}
-          <div className="mb-3 sm:mb-4 px-2">
+          {/* Progress Bar - Always visible */}
+          <div className="mb-3 sm:mb-4">
             <input
               type="range"
               min="0"
               max={duration || 100}
               value={currentTime}
               onChange={handleSeek}
-              className="w-full h-1.5 sm:h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:cursor-pointer"
+              className="w-full h-1.5 sm:h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-yellow-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-yellow-500 [&::-moz-range-thumb]:cursor-pointer"
             />
-            <div className="flex justify-between text-xs sm:text-sm text-gray-300 mt-1">
+            <div className="flex justify-between text-xs sm:text-sm text-gray-300 mt-1 px-1">
               <span>{formatTime(currentTime)}</span>
               <span>{formatTime(duration)}</span>
             </div>
           </div>
 
-          {/* Control Buttons */}
-          <div className="flex items-center justify-between px-2">
+          {/* Control Buttons - Always visible */}
+          <div className="flex items-center justify-between">
             {/* Left Controls */}
-            <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex items-center gap-3 sm:gap-4">
               <button
                 onClick={handlePlayPause}
                 className="text-white hover:text-yellow-400 p-2 rounded-full hover:bg-white/10 transition-all duration-200"
                 aria-label={isPlaying ? "Pause" : "Play"}
               >
                 {isPlaying ? (
-                  <FiPause size={20} className="sm:w-6 sm:h-6" />
+                  <FiPause className="w-5 h-5 sm:w-6 sm:h-6" />
                 ) : (
-                  <FiPlay size={20} className="sm:w-6 sm:h-6" />
+                  <FiPlay className="w-5 h-5 sm:w-6 sm:h-6" />
                 )}
               </button>
 
@@ -288,14 +313,14 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                   aria-label={isMuted ? "Unmute" : "Mute"}
                 >
                   {isMuted || volume === 0 ? (
-                    <FiVolumeX size={20} className="sm:w-6 sm:h-6" />
+                    <FiVolumeX className="w-5 h-5 sm:w-6 sm:h-6" />
                   ) : (
-                    <FiVolume2 size={20} className="sm:w-6 sm:h-6" />
+                    <FiVolume2 className="w-5 h-5 sm:w-6 sm:h-6" />
                   )}
                 </button>
                 
-                {/* Volume Slider */}
-                <div className="hidden sm:flex items-center w-24 lg:w-32">
+                {/* Volume Slider - Visible on all screens */}
+                <div className="flex items-center w-20 sm:w-28 md:w-32">
                   <input
                     type="range"
                     min="0"
@@ -309,23 +334,23 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                 </div>
               </div>
 
-              {/* Time Display - Mobile Only */}
-              <div className="sm:hidden text-white text-sm">
+              {/* Time Display - Mobile */}
+              <div className="sm:hidden text-white text-xs font-medium">
                 {formatTime(currentTime)} / {formatTime(duration)}
               </div>
             </div>
 
             {/* Right Controls */}
-            <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex items-center">
               <button
                 onClick={handleFullscreen}
                 className="text-white hover:text-yellow-400 p-2 rounded-full hover:bg-white/10 transition-all duration-200"
                 aria-label={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
               >
                 {isFullscreen ? (
-                  <FiMinimize size={20} className="sm:w-6 sm:h-6" />
+                  <FiMinimize className="w-5 h-5 sm:w-6 sm:h-6" />
                 ) : (
-                  <FiMaximize size={20} className="sm:w-6 sm:h-6" />
+                  <FiMaximize className="w-5 h-5 sm:w-6 sm:h-6" />
                 )}
               </button>
             </div>
