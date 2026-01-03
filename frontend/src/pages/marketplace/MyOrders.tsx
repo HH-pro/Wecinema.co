@@ -13,9 +13,9 @@ import {
   FiSearch,
   FiAlertCircle
 } from 'react-icons/fi';
-import axios from 'axios';
+import { marketplaceApi } from '../api/marketplace'; // Import the API service
 
-// Types
+// Types (keep your existing interfaces)
 interface User {
   _id: string;
   username: string;
@@ -81,13 +81,6 @@ interface OrderStats {
   totalRevenue?: number;
 }
 
-interface OrdersResponse {
-  success: boolean;
-  orders: Order[];
-  stats: OrderStats;
-  count: number;
-}
-
 const MyOrders: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -106,34 +99,14 @@ const MyOrders: React.FC = () => {
     fetchOrders();
   }, []);
 
-  const getAuthToken = (): string | null => {
-    return localStorage.getItem('token');
-  };
-
   const fetchOrders = async (): Promise<void> => {
     try {
       setLoading(true);
       setError('');
       
-      const token = getAuthToken();
+      const response = await marketplaceApi.getMyOrders();
       
-      if (!token) {
-        setError('Please login to view your orders');
-        setLoading(false);
-        return;
-      }
-
-      const response = await axios.get<OrdersResponse>(
-        'http://localhost:3000/marketplace/orders/my-orders',
-        { 
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          } 
-        }
-      );
-
-      if (response.data.success) {
+      if (response.success && response.data) {
         setOrders(response.data.orders || []);
         setStats(response.data.stats || {
           total: 0,
@@ -142,7 +115,7 @@ const MyOrders: React.FC = () => {
           pending: 0
         });
       } else {
-        setError('Failed to load orders');
+        setError(response.error || 'Failed to load orders');
       }
     } catch (error: any) {
       if (error.response?.status === 401) {
@@ -153,6 +126,7 @@ const MyOrders: React.FC = () => {
       } else {
         setError('Failed to load orders. Please try again.');
       }
+      console.error('Error fetching orders:', error);
     } finally {
       setLoading(false);
     }
@@ -246,18 +220,17 @@ const MyOrders: React.FC = () => {
     navigate('/login');
   };
 
- const formatPrice = (
-  amount: number,
-  currency: string = 'USD'
-): string => {
-  const valueInDollars = (amount || 0) / 100;
+  const formatPrice = (
+    amount: number,
+    currency: string = 'USD'
+  ): string => {
+    const valueInDollars = (amount || 0) / 100;
 
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(valueInDollars);
-};
-
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+    }).format(valueInDollars);
+  };
 
   const formatDate = (date: string): string => {
     return new Date(date).toLocaleDateString('en-US', {
