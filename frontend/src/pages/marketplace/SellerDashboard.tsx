@@ -218,9 +218,7 @@ const SellerDashboard: React.FC = () => {
   
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
-  // ✅ NEW: Disconnect Stripe Modal State
-  const [showDisconnectModal, setShowDisconnectModal] = useState(false);
-  const [disconnecting, setDisconnecting] = useState(false);
+  // ✅ UPDATED: Disconnect state is now handled within StripeSetupModal
 
   // Calculate derived stats
   const totalListings = listings.length;
@@ -456,86 +454,12 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ NEW: Disconnect Stripe Account
-  const handleDisconnectStripe = async () => {
-    try {
-      setDisconnecting(true);
-      
-      console.log('🔌 Disconnecting Stripe account...');
-      
-      // Call API to disconnect Stripe
-      const response = await ordersApi.disconnectStripeAccount();
-      
-      if (response.success) {
-        setSuccessMessage('Stripe account disconnected successfully!');
-        setShowDisconnectModal(false);
-        
-        // ✅ Refresh data to update UI
-        setTimeout(() => {
-          refreshDataAfterAction('all');
-        }, 1000);
-        
-      } else {
-        setError(response.error || 'Failed to disconnect Stripe account. Please try again.');
-      }
-    } catch (err: any) {
-      console.error('❌ Error disconnecting Stripe:', err);
-      setError('Failed to disconnect Stripe account. Please try again.');
-    } finally {
-      setDisconnecting(false);
-    }
-  };
-
-  // ✅ NEW: Mock disconnect function (if API not available)
-  const mockDisconnectStripe = async () => {
-    try {
-      setDisconnecting(true);
-      
-      console.log('🔌 Mock disconnecting Stripe account...');
-      
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock successful disconnect
-      setStripeStatus({
-        account: {
-          id: '',
-          business_type: '',
-          business_profile: {},
-          charges_enabled: false,
-          payouts_enabled: false,
-          details_submitted: false,
-          capabilities: {},
-          requirements: {
-            currently_due: [],
-            eventually_due: [],
-            past_due: [],
-            disabled_reason: ''
-          }
-        },
-        status: {
-          canReceivePayments: false,
-          missingRequirements: [],
-          needsAction: false,
-          isActive: false
-        },
-        message: 'Please connect your Stripe account to receive payments'
-      });
-      
-      setSuccessMessage('Stripe account disconnected successfully!');
-      setShowDisconnectModal(false);
-      
-      // ✅ Refresh data
-      setTimeout(() => {
-        refreshDataAfterAction('all');
-      }, 500);
-      
-    } catch (err: any) {
-      console.error('❌ Error in mock disconnect:', err);
-      setError('Failed to disconnect Stripe account. Please try again.');
-    } finally {
-      setDisconnecting(false);
-    }
+  // ✅ NEW: Handle Stripe disconnect success
+  const handleStripeDisconnectSuccess = () => {
+    setSuccessMessage('Stripe account disconnected successfully!');
+    setTimeout(() => {
+      refreshDataAfterAction('all');
+    }, 1000);
   };
 
   // ✅ UPDATED: Fetch seller statistics - FOCUS ON COMPLETED ORDERS
@@ -1549,9 +1473,9 @@ const SellerDashboard: React.FC = () => {
                       </div>
                     </button>
                     
-                    {/* Disconnect Button */}
+                    {/* Disconnect Button - Now opens StripeSetupModal which shows disconnect flow */}
                     <button
-                      onClick={() => setShowDisconnectModal(true)}
+                      onClick={handleOpenStripeSetup}
                       className="flex-1 bg-white hover:bg-red-50 text-red-600 border border-red-300 font-medium py-3 px-4 rounded-xl transition-all duration-200 shadow-sm hover:shadow whitespace-nowrap text-center"
                     >
                       <div className="flex items-center justify-center gap-2">
@@ -1782,110 +1706,15 @@ const SellerDashboard: React.FC = () => {
             )}
           </div>
 
-          {/* Modals */}
+          {/* ✅ Stripe Setup/Disconnect Modal */}
           {showStripeSetup && (
-            // In SellerDashboard.tsx
-<SafeStripeSetupModal
-  show={showStripeSetup}
-  onClose={() => setShowStripeSetup(false)}
-  onSuccess={handleStripeSetupSuccess}
-  stripeConnected={stripeStatus?.account?.charges_enabled || false}
-/>
-          )}
-
-          {/* ✅ NEW: Disconnect Stripe Modal */}
-          {showDisconnectModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-              <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 transform transition-all duration-300 animate-scale-in">
-                <div className="flex items-center mb-4">
-                  <div className="bg-red-100 p-3 rounded-xl mr-4">
-                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Disconnect Stripe Account</h3>
-                    <p className="text-sm text-gray-600 mt-1">This action cannot be undone</p>
-                  </div>
-                </div>
-
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
-                  <div className="flex items-start">
-                    <svg className="w-5 h-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <div>
-                      <h4 className="text-sm font-medium text-red-800">Important Warning</h4>
-                      <ul className="mt-2 space-y-2 text-sm text-red-700">
-                        <li className="flex items-start">
-                          <span className="mr-2">•</span>
-                          <span>You will not be able to receive payments for new orders</span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="mr-2">•</span>
-                          <span>Pending withdrawals will be cancelled</span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="mr-2">•</span>
-                          <span>Any available balance will remain in your Stripe account</span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="mr-2">•</span>
-                          <span>You can reconnect anytime</span>
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Show balance warning if there's available balance */}
-                {orderStats.availableBalance !== undefined && orderStats.availableBalance > 0 && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
-                    <div className="flex items-center">
-                      <svg className="w-5 h-5 text-yellow-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <div>
-                        <p className="text-sm font-medium text-yellow-800">
-                          You have {safeFormatCurrency(orderStats.availableBalance)} available balance
-                        </p>
-                        <p className="text-xs text-yellow-700 mt-1">
-                          Consider withdrawing your funds before disconnecting
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setShowDisconnectModal(false)}
-                    disabled={disconnecting}
-                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-xl transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => {
-                      // Use mock disconnect for now - replace with actual API call when available
-                      mockDisconnectStripe();
-                      // handleDisconnectStripe(); // Uncomment when API is ready
-                    }}
-                    disabled={disconnecting}
-                    className="flex-1 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-medium py-3 px-4 rounded-xl transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {disconnecting ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Disconnecting...
-                      </>
-                    ) : (
-                      'Disconnect Account'
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
+            <SafeStripeSetupModal
+              show={showStripeSetup}
+              onClose={() => setShowStripeSetup(false)}
+              onSuccess={handleStripeSetupSuccess}
+              onDisconnectSuccess={handleStripeDisconnectSuccess}
+              stripeConnected={stripeStatus?.account?.charges_enabled || false}
+            />
           )}
 
           {selectedOrderId && (
