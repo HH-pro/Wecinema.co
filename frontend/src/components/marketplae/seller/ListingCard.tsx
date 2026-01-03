@@ -166,7 +166,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
 
           <button
             onClick={onDirectPayment}
-            className="px-3 bg-green-600 hover:bg-green-700 text-white text-sm py-2 rounded-md transition-colors duration-200 flex items-center gap-2 group/buy"
+            className="px-3 bg-yellow-600 hover:bg-yellow-700 text-white text-sm py-2 rounded-md transition-colors duration-200 flex items-center gap-2 group/buy"
           >
             <FiCreditCard size={14} className="group-hover/buy:scale-110 transition-transform" />
             Buy Now
