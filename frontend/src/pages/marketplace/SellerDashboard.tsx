@@ -36,7 +36,6 @@ import StripeAccountStatus from '../../components/marketplae/seller/StripeAccoun
 import StripeSuccessAlert from '../../components/marketplae/seller/StripeSuccessAlert';
 
 // Import tab components
-import OffersTab from '../../components/marketplae/seller/OffersTab';
 import ListingsTab from '../../components/marketplae/seller/ListingsTab';
 import OrdersTab from '../../components/marketplae/seller/OrdersTab';
 import WithdrawTab from '../../components/marketplae/seller/WithdrawTab';
@@ -137,7 +136,6 @@ const SafeActionCard = (typeof ActionCard === 'function' || typeof ActionCard ==
 const SafeOrderWorkflowGuide = (typeof OrderWorkflowGuide === 'function' || typeof OrderWorkflowGuide === 'object') ? OrderWorkflowGuide : () => <SimpleFallback name="OrderWorkflowGuide" />;
 const SafeStripeAccountStatus = (typeof StripeAccountStatus === 'function' || typeof StripeAccountStatus === 'object') ? StripeAccountStatus : () => <SimpleFallback name="StripeAccountStatus" />;
 const SafeStripeSuccessAlert = (typeof StripeSuccessAlert === 'function' || typeof StripeSuccessAlert === 'object') ? StripeSuccessAlert : () => <SimpleFallback name="StripeSuccessAlert" />;
-const SafeOffersTab = (typeof OffersTab === 'function' || typeof OffersTab === 'object') ? OffersTab : () => <SimpleFallback name="OffersTab" />;
 const SafeListingsTab = (typeof ListingsTab === 'function' || typeof ListingsTab === 'object') ? ListingsTab : () => <SimpleFallback name="ListingsTab" />;
 const SafeOrdersTab = (typeof OrdersTab === 'function' || typeof OrdersTab === 'object') ? OrdersTab : () => <SimpleFallback name="OrdersTab" />;
 const SafeWithdrawTab = (typeof WithdrawTab === 'function' || typeof WithdrawTab === 'object') ? WithdrawTab : () => <SimpleFallback name="WithdrawTab" />;
@@ -1273,18 +1271,7 @@ const SellerDashboard: React.FC = () => {
                   />
                 )}
 
-                {/* Offers Tab */}
-                {activeTab === 'offers' && (
-                  <SafeOffersTab
-                    offers={offers}
-                    loading={offersLoading}
-                    onOfferAction={handleOfferAction}
-                    onPlayVideo={handlePlayVideo}
-                    onRefresh={() => fetchOffers()}
-                    actionLoading={orderActionLoading}
-                    onViewListing={(listingId) => navigate(`/marketplace/listing/${listingId}`)}
-                  />
-                )}
+               
 
                 {/* Listings Tab */}
                 {activeTab === 'listings' && (
