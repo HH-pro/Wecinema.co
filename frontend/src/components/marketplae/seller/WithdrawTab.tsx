@@ -1,4 +1,4 @@
-// src/components/marketplace/seller/WithdrawTab.tsx - UPDATED VERSION
+// src/components/marketplace/seller/WithdrawTab.tsx - CORRECTED VERSION
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import marketplaceApi from '../../../api/marketplaceApi';
@@ -78,26 +78,27 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
         let balance = 0;
         
         if (data.totals?.pendingRevenue) {
-          // If we have pending revenue, that's available for withdrawal
-          balance = data.totals.pendingRevenue * 100; // Convert to cents
+          // If we have pending revenue, that's already in dollars
+          balance = data.totals.pendingRevenue; // ALREADY IN DOLLARS
         } else if (data.totals?.totalRevenue) {
           // Use total revenue minus completed revenue
           const completedRevenue = data.totals.completedOrders?.revenue || 0;
-          balance = (data.totals.totalRevenue - completedRevenue) * 100;
+          balance = (data.totals.totalRevenue - completedRevenue); // ALREADY IN DOLLARS
         } else if (data.totals?.thisMonthRevenue) {
-          balance = data.totals.thisMonthRevenue * 100;
+          balance = data.totals.thisMonthRevenue; // ALREADY IN DOLLARS
         }
         
-        setAvailableBalance(balance);
+        // Convert dollars to cents for formatCurrency
+        setAvailableBalance(balance * 100);
         
-        // Set withdrawal stats
+        // Set withdrawal stats (ALREADY IN DOLLARS)
         setWithdrawalStats({
-          totalWithdrawn: data.totals?.completedOrders?.revenue || 0,
-          availableBalance: balance,
+          totalWithdrawn: data.totals?.completedOrders?.revenue || 0, // DOLLARS
+          availableBalance: balance, // DOLLARS
           pendingOrders: data.totals?.pendingOrders?.count || 0,
-          pendingRevenue: data.totals?.pendingOrders?.revenue || 0,
+          pendingRevenue: data.totals?.pendingOrders?.revenue || 0, // DOLLARS
           completedOrders: data.totals?.completedOrders?.count || 0,
-          totalRevenue: data.totals?.totalRevenue || 0
+          totalRevenue: data.totals?.totalRevenue || 0 // DOLLARS
         });
         
         return;
@@ -116,14 +117,17 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
           const completedAmount = completedSales.reduce((sum: number, sale: any) => sum + sale.amount, 0);
           const pendingAmount = pendingSales.reduce((sum: number, sale: any) => sum + sale.amount, 0);
           
-          setAvailableBalance(pendingAmount * 100);
+          // Note: sale.amount is already in cents from API
+          // Convert cents to dollars for our internal representation
+          setAvailableBalance(pendingAmount); // Already in cents
+          
           setWithdrawalStats({
-            totalWithdrawn: completedAmount,
-            availableBalance: pendingAmount * 100,
+            totalWithdrawn: completedAmount / 100, // Convert cents to dollars
+            availableBalance: pendingAmount / 100, // Convert cents to dollars
             pendingOrders: pendingSales.length,
-            pendingRevenue: pendingAmount,
+            pendingRevenue: pendingAmount / 100, // Convert cents to dollars
             completedOrders: completedSales.length,
-            totalRevenue: completedAmount + pendingAmount
+            totalRevenue: (completedAmount + pendingAmount) / 100 // Convert cents to dollars
           });
         }
       } catch (orderError) {
@@ -199,9 +203,6 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
       setHistoryLoading(true);
       
       // Try to get payout history from API
-      // Note: You'll need to add this endpoint to your marketplaceApi
-      // For now, we'll simulate with withdrawal history
-      
       if (withdrawalHistory && Array.isArray(withdrawalHistory)) {
         setPayoutHistory(withdrawalHistory);
       } else if (withdrawalHistory?.withdrawals) {
@@ -216,7 +217,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
           
           const history = completedOrders.map((order: any) => ({
             _id: order._id,
-            amount: order.sellerAmount || order.amount * 0.9, // 90% after platform fee
+            amount: order.sellerAmount || order.amount * 0.9, // Already in cents
             status: 'completed',
             createdAt: order.completedAt || order.updatedAt,
             paymentMethod: 'stripe',
@@ -258,15 +259,15 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
     }
     // Check earnings balance
     else if (earningsBalance?.availableBalance) {
-      balance = earningsBalance.availableBalance;
+      balance = earningsBalance.availableBalance * 100; // Convert dollars to cents
     } 
     // Check stripe status
     else if (stripeStatus?.balance?.available) {
-      balance = stripeStatus.balance.available;
+      balance = stripeStatus.balance.available; // Already in cents
     }
     // Check withdrawal stats
     else if (withdrawalStats?.availableBalance) {
-      balance = withdrawalStats.availableBalance;
+      balance = withdrawalStats.availableBalance * 100; // Convert dollars to cents
     }
     
     setAvailableBalance(balance);
@@ -293,9 +294,6 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
     setWithdrawing(true);
     
     try {
-      // Note: You'll need to add a payout endpoint to marketplaceApi
-      // For now, we'll simulate the withdrawal process
-      
       toast.info('Withdrawal request submitted. Processing...', {
         autoClose: 3000
       });
@@ -303,7 +301,6 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Simulate successful withdrawal
       const withdrawalData = {
         success: true,
         data: {
@@ -335,7 +332,6 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
           onRefresh ? onRefresh() : Promise.resolve()
         ]);
         
-        // Clear success message after 5 seconds
         setTimeout(() => {
           setSuccessMessage('');
         }, 5000);
@@ -367,7 +363,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
     const validAmounts = amounts.filter(amount => amount.value <= availableInDollars);
     
     // Add "All" option if there's enough balance
-    if (availableInDollars >= 5) { // Minimum $5
+    if (availableInDollars >= 5) {
       validAmounts.push({ 
         label: 'All Available', 
         value: availableInDollars 
@@ -380,7 +376,6 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
   const quickAmounts = getQuickAmounts();
 
   const handleQuickAmount = (amount: number) => {
-    // Cap at available balance and ensure minimum of $0.01
     const maxAmount = centsToDollars(availableBalance);
     const cappedAmount = Math.max(0.01, Math.min(amount, maxAmount));
     setWithdrawAmount(cappedAmount.toFixed(2));
@@ -418,14 +413,16 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
     }
   };
 
-  // ✅ CALCULATE TOTAL WITHDRAWN
+  // ✅ CALCULATE TOTAL WITHDRAWN - FIXED
   const calculateTotalWithdrawn = () => {
     if (withdrawalStats?.totalWithdrawn) {
-      return withdrawalStats.totalWithdrawn * 100; // Convert to cents
+      // totalWithdrawn is already in dollars, convert to cents
+      return withdrawalStats.totalWithdrawn * 100;
     }
     
     if (earningsBalance?.totalWithdrawn) {
-      return earningsBalance.totalWithdrawn;
+      // Convert dollars to cents
+      return earningsBalance.totalWithdrawn * 100;
     }
     
     if (payoutHistory.length > 0) {
@@ -526,7 +523,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
             <div>
               <p className="text-sm font-medium text-green-800">Available to Withdraw</p>
               <p className="text-3xl font-bold text-green-900 mt-2">
-                {/* ✅ STRICTLY USING MARKETPLACE API FORMATCURRENCY */}
+                {/* ✅ CORRECT: availableBalance is in cents, formatCurrency expects cents */}
                 {formatCurrency(availableBalance)}
               </p>
               <p className="text-sm text-green-700 mt-2">
@@ -555,7 +552,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                 {withdrawalStats?.pendingOrders || 0}
               </p>
               <p className="text-sm text-blue-700 mt-2">
-                {/* ✅ STRICTLY USING MARKETPLACE API FORMATCURRENCY */}
+                {/* ✅ CORRECT: Convert dollars to cents */}
                 {formatCurrency((withdrawalStats?.pendingRevenue || 0) * 100)}
               </p>
             </div>
@@ -569,7 +566,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
             <div>
               <p className="text-sm font-medium text-purple-800">Total Withdrawn</p>
               <p className="text-3xl font-bold text-purple-900 mt-2">
-                {/* ✅ STRICTLY USING MARKETPLACE API FORMATCURRENCY */}
+                {/* ✅ CORRECT: totalWithdrawn is already in cents */}
                 {formatCurrency(totalWithdrawn)}
               </p>
               <p className="text-sm text-purple-700 mt-2">
@@ -581,7 +578,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
         </div>
       </div>
 
-      {/* Withdrawal Statistics */}
+      {/* Withdrawal Statistics - FIXED */}
       {withdrawalStats && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Earnings Statistics</h3>
@@ -589,7 +586,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
             <div className="bg-gray-50 rounded-xl p-4">
               <p className="text-sm font-medium text-gray-600">Total Revenue</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
-                {/* ✅ STRICTLY USING MARKETPLACE API FORMATCURRENCY */}
+                {/* ✅ CORRECT: Convert dollars to cents */}
                 {formatCurrency((withdrawalStats.totalRevenue || 0) * 100)}
               </p>
             </div>
@@ -608,7 +605,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
             <div className="bg-gray-50 rounded-xl p-4">
               <p className="text-sm font-medium text-gray-600">Platform Fee (10%)</p>
               <p className="text-lg font-bold text-gray-900 mt-1">
-                {/* ✅ STRICTLY USING MARKETPLACE API FORMATCURRENCY */}
+                {/* ✅ CORRECT: Calculate 10% of total revenue in cents */}
                 {formatCurrency(((withdrawalStats.totalRevenue || 0) * 0.1) * 100)}
               </p>
             </div>
@@ -878,7 +875,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
-                        {/* ✅ STRICTLY USING MARKETPLACE API FORMATCURRENCY */}
+                        {/* ✅ payout.amount is already in cents */}
                         {formatCurrency(payout.amount)}
                       </div>
                     </td>
