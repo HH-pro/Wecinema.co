@@ -1220,7 +1220,6 @@ const SellerDashboard: React.FC = () => {
               onClose={() => setShowStripeSuccessAlert(false)}
             />
           )}
-                    totalEarnings={orderStats.totalRevenue}
 
           {/* Header */}
           <SafeDashboardHeader
@@ -1321,8 +1320,9 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* ✅ Stripe Account Status (Only show if not connected) */}
-          {!stripeStatus?.account?.charges_enabled && (
+          {/* ✅ Stripe Account Status - UPDATED: Shows setup prompt OR ready to earn status */}
+          {!stripeStatus?.account?.charges_enabled ? (
+            // Show setup prompt when NOT connected
             <SafeStripeAccountStatus
               stripeStatus={{
                 connected: stripeStatus?.account?.charges_enabled || false,
@@ -1333,6 +1333,93 @@ const SellerDashboard: React.FC = () => {
               onSetupClick={handleOpenStripeSetup}
               isLoading={stripeStatus === null}
             />
+          ) : (
+            // Show earning status when connected
+            <div className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-3 rounded-xl mr-4 shadow-sm">
+                    <span className="text-xl text-white">💰</span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Ready to Earn! 🎉
+                    </h3>
+                    <p className="text-gray-600 mt-1">
+                      Your Stripe account is connected and ready to accept payments.
+                    </p>
+                    
+                    {/* Show available balance */}
+                    {orderStats.availableBalance !== undefined && orderStats.availableBalance > 0 && (
+                      <div className="mt-3 p-3 bg-green-100/30 rounded-lg border border-green-200">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs text-gray-500">Available Balance</p>
+                            <p className="text-lg font-semibold text-gray-900">
+                              {safeFormatCurrency(orderStats.availableBalance)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Pending Revenue</p>
+                            <p className="text-lg font-semibold text-yellow-600">
+                              {safeFormatCurrency(orderStats.pendingRevenue)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex gap-3">
+                  {/* Stripe Dashboard Link */}
+                  {stripeStatus?.account?.id && (
+                    <a
+                      href={`https://dashboard.stripe.com/connect/accounts/${stripeStatus.account.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium py-3 px-6 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 whitespace-nowrap"
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        Stripe Dashboard
+                      </div>
+                    </a>
+                  )}
+                  
+                  {/* Withdraw Button if there's available balance */}
+                  {orderStats.availableBalance !== undefined && orderStats.availableBalance > 0 && (
+                    <button
+                      onClick={() => setActiveTab('withdraw')}
+                      className="bg-white hover:bg-gray-50 text-green-600 border border-green-300 font-medium py-3 px-6 rounded-xl transition-all duration-200 shadow-sm hover:shadow whitespace-nowrap"
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        Withdraw Funds
+                      </div>
+                    </button>
+                  )}
+                  
+                  {/* Manage Account Button */}
+                  <button
+                    onClick={handleOpenStripeSetup}
+                    className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 font-medium py-3 px-6 rounded-xl transition-all duration-200 shadow-sm hover:shadow whitespace-nowrap"
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      Manage Account
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* ✅ Navigation */}
@@ -1353,7 +1440,7 @@ const SellerDashboard: React.FC = () => {
               </div>
             ) : (
               <>
-                {/* Overview Tab - UPDATED: Added StatsGrid with completed orders data */}
+                {/* Overview Tab */}
                 {activeTab === 'overview' && (
                   <div className="space-y-8">
                     {/* Welcome Card */}
@@ -1371,7 +1458,6 @@ const SellerDashboard: React.FC = () => {
                       }}
                     />
 
-                   
                     {/* Order Workflow Guide */}
                     <SafeOrderWorkflowGuide />
 
@@ -1522,31 +1608,30 @@ const SellerDashboard: React.FC = () => {
 
                 {/* Withdraw Tab */}
                 {activeTab === 'withdraw' && (
-                  // SellerDashboard.tsx mein WithdrawTab ko call karte waqt:
-<SafeWithdrawTab
-  stripeStatus={{
-    connected: stripeStatus?.account?.charges_enabled || false,
-    chargesEnabled: stripeStatus?.account?.charges_enabled || false,
-    detailsSubmitted: stripeStatus?.account?.details_submitted || false,
-    status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive',
-    balance: stripeStatus?.account?.balance || 0,
-    availableBalance: stripeStatus?.account?.balance || 0,
-    pendingBalance: 0
-  }}
-  withdrawalHistory={withdrawalHistory}
-  loading={withdrawalsLoading}
-  currentPage={withdrawalsPage}
-  onPageChange={setWithdrawalsPage}
-  onWithdrawRequest={handleWithdrawRequest}
-  onRefresh={() => {
-    refreshDataAfterAction('withdrawal');
-  }}
-  // ✅ ADDED: Earning data passed from parent
-  totalRevenue={orderStats.totalRevenue}
-  thisMonthRevenue={orderStats.thisMonthRevenue}
-  pendingRevenue={orderStats.pendingRevenue}
-  completedRevenue={orderStats.completedRevenue}
-/>
+                  <SafeWithdrawTab
+                    stripeStatus={{
+                      connected: stripeStatus?.account?.charges_enabled || false,
+                      chargesEnabled: stripeStatus?.account?.charges_enabled || false,
+                      detailsSubmitted: stripeStatus?.account?.details_submitted || false,
+                      status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive',
+                      balance: stripeStatus?.account?.balance || 0,
+                      availableBalance: stripeStatus?.account?.balance || 0,
+                      pendingBalance: 0
+                    }}
+                    withdrawalHistory={withdrawalHistory}
+                    loading={withdrawalsLoading}
+                    currentPage={withdrawalsPage}
+                    onPageChange={setWithdrawalsPage}
+                    onWithdrawRequest={handleWithdrawRequest}
+                    onRefresh={() => {
+                      refreshDataAfterAction('withdrawal');
+                    }}
+                    // ✅ ADDED: Earning data passed from parent
+                    totalRevenue={orderStats.totalRevenue}
+                    thisMonthRevenue={orderStats.thisMonthRevenue}
+                    pendingRevenue={orderStats.pendingRevenue}
+                    completedRevenue={orderStats.completedRevenue}
+                  />
                 )}
               </>
             )}
