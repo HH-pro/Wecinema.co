@@ -1116,22 +1116,23 @@ const SellerDashboard: React.FC = () => {
             />
           )}
 
-          {/* Header */}
-          <SafeDashboardHeader
-            title="Seller Dashboard"
-            subtitle="Manage orders, track earnings, and grow your business"
-            earnings={safeFormatCurrency(orderStats.totalRevenue)}
-            onRefresh={handleRefresh}
-            refreshing={refreshing}
-            stripeStatus={{
-              connected: stripeStatus?.account?.charges_enabled || false,
-              chargesEnabled: stripeStatus?.account?.charges_enabled || false,
-              detailsSubmitted: stripeStatus?.account?.details_submitted || false,
-              status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive',
-              availableBalance: stripeStatus?.account?.balance || 0
-            }}
-            onCheckStripe={checkStripeAccountStatus}
-          />
+        // SellerDashboard.tsx میں DashboardHeader کے call میں:
+<SafeDashboardHeader
+  title="Seller Dashboard"
+  subtitle="Manage orders, track earnings, and grow your business"
+  earnings={safeFormatCurrency(orderStats.totalRevenue)}
+  totalEarnings={safeFormatCurrency(sellerStats?.totals?.totalRevenue || 0)} // ✅ Add this
+  onRefresh={handleRefresh}
+  refreshing={refreshing}
+  stripeStatus={{
+    connected: stripeStatus?.account?.charges_enabled || false,
+    chargesEnabled: stripeStatus?.account?.charges_enabled || false,
+    detailsSubmitted: stripeStatus?.account?.details_submitted || false,
+    status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive',
+    availableBalance: stripeStatus?.account?.balance || 0
+  }}
+  onCheckStripe={checkStripeAccountStatus}
+/>
 
           {/* ✅ Development Mode Banner */}
           {(process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') && (
