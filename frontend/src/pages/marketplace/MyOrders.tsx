@@ -246,12 +246,18 @@ const MyOrders: React.FC = () => {
     navigate('/login');
   };
 
-  const formatPrice = (price: number): string => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(price);
-  };
+ const formatPrice = (
+  amount: number,
+  currency: string = 'USD'
+): string => {
+  const valueInDollars = (amount || 0) / 100;
+
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+  }).format(valueInDollars);
+};
+
 
   const formatDate = (date: string): string => {
     return new Date(date).toLocaleDateString('en-US', {
