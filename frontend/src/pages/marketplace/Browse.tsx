@@ -946,20 +946,6 @@ const Browse: React.FC = () => {
                           {listing.description}
                         </p>
                         
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-xs text-gray-500 flex items-center">
-                              <FiEye className="w-3 h-3 mr-1" />
-                              {listing.views || 0} views
-                            </span>
-                          </div>
-                          
-                          <div className="text-xs text-gray-500 flex items-center gap-1">
-                            <FiCalendar size={10} />
-                            {formatDate(listing.createdAt || '')}
-                          </div>
-                        </div>
-                      </div>
                       
                       {/* Tags */}
                       {listing.tags && listing.tags.length > 0 && (
