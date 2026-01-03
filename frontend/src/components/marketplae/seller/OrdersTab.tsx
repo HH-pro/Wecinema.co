@@ -157,8 +157,8 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
   const toggleExpandOrder = (orderId: string) => {
     setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
   };
-// ✅ ALTERNATIVE: DIRECT API CALL FUNCTION
-const handleActualDeliverDirect = async (deliveryData: {
+// ✅ COMPLETE FIXED FILE UPLOAD AND DELIVERY FUNCTION
+const handleActualDeliver = async (deliveryData: {
   orderId: string;
   message: string;
   attachments: File[];
@@ -168,105 +168,214 @@ const handleActualDeliverDirect = async (deliveryData: {
   try {
     setIsSubmittingDelivery(true);
     
-    console.log('🚀 Starting direct delivery process...');
+    console.log('🚀 Starting delivery process for order:', deliveryData.orderId, {
+      messageLength: deliveryData.message?.length,
+      filesCount: deliveryData.attachments?.length,
+      isFinal: deliveryData.isFinal,
+      orderStatus: selectedOrderForDelivery?.status
+    });
 
-    // Step 1: Get auth token
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    if (!token) {
-      toast.error('Please login again');
-      return;
-    }
+    let uploadedAttachments: any[] = [];
 
-    let uploadedFiles: any[] = [];
-
-    // Step 2: Upload files if any
-    if (deliveryData.attachments.length > 0) {
-      const formData = new FormData();
-      deliveryData.attachments.forEach(file => {
-        formData.append('files', file);
-      });
-
-      console.log('📤 Uploading files directly...');
+    // ✅ STEP 1: UPLOAD FILES IF AVAILABLE
+    if (deliveryData.attachments && deliveryData.attachments.length > 0) {
+      console.log('📤 Uploading files...', deliveryData.attachments.length);
       
       try {
-        const uploadResponse = await fetch('http://localhost:3000/marketplace/orders/upload/delivery', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          body: formData,
-        });
-
-        const uploadData = await uploadResponse.json();
-        console.log('📦 Upload response:', uploadData);
-
-        if (!uploadResponse.ok) {
-          throw new Error(uploadData.error || uploadData.message || 'Upload failed');
+        // Validate files before upload
+        const validationErrors: string[] = [];
+        for (const file of deliveryData.attachments) {
+          const error = validateFileBeforeUpload(file);
+          if (error) validationErrors.push(error);
+        }
+        
+        if (validationErrors.length > 0) {
+          throw new Error(validationErrors.join(', '));
         }
 
-        if (uploadData.success) {
-          uploadedFiles = uploadData.files || uploadData.data?.files || [];
-          console.log('✅ Files uploaded:', uploadedFiles);
+        // Upload files using marketplaceApi
+        console.log('🌐 Calling uploadDeliveryFiles API...');
+        const uploadResponse = await marketplaceApi.orders.uploadDeliveryFiles(deliveryData.attachments);
+        
+        console.log('📦 Upload API response:', {
+          success: uploadResponse.success,
+          hasData: !!uploadResponse.data,
+          filesCount: uploadResponse.data?.files?.length
+        });
+        
+        if (uploadResponse.success && uploadResponse.data) {
+          uploadedAttachments = uploadResponse.data.files || uploadResponse.data || [];
+          console.log('✅ Files uploaded successfully:', uploadedAttachments.map(f => ({
+            name: f.originalName || f.filename,
+            url: f.url,
+            size: f.size
+          })));
         } else {
-          throw new Error(uploadData.error || 'Upload failed');
+          throw new Error(uploadResponse.error || uploadResponse.message || 'File upload failed');
         }
       } catch (uploadError: any) {
-        console.error('Upload error:', uploadError);
-        toast.error(uploadError.message || 'File upload failed');
+        console.error('❌ File upload error:', {
+          message: uploadError.message,
+          stack: uploadError.stack
+        });
+        
+        let errorMessage = uploadError.message || 'Failed to upload files';
+        
+        // Handle specific error cases
+        if (uploadError.message?.includes('401') || uploadError.message?.includes('unauthorized')) {
+          errorMessage = 'Authentication failed. Please login again.';
+        } else if (uploadError.message?.includes('network')) {
+          errorMessage = 'Network error. Please check your connection.';
+        } else if (uploadError.message?.includes('File type')) {
+          errorMessage = 'Invalid file type. Please use supported formats.';
+        } else if (uploadError.message?.includes('size')) {
+          errorMessage = 'File too large. Maximum size is 100MB.';
+        }
+        
+        toast.error(`❌ ${errorMessage}`);
         return;
       }
     }
 
-    // Step 3: Determine endpoint based on order status
+    // ✅ STEP 2: PREPARE DELIVERY DATA
     const isRevision = selectedOrderForDelivery?.status === 'in_revision';
-    const endpoint = isRevision 
-      ? `http://localhost:3000/marketplace/orders/${deliveryData.orderId}/complete-revision`
-      : `http://localhost:3000/marketplace/orders/${deliveryData.orderId}/deliver-with-email`;
-
-    // Step 4: Prepare delivery data
-    const deliveryPayload = {
+    console.log('🔄 Delivery type:', isRevision ? 'REVISION' : 'INITIAL DELIVERY');
+    
+    const deliveryPayload: any = {
       deliveryMessage: deliveryData.message,
-      deliveryFiles: uploadedFiles.map(f => f.url),
-      attachments: uploadedFiles,
       isFinalDelivery: deliveryData.isFinal
     };
 
-    console.log('📦 Sending delivery to:', endpoint, deliveryPayload);
-
-    // Step 5: Send delivery request
-    const response = await fetch(endpoint, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(deliveryPayload),
-    });
-
-    const responseData = await response.json();
-    console.log('📊 Delivery response:', responseData);
-
-    if (!response.ok) {
-      throw new Error(responseData.error || responseData.message || 'Delivery failed');
+    // Add files if uploaded
+    if (uploadedAttachments.length > 0) {
+      // Check response format and extract URLs
+      const fileUrls = uploadedAttachments.map(f => {
+        // Handle different response formats
+        if (f.url) return f.url;
+        if (f.path) return f.path;
+        return null;
+      }).filter(url => url !== null);
+      
+      if (fileUrls.length > 0) {
+        deliveryPayload.deliveryFiles = fileUrls;
+      }
+      
+      // Add attachments array if needed by API
+      deliveryPayload.attachments = uploadedAttachments;
     }
 
-    if (responseData.success) {
-      toast.success(isRevision ? 'Revision completed!' : 'Order delivered!');
-      
-      // Close modal and refresh
-      setDeliveryModalOpen(false);
-      setSelectedOrderForDelivery(null);
-      
-      setTimeout(() => onRefresh(), 1000);
-    } else {
-      throw new Error(responseData.error || 'Delivery failed');
-    }
+    console.log('📦 Prepared delivery payload:', deliveryPayload);
 
+    // ✅ STEP 3: SEND DELIVERY REQUEST
+    try {
+      let response;
+      
+      if (isRevision) {
+        // Complete revision
+        console.log('🔄 Calling completeRevision API...');
+        response = await marketplaceApi.orders.completeRevision(
+          deliveryData.orderId,
+          deliveryPayload
+        );
+      } else {
+        // Initial delivery
+        console.log('📤 Calling deliverOrder API...');
+        response = await marketplaceApi.orders.deliverOrder(
+          deliveryData.orderId,
+          deliveryPayload
+        );
+      }
+      
+      console.log('📊 Delivery API response:', {
+        success: response.success,
+        message: response.message,
+        error: response.error,
+        data: response.data
+      });
+      
+      if (response.success) {
+        const successMessage = isRevision 
+          ? '✅ Revision completed successfully!'
+          : '✅ Order delivered successfully! Buyer has been notified.';
+        
+        toast.success(successMessage, {
+          duration: 5000,
+          icon: '🎉'
+        });
+        
+        // ✅ STEP 4: SUCCESS - CLOSE MODAL AND REFRESH
+        console.log('🎉 Delivery successful! Closing modal...');
+        setDeliveryModalOpen(false);
+        setSelectedOrderForDelivery(null);
+        
+        // Refresh orders after short delay
+        setTimeout(() => {
+          console.log('🔄 Refreshing orders list...');
+          onRefresh();
+        }, 1500);
+        
+      } else {
+        // Handle API error response
+        const errorMsg = response.error || response.message || 'Delivery failed';
+        console.error('❌ API returned error:', errorMsg);
+        
+        // Check for specific error cases
+        if (errorMsg.includes('not found') || errorMsg.includes('does not exist')) {
+          throw new Error('Order not found or already completed');
+        } else if (errorMsg.includes('permission') || errorMsg.includes('unauthorized')) {
+          throw new Error('You do not have permission to deliver this order');
+        } else if (errorMsg.includes('validation') || errorMsg.includes('Validation failed')) {
+          throw new Error('Invalid delivery data. Please check your information.');
+        } else {
+          throw new Error(errorMsg);
+        }
+      }
+      
+    } catch (apiError: any) {
+      console.error('❌ Delivery API error:', {
+        message: apiError.message,
+        name: apiError.name,
+        stack: apiError.stack
+      });
+      
+      // Re-throw for outer catch block
+      throw apiError;
+    }
+    
   } catch (error: any) {
-    console.error('❌ Direct delivery error:', error);
-    toast.error(error.message || 'Delivery failed');
+    console.error('❌ Complete delivery process error:', error);
+    
+    let errorMessage = 'Delivery failed. Please try again.';
+    
+    // Map specific errors to user-friendly messages
+    if (error.message?.includes('File type')) {
+      errorMessage = 'Invalid file type. Please use supported file formats.';
+    } else if (error.message?.includes('size')) {
+      errorMessage = 'File too large. Maximum size is 100MB.';
+    } else if (error.message?.includes('network') || error.message?.includes('Network Error')) {
+      errorMessage = 'Network error. Please check your internet connection.';
+    } else if (error.message?.includes('401') || error.message?.includes('unauthorized')) {
+      errorMessage = 'Your session has expired. Please login again.';
+    } else if (error.message?.includes('not found')) {
+      errorMessage = 'Order not found. It may have been cancelled or completed.';
+    } else if (error.message?.includes('permission')) {
+      errorMessage = 'You do not have permission to deliver this order.';
+    } else if (error.message?.includes('validation')) {
+      errorMessage = 'Invalid delivery data. Please check all fields.';
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    toast.error(`❌ ${errorMessage}`, {
+      duration: 5000
+    });
+    
+    // Don't close modal on error - let user try again
+    console.log('⚠️ Keeping modal open due to error');
+    
   } finally {
     setIsSubmittingDelivery(false);
+    console.log('🏁 Delivery process completed');
   }
 };
   // ✅ Handle Start Processing using marketplaceApi
