@@ -24,7 +24,6 @@ const paymentsApi = marketplaceApi.payments;
 // Import components
 import DashboardHeader from '../../components/marketplae/seller/DashboardHeader';
 import TabNavigation from '../../components/marketplae/seller/TabNavigation';
-import StatsGrid from '../../components/marketplae/seller/StatsGrid';
 import WelcomeCard from '../../components/marketplae/seller/WelcomeCard';
 import RecentOrders from '../../components/marketplae/seller/RecentOrders';
 import ActionCard from '../../components/marketplae/seller/ActionCard';
@@ -126,7 +125,6 @@ const SimpleFallback = ({ name }: { name: string }) => (
 // Use simple checks for components
 const SafeDashboardHeader = (typeof DashboardHeader === 'function' || typeof DashboardHeader === 'object') ? DashboardHeader : () => <SimpleFallback name="DashboardHeader" />;
 const SafeTabNavigation = (typeof TabNavigation === 'function' || typeof TabNavigation === 'object') ? TabNavigation : () => <SimpleFallback name="TabNavigation" />;
-const SafeStatsGrid = (typeof StatsGrid === 'function' || typeof StatsGrid === 'object') ? StatsGrid : () => <SimpleFallback name="StatsGrid" />;
 const SafeWelcomeCard = (typeof WelcomeCard === 'function' || typeof WelcomeCard === 'object') ? WelcomeCard : () => <SimpleFallback name="WelcomeCard" />;
 const SafeRecentOrders = (typeof RecentOrders === 'function' || typeof RecentOrders === 'object') ? RecentOrders : () => <SimpleFallback name="RecentOrders" />;
 const SafeActionCard = (typeof ActionCard === 'function' || typeof ActionCard === 'object') ? ActionCard : () => <SimpleFallback name="ActionCard" />;
@@ -1373,48 +1371,7 @@ const SellerDashboard: React.FC = () => {
                       }}
                     />
 
-                    {/* ✅ Stats Grid - UPDATED: Shows completed orders revenue */}
-                    <SafeStatsGrid
-                      stats={[
-                        {
-                          title: 'Total Revenue',
-                          value: safeFormatCurrency(orderStats.totalRevenue),
-                          change: '+12.5%',
-                          trend: 'up',
-                          icon: '💰',
-                          description: 'From completed orders',
-                          tooltip: 'Total earnings from all completed orders'
-                        },
-                        {
-                          title: 'Completed Orders',
-                          value: orderStats.completedOrdersCount?.toString() || '0',
-                          change: null,
-                          trend: 'neutral',
-                          icon: '✅',
-                          description: 'Successfully delivered',
-                          tooltip: 'Total number of completed orders'
-                        },
-                        {
-                          title: 'Active Orders',
-                          value: orderStats.activeOrders.toString(),
-                          change: '+2',
-                          trend: 'up',
-                          icon: '📦',
-                          description: 'In progress',
-                          tooltip: 'Orders currently being processed'
-                        },
-                        {
-                          title: 'Active Listings',
-                          value: activeListings.toString(),
-                          change: null,
-                          trend: 'neutral',
-                          icon: '🏠',
-                          description: 'Live on marketplace',
-                          tooltip: 'Number of active listings'
-                        }
-                      ]}
-                    />
-
+                   
                     {/* Order Workflow Guide */}
                     <SafeOrderWorkflowGuide />
 
