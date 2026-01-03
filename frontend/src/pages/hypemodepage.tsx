@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import axios from 'axios';
 import { Layout } from "../components";
 import { useNavigate } from 'react-router-dom';
-import { getAuth, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from "firebase/auth";
+import { getAuth, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { googleProvider } from "../firebase/config";
 import { motion } from "framer-motion";
 import Confetti from "react-confetti";
@@ -22,51 +22,6 @@ const HypeModeProfile = () => {
   const [selectedSubscription, setSelectedSubscription] = useState<"user" | "studio" | null>(null);
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer");
   const [isLoading, setIsLoading] = useState(false);
-  const [hasPaid, setHasPaid] = useState(false);
-
-  // Check user payment status
-  const checkPaymentStatus = async (userId: string) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`https://wecinema.co/api/user/payment-status/${userId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      
-      return response.data.hasPaid || false;
-    } catch (error) {
-      console.error("Error checking payment status:", error);
-      return false;
-    }
-  };
-
-  // Component mount pe authentication status check
-  useEffect(() => {
-    const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const token = localStorage.getItem('token');
-        if (token) {
-          setIsLoggedIn(true);
-          
-          // User ID extract karo Firebase user se ya backend response se
-          const userId = user.uid;
-          
-          // Payment status check karo
-          const paidStatus = await checkPaymentStatus(userId);
-          setHasPaid(paidStatus);
-          
-          // Agar user already paid hai, toh home page redirect karo
-          if (paidStatus) {
-            navigate('/home');
-          }
-        }
-      }
-    });
-
-    return () => unsubscribe();
-  }, [navigate]);
 
   // Register user with backend
   const registerUser = async (username: string, email: string, avatar: string, userType: string) => {
@@ -115,12 +70,7 @@ const HypeModeProfile = () => {
         setUserId(userId);
         setPopupMessage('Login successful!');
         setShowPopup(true);
-        
-        // Login ke baad payment status check karo
-        const paidStatus = await checkPaymentStatus(userId);
-        setHasPaid(paidStatus);
-        
-        return { success: true, hasPaid: paidStatus };
+        return true;
       }
     } catch (error: any) {
       if (error.response) {
@@ -129,7 +79,7 @@ const HypeModeProfile = () => {
         setPopupMessage('Login failed.');
       }
       setShowPopup(true);
-      return { success: false, hasPaid: false };
+      return false;
     }
   };
 
@@ -144,19 +94,12 @@ const HypeModeProfile = () => {
       if (isSignup) {
         const success = await registerUser(username, email, avatar, userType);
         if (success) {
-          // New registration hai, toh payment page pe jao
           navigateToPayment();
         }
       } else {
-        const result = await loginUser(email);
-        if (result.success) {
-          // Agar user already paid hai, toh home page redirect
-          if (result.hasPaid) {
-            navigate('/home');
-          } else {
-            // Payment pending hai, toh payment page pe jao
-            navigateToPayment();
-          }
+        const success = await loginUser(email);
+        if (success) {
+          navigateToPayment();
         }
       }
     } catch (error) {
@@ -285,7 +228,6 @@ const HypeModeProfile = () => {
       await signOut(auth);
       localStorage.removeItem('token');
       setIsLoggedIn(false);
-      setHasPaid(false);
       setPopupMessage('Logout successful.');
       setShowPopup(true);
     } catch (error) {
@@ -324,30 +266,6 @@ const HypeModeProfile = () => {
     setTimeout(() => setShowFireworks(false), 1000);
   }, []);
 
-  // Agar user already logged in hai aur paid bhi hai, toh home page show karo
-  if (isLoggedIn && hasPaid) {
-    return (
-      <Layout expand={false} hasHeader={true}>
-        <div className="already-logged-in-container">
-          <h2>Welcome Back! 🎉</h2>
-          <p>You're already logged in and have an active subscription.</p>
-          <button 
-            className="subscription-button-small"
-            onClick={() => navigate('/home')}
-          >
-            Go to Home
-          </button>
-          <button 
-            className="subscription-button-small logout-button-small"
-            onClick={handleGoogleLogout}
-          >
-            Logout
-          </button>
-        </div>
-      </Layout>
-    );
-  }
-
   return (
     <Layout expand={false} hasHeader={true}>
       <div className="banner-small">
@@ -373,23 +291,9 @@ const HypeModeProfile = () => {
           {isSignup ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
         </button>
 
-        {isLoggedIn && !hasPaid ? (
-          <div className="payment-pending-container">
-            <h2>Payment Required</h2>
-            <p>Please complete your payment to access HypeMode features.</p>
-            <button 
-              className="subscription-button-small"
-              onClick={() => navigate('/payment', { 
-                state: { 
-                  subscriptionType: selectedSubscription, 
-                  amount: selectedSubscription === 'user' ? 5 : 10, 
-                  userId,
-                  userType 
-                } 
-              })}
-            >
-              Complete Payment
-            </button>
+        {isLoggedIn ? (
+          <div className="cards-container-small">
+            
           </div>
         ) : (
           <>
