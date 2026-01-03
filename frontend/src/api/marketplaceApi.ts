@@ -1,4 +1,4 @@
-// src/api/marketplaceApi.ts
+// src/api/marketplaceApi.ts - COMPLETE UPDATED VERSION
 import axios, { AxiosError, AxiosResponse } from 'axios';
 
 // ============================================
@@ -18,6 +18,7 @@ export interface ApiResponse<T = any> {
     pages: number;
   };
 }
+
 export interface Listing {
   _id: string;
   title: string;
@@ -25,19 +26,16 @@ export interface Listing {
   price: number;
   formattedPrice: string;
   status: 'active' | 'sold' | 'pending' | 'draft' | 'inactive' | 'reserved';
-  type: string; // e.g., "for_sale", "for_rent"
+  type: string;
   category: string;
   tags: string[];
   currency: string;
   isDigital: boolean;
-
-  mediaUrls: string[];           // Video or image URLs
-  thumbnail?: string;            // Optional thumbnail (video poster or image)
-
+  mediaUrls: string[];
+  thumbnail?: string;
   views: number;
   favoriteCount: number;
   purchaseCount: number;
-
   sellerId: {
     _id: string;
     username: string;
@@ -48,9 +46,7 @@ export interface Listing {
     stripeAccountId?: string;
     stripeAccountStatus?: string;
   };
-  
-  sellerEmail?: string;          // Optional seller email
-
+  sellerEmail?: string;
   seller?: {
     _id: string;
     username: string;
@@ -58,20 +54,17 @@ export interface Listing {
     sellerRating?: number;
     email?: string;
   };
-
-  maxRevisions?: number;         // For digital products/services
-  deliveryTime?: string;         // e.g., "3 days"
-  availability?: string;         // e.g., "In stock"
+  maxRevisions?: number;
+  deliveryTime?: string;
+  availability?: string;
   totalOrders?: number;
   lastOrderAt?: string;
   reservedUntil?: string;
-
-  createdAt: string;             // ISO date string
-  updatedAt: string;             // ISO date string
-  createdAtFormatted?: string;   // e.g., "Jan 2, 2026"
-  statusColor?: string;          // e.g., "green", "red"
+  createdAt: string;
+  updatedAt: string;
+  createdAtFormatted?: string;
+  statusColor?: string;
 }
-
 
 export interface Order {
   _id: string;
@@ -296,6 +289,13 @@ export interface SellerAccountStatus {
       eventually_due: string[];
       past_due: string[];
       disabled_reason: string;
+      pending_verification?: string[];
+    };
+    balance?: {
+      available: number;
+      pending: number;
+      total: number;
+      currency: string;
     };
   };
   status: {
@@ -314,6 +314,13 @@ export interface SellerStats {
     count: number;
     totalAmount: number;
   }>;
+  completedOrders?: any[];
+  monthlyRevenue?: Array<{
+    month: string;
+    year: number;
+    revenue: number;
+    orders: number;
+  }>;
   totals: {
     totalOrders: number;
     totalRevenue: number;
@@ -328,7 +335,50 @@ export interface SellerStats {
     };
     thisMonthRevenue: number;
   };
-  breakdown: Record<string, number>;
+  breakdown: Record<string, {
+    count: number;
+    revenue: number;
+  }>;
+}
+
+// ============================================
+// ✅ STRIPE SPECIFIC TYPES
+// ============================================
+
+export interface StripeOnboardingResponse {
+  url: string;
+  stripeAccountId: string;
+  message: string;
+  accountStatus?: 'new' | 'verification_required' | 'incomplete' | 'active';
+  requirements?: {
+    pending_verification?: string[];
+    currently_due?: string[];
+    disabled_reason?: string;
+  };
+}
+
+export interface StripeContinueOnboardingResponse {
+  url: string;
+  stripeAccountId: string;
+  message: string;
+  accountStatus: 'verification_in_progress';
+  requirements?: {
+    pending_verification?: string[];
+  };
+}
+
+export interface StripeAccountRequirements {
+  requirements: {
+    currently_due: string[];
+    eventually_due: string[];
+    past_due: string[];
+    pending_verification: string[];
+    disabled_reason: string;
+  };
+  charges_enabled: boolean;
+  payouts_enabled: boolean;
+  details_submitted: boolean;
+  disabled_reason: string;
 }
 
 // ============================================
@@ -398,6 +448,199 @@ const handleApiError = <T>(error: AxiosError, defaultMessage: string = 'API Erro
 };
 
 // ============================================
+// ✅ STRIPE API ENDPOINTS
+// ============================================
+
+export const stripeApi = {
+  // Start Stripe onboarding
+  startStripeOnboarding: async (): Promise<ApiResponse<StripeOnboardingResponse>> => {
+    try {
+      console.log('🔄 Calling /marketplace/stripe/onboard-seller');
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/stripe/onboard-seller`,
+        {},
+        getHeaders()
+      );
+      
+      const data = response.data;
+      console.log('✅ Onboarding response:', {
+        success: data.success,
+        hasUrl: !!data.url,
+        hasAccountId: !!data.stripeAccountId,
+        accountStatus: data.accountStatus
+      });
+      
+      return {
+        success: data.success,
+        data: {
+          url: data.url,
+          stripeAccountId: data.stripeAccountId,
+          message: data.message,
+          accountStatus: data.accountStatus,
+          requirements: data.requirements
+        },
+        message: data.message,
+        error: data.error
+      };
+    } catch (error) {
+      console.error('❌ Stripe onboarding error:', error);
+      return handleApiError(error as AxiosError, 'Failed to start Stripe onboarding');
+    }
+  },
+
+  // Continue Stripe onboarding for existing accounts
+  continueStripeOnboarding: async (): Promise<ApiResponse<StripeContinueOnboardingResponse>> => {
+    try {
+      console.log('🔄 Calling /marketplace/stripe/continue-onboarding');
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/stripe/continue-onboarding`,
+        {},
+        getHeaders()
+      );
+      
+      const data = response.data;
+      console.log('✅ Continue onboarding response:', {
+        success: data.success,
+        hasUrl: !!data.url,
+        accountStatus: data.accountStatus
+      });
+      
+      return {
+        success: data.success,
+        data: {
+          url: data.url,
+          stripeAccountId: data.stripeAccountId,
+          message: data.message,
+          accountStatus: data.accountStatus,
+          requirements: data.requirements,
+          pending_verification: data.pending_verification
+        },
+        message: data.message,
+        error: data.error
+      };
+    } catch (error) {
+      console.error('❌ Continue onboarding error:', error);
+      return handleApiError(error as AxiosError, 'Failed to continue Stripe onboarding');
+    }
+  },
+
+  // Get Stripe account status
+  getStripeAccountStatus: async (): Promise<ApiResponse<SellerAccountStatus>> => {
+    try {
+      console.log('🔍 Calling /marketplace/stripe/account-status');
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/account-status`,
+        getHeaders()
+      );
+      
+      const data = response.data;
+      console.log('✅ Account status response:', {
+        success: data.success,
+        hasAccount: !!data.data?.account,
+        charges_enabled: data.data?.account?.charges_enabled,
+        pending_verification: data.data?.account?.requirements?.pending_verification
+      });
+      
+      if (data.success) {
+        return {
+          success: true,
+          data: data.data,
+          message: data.message
+        };
+      } else {
+        return {
+          success: false,
+          error: data.error || 'Failed to get account status',
+          message: data.message
+        };
+      }
+    } catch (error) {
+      console.error('❌ Get account status error:', error);
+      return handleApiError(error as AxiosError, 'Failed to get Stripe account status');
+    }
+  },
+
+  // Get account requirements
+  getAccountRequirements: async (): Promise<ApiResponse<StripeAccountRequirements>> => {
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/stripe/account-requirements`,
+        getHeaders()
+      );
+      
+      return {
+        success: response.data.success,
+        data: response.data.data,
+        message: response.data.message,
+        error: response.data.error
+      };
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to get account requirements');
+    }
+  },
+
+  // Update verification details
+  updateStripeVerification: async (data: any): Promise<ApiResponse<any>> => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/stripe/update-verification`,
+        data,
+        getHeaders()
+      );
+      
+      return {
+        success: response.data.success,
+        data: response.data.data,
+        message: response.data.message,
+        error: response.data.error
+      };
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to update verification');
+    }
+  },
+
+  // Disconnect Stripe account
+  disconnectStripeAccount: async (): Promise<ApiResponse<{ message: string }>> => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/stripe/disconnect`,
+        {},
+        getHeaders()
+      );
+      
+      return {
+        success: response.data.success,
+        data: response.data.data,
+        message: response.data.message,
+        error: response.data.error
+      };
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to disconnect Stripe account');
+    }
+  },
+
+  // Create account link for existing account
+  createAccountLink: async (accountId: string): Promise<ApiResponse<{ url: string }>> => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/marketplace/stripe/create-account-link`,
+        { accountId },
+        getHeaders()
+      );
+      
+      return {
+        success: response.data.success,
+        data: response.data.data,
+        message: response.data.message,
+        error: response.data.error
+      };
+    } catch (error) {
+      return handleApiError(error as AxiosError, 'Failed to create account link');
+    }
+  }
+};
+
+// ============================================
 // ✅ LISTINGS API
 // ============================================
 
@@ -445,7 +688,8 @@ export const listingsApi = {
       return handleApiError(error as AxiosError, 'Failed to fetch listings');
     }
   },
- // Get seller's own listings
+
+  // Get seller's own listings
   getMyListings: async (params?: {
     page?: number;
     limit?: number;
@@ -478,10 +722,6 @@ export const listingsApi = {
         fullResponse: response.data
       });
       
-      // ✅ Handle both response formats:
-      // Format 1: { success: true, data: { listings: [], pagination: {} } }
-      // Format 2: { success: true, listings: [], pagination: {} }
-      
       if (response.data.success) {
         let listings: Listing[] = [];
         let pagination = {
@@ -491,13 +731,10 @@ export const listingsApi = {
           pages: 0
         };
         
-        // Check which format we received
         if (response.data.data && response.data.data.listings) {
-          // Format 1: With 'data' wrapper
           listings = response.data.data.listings || [];
           pagination = response.data.data.pagination || pagination;
         } else if (response.data.listings) {
-          // Format 2: Direct 'listings' property
           listings = response.data.listings || [];
           pagination = response.data.pagination || pagination;
         }
@@ -525,7 +762,6 @@ export const listingsApi = {
       return handleApiError(error as AxiosError, 'Failed to fetch your listings');
     }
   },
-  // ... rest of the API methods
 
   // Create new listing
   createListing: async (listingData: {
@@ -822,127 +1058,194 @@ export const ordersApi = {
     }
   },
 
- // src/api/marketplaceApi.ts میں getSellerStats method
-
-getSellerStats: async (): Promise<ApiResponse<SellerStats>> => {
-  try {
-    console.log('🔍 Calling seller stats API...');
-    
-    const headers = getHeaders();
-    console.log('📋 Request headers:', {
-      hasAuth: !!headers.headers.Authorization,
-      baseURL: API_BASE_URL,
-      endpoint: '/marketplace/orders/stats/seller'
-    });
-    
-    const response = await axios.get(
-      `${API_BASE_URL}/marketplace/orders/stats/seller`,
-      headers
-    );
-    
-    console.log('📊 Seller stats API response received:', {
-      status: response.status,
-      statusText: response.statusText,
-      hasData: !!response.data,
-      success: response.data?.success,
-      dataKeys: response.data ? Object.keys(response.data) : 'No data'
-    });
-    
-    // Handle the response
-    const responseData = response.data;
-    
-    // Case 1: Direct success response
-    if (responseData.success === true) {
-      console.log('✅ API returned direct success');
+  // Get seller statistics
+  getSellerStats: async (): Promise<ApiResponse<SellerStats>> => {
+    try {
+      console.log('🔍 Calling seller stats API...');
       
-      // Check if data is nested or direct
-      const statsData = responseData.data || responseData;
+      const headers = getHeaders();
+      console.log('📋 Request headers:', {
+        hasAuth: !!headers.headers.Authorization,
+        baseURL: API_BASE_URL,
+        endpoint: '/marketplace/orders/stats/seller'
+      });
       
-      return {
-        success: true,
-        data: statsData,
-        message: responseData.message || 'Seller statistics fetched successfully',
-        status: response.status
-      };
-    }
-    
-    // Case 2: Response has success: false
-    if (responseData.success === false) {
-      console.warn('⚠️ API returned success: false', responseData);
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/stats/seller`,
+        headers
+      );
+      
+      console.log('📊 Seller stats API response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        hasData: !!response.data,
+        success: response.data?.success,
+        dataKeys: response.data ? Object.keys(response.data) : 'No data'
+      });
+      
+      const responseData = response.data;
+      
+      if (responseData.success === true) {
+        console.log('✅ API returned direct success');
+        
+        const statsData = responseData.data || responseData;
+        
+        return {
+          success: true,
+          data: statsData,
+          message: responseData.message || 'Seller statistics fetched successfully',
+          status: response.status
+        };
+      }
+      
+      if (responseData.success === false) {
+        console.warn('⚠️ API returned success: false', responseData);
+        
+        return {
+          success: false,
+          error: responseData.error || responseData.message || 'Failed to fetch seller statistics',
+          message: responseData.message,
+          status: response.status,
+          data: responseData.data || responseData
+        };
+      }
+      
+      console.log('ℹ️ Response has non-standard format, normalizing...');
+      
+      let statsData: SellerStats | null = null;
+      
+      if (responseData.statsByStatus || responseData.totals) {
+        statsData = responseData;
+      } else if (responseData.data?.statsByStatus || responseData.data?.totals) {
+        statsData = responseData.data;
+      }
+      
+      if (statsData) {
+        return {
+          success: true,
+          data: statsData,
+          message: 'Seller statistics fetched successfully',
+          status: response.status
+        };
+      }
+      
+      console.error('❓ Unknown response format:', responseData);
       
       return {
         success: false,
-        error: responseData.error || responseData.message || 'Failed to fetch seller statistics',
-        message: responseData.message,
+        error: 'Unknown response format from server',
+        message: 'Could not parse seller statistics',
         status: response.status,
-        data: responseData.data || responseData
+        data: responseData
       };
-    }
-    
-    // Case 3: Response doesn't have success property (non-standard format)
-    console.log('ℹ️ Response has non-standard format, normalizing...');
-    
-    // Try to extract seller stats data
-    let statsData: SellerStats | null = null;
-    
-    if (responseData.statsByStatus || responseData.totals) {
-      // Looks like a SellerStats object
-      statsData = responseData;
-    } else if (responseData.data?.statsByStatus || responseData.data?.totals) {
-      // Nested in data property
-      statsData = responseData.data;
-    }
-    
-    if (statsData) {
+      
+    } catch (error) {
+      console.error('❌ Error in getSellerStats API:', error);
+      
+      const axiosError = error as AxiosError;
+      const errorResponse = axiosError.response?.data as any;
+      
+      const errorMessage = 
+        errorResponse?.error || 
+        errorResponse?.message || 
+        errorResponse?.details ||
+        axiosError.message || 
+        'Failed to fetch seller statistics';
+      
+      console.error('📋 Error details:', {
+        status: axiosError.response?.status,
+        statusText: axiosError.response?.statusText,
+        errorMessage: errorMessage,
+        responseData: errorResponse
+      });
+      
       return {
-        success: true,
-        data: statsData,
-        message: 'Seller statistics fetched successfully',
-        status: response.status
+        success: false,
+        error: errorMessage,
+        message: errorResponse?.message,
+        status: axiosError.response?.status,
+        data: errorResponse
       };
     }
-    
-    // Case 4: Unknown response format
-    console.error('❓ Unknown response format:', responseData);
-    
-    return {
-      success: false,
-      error: 'Unknown response format from server',
-      message: 'Could not parse seller statistics',
-      status: response.status,
-      data: responseData
+  },
+
+  // ✅ NEW: Get completed orders for earnings tab
+  getCompletedOrders: async (params?: {
+    page?: number;
+    limit?: number;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<ApiResponse<{
+    completedOrders: Order[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      pages: number;
     };
-    
-  } catch (error) {
-    console.error('❌ Error in getSellerStats API:', error);
-    
-    const axiosError = error as AxiosError;
-    const errorResponse = axiosError.response?.data as any;
-    
-    // Extract error message from various possible locations
-    const errorMessage = 
-      errorResponse?.error || 
-      errorResponse?.message || 
-      errorResponse?.details ||
-      axiosError.message || 
-      'Failed to fetch seller statistics';
-    
-    console.error('📋 Error details:', {
-      status: axiosError.response?.status,
-      statusText: axiosError.response?.statusText,
-      errorMessage: errorMessage,
-      responseData: errorResponse
-    });
-    
-    return {
-      success: false,
-      error: errorMessage,
-      message: errorResponse?.message,
-      status: axiosError.response?.status,
-      data: errorResponse
+    summary: {
+      totalOrders: number;
+      totalRevenue: number;
+      averageOrderValue: number;
     };
-  }
-},
+  }>> => {
+    try {
+      console.log('💰 Calling completed orders API...');
+      
+      const response = await axios.get(
+        `${API_BASE_URL}/marketplace/orders/stats/completed-orders`,
+        {
+          params,
+          ...getHeaders()
+        }
+      );
+      
+      console.log('✅ Completed orders response:', {
+        success: response.data.success,
+        count: response.data.data?.completedOrders?.length,
+        totalRevenue: response.data.data?.summary?.totalRevenue
+      });
+      
+      if (response.data.success) {
+        return {
+          success: true,
+          data: response.data.data,
+          message: response.data.message
+        };
+      } else {
+        return {
+          success: false,
+          error: response.data.error || 'Failed to fetch completed orders',
+          message: response.data.message
+        };
+      }
+    } catch (error) {
+      console.error('❌ Error fetching completed orders:', error);
+      return handleApiError(error as AxiosError, 'Failed to fetch completed orders');
+    }
+  },
+
+  // ========== STRIPE ACCOUNT MANAGEMENT ========== //
+  
+  // Get seller's Stripe account status (now uses stripeApi)
+  getSellerAccountStatus: async (): Promise<ApiResponse<SellerAccountStatus>> => {
+    return stripeApi.getStripeAccountStatus();
+  },
+
+  // Start Stripe onboarding (now uses stripeApi)
+  startStripeOnboarding: async (): Promise<ApiResponse<StripeOnboardingResponse>> => {
+    return stripeApi.startStripeOnboarding();
+  },
+
+  // Continue Stripe onboarding (NEW)
+  continueStripeOnboarding: async (): Promise<ApiResponse<StripeContinueOnboardingResponse>> => {
+    return stripeApi.continueStripeOnboarding();
+  },
+
+  // Disconnect Stripe account (NEW)
+  disconnectStripeAccount: async (): Promise<ApiResponse<{ message: string }>> => {
+    return stripeApi.disconnectStripeAccount();
+  },
 
   // ========== SINGLE ORDER OPERATIONS ========== //
   
@@ -1299,21 +1602,6 @@ getSellerStats: async (): Promise<ApiResponse<SellerStats>> => {
     }
   },
 
-  // ========== STRIPE ACCOUNT MANAGEMENT ========== //
-  
-  // Check seller's Stripe account status
-  getSellerAccountStatus: async (): Promise<ApiResponse<SellerAccountStatus>> => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/orders/seller/account-status`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error as AxiosError, 'Failed to fetch Stripe account status');
-    }
-  },
-
   // ========== ADMIN OPERATIONS ========== //
   
   // Delete all orders (admin only)
@@ -1334,7 +1622,7 @@ getSellerStats: async (): Promise<ApiResponse<SellerStats>> => {
 };
 
 // ============================================
-// ✅ OFFERS API (UPDATED WITH NEW ROUTES)
+// ✅ OFFERS API (UPDATED)
 // ============================================
 
 export const offersApi = {
@@ -1935,6 +2223,7 @@ export const formatCurrencyshow = (amount: number, currency: string = 'USD'): st
     currency: currency,
   }).format(amount || 0);
 };
+
 // Calculate platform fee (10%)
 export const calculatePlatformFee = (amount: number): number => {
   return parseFloat((amount * 0.10).toFixed(2));
@@ -1957,7 +2246,6 @@ export const getCurrentUser = (): any => {
     const token = getAuthToken();
     if (!token) return null;
     
-    // Decode JWT token
     try {
       const base64Url = token.split('.')[1];
       if (!base64Url) return null;
@@ -2032,7 +2320,7 @@ export const validateOfferAmount = (amount: number, listingPrice: number): {
   maxAmount: number;
 } => {
   const minAmount = 0.50;
-  const maxAmount = listingPrice * 2; // Allow up to 2x listing price
+  const maxAmount = listingPrice * 2;
   
   if (amount < minAmount) {
     return {
@@ -2069,6 +2357,7 @@ const marketplaceApi = {
   orders: ordersApi,
   offers: offersApi,
   payments: paymentsApi,
+  stripe: stripeApi, // ✅ NEW: Added stripe API
   utils: {
     formatCurrency,
     calculatePlatformFee,
