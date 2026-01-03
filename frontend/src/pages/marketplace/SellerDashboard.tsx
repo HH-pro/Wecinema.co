@@ -86,16 +86,29 @@ interface WithdrawalHistory {
   };
 }
 
-// For now, create a simple formatCurrency function
-const formatCurrency = (amount: number) => {
-  // If amount is less than 100, assume it's already in dollars
-  if (amount < 100) {
-    return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// ✅ UPDATED: Improved formatCurrency function that always converts cents to dollars
+const formatCurrency = (amount: number | undefined): string => {
+  if (amount === undefined || amount === null || isNaN(amount)) {
+    return '$0.00';
   }
   
-  // Otherwise, assume it's cents and convert to dollars
+  // ✅ ALWAYS convert from cents to dollars (divide by 100)
   const amountInDollars = amount / 100;
+  
   return `$${amountInDollars.toLocaleString('en-US', { 
+    minimumFractionDigits: 2, 
+    maximumFractionDigits: 2 
+  })}`;
+};
+
+// ✅ NEW: Safe format function for display (already in dollars)
+const safeFormatCurrency = (amount: number | undefined): string => {
+  if (amount === undefined || amount === null || isNaN(amount)) {
+    return '$0.00';
+  }
+  
+  // Amount is already in dollars at this point
+  return `$${amount.toLocaleString('en-US', { 
     minimumFractionDigits: 2, 
     maximumFractionDigits: 2 
   })}`;
@@ -250,7 +263,7 @@ const SellerDashboard: React.FC = () => {
     }
   ]);
 
-  // ✅ Calculate order stats from orders
+  // ✅ UPDATED: Calculate order stats from orders - FIXED cents to dollars conversion
   const calculateOrderStats = useCallback((orders: Order[]): OrderStats => {
     const now = new Date();
     const thisMonth = now.getMonth();
@@ -262,37 +275,42 @@ const SellerDashboard: React.FC = () => {
              orderDate.getFullYear() === thisYear;
     });
 
-    // Calculate total revenue (amount is in cents)
-    const totalRevenue = orders
+    // ✅ CORRECTED: Convert cents to dollars when calculating
+    const completedRevenue = orders
       .filter(order => order.status === 'completed')
       .reduce((sum, order) => sum + (order.amount || 0), 0) / 100; // Convert cents to dollars
 
-    // Calculate pending revenue
     const pendingRevenue = orders
       .filter(order => ['pending_payment', 'paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(order.status))
-      .reduce((sum, order) => sum + (order.amount || 0), 0) / 100;
+      .reduce((sum, order) => sum + (order.amount || 0), 0) / 100; // Convert cents to dollars
 
-    // Calculate this month revenue
     const thisMonthRevenue = thisMonthOrders
       .filter(order => order.status === 'completed')
-      .reduce((sum, order) => sum + (order.amount || 0), 0) / 100;
+      .reduce((sum, order) => sum + (order.amount || 0), 0) / 100; // Convert cents to dollars
+
+    // Count orders by status
+    const statusCounts = orders.reduce((acc, order) => {
+      acc[order.status] = (acc[order.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
 
     return {
       totalOrders: orders.length,
       activeOrders: orders.filter(order => 
         ['pending_payment', 'paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(order.status)
       ).length,
-      pendingPayment: orders.filter(order => order.status === 'pending_payment').length,
-      processing: orders.filter(order => order.status === 'processing').length,
-      inProgress: orders.filter(order => order.status === 'in_progress').length,
-      delivered: orders.filter(order => order.status === 'delivered').length,
-      completed: orders.filter(order => order.status === 'completed').length,
-      cancelled: orders.filter(order => order.status === 'cancelled').length,
-      totalRevenue,
-      pendingRevenue,
+      pendingPayment: statusCounts['pending_payment'] || 0,
+      processing: statusCounts['processing'] || 0,
+      inProgress: statusCounts['in_progress'] || 0,
+      delivered: statusCounts['delivered'] || 0,
+      completed: statusCounts['completed'] || 0,
+      cancelled: statusCounts['cancelled'] || 0,
+      totalRevenue: completedRevenue,
+      pendingRevenue: pendingRevenue,
       thisMonthOrders: thisMonthOrders.length,
-      thisMonthRevenue,
-      availableBalance: stripeStatus?.account?.charges_enabled ? (stripeStatus.account.balance || 0) / 100 : 0
+      thisMonthRevenue: thisMonthRevenue,
+      availableBalance: stripeStatus?.account?.charges_enabled ? 
+        (stripeStatus.account.balance || 0) / 100 : 0 // Convert cents to dollars
     };
   }, [stripeStatus]);
 
@@ -305,6 +323,13 @@ const SellerDashboard: React.FC = () => {
       if (response.success && response.data) {
         console.log('✅ Stripe status:', response.data);
         setStripeStatus(response.data);
+        
+        // ✅ Update available balance in orderStats
+        setOrderStats(prev => ({
+          ...prev,
+          availableBalance: response.data.account?.charges_enabled ? 
+            (response.data.account.balance || 0) / 100 : 0 // Convert cents to dollars
+        }));
       } else {
         console.warn('⚠️ Stripe status API failed:', response.error);
         // Set default status
@@ -339,62 +364,80 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
- const fetchSellerStats = async () => {
-  try {
-    setEarningsLoading(true);
-    console.log('📊 Starting to fetch seller stats...');
-    
-    const response = await ordersApi.getSellerStats();
-    
-    console.log('📊 fetchSellerStats got response:', {
-      success: response.success,
-      error: response.error,
-      hasData: !!response.data,
-      dataType: response.data ? typeof response.data : 'none',
-      message: response.message
-    });
-    
-    if (response.success && response.data) {
-      console.log('✅ Setting seller stats:', response.data);
-      setSellerStats(response.data);
+  // ✅ UPDATED: Fetch seller statistics with proper cents to dollars conversion
+  const fetchSellerStats = async () => {
+    try {
+      setEarningsLoading(true);
+      console.log('📊 Starting to fetch seller stats...');
       
-      // Convert amounts from cents to dollars
-      const totals = response.data.totals || {};
+      const response = await ordersApi.getSellerStats();
       
-      setOrderStats(prev => ({
-        ...prev,
-        totalOrders: totals.totalOrders || prev.totalOrders,
-        totalRevenue: (totals.totalRevenue || 0) / 100,
-        pendingRevenue: (totals.pendingOrders?.revenue || 0) / 100,
-        thisMonthRevenue: (totals.thisMonthRevenue || 0) / 100,
-        completed: totals.completedOrders?.count || prev.completed,
-        activeOrders: totals.pendingOrders?.count || prev.activeOrders,
-        availableBalance: stripeStatus?.account?.charges_enabled ? 
-          (stripeStatus.account.balance || 0) / 100 : 0
-      }));
+      console.log('📊 Seller stats API response:', {
+        success: response.success,
+        error: response.error,
+        hasData: !!response.data,
+        dataType: response.data ? typeof response.data : 'none',
+        message: response.message,
+        rawTotals: response.data?.totals
+      });
       
-    } else {
-      console.warn('⚠️ Seller stats API failed, using fallback');
-      // Calculate from local orders
+      if (response.success && response.data) {
+        console.log('✅ Setting seller stats:', response.data);
+        setSellerStats(response.data);
+        
+        // ✅ Convert all amounts from cents to dollars
+        const totals = response.data.totals || {};
+        
+        // Log raw amounts for debugging
+        console.log('💰 Raw amounts from API (in cents):', {
+          totalRevenue: totals.totalRevenue,
+          thisMonthRevenue: totals.thisMonthRevenue,
+          pendingRevenue: totals.pendingOrders?.revenue,
+          completedRevenue: totals.completedOrders?.revenue
+        });
+        
+        setOrderStats(prev => ({
+          ...prev,
+          totalOrders: totals.totalOrders || prev.totalOrders,
+          totalRevenue: (totals.totalRevenue || 0) / 100, // Convert cents to dollars
+          pendingRevenue: (totals.pendingOrders?.revenue || 0) / 100, // Convert cents to dollars
+          thisMonthRevenue: (totals.thisMonthRevenue || 0) / 100, // Convert cents to dollars
+          completed: totals.completedOrders?.count || prev.completed,
+          activeOrders: totals.pendingOrders?.count || prev.activeOrders,
+          availableBalance: stripeStatus?.account?.charges_enabled ? 
+            (stripeStatus.account.balance || 0) / 100 : 0 // Convert cents to dollars
+        }));
+        
+        // Log converted amounts for debugging
+        console.log('💰 Converted amounts (in dollars):', {
+          totalRevenue: (totals.totalRevenue || 0) / 100,
+          thisMonthRevenue: (totals.thisMonthRevenue || 0) / 100,
+          pendingRevenue: (totals.pendingOrders?.revenue || 0) / 100
+        });
+        
+      } else {
+        console.warn('⚠️ Seller stats API failed, using fallback');
+        // Calculate from local orders
+        const localStats = calculateOrderStats(orders);
+        setOrderStats(localStats);
+        
+        if (response.error) {
+          setError(`Stats: ${response.error}`);
+        }
+      }
+      
+    } catch (err: any) {
+      console.error('❌ fetchSellerStats caught error:', err);
+      // Calculate from local orders as fallback
       const localStats = calculateOrderStats(orders);
       setOrderStats(localStats);
       
-      if (response.error) {
-        setError(`Stats: ${response.error}`);
-      }
+    } finally {
+      setEarningsLoading(false);
     }
-    
-  } catch (err: any) {
-    console.error('❌ fetchSellerStats caught error:', err);
-    // Calculate from local orders as fallback
-    const localStats = calculateOrderStats(orders);
-    setOrderStats(localStats);
-    
-  } finally {
-    setEarningsLoading(false);
-  }
-};
-  // ✅ Fetch orders for seller
+  };
+
+  // ✅ UPDATED: Fetch orders for seller with cents handling
   const fetchSellerOrders = async () => {
     try {
       setOrdersLoading(true);
@@ -405,6 +448,18 @@ const SellerDashboard: React.FC = () => {
       if (response.success && response.data) {
         const ordersData = response.data.sales || [];
         console.log(`✅ Found ${ordersData.length} orders`);
+        
+        // Log sample order amounts for debugging
+        if (ordersData.length > 0) {
+          console.log('📊 Sample order amounts (in cents):', 
+            ordersData.slice(0, 3).map(o => ({
+              id: o._id,
+              amount: o.amount,
+              status: o.status,
+              amountInDollars: o.amount / 100
+            }))
+          );
+        }
         
         // Filter orders if needed
         let filteredOrders = ordersData;
@@ -419,7 +474,7 @@ const SellerDashboard: React.FC = () => {
         // Update state
         setOrders(paginatedOrders);
         
-        // Calculate stats
+        // Calculate stats (already handles cents to dollars conversion)
         const stats = calculateOrderStats(ordersData);
         
         // Merge with API stats if available
@@ -429,8 +484,8 @@ const SellerDashboard: React.FC = () => {
             ...stats,
             totalOrders: apiStats.total || stats.totalOrders,
             totalRevenue: (apiStats.totalRevenue || 0) / 100, // Convert cents to dollars
-            pendingRevenue: (apiStats.pendingRevenue || 0) / 100,
-            thisMonthRevenue: (apiStats.thisMonthRevenue || 0) / 100
+            pendingRevenue: (apiStats.pendingRevenue || 0) / 100, // Convert cents to dollars
+            thisMonthRevenue: (apiStats.thisMonthRevenue || 0) / 100 // Convert cents to dollars
           };
           setOrderStats(mergedStats);
         } else {
@@ -500,6 +555,19 @@ const SellerDashboard: React.FC = () => {
         }
         
         console.log(`✅ Loaded ${listingsData.length} listings`);
+        
+        // Log listing prices for debugging
+        if (listingsData.length > 0) {
+          console.log('💰 Listing prices:', 
+            listingsData.slice(0, 3).map(l => ({
+              id: l._id,
+              price: l.price,
+              formattedPrice: l.formattedPrice,
+              priceInDollars: l.price / 100
+            }))
+          );
+        }
+        
         setListings(listingsData);
         
         if (listingsData.length === 0) {
@@ -528,11 +596,11 @@ const SellerDashboard: React.FC = () => {
       // For now, use mock data since we don't have a withdrawals API
       console.log('💸 Fetching withdrawal history...');
       
-      // Mock withdrawal data
+      // Mock withdrawal data (amounts in cents)
       const mockWithdrawals: Withdrawal[] = [
         {
           _id: '1',
-          amount: 5000,
+          amount: 500000, // $5000.00 in cents
           status: 'completed',
           stripeTransferId: 'tr_123',
           stripePayoutId: 'po_123',
@@ -543,7 +611,7 @@ const SellerDashboard: React.FC = () => {
         },
         {
           _id: '2',
-          amount: 3000,
+          amount: 300000, // $3000.00 in cents
           status: 'pending',
           stripeTransferId: 'tr_456',
           createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
@@ -570,7 +638,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ ✅ ✅ MAJOR UPDATE: Function to refresh specific data after actions
+  // ✅ ✅ ✅ Function to refresh specific data after actions
   const refreshDataAfterAction = async (actionType: 'listing' | 'order' | 'stripe' | 'withdrawal' | 'earnings') => {
     console.log(`🔄 Refreshing data after ${actionType} action...`);
     
@@ -1023,7 +1091,7 @@ const SellerDashboard: React.FC = () => {
     } else if (activeTab === 'earnings') {
       fetchSellerStats(); // ✅ Refresh earnings data when switching to earnings tab
     }
-  }, [activeTab, listingsPage, listingsStatusFilter, ordersPage, ordersFilter, withdrawalsPage, refreshCounter]); // ✅ Added refreshCounter dependency
+  }, [activeTab, listingsPage, listingsStatusFilter, ordersPage, ordersFilter, withdrawalsPage, refreshCounter]);
 
   // Determine loading state
   const getCurrentLoadingState = () => {
@@ -1037,40 +1105,30 @@ const SellerDashboard: React.FC = () => {
 
   const currentLoading = getCurrentLoadingState();
 
-  // Calculate total withdrawn amount
+  // Calculate total withdrawn amount (in dollars)
   const totalWithdrawn = withdrawalHistory?.withdrawals?.reduce(
     (sum, w) => sum + (w.status === 'completed' ? w.amount : 0), 
     0
   ) || 0;
 
- // SellerDashboard.tsx میں statsForGrid preparation
+  // ✅ UPDATED: Safe preparation of stats for grid (all amounts already in dollars)
+  const statsForGrid = {
+    totalRevenue: orderStats.totalRevenue || 0,
+    totalOrders: orderStats.totalOrders || 0,
+    activeOrders: orderStats.activeOrders || 0,
+    totalListings: totalListings || 0,
+    activeListings: activeListings || 0,
+    thisMonthRevenue: orderStats.thisMonthRevenue || 0,
+    thisMonthOrders: orderStats.thisMonthOrders || 0,
+    availableBalance: orderStats.availableBalance || 0,
+    totalWithdrawn: totalWithdrawn / 100, // Convert cents to dollars
+    // Use API data if available (already converted to dollars)
+    totalEarnings: sellerStats?.totals?.totalRevenue ? 
+      sellerStats.totals.totalRevenue / 100 : 
+      (orderStats.totalRevenue || 0)
+  };
 
-// ✅ Safe preparation of stats for grid
-const statsForGrid = {
-  totalRevenue: orderStats.totalRevenue || 0,
-  totalOrders: orderStats.totalOrders || 0,
-  activeOrders: orderStats.activeOrders || 0,
-  totalListings: totalListings || 0,
-  activeListings: activeListings || 0,
-  thisMonthRevenue: orderStats.thisMonthRevenue || 0,
-  thisMonthOrders: orderStats.thisMonthOrders || 0,
-  availableBalance: orderStats.availableBalance || 0,
-  totalWithdrawn: (totalWithdrawn || 0) / 100,
-  // Use API data if available
-  totalEarnings: sellerStats?.totals?.totalRevenue ? 
-    sellerStats.totals.totalRevenue / 100 : 
-    (orderStats.totalRevenue || 0)
-};
-
-console.log('📊 Stats for grid prepared:', statsForGrid);
-
-// ✅ Render StatsGrid with proper null check
-{statsForGrid && (
-  <SafeStatsGrid
-    stats={statsForGrid}
-    onTabChange={setActiveTab}
-  />
-)}
+  console.log('📊 Stats for grid prepared:', statsForGrid);
 
   // ✅ NEW: Auto-refresh indicator
   const [showAutoRefreshIndicator, setShowAutoRefreshIndicator] = useState(false);
@@ -1100,11 +1158,6 @@ console.log('📊 Stats for grid prepared:', statsForGrid);
       </MarketplaceLayout>
     );
   }
-
-  // Safe currency formatting function
-  const safeFormatCurrency = (amount: number) => {
-    return formatCurrency(amount);
-  };
 
   // Helper to get buyer name from order
   const getBuyerName = (order: Order): string => {
@@ -1154,22 +1207,23 @@ console.log('📊 Stats for grid prepared:', statsForGrid);
             />
           )}
 
-<SafeDashboardHeader
-  title="Seller Dashboard"
-  subtitle="Manage orders, track earnings, and grow your business"
-  earnings={safeFormatCurrency(orderStats.totalRevenue)}
-  totalEarnings={safeFormatCurrency(sellerStats?.totals?.totalRevenue || 0)} // ✅ Add this
-  onRefresh={handleRefresh}
-  refreshing={refreshing}
-  stripeStatus={{
-    connected: stripeStatus?.account?.charges_enabled || false,
-    chargesEnabled: stripeStatus?.account?.charges_enabled || false,
-    detailsSubmitted: stripeStatus?.account?.details_submitted || false,
-    status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive',
-    availableBalance: stripeStatus?.account?.balance || 0
-  }}
-  onCheckStripe={checkStripeAccountStatus}
-/>
+          {/* Header */}
+          <SafeDashboardHeader
+            title="Seller Dashboard"
+            subtitle="Manage orders, track earnings, and grow your business"
+            earnings={safeFormatCurrency(orderStats.totalRevenue)}
+            totalEarnings={formatCurrency(sellerStats?.totals?.totalRevenue || 0)} // ✅ Use formatCurrency for cents
+            onRefresh={handleRefresh}
+            refreshing={refreshing}
+            stripeStatus={{
+              connected: stripeStatus?.account?.charges_enabled || false,
+              chargesEnabled: stripeStatus?.account?.charges_enabled || false,
+              detailsSubmitted: stripeStatus?.account?.details_submitted || false,
+              status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive',
+              availableBalance: stripeStatus?.account?.balance || 0
+            }}
+            onCheckStripe={checkStripeAccountStatus}
+          />
 
           {/* ✅ Development Mode Banner */}
           {(process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') && (
@@ -1293,10 +1347,12 @@ console.log('📊 Stats for grid prepared:', statsForGrid);
                     />
 
                     {/* Stats Grid */}
-                    <SafeStatsGrid
-                      stats={statsForGrid}
-                      onTabChange={setActiveTab}
-                    />
+                    {statsForGrid && (
+                      <SafeStatsGrid
+                        stats={statsForGrid}
+                        onTabChange={setActiveTab}
+                      />
+                    )}
 
                     {/* Order Workflow Guide */}
                     <SafeOrderWorkflowGuide />
