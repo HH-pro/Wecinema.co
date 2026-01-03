@@ -1234,15 +1234,13 @@ const BuyerDashboard: React.FC = () => {
   if (loading && orders.length === 0) {
     return (
       <MarketplaceLayout>
-        <div className="buyer-dashboard loading-state">
-          <div className="loading-content">
-            <div className="loader-container">
-              <div className="loader-spinner"></div>
-              <div className="loader-text">Loading your dashboard...</div>
-              <div className="loader-subtext">Preparing your personalized experience</div>
-            </div>
-          </div>
-        </div>
+         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+                    <p className="text-lg text-gray-800 font-medium">Loading your dashboard...</p>
+                    <p className="text-gray-600 mt-2">This may take a few moments</p>
+                  </div>
+                </div>
       </MarketplaceLayout>
     );
   }
