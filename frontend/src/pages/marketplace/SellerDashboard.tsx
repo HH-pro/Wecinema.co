@@ -1445,7 +1445,7 @@ const SellerDashboard: React.FC = () => {
                       detailsSubmitted: stripeStatus?.account?.details_submitted || false,
                       status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive',
                       balance: stripeStatus?.account?.balance || 0,
-                      availableBalance: stripeStatus?.account?.balance || 0,
+                      availableBalance: stripeStatus?.account || 0,
                       pendingBalance: 0
                     }}
                     orderStats={orderStats}
