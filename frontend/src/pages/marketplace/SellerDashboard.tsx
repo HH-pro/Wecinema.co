@@ -437,7 +437,6 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // SellerDashboard.tsx میں fetchSellerOrders function میں logging شامل کریں
 
 const fetchSellerOrders = async () => {
   try {
@@ -1162,7 +1161,6 @@ const fetchSellerOrders = async () => {
           )}
 
           {/* Header */}
-         // SellerDashboard.tsx میں
 <SafeDashboardHeader
   title="Seller Dashboard"
   subtitle="Manage orders, track earnings, and grow your business"
