@@ -1522,30 +1522,31 @@ const SellerDashboard: React.FC = () => {
 
                 {/* Withdraw Tab */}
                 {activeTab === 'withdraw' && (
-                  <SafeWithdrawTab
-                    stripeStatus={{
-                      connected: stripeStatus?.account?.charges_enabled || false,
-                      chargesEnabled: stripeStatus?.account?.charges_enabled || false,
-                      detailsSubmitted: stripeStatus?.account?.details_submitted || false,
-                      status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive',
-                      balance: stripeStatus?.account?.balance || 0,
-                      availableBalance: stripeStatus?.account?.balance || 0,
-                      pendingBalance: 0
-                    }}
-                    withdrawalHistory={withdrawalHistory}
-                    loading={withdrawalsLoading}
-                    currentPage={withdrawalsPage}
-                    onPageChange={setWithdrawalsPage}
-                    onWithdrawRequest={handleWithdrawRequest}
-                    onRefresh={() => {
-                      refreshDataAfterAction('withdrawal');
-                    }}
-                    totalRevenue={orderStats.totalRevenue}
-                    thisMonthRevenue={orderStats.thisMonthRevenue}
-                    pendingRevenue={orderStats.pendingRevenue}
-                    // ✅ ADDED: Pass completed revenue for context
-                    completedRevenue={orderStats.completedRevenue || 0}
-                  />
+                  // SellerDashboard.tsx mein WithdrawTab ko call karte waqt:
+<SafeWithdrawTab
+  stripeStatus={{
+    connected: stripeStatus?.account?.charges_enabled || false,
+    chargesEnabled: stripeStatus?.account?.charges_enabled || false,
+    detailsSubmitted: stripeStatus?.account?.details_submitted || false,
+    status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive',
+    balance: stripeStatus?.account?.balance || 0,
+    availableBalance: stripeStatus?.account?.balance || 0,
+    pendingBalance: 0
+  }}
+  withdrawalHistory={withdrawalHistory}
+  loading={withdrawalsLoading}
+  currentPage={withdrawalsPage}
+  onPageChange={setWithdrawalsPage}
+  onWithdrawRequest={handleWithdrawRequest}
+  onRefresh={() => {
+    refreshDataAfterAction('withdrawal');
+  }}
+  // ✅ ADDED: Earning data passed from parent
+  totalRevenue={orderStats.totalRevenue}
+  thisMonthRevenue={orderStats.thisMonthRevenue}
+  pendingRevenue={orderStats.pendingRevenue}
+  completedRevenue={orderStats.completedRevenue}
+/>
                 )}
               </>
             )}
