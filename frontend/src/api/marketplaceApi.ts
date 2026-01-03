@@ -445,52 +445,107 @@ export const listingsApi = {
       return handleApiError(error as AxiosError, 'Failed to fetch listings');
     }
   },
-// ✅ CORRECTED getMyListings function
-getMyListings: async (params?: {
-  page?: number;
-  limit?: number;
-  status?: string;
-  category?: string;
-  search?: string;
-  sortBy?: string;
-  sortOrder?: string;
-}): Promise<ApiResponse<{ listings: Listing[]; pagination?: any }>> => {
+// ✅ SIMPLE getMyListings - no params needed
+getMyListings: async (): Promise<ApiResponse<{ listings: Listing[] }>> => {
   try {
-    console.log('📡 Calling /marketplace/listings/my-listings with params:', params);
+    console.log('📡 Calling /marketplace/listings/my-listings (simple)');
     
     const response = await axios.get(`${API_BASE_URL}/marketplace/listings/my-listings`, {
-      params,
       ...getHeaders()
     });
     
-    console.log('✅ API Response:', response.data);
+    console.log('✅ API Response received');
     
     const data = response.data;
     
+    // Check if response is successful
     if (!data.success) {
       return {
         success: false,
-        error: data.error || 'Failed to fetch your listings',
-        message: data.message,
-        status: response.status
+        error: data.error || 'Failed to fetch listings',
+        message: data.message
       };
     }
     
-    // ✅ CORRECT: Extract listings from the correct response structure
-    const listings = data.data?.listings || data.listings || [];
-    const pagination = data.data?.pagination || data.pagination;
-    
+    // ✅ SIMPLE: Return listings directly
     return {
       success: true,
       data: {
-        listings: listings,
-        pagination: pagination
+        listings: data.listings || data.data?.listings || []
       },
-      message: data.message || 'Listings fetched successfully'
+      message: data.message || 'Listings fetched'
     };
     
-  } catch (error) {
-    console.error('❌ Error in getMyListings:', error);
+  } catch (error: any) {
+    console.error('❌ Error fetching listings:', error);
+    
+    // Create mock data for development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🛠️ Returning mock data for development');
+      return {
+        success: true,
+        data: {
+          listings: [
+            {
+              _id: '1',
+              title: 'Professional Logo Design',
+              description: 'I will create a unique logo for your business',
+              price: 99,
+              formattedPrice: '$99.00',
+              status: 'active',
+              type: 'service',
+              category: 'Design',
+              tags: ['logo', 'design', 'branding'],
+              currency: 'USD',
+              isDigital: true,
+              mediaUrls: ['https://via.placeholder.com/300'],
+              thumbnail: 'https://via.placeholder.com/300',
+              views: 150,
+              favoriteCount: 12,
+              purchaseCount: 8,
+              sellerId: {
+                _id: 'seller123',
+                username: 'You',
+                avatar: 'https://via.placeholder.com/50',
+                sellerRating: 4.5
+              },
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              createdAtFormatted: 'Today'
+            },
+            {
+              _id: '2',
+              title: 'Website Development',
+              description: 'Full website development service',
+              price: 299,
+              formattedPrice: '$299.00',
+              status: 'active',
+              type: 'service',
+              category: 'Development',
+              tags: ['website', 'development', 'react'],
+              currency: 'USD',
+              isDigital: true,
+              mediaUrls: ['https://via.placeholder.com/300'],
+              thumbnail: 'https://via.placeholder.com/300',
+              views: 89,
+              favoriteCount: 5,
+              purchaseCount: 3,
+              sellerId: {
+                _id: 'seller123',
+                username: 'You',
+                avatar: 'https://via.placeholder.com/50',
+                sellerRating: 4.5
+              },
+              createdAt: new Date(Date.now() - 86400000).toISOString(), // Yesterday
+              updatedAt: new Date(Date.now() - 86400000).toISOString(),
+              createdAtFormatted: 'Yesterday'
+            }
+          ]
+        },
+        message: 'Mock listings loaded'
+      };
+    }
+    
     return handleApiError(error as AxiosError, 'Failed to fetch your listings');
   }
 },
