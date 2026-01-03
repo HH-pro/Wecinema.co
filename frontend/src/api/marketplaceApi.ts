@@ -822,18 +822,127 @@ export const ordersApi = {
     }
   },
 
-  // Get seller statistics
-  getSellerStats: async (): Promise<ApiResponse<SellerStats>> => {
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/marketplace/orders/stats/seller`,
-        getHeaders()
-      );
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error as AxiosError, 'Failed to fetch seller statistics');
+ // src/api/marketplaceApi.ts میں getSellerStats method
+
+getSellerStats: async (): Promise<ApiResponse<SellerStats>> => {
+  try {
+    console.log('🔍 Calling seller stats API...');
+    
+    const headers = getHeaders();
+    console.log('📋 Request headers:', {
+      hasAuth: !!headers.headers.Authorization,
+      baseURL: API_BASE_URL,
+      endpoint: '/marketplace/orders/stats/seller'
+    });
+    
+    const response = await axios.get(
+      `${API_BASE_URL}/marketplace/orders/stats/seller`,
+      headers
+    );
+    
+    console.log('📊 Seller stats API response received:', {
+      status: response.status,
+      statusText: response.statusText,
+      hasData: !!response.data,
+      success: response.data?.success,
+      dataKeys: response.data ? Object.keys(response.data) : 'No data'
+    });
+    
+    // Handle the response
+    const responseData = response.data;
+    
+    // Case 1: Direct success response
+    if (responseData.success === true) {
+      console.log('✅ API returned direct success');
+      
+      // Check if data is nested or direct
+      const statsData = responseData.data || responseData;
+      
+      return {
+        success: true,
+        data: statsData,
+        message: responseData.message || 'Seller statistics fetched successfully',
+        status: response.status
+      };
     }
-  },
+    
+    // Case 2: Response has success: false
+    if (responseData.success === false) {
+      console.warn('⚠️ API returned success: false', responseData);
+      
+      return {
+        success: false,
+        error: responseData.error || responseData.message || 'Failed to fetch seller statistics',
+        message: responseData.message,
+        status: response.status,
+        data: responseData.data || responseData
+      };
+    }
+    
+    // Case 3: Response doesn't have success property (non-standard format)
+    console.log('ℹ️ Response has non-standard format, normalizing...');
+    
+    // Try to extract seller stats data
+    let statsData: SellerStats | null = null;
+    
+    if (responseData.statsByStatus || responseData.totals) {
+      // Looks like a SellerStats object
+      statsData = responseData;
+    } else if (responseData.data?.statsByStatus || responseData.data?.totals) {
+      // Nested in data property
+      statsData = responseData.data;
+    }
+    
+    if (statsData) {
+      return {
+        success: true,
+        data: statsData,
+        message: 'Seller statistics fetched successfully',
+        status: response.status
+      };
+    }
+    
+    // Case 4: Unknown response format
+    console.error('❓ Unknown response format:', responseData);
+    
+    return {
+      success: false,
+      error: 'Unknown response format from server',
+      message: 'Could not parse seller statistics',
+      status: response.status,
+      data: responseData
+    };
+    
+  } catch (error) {
+    console.error('❌ Error in getSellerStats API:', error);
+    
+    const axiosError = error as AxiosError;
+    const errorResponse = axiosError.response?.data as any;
+    
+    // Extract error message from various possible locations
+    const errorMessage = 
+      errorResponse?.error || 
+      errorResponse?.message || 
+      errorResponse?.details ||
+      axiosError.message || 
+      'Failed to fetch seller statistics';
+    
+    console.error('📋 Error details:', {
+      status: axiosError.response?.status,
+      statusText: axiosError.response?.statusText,
+      errorMessage: errorMessage,
+      responseData: errorResponse
+    });
+    
+    return {
+      success: false,
+      error: errorMessage,
+      message: errorResponse?.message,
+      status: axiosError.response?.status,
+      data: errorResponse
+    };
+  }
+},
 
   // ========== SINGLE ORDER OPERATIONS ========== //
   
