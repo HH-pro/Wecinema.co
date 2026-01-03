@@ -219,57 +219,69 @@ const OrderDetailsPage: React.FC = () => {
       setActiveTab(tab);
     }
   }, [searchParams]);
+// اصل fetchOrderDetails function کو یوں تبدیل کریں:
+const fetchOrderDetails = async () => {
+  if (!orderId) {
+    setError('No order ID provided');
+    setLoading(false);
+    return;
+  }
 
-  // Main function to fetch order details
-  const fetchOrderDetails = async () => {
-    if (!orderId) {
-      setError('No order ID provided');
-      setLoading(false);
-      return;
+  try {
+    setLoading(true);
+    setError(null);
+
+    // 1. Fetch order details
+    const orderResponse = await marketplaceApi.orders.getOrderDetails(orderId);
+    
+    // 2. Check response structure properly
+    if (!orderResponse.success || !orderResponse.data) {
+      console.error('Order response:', orderResponse);
+      throw new Error(orderResponse.error || 'Failed to fetch order details');
     }
 
+    // 3. Extract data with safe access
+    const orderData = orderResponse.data;
+    
+    // 4. Check if order exists in response
+    if (!orderData.order) {
+      console.error('No order in response:', orderData);
+      throw new Error('Order not found in response');
+    }
+
+    setOrder(orderData.order);
+    setTimeline(orderData.timeline || []);
+    setUserRole(orderData.userRole || 'buyer');
+    setPermissions(orderData.permissions || {});
+
+    // 5. Fetch deliveries separately if needed
     try {
-      setLoading(true);
-      setError(null);
-
-      // Fetch order details
-      const orderResponse: ApiResponse = await marketplaceApi.orders.getOrderDetails(orderId);
-      
-      if (!orderResponse.success) {
-        throw new Error(orderResponse.error || 'Failed to fetch order details');
+      const deliveriesResponse = await marketplaceApi.orders.getDeliveries(orderId);
+      if (deliveriesResponse.success && deliveriesResponse.data) {
+        setDeliveries(deliveriesResponse.data.deliveries || []);
       }
-
-      const orderData = orderResponse.data;
-      setOrder(orderData.order);
-      setTimeline(orderData.timeline || []);
-      setUserRole(orderData.userRole);
-      setPermissions(orderData.permissions || {});
-
-      // Fetch deliveries if needed
-      if (orderData.deliveries) {
-        setDeliveries(orderData.deliveries);
-      }
-
-      // Fetch files if needed
-      if (orderData.deliveryFiles) {
-        setFiles(orderData.deliveryFiles);
-      } else {
-        // Fetch files separately
-        const filesResponse = await marketplaceApi.orders.getDownloadFiles(orderId);
-        if (filesResponse.success && filesResponse.data) {
-          setFiles(filesResponse.data.files || []);
-        }
-      }
-
-    } catch (error: any) {
-      console.error('Error fetching order details:', error);
-      setError(error.message || 'Failed to load order details');
-      toast.error(error.message || 'Failed to load order details');
-    } finally {
-      setLoading(false);
+    } catch (deliveryError) {
+      console.warn('Could not fetch deliveries:', deliveryError);
     }
-  };
 
+    // 6. Fetch files separately
+    try {
+      const filesResponse = await marketplaceApi.orders.getDownloadFiles(orderId);
+      if (filesResponse.success && filesResponse.data) {
+        setFiles(filesResponse.data.files || []);
+      }
+    } catch (fileError) {
+      console.warn('Could not fetch files:', fileError);
+    }
+
+  } catch (error: any) {
+    console.error('Error fetching order details:', error);
+    setError(error.message || 'Failed to load order details');
+    toast.error(error.message || 'Failed to load order details');
+  } finally {
+    setLoading(false);
+  }
+};
   // Handle tab change
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
