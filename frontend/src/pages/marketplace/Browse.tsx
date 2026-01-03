@@ -10,7 +10,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import marketplaceApi from '../../api/marketplaceApi';
 import VideoPlayerModal from '../../components/marketplae/VideoPlayerModal';
-import PaymentModal from '../../components/marketplae/PaymentModal';
+import PaymentModal from '../../components/marketplae/paymentModal';
 import OfferModal from '../../components/marketplae/OfferModal';
 
 // Constants for placeholder images
