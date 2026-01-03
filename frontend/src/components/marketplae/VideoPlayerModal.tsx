@@ -32,69 +32,70 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const [videoSrc, setVideoSrc] = useState<string>('');
   const controlsTimeoutRef = useRef<NodeJS.Timeout>();
 
+  // High z-index ki guarantee ke liye
   useEffect(() => {
-    if (show && videoUrl) {
-      setIsLoading(true);
-      setError('');
-      setVideoSrc(videoUrl);
-      
-      // Preload the video
-      const preloadVideo = document.createElement('video');
-      preloadVideo.src = videoUrl;
-      preloadVideo.preload = 'metadata';
-      
-      // Fix for browser video overlays
+    if (show) {
+      // Body ko fix karo aur overflow hidden karo
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
       document.body.style.width = '100%';
+      document.body.style.height = '100%';
+      document.body.style.top = '0';
+      document.body.style.left = '0';
       
+      // Agar koi bhi element high z-index par hai toh unhe niche karo
+      const allElements = document.querySelectorAll('*');
+      allElements.forEach(el => {
+        const element = el as HTMLElement;
+        const currentZIndex = parseInt(window.getComputedStyle(element).zIndex);
+        if (currentZIndex > 9990) {
+          element.style.zIndex = '9990';
+        }
+      });
+
+      // Video URL set karo
+      setVideoSrc(videoUrl);
+      setIsLoading(true);
+      setError('');
+      
+      // Modal ko focus karo
+      setTimeout(() => {
+        modalRef.current?.focus();
+      }, 100);
+
       return () => {
+        // Cleanup
         document.body.style.overflow = '';
         document.body.style.position = '';
         document.body.style.width = '';
+        document.body.style.height = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
       };
     }
   }, [show, videoUrl]);
 
+  // Video event listeners
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !videoSrc) return;
 
-    const handlePlay = () => {
-      setIsPlaying(true);
-      setIsLoading(false);
-    };
-    
+    const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
-    
     const handleTimeUpdate = () => setCurrentTime(video.currentTime);
-    
     const handleLoadedMetadata = () => {
       setDuration(video.duration);
       setIsLoading(false);
-      
-      // Auto-play if video is ready
-      if (!video.paused) {
-        video.play().catch(e => {
-          console.log('Auto-play prevented:', e);
-          setIsPlaying(false);
-        });
-      }
     };
-    
     const handleEnded = () => setIsPlaying(false);
-    
     const handleVolumeChange = () => {
       setIsMuted(video.muted);
       setVolume(video.volume);
     };
-    
-    const handleError = (e: Event) => {
-      console.error('Video error:', e);
-      setError('Unable to load video. The file may be corrupted, unsupported, or inaccessible.');
+    const handleError = () => {
+      setError('Video play nahi ho raha. Kripya koshish karein ya koi aur video select karein.');
       setIsLoading(false);
     };
-    
     const handleCanPlay = () => {
       setIsLoading(false);
     };
@@ -108,18 +109,35 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     video.addEventListener('error', handleError);
     video.addEventListener('canplay', handleCanPlay);
 
+    // Auto-play attempt (with user interaction)
+    const tryAutoPlay = () => {
+      if (!video.paused) return;
+      
+      video.play().then(() => {
+        setIsPlaying(true);
+      }).catch(err => {
+        console.log('Auto-play blocked:', err);
+        // User interaction required, no error needed
+      });
+    };
+
+    // Short delay for auto-play
+    const autoPlayTimer = setTimeout(tryAutoPlay, 500);
+
     return () => {
       video.removeEventListener('play', handlePlay);
-      video.removeEventListener('pause', handlePlay);
+      video.removeEventListener('pause', handlePause);
       video.removeEventListener('timeupdate', handleTimeUpdate);
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('ended', handleEnded);
       video.removeEventListener('volumechange', handleVolumeChange);
       video.removeEventListener('error', handleError);
       video.removeEventListener('canplay', handleCanPlay);
+      clearTimeout(autoPlayTimer);
     };
   }, [videoSrc]);
 
+  // Fullscreen change listener
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
@@ -131,13 +149,14 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     };
   }, []);
 
+  // Controls auto-hide
   const showControlsTemporarily = () => {
     setShowControls(true);
     if (controlsTimeoutRef.current) {
       clearTimeout(controlsTimeoutRef.current);
     }
     controlsTimeoutRef.current = setTimeout(() => {
-      if (isPlaying) {
+      if (isPlaying && !isLoading) {
         setShowControls(false);
       }
     }, 3000);
@@ -152,38 +171,48 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
         clearTimeout(controlsTimeoutRef.current);
       }
     };
-  }, [show, isPlaying]);
+  }, [show, isPlaying, isLoading]);
 
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!show) return;
+      
       const video = videoRef.current;
-      if (!video || !show) return;
+      if (!video) return;
 
       switch (e.key) {
         case ' ':
         case 'Spacebar':
           e.preventDefault();
+          e.stopPropagation();
           handlePlayPause();
           break;
         case 'f':
         case 'F':
           e.preventDefault();
+          e.stopPropagation();
           handleFullscreen();
           break;
         case 'm':
         case 'M':
           e.preventDefault();
+          e.stopPropagation();
           toggleMute();
           break;
         case 'ArrowLeft':
           e.preventDefault();
+          e.stopPropagation();
           video.currentTime = Math.max(0, video.currentTime - 10);
           break;
         case 'ArrowRight':
           e.preventDefault();
+          e.stopPropagation();
           video.currentTime = Math.min(video.duration, video.currentTime + 10);
           break;
         case 'Escape':
+          e.preventDefault();
+          e.stopPropagation();
           if (document.fullscreenElement) {
             document.exitFullscreen();
           } else {
@@ -200,7 +229,7 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [show, videoRef.current]);
+  }, [show, onClose]);
 
   if (!show) return null;
 
@@ -216,31 +245,29 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handlePlayPause = () => {
+  const handlePlayPause = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    
     const video = videoRef.current;
     if (!video) return;
     
     try {
       if (video.paused || video.ended) {
-        const playPromise = video.play();
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => {
-              setIsPlaying(true);
-            })
-            .catch(error => {
-              console.error('Play failed:', error);
-              setIsPlaying(false);
-              setError('Playback failed. Please ensure the video format is supported and try again.');
-            });
-        }
+        video.play().then(() => {
+          setIsPlaying(true);
+        }).catch(err => {
+          console.error('Play failed:', err);
+          // User interaction required error - show play button only
+        });
       } else {
         video.pause();
         setIsPlaying(false);
       }
     } catch (error) {
       console.error('Play/Pause error:', error);
-      setError('Playback error occurred. Please try again.');
     }
     showControlsTemporarily();
   };
@@ -290,14 +317,14 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   };
 
   const handleFullscreen = () => {
-    const element = modalRef.current || videoRef.current;
+    const element = modalRef.current;
     if (!element) return;
     
     if (document.fullscreenElement) {
       document.exitFullscreen();
     } else {
       element.requestFullscreen().catch(err => {
-        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+        console.error('Fullscreen error:', err);
       });
     }
     showControlsTemporarily();
@@ -314,8 +341,6 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
       link.click();
       document.body.removeChild(link);
     } catch (error) {
-      console.error('Download failed:', error);
-      // Fallback to opening in new tab
       window.open(videoUrl, '_blank');
     }
   };
@@ -324,37 +349,39 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     if (!url) return false;
     
     const videoExtensions = /\.(mp4|mov|avi|wmv|flv|mkv|webm|m4v|ogg|ogv|3gp|3g2|mpg|mpeg)$/i;
-    if (videoExtensions.test(url)) {
-      return true;
+    return videoExtensions.test(url);
+  };
+
+  // Handle click outside to close
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
     }
-    
-    const videoDomains = [
-      'youtube.com',
-      'youtu.be',
-      'vimeo.com',
-      'dailymotion.com',
-      'twitch.tv',
-      'streamable.com',
-      'cloudinary.com',
-      'vidyard.com',
-      'wistia.com'
-    ];
-    
-    return videoDomains.some(domain => url.includes(domain));
+  };
+
+  // Handle modal click (prevent bubbling)
+  const handleModalClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
   };
 
   return (
     <div 
       ref={modalRef}
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 backdrop-blur-md p-4 transition-all duration-300"
-      onClick={() => setShowControls(true)}
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/95 backdrop-blur-md p-4"
+      onClick={handleBackdropClick}
       onMouseMove={showControlsTemporarily}
+      tabIndex={-1}
+      style={{ zIndex: 10000 }}
     >
       {/* Modal Container */}
-      <div className="relative w-full max-w-6xl max-h-[90vh] bg-black/90 rounded-2xl overflow-hidden shadow-2xl border border-gray-800">
+      <div 
+        className="relative w-full max-w-6xl max-h-[90vh] bg-black/90 rounded-2xl overflow-hidden shadow-2xl border border-gray-800"
+        onClick={handleModalClick}
+        style={{ zIndex: 10001 }}
+      >
         {/* Header */}
         <div 
-          className={`absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/95 via-black/80 to-transparent p-4 transition-all duration-300 ${
+          className={`absolute top-0 left-0 right-0 z-30 bg-gradient-to-b from-black/95 via-black/80 to-transparent p-4 transition-all duration-300 ${
             showControls ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10'
           }`}
         >
@@ -387,7 +414,10 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                 {isFullscreen ? <FiMinimize size={20} /> : <FiMaximize size={20} />}
               </button>
               <button
-                onClick={onClose}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                }}
                 className="text-white hover:text-red-400 p-2 rounded-lg hover:bg-red-500/10 transition-all duration-200"
                 title="Close"
               >
@@ -429,14 +459,14 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
             <>
               {/* Loading Overlay */}
               {isLoading && (
-                <div className="absolute inset-0 bg-black/90 flex items-center justify-center z-10">
+                <div className="absolute inset-0 bg-black/90 flex items-center justify-center z-20">
                   <div className="text-center">
                     <div className="relative inline-block mb-4">
                       <div className="absolute inset-0 animate-pulse bg-yellow-400 opacity-20 rounded-full blur-xl"></div>
                       <div className="relative animate-spin rounded-full h-16 w-16 border-4 border-transparent border-t-yellow-500 border-r-amber-500 mx-auto"></div>
                     </div>
                     <p className="text-white font-medium">Loading video...</p>
-                    <p className="text-gray-400 text-sm mt-2">This may take a moment</p>
+                    <p className="text-gray-400 text-sm mt-2">Please wait</p>
                   </div>
                 </div>
               )}
@@ -461,6 +491,7 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                   playsInline
                   controls={false}
                   crossOrigin="anonymous"
+                  style={{ zIndex: 10 }}
                 >
                   <source src={videoSrc} type="video/mp4" />
                   <source src={videoSrc} type="video/webm" />
@@ -487,7 +518,8 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
               {!isPlaying && !isLoading && !error && (
                 <button
                   onClick={handlePlayPause}
-                  className="absolute z-10 transform -translate-x-1/2 -translate-y-1/2 top-1/2 left-1/2 w-20 h-20 bg-yellow-500 hover:bg-yellow-600 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 group"
+                  className="absolute z-30 transform -translate-x-1/2 -translate-y-1/2 top-1/2 left-1/2 w-20 h-20 bg-yellow-500 hover:bg-yellow-600 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 group"
+                  style={{ zIndex: 30 }}
                 >
                   <BsFillPlayFill className="text-white ml-1" size={32} />
                   <div className="absolute inset-0 border-4 border-yellow-400 rounded-full animate-ping opacity-20"></div>
@@ -496,10 +528,11 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
               
               {/* Video Controls */}
               <div 
-                className={`absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black/95 via-black/85 to-transparent p-4 transition-all duration-300 ${
+                className={`absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black/95 via-black/85 to-transparent p-4 transition-all duration-300 ${
                   showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
                 }`}
                 onClick={(e) => e.stopPropagation()}
+                style={{ zIndex: 30 }}
               >
                 {/* Progress Bar */}
                 <div className="mb-4">
@@ -583,37 +616,7 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
             </>
           )}
         </div>
-        
-        {/* Keyboard Shortcuts Info */}
-        <div className={`absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/90 backdrop-blur-sm text-white text-xs rounded-lg p-3 transition-all duration-300 ${
-          showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
-        }`}>
-          <div className="flex items-center gap-6">
-            <span className="flex items-center gap-1">
-              <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">Space</kbd>
-              <span className="text-gray-300">Play/Pause</span>
-            </span>
-            <span className="flex items-center gap-1">
-              <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">F</kbd>
-              <span className="text-gray-300">Fullscreen</span>
-            </span>
-            <span className="flex items-center gap-1">
-              <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">M</kbd>
-              <span className="text-gray-300">Mute</span>
-            </span>
-            <span className="flex items-center gap-1">
-              <kbd className="px-2 py-1 bg-gray-700 rounded text-xs">ESC</kbd>
-              <span className="text-gray-300">Close</span>
-            </span>
-          </div>
-        </div>
       </div>
-      
-      {/* Close on background click */}
-      <div 
-        className="absolute inset-0 -z-10 cursor-pointer"
-        onClick={onClose}
-      />
     </div>
   );
 };
