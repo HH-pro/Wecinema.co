@@ -23,7 +23,9 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
   onPageChange,
   onWithdrawRequest,
   onRefresh,
- 
+  // ✅ DEFAULT VALUE SET FROM MARKETPLACE API
+  
+  
 }) => {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
