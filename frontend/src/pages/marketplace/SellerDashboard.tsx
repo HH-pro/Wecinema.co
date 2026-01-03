@@ -1444,6 +1444,7 @@ const SellerDashboard: React.FC = () => {
                       chargesEnabled: stripeStatus?.account?.charges_enabled || false,
                       detailsSubmitted: stripeStatus?.account?.details_submitted || false,
                       status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive',
+                      balance: stripeStatus?.account?.balance || 0,
                       availableBalance: stripeStatus?.account?.balance || 0,
                       pendingBalance: 0
                     }}
@@ -1455,7 +1456,6 @@ const SellerDashboard: React.FC = () => {
                       refreshDataAfterAction('earnings');
                     }}
                     // ✅ ADDED: Pass completed orders data
-                    totalEarnings={orderStats.totalRevenue}
                     thisMonthEarnings={orderStats.thisMonthRevenue}
                     pendingEarnings={orderStats.pendingRevenue}
                     totalWithdrawn={totalWithdrawn / 100}
