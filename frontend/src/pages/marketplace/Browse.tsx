@@ -5,12 +5,12 @@ import { Listing } from '../../types/marketplace';
 import { 
   FiFilter, FiPlus, FiSearch, FiX, FiCreditCard, FiAlertCircle, 
   FiLoader, FiUser, FiPlay, FiClock, FiDollarSign, FiEye, FiVideo,
-  FiTrendingUp, FiTrendingDown, FiCalendar, FiType, FiTag, FiDollarSign as FiDollar
+  FiTrendingUp, FiTrendingDown, FiCalendar
 } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import marketplaceApi from '../../api/marketplaceApi';
 import VideoPlayerModal from '../../components/marketplae/VideoPlayerModal';
-import PaymentModal from '../../components/marketplae/paymentModal';
+import PaymentModal from '../../components/marketplae/PaymentModal';
 import OfferModal from '../../components/marketplae/OfferModal';
 
 // Constants for placeholder images
@@ -19,10 +19,10 @@ const ERROR_IMAGE = 'https://via.placeholder.com/300x200/F3F4F6/6B7280?text=Vide
 
 // Content type categories
 const CONTENT_TYPES = [
-  { id: 'sale', label: 'For Sale', icon: '💰', color: 'bg-green-500', hoverColor: 'hover:bg-green-600' },
-  { id: 'commission', label: 'Commission', icon: '🎨', color: 'bg-purple-500', hoverColor: 'hover:bg-purple-600' },
-  { id: 'adaptation', label: 'Adaptation Rights', icon: '📜', color: 'bg-blue-500', hoverColor: 'hover:bg-blue-600' },
-  { id: 'license', label: 'License', icon: '📋', color: 'bg-amber-500', hoverColor: 'hover:bg-amber-600' }
+  { id: 'sale', label: 'For Sale', icon: '💰', color: 'bg-green-500', textColor: 'text-green-700' },
+  { id: 'commission', label: 'Commission', icon: '🎨', color: 'bg-purple-500', textColor: 'text-purple-700' },
+  { id: 'adaptation', label: 'Adaptation Rights', icon: '📜', color: 'bg-blue-500', textColor: 'text-blue-700' },
+  { id: 'license', label: 'License', icon: '📋', color: 'bg-amber-500', textColor: 'text-amber-700' }
 ];
 
 // Sort options
@@ -272,7 +272,7 @@ const Browse: React.FC = () => {
   };
 
   const getQualityBadge = (quality?: string) => {
-    if (!quality) return { color: 'bg-yellow-400 text-gray-800', label: '' };
+    if (!quality) return { color: 'bg-yellow-100 text-yellow-800', label: '' };
     
     switch (quality.toLowerCase()) {
       case '4k':
@@ -282,17 +282,16 @@ const Browse: React.FC = () => {
       case '1080p':
         return { color: 'bg-blue-500 text-white', label: 'HD' };
       default:
-        return { color: 'bg-yellow-400 text-gray-800', label: '' };
+        return { color: 'bg-yellow-100 text-yellow-800', label: '' };
     }
   };
 
- const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount || 0);
-};
-
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+    }).format(amount || 0);
+  };
 
   const formatDate = (dateString: string): string => {
     if (!dateString) return '';
@@ -472,14 +471,12 @@ const Browse: React.FC = () => {
   if (loading) {
     return (
       <MarketplaceLayout>
-        <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center p-4">
+        <div className="min-h-screen bg-white flex items-center justify-center p-4">
           <div className="text-center">
             <div className="relative inline-block">
-              <div className="absolute inset-0 animate-pulse bg-yellow-400 opacity-20 rounded-full blur-xl"></div>
-              <div className="relative animate-spin rounded-full h-24 w-24 border-4 border-transparent border-t-yellow-500 border-r-amber-500 mx-auto"></div>
+              <div className="relative animate-spin rounded-full h-16 w-16 border-4 border-gray-200 border-t-blue-600 mx-auto"></div>
             </div>
-            <p className="mt-8 text-gray-900 text-xl font-bold tracking-wider">LOADING VIDEO CONTENT</p>
-            <p className="mt-2 text-gray-600 text-sm">Discovering premium videos and creative assets</p>
+            <p className="mt-8 text-gray-900 text-lg font-semibold">Loading content...</p>
           </div>
         </div>
       </MarketplaceLayout>
@@ -488,45 +485,35 @@ const Browse: React.FC = () => {
 
   return (
     <MarketplaceLayout>
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-8">
-        {/* Animated Background Effects */}
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 left-1/4 w-72 h-72 bg-gradient-to-r from-yellow-100 to-amber-100 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse"></div>
-          <div className="absolute bottom-0 right-1/4 w-72 h-72 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse delay-1000"></div>
-        </div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <div className="min-h-screen bg-white py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Error Banner */}
           {error && (
-            <div className="mb-6 bg-gradient-to-r from-red-50 to-orange-50 backdrop-blur-xl border-l-4 border-red-500 rounded-r-lg shadow-lg p-6 animate-slideIn">
-              <div className="flex items-center gap-4">
-                <div className="flex-shrink-0">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-r from-red-400 to-orange-400 flex items-center justify-center animate-pulse">
-                    <FiAlertCircle className="text-white" size={24} />
-                  </div>
-                </div>
+            <div className="mb-6 bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4">
+              <div className="flex items-center gap-3">
+                <FiAlertCircle className="text-red-500" size={20} />
                 <div className="flex-1">
-                  <p className="text-gray-900 text-lg font-bold">⚠️ {error}</p>
+                  <p className="text-gray-900 text-sm">{error}</p>
                 </div>
                 <button
                   onClick={() => setError('')}
-                  className="text-red-600 hover:text-red-800 p-2 hover:bg-red-100 rounded-lg transition-all"
+                  className="text-red-600 hover:text-red-800 p-1"
                 >
-                  <FiX size={20} />
+                  <FiX size={18} />
                 </button>
               </div>
             </div>
           )}
 
-          {/* Header Section - Professional Design */}
-          <div className="mb-10">
+          {/* Header Section */}
+          <div className="mb-8">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-              <div className="space-y-4">
-                <h1 className="text-4xl md:text-5xl font-bold text-gray-900 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+              <div className="space-y-3">
+                <h1 className="text-3xl font-bold text-gray-900">
                   Video Marketplace
                 </h1>
-                <p className="text-gray-600 text-lg max-w-2xl">
-                  Discover premium video content. Buy, sell, license, and commission high-quality videos from talented creators.
+                <p className="text-gray-600 max-w-2xl">
+                  Discover premium video content. Buy, sell, license, and commission high-quality videos.
                 </p>
               </div>
               
@@ -535,16 +522,16 @@ const Browse: React.FC = () => {
                   <>
                     <button 
                       onClick={() => navigate('/marketplace/create')}
-                      className="group relative inline-flex items-center justify-center px-6 py-3 bg-yellow-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 overflow-hidden hover:bg-yellow-600 border border-yellow-500"
+                      className="inline-flex items-center justify-center px-5 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
                     >
-                      <FiPlus className="relative mr-2" size={18} />
-                      <span className="relative">Upload Video</span>
+                      <FiPlus className="mr-2" size={16} />
+                      Upload Video
                     </button>
                     <button 
                       onClick={() => navigate('/marketplace/my-orders')}
-                      className="inline-flex items-center justify-center px-5 py-3 border border-gray-300 text-gray-700 font-semibold rounded-xl bg-white hover:bg-gray-50 shadow-sm hover:shadow transition-all duration-200"
+                      className="inline-flex items-center justify-center px-5 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg bg-white hover:bg-gray-50 transition-colors"
                     >
-                      <FiCreditCard className="mr-2" size={18} />
+                      <FiCreditCard className="mr-2" size={16} />
                       My Orders
                     </button>
                   </>
@@ -552,114 +539,135 @@ const Browse: React.FC = () => {
                 
                 <button 
                   onClick={() => setShowFilters(!showFilters)}
-                  className="inline-flex items-center justify-center px-5 py-3 border border-gray-300 text-gray-700 font-semibold rounded-xl bg-white hover:bg-gray-50 shadow-sm hover:shadow transition-all duration-200"
+                  className="inline-flex items-center justify-center px-5 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg bg-white hover:bg-gray-50 transition-colors"
                 >
-                  <FiFilter className="mr-2" size={18} />
+                  <FiFilter className="mr-2" size={16} />
                   {showFilters ? 'Hide Filters' : 'Filters'}
                 </button>
               </div>
             </div>
 
-            {/* Search Bar - Professional Design */}
-            <div className="mt-8 max-w-3xl">
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <FiSearch className="text-gray-400 group-focus-within:text-yellow-500 transition-colors" size={20} />
+            {/* Content Type Buttons - Simple Design */}
+            <div className="mt-6">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wider">
+                Browse Content Types
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {CONTENT_TYPES.map((type) => (
+                  <button
+                    key={type.id}
+                    onClick={() => {
+                      setActiveCategory(activeCategory === type.id ? '' : type.id);
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                      activeCategory === type.id
+                        ? `${type.color} text-white border-transparent`
+                        : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    <span className="text-base">{type.icon}</span>
+                    <span className="font-medium">{type.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Search Bar */}
+            <div className="mt-6 max-w-2xl">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <FiSearch className="text-gray-400" size={18} />
                 </div>
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search videos by title, description, tags, or creator..."
-                  className="block w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 shadow-sm hover:shadow transition-all duration-200 text-base"
+                  placeholder="Search videos by title, description, tags..."
+                  className="block w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery('')}
-                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
                   >
-                    <FiX size={18} />
+                    <FiX size={16} />
                   </button>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Stats Cards - Professional Design */}
-          <div className="mb-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow duration-200">
+          {/* Stats Cards */}
+          <div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">{listings.length}</div>
-                  <div className="text-gray-600 text-sm font-medium">Total Listings</div>
+                  <div className="text-2xl font-bold text-gray-900">{listings.length}</div>
+                  <div className="text-gray-600 text-sm">Total Listings</div>
                 </div>
-                <div className="w-12 h-12 rounded-lg bg-gradient-to-r from-yellow-100 to-amber-100 flex items-center justify-center">
-                  <FiVideo className="text-yellow-600" size={20} />
+                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <FiVideo className="text-blue-600" size={18} />
                 </div>
               </div>
             </div>
-            <div className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">
+                  <div className="text-2xl font-bold text-gray-900">
                     {listings.filter(l => getFirstMediaUrl(l.mediaUrls || []).isVideo).length}
                   </div>
-                  <div className="text-gray-600 text-sm font-medium">Video Content</div>
+                  <div className="text-gray-600 text-sm">Video Content</div>
                 </div>
-                <div className="w-12 h-12 rounded-lg bg-gradient-to-r from-blue-100 to-indigo-100 flex items-center justify-center">
-                  <FiPlay className="text-blue-600" size={20} />
+                <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+                  <FiPlay className="text-green-600" size={18} />
                 </div>
               </div>
             </div>
-            <div className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold text-gray-900 mb-1">
+                  <div className="text-2xl font-bold text-gray-900">
                     {new Set(listings.map(l => l.sellerId?._id)).size}
                   </div>
-                  <div className="text-gray-600 text-sm font-medium">Active Creators</div>
+                  <div className="text-gray-600 text-sm">Active Creators</div>
                 </div>
-                <div className="w-12 h-12 rounded-lg bg-gradient-to-r from-green-100 to-emerald-100 flex items-center justify-center">
-                  <FiUser className="text-green-600" size={20} />
+                <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                  <FiUser className="text-purple-600" size={18} />
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Filters Section - Professional Design */}
+          {/* Filters Section */}
           {showFilters && (
-            <div className="mb-8 bg-white rounded-2xl shadow-xl border border-gray-200 p-6 animate-fadeIn">
-              <div className="flex items-center justify-between mb-6">
+            <div className="mb-6 bg-white border border-gray-200 rounded-lg p-5">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-yellow-500 flex items-center justify-center">
-                    <FiFilter className="text-white" size={18} />
-                  </div>
+                  <FiFilter className="text-gray-600" size={18} />
                   <div>
-                    <h3 className="text-xl font-bold text-gray-900">Advanced Filters</h3>
-                    <p className="text-gray-600 text-sm">Refine your search with precise filters</p>
+                    <h3 className="font-semibold text-gray-900">Filters</h3>
                   </div>
                 </div>
                 <button
                   onClick={clearFilters}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-lg border border-gray-300 transition-all duration-200"
+                  className="text-sm text-gray-600 hover:text-gray-900"
                 >
-                  Clear all filters
+                  Clear all
                 </button>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Content Type Filter */}
-                <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-gray-800 flex items-center gap-2">
-                    <FiType className="text-yellow-500" size={16} />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Content Type
                   </label>
                   <select 
                     value={filters.type}
                     onChange={(e) => setFilters(prev => ({ ...prev, type: e.target.value }))}
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none text-sm transition-all duration-200 bg-white hover:border-gray-300"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                   >
-                    <option value="">All Content Types</option>
+                    <option value="">All Types</option>
                     <option value="sale">💰 For Sale</option>
                     <option value="commission">🎨 Commission</option>
                     <option value="adaptation">📜 Adaptation Rights</option>
@@ -668,160 +676,125 @@ const Browse: React.FC = () => {
                 </div>
 
                 {/* Sort Options */}
-                <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-gray-800 flex items-center gap-2">
-                    <FiTag className="text-yellow-500" size={16} />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Sort By
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {SORT_OPTIONS.map((option) => {
-                      const Icon = option.icon;
-                      return (
-                        <button
-                          key={option.id}
-                          onClick={() => setFilters(prev => ({ ...prev, sortBy: option.id }))}
-                          className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border-2 transition-all duration-200 ${
-                            filters.sortBy === option.id
-                              ? 'border-yellow-400 bg-yellow-50 text-gray-900'
-                              : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                          }`}
-                        >
-                          <Icon size={14} className={filters.sortBy === option.id ? 'text-yellow-500' : 'text-gray-500'} />
-                          <span className="text-xs font-medium">{option.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <select 
+                    value={filters.sortBy}
+                    onChange={(e) => setFilters(prev => ({ ...prev, sortBy: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  >
+                    <option value="latest">Latest First</option>
+                    <option value="popular">Popular First</option>
+                    <option value="price_low">Price: Low to High</option>
+                    <option value="price_high">Price: High to Low</option>
+                  </select>
                 </div>
 
                 {/* Price Range Filter */}
-                <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-gray-800 flex items-center gap-2">
-                    <FiDollar className="text-yellow-500" size={16} />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Price Range (₹)
                   </label>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">Min</div>
-                        <input
-                          type="number"
-                          placeholder="0"
-                          value={filters.minPrice}
-                          onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))}
-                          className="w-full pl-12 pr-3 py-2.5 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none text-sm transition-all duration-200"
-                          min="0"
-                        />
-                      </div>
-                      <div className="relative flex-1">
-                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">Max</div>
-                        <input
-                          type="number"
-                          placeholder="10000"
-                          value={filters.maxPrice}
-                          onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: e.target.value }))}
-                          className="w-full pl-12 pr-3 py-2.5 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none text-sm transition-all duration-200"
-                          min="0"
-                        />
-                      </div>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <input
+                        type="number"
+                        placeholder="Min"
+                        value={filters.minPrice}
+                        onChange={(e) => setFilters(prev => ({ ...prev, minPrice: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        min="0"
+                      />
                     </div>
-                    <div className="text-xs text-gray-500 text-center">
-                      Leave blank for no price limit
+                    <div className="flex-1">
+                      <input
+                        type="number"
+                        placeholder="Max"
+                        value={filters.maxPrice}
+                        onChange={(e) => setFilters(prev => ({ ...prev, maxPrice: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        min="0"
+                      />
                     </div>
                   </div>
                 </div>
               </div>
               
-              <div className="mt-6 pt-6 border-t border-gray-200">
+              <div className="mt-4 pt-4 border-t border-gray-200">
                 <button
                   onClick={fetchListings}
-                  className="w-full py-3.5 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 border border-yellow-500"
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
                 >
-                  Apply Filters & Refresh Results
+                  Apply Filters
                 </button>
               </div>
             </div>
           )}
 
-          {/* Results Header - Professional */}
-          <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="px-4 py-2.5 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
-                <p className="text-gray-800 text-sm font-medium">
-                  {activeCategory ? (
-                    <>
-                      Showing <span className="text-gray-900 font-bold">{listings.length}</span> {CONTENT_TYPES.find(t => t.id === activeCategory)?.label.toLowerCase()} listings
-                    </>
-                  ) : (
-                    <>
-                      Found <span className="text-gray-900 font-bold">{listings.length}</span> listings
-                      {searchQuery && (
-                        <span> for "<span className="text-gray-900 font-semibold">{searchQuery}</span>"</span>
-                      )}
-                    </>
+          {/* Results Header */}
+          <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="text-sm text-gray-600">
+              {activeCategory ? (
+                <>
+                  Showing <span className="font-semibold text-gray-900">{listings.length}</span> {CONTENT_TYPES.find(t => t.id === activeCategory)?.label.toLowerCase()} listings
+                </>
+              ) : (
+                <>
+                  Found <span className="font-semibold text-gray-900">{listings.length}</span> listings
+                  {searchQuery && (
+                    <span> for "<span className="font-semibold text-gray-900">{searchQuery}</span>"</span>
                   )}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {(searchQuery || activeCategory) && (
-                  <button
-                    onClick={() => {
-                      if (searchQuery) setSearchQuery('');
-                      if (activeCategory) setActiveCategory('');
-                    }}
-                    className="px-3 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-lg border border-gray-300 transition-all duration-200 flex items-center gap-1"
-                  >
-                    <FiX size={12} />
-                    Clear {searchQuery && activeCategory ? 'all' : searchQuery ? 'search' : 'filter'}
-                  </button>
-                )}
-              </div>
+                </>
+              )}
             </div>
-            
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 font-medium">Sorted by:</span>
-              <span className="text-sm text-gray-800 font-semibold">
-                {SORT_OPTIONS.find(s => s.id === filters.sortBy)?.label}
-              </span>
-            </div>
+            {(searchQuery || activeCategory) && (
+              <button
+                onClick={() => {
+                  if (searchQuery) setSearchQuery('');
+                  if (activeCategory) setActiveCategory('');
+                }}
+                className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
+              >
+                <FiX size={14} />
+                Clear {searchQuery && activeCategory ? 'all' : searchQuery ? 'search' : 'filter'}
+              </button>
+            )}
           </div>
 
-          {/* Listings Grid - Professional Design */}
+          {/* Listings Grid */}
           {listings.length === 0 ? (
-            <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-lg border border-gray-200 p-12 text-center">
+            <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
               <div className="max-w-md mx-auto">
-                <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-r from-yellow-100 to-amber-100 rounded-full flex items-center justify-center border border-yellow-200 shadow-inner">
-                  <FiVideo size={32} className="text-yellow-600" />
+                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                  <FiVideo className="text-gray-400" size={24} />
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   {activeCategory 
                     ? `No ${CONTENT_TYPES.find(t => t.id === activeCategory)?.label.toLowerCase()} listings found` 
-                    : searchQuery || Object.values(filters).some(Boolean) 
-                    ? 'No listings found' 
-                    : 'Welcome to Video Marketplace!'
+                    : 'No listings found'
                   }
                 </h3>
-                <p className="text-gray-600 text-base mb-8">
+                <p className="text-gray-600 text-sm mb-6">
                   {activeCategory
-                    ? `There are currently no ${CONTENT_TYPES.find(t => t.id === activeCategory)?.label.toLowerCase()} listings. Be the first to create one!`
-                    : searchQuery || Object.values(filters).some(Boolean)
-                    ? 'Try adjusting your search or filters to find what you\'re looking for.'
-                    : 'Be the first to upload a video and start selling!'
+                    ? `There are currently no ${CONTENT_TYPES.find(t => t.id === activeCategory)?.label.toLowerCase()} listings.`
+                    : 'Try adjusting your search or filters.'
                   }
                 </p>
                 {marketplaceApi.utils.checkAuth() && (
                   <button 
                     onClick={() => navigate('/marketplace/create')}
-                    className="inline-flex items-center justify-center px-6 py-3.5 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200 border border-yellow-500"
+                    className="inline-flex items-center justify-center px-5 py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
                   >
-                    <FiPlus className="mr-2" size={18} />
-                    Upload Your First Video
+                    <FiPlus className="mr-2" size={16} />
+                    Upload Video
                   </button>
                 )}
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {listings.map(listing => {
                 const { url: mediaUrl, isVideo, isImage } = getFirstMediaUrl(listing.mediaUrls || []);
                 const thumbnailUrl = getThumbnailUrl(listing);
@@ -831,12 +804,12 @@ const Browse: React.FC = () => {
                 return (
                   <div 
                     key={listing._id} 
-                    className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl overflow-hidden hover:shadow-xl transition-all duration-300 group"
+                    className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow duration-200"
                     onMouseEnter={() => setHoveredListing(listing._id)}
                     onMouseLeave={() => setHoveredListing(null)}
                   >
                     {/* Media Thumbnail */}
-                    <div className="h-48 bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
+                    <div className="h-48 bg-gray-100 relative overflow-hidden">
                       {mediaUrl ? (
                         isVideo ? (
                           // Video thumbnail with play button
@@ -845,26 +818,18 @@ const Browse: React.FC = () => {
                             onClick={() => handleVideoClick(mediaUrl, listing.title, listing)}
                           >
                             <video
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              className="w-full h-full object-cover"
                               preload="metadata"
                               poster={listing.mediaUrls?.find(url => isImageUrl(url)) || ''}
                             >
                               <source src={mediaUrl} type="video/mp4" />
                             </video>
-                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition-all duration-300">
-                              <div className="w-12 h-12 bg-white bg-opacity-90 rounded-full flex items-center justify-center transform scale-0 group-hover:scale-100 transition-transform duration-300">
-                                <svg className="w-6 h-6 text-gray-900" fill="currentColor" viewBox="0 0 24 24">
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 flex items-center justify-center transition-all duration-300">
+                              <div className="w-10 h-10 bg-white bg-opacity-90 rounded-full flex items-center justify-center">
+                                <svg className="w-5 h-5 text-gray-900" fill="currentColor" viewBox="0 0 24 24">
                                   <path d="M8 5v14l11-7z" />
                                 </svg>
                               </div>
-                            </div>
-                            <div className="absolute top-3 left-3">
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
-                                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
-                                  <path d="M8 5v14l11-7z" />
-                                </svg>
-                                Video
-                              </span>
                             </div>
                           </div>
                         ) : isImage ? (
@@ -873,67 +838,53 @@ const Browse: React.FC = () => {
                             <img
                               src={thumbnailUrl}
                               alt={listing.title}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              className="w-full h-full object-cover"
                               loading="lazy"
                               onError={() => handleImageError(listing._id)}
                             />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                           </div>
                         ) : (
                           // Generic media
-                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100 group-hover:from-blue-100 group-hover:to-blue-200 transition-all duration-300">
-                            <div className="text-center transform group-hover:scale-110 transition-transform duration-300">
-                              <svg className="w-12 h-12 text-blue-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                            <div className="text-center">
+                              <svg className="w-10 h-10 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                               </svg>
-                              <p className="text-sm text-blue-600 mt-2">Media File</p>
                             </div>
                           </div>
                         )
                       ) : (
                         // No media
-                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 group-hover:from-gray-200 group-hover:to-gray-300 transition-all duration-300">
-                          <div className="text-center transform group-hover:scale-110 transition-transform duration-300">
-                            <svg className="w-12 h-12 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                          <div className="text-center">
+                            <svg className="w-10 h-10 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
-                            <p className="text-sm text-gray-500 mt-2">No Media</p>
                           </div>
                         </div>
                       )}
                       
-                      {/* Quality Badge */}
-                      {qualityBadge.label && (
-                        <div className={`absolute top-3 right-3 z-10 px-2 py-1 rounded ${qualityBadge.color} text-xs font-bold shadow-sm`}>
-                          {qualityBadge.label}
-                        </div>
-                      )}
-                      
                       {/* Content Type Badge */}
-                      <div className="absolute top-3 left-3 z-10">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          contentType?.color || 'bg-gray-600'
-                        } text-white border border-white/30 shadow-sm`}>
+                      <div className="absolute top-2 left-2">
+                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${contentType?.color || 'bg-gray-600'} text-white`}>
                           <span className="mr-1">{contentType?.icon || '📁'}</span>
-                          <span className="font-semibold">
-                            {contentType?.label || listing.type || 'Sale'}
-                          </span>
+                          <span>{contentType?.label || listing.type || 'Sale'}</span>
                         </span>
                       </div>
                       
                       {/* Price Tag */}
-                      <div className="absolute bottom-3 left-3">
-                        <div className="bg-yellow-600 text-white px-3 py-1.5 rounded-lg shadow-lg">
-                          <p className="text-lg font-bold">{formatCurrency(listing.price)}</p>
+                      <div className="absolute bottom-2 left-2">
+                        <div className="bg-green-600 text-white px-2 py-1 rounded">
+                          <p className="text-sm font-bold">{formatCurrency(listing.price)}</p>
                         </div>
                       </div>
                     </div>
                     
                     {/* Listing Info */}
-                    <div className="p-5">
-                      <div className="mb-4">
+                    <div className="p-4">
+                      <div className="mb-3">
                         <h3 
-                          className="font-semibold text-gray-900 mb-2 truncate group-hover:text-blue-600 transition-colors cursor-pointer"
+                          className="font-semibold text-gray-900 mb-2 line-clamp-1 cursor-pointer hover:text-blue-600"
                           title={listing.title}
                           onClick={() => handleViewDetails(listing._id)}
                         >
@@ -944,34 +895,38 @@ const Browse: React.FC = () => {
                           {listing.description}
                         </p>
                         
-                  
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="text-xs text-gray-500">
+                            {formatDate(listing.createdAt || '')}
+                          </div>
+                        </div>
                       </div>
                       
                       {/* Tags */}
                       {listing.tags && listing.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mb-4">
-                          {listing.tags.slice(0, 3).map((tag, index) => (
+                          {listing.tags.slice(0, 2).map((tag, index) => (
                             <span 
                               key={index} 
-                              className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 border border-gray-300 hover:bg-gray-300 transition-colors cursor-default"
+                              className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-700 border border-gray-300"
                               title={tag}
                             >
                               #{tag}
                             </span>
                           ))}
-                          {listing.tags.length > 3 && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-200 text-gray-600 border border-gray-300">
-                              +{listing.tags.length - 3}
+                          {listing.tags.length > 2 && (
+                            <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-200 text-gray-600 border border-gray-300">
+                              +{listing.tags.length - 2}
                             </span>
                           )}
                         </div>
                       )}
                       
-                      {/* Action Button - Only Buy Now */}
-                      <div className="pt-4 border-t border-gray-200">
+                      {/* Action Button */}
+                      <div className="pt-3 border-t border-gray-200">
                         <button
                           onClick={() => handleMakeOffer(listing)}
-                          className="w-full py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-semibold rounded-lg transition-all duration-200 flex items-center justify-center hover:shadow-lg transform hover:-translate-y-0.5 border border-yellow-500"
+                          className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center"
                         >
                           <FiDollarSign className="w-4 h-4 mr-2" />
                           Buy Now - {formatCurrency(listing.price)}
@@ -979,23 +934,23 @@ const Browse: React.FC = () => {
                       </div>
                       
                       {/* Seller Info */}
-                      <div className="mt-4 pt-3 border-t border-gray-200 flex items-center justify-between">
+                      <div className="mt-3 pt-3 border-t border-gray-200 flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-r from-gray-100 to-gray-200 flex items-center justify-center overflow-hidden border border-gray-300">
+                          <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden border border-gray-300">
                             {listing.sellerId?.avatar ? (
                               <img 
                                 src={listing.sellerId.avatar} 
                                 alt={listing.sellerId.username}
                                 className="w-full h-full object-cover"
                                 onError={(e) => {
-                                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/32/F3F4F6/9CA3AF?text=U';
+                                  (e.target as HTMLImageElement).src = 'https://via.placeholder.com/28/F3F4F6/9CA3AF?text=U';
                                 }}
                               />
                             ) : (
-                              <FiUser size={14} className="text-gray-600" />
+                              <FiUser size={12} className="text-gray-600" />
                             )}
                           </div>
-                          <span className="text-xs text-gray-700 truncate max-w-[100px] font-medium">
+                          <span className="text-xs text-gray-700 truncate max-w-[80px]">
                             {listing.sellerId?.username || 'Seller'}
                           </span>
                         </div>
@@ -1014,45 +969,17 @@ const Browse: React.FC = () => {
             </div>
           )}
 
-          {/* Load More - Professional */}
+          {/* Load More */}
           {listings.length > 0 && listings.length >= 12 && (
-            <div className="mt-8 text-center">
+            <div className="mt-6 text-center">
               <button 
                 onClick={fetchListings}
-                className="inline-flex items-center justify-center px-6 py-3.5 bg-gray-800 hover:bg-gray-900 text-white font-semibold rounded-xl border border-gray-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                className="inline-flex items-center justify-center px-5 py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg bg-white hover:bg-gray-50 transition-colors"
               >
-                <span>Load More Videos</span>
-                <FiPlus className="ml-2" size={18} />
+                Load More Videos
               </button>
             </div>
           )}
-
-          {/* Call to Action Footer - Professional */}
-          <div className="mt-12 bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl border border-gray-200 p-8 text-center">
-            <div className="max-w-2xl mx-auto">
-              <h2 className="text-2xl font-bold text-gray-900 mb-3">
-                Start Your Video Journey Today
-              </h2>
-              <p className="text-gray-600 mb-6">
-                Join thousands of creators and buyers in our thriving video marketplace. 
-                Whether you're looking to sell your work or find the perfect video, we've got you covered.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <button 
-                  onClick={() => navigate('/marketplace/create')}
-                  className="px-8 py-3.5 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-xl border border-yellow-500 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
-                >
-                  Start Selling Videos
-                </button>
-                <button 
-                  onClick={() => setShowFilters(true)}
-                  className="px-8 py-3.5 border-2 border-gray-300 text-gray-700 font-semibold rounded-xl bg-white hover:bg-gray-50 shadow-sm hover:shadow transition-all duration-200"
-                >
-                  Explore Marketplace
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
