@@ -157,7 +157,61 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
   const toggleExpandOrder = (orderId: string) => {
     setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
   };
+// ✅ TEST FUNCTION FOR DEBUGGING
+const testDeliveryFlow = async () => {
+  try {
+    console.log('🧪 Testing delivery flow...');
+    
+    // Test 1: Check auth token
+    const token = localStorage.getItem('token');
+    console.log('🔑 Token exists:', !!token);
+    
+    // Test 2: Check API base URL
+    console.log('🌐 API Base URL:', marketplaceApi.utils.getApiBaseUrl());
+    
+    // Test 3: Test file upload endpoint
+    console.log('📤 Testing file upload endpoint...');
+    try {
+      const testResponse = await fetch('http://localhost:3000/marketplace/orders/upload/delivery', {
+        method: 'OPTIONS',
+      });
+      console.log('✅ Upload endpoint accessible:', testResponse.ok);
+    } catch (error) {
+      console.error('❌ Upload endpoint not accessible:', error);
+    }
+    
+    // Test 4: Test deliver endpoint
+    if (selectedOrderForDelivery) {
+      console.log('📦 Testing deliver endpoint for order:', selectedOrderForDelivery._id);
+      try {
+        const deliverResponse = await fetch(
+          `http://localhost:3000/marketplace/orders/${selectedOrderForDelivery._id}/deliver-with-email`,
+          { method: 'OPTIONS' }
+        );
+        console.log('✅ Deliver endpoint accessible:', deliverResponse.ok);
+      } catch (error) {
+        console.error('❌ Deliver endpoint not accessible:', error);
+      }
+    }
+    
+    console.log('✅ All tests completed');
+    
+  } catch (error) {
+    console.error('❌ Test failed:', error);
+  }
+};
 
+// OrdersTab mein call karein jab modal open ho
+useEffect(() => {
+  if (deliveryModalOpen && selectedOrderForDelivery) {
+    console.log('🔍 Debug info for delivery:', {
+      order: selectedOrderForDelivery,
+      status: selectedOrderForDelivery.status,
+      id: selectedOrderForDelivery._id
+    });
+    // testDeliveryFlow(); // Uncomment for debugging
+  }
+}, [deliveryModalOpen, selectedOrderForDelivery]);
   // ✅ Handle Start Processing using marketplaceApi
   const handleStartProcessing = async (orderId: string) => {
     try {
