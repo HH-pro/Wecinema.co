@@ -1784,12 +1784,13 @@ const SellerDashboard: React.FC = () => {
 
           {/* Modals */}
           {showStripeSetup && (
-            <SafeStripeSetupModal
-              show={showStripeSetup}
-              onClose={() => setShowStripeSetup(false)}
-              onSuccess={handleStripeSetupSuccess}
-              stripeConnected={stripeStatus?.account?.charges_enabled || false}
-            />
+            // In SellerDashboard.tsx
+<SafeStripeSetupModal
+  show={showStripeSetup}
+  onClose={() => setShowStripeSetup(false)}
+  onSuccess={handleStripeSetupSuccess}
+  stripeConnected={stripeStatus?.account?.charges_enabled || false}
+/>
           )}
 
           {/* ✅ NEW: Disconnect Stripe Modal */}
