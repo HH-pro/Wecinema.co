@@ -29,8 +29,8 @@
   width: 80px;
   height: 80px;
   margin: 0 auto 2rem;
-  border: 4px solid rgba(79, 70, 229, 0.1);
-  border-top: 4px solid #F97316;
+  border: 4px solid;
+  border-top: 4px solid #C2410C;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
