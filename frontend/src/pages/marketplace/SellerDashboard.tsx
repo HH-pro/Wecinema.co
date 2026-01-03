@@ -1287,24 +1287,23 @@ const fetchListings = async () => {
 
                 {/* Listings Tab */}
                 {activeTab === 'listings' && (
-                 // SellerDashboard.tsx में
-<SafeListingsTab
-  listings={listings} // ✅ Changed from listingsData to listings
-  loading={listingsLoading}
-  statusFilter={listingsStatusFilter}
-  currentPage={listingsPage}
-  totalPages={listingsData?.pagination?.pages || 1}
-  onStatusFilterChange={setListingsStatusFilter}
-  onPageChange={setListingsPage}
-  onEditListing={handleEditListing}
-  onDeleteListing={handleDeleteListing}
-  onToggleStatus={handleToggleListingStatus}
-  onPlayVideo={handlePlayVideo}
-  onRefresh={fetchListings}
-  actionLoading={listingActionLoading}
-  onCreateListing={() => navigate('/marketplace/create')}
-  onViewListing={(id) => navigate(`/marketplace/listing/${id}`)}
-/>
+                  <SafeListingsTab
+                    listings={listings}
+                    loading={listingsLoading}
+                    statusFilter={listingsStatusFilter}
+                    currentPage={listingsPage}
+                    totalPages={Math.ceil(totalListings / listingsLimit)}
+                    onStatusFilterChange={setListingsStatusFilter}
+                    onPageChange={setListingsPage}
+                    onEditListing={handleEditListing}
+                    onDeleteListing={handleDeleteListing}
+                    onToggleStatus={handleToggleListingStatus}
+                    onPlayVideo={handlePlayVideo}
+                    onRefresh={fetchListings}
+                    actionLoading={listingActionLoading}
+                    onCreateListing={() => navigate('/marketplace/create')}
+                    onViewListing={(id) => navigate(`/marketplace/listing/${id}`)}
+                  />
                 )}
 
                 {/* Orders Tab */}
