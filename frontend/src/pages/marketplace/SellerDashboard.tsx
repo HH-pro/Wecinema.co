@@ -1,4 +1,4 @@
-// src/pages/seller/SellerDashboard.tsx - COMPLETE UPDATED VERSION
+// src/pages/seller/SellerDashboard.tsx - COMPLETE UPDATED VERSION WITH DISCONNECT OPTION
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -217,6 +217,10 @@ const SellerDashboard: React.FC = () => {
   const [ordersLimit] = useState(10);
   
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  // ✅ NEW: Disconnect Stripe Modal State
+  const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   // Calculate derived stats
   const totalListings = listings.length;
@@ -449,6 +453,88 @@ const SellerDashboard: React.FC = () => {
     } catch (err: any) {
       console.error('❌ Error checking Stripe status:', err);
       setError('Failed to check Stripe account status. Please try again.');
+    }
+  };
+
+  // ✅ NEW: Disconnect Stripe Account
+  const handleDisconnectStripe = async () => {
+    try {
+      setDisconnecting(true);
+      
+      console.log('🔌 Disconnecting Stripe account...');
+      
+      // Call API to disconnect Stripe
+      const response = await ordersApi.disconnectStripeAccount();
+      
+      if (response.success) {
+        setSuccessMessage('Stripe account disconnected successfully!');
+        setShowDisconnectModal(false);
+        
+        // ✅ Refresh data to update UI
+        setTimeout(() => {
+          refreshDataAfterAction('all');
+        }, 1000);
+        
+      } else {
+        setError(response.error || 'Failed to disconnect Stripe account. Please try again.');
+      }
+    } catch (err: any) {
+      console.error('❌ Error disconnecting Stripe:', err);
+      setError('Failed to disconnect Stripe account. Please try again.');
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
+  // ✅ NEW: Mock disconnect function (if API not available)
+  const mockDisconnectStripe = async () => {
+    try {
+      setDisconnecting(true);
+      
+      console.log('🔌 Mock disconnecting Stripe account...');
+      
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Mock successful disconnect
+      setStripeStatus({
+        account: {
+          id: '',
+          business_type: '',
+          business_profile: {},
+          charges_enabled: false,
+          payouts_enabled: false,
+          details_submitted: false,
+          capabilities: {},
+          requirements: {
+            currently_due: [],
+            eventually_due: [],
+            past_due: [],
+            disabled_reason: ''
+          }
+        },
+        status: {
+          canReceivePayments: false,
+          missingRequirements: [],
+          needsAction: false,
+          isActive: false
+        },
+        message: 'Please connect your Stripe account to receive payments'
+      });
+      
+      setSuccessMessage('Stripe account disconnected successfully!');
+      setShowDisconnectModal(false);
+      
+      // ✅ Refresh data
+      setTimeout(() => {
+        refreshDataAfterAction('all');
+      }, 500);
+      
+    } catch (err: any) {
+      console.error('❌ Error in mock disconnect:', err);
+      setError('Failed to disconnect Stripe account. Please try again.');
+    } finally {
+      setDisconnecting(false);
     }
   };
 
@@ -1320,7 +1406,7 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* ✅ Stripe Account Status - UPDATED: Shows setup prompt OR ready to earn status */}
+          {/* ✅ Stripe Account Status - UPDATED: Shows setup prompt OR ready to earn status WITH DISCONNECT OPTION */}
           {!stripeStatus?.account?.charges_enabled ? (
             // Show setup prompt when NOT connected
             <SafeStripeAccountStatus
@@ -1336,87 +1422,146 @@ const SellerDashboard: React.FC = () => {
           ) : (
             // Show earning status when connected
             <div className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-3 rounded-xl mr-4 shadow-sm">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                <div className="flex items-start">
+                  <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-3 rounded-xl mr-4 shadow-sm flex-shrink-0">
                     <span className="text-xl text-white">💰</span>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Ready to Earn! 🎉
-                    </h3>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Ready to Earn! 🎉
+                      </h3>
+                      <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                        Connected
+                      </span>
+                    </div>
                     <p className="text-gray-600 mt-1">
                       Your Stripe account is connected and ready to accept payments.
                     </p>
                     
-                    {/* Show available balance */}
-                    {orderStats.availableBalance !== undefined && orderStats.availableBalance > 0 && (
-                      <div className="mt-3 p-3 bg-green-100/30 rounded-lg border border-green-200">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-xs text-gray-500">Available Balance</p>
-                            <p className="text-lg font-semibold text-gray-900">
-                              {safeFormatCurrency(orderStats.availableBalance)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500">Pending Revenue</p>
-                            <p className="text-lg font-semibold text-yellow-600">
-                              {safeFormatCurrency(orderStats.pendingRevenue)}
-                            </p>
-                          </div>
+                    {/* Account Info */}
+                    <div className="mt-3 space-y-3">
+                      {/* Status Indicators */}
+                      <div className="flex flex-wrap gap-3">
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <span className="text-xs text-gray-700">Charges Enabled</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <span className="text-xs text-gray-700">Payouts Enabled</span>
                         </div>
                       </div>
-                    )}
+
+                      {/* Balance Info */}
+                      <div className="p-3 bg-green-100/30 rounded-lg border border-green-200">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          {orderStats.availableBalance !== undefined && (
+                            <div>
+                              <p className="text-xs text-gray-500">Available Balance</p>
+                              <p className="text-lg font-semibold text-gray-900">
+                                {safeFormatCurrency(orderStats.availableBalance)}
+                              </p>
+                            </div>
+                          )}
+                          {orderStats.pendingRevenue !== undefined && orderStats.pendingRevenue > 0 && (
+                            <div>
+                              <p className="text-xs text-gray-500">Pending Revenue</p>
+                              <p className="text-lg font-semibold text-yellow-600">
+                                {safeFormatCurrency(orderStats.pendingRevenue)}
+                              </p>
+                            </div>
+                          )}
+                          {orderStats.totalRevenue !== undefined && (
+                            <div>
+                              <p className="text-xs text-gray-500">Total Earnings</p>
+                              <p className="text-lg font-semibold text-green-700">
+                                {safeFormatCurrency(orderStats.totalRevenue)}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Account ID (if available) */}
+                      {stripeStatus?.account?.id && (
+                        <div className="text-xs text-gray-500">
+                          <span className="font-medium">Account ID:</span>{' '}
+                          <span className="font-mono text-gray-700">
+                            {stripeStatus.account.id.substring(0, 8)}...
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
                 
-                <div className="flex gap-3">
-                  {/* Stripe Dashboard Link */}
-                  {stripeStatus?.account?.id && (
-                    <a
-                      href={`https://dashboard.stripe.com/connect/accounts/${stripeStatus.account.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium py-3 px-6 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 whitespace-nowrap"
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
-                        Stripe Dashboard
-                      </div>
-                    </a>
-                  )}
+                <div className="flex flex-col sm:flex-row lg:flex-col gap-3 flex-shrink-0">
+                  {/* Action Buttons */}
+                  <div className="flex gap-3">
+                    {/* Stripe Dashboard Link */}
+                    {stripeStatus?.account?.id && (
+                      <a
+                        href={`https://dashboard.stripe.com/connect/accounts/${stripeStatus.account.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium py-3 px-4 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 whitespace-nowrap text-center"
+                      >
+                        <div className="flex items-center justify-center gap-2">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                          Dashboard
+                        </div>
+                      </a>
+                    )}
+                    
+                    {/* Withdraw Button if there's available balance */}
+                    {orderStats.availableBalance !== undefined && orderStats.availableBalance > 0 && (
+                      <button
+                        onClick={() => setActiveTab('withdraw')}
+                        className="flex-1 bg-white hover:bg-gray-50 text-green-600 border border-green-300 font-medium py-3 px-4 rounded-xl transition-all duration-200 shadow-sm hover:shadow whitespace-nowrap text-center"
+                      >
+                        <div className="flex items-center justify-center gap-2">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                          Withdraw
+                        </div>
+                      </button>
+                    )}
+                  </div>
                   
-                  {/* Withdraw Button if there's available balance */}
-                  {orderStats.availableBalance !== undefined && orderStats.availableBalance > 0 && (
+                  {/* Manage & Disconnect Buttons */}
+                  <div className="flex gap-3">
+                    {/* Manage Account Button */}
                     <button
-                      onClick={() => setActiveTab('withdraw')}
-                      className="bg-white hover:bg-gray-50 text-green-600 border border-green-300 font-medium py-3 px-6 rounded-xl transition-all duration-200 shadow-sm hover:shadow whitespace-nowrap"
+                      onClick={handleOpenStripeSetup}
+                      className="flex-1 bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 font-medium py-3 px-4 rounded-xl transition-all duration-200 shadow-sm hover:shadow whitespace-nowrap text-center"
                     >
                       <div className="flex items-center justify-center gap-2">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
-                        Withdraw Funds
+                        Manage
                       </div>
                     </button>
-                  )}
-                  
-                  {/* Manage Account Button */}
-                  <button
-                    onClick={handleOpenStripeSetup}
-                    className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 font-medium py-3 px-6 rounded-xl transition-all duration-200 shadow-sm hover:shadow whitespace-nowrap"
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      Manage Account
-                    </div>
-                  </button>
+                    
+                    {/* Disconnect Button */}
+                    <button
+                      onClick={() => setShowDisconnectModal(true)}
+                      className="flex-1 bg-white hover:bg-red-50 text-red-600 border border-red-300 font-medium py-3 px-4 rounded-xl transition-all duration-200 shadow-sm hover:shadow whitespace-nowrap text-center"
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Disconnect
+                      </div>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1645,6 +1790,101 @@ const SellerDashboard: React.FC = () => {
               onSuccess={handleStripeSetupSuccess}
               stripeConnected={stripeStatus?.account?.charges_enabled || false}
             />
+          )}
+
+          {/* ✅ NEW: Disconnect Stripe Modal */}
+          {showDisconnectModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 transform transition-all duration-300 animate-scale-in">
+                <div className="flex items-center mb-4">
+                  <div className="bg-red-100 p-3 rounded-xl mr-4">
+                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Disconnect Stripe Account</h3>
+                    <p className="text-sm text-gray-600 mt-1">This action cannot be undone</p>
+                  </div>
+                </div>
+
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+                  <div className="flex items-start">
+                    <svg className="w-5 h-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <h4 className="text-sm font-medium text-red-800">Important Warning</h4>
+                      <ul className="mt-2 space-y-2 text-sm text-red-700">
+                        <li className="flex items-start">
+                          <span className="mr-2">•</span>
+                          <span>You will not be able to receive payments for new orders</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="mr-2">•</span>
+                          <span>Pending withdrawals will be cancelled</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="mr-2">•</span>
+                          <span>Any available balance will remain in your Stripe account</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="mr-2">•</span>
+                          <span>You can reconnect anytime</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Show balance warning if there's available balance */}
+                {orderStats.availableBalance !== undefined && orderStats.availableBalance > 0 && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
+                    <div className="flex items-center">
+                      <svg className="w-5 h-5 text-yellow-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div>
+                        <p className="text-sm font-medium text-yellow-800">
+                          You have {safeFormatCurrency(orderStats.availableBalance)} available balance
+                        </p>
+                        <p className="text-xs text-yellow-700 mt-1">
+                          Consider withdrawing your funds before disconnecting
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowDisconnectModal(false)}
+                    disabled={disconnecting}
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-xl transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Use mock disconnect for now - replace with actual API call when available
+                      mockDisconnectStripe();
+                      // handleDisconnectStripe(); // Uncomment when API is ready
+                    }}
+                    disabled={disconnecting}
+                    className="flex-1 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-medium py-3 px-4 rounded-xl transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {disconnecting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Disconnecting...
+                      </>
+                    ) : (
+                      'Disconnect Account'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
           {selectedOrderId && (
