@@ -1921,7 +1921,7 @@ export const formatCurrency = (
   amount: number,
   currency: string = 'USD'
 ): string => {
-  const valueInDollars = (amount || 0) / 1000;
+  const valueInDollars = (amount || 0) / 100;
 
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
