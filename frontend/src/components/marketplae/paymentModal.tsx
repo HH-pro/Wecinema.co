@@ -1,48 +1,47 @@
-import React, { useState } from 'react';
-import { FiCheck, FiX, FiUser, FiMail, FiCreditCard, FiAlertCircle, FiLoader, FiImage } from 'react-icons/fi';
-import { Elements, PaymentElement, useStripe, useElements, AddressElement } from '@stripe/react-stripe-js';
+import React from 'react';
 import { loadStripe } from '@stripe/stripe-js';
+import { Elements, PaymentElement, useStripe, useElements, AddressElement } from '@stripe/react-stripe-js';
+import { FiX, FiCreditCard, FiCheck, FiAlertCircle, FiLoader, FiUser, FiMail } from 'react-icons/fi';
 import marketplaceApi from '../../api/marketplaceApi';
 
-// Initialize Stripe
 const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "pk_test_51SKw7ZHYamYyPYbDUlqbeydcW1hVGrHOvCZ8mBwSU1gw77TIRyzng31iSqAvPIQzTYKG8UWfDew7kdKgBxsw7vtq00WTLU3YCZ";
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 
 interface PaymentModalProps {
-  show: boolean;
-  clientSecret: string;
-  offerData: any;
+  isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  clientSecret: string;
+  offerData: any;
   paymentStatus: 'idle' | 'processing' | 'success' | 'failed';
   setPaymentStatus: (status: 'idle' | 'processing' | 'success' | 'failed') => void;
   billingDetails: any;
-  onBillingDetailsChange: (details: any) => void;
+  setBillingDetails: (details: any) => void;
   currentUser: any;
   getThumbnailUrl: (listing: any) => string;
 }
 
 const PaymentModal: React.FC<PaymentModalProps> = ({
-  show,
-  clientSecret,
-  offerData,
+  isOpen,
   onClose,
   onSuccess,
+  clientSecret,
+  offerData,
   paymentStatus,
   setPaymentStatus,
   billingDetails,
-  onBillingDetailsChange,
+  setBillingDetails,
   currentUser,
   getThumbnailUrl
 }) => {
-  if (!show) return null;
+  if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black bg-opacity-50 p-2 sm:p-4 overflow-y-auto">
-      <div className="w-full max-w-md sm:max-w-lg mx-4 mt-4 sm:mt-8 lg:mt-12">
-        <div className="bg-white rounded-lg shadow-xl flex flex-col max-h-[calc(100vh-4rem)] sm:max-h-[calc(100vh-6rem)] overflow-hidden">
-          {/* Header - Sticky */}
-          <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-2 sm:p-4 overflow-y-auto">
+      <div className="w-full max-w-md sm:max-w-lg mx-4">
+        <div className="bg-white rounded-lg shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
+          {/* Header */}
+          <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold text-gray-900">
                 {offerData?.type === 'direct_purchase' ? 'Complete Purchase' : 'Complete Offer Payment'}
@@ -85,17 +84,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                   <div className="mt-3 pt-3 border-t border-yellow-300">
                     <div className="flex items-start gap-3">
                       <div className="w-12 h-12 rounded-lg overflow-hidden border border-gray-300 flex-shrink-0 bg-gray-100">
-                        {getThumbnailUrl(offerData.listing) ? (
-                          <img
-                            src={getThumbnailUrl(offerData.listing)}
-                            alt={offerData.listing.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                            <FiImage className="text-gray-400" size={16} />
-                          </div>
-                        )}
+                        <img
+                          src={getThumbnailUrl(offerData.listing)}
+                          alt={offerData.listing.title}
+                          className="w-full h-full object-cover"
+                        />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="font-semibold text-gray-900 text-sm truncate">
@@ -130,7 +123,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                     paymentStatus={paymentStatus}
                     setPaymentStatus={setPaymentStatus}
                     billingDetails={billingDetails}
-                    onBillingDetailsChange={onBillingDetailsChange}
+                    setBillingDetails={setBillingDetails}
                     currentUser={currentUser}
                   />
                 </Elements>
@@ -166,20 +159,15 @@ const PaymentForm = ({
   paymentStatus, 
   setPaymentStatus,
   billingDetails,
-  onBillingDetailsChange,
+  setBillingDetails,
   currentUser
 }: any) => {
   const stripe = useStripe();
   const elements = useElements();
-  const [error, setError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showBillingForm, setShowBillingForm] = useState(false);
- const safeCurrentUser = currentUser || {};
-  const userInfo = {
-    name: safeCurrentUser?.username || billingDetails?.name || 'Customer',
-    email: safeCurrentUser?.email || billingDetails?.email || '',
-    phone: billingDetails?.phone || ''
-  };
+  const [error, setError] = React.useState('');
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [showBillingForm, setShowBillingForm] = React.useState(false);
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     
@@ -193,16 +181,12 @@ const PaymentForm = ({
     setError('');
 
     try {
-      console.log('🔄 Confirming payment...');
-
-      // Get user info
       const userInfo = {
         name: currentUser?.username || billingDetails.name || 'Customer',
         email: currentUser?.email || billingDetails.email || '',
         phone: billingDetails.phone || ''
       };
 
-      // Prepare billing details for confirmPayment
       const billingDetailsForStripe = {
         name: userInfo.name,
         email: userInfo.email || undefined,
@@ -217,9 +201,6 @@ const PaymentForm = ({
         }
       };
 
-      console.log('📋 Billing details for Stripe:', billingDetailsForStripe);
-
-      // Direct confirmation without submit()
       const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
@@ -232,50 +213,11 @@ const PaymentForm = ({
       });
 
       if (stripeError) {
-        console.error('❌ Stripe payment error:', stripeError);
-        setError(stripeError.message || 'Payment failed. Please try again.');
-        setPaymentStatus('failed');
-        setIsSubmitting(false);
-        return;
+        throw new Error(stripeError.message || 'Payment failed');
       }
 
-      console.log('✅ Stripe payment successful:', {
-        paymentIntentId: paymentIntent?.id,
-        status: paymentIntent?.status
-      });
-
-      // Prepare confirmation data
-      let confirmationPayload;
-      let confirmationEndpoint;
-
-      if (offerData?.type === 'direct_purchase') {
-        // For direct purchase, use the orders API
-        confirmationEndpoint = '/marketplace/orders/confirm-payment';
-        confirmationPayload = {
-          orderId: offerData.order?._id,
-          paymentIntentId: paymentIntent?.id,
-          billingDetails: billingDetailsForStripe
-        };
-      } else {
-        // For offers, use the offers API
-        confirmationEndpoint = '/marketplace/offers/confirm-offer-payment';
-        confirmationPayload = {
-          offerId: offerData?.offer?._id || offerData?.offerId,
-          paymentIntentId: paymentIntent?.id,
-          billingDetails: billingDetailsForStripe
-        };
-      }
-
-      console.log('📤 Sending confirmation to server:', {
-        endpoint: confirmationEndpoint,
-        payload: confirmationPayload
-      });
-
-      // Use marketplaceApi for the confirmation
       let response;
       if (offerData?.type === 'direct_purchase') {
-        // Note: You'll need to add a confirmDirectPayment method to your orders API
-        // For now, we'll use the offers API confirmOfferPayment as a fallback
         response = await marketplaceApi.offers.confirmOfferPayment({
           offerId: offerData.offer?._id,
           paymentIntentId: paymentIntent?.id
@@ -291,26 +233,10 @@ const PaymentForm = ({
         throw new Error(response.error || 'Payment confirmation failed');
       }
 
-      console.log('✅ Server confirmation successful:', response.data);
       setPaymentStatus('success');
-      
-      // Wait a moment before redirecting to show success state
-      setTimeout(() => {
-        onSuccess();
-      }, 1500);
-
+      setTimeout(() => onSuccess(), 1500);
     } catch (err: any) {
-      console.error('❌ Payment processing error:', err);
-      
-      let errorMessage = 'Payment failed. Please try again.';
-      
-      if (err.error) {
-        errorMessage = err.error;
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-
-      setError(errorMessage);
+      setError(err.message || 'Payment failed. Please try again.');
       setPaymentStatus('failed');
     } finally {
       setIsSubmitting(false);
@@ -320,7 +246,8 @@ const PaymentForm = ({
   const handleAddressChange = (event: any) => {
     if (event.complete) {
       const address = event.value.address;
-      onBillingDetailsChange({
+      setBillingDetails((prev: any) => ({
+        ...prev,
         address: {
           line1: address.line1 || '',
           line2: address.line2 || '',
@@ -329,7 +256,7 @@ const PaymentForm = ({
           postal_code: address.postal_code || '',
           country: address.country || 'US'
         }
-      });
+      }));
     }
   };
 
@@ -348,13 +275,11 @@ const PaymentForm = ({
             className="text-xs text-yellow-600 hover:text-yellow-500"
           >
             {showBillingForm ? 'Hide' : 'Edit'}
-              <span>{billingDetails?.name || safeCurrentUser?.username || 'Not provided'}</span>
           </button>
         </div>
         
         {showBillingForm ? (
           <div className="space-y-4">
-            {/* Name Input */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Full Name
@@ -362,14 +287,13 @@ const PaymentForm = ({
               <input
                 type="text"
                 value={billingDetails.name || currentUser?.username || ''}
-                onChange={(e) => onBillingDetailsChange({ name: e.target.value })}
+                onChange={(e) => setBillingDetails((prev: any) => ({ ...prev, name: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
                 placeholder="Enter your full name"
                 required
               />
             </div>
 
-            {/* Email Input */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Email Address
@@ -377,14 +301,13 @@ const PaymentForm = ({
               <input
                 type="email"
                 value={billingDetails.email || currentUser?.email || ''}
-                onChange={(e) => onBillingDetailsChange({ email: e.target.value })}
+                onChange={(e) => setBillingDetails((prev: any) => ({ ...prev, email: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
                 placeholder="Enter your email"
                 required
               />
             </div>
 
-            {/* Phone Input (Optional) */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Phone Number (Optional)
@@ -392,13 +315,12 @@ const PaymentForm = ({
               <input
                 type="tel"
                 value={billingDetails.phone || ''}
-                onChange={(e) => onBillingDetailsChange({ phone: e.target.value })}
+                onChange={(e) => setBillingDetails((prev: any) => ({ ...prev, phone: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
                 placeholder="Enter your phone number"
               />
             </div>
 
-            {/* Address Element */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
                 Billing Address
@@ -408,25 +330,12 @@ const PaymentForm = ({
                   options={{
                     mode: 'billing',
                     allowedCountries: ['US', 'CA', 'GB', 'AU', 'IN'],
-                    fields: {
-                      phone: 'always'
-                    },
-                    validation: {
-                      phone: {
-                        required: 'never'
-                      }
-                    },
+                    fields: { phone: 'always' },
+                    validation: { phone: { required: 'never' } },
                     defaultValues: {
                       name: billingDetails.name || currentUser?.username || '',
                       phone: billingDetails.phone || '',
-                      address: {
-                        line1: billingDetails.address.line1 || '',
-                        line2: billingDetails.address.line2 || '',
-                        city: billingDetails.address.city || '',
-                        state: billingDetails.address.state || '',
-                        postal_code: billingDetails.address.postal_code || '',
-                        country: billingDetails.address.country || 'US'
-                      }
+                      address: billingDetails.address
                     }
                   }}
                   onChange={handleAddressChange}
@@ -466,19 +375,13 @@ const PaymentForm = ({
             <PaymentElement 
               options={{
                 layout: 'tabs',
-                wallets: {
-                  applePay: 'auto',
-                  googlePay: 'auto'
-                },
+                wallets: { applePay: 'auto', googlePay: 'auto' },
                 fields: {
                   billingDetails: {
                     name: 'auto',
                     email: 'auto',
                     phone: 'auto',
-                    address: {
-                      country: 'auto',
-                      postalCode: 'auto'
-                    }
+                    address: { country: 'auto', postalCode: 'auto' }
                   }
                 }
               }}
