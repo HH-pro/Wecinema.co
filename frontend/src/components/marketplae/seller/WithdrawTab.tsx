@@ -14,17 +14,6 @@ interface WithdrawTabProps {
   onRefresh?: () => Promise<void>;
   formatCurrency?: (amountInCents: number) => string;
 }
- const formatCurrency = (
-  amount: number,
-  currency: string = 'USD'
-): string => {
-  const valueInDollars = (amount || 0) / 100;
-
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(valueInDollars);
-};
 
 const WithdrawTab: React.FC<WithdrawTabProps> = ({
   stripeStatus,
