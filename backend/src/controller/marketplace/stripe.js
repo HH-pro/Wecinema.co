@@ -166,8 +166,7 @@ router.get('/status-simple', authenticateMiddleware, async (req, res) => {
     });
   }
 });
-
-// ✅ UPDATED: Stripe Onboarding Endpoint with Improved Business URL
+// ✅ UPDATED: Stripe Onboarding Endpoint with Improved Business URL and Continue Onboarding
 router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
   console.log('=== STRIPE ONBOARDING STARTED ===');
   const startTime = Date.now();
@@ -197,35 +196,39 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
           details_submitted: account.details_submitted,
           charges_enabled: account.charges_enabled,
           payouts_enabled: account.payouts_enabled,
-          requirements: account.requirements
+          requirements: {
+            currently_due: account.requirements?.currently_due || [],
+            eventually_due: account.requirements?.eventually_due || [],
+            past_due: account.requirements?.past_due || [],
+            pending_verification: account.requirements?.pending_verification || [],
+            disabled_reason: account.requirements?.disabled_reason
+          }
         });
         
         // If account is fully onboarded and active
-        if (account.details_submitted && account.charges_enabled) {
+        if (account.details_submitted && account.charges_enabled && account.payouts_enabled) {
           console.log('6. Account already completed onboarding and active');
           return res.status(400).json({
             success: false,
             error: 'Stripe account is already connected and active. You can accept payments.',
             stripeAccountId: user.stripeAccountId,
-            accountStatus: 'active'
+            accountStatus: 'active',
+            charges_enabled: true,
+            payouts_enabled: true
           });
         }
         
-        // If account exists but needs more information
-        if (account.details_submitted && !account.charges_enabled) {
-          console.log('6a. Account needs additional verification');
-          const accountLink = await stripe.accountLinks.create({
-            account: user.stripeAccountId,
-            refresh_url: `${process.env.FRONTEND_URL}/marketplace/dashboard?stripe=refresh&account_id=${user.stripeAccountId}`,
-            return_url: `${process.env.FRONTEND_URL}/marketplace/dashboard?stripe=success&account_id=${user.stripeAccountId}`,
-            type: 'account_onboarding',
-          });
-
-          return res.json({
-            success: true,
-            url: accountLink.url,
+        // If account exists but needs more information - REDIRECT TO CONTINUE ONBOARDING
+        if ((account.details_submitted && !account.charges_enabled) || 
+            (account.requirements?.pending_verification?.length > 0)) {
+          console.log('6a. Account needs additional verification - redirecting to continue-onboarding');
+          return res.status(400).json({
+            success: false,
+            error: 'Account requires additional verification. Please use continue-onboarding endpoint.',
             stripeAccountId: user.stripeAccountId,
-            message: 'Additional verification required for your Stripe account'
+            accountStatus: 'verification_required',
+            charges_enabled: account.charges_enabled,
+            requirements: account.requirements
           });
         }
         
@@ -233,8 +236,8 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
         console.log('7. Creating account link for existing account...');
         const accountLink = await stripe.accountLinks.create({
           account: user.stripeAccountId,
-          refresh_url: `${process.env.FRONTEND_URL}/marketplace/dashboard?stripe=refresh&account_id=${user.stripeAccountId}`,
-          return_url: `${process.env.FRONTEND_URL}/marketplace/dashboard?stripe=success&account_id=${user.stripeAccountId}`,
+          refresh_url: `${process.env.FRONTEND_URL || 'https://wecinema.co'}/marketplace/dashboard?stripe=refresh&account_id=${user.stripeAccountId}`,
+          return_url: `${process.env.FRONTEND_URL || 'https://wecinema.co'}/marketplace/dashboard?stripe=success&account_id=${user.stripeAccountId}`,
           type: 'account_onboarding',
         });
 
@@ -243,7 +246,8 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
           success: true,
           url: accountLink.url,
           stripeAccountId: user.stripeAccountId,
-          message: 'Continue your Stripe account setup'
+          message: 'Continue your Stripe account setup',
+          accountStatus: 'incomplete'
         });
       } catch (stripeError) {
         console.log('9. Existing account retrieval failed:', {
@@ -349,7 +353,8 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
       success: true,
       url: accountLink.url,
       stripeAccountId: account.id,
-      message: 'Redirecting to Stripe to complete your account setup'
+      message: 'Redirecting to Stripe to complete your account setup',
+      accountStatus: 'new'
     });
 
   } catch (error) {
@@ -394,6 +399,249 @@ router.post('/onboard-seller', authenticateMiddleware, async (req, res) => {
     });
   }
 });
+
+// ✅ NEW: Continue Onboarding Endpoint for existing accounts
+router.post('/continue-onboarding', authenticateMiddleware, async (req, res) => {
+  console.log('=== STRIPE CONTINUE ONBOARDING STARTED ===');
+  const startTime = Date.now();
+  
+  try {
+    const userId = req.user.id;
+    console.log('1. User ID:', userId);
+
+    // Get user
+    const user = await User.findById(userId);
+    if (!user) {
+      console.log('❌ User not found in database');
+      return res.status(404).json({
+        success: false,
+        error: 'User account not found. Please try logging in again.'
+      });
+    }
+    
+    console.log('2. User found:', user.email);
+
+    // Check if user has Stripe account
+    if (!user.stripeAccountId) {
+      console.log('❌ No Stripe account found for user');
+      return res.status(400).json({
+        success: false,
+        error: 'No Stripe account found. Please start new onboarding first.'
+      });
+    }
+    
+    console.log('3. Existing Stripe account ID:', user.stripeAccountId);
+
+    // Retrieve current account status
+    let account;
+    try {
+      account = await stripe.accounts.retrieve(user.stripeAccountId);
+      console.log('4. Account retrieved:', {
+        id: account.id,
+        charges_enabled: account.charges_enabled,
+        payouts_enabled: account.payouts_enabled,
+        details_submitted: account.details_submitted,
+        disabled_reason: account.requirements?.disabled_reason,
+        pending_verification: account.requirements?.pending_verification || []
+      });
+    } catch (stripeError) {
+      console.error('5. Failed to retrieve account:', stripeError);
+      return res.status(400).json({
+        success: false,
+        error: 'Failed to retrieve Stripe account. Please try starting new onboarding.',
+        stripeError: stripeError.message
+      });
+    }
+
+    // Check if account is already fully active
+    if (account.charges_enabled && account.payouts_enabled) {
+      console.log('6. Account already fully active');
+      return res.status(400).json({
+        success: false,
+        error: 'Stripe account is already fully active and verified.',
+        stripeAccountId: user.stripeAccountId,
+        accountStatus: 'active',
+        charges_enabled: true,
+        payouts_enabled: true
+      });
+    }
+
+    // Create account link for continuing onboarding
+    console.log('7. Creating account link for continuing onboarding...');
+    
+    const baseUrl = process.env.FRONTEND_URL || 'https://wecinema.co';
+    const accountLink = await stripe.accountLinks.create({
+      account: user.stripeAccountId,
+      refresh_url: `${baseUrl}/marketplace/dashboard?stripe=refresh&account_id=${user.stripeAccountId}&action=continue`,
+      return_url: `${baseUrl}/marketplace/dashboard?stripe=success&account_id=${user.stripeAccountId}&action=continue`,
+      type: 'account_onboarding',
+    });
+
+    console.log('8. Account link created:', accountLink.url);
+
+    // Update user's Stripe account status
+    user.stripeAccountStatus = 'verification_in_progress';
+    user.stripeAccountUpdatedAt = new Date();
+    await user.save();
+    console.log('9. User account status updated');
+
+    const processingTime = Date.now() - startTime;
+    console.log(`10. 🎉 SUCCESS - Continue onboarding completed in ${processingTime}ms`);
+    
+    res.json({
+      success: true,
+      url: accountLink.url,
+      stripeAccountId: user.stripeAccountId,
+      message: 'Redirecting to Stripe to complete verification',
+      accountStatus: 'verification_in_progress',
+      requirements: account.requirements,
+      pending_verification: account.requirements?.pending_verification || []
+    });
+
+  } catch (error) {
+    const processingTime = Date.now() - startTime;
+    console.error(`❌ Continue onboarding failed after ${processingTime}ms:`, error);
+    
+    res.status(500).json({
+      success: false,
+      error: 'Failed to continue Stripe onboarding. Please try again.',
+      details: error.message,
+      code: error.code
+    });
+  }
+});
+
+// ✅ NEW: Get Account Status with Requirements
+router.get('/account-status', authenticateMiddleware, async (req, res) => {
+  console.log('=== GETTING STRIPE ACCOUNT STATUS ===');
+  
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    if (!user.stripeAccountId) {
+      // No Stripe account yet
+      return res.json({
+        success: true,
+        data: {
+          account: null,
+          status: {
+            canReceivePayments: false,
+            missingRequirements: [],
+            needsAction: false,
+            isActive: false
+          },
+          message: 'No Stripe account connected'
+        }
+      });
+    }
+
+    // Retrieve account from Stripe
+    let account;
+    try {
+      account = await stripe.accounts.retrieve(user.stripeAccountId);
+    } catch (stripeError) {
+      console.error('Failed to retrieve Stripe account:', stripeError);
+      return res.status(400).json({
+        success: false,
+        error: 'Failed to retrieve Stripe account',
+        stripeError: stripeError.message
+      });
+    }
+
+    // Determine account status
+    const isActive = account.charges_enabled && account.payouts_enabled;
+    const needsAction = account.requirements?.currently_due?.length > 0 || 
+                       account.requirements?.past_due?.length > 0 ||
+                       account.requirements?.pending_verification?.length > 0;
+    
+    const status = {
+      canReceivePayments: account.charges_enabled,
+      missingRequirements: account.requirements?.currently_due || [],
+      pendingVerification: account.requirements?.pending_verification || [],
+      needsAction: needsAction,
+      isActive: isActive,
+      disabledReason: account.requirements?.disabled_reason
+    };
+
+    console.log('Account status retrieved:', {
+      accountId: account.id,
+      charges_enabled: account.charges_enabled,
+      payouts_enabled: account.payouts_enabled,
+      status: status
+    });
+
+    res.json({
+      success: true,
+      data: {
+        account: {
+          id: account.id,
+          business_type: account.business_type,
+          business_profile: account.business_profile || {},
+          charges_enabled: account.charges_enabled,
+          payouts_enabled: account.payouts_enabled,
+          details_submitted: account.details_submitted,
+          capabilities: account.capabilities || {},
+          requirements: account.requirements || {
+            currently_due: [],
+            eventually_due: [],
+            past_due: [],
+            pending_verification: [],
+            disabled_reason: ''
+          },
+          balance: await getAccountBalance(account.id)
+        },
+        status: status,
+        message: isActive ? 'Account is active and ready' : 
+                 needsAction ? 'Account requires action' : 
+                 'Account setup in progress'
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting account status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get Stripe account status',
+      details: error.message
+    });
+  }
+});
+
+// Helper function to get account balance
+async function getAccountBalance(accountId) {
+  try {
+    const balance = await stripe.balance.retrieve({
+      stripeAccount: accountId
+    });
+    
+    // Calculate available balance (amount that can be paid out)
+    const available = balance.available.reduce((sum, item) => sum + item.amount, 0);
+    const pending = balance.pending.reduce((sum, item) => sum + item.amount, 0);
+    
+    return {
+      available: available,
+      pending: pending,
+      total: available + pending,
+      currency: balance.available[0]?.currency || 'usd'
+    };
+  } catch (error) {
+    console.error('Error getting balance:', error);
+    return {
+      available: 0,
+      pending: 0,
+      total: 0,
+      currency: 'usd'
+    };
+  }
+}
 
 // ✅ Alternative onboarding without business_profile
 router.post('/onboard-seller-retry', authenticateMiddleware, async (req, res) => {
