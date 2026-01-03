@@ -32,7 +32,7 @@ import OrderWorkflowGuide from '../../components/marketplae/seller/OrderWorkflow
 import StripeAccountStatus from '../../components/marketplae/seller/StripeAccountStatus';
 import StripeSuccessAlert from '../../components/marketplae/seller/StripeSuccessAlert';
 
-// Import tab components - REMOVED OffersTab import
+// Import tab components
 import ListingsTab from '../../components/marketplae/seller/ListingsTab';
 import OrdersTab from '../../components/marketplae/seller/OrdersTab';
 import WithdrawTab from '../../components/marketplae/seller/WithdrawTab';
@@ -220,7 +220,7 @@ const SellerDashboard: React.FC = () => {
   const totalListings = listings.length;
   const activeListings = listings.filter(listing => listing.status === 'active').length;
 
-  // ✅ UPDATED: Tab configuration - REMOVED Offers tab
+  // ✅ UPDATED: Tab configuration
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊', badge: null },
     { id: 'earnings', label: 'Earnings', icon: '💰', badge: null },
@@ -263,7 +263,88 @@ const SellerDashboard: React.FC = () => {
     }
   ]);
 
-  // ✅ UPDATED: Calculate order stats from orders - FIXED cents to dollars conversion
+  // ✅ NEW: Function to auto-refresh everything
+  const refreshAllData = useCallback(async () => {
+    console.log('🔄 AUTO-REFRESHING ALL DATA...');
+    
+    try {
+      setRefreshing(true);
+      
+      // Refresh all data in parallel
+      await Promise.all([
+        fetchSellerOrders(),
+        fetchListings(),
+        fetchSellerStats(),
+        checkStripeAccountStatus()
+      ]);
+      
+      // Increment refresh counter for UI updates
+      setRefreshCounter(prev => prev + 1);
+      
+      console.log('✅ All data refreshed successfully');
+    } catch (error) {
+      console.error('❌ Error in auto-refresh:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
+  // ✅ UPDATED: Function to refresh specific data after actions
+  const refreshDataAfterAction = useCallback(async (actionType: 'listing' | 'order' | 'stripe' | 'withdrawal' | 'earnings' | 'all') => {
+    console.log(`🔄 Refreshing data after ${actionType} action...`);
+    
+    try {
+      // Always refresh stats and Stripe status
+      await Promise.all([
+        fetchSellerStats(),
+        checkStripeAccountStatus()
+      ]);
+
+      // Refresh specific data based on action type
+      switch (actionType) {
+        case 'listing':
+          await fetchListings();
+          break;
+        case 'order':
+          await fetchSellerOrders();
+          break;
+        case 'withdrawal':
+          await fetchWithdrawalHistory();
+          break;
+        case 'earnings':
+          // Already handled by fetchSellerStats
+          break;
+        case 'all':
+          await refreshAllData();
+          break;
+      }
+
+      // Also refresh current tab data
+      if (activeTab === 'overview') {
+        await Promise.all([
+          fetchSellerOrders(),
+          fetchListings()
+        ]);
+      } else if (activeTab === 'listings') {
+        await fetchListings();
+      } else if (activeTab === 'orders') {
+        await fetchSellerOrders();
+      } else if (activeTab === 'withdraw') {
+        await fetchWithdrawalHistory();
+      }
+
+      console.log(`✅ ${actionType} data refreshed successfully`);
+      
+      // Show success toast
+      setSuccessMessage('Data updated successfully!');
+      
+    } catch (error) {
+      console.error(`❌ Error refreshing ${actionType} data:`, error);
+      setError('Failed to refresh data. Please try again.');
+    }
+  }, [activeTab, refreshAllData]);
+
+  // ✅ UPDATED: Calculate order stats from orders
   const calculateOrderStats = useCallback((orders: Order[]): OrderStats => {
     const now = new Date();
     const thisMonth = now.getMonth();
@@ -275,20 +356,18 @@ const SellerDashboard: React.FC = () => {
              orderDate.getFullYear() === thisYear;
     });
 
-    // ✅ CORRECTED: Convert cents to dollars when calculating
     const completedRevenue = orders
       .filter(order => order.status === 'completed')
-      .reduce((sum, order) => sum + (order.amount || 0), 0) / 100; // Convert cents to dollars
+      .reduce((sum, order) => sum + (order.amount || 0), 0) / 100;
 
     const pendingRevenue = orders
       .filter(order => ['pending_payment', 'paid', 'processing', 'in_progress', 'delivered', 'in_revision'].includes(order.status))
-      .reduce((sum, order) => sum + (order.amount || 0), 0) / 100; // Convert cents to dollars
+      .reduce((sum, order) => sum + (order.amount || 0), 0) / 100;
 
     const thisMonthRevenue = thisMonthOrders
       .filter(order => order.status === 'completed')
-      .reduce((sum, order) => sum + (order.amount || 0), 0) / 100; // Convert cents to dollars
+      .reduce((sum, order) => sum + (order.amount || 0), 0) / 100;
 
-    // Count orders by status
     const statusCounts = orders.reduce((acc, order) => {
       acc[order.status] = (acc[order.status] || 0) + 1;
       return acc;
@@ -310,7 +389,7 @@ const SellerDashboard: React.FC = () => {
       thisMonthOrders: thisMonthOrders.length,
       thisMonthRevenue: thisMonthRevenue,
       availableBalance: stripeStatus?.account?.charges_enabled ? 
-        (stripeStatus.account.balance || 0) / 100 : 0 // Convert cents to dollars
+        (stripeStatus.account.balance || 0) / 100 : 0
     };
   }, [stripeStatus]);
 
@@ -324,15 +403,13 @@ const SellerDashboard: React.FC = () => {
         console.log('✅ Stripe status:', response.data);
         setStripeStatus(response.data);
         
-        // ✅ Update available balance in orderStats
         setOrderStats(prev => ({
           ...prev,
           availableBalance: response.data.account?.charges_enabled ? 
-            (response.data.account.balance || 0) / 100 : 0 // Convert cents to dollars
+            (response.data.account.balance || 0) / 100 : 0
         }));
       } else {
         console.warn('⚠️ Stripe status API failed:', response.error);
-        // Set default status
         setStripeStatus({
           account: {
             id: '',
@@ -364,7 +441,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ UPDATED: Fetch seller statistics with proper cents to dollars conversion
+  // ✅ UPDATED: Fetch seller statistics
   const fetchSellerStats = async () => {
     try {
       setEarningsLoading(true);
@@ -385,10 +462,8 @@ const SellerDashboard: React.FC = () => {
         console.log('✅ Setting seller stats:', response.data);
         setSellerStats(response.data);
         
-        // ✅ Convert all amounts from cents to dollars
         const totals = response.data.totals || {};
         
-        // Log raw amounts for debugging
         console.log('💰 Raw amounts from API (in cents):', {
           totalRevenue: totals.totalRevenue,
           thisMonthRevenue: totals.thisMonthRevenue,
@@ -399,16 +474,15 @@ const SellerDashboard: React.FC = () => {
         setOrderStats(prev => ({
           ...prev,
           totalOrders: totals.totalOrders || prev.totalOrders,
-          totalRevenue: (totals.totalRevenue || 0) / 100, // Convert cents to dollars
-          pendingRevenue: (totals.pendingOrders?.revenue || 0) / 100, // Convert cents to dollars
-          thisMonthRevenue: (totals.thisMonthRevenue || 0) / 100, // Convert cents to dollars
+          totalRevenue: (totals.totalRevenue || 0) / 100,
+          pendingRevenue: (totals.pendingOrders?.revenue || 0) / 100,
+          thisMonthRevenue: (totals.thisMonthRevenue || 0) / 100,
           completed: totals.completedOrders?.count || prev.completed,
           activeOrders: totals.pendingOrders?.count || prev.activeOrders,
           availableBalance: stripeStatus?.account?.charges_enabled ? 
-            (stripeStatus.account.balance || 0) / 100 : 0 // Convert cents to dollars
+            (stripeStatus.account.balance || 0) / 100 : 0
         }));
         
-        // Log converted amounts for debugging
         console.log('💰 Converted amounts (in dollars):', {
           totalRevenue: (totals.totalRevenue || 0) / 100,
           thisMonthRevenue: (totals.thisMonthRevenue || 0) / 100,
@@ -417,7 +491,6 @@ const SellerDashboard: React.FC = () => {
         
       } else {
         console.warn('⚠️ Seller stats API failed, using fallback');
-        // Calculate from local orders
         const localStats = calculateOrderStats(orders);
         setOrderStats(localStats);
         
@@ -428,7 +501,6 @@ const SellerDashboard: React.FC = () => {
       
     } catch (err: any) {
       console.error('❌ fetchSellerStats caught error:', err);
-      // Calculate from local orders as fallback
       const localStats = calculateOrderStats(orders);
       setOrderStats(localStats);
       
@@ -437,41 +509,52 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-
-const fetchSellerOrders = async () => {
-  try {
-    setOrdersLoading(true);
-    
-    console.log('📦 Fetching seller orders...');
-    const response = await ordersApi.getMySales();
-    
-    if (response.success && response.data) {
-      const ordersData = response.data.sales || [];
-      console.log(`✅ Found ${ordersData.length} orders`);
+  // ✅ UPDATED: Fetch seller orders with auto-refresh capability
+  const fetchSellerOrders = async () => {
+    try {
+      setOrdersLoading(true);
       
-      // ✅ DETAILED LOGGING FOR AMOUNTS
-      ordersData.forEach((order: Order, index: number) => {
-        console.log(`📊 Order ${index + 1}:`, {
-          id: order._id,
-          amount: order.amount,
-          amountInDollars: order.amount / 100,
-          status: order.status,
-          createdAt: order.createdAt,
-          listingTitle: typeof order.listingId === 'object' ? order.listingId.title : 'N/A'
+      console.log('📦 Fetching seller orders...');
+      const response = await ordersApi.getMySales();
+      
+      if (response.success && response.data) {
+        const ordersData = response.data.sales || [];
+        console.log(`✅ Found ${ordersData.length} orders`);
+        
+        ordersData.forEach((order: Order, index: number) => {
+          console.log(`📊 Order ${index + 1}:`, {
+            id: order._id,
+            amount: order.amount,
+            amountInDollars: order.amount / 100,
+            status: order.status,
+            createdAt: order.createdAt,
+            listingTitle: typeof order.listingId === 'object' ? order.listingId.title : 'N/A'
+          });
         });
-      });
+        
+        setOrders(ordersData);
+        
+        // ✅ Calculate and update stats
+        const updatedStats = calculateOrderStats(ordersData);
+        setOrderStats(prev => ({
+          ...prev,
+          ...updatedStats
+        }));
+        
+      } else {
+        console.warn('⚠️ No orders found or API error');
+        setOrders([]);
+      }
       
-      // باقی کوڈ...
+    } catch (error: any) {
+      console.error('❌ Error fetching seller orders:', error);
+      setError('Failed to load orders. Please try again.');
+    } finally {
+      setOrdersLoading(false);
     }
-  } catch (error: any) {
-    console.error('❌ Error fetching seller orders:', error);
-    setError('Failed to load orders. Please try again.');
-  } finally {
-    setOrdersLoading(false);
-  }
-};
+  };
 
-  // ✅ Fetch listings
+  // ✅ UPDATED: Fetch listings with auto-refresh capability
   const fetchListings = async () => {
     try {
       setListingsLoading(true);
@@ -496,20 +579,16 @@ const fetchSellerOrders = async () => {
       });
       
       if (response.success) {
-        // ✅ Handle both response formats
         let listingsData: Listing[] = [];
         
         if (response.data?.listings) {
-          // Direct format: { listings: [], pagination: {} }
           listingsData = response.data.listings;
         } else if (response.data?.data?.listings) {
-          // Nested format: { data: { listings: [], pagination: {} } }
           listingsData = response.data.data.listings;
         }
         
         console.log(`✅ Loaded ${listingsData.length} listings`);
         
-        // Log listing prices for debugging
         if (listingsData.length > 0) {
           console.log('💰 Listing prices:', 
             listingsData.slice(0, 3).map(l => ({
@@ -546,14 +625,12 @@ const fetchSellerOrders = async () => {
     try {
       setWithdrawalsLoading(true);
       
-      // For now, use mock data since we don't have a withdrawals API
       console.log('💸 Fetching withdrawal history...');
       
-      // Mock withdrawal data (amounts in cents)
       const mockWithdrawals: Withdrawal[] = [
         {
           _id: '1',
-          amount: 500000, // $5000.00 in cents
+          amount: 500000,
           status: 'completed',
           stripeTransferId: 'tr_123',
           stripePayoutId: 'po_123',
@@ -564,7 +641,7 @@ const fetchSellerOrders = async () => {
         },
         {
           _id: '2',
-          amount: 300000, // $3000.00 in cents
+          amount: 300000,
           status: 'pending',
           stripeTransferId: 'tr_456',
           createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
@@ -591,54 +668,6 @@ const fetchSellerOrders = async () => {
     }
   };
 
-  // ✅ ✅ ✅ Function to refresh specific data after actions
-  const refreshDataAfterAction = async (actionType: 'listing' | 'order' | 'stripe' | 'withdrawal' | 'earnings') => {
-    console.log(`🔄 Refreshing data after ${actionType} action...`);
-    
-    try {
-      // Always refresh stats and Stripe status
-      await Promise.all([
-        fetchSellerStats(), // ✅ This now includes earnings data
-        checkStripeAccountStatus()
-      ]);
-
-      // Refresh specific data based on action type
-      switch (actionType) {
-        case 'listing':
-          await fetchListings();
-          break;
-        case 'order':
-          await fetchSellerOrders();
-          break;
-        case 'withdrawal':
-          await fetchWithdrawalHistory();
-          break;
-        case 'earnings':
-          // Earnings tab already handled by fetchSellerStats
-          break;
-      }
-
-      // Also refresh current tab data
-      if (activeTab === 'overview') {
-        // For overview tab, refresh all relevant data
-        await Promise.all([
-          fetchSellerOrders(),
-          fetchListings()
-        ]);
-      } else if (activeTab === 'listings') {
-        await fetchListings();
-      } else if (activeTab === 'orders') {
-        await fetchSellerOrders();
-      } else if (activeTab === 'withdraw') {
-        await fetchWithdrawalHistory();
-      }
-
-      console.log(`✅ ${actionType} data refreshed successfully`);
-    } catch (error) {
-      console.error(`❌ Error refreshing ${actionType} data:`, error);
-    }
-  };
-
   // ✅ Fetch all dashboard data
   const fetchDashboardData = async () => {
     try {
@@ -654,11 +683,10 @@ const fetchSellerOrders = async () => {
 
       console.log('🚀 Fetching dashboard data...');
       
-      // Fetch data in parallel
       await Promise.all([
         fetchSellerOrders(),
         fetchListings(),
-        fetchSellerStats(), // ✅ Includes earnings data
+        fetchSellerStats(),
         checkStripeAccountStatus()
       ]);
 
@@ -678,10 +706,8 @@ const fetchSellerOrders = async () => {
     try {
       setRefreshing(true);
       
-      // Convert amount to cents
       const amountInCents = amount * 100;
       
-      // For now, show success message
       const mockWithdrawal: Withdrawal = {
         _id: Date.now().toString(),
         amount: amountInCents,
@@ -692,7 +718,6 @@ const fetchSellerOrders = async () => {
         description: `Withdrawal of $${amount.toFixed(2)}`
       };
       
-      // Add to history
       setWithdrawalHistory(prev => {
         if (!prev) {
           return {
@@ -716,7 +741,6 @@ const fetchSellerOrders = async () => {
       // ✅ AUTO-REFRESH after withdrawal
       setTimeout(() => {
         refreshDataAfterAction('withdrawal');
-        setRefreshCounter(prev => prev + 1);
       }, 500);
       
     } catch (error: any) {
@@ -727,7 +751,7 @@ const fetchSellerOrders = async () => {
     }
   };
 
-  // ✅ Handle Edit Listing - UPDATED with auto-refresh
+  // ✅ UPDATED: Handle Edit Listing with auto-refresh
   const handleEditListing = (listing: Listing) => {
     setEditingListing(listing);
     setShowEditModal(true);
@@ -742,7 +766,6 @@ const fetchSellerOrders = async () => {
       const response = await listingsApi.editListing(editingListing._id, updatedData);
 
       if (response.success && response.data) {
-        // Update local state
         setListings(prev => prev.map(listing => 
           listing._id === editingListing._id 
             ? { ...listing, ...updatedData, ...response.data?.listing }
@@ -756,7 +779,6 @@ const fetchSellerOrders = async () => {
         // ✅ AUTO-REFRESH after edit
         setTimeout(() => {
           refreshDataAfterAction('listing');
-          setRefreshCounter(prev => prev + 1);
         }, 300);
         
       } else {
@@ -770,7 +792,7 @@ const fetchSellerOrders = async () => {
     }
   };
 
-  // ✅ Handle Delete Listing - UPDATED with auto-refresh
+  // ✅ UPDATED: Handle Delete Listing with auto-refresh
   const handleDeleteListing = (listing: Listing) => {
     setDeletingListing(listing);
     setShowDeleteModal(true);
@@ -785,7 +807,6 @@ const fetchSellerOrders = async () => {
       const response = await listingsApi.deleteListing(deletingListing._id);
 
       if (response.success) {
-        // Remove from local state
         setListings(prev => prev.filter(listing => listing._id !== deletingListing._id));
         
         setShowDeleteModal(false);
@@ -795,7 +816,6 @@ const fetchSellerOrders = async () => {
         // ✅ AUTO-REFRESH after delete
         setTimeout(() => {
           refreshDataAfterAction('listing');
-          setRefreshCounter(prev => prev + 1);
         }, 300);
         
       } else {
@@ -809,7 +829,7 @@ const fetchSellerOrders = async () => {
     }
   };
 
-  // ✅ Handle Toggle Listing Status - UPDATED with auto-refresh
+  // ✅ UPDATED: Handle Toggle Listing Status with auto-refresh
   const handleToggleListingStatus = async (listing: Listing) => {
     try {
       setListingActionLoading(`toggle-${listing._id}`);
@@ -819,7 +839,6 @@ const fetchSellerOrders = async () => {
       if (response.success && response.data) {
         const updatedListing = response.data.listing;
         
-        // Update local state
         setListings(prev => prev.map(l => 
           l._id === listing._id ? { ...l, ...updatedListing } : l
         ));
@@ -829,7 +848,6 @@ const fetchSellerOrders = async () => {
         // ✅ AUTO-REFRESH after status change
         setTimeout(() => {
           refreshDataAfterAction('listing');
-          setRefreshCounter(prev => prev + 1);
         }, 300);
         
       } else {
@@ -844,7 +862,7 @@ const fetchSellerOrders = async () => {
     }
   };
 
-  // ✅ Order management functions - ALL UPDATED with auto-refresh
+  // ✅ UPDATED: Order management functions with auto-refresh
   const handleSimpleStartProcessing = async (order: Order) => {
     try {
       setOrderActionLoading(order._id);
@@ -852,7 +870,6 @@ const fetchSellerOrders = async () => {
       const response = await ordersApi.updateOrderStatus(order._id, 'processing');
 
       if (response.success && response.data) {
-        // Update local state
         setOrders(prev => prev.map(o => 
           o._id === order._id 
             ? { ...o, status: 'processing', ...response.data?.order }
@@ -864,7 +881,6 @@ const fetchSellerOrders = async () => {
         // ✅ AUTO-REFRESH after order status change
         setTimeout(() => {
           refreshDataAfterAction('order');
-          setRefreshCounter(prev => prev + 1);
         }, 300);
         
       } else {
@@ -896,7 +912,6 @@ const fetchSellerOrders = async () => {
         // ✅ AUTO-REFRESH after order status change
         setTimeout(() => {
           refreshDataAfterAction('order');
-          setRefreshCounter(prev => prev + 1);
         }, 300);
         
       } else {
@@ -915,7 +930,6 @@ const fetchSellerOrders = async () => {
       setSelectedOrder(order);
       setOrderActionLoading(order._id);
       
-      // For delivery, we need to call the deliver endpoint with delivery data
       const deliveryData = {
         deliveryMessage: 'Your order is ready!',
         isFinalDelivery: true
@@ -935,7 +949,6 @@ const fetchSellerOrders = async () => {
         // ✅ AUTO-REFRESH after delivery
         setTimeout(() => {
           refreshDataAfterAction('order');
-          setRefreshCounter(prev => prev + 1);
         }, 300);
         
       } else {
@@ -968,7 +981,6 @@ const fetchSellerOrders = async () => {
           // ✅ AUTO-REFRESH after cancellation
           setTimeout(() => {
             refreshDataAfterAction('order');
-            setRefreshCounter(prev => prev + 1);
           }, 300);
           
         } else {
@@ -1001,8 +1013,7 @@ const fetchSellerOrders = async () => {
     
     // ✅ AUTO-REFRESH after Stripe setup
     setTimeout(() => {
-      refreshDataAfterAction('stripe');
-      setRefreshCounter(prev => prev + 1);
+      refreshDataAfterAction('all');
     }, 1500);
   };
 
@@ -1012,9 +1023,8 @@ const fetchSellerOrders = async () => {
     setSuccessMessage('');
     
     try {
-      await fetchDashboardData();
+      await refreshAllData();
       setSuccessMessage('Dashboard refreshed successfully!');
-      setRefreshCounter(prev => prev + 1);
     } catch (error) {
       console.error('❌ Refresh error:', error);
       setError('Failed to refresh data. Please try again.');
@@ -1042,7 +1052,7 @@ const fetchSellerOrders = async () => {
     } else if (activeTab === 'withdraw') {
       fetchWithdrawalHistory();
     } else if (activeTab === 'earnings') {
-      fetchSellerStats(); // ✅ Refresh earnings data when switching to earnings tab
+      fetchSellerStats();
     }
   }, [activeTab, listingsPage, listingsStatusFilter, ordersPage, ordersFilter, withdrawalsPage, refreshCounter]);
 
@@ -1064,7 +1074,7 @@ const fetchSellerOrders = async () => {
     0
   ) || 0;
 
-  // ✅ UPDATED: Safe preparation of stats for grid (all amounts already in dollars)
+  // ✅ UPDATED: Safe preparation of stats for grid
   const statsForGrid = {
     totalRevenue: orderStats.totalRevenue || 0,
     totalOrders: orderStats.totalOrders || 0,
@@ -1074,11 +1084,8 @@ const fetchSellerOrders = async () => {
     thisMonthRevenue: orderStats.thisMonthRevenue || 0,
     thisMonthOrders: orderStats.thisMonthOrders || 0,
     availableBalance: orderStats.availableBalance || 0,
-    totalWithdrawn: totalWithdrawn / 100, // Convert cents to dollars
-    // Use API data if available (already converted to dollars)
-    totalEarnings: sellerStats?.totals?.totalRevenue ? 
-      sellerStats.totals.totalRevenue / 100 : 
-      (orderStats.totalRevenue || 0)
+    totalWithdrawn: totalWithdrawn / 100,
+    // ✅ REMOVED: Earning data moved to Earnings tab only
   };
 
   console.log('📊 Stats for grid prepared:', statsForGrid);
@@ -1161,63 +1168,72 @@ const fetchSellerOrders = async () => {
           )}
 
           {/* Header */}
-<SafeDashboardHeader
-  title="Seller Dashboard"
-  subtitle="Manage orders, track earnings, and grow your business"
-  earnings={safeFormatCurrency(orderStats.totalRevenue)} // Already in dollars
-  totalEarnings={formatCurrency(sellerStats?.totals?.totalRevenue || 0)} // Converts cents to dollars
-  onRefresh={handleRefresh}
-  refreshing={refreshing}
-  stripeStatus={{
-    connected: stripeStatus?.account?.charges_enabled || false,
-    chargesEnabled: stripeStatus?.account?.charges_enabled || false,
-    detailsSubmitted: stripeStatus?.account?.details_submitted || false,
-    status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive',
-    availableBalance: stripeStatus?.account?.balance || 0 // In cents
-  }}
-  onCheckStripe={checkStripeAccountStatus}
-/>
+          <SafeDashboardHeader
+            title="Seller Dashboard"
+            subtitle="Manage orders, track earnings, and grow your business"
+            earnings={safeFormatCurrency(orderStats.totalRevenue)}
+            totalEarnings={formatCurrency(sellerStats?.totals?.totalRevenue || 0)}
+            onRefresh={handleRefresh}
+            refreshing={refreshing}
+            stripeStatus={{
+              connected: stripeStatus?.account?.charges_enabled || false,
+              chargesEnabled: stripeStatus?.account?.charges_enabled || false,
+              detailsSubmitted: stripeStatus?.account?.details_submitted || false,
+              status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive',
+              availableBalance: stripeStatus?.account?.balance || 0
+            }}
+            onCheckStripe={checkStripeAccountStatus}
+          />
 
-          {/* ✅ Development Mode Banner */}
+          {/* ✅ Development Mode Banner - IMPROVED UI */}
           {(process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') && (
             <div className="mb-6 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-4">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex items-center">
                   <div className="bg-purple-100 p-2 rounded-lg mr-3">
-                    <span className="text-purple-600 text-xl">🛠️</span>
+                    <span className="text-purple-600 text-xl">🔄</span>
                   </div>
                   <div>
-                    <h3 className="font-medium text-purple-800">Development Mode</h3>
+                    <h3 className="font-medium text-purple-800">Auto-Refresh Active</h3>
                     <p className="text-sm text-purple-700">
-                      Using real API data. Auto-refresh enabled on all actions.
+                      Data automatically refreshes after every action
                     </p>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex items-center space-x-2">
+                  <div className="flex items-center text-sm text-purple-700">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                    <span>Real-time updates</span>
+                  </div>
                   <button
                     onClick={handleRefresh}
-                    className="px-4 py-2 bg-white border border-purple-300 text-purple-600 hover:bg-purple-50 text-sm font-medium rounded-lg transition duration-200"
+                    className="px-4 py-2 bg-white border border-purple-300 text-purple-600 hover:bg-purple-50 text-sm font-medium rounded-lg transition duration-200 flex items-center"
                   >
-                    Refresh Data
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Refresh Now
                   </button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* ✅ Success Message */}
+          {/* ✅ Success Message - IMPROVED UI */}
           {successMessage && (
-            <div className="mb-6 bg-green-50 border border-green-200 rounded-xl p-4">
-              <div className="flex items-center">
-                <div className="w-5 h-5 text-green-600 mr-3 flex-shrink-0">
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
+            <div className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 animate-fade-in">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-5 h-5 text-green-600 mr-3 flex-shrink-0">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <p className="text-sm text-green-800 font-medium">{successMessage}</p>
                 </div>
-                <p className="text-sm text-green-800">{successMessage}</p>
                 <button
                   onClick={() => setSuccessMessage('')}
-                  className="ml-auto text-green-600 hover:text-green-800"
+                  className="text-green-600 hover:text-green-800 ml-4"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1227,19 +1243,21 @@ const fetchSellerOrders = async () => {
             </div>
           )}
 
-          {/* ✅ Error Message */}
+          {/* ✅ Error Message - IMPROVED UI */}
           {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4">
-              <div className="flex items-center">
-                <div className="w-5 h-5 text-red-600 mr-3 flex-shrink-0">
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+            <div className="mb-6 bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-xl p-4 animate-fade-in">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="w-5 h-5 text-red-600 mr-3 flex-shrink-0">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <p className="text-sm text-red-800 font-medium">{error}</p>
                 </div>
-                <p className="text-sm text-red-800">{error}</p>
                 <button
                   onClick={() => setError('')}
-                  className="ml-auto text-red-600 hover:text-red-800"
+                  className="text-red-600 hover:text-red-800 ml-4"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1263,7 +1281,7 @@ const fetchSellerOrders = async () => {
             />
           )}
 
-          {/* ✅ Navigation - Now without Offers tab */}
+          {/* ✅ Navigation */}
           <SafeTabNavigation
             tabs={tabs}
             activeTab={activeTab}
@@ -1281,7 +1299,7 @@ const fetchSellerOrders = async () => {
               </div>
             ) : (
               <>
-                {/* Overview Tab */}
+                {/* Overview Tab - UPDATED: Removed earning details */}
                 {activeTab === 'overview' && (
                   <div className="space-y-8">
                     {/* Welcome Card */}
@@ -1299,7 +1317,7 @@ const fetchSellerOrders = async () => {
                       }}
                     />
 
-                    {/* Stats Grid */}
+                    {/* Stats Grid - SIMPLIFIED: No earning details */}
                     {statsForGrid && (
                       <SafeStatsGrid
                         stats={statsForGrid}
@@ -1371,7 +1389,7 @@ const fetchSellerOrders = async () => {
                   </div>
                 )}
 
-                {/* Earnings Tab */}
+                {/* Earnings Tab - ENHANCED: Moved all earning details here */}
                 {activeTab === 'earnings' && (
                   <SafeEarningsTab
                     stripeStatus={{
@@ -1384,13 +1402,17 @@ const fetchSellerOrders = async () => {
                       pendingBalance: 0
                     }}
                     orderStats={orderStats}
-                    sellerStats={sellerStats} // ✅ Now contains earnings data from API
+                    sellerStats={sellerStats}
                     onWithdrawRequest={handleWithdrawRequest}
                     loading={earningsLoading}
                     onRefresh={() => {
                       refreshDataAfterAction('earnings');
-                      setRefreshCounter(prev => prev + 1);
                     }}
+                    // ✅ ADDED: Pass additional earning data
+                    totalEarnings={sellerStats?.totals?.totalRevenue ? sellerStats.totals.totalRevenue / 100 : 0}
+                    thisMonthEarnings={orderStats.thisMonthRevenue}
+                    pendingEarnings={orderStats.pendingRevenue}
+                    totalWithdrawn={totalWithdrawn / 100}
                   />
                 )}
 
@@ -1442,8 +1464,7 @@ const fetchSellerOrders = async () => {
                     orderActionLoading={orderActionLoading}
                     onCreateListing={() => navigate('/marketplace/create')}
                     onRefresh={() => {
-                      fetchSellerOrders();
-                      setRefreshCounter(prev => prev + 1);
+                      refreshDataAfterAction('order');
                     }}
                   />
                 )}
@@ -1466,8 +1487,7 @@ const fetchSellerOrders = async () => {
                     onPageChange={setWithdrawalsPage}
                     onWithdrawRequest={handleWithdrawRequest}
                     onRefresh={() => {
-                      fetchWithdrawalHistory();
-                      setRefreshCounter(prev => prev + 1);
+                      refreshDataAfterAction('withdrawal');
                     }}
                     totalRevenue={orderStats.totalRevenue}
                     thisMonthRevenue={orderStats.thisMonthRevenue}
@@ -1497,9 +1517,7 @@ const fetchSellerOrders = async () => {
                 setSelectedOrderId(null);
               }}
               onStatusUpdate={() => {
-                fetchSellerOrders();
-                fetchSellerStats();
-                setRefreshCounter(prev => prev + 1);
+                refreshDataAfterAction('order');
               }}
             />
           )}
