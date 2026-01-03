@@ -219,7 +219,6 @@ const OrderDetailsPage: React.FC = () => {
       setActiveTab(tab);
     }
   }, [searchParams]);
-// اصل fetchOrderDetails function کو یوں تبدیل کریں:
 const fetchOrderDetails = async () => {
   if (!orderId) {
     setError('No order ID provided');
@@ -231,51 +230,48 @@ const fetchOrderDetails = async () => {
     setLoading(true);
     setError(null);
 
-    // 1. Fetch order details
+    console.log('📡 Fetching order details for:', orderId);
+    
+    // API call
     const orderResponse = await marketplaceApi.orders.getOrderDetails(orderId);
     
-    // 2. Check response structure properly
-    if (!orderResponse.success || !orderResponse.data) {
-      console.error('Order response:', orderResponse);
-      throw new Error(orderResponse.error || 'Failed to fetch order details');
-    }
-
-    // 3. Extract data with safe access
-    const orderData = orderResponse.data;
+    console.log('📊 Full API Response:', orderResponse);
     
-    // 4. Check if order exists in response
-    if (!orderData.order) {
-      console.error('No order in response:', orderData);
+    // ✅ FIXED: Check success and extract data directly from response
+    if (!orderResponse.success) {
+      const errorMsg = orderResponse.error || orderResponse.message || 'Failed to fetch order details';
+      throw new Error(errorMsg);
+    }
+    
+    // ✅ FIXED: Extract order directly from response (not from response.data)
+    if (!orderResponse.order) {
+      console.error('No order in response:', orderResponse);
       throw new Error('Order not found in response');
     }
-
-    setOrder(orderData.order);
-    setTimeline(orderData.timeline || []);
-    setUserRole(orderData.userRole || 'buyer');
-    setPermissions(orderData.permissions || {});
-
-    // 5. Fetch deliveries separately if needed
-    try {
-      const deliveriesResponse = await marketplaceApi.orders.getDeliveries(orderId);
-      if (deliveriesResponse.success && deliveriesResponse.data) {
-        setDeliveries(deliveriesResponse.data.deliveries || []);
-      }
-    } catch (deliveryError) {
-      console.warn('Could not fetch deliveries:', deliveryError);
+    
+    // Set state from response
+    setOrder(orderResponse.order);
+    setTimeline(orderResponse.timeline || []);
+    setUserRole(orderResponse.userRole || 'buyer');
+    setPermissions(orderResponse.permissions || {});
+    
+    // Deliveries and files are already in response
+    if (orderResponse.deliveries) {
+      setDeliveries(orderResponse.deliveries);
     }
-
-    // 6. Fetch files separately
-    try {
-      const filesResponse = await marketplaceApi.orders.getDownloadFiles(orderId);
-      if (filesResponse.success && filesResponse.data) {
-        setFiles(filesResponse.data.files || []);
-      }
-    } catch (fileError) {
-      console.warn('Could not fetch files:', fileError);
+    
+    if (orderResponse.deliveryFiles) {
+      setFiles(orderResponse.deliveryFiles);
     }
+    
+    console.log('✅ Order loaded successfully:', {
+      orderId: orderResponse.order._id,
+      status: orderResponse.order.status,
+      amount: orderResponse.order.amount
+    });
 
   } catch (error: any) {
-    console.error('Error fetching order details:', error);
+    console.error('❌ Error fetching order details:', error);
     setError(error.message || 'Failed to load order details');
     toast.error(error.message || 'Failed to load order details');
   } finally {
