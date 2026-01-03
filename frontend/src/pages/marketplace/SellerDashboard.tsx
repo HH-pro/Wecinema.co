@@ -1043,19 +1043,34 @@ const SellerDashboard: React.FC = () => {
     0
   ) || 0;
 
-  // Prepare stats for StatsGrid
-  const statsForGrid = {
-    totalRevenue: orderStats.totalRevenue,
-    totalOrders: orderStats.totalOrders,
-    activeOrders: orderStats.activeOrders,
-    pendingOffers: 0, // ✅ Removed offers
-    totalListings: totalListings,
-    activeListings: activeListings,
-    thisMonthRevenue: orderStats.thisMonthRevenue,
-    thisMonthOrders: orderStats.thisMonthOrders,
-    availableBalance: orderStats.availableBalance || 0,
-    totalWithdrawn: totalWithdrawn / 100 // Convert cents to dollars
-  };
+ // SellerDashboard.tsx میں statsForGrid preparation
+
+// ✅ Safe preparation of stats for grid
+const statsForGrid = {
+  totalRevenue: orderStats.totalRevenue || 0,
+  totalOrders: orderStats.totalOrders || 0,
+  activeOrders: orderStats.activeOrders || 0,
+  totalListings: totalListings || 0,
+  activeListings: activeListings || 0,
+  thisMonthRevenue: orderStats.thisMonthRevenue || 0,
+  thisMonthOrders: orderStats.thisMonthOrders || 0,
+  availableBalance: orderStats.availableBalance || 0,
+  totalWithdrawn: (totalWithdrawn || 0) / 100,
+  // Use API data if available
+  totalEarnings: sellerStats?.totals?.totalRevenue ? 
+    sellerStats.totals.totalRevenue / 100 : 
+    (orderStats.totalRevenue || 0)
+};
+
+console.log('📊 Stats for grid prepared:', statsForGrid);
+
+// ✅ Render StatsGrid with proper null check
+{statsForGrid && (
+  <SafeStatsGrid
+    stats={statsForGrid}
+    onTabChange={setActiveTab}
+  />
+)}
 
   // ✅ NEW: Auto-refresh indicator
   const [showAutoRefreshIndicator, setShowAutoRefreshIndicator] = useState(false);
