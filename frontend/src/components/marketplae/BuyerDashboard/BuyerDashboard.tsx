@@ -53,13 +53,23 @@ import {
   FaShoppingBasket,
   FaChartBar,
   FaBell,
-  FaCog
+  FaCog,
+  FaQuestionCircle,
+  FaFileAlt,
+  FaMoneyBillAlt
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import './BuyerDashboard.css';
 import MarketplaceLayout from '../../Layout';
-import { marketplaceAPI, isAuthenticated, formatCurrency, getOrderStatusInfo } from '../../../api';
+import marketplaceAPI, { isAuthenticated, formatCurrency } from '../../../api/marketplaceApi';
+import { Order, OrderStats } from '../../../api/marketplaceApi';
 
+// Extend Order interface for buyer dashboard specific needs
+interface BuyerOrder extends Order {
+  orderNumber?: string;
+}
+
+// User interface
 interface User {
   _id: string;
   username: string;
@@ -70,6 +80,7 @@ interface User {
   sellerRating?: number;
 }
 
+// Listing interface
 interface Listing {
   _id: string;
   title: string;
@@ -81,31 +92,9 @@ interface Listing {
   tags?: string[];
 }
 
-interface Order {
-  _id: string;
-  buyerId: User | string;
-  sellerId: User | string;
-  listingId: Listing | string;
-  amount: number;
-  status: 'pending_payment' | 'paid' | 'processing' | 'in_progress' | 'delivered' | 'in_revision' | 'completed' | 'cancelled' | 'disputed';
-  paymentReleased: boolean;
-  platformFee?: number;
-  sellerAmount?: number;
-  paidAt?: string;
-  deliveredAt?: string;
-  completedAt?: string;
-  revisions: number;
-  maxRevisions: number;
-  deliveryMessage?: string;
-  deliveryFiles?: string[];
-  expectedDelivery?: string;
-  createdAt: string;
-  orderNumber?: string;
-}
-
 const BuyerDashboard: React.FC = () => {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<BuyerOrder[]>([]);
+  const [filteredOrders, setFilteredOrders] = useState<BuyerOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -113,7 +102,8 @@ const BuyerDashboard: React.FC = () => {
   const [showOrderDetails, setShowOrderDetails] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [showActionsModal, setShowActionsModal] = useState(false);
-  const [selectedOrderForActions, setSelectedOrderForActions] = useState<Order | null>(null);
+  const [selectedOrderForActions, setSelectedOrderForActions] = useState<BuyerOrder | null>(null);
+  const [stats, setStats] = useState<OrderStats | null>(null);
   
   const actionsModalRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -128,7 +118,9 @@ const BuyerDashboard: React.FC = () => {
     in_revision: { color: '#f97316', rgb: '249, 115, 22', icon: <FaUndo /> },
     completed: { color: '#059669', rgb: '5, 150, 105', icon: <FaRegCheckCircle /> },
     cancelled: { color: '#6b7280', rgb: '107, 114, 128', icon: <FaRegTimesCircle /> },
-    disputed: { color: '#dc2626', rgb: '220, 38, 38', icon: <FaExclamationCircle /> }
+    disputed: { color: '#dc2626', rgb: '220, 38, 38', icon: <FaExclamationCircle /> },
+    pending: { color: '#f59e0b', rgb: '245, 158, 11', icon: <FaRegClock /> },
+    refunded: { color: '#6b7280', rgb: '107, 114, 128', icon: <FaRegTimesCircle /> }
   };
 
   // Status text mapping
@@ -141,10 +133,12 @@ const BuyerDashboard: React.FC = () => {
     in_revision: 'In Revision',
     completed: 'Completed',
     cancelled: 'Cancelled',
-    disputed: 'Disputed'
+    disputed: 'Disputed',
+    pending: 'Pending',
+    refunded: 'Refunded'
   };
 
-  // Quick actions configuration - UPDATED WITH PROFESSIONAL STYLING
+  // Quick actions configuration
   const quickActions = [
     {
       icon: <FaShoppingCart />,
@@ -155,7 +149,6 @@ const BuyerDashboard: React.FC = () => {
       color: '#f59e0b',
       badge: 'New'
     },
-   
     {
       icon: <FaComment />,
       label: 'Messages',
@@ -173,8 +166,14 @@ const BuyerDashboard: React.FC = () => {
       type: 'secondary' as const,
       color: '#10b981'
     },
-   
-    
+    {
+      icon: <FaFileAlt />,
+      label: 'Invoices',
+      description: 'View order invoices',
+      action: () => navigate('/marketplace/orders/invoices'),
+      type: 'secondary' as const,
+      color: '#8b5cf6'
+    }
   ];
 
   // Category icons mapping
@@ -226,10 +225,14 @@ const BuyerDashboard: React.FC = () => {
         return;
       }
 
-      const ordersResponse = await marketplaceAPI.orders.getMy(setLoading) as any;
+      // Fetch orders
+      const ordersResponse = await marketplaceAPI.orders.getMyOrders();
       
-      if (ordersResponse.success && ordersResponse.orders) {
-        setOrders(ordersResponse.orders);
+      if (ordersResponse.success && ordersResponse.data?.orders) {
+        setOrders(ordersResponse.data.orders);
+        if (ordersResponse.data.stats) {
+          setStats(ordersResponse.data.stats);
+        }
       } else {
         console.error('Failed to fetch orders:', ordersResponse.error);
       }
@@ -250,7 +253,8 @@ const BuyerDashboard: React.FC = () => {
         const title = getListingTitle(order).toLowerCase();
         const seller = getSellerUsername(order).toLowerCase();
         const orderNumber = order.orderNumber?.toLowerCase() || '';
-        return title.includes(query) || seller.includes(query) || orderNumber.includes(query);
+        const orderId = order._id.toLowerCase();
+        return title.includes(query) || seller.includes(query) || orderNumber.includes(query) || orderId.includes(query);
       });
     }
 
@@ -270,6 +274,8 @@ const BuyerDashboard: React.FC = () => {
           return b.amount - a.amount;
         case 'price_low':
           return a.amount - b.amount;
+        case 'status':
+          return a.status.localeCompare(b.status);
         default:
           return 0;
       }
@@ -278,9 +284,9 @@ const BuyerDashboard: React.FC = () => {
     setFilteredOrders(filtered);
   };
 
-  const getSellerUsername = (order: Order): string => {
+  const getSellerUsername = (order: BuyerOrder): string => {
     if (typeof order.sellerId === 'object' && order.sellerId !== null) {
-      const seller = order.sellerId as User;
+      const seller = order.sellerId as any;
       return seller.firstName 
         ? `${seller.firstName} ${seller.lastName || ''}`.trim()
         : seller.username || 'Unknown Seller';
@@ -288,42 +294,42 @@ const BuyerDashboard: React.FC = () => {
     return 'Unknown Seller';
   };
 
-  const getListingTitle = (order: Order): string => {
+  const getListingTitle = (order: BuyerOrder): string => {
     if (typeof order.listingId === 'object' && order.listingId !== null) {
-      return (order.listingId as Listing).title || 'Unnamed Listing';
+      return (order.listingId as any).title || 'Unnamed Listing';
     }
     return 'Unnamed Listing';
   };
 
-  const getListingCategory = (order: Order): string => {
+  const getListingCategory = (order: BuyerOrder): string => {
     if (typeof order.listingId === 'object' && order.listingId !== null) {
-      return (order.listingId as Listing).category || 'General';
+      return (order.listingId as any).category || 'General';
     }
     return 'General';
   };
 
-  const getCategoryIcon = (order: Order): JSX.Element => {
+  const getCategoryIcon = (order: BuyerOrder): JSX.Element => {
     const category = getListingCategory(order).toLowerCase();
     return categoryIcons[category] || categoryIcons.default;
   };
 
   // Get status color
-  const getStatusColor = (status: Order['status']): string => {
-    return statusColors[status]?.color || '#f59e0b';
+  const getStatusColor = (status: string): string => {
+    return statusColors[status as keyof typeof statusColors]?.color || '#f59e0b';
   };
 
   // Get status text
-  const getStatusText = (status: Order['status']): string => {
-    return statusText[status] || 'Unknown Status';
+  const getStatusText = (status: string): string => {
+    return statusText[status as keyof typeof statusText] || 'Unknown Status';
   };
 
   // Get status icon
-  const getStatusIcon = (status: Order['status']): JSX.Element => {
-    return statusColors[status]?.icon || <FaClock />;
+  const getStatusIcon = (status: string): JSX.Element => {
+    return statusColors[status as keyof typeof statusColors]?.icon || <FaClock />;
   };
 
   // Get order actions based on status
-  const getOrderActions = (order: Order) => {
+  const getOrderActions = (order: BuyerOrder) => {
     const actions = [];
     
     // Always available actions
@@ -339,6 +345,7 @@ const BuyerDashboard: React.FC = () => {
     // Status-specific actions
     switch (order.status) {
       case 'pending_payment':
+      case 'pending':
         actions.push({
           label: 'Complete Payment',
           action: 'complete_payment',
@@ -499,7 +506,7 @@ const BuyerDashboard: React.FC = () => {
           
         case 'complete_order':
           if (window.confirm('Are you sure you want to mark this order as complete? This will release payment to the seller.')) {
-            await marketplaceAPI.orders.complete(orderId, setLoading);
+            await marketplaceAPI.orders.completeOrder(orderId);
             await fetchBuyerData();
           }
           break;
@@ -507,10 +514,10 @@ const BuyerDashboard: React.FC = () => {
         case 'request_revision':
           const revisionNotes = prompt('Please provide detailed revision notes (minimum 10 characters):');
           if (revisionNotes && revisionNotes.trim().length >= 10) {
-            await marketplaceAPI.orders.requestRevision(orderId, revisionNotes.trim(), setLoading);
+            await marketplaceAPI.orders.requestRevision(orderId, revisionNotes.trim());
             await fetchBuyerData();
           } else if (revisionNotes) {
-            console.log('Revision notes must be at least 10 characters');
+            alert('Revision notes must be at least 10 characters');
           }
           break;
           
@@ -518,13 +525,11 @@ const BuyerDashboard: React.FC = () => {
           const cancelReason = prompt('Please provide reason for cancellation:');
           if (cancelReason && cancelReason.trim()) {
             if (window.confirm('Are you sure you want to cancel this order?')) {
-              await marketplaceAPI.orders.cancelByBuyer(orderId, cancelReason.trim(), setLoading);
+              await marketplaceAPI.orders.cancelOrderByBuyer(orderId, cancelReason.trim());
               await fetchBuyerData();
             }
           }
           break;
-          
-      
           
         case 'view_invoice':
           navigate(`/marketplace/orders/${orderId}/invoice`);
@@ -543,11 +548,12 @@ const BuyerDashboard: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Order action error:', error);
+      alert(`Error: ${error.message || 'Failed to perform action'}`);
     }
   };
 
   // Open actions modal
-  const openActionsModal = (order: Order, e: React.MouseEvent) => {
+  const openActionsModal = (order: BuyerOrder, e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     setSelectedOrderForActions(order);
@@ -557,6 +563,7 @@ const BuyerDashboard: React.FC = () => {
   // Export orders to CSV
   const exportOrders = () => {
     if (filteredOrders.length === 0) {
+      alert('No orders to export');
       return;
     }
 
@@ -567,6 +574,7 @@ const BuyerDashboard: React.FC = () => {
         'Seller': getSellerUsername(order),
         'Amount': formatCurrency(order.amount, 'USD'),
         'Status': getStatusText(order.status),
+        'Payment Status': order.paymentStatus || 'N/A',
         'Created Date': new Date(order.createdAt).toLocaleDateString('en-US', {
           year: 'numeric',
           month: 'short',
@@ -598,6 +606,7 @@ const BuyerDashboard: React.FC = () => {
       
     } catch (error) {
       console.error('Export error:', error);
+      alert('Failed to export orders');
     }
   };
 
@@ -609,7 +618,7 @@ const BuyerDashboard: React.FC = () => {
     ).length;
     const completedOrders = orders.filter(order => order.status === 'completed').length;
     const totalSpent = orders
-      .filter(order => ['completed', 'delivered', 'paid'].includes(order.status))
+      .filter(order => ['completed', 'delivered', 'paid', 'in_progress'].includes(order.status))
       .reduce((sum, order) => sum + order.amount, 0);
 
     return { totalOrders, activeOrders, completedOrders, totalSpent };
@@ -628,7 +637,7 @@ const BuyerDashboard: React.FC = () => {
           <div className="modal-header">
             <div className="modal-title-section">
               <h3>Order Actions</h3>
-              <p className="modal-subtitle">#{order.orderNumber} • {getListingTitle(order)}</p>
+              <p className="modal-subtitle">#{order.orderNumber || order._id.slice(-8)} • {getListingTitle(order)}</p>
             </div>
             <button 
               className="close-btn" 
@@ -741,7 +750,7 @@ const BuyerDashboard: React.FC = () => {
             </small>
           </div>
           <div className="stat-trend">
-            <span className="trend-up">+12%</span>
+            {stats && <span className="trend-up">+{Math.round(totalSpent / 100) || 0}%</span>}
           </div>
         </div>
 
@@ -758,7 +767,7 @@ const BuyerDashboard: React.FC = () => {
             </small>
           </div>
           <div className="stat-trend">
-            <span className="trend-up">+5%</span>
+            {stats && <span className="trend-up">+{Math.round((activeOrders / totalOrders) * 100) || 0}%</span>}
           </div>
         </div>
 
@@ -775,7 +784,7 @@ const BuyerDashboard: React.FC = () => {
             </small>
           </div>
           <div className="stat-trend">
-            <span className="trend-up">+8%</span>
+            {stats && <span className="trend-up">+{Math.round((completedOrders / totalOrders) * 100) || 0}%</span>}
           </div>
         </div>
 
@@ -792,7 +801,7 @@ const BuyerDashboard: React.FC = () => {
             </small>
           </div>
           <div className="stat-trend">
-            <span className="trend-up">+15%</span>
+            {stats && <span className="trend-up">+{Math.round(totalSpent / 100) || 0}%</span>}
           </div>
         </div>
       </div>
@@ -832,8 +841,8 @@ const BuyerDashboard: React.FC = () => {
                 '--status-rgb': statusColors[status as keyof typeof statusColors]?.rgb
               } as React.CSSProperties}
             >
-              {getStatusIcon(status as Order['status'])}
-              <span>{getStatusText(status as Order['status'])}</span>
+              {getStatusIcon(status)}
+              <span>{getStatusText(status)}</span>
               <span className="filter-count">{count}</span>
             </button>
           )
@@ -843,11 +852,14 @@ const BuyerDashboard: React.FC = () => {
   };
 
   // Render order card with professional styling
-  const renderOrderCard = (order: Order) => {
+  const renderOrderCard = (order: BuyerOrder) => {
     const seller = getSellerUsername(order);
     const title = getListingTitle(order);
     const category = getListingCategory(order);
     const statusColor = getStatusColor(order.status);
+    const sellerRating = order.sellerId && typeof order.sellerId === 'object' 
+      ? (order.sellerId as any).sellerRating || 0 
+      : 0;
 
     return (
       <div 
@@ -856,6 +868,7 @@ const BuyerDashboard: React.FC = () => {
         style={{ 
           '--status-color': statusColor
         } as React.CSSProperties}
+        onClick={() => navigate(`/marketplace/orders/${order._id}`)}
       >
         <div className="order-avatar">
           <div className="avatar-container">
@@ -906,8 +919,11 @@ const BuyerDashboard: React.FC = () => {
             <p className="seller">
               <FaUserCircle className="seller-icon" />
               <span className="seller-name">Seller: {seller}</span>
-              <span className="seller-rating">
-              </span>
+              {sellerRating > 0 && (
+                <span className="seller-rating">
+                  <FaStar /> {sellerRating.toFixed(1)}
+                </span>
+              )}
             </p>
           </div>
           
@@ -931,7 +947,7 @@ const BuyerDashboard: React.FC = () => {
           
           <div className="order-info">
             <div className="info-row">
-              {(order.revisions > 0) && (
+              {(order.revisions || 0) > 0 && (
                 <span className="revisions-count">
                   <FaReply />
                   Revisions: {order.revisions}/{order.maxRevisions || 3}
@@ -983,7 +999,7 @@ const BuyerDashboard: React.FC = () => {
                 </span>
               ) : (
                 <span className="payment-pending">
-                  <FaClock /> Payment Pending
+                  <FaClock /> {order.paymentStatus === 'failed' ? 'Payment Failed' : 'Payment Pending'}
                 </span>
               )}
             </div>
@@ -992,7 +1008,10 @@ const BuyerDashboard: React.FC = () => {
           <div className="order-actions">
             <div className="quick-actions-row">
               <button
-                onClick={() => navigate(`/marketplace/orders/${order._id}`)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/marketplace/orders/${order._id}`);
+                }}
                 className="view-order-btn"
               >
                 <FaEye /> View Details
@@ -1000,7 +1019,10 @@ const BuyerDashboard: React.FC = () => {
               
               {order.status === 'delivered' && (
                 <button
-                  onClick={() => handleOrderAction(order._id, 'download_files')}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOrderAction(order._id, 'download_files');
+                  }}
                   className="download-files-btn"
                 >
                   <FaDownload /> Download
@@ -1021,11 +1043,13 @@ const BuyerDashboard: React.FC = () => {
     );
   };
 
-  const getProgressWidth = (status: Order['status']): string => {
+  const getProgressWidth = (status: string): string => {
     switch(status) {
       case 'pending_payment':
-      case 'paid':
+      case 'pending':
         return '25%';
+      case 'paid':
+        return '30%';
       case 'processing':
         return '50%';
       case 'in_progress':
@@ -1088,7 +1112,7 @@ const BuyerDashboard: React.FC = () => {
               <span className="stat-badge">
                 <FaDollarSign /> {formatCurrency(
                   orders
-                    .filter(o => ['completed', 'delivered', 'paid'].includes(o.status))
+                    .filter(o => ['completed', 'delivered', 'paid', 'in_progress'].includes(o.status))
                     .reduce((sum, order) => sum + order.amount, 0), 
                   'USD'
                 )}
@@ -1115,10 +1139,46 @@ const BuyerDashboard: React.FC = () => {
           </div>
         </div>
 
+        {/* Search and Filter Section */}
+        <div className="search-filter-section">
+          <div className="search-box">
+            <FaSearch className="search-icon" />
+            <input
+              type="text"
+              placeholder="Search orders by title, seller, or order number..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="search-input"
+            />
+            {searchQuery && (
+              <button className="clear-search" onClick={() => setSearchQuery('')}>
+                <FaTimes />
+              </button>
+            )}
+          </div>
+          
+          <div className="filter-controls">
+            <div className="sort-dropdown">
+              <select 
+                value={sortBy} 
+                onChange={(e) => setSortBy(e.target.value)}
+                className="sort-select"
+              >
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="price_high">Price: High to Low</option>
+                <option value="price_low">Price: Low to High</option>
+                <option value="status">Status</option>
+              </select>
+              <FaChevronDown className="dropdown-arrow" />
+            </div>
+          </div>
+        </div>
+
         {/* Statistics Overview */}
         {renderStats()}
 
-        {/* Quick Actions - PROFESSIONAL STYLING */}
+        {/* Quick Actions */}
         <div className="quick-actions-section">
           <div className="section-header">
             <div className="section-title">
@@ -1176,9 +1236,7 @@ const BuyerDashboard: React.FC = () => {
           {renderStatusFilters()}
         </div>
 
-    
-
-        {/* Orders Section - PROFESSIONAL STYLING */}
+        {/* Orders Section */}
         <div className="orders-section">
           <div className="section-header">
             <div className="section-title">
@@ -1216,7 +1274,6 @@ const BuyerDashboard: React.FC = () => {
                 >
                   <FaDownload /> Export CSV
                 </button>
-               
               </div>
             </div>
           </div>
