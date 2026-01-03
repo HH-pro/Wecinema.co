@@ -1087,8 +1087,9 @@ const Browse: React.FC = () => {
         onSuccess={handlePaymentSuccess}
         paymentStatus={paymentStatus}
         setPaymentStatus={setPaymentStatus}
-        currentUser={currentUser}
+        currentUser={user}
         getThumbnailUrl={getThumbnailUrl}
+        
       />
     </MarketplaceLayout>
   );
