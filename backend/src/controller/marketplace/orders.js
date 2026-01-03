@@ -385,12 +385,44 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
       });
     }
 
+    // ✅ IMPORTANT: VALIDATE AND CONVERT AMOUNT TO CENTS
+    console.log('💰 Original amount received:', amount);
+    
     if (amount <= 0) {
       return res.status(400).json({
         success: false,
         error: 'Amount must be greater than 0'
       });
     }
+
+    // ✅ FIX: Convert amount from dollars to cents
+    let amountInCents = amount;
+    
+    // Check if amount is in dollars (not cents)
+    // Rule 1: If amount is less than 1000 and doesn't end with 00, it's likely dollars
+    if (amount < 1000 && amount % 100 !== 0) {
+      console.log(`🔧 Converting ${amount} dollars to cents: ${amount} * 100 = ${amount * 100}`);
+      amountInCents = Math.round(amount * 100);
+    }
+    // Rule 2: If amount has decimal places, it's dollars
+    else if (amount % 1 !== 0) {
+      console.log(`🔧 Converting decimal amount ${amount} dollars to cents: ${amount} * 100 = ${Math.round(amount * 100)}`);
+      amountInCents = Math.round(amount * 100);
+    }
+    // Rule 3: If amount is a whole number between 1-10000, check typical price ranges
+    else if (amount >= 1 && amount <= 10000 && amount % 1 === 0) {
+      // Check if this looks like a dollar amount (not cents)
+      // Typical dollar amounts: 10, 25, 50, 100, 200, 300, 500, 1000
+      // Typical cent amounts end with 00: 1000, 2500, 5000, 10000
+      if (amount % 100 !== 0) {
+        console.log(`🔧 Amount ${amount} looks like dollars (not ending with 00), converting to cents`);
+        amountInCents = amount * 100;
+      } else {
+        console.log(`✅ Amount ${amount} already looks like cents (ends with 00)`);
+      }
+    }
+    
+    console.log(`✅ Final amount in cents: ${amountInCents} ($${amountInCents/100})`);
 
     if (sellerId !== currentUserId) {
       return res.status(403).json({
@@ -466,15 +498,27 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
       });
     }
 
+    // ✅ Also check the offer amount matches
+    const offerAmountInCents = offer.amount || offer.offeredPrice || 0;
+    console.log(`📊 Offer amount: ${offerAmountInCents} ($${offerAmountInCents/100})`);
+    console.log(`📊 Converted amount: ${amountInCents} ($${amountInCents/100})`);
+    
+    // Allow small differences due to conversion
+    const amountDifference = Math.abs(amountInCents - offerAmountInCents);
+    if (amountDifference > 100) { // More than $1 difference
+      console.warn(`⚠️ Amount mismatch: Order ${amountInCents} vs Offer ${offerAmountInCents}`);
+    }
+
     const expectedDelivery = new Date();
     expectedDelivery.setDate(expectedDelivery.getDate() + parseInt(expectedDeliveryDays));
 
+    // ✅ Use amountInCents for all calculations
     const order = new Order({
       offerId,
       listingId,
       buyerId,
       sellerId,
-      amount,
+      amount: amountInCents, // ✅ Store in cents
       shippingAddress: shippingAddress || {
         address: 'Not provided',
         city: '',
@@ -492,15 +536,20 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
       revisions: 0,
       stripePaymentIntentId: null,
       stripeTransferId: null,
-      platformFee: calculatePlatformFee(amount),
-      sellerPayoutAmount: calculateSellerPayout(amount)
+      platformFee: calculatePlatformFee(amountInCents), // ✅ Calculate using cents
+      sellerPayoutAmount: calculateSellerPayout(amountInCents) // ✅ Calculate using cents
     });
 
     await order.save();
 
+    // ✅ Update offer with the correct amount (in cents)
     offer.status = 'accepted';
     offer.acceptedAt = new Date();
     offer.orderId = order._id;
+    if (offer.amount !== amountInCents) {
+      console.log(`📝 Updating offer amount from ${offer.amount} to ${amountInCents}`);
+      offer.amount = amountInCents;
+    }
     await offer.save();
 
     if (listing.availability === 'single') {
@@ -512,11 +561,25 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
     await User.findByIdAndUpdate(sellerId, { $inc: { totalOrders: 1 } });
 
     const populatedOrder = await populateOrder(order._id).lean();
+    
+    // ✅ Log the final order details
+    console.log(`🎉 Order created successfully!`);
+    console.log(`   Order ID: ${order._id}`);
+    console.log(`   Amount: ${order.amount} cents ($${order.amount/100})`);
+    console.log(`   Status: ${order.status}`);
+    console.log(`   Buyer: ${buyerId}`);
+    console.log(`   Seller: ${sellerId}`);
 
     res.status(201).json({
       success: true,
       message: 'Order created successfully',
       order: populatedOrder,
+      amountDetails: {
+        originalAmount: amount,
+        amountInCents: amountInCents,
+        amountInDollars: amountInCents / 100,
+        message: `Amount converted to ${amountInCents} cents ($${amountInCents/100})`
+      },
       nextSteps: {
         paymentRequired: true,
         message: 'Buyer needs to complete payment to start the order'
@@ -524,15 +587,22 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error creating order:', error);
+    console.error('❌ Error creating order:', error);
     
     if (error.name === 'ValidationError') {
       const errors = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({ success: false, error: 'Validation failed', details: errors });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Validation failed', 
+        details: errors 
+      });
     }
 
     if (error.code === 11000) {
-      return res.status(400).json({ success: false, error: 'Order already exists for this offer' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Order already exists for this offer' 
+      });
     }
 
     res.status(500).json({
@@ -542,7 +612,6 @@ router.post("/create", authenticateMiddleware, async (req, res) => {
     });
   }
 });
-
 // ======================================================
 // ========== BUYER-SPECIFIC ROUTES ==========
 // ======================================================
