@@ -125,7 +125,6 @@ const SimpleFallback = ({ name }: { name: string }) => (
 const SafeDashboardHeader = (typeof DashboardHeader === 'function' || typeof DashboardHeader === 'object') ? DashboardHeader : () => <SimpleFallback name="DashboardHeader" />;
 const SafeTabNavigation = (typeof TabNavigation === 'function' || typeof TabNavigation === 'object') ? TabNavigation : () => <SimpleFallback name="TabNavigation" />;
 const SafeWelcomeCard = (typeof WelcomeCard === 'function' || typeof WelcomeCard === 'object') ? WelcomeCard : () => <SimpleFallback name="WelcomeCard" />;
-const SafeStatsGrid = (typeof StatsGrid === 'function' || typeof StatsGrid === 'object') ? StatsGrid : () => <SimpleFallback name="StatsGrid" />;
 const SafeRecentOrders = (typeof RecentOrders === 'function' || typeof RecentOrders === 'object') ? RecentOrders : () => <SimpleFallback name="RecentOrders" />;
 const SafeActionCard = (typeof ActionCard === 'function' || typeof ActionCard === 'object') ? ActionCard : () => <SimpleFallback name="ActionCard" />;
 const SafeOrderWorkflowGuide = (typeof OrderWorkflowGuide === 'function' || typeof OrderWorkflowGuide === 'object') ? OrderWorkflowGuide : () => <SimpleFallback name="OrderWorkflowGuide" />;
@@ -1318,12 +1317,7 @@ const SellerDashboard: React.FC = () => {
                     />
 
                     {/* Stats Grid - SIMPLIFIED: No earning details */}
-                    {statsForGrid && (
-                      <SafeStatsGrid
-                        stats={statsForGrid}
-                        onTabChange={setActiveTab}
-                      />
-                    )}
+                   
 
                     {/* Order Workflow Guide */}
                     <SafeOrderWorkflowGuide />
