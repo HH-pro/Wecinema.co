@@ -2416,8 +2416,7 @@ router.put("/:orderId/cancel-by-seller", authenticateMiddleware, async (req, res
     });
   }
 });
-
-// ========== SELLER STATISTICS ========== //
+// ========== SELLER STATISTICS - UPDATED WITH COMPLETED ORDERS FOCUS ========== //
 router.get("/stats/seller", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
@@ -2434,7 +2433,6 @@ router.get("/stats/seller", authenticateMiddleware, async (req, res) => {
     // ✅ FIX: Use new keyword with ObjectId
     let sellerId;
     try {
-      // Method 1: Create ObjectId properly
       sellerId = new mongoose.Types.ObjectId(userId);
     } catch (error) {
       console.error('Error creating ObjectId:', error);
@@ -2455,7 +2453,7 @@ router.get("/stats/seller", authenticateMiddleware, async (req, res) => {
     const statsByStatus = await Order.aggregate([
       { 
         $match: { 
-          sellerId: sellerId  // ✅ Use the properly created ObjectId
+          sellerId: sellerId
         } 
       },
       { 
@@ -2466,23 +2464,26 @@ router.get("/stats/seller", authenticateMiddleware, async (req, res) => {
         } 
       },
       {
-        $sort: { count: -1 } // Sort by highest count first
+        $sort: { count: -1 }
       }
     ]);
 
     console.log('Stats by status found:', statsByStatus.length);
 
-    // Ensure all statuses are included (even with zero count)
-    const completeStats = allStatuses.map(status => {
-      const found = statsByStatus.find(s => s._id === status);
-      return found || {
-        _id: status,
-        count: 0,
-        totalAmount: 0
-      };
-    });
+    // ✅ NEW: Get detailed completed orders
+    const completedOrders = await Order.find({
+      sellerId: sellerId,
+      status: 'completed'
+    })
+    .sort({ createdAt: -1 })
+    .limit(50)
+    .populate('listingId', 'title price')
+    .populate('buyerId', 'username email')
+    .lean();
 
-    // Calculate total statistics - SIMPLIFIED VERSION to avoid facet issues
+    console.log('Completed orders found:', completedOrders.length);
+
+    // Calculate total statistics
     const totalOrders = await Order.countDocuments({ sellerId: sellerId });
     
     // Get total revenue from all orders
@@ -2504,7 +2505,7 @@ router.get("/stats/seller", authenticateMiddleware, async (req, res) => {
     const totalRevenue = totalRevenueResult[0]?.totalAmount || 0;
     const avgOrderValue = totalRevenueResult[0]?.avgOrderValue || 0;
 
-    // Get completed orders revenue
+    // ✅ IMPROVED: Get completed orders revenue with detailed calculation
     const completedRevenueResult = await Order.aggregate([
       { 
         $match: { 
@@ -2541,7 +2542,7 @@ router.get("/stats/seller", authenticateMiddleware, async (req, res) => {
       }
     ]);
 
-    // Get this month's revenue
+    // Get this month's completed revenue
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
@@ -2563,11 +2564,60 @@ router.get("/stats/seller", authenticateMiddleware, async (req, res) => {
       }
     ]);
 
+    // ✅ NEW: Get last 6 months revenue data for charts
+    const last6Months = [];
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+      const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+      
+      last6Months.push({
+        month: monthStart.toLocaleString('default', { month: 'short' }),
+        year: monthStart.getFullYear(),
+        start: monthStart,
+        end: monthEnd
+      });
+    }
+
+    const monthlyRevenue = [];
+    for (const month of last6Months) {
+      const revenue = await Order.aggregate([
+        {
+          $match: {
+            sellerId: sellerId,
+            status: 'completed',
+            createdAt: {
+              $gte: month.start,
+              $lte: month.end
+            }
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: "$amount" },
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+      
+      monthlyRevenue.push({
+        month: month.month,
+        year: month.year,
+        revenue: revenue[0]?.total || 0,
+        orders: revenue[0]?.count || 0
+      });
+    }
+
     // Prepare breakdown by status
     const breakdown = {};
     statsByStatus.forEach(stat => {
       if (stat._id) {
-        breakdown[stat._id] = stat.totalAmount;
+        breakdown[stat._id] = {
+          count: stat.count,
+          revenue: stat.totalAmount
+        };
       }
     });
 
@@ -2575,7 +2625,8 @@ router.get("/stats/seller", authenticateMiddleware, async (req, res) => {
     const response = {
       success: true,
       data: {
-        statsByStatus: completeStats,
+        statsByStatus: statsByStatus,
+        completedOrders: completedOrders,
         totals: {
           totalOrders: totalOrders,
           totalRevenue: totalRevenue,
@@ -2590,12 +2641,19 @@ router.get("/stats/seller", authenticateMiddleware, async (req, res) => {
           },
           thisMonthRevenue: thisMonthRevenueResult[0]?.total || 0
         },
+        monthlyRevenue: monthlyRevenue,
         breakdown: breakdown
       },
       message: 'Seller statistics fetched successfully'
     };
 
-    console.log('✅ Seller stats response prepared');
+    console.log('✅ Seller stats response prepared with:', {
+      totalOrders: totalOrders,
+      completedOrdersCount: completedRevenueResult[0]?.count || 0,
+      completedRevenue: completedRevenueResult[0]?.total || 0,
+      monthlyRevenuePoints: monthlyRevenue.length
+    });
+
     res.status(200).json(response);
 
   } catch (error) {
@@ -2605,6 +2663,100 @@ router.get("/stats/seller", authenticateMiddleware, async (req, res) => {
       error: 'Failed to fetch statistics',
       details: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// ✅ NEW: Get Only Completed Orders for Earnings Tab
+router.get("/stats/completed-orders", authenticateMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { page = 1, limit = 20, startDate, endDate } = req.query;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID not found'
+      });
+    }
+
+    let sellerId;
+    try {
+      sellerId = new mongoose.Types.ObjectId(userId);
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid user ID format'
+      });
+    }
+
+    // Build query
+    const query = {
+      sellerId: sellerId,
+      status: 'completed'
+    };
+
+    // Add date filters if provided
+    if (startDate) {
+      query.createdAt = { $gte: new Date(startDate) };
+    }
+    if (endDate) {
+      query.createdAt = { ...query.createdAt, $lte: new Date(endDate) };
+    }
+
+    // Calculate pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Get completed orders with pagination
+    const completedOrders = await Order.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .populate('listingId', 'title price category')
+      .populate('buyerId', 'username email')
+      .lean();
+
+    // Get total count for pagination
+    const totalCount = await Order.countDocuments(query);
+
+    // Calculate total revenue for these orders
+    const totalRevenueResult = await Order.aggregate([
+      {
+        $match: query
+      },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: "$amount" }
+        }
+      }
+    ]);
+
+    const totalRevenue = totalRevenueResult[0]?.totalRevenue || 0;
+
+    res.json({
+      success: true,
+      data: {
+        completedOrders: completedOrders,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: totalCount,
+          pages: Math.ceil(totalCount / parseInt(limit))
+        },
+        summary: {
+          totalOrders: totalCount,
+          totalRevenue: totalRevenue,
+          averageOrderValue: totalCount > 0 ? totalRevenue / totalCount : 0
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching completed orders:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch completed orders'
     });
   }
 });
