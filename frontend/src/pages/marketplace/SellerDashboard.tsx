@@ -1,4 +1,4 @@
-// src/pages/seller/SellerDashboard.tsx - COMPLETE UPDATED VERSION WITH AUTO-REFRESH ON ACTIONS
+// src/pages/seller/SellerDashboard.tsx - COMPLETE UPDATED VERSION
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -12,8 +12,6 @@ import { getCurrentUserId } from '../../utilities/helperfFunction';
 import marketplaceApi, { 
   Listing, 
   Order, 
-  Offer, 
-  OrderStats as ApiOrderStats,
   SellerStats,
   SellerAccountStatus 
 } from '../../api/marketplaceApi';
@@ -21,7 +19,6 @@ import marketplaceApi, {
 // Access API methods
 const listingsApi = marketplaceApi.listings;
 const ordersApi = marketplaceApi.orders;
-const offersApi = marketplaceApi.offers;
 const paymentsApi = marketplaceApi.payments;
 
 // Import components
@@ -35,7 +32,7 @@ import OrderWorkflowGuide from '../../components/marketplae/seller/OrderWorkflow
 import StripeAccountStatus from '../../components/marketplae/seller/StripeAccountStatus';
 import StripeSuccessAlert from '../../components/marketplae/seller/StripeSuccessAlert';
 
-// Import tab components
+// Import tab components - REMOVED OffersTab import
 import ListingsTab from '../../components/marketplae/seller/ListingsTab';
 import OrdersTab from '../../components/marketplae/seller/OrdersTab';
 import WithdrawTab from '../../components/marketplae/seller/WithdrawTab';
@@ -63,21 +60,6 @@ interface OrderStats {
   thisMonthOrders: number;
   thisMonthRevenue: number;
   availableBalance?: number;
-}
-
-interface StripeStatus {
-  connected: boolean;
-  chargesEnabled: boolean;
-  detailsSubmitted: boolean;
-  accountId?: string;
-  email?: string;
-  country?: string;
-  status?: string;
-  payoutsEnabled?: boolean;
-  name?: string;
-  balance?: number;
-  availableBalance?: number;
-  pendingBalance?: number;
 }
 
 interface Withdrawal {
@@ -148,7 +130,6 @@ const SafeVideoPlayerModal = (typeof VideoPlayerModal === 'function' || typeof V
 
 const SellerDashboard: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [offers, setOffers] = useState<Offer[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
@@ -157,7 +138,7 @@ const SellerDashboard: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showStripeSuccessAlert, setShowStripeSuccessAlert] = useState(false);
-  const [refreshCounter, setRefreshCounter] = useState(0); // ✅ NEW: For triggering refreshes
+  const [refreshCounter, setRefreshCounter] = useState(0); // ✅ For triggering refreshes
   const navigate = useNavigate();
   
   // Order stats
@@ -189,7 +170,6 @@ const SellerDashboard: React.FC = () => {
   // Separate loading states
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [listingsLoading, setListingsLoading] = useState(false);
-  const [offersLoading, setOffersLoading] = useState(false);
   const [earningsLoading, setEarningsLoading] = useState(false);
   
   // Track if initial data has been loaded
@@ -226,16 +206,13 @@ const SellerDashboard: React.FC = () => {
   // Calculate derived stats
   const totalListings = listings.length;
   const activeListings = listings.filter(listing => listing.status === 'active').length;
-  const pendingOffers = offers.filter(offer => offer.status === 'pending').length;
-  const totalWithdrawals = withdrawalHistory?.withdrawals?.length || 0;
 
-  // Tab configuration
+  // ✅ UPDATED: Tab configuration - REMOVED Offers tab
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊', badge: null },
     { id: 'earnings', label: 'Earnings', icon: '💰', badge: null },
     { id: 'listings', label: 'My Listings', icon: '🏠', badge: totalListings > 0 ? totalListings : null },
     { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders > 0 ? orderStats.activeOrders : null },
-    { id: 'offers', label: 'Offers', icon: '💌', badge: pendingOffers > 0 ? pendingOffers : null },
     { id: 'withdraw', label: 'Withdraw', icon: '💸', badge: null }
   ];
 
@@ -362,20 +339,35 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Fetch seller statistics
+  // ✅ Fetch seller statistics - UPDATED to include earnings data
   const fetchSellerStats = async () => {
     try {
-      console.log('📊 Fetching seller stats...');
+      setEarningsLoading(true);
+      console.log('📊 Fetching seller stats and earnings...');
       const response = await ordersApi.getSellerStats();
       
       if (response.success && response.data) {
         console.log('✅ Seller stats:', response.data);
         setSellerStats(response.data);
+        
+        // Also update order stats with API data for consistency
+        if (response.data.stats) {
+          setOrderStats(prev => ({
+            ...prev,
+            totalOrders: response.data.stats.total || prev.totalOrders,
+            totalRevenue: (response.data.stats.totalRevenue || 0) / 100,
+            pendingRevenue: (response.data.stats.pendingRevenue || 0) / 100,
+            thisMonthRevenue: (response.data.stats.thisMonthRevenue || 0) / 100,
+            availableBalance: stripeStatus?.account?.charges_enabled ? (stripeStatus.account.balance || 0) / 100 : 0
+          }));
+        }
       } else {
         console.warn('⚠️ Seller stats API failed:', response.error);
       }
     } catch (err: any) {
       console.error('❌ Error fetching seller stats:', err);
+    } finally {
+      setEarningsLoading(false);
     }
   };
 
@@ -448,85 +440,60 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // SellerDashboard.tsx - SIMPLIFIED fetchListings
-
-const fetchListings = async () => {
-  try {
-    setListingsLoading(true);
-    setError('');
-    
-    console.log('🏠 Fetching seller listings...');
-    
-    const params = {
-      page: listingsPage,
-      limit: listingsLimit,
-      status: listingsStatusFilter || undefined
-    };
-    
-    console.log('📋 Fetch params:', params);
-    
-    const response = await listingsApi.getMyListings(params);
-    
-    console.log('📦 API Response:', {
-      success: response.success,
-      hasData: !!response.data,
-      hasListings: !!response.data?.listings || !!response.data?.data?.listings
-    });
-    
-    if (response.success) {
-      // ✅ Handle both response formats
-      let listingsData: Listing[] = [];
-      
-      if (response.data?.listings) {
-        // Direct format: { listings: [], pagination: {} }
-        listingsData = response.data.listings;
-      } else if (response.data?.data?.listings) {
-        // Nested format: { data: { listings: [], pagination: {} } }
-        listingsData = response.data.data.listings;
-      }
-      
-      console.log(`✅ Loaded ${listingsData.length} listings`);
-      setListings(listingsData);
-      
-      if (listingsData.length === 0) {
-        setSuccessMessage('No listings found. Create your first listing!');
-      }
-    } else {
-      console.warn('⚠️ API returned error:', response.error);
-      setListings([]);
-      setError(response.error || 'Failed to load listings');
-    }
-    
-  } catch (error: any) {
-    console.error('❌ Error in fetchListings:', error);
-    setListings([]);
-    setError('Failed to load listings');
-  } finally {
-    setListingsLoading(false);
-  }
-};
-  // ✅ Fetch offers received
-  const fetchOffers = async () => {
+  // ✅ Fetch listings
+  const fetchListings = async () => {
     try {
-      setOffersLoading(true);
+      setListingsLoading(true);
+      setError('');
       
-      console.log('💌 Fetching received offers...');
-      const response = await offersApi.getReceivedOffers();
+      console.log('🏠 Fetching seller listings...');
       
-      if (response.success && response.data) {
-        const offersData = response.data.offers || [];
-        console.log(`✅ Found ${offersData.length} offers`);
-        setOffers(offersData);
+      const params = {
+        page: listingsPage,
+        limit: listingsLimit,
+        status: listingsStatusFilter || undefined
+      };
+      
+      console.log('📋 Fetch params:', params);
+      
+      const response = await listingsApi.getMyListings(params);
+      
+      console.log('📦 API Response:', {
+        success: response.success,
+        hasData: !!response.data,
+        hasListings: !!response.data?.listings || !!response.data?.data?.listings
+      });
+      
+      if (response.success) {
+        // ✅ Handle both response formats
+        let listingsData: Listing[] = [];
+        
+        if (response.data?.listings) {
+          // Direct format: { listings: [], pagination: {} }
+          listingsData = response.data.listings;
+        } else if (response.data?.data?.listings) {
+          // Nested format: { data: { listings: [], pagination: {} } }
+          listingsData = response.data.data.listings;
+        }
+        
+        console.log(`✅ Loaded ${listingsData.length} listings`);
+        setListings(listingsData);
+        
+        if (listingsData.length === 0) {
+          setSuccessMessage('No listings found. Create your first listing!');
+        }
       } else {
-        console.warn('⚠️ No offers found or API error:', response.error);
-        setOffers([]);
-        setError('Failed to load offers. Please try again.');
+        console.warn('⚠️ API returned error:', response.error);
+        setListings([]);
+        setError(response.error || 'Failed to load listings');
       }
+      
     } catch (error: any) {
-      console.error('❌ Error fetching offers:', error);
-      setError('Failed to load offers. Please try again.');
+      console.error('❌ Error in fetchListings:', error);
+      setListings([]);
+      setError('Failed to load listings');
     } finally {
-      setOffersLoading(false);
+      setListingsLoading(false);
     }
   };
 
@@ -581,13 +548,13 @@ const fetchListings = async () => {
   };
 
   // ✅ ✅ ✅ MAJOR UPDATE: Function to refresh specific data after actions
-  const refreshDataAfterAction = async (actionType: 'listing' | 'order' | 'offer' | 'stripe' | 'withdrawal') => {
+  const refreshDataAfterAction = async (actionType: 'listing' | 'order' | 'stripe' | 'withdrawal' | 'earnings') => {
     console.log(`🔄 Refreshing data after ${actionType} action...`);
     
     try {
       // Always refresh stats and Stripe status
       await Promise.all([
-        fetchSellerStats(),
+        fetchSellerStats(), // ✅ This now includes earnings data
         checkStripeAccountStatus()
       ]);
 
@@ -599,11 +566,11 @@ const fetchListings = async () => {
         case 'order':
           await fetchSellerOrders();
           break;
-        case 'offer':
-          await fetchOffers();
-          break;
         case 'withdrawal':
           await fetchWithdrawalHistory();
+          break;
+        case 'earnings':
+          // Earnings tab already handled by fetchSellerStats
           break;
       }
 
@@ -612,15 +579,12 @@ const fetchListings = async () => {
         // For overview tab, refresh all relevant data
         await Promise.all([
           fetchSellerOrders(),
-          fetchListings(),
-          fetchOffers()
+          fetchListings()
         ]);
       } else if (activeTab === 'listings') {
         await fetchListings();
       } else if (activeTab === 'orders') {
         await fetchSellerOrders();
-      } else if (activeTab === 'offers') {
-        await fetchOffers();
       } else if (activeTab === 'withdraw') {
         await fetchWithdrawalHistory();
       }
@@ -650,8 +614,7 @@ const fetchListings = async () => {
       await Promise.all([
         fetchSellerOrders(),
         fetchListings(),
-        fetchOffers(),
-        fetchSellerStats(),
+        fetchSellerStats(), // ✅ Includes earnings data
         checkStripeAccountStatus()
       ]);
 
@@ -987,40 +950,6 @@ const fetchListings = async () => {
     setShowVideoModal(true);
   };
 
-  // ✅ Handle offer actions - UPDATED with auto-refresh
-  const handleOfferAction = async (offerId: string, action: 'accept' | 'reject') => {
-    try {
-      setOrderActionLoading(offerId);
-      
-      let response;
-      if (action === 'accept') {
-        response = await offersApi.acceptOffer(offerId);
-      } else {
-        response = await offersApi.rejectOffer(offerId, 'Seller rejected the offer');
-      }
-
-      if (response.success && response.data) {
-        // Remove offer from list
-        setOffers(prev => prev.filter(offer => offer._id !== offerId));
-        setSuccessMessage(`Offer ${action}ed successfully!`);
-        
-        // ✅ AUTO-REFRESH after offer action
-        setTimeout(() => {
-          refreshDataAfterAction('offer');
-          setRefreshCounter(prev => prev + 1);
-        }, 300);
-        
-      } else {
-        setError(response.error || `Failed to ${action} offer. Please try again.`);
-      }
-    } catch (error: any) {
-      console.error(`❌ Error ${action}ing offer:`, error);
-      setError(`Failed to ${action} offer. Please try again.`);
-    } finally {
-      setOrderActionLoading(null);
-    }
-  };
-
   const handleStripeSetupSuccess = () => {
     setShowStripeSetup(false);
     setShowStripeSuccessAlert(true);
@@ -1066,20 +995,19 @@ const fetchListings = async () => {
       fetchListings();
     } else if (activeTab === 'orders') {
       fetchSellerOrders();
-    } else if (activeTab === 'offers') {
-      fetchOffers();
     } else if (activeTab === 'withdraw') {
       fetchWithdrawalHistory();
+    } else if (activeTab === 'earnings') {
+      fetchSellerStats(); // ✅ Refresh earnings data when switching to earnings tab
     }
   }, [activeTab, listingsPage, listingsStatusFilter, ordersPage, ordersFilter, withdrawalsPage, refreshCounter]); // ✅ Added refreshCounter dependency
 
   // Determine loading state
   const getCurrentLoadingState = () => {
     if (activeTab === 'overview') return loading && !initialDataLoaded;
-    if (activeTab === 'earnings') return false;
+    if (activeTab === 'earnings') return earningsLoading;
     if (activeTab === 'listings') return listingsLoading;
     if (activeTab === 'orders') return ordersLoading;
-    if (activeTab === 'offers') return offersLoading;
     if (activeTab === 'withdraw') return withdrawalsLoading;
     return loading;
   };
@@ -1097,7 +1025,7 @@ const fetchListings = async () => {
     totalRevenue: orderStats.totalRevenue,
     totalOrders: orderStats.totalOrders,
     activeOrders: orderStats.activeOrders,
-    pendingOffers: pendingOffers,
+    pendingOffers: 0, // ✅ Removed offers
     totalListings: totalListings,
     activeListings: activeListings,
     thisMonthRevenue: orderStats.thisMonthRevenue,
@@ -1290,7 +1218,7 @@ const fetchListings = async () => {
             />
           )}
 
-          {/* ✅ Navigation */}
+          {/* ✅ Navigation - Now without Offers tab */}
           <SafeTabNavigation
             tabs={tabs}
             activeTab={activeTab}
@@ -1409,44 +1337,69 @@ const fetchListings = async () => {
                       pendingBalance: 0
                     }}
                     orderStats={orderStats}
-                    sellerStats={sellerStats}
+                    sellerStats={sellerStats} // ✅ Now contains earnings data from API
                     onWithdrawRequest={handleWithdrawRequest}
                     loading={earningsLoading}
-                    onRefresh={checkStripeAccountStatus}
+                    onRefresh={() => {
+                      refreshDataAfterAction('earnings');
+                      setRefreshCounter(prev => prev + 1);
+                    }}
                   />
                 )}
 
                 {/* Listings Tab */}
+                {activeTab === 'listings' && (
+                  <SafeListingsTab
+                    listingsData={{
+                      listings: listings,
+                      pagination: {
+                        page: listingsPage,
+                        limit: listingsLimit,
+                        total: listings.length,
+                        pages: Math.ceil(listings.length / listingsLimit)
+                      }
+                    }}
+                    loading={listingsLoading}
+                    statusFilter={listingsStatusFilter}
+                    currentPage={listingsPage}
+                    totalPages={Math.ceil(listings.length / listingsLimit)}
+                    onStatusFilterChange={setListingsStatusFilter}
+                    onPageChange={setListingsPage}
+                    onEditListing={handleEditListing}
+                    onDeleteListing={handleDeleteListing}
+                    onToggleStatus={handleToggleListingStatus}
+                    onPlayVideo={handlePlayVideo}
+                    onRefresh={fetchListings}
+                    actionLoading={listingActionLoading}
+                    onCreateListing={() => navigate('/marketplace/create')}
+                    onViewListing={(id) => navigate(`/marketplace/listing/${id}`)}
+                  />
+                )}
 
-{/* Listings Tab */}
-{activeTab === 'listings' && (
-  <SafeListingsTab
-    // ✅ CHANGE THIS: listings prop ko listingsData ki jagah
-    listingsData={{
-      listings: listings,
-      pagination: {
-        page: listingsPage,
-        limit: listingsLimit,
-        total: listings.length,
-        pages: Math.ceil(listings.length / listingsLimit)
-      }
-    }}
-    loading={listingsLoading}
-    statusFilter={listingsStatusFilter}
-    currentPage={listingsPage}
-    totalPages={Math.ceil(listings.length / listingsLimit)}
-    onStatusFilterChange={setListingsStatusFilter}
-    onPageChange={setListingsPage}
-    onEditListing={handleEditListing}
-    onDeleteListing={handleDeleteListing}
-    onToggleStatus={handleToggleListingStatus}
-    onPlayVideo={handlePlayVideo}
-    onRefresh={fetchListings}
-    actionLoading={listingActionLoading}
-    onCreateListing={() => navigate('/marketplace/create')}
-    onViewListing={(id) => navigate(`/marketplace/listing/${id}`)}
-  />
-)}
+                {/* Orders Tab */}
+                {activeTab === 'orders' && (
+                  <SafeOrdersTab
+                    orders={orders}
+                    loading={ordersLoading}
+                    filter={ordersFilter}
+                    currentPage={ordersPage}
+                    totalPages={Math.ceil(orders.length / ordersLimit)}
+                    onFilterChange={setOrdersFilter}
+                    onPageChange={setOrdersPage}
+                    onViewOrderDetails={handleViewOrderDetails}
+                    onStartProcessing={handleSimpleStartProcessing}
+                    onStartWork={handleSimpleStartWork}
+                    onDeliver={handleSimpleDeliver}
+                    onCancel={handleSimpleCancel}
+                    onCompleteRevision={() => {}}
+                    orderActionLoading={orderActionLoading}
+                    onCreateListing={() => navigate('/marketplace/create')}
+                    onRefresh={() => {
+                      fetchSellerOrders();
+                      setRefreshCounter(prev => prev + 1);
+                    }}
+                  />
+                )}
 
                 {/* Withdraw Tab */}
                 {activeTab === 'withdraw' && (
@@ -1465,7 +1418,10 @@ const fetchListings = async () => {
                     currentPage={withdrawalsPage}
                     onPageChange={setWithdrawalsPage}
                     onWithdrawRequest={handleWithdrawRequest}
-                    onRefresh={() => fetchWithdrawalHistory()}
+                    onRefresh={() => {
+                      fetchWithdrawalHistory();
+                      setRefreshCounter(prev => prev + 1);
+                    }}
                     totalRevenue={orderStats.totalRevenue}
                     thisMonthRevenue={orderStats.thisMonthRevenue}
                     pendingRevenue={orderStats.pendingRevenue}
