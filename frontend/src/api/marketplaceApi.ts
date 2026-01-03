@@ -445,27 +445,55 @@ export const listingsApi = {
       return handleApiError(error as AxiosError, 'Failed to fetch listings');
     }
   },
-
-  // Get seller's own listings
-  getMyListings: async (params?: {
-    page?: number;
-    limit?: number;
-    status?: string;
-    category?: string;
-    search?: string;
-    sortBy?: string;
-    sortOrder?: string;
-  }): Promise<ApiResponse<{ listings: Listing[] }>> => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/marketplace/listings/my-listings`, {
-        params,
-        ...getHeaders()
-      });
-      return normalizeResponse(response);
-    } catch (error) {
-      return handleApiError(error as AxiosError, 'Failed to fetch your listings');
+// ✅ CORRECTED getMyListings function
+getMyListings: async (params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  category?: string;
+  search?: string;
+  sortBy?: string;
+  sortOrder?: string;
+}): Promise<ApiResponse<{ listings: Listing[]; pagination?: any }>> => {
+  try {
+    console.log('📡 Calling /marketplace/listings/my-listings with params:', params);
+    
+    const response = await axios.get(`${API_BASE_URL}/marketplace/listings/my-listings`, {
+      params,
+      ...getHeaders()
+    });
+    
+    console.log('✅ API Response:', response.data);
+    
+    const data = response.data;
+    
+    if (!data.success) {
+      return {
+        success: false,
+        error: data.error || 'Failed to fetch your listings',
+        message: data.message,
+        status: response.status
+      };
     }
-  },
+    
+    // ✅ CORRECT: Extract listings from the correct response structure
+    const listings = data.data?.listings || data.listings || [];
+    const pagination = data.data?.pagination || data.pagination;
+    
+    return {
+      success: true,
+      data: {
+        listings: listings,
+        pagination: pagination
+      },
+      message: data.message || 'Listings fetched successfully'
+    };
+    
+  } catch (error) {
+    console.error('❌ Error in getMyListings:', error);
+    return handleApiError(error as AxiosError, 'Failed to fetch your listings');
+  }
+},
 
   // Create new listing
   createListing: async (listingData: {
