@@ -85,20 +85,42 @@ interface WithdrawalHistory {
     pages: number;
   };
 }
+// SellerDashboard.tsx میں formatCurrency function
 
-// For now, create a simple formatCurrency function
-const formatCurrency = (amount: number) => {
-  // If amount is less than 100, assume it's already in dollars
-  if (amount < 100) {
-    return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  }
+const formatCurrency = (amount: number): string => {
+  if (amount === undefined || amount === null) return '$0.00';
   
-  // Otherwise, assume it's cents and convert to dollars
+  // ✅ ALWAYS assume amount is in cents and convert to dollars
   const amountInDollars = amount / 100;
+  
   return `$${amountInDollars.toLocaleString('en-US', { 
     minimumFractionDigits: 2, 
     maximumFractionDigits: 2 
   })}`;
+};
+
+// یا safe version بنائیں
+const safeFormatCurrency = (amount: number | undefined): string => {
+  if (amount === undefined || amount === null || isNaN(amount)) {
+    return '$0.00';
+  }
+  
+  // Determine if amount is in cents or dollars
+  // If amount is less than 1000 and has more than 2 decimal places in cents
+  if (amount < 1000 && amount % 1 !== 0) {
+    // Likely already in dollars (like 999.00)
+    return `$${amount.toLocaleString('en-US', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    })}`;
+  } else {
+    // Likely in cents (like 99900)
+    const amountInDollars = amount / 100;
+    return `$${amountInDollars.toLocaleString('en-US', { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    })}`;
+  }
 };
 
 // Simple fallback components
