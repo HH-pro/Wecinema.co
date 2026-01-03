@@ -277,77 +277,27 @@ router.get("/:id", async (req, res) => {
     });
   }
 });
-
-// Get seller's own listings
-router.get("/my-listings", authenticateMiddleware, async (req, res) => {
+// Get seller's own listings - SIMPLIFIED VERSION
+router.get('/listings/my-listings', authenticateMiddleware, async (req, res) => {
   try {
-    console.log("🎯 GET /marketplace/listings/my-listings");
+    console.log('🎯 GET /marketplace/listings/my-listings called');
+    console.log('👤 Seller ID:', req.user._id);
     
     const sellerId = req.user._id;
-    console.log("👤 Seller ID:", sellerId);
     
-    const { 
-      status = 'all', 
-      page = 1, 
-      limit = 10,
-      category = 'all',
-      search,
-      sortBy = 'updatedAt',
-      sortOrder = 'desc'
-    } = req.query;
-    
-    console.log("📋 Query params:", req.query);
-    
-    // Build filter
-    const filter = { sellerId: sellerId };
-    
-    if (status && status !== 'all') {
-      filter.status = status;
-    }
-    
-    if (category && category !== 'all') {
-      filter.category = category;
-    }
-    
-    if (search && search.trim() !== '') {
-      filter.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { tags: { $regex: search, $options: 'i' } }
-      ];
-    }
-    
-    console.log("🔍 Filter:", JSON.stringify(filter, null, 2));
-    
-    // Parse pagination
-    const pageNum = Math.max(1, parseInt(page));
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
-    const skip = (pageNum - 1) * limitNum;
-    
-    // Sort options
-    const sortOptions = {};
-    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
-    
-    // Get listings
-    const listings = await MarketplaceListing.find(filter)
+    // SIMPLE: Get all listings for this seller, no filters
+    const listings = await MarketplaceListing.find({ sellerId: sellerId })
       .populate({
-        path: "sellerId",
-        select: "username avatar sellerRating email phoneNumber"
+        path: 'sellerId',
+        select: 'username avatar sellerRating'
       })
-      .sort(sortOptions)
-      .skip(skip)
-      .limit(limitNum)
+      .sort({ updatedAt: -1 }) // Latest first
       .lean();
     
-    console.log(`📊 Found ${listings.length} listings`);
+    console.log(`📊 Found ${listings.length} listings for seller ${sellerId}`);
     
-    const total = await MarketplaceListing.countDocuments(filter);
-    
-    // Format listings
+    // Format listings - SIMPLE
     const formattedListings = listings.map(listing => {
-      const mediaUrls = Array.isArray(listing.mediaUrls) ? listing.mediaUrls : [];
-      const tags = Array.isArray(listing.tags) ? listing.tags : [];
-      
       return {
         _id: listing._id.toString(),
         sellerId: listing.sellerId,
@@ -358,21 +308,15 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
         currency: listing.currency || 'USD',
         type: listing.type || 'for_sale',
         category: listing.category || 'Uncategorized',
-        mediaUrls: mediaUrls,
-        thumbnail: mediaUrls.length > 0 ? mediaUrls[0] : null,
+        mediaUrls: Array.isArray(listing.mediaUrls) ? listing.mediaUrls : [],
+        thumbnail: listing.mediaUrls?.[0] || null,
         status: listing.status || 'active',
-        tags: tags,
+        tags: Array.isArray(listing.tags) ? listing.tags : [],
         createdAt: listing.createdAt,
         updatedAt: listing.updatedAt,
-        createdAtFormatted: new Date(listing.createdAt).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        }),
         views: listing.viewCount || 0,
-        statusColor: listing.status === 'active' ? 'green' : 
-                    listing.status === 'sold' ? 'blue' : 
-                    listing.status === 'pending' ? 'orange' : 'gray',
+        favoriteCount: listing.favoriteCount || 0,
+        purchaseCount: listing.purchaseCount || 0,
         seller: listing.sellerId ? {
           _id: listing.sellerId._id,
           username: listing.sellerId.username,
@@ -382,26 +326,18 @@ router.get("/my-listings", authenticateMiddleware, async (req, res) => {
       };
     });
     
-    // ✅ RESPONSE FORMAT THAT MATCHES FRONTEND EXPECTATIONS
+    // ✅ SIMPLE RESPONSE: Just return the listings array
     res.status(200).json({
       success: true,
-      data: {
-        listings: formattedListings,
-        pagination: {
-          page: pageNum,
-          limit: limitNum,
-          total,
-          pages: Math.ceil(total / limitNum)
-        }
-      },
-      message: `Found ${total} listing${total !== 1 ? 's' : ''}`
+      listings: formattedListings,
+      message: `Found ${formattedListings.length} listings`
     });
     
   } catch (error) {
-    console.error("❌ Error in /listings/my-listings:", error);
+    console.error('❌ Error in /listings/my-listings:', error);
     res.status(500).json({ 
       success: false,
-      error: "Failed to fetch your listings",
+      error: 'Failed to fetch your listings',
       message: error.message
     });
   }
