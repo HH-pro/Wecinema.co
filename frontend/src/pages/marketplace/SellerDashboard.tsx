@@ -30,6 +30,7 @@ import ActionCard from '../../components/marketplae/seller/ActionCard';
 import OrderWorkflowGuide from '../../components/marketplae/seller/OrderWorkflowGuide';
 import StripeAccountStatus from '../../components/marketplae/seller/StripeAccountStatus';
 import StripeSuccessAlert from '../../components/marketplae/seller/StripeSuccessAlert';
+import StripeConnectedStatus from '../../components/marketplae/seller/StripeConnectedStatus'; // ✅ NEW: Import connected status component
 
 // Import tab components
 import ListingsTab from '../../components/marketplae/seller/ListingsTab';
@@ -131,6 +132,7 @@ const SafeActionCard = (typeof ActionCard === 'function' || typeof ActionCard ==
 const SafeOrderWorkflowGuide = (typeof OrderWorkflowGuide === 'function' || typeof OrderWorkflowGuide === 'object') ? OrderWorkflowGuide : () => <SimpleFallback name="OrderWorkflowGuide" />;
 const SafeStripeAccountStatus = (typeof StripeAccountStatus === 'function' || typeof StripeAccountStatus === 'object') ? StripeAccountStatus : () => <SimpleFallback name="StripeAccountStatus" />;
 const SafeStripeSuccessAlert = (typeof StripeSuccessAlert === 'function' || typeof StripeSuccessAlert === 'object') ? StripeSuccessAlert : () => <SimpleFallback name="StripeSuccessAlert" />;
+const SafeStripeConnectedStatus = (typeof StripeConnectedStatus === 'function' || typeof StripeConnectedStatus === 'object') ? StripeConnectedStatus : () => <SimpleFallback name="StripeConnectedStatus" />; // ✅ NEW
 const SafeListingsTab = (typeof ListingsTab === 'function' || typeof ListingsTab === 'object') ? ListingsTab : () => <SimpleFallback name="ListingsTab" />;
 const SafeOrdersTab = (typeof OrdersTab === 'function' || typeof OrdersTab === 'object') ? OrdersTab : () => <SimpleFallback name="OrdersTab" />;
 const SafeWithdrawTab = (typeof WithdrawTab === 'function' || typeof WithdrawTab === 'object') ? WithdrawTab : () => <SimpleFallback name="WithdrawTab" />;
@@ -1220,7 +1222,6 @@ const SellerDashboard: React.FC = () => {
               onClose={() => setShowStripeSuccessAlert(false)}
             />
           )}
-                    totalEarnings={orderStats.totalRevenue}
 
           {/* Header */}
           <SafeDashboardHeader
@@ -1321,18 +1322,34 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* ✅ Stripe Account Status (Only show if not connected) */}
-          {!stripeStatus?.account?.charges_enabled && (
-            <SafeStripeAccountStatus
-              stripeStatus={{
-                connected: stripeStatus?.account?.charges_enabled || false,
-                chargesEnabled: stripeStatus?.account?.charges_enabled || false,
-                detailsSubmitted: stripeStatus?.account?.details_submitted || false,
-                status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive'
-              }}
-              onSetupClick={handleOpenStripeSetup}
-              isLoading={stripeStatus === null}
-            />
+          {/* ✅ Stripe Status Section - UPDATED with conditional rendering */}
+          {stripeStatus && (
+            <div className="mb-6">
+              {/* Show "Connect Stripe" message when NOT connected */}
+              {!stripeStatus.account?.charges_enabled ? (
+                <SafeStripeAccountStatus
+                  stripeStatus={{
+                    connected: false,
+                    chargesEnabled: false,
+                    detailsSubmitted: false,
+                    status: 'inactive'
+                  }}
+                  onSetupClick={handleOpenStripeSetup}
+                  isLoading={stripeStatus === null}
+                />
+              ) : (
+                /* Show "Connected Status" when Stripe IS connected */
+                <SafeStripeConnectedStatus
+                  balance={stripeStatus.account?.balance || 0}
+                  onCheckBalance={() => {
+                    checkStripeAccountStatus();
+                    setSuccessMessage('Balance checked successfully!');
+                  }}
+                  onViewEarnings={() => setActiveTab('earnings')}
+                  onWithdraw={() => setActiveTab('withdraw')}
+                />
+              )}
+            </div>
           )}
 
           {/* ✅ Navigation */}
@@ -1522,31 +1539,30 @@ const SellerDashboard: React.FC = () => {
 
                 {/* Withdraw Tab */}
                 {activeTab === 'withdraw' && (
-                  // SellerDashboard.tsx mein WithdrawTab ko call karte waqt:
-<SafeWithdrawTab
-  stripeStatus={{
-    connected: stripeStatus?.account?.charges_enabled || false,
-    chargesEnabled: stripeStatus?.account?.charges_enabled || false,
-    detailsSubmitted: stripeStatus?.account?.details_submitted || false,
-    status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive',
-    balance: stripeStatus?.account?.balance || 0,
-    availableBalance: stripeStatus?.account?.balance || 0,
-    pendingBalance: 0
-  }}
-  withdrawalHistory={withdrawalHistory}
-  loading={withdrawalsLoading}
-  currentPage={withdrawalsPage}
-  onPageChange={setWithdrawalsPage}
-  onWithdrawRequest={handleWithdrawRequest}
-  onRefresh={() => {
-    refreshDataAfterAction('withdrawal');
-  }}
-  // ✅ ADDED: Earning data passed from parent
-  totalRevenue={orderStats.totalRevenue}
-  thisMonthRevenue={orderStats.thisMonthRevenue}
-  pendingRevenue={orderStats.pendingRevenue}
-  completedRevenue={orderStats.completedRevenue}
-/>
+                  <SafeWithdrawTab
+                    stripeStatus={{
+                      connected: stripeStatus?.account?.charges_enabled || false,
+                      chargesEnabled: stripeStatus?.account?.charges_enabled || false,
+                      detailsSubmitted: stripeStatus?.account?.details_submitted || false,
+                      status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive',
+                      balance: stripeStatus?.account?.balance || 0,
+                      availableBalance: stripeStatus?.account?.balance || 0,
+                      pendingBalance: 0
+                    }}
+                    withdrawalHistory={withdrawalHistory}
+                    loading={withdrawalsLoading}
+                    currentPage={withdrawalsPage}
+                    onPageChange={setWithdrawalsPage}
+                    onWithdrawRequest={handleWithdrawRequest}
+                    onRefresh={() => {
+                      refreshDataAfterAction('withdrawal');
+                    }}
+                    // ✅ ADDED: Earning data passed from parent
+                    totalRevenue={orderStats.totalRevenue}
+                    thisMonthRevenue={orderStats.thisMonthRevenue}
+                    pendingRevenue={orderStats.pendingRevenue}
+                    completedRevenue={orderStats.completedRevenue}
+                  />
                 )}
               </>
             )}
