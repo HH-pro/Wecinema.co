@@ -76,7 +76,7 @@
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, #4F46E5, #7C3AED, #4F46E5);
+  background: linear-gradient(90deg, #F97316 , #7C3AED, #F97316 );
   background-size: 200% 100%;
   animation: gradientShift 3s ease infinite;
 }
@@ -220,7 +220,7 @@
 
 .search-input:focus {
   outline: none;
-  border-color: #4F46E5;
+  border-color: #F97316 ;
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
@@ -268,7 +268,7 @@
 
 .sort-select:focus {
   outline: none;
-  border-color: #4F46E5;
+  border-color: #F97316 ;
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
@@ -288,7 +288,7 @@
   gap: 0.5rem;
   padding: 0.875rem 1.25rem;
   background: white;
-  color: #4F46E5;
+  color: #F97316 ;
   border: 2px solid #e5e7eb;
   border-radius: 12px;
   font-weight: 600;
@@ -304,9 +304,9 @@
 }
 
 .filter-toggle.active {
-  background: #4F46E5;
+  background: #F97316 ;
   color: white;
-  border-color: #4F46E5;
+  border-color: #F97316 ;
 }
 
 /* Advanced Filters */
@@ -365,7 +365,7 @@
 
 .filter-select:focus {
   outline: none;
-  border-color: #4F46E5;
+  border-color: #F97316 ;
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
@@ -388,7 +388,7 @@
 
 .date-input:focus, .amount-input:focus {
   outline: none;
-  border-color: #4F46E5;
+  border-color: #F97316 ;
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
@@ -424,7 +424,7 @@
 
 .seller-input:focus {
   outline: none;
-  border-color: #4F46E5;
+  border-color: #F97316 ;
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
@@ -490,7 +490,7 @@
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, #4F46E5, #7C3AED);
+  background: linear-gradient(90deg, #F97316 , #7C3AED);
 }
 
 .stat-icon {
@@ -688,7 +688,7 @@
   gap: 0.5rem;
   padding: 0.75rem 1.25rem;
   background: #f9fafb;
-  color: #4F46E5;
+  color: #F97316 ;
   border: 2px solid #e5e7eb;
   border-radius: 8px;
   font-weight: 600;
@@ -851,9 +851,9 @@
 }
 
 .status-filter-btn.active {
-  background: #4F46E5;
+  background: #F97316 ;
   color: white;
-  border-color: #4F46E5;
+  border-color: #F97316 ;
 }
 
 .status-filter-btn svg {
@@ -994,7 +994,7 @@
   top: 0;
   bottom: 0;
   width: 6px;
-  background: #4F46E5;
+  background: #F97316 ;
   border-radius: 6px 0 0 6px;
 }
 
@@ -1026,7 +1026,7 @@
 }
 
 .category-badge {
-  background: #4F46E5;
+  background: #F97316 ;
   color: white;
   padding: 0.375rem 0.75rem;
   border-radius: 12px;
@@ -1154,7 +1154,7 @@
 }
 
 .seller-icon {
-  color: #4F46E5;
+  color: #F97316 ;
   flex-shrink: 0;
 }
 
@@ -1224,7 +1224,7 @@
 }
 
 .progress-step.active::before {
-  background: #4F46E5;
+  background: #F97316 ;
 }
 
 .order-info {
@@ -1349,7 +1349,7 @@
   padding: 0.875rem;
   border: 2px solid #e5e7eb;
   background: white;
-  color: #4F46E5;
+  color: #F97316 ;
   border-radius: 8px;
   font-size: 0.875rem;
   font-weight: 600;
@@ -1464,7 +1464,7 @@
 }
 
 .primary-action {
-  background: #4F46E5;
+  background: #F97316 ;
   color: white;
   border: none;
   box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);
@@ -1478,7 +1478,7 @@
 
 .secondary-action {
   background: white;
-  color: #4F46E5;
+  color: #F97316 ;
   border: 2px solid #e5e7eb;
 }
 
@@ -1798,7 +1798,7 @@
 }
 
 .btn-primary {
-  background: #4F46E5;
+  background: #F97316 ;
   color: white;
   box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);
 }
