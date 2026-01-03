@@ -277,78 +277,138 @@ router.get("/:id", async (req, res) => {
     });
   }
 });
-
-
-// Get listing by ID
-router.get("/listings/:id", async (req, res) => {
+// Backend route - UPDATE response format
+router.get("/my-listings", authenticateMiddleware, async (req, res) => {
   try {
-    // Your existing code...
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// ============================================
-// ✅ ORDERS ROUTES
-// ============================================
-
-router.get("/orders/my-sales", authenticateMiddleware, async (req, res) => {
-  try {
-    console.log("🎯 GET /marketplace/orders/my-sales");
+    console.log("🎯 /my-listings endpoint hit");
     
     const sellerId = req.user._id;
     
-    // Your orders logic here...
+    const { 
+      status = 'all', 
+      page = 1, 
+      limit = 10,
+      category = 'all',
+      search,
+      sortBy = 'updatedAt',
+      sortOrder = 'desc'
+    } = req.query;
     
+    // Build filter
+    const filter = { sellerId: sellerId };
+    
+    if (status && status !== 'all') {
+      filter.status = status;
+    }
+    
+    if (category && category !== 'all') {
+      filter.category = category;
+    }
+    
+    if (search && search.trim() !== '') {
+      filter.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { tags: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    console.log("🔍 Filter criteria:", filter);
+    
+    // Parse pagination
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+    const skip = (pageNum - 1) * limitNum;
+    
+    // Sort options
+    const sortOptions = {};
+    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    
+    // Get listings
+    const listings = await MarketplaceListing.find(filter)
+      .populate({
+        path: "sellerId",
+        select: "username avatar sellerRating email phoneNumber"
+      })
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
+    
+    console.log("📊 Found listings count:", listings.length);
+    
+    const total = await MarketplaceListing.countDocuments(filter);
+    
+    // Format listings
+    const formattedListings = listings.map(listing => {
+      const mediaUrls = Array.isArray(listing.mediaUrls) ? listing.mediaUrls : [];
+      const tags = Array.isArray(listing.tags) ? listing.tags : [];
+      
+      return {
+        _id: listing._id.toString(),
+        sellerId: listing.sellerId,
+        title: listing.title || 'Untitled',
+        description: listing.description || '',
+        price: listing.price || 0,
+        formattedPrice: `$${(listing.price || 0).toFixed(2)}`,
+        currency: listing.currency || 'USD',
+        type: listing.type || 'for_sale',
+        category: listing.category || 'Uncategorized',
+        mediaUrls: mediaUrls,
+        thumbnail: mediaUrls.length > 0 ? mediaUrls[0] : null,
+        status: listing.status || 'active',
+        tags: tags,
+        createdAt: listing.createdAt,
+        updatedAt: listing.updatedAt,
+        createdAtFormatted: new Date(listing.createdAt).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        }),
+        views: listing.viewCount || 0,
+        statusColor: listing.status === 'active' ? 'green' : 
+                    listing.status === 'sold' ? 'blue' : 
+                    listing.status === 'pending' ? 'orange' : 'gray',
+        seller: listing.sellerId ? {
+          _id: listing.sellerId._id,
+          username: listing.sellerId.username,
+          avatar: listing.sellerId.avatar,
+          sellerRating: listing.sellerId.sellerRating
+        } : null
+      };
+    });
+    
+    // ✅ UPDATED: Wrap in 'data' object to match frontend expectations
     res.status(200).json({
       success: true,
       data: {
-        sales: orders,
-        stats: stats
+        listings: formattedListings,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          pages: Math.ceil(total / limitNum)
+        }
       },
-      message: `Found ${orders.length} sales`
+      filters: {
+        status: status,
+        category: category,
+        search: search || ''
+      },
+      timestamp: new Date().getTime(),
+      currency: "USD",
+      message: `Found ${total} listing${total !== 1 ? 's' : ''}`
     });
     
   } catch (error) {
-    console.error("❌ Error in /orders/my-sales:", error);
+    console.error("❌ Error fetching my listings:", error);
     res.status(500).json({ 
       success: false,
-      error: "Failed to fetch sales",
+      error: "Failed to fetch my listings",
       message: error.message
     });
   }
 });
-
-// ============================================
-// ✅ OFFERS ROUTES
-// ============================================
-
-router.get("/offers/received-offers", authenticateMiddleware, async (req, res) => {
-  try {
-    console.log("🎯 GET /marketplace/offers/received-offers");
-    
-    const sellerId = req.user._id;
-    
-    // Your offers logic here...
-    
-    res.status(200).json({
-      success: true,
-      data: {
-        offers: offers
-      },
-      message: `Found ${offers.length} offers`
-    });
-    
-  } catch (error) {
-    console.error("❌ Error in /offers/received-offers:", error);
-    res.status(500).json({ 
-      success: false,
-      error: "Failed to fetch offers",
-      message: error.message
-    });
-  }
-});
-
 // ===================================================
 // ✅ CREATE LISTING
 // ===================================================
