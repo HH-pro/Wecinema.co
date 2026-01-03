@@ -75,7 +75,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                         {offerData?.type === 'direct_purchase' ? 'Purchase Amount' : 'Offer Amount'}
                       </div>
                       <div className="text-2xl font-bold text-gray-900">
-                        {marketplaceApi.utils.formatCurrency(offerData?.amount)}
+                        {marketplaceApi.utils.formatCurrencyshow(offerData?.amount)}
                       </div>
                     </div>
                   </div>
@@ -541,7 +541,7 @@ const PaymentForm = ({
               Success!
             </>
           ) : (
-            `Pay ${marketplaceApi.utils.formatCurrency(offerData?.amount)}`
+            `Pay ${marketplaceApi.utils.formatCurrencyshow(offerData?.amount)}`
           )}
         </button>
       </div>
