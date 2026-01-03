@@ -2352,10 +2352,32 @@ router.put("/:orderId/cancel-by-seller", authenticateMiddleware, async (req, res
 router.get("/stats/seller", authenticateMiddleware, async (req, res) => {
   try {
     const userId = req.user.id || req.user._id || req.user.userId;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID not found'
+      });
+    }
+
+    console.log('📊 Fetching seller stats for user:', userId);
+
+    // ✅ FIX: Use new keyword with ObjectId
+    let sellerId;
+    try {
+      // Method 1: Create ObjectId properly
+      sellerId = new mongoose.Types.ObjectId(userId);
+    } catch (error) {
+      console.error('Error creating ObjectId:', error);
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid user ID format'
+      });
+    }
 
     // Define all possible order statuses
     const allStatuses = [
-      'pending', 'paid', 'processing', 'in_progress', 
+      'pending', 'pending_payment', 'paid', 'processing', 'in_progress', 
       'delivered', 'completed', 'cancelled', 'refunded',
       'in_revision', 'disputed'
     ];
@@ -2364,7 +2386,7 @@ router.get("/stats/seller", authenticateMiddleware, async (req, res) => {
     const statsByStatus = await Order.aggregate([
       { 
         $match: { 
-          sellerId: mongoose.Types.ObjectId(userId) 
+          sellerId: sellerId  // ✅ Use the properly created ObjectId
         } 
       },
       { 
@@ -2379,6 +2401,8 @@ router.get("/stats/seller", authenticateMiddleware, async (req, res) => {
       }
     ]);
 
+    console.log('Stats by status found:', statsByStatus.length);
+
     // Ensure all statuses are included (even with zero count)
     const completeStats = allStatuses.map(status => {
       const found = statsByStatus.find(s => s._id === status);
@@ -2389,127 +2413,132 @@ router.get("/stats/seller", authenticateMiddleware, async (req, res) => {
       };
     });
 
-    // Calculate total statistics
-    const totalStats = await Order.aggregate([
+    // Calculate total statistics - SIMPLIFIED VERSION to avoid facet issues
+    const totalOrders = await Order.countDocuments({ sellerId: sellerId });
+    
+    // Get total revenue from all orders
+    const totalRevenueResult = await Order.aggregate([
       { 
         $match: { 
-          sellerId: mongoose.Types.ObjectId(userId) 
+          sellerId: sellerId 
         } 
       },
       {
-        $facet: {
-          // Total summary
-          totalSummary: [
-            {
-              $group: {
-                _id: null,
-                totalOrders: { $sum: 1 },
-                totalAmount: { $sum: "$amount" },
-                avgOrderValue: { $avg: "$amount" }
-              }
-            }
-          ],
-          // Revenue breakdown by status categories
-          revenueBreakdown: [
-            {
-              $group: {
-                _id: "$status",
-                totalAmount: { $sum: "$amount" }
-              }
-            }
-          ],
-          // Completed orders revenue
-          completedRevenue: [
-            { 
-              $match: { 
-                status: 'completed' 
-              } 
-            },
-            { 
-              $group: { 
-                _id: null, 
-                total: { $sum: "$amount" },
-                count: { $sum: 1 }
-              } 
-            }
-          ],
-          // Pending/active orders revenue (orders not completed/cancelled/refunded)
-          pendingRevenue: [
-            { 
-              $match: { 
-                status: { 
-                  $in: ['pending', 'paid', 'processing', 'in_progress', 
-                       'delivered', 'in_revision', 'disputed'] 
-                }
-              } 
-            },
-            { 
-              $group: { 
-                _id: null, 
-                total: { $sum: "$amount" },
-                count: { $sum: 1 }
-              } 
-            }
-          ],
-          // This month's revenue
-          thisMonthRevenue: [
-            { 
-              $match: { 
-                status: 'completed',
-                createdAt: { 
-                  $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-                }
-              } 
-            },
-            { 
-              $group: { 
-                _id: null, 
-                total: { $sum: "$amount" },
-                count: { $sum: 1 }
-              } 
-            }
-          ]
+        $group: {
+          _id: null,
+          totalAmount: { $sum: "$amount" },
+          avgOrderValue: { $avg: "$amount" }
         }
       }
     ]);
-
-    const summary = totalStats[0];
     
+    const totalRevenue = totalRevenueResult[0]?.totalAmount || 0;
+    const avgOrderValue = totalRevenueResult[0]?.avgOrderValue || 0;
+
+    // Get completed orders revenue
+    const completedRevenueResult = await Order.aggregate([
+      { 
+        $match: { 
+          sellerId: sellerId,
+          status: 'completed' 
+        } 
+      },
+      { 
+        $group: { 
+          _id: null, 
+          total: { $sum: "$amount" },
+          count: { $sum: 1 }
+        } 
+      }
+    ]);
+    
+    // Get pending/active orders revenue
+    const pendingRevenueResult = await Order.aggregate([
+      { 
+        $match: { 
+          sellerId: sellerId,
+          status: { 
+            $in: ['pending', 'pending_payment', 'paid', 'processing', 'in_progress', 
+                  'delivered', 'in_revision', 'disputed'] 
+          }
+        } 
+      },
+      { 
+        $group: { 
+          _id: null, 
+          total: { $sum: "$amount" },
+          count: { $sum: 1 }
+        } 
+      }
+    ]);
+
+    // Get this month's revenue
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    
+    const thisMonthRevenueResult = await Order.aggregate([
+      { 
+        $match: { 
+          sellerId: sellerId,
+          status: 'completed',
+          createdAt: { $gte: startOfMonth }
+        } 
+      },
+      { 
+        $group: { 
+          _id: null, 
+          total: { $sum: "$amount" },
+          count: { $sum: 1 }
+        } 
+      }
+    ]);
+
+    // Prepare breakdown by status
+    const breakdown = {};
+    statsByStatus.forEach(stat => {
+      if (stat._id) {
+        breakdown[stat._id] = stat.totalAmount;
+      }
+    });
+
     // Prepare final response
     const response = {
       success: true,
-      statsByStatus: completeStats,
-      totals: {
-        totalOrders: summary.totalSummary[0]?.totalOrders || 0,
-        totalRevenue: summary.totalSummary[0]?.totalAmount || 0,
-        averageOrderValue: summary.totalSummary[0]?.avgOrderValue || 0,
-        completedOrders: {
-          count: summary.completedRevenue[0]?.count || 0,
-          revenue: summary.completedRevenue[0]?.total || 0
+      data: {
+        statsByStatus: completeStats,
+        totals: {
+          totalOrders: totalOrders,
+          totalRevenue: totalRevenue,
+          averageOrderValue: avgOrderValue,
+          completedOrders: {
+            count: completedRevenueResult[0]?.count || 0,
+            revenue: completedRevenueResult[0]?.total || 0
+          },
+          pendingOrders: {
+            count: pendingRevenueResult[0]?.count || 0,
+            revenue: pendingRevenueResult[0]?.total || 0
+          },
+          thisMonthRevenue: thisMonthRevenueResult[0]?.total || 0
         },
-        pendingOrders: {
-          count: summary.pendingRevenue[0]?.count || 0,
-          revenue: summary.pendingRevenue[0]?.total || 0
-        },
-        thisMonthRevenue: summary.thisMonthRevenue[0]?.total || 0
+        breakdown: breakdown
       },
-      breakdown: summary.revenueBreakdown.reduce((acc, item) => {
-        acc[item._id] = item.totalAmount;
-        return acc;
-      }, {})
+      message: 'Seller statistics fetched successfully'
     };
 
+    console.log('✅ Seller stats response prepared');
     res.status(200).json(response);
+
   } catch (error) {
-    console.error('Error fetching seller stats:', error);
+    console.error('❌ Error fetching seller stats:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to fetch statistics',
-      details: error.message 
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
-
 // ======================================================
 // ========== ADMIN/UTILITY ROUTES ==========
 // ======================================================
