@@ -526,7 +526,6 @@ export const listingsApi = {
     }
   },
   // ... rest of the API methods
-};
 
   // Create new listing
   createListing: async (listingData: {
