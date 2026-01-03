@@ -157,61 +157,118 @@ const OrdersTab: React.FC<OrdersTabProps> = ({
   const toggleExpandOrder = (orderId: string) => {
     setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
   };
-// ✅ TEST FUNCTION FOR DEBUGGING
-const testDeliveryFlow = async () => {
+// ✅ ALTERNATIVE: DIRECT API CALL FUNCTION
+const handleActualDeliverDirect = async (deliveryData: {
+  orderId: string;
+  message: string;
+  attachments: File[];
+  isFinal: boolean;
+  revisionsLeft?: number;
+}) => {
   try {
-    console.log('🧪 Testing delivery flow...');
+    setIsSubmittingDelivery(true);
     
-    // Test 1: Check auth token
-    const token = localStorage.getItem('token');
-    console.log('🔑 Token exists:', !!token);
-    
-    // Test 2: Check API base URL
-    console.log('🌐 API Base URL:', marketplaceApi.utils.getApiBaseUrl());
-    
-    // Test 3: Test file upload endpoint
-    console.log('📤 Testing file upload endpoint...');
-    try {
-      const testResponse = await fetch('http://localhost:3000/marketplace/orders/upload/delivery', {
-        method: 'OPTIONS',
-      });
-      console.log('✅ Upload endpoint accessible:', testResponse.ok);
-    } catch (error) {
-      console.error('❌ Upload endpoint not accessible:', error);
+    console.log('🚀 Starting direct delivery process...');
+
+    // Step 1: Get auth token
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (!token) {
+      toast.error('Please login again');
+      return;
     }
-    
-    // Test 4: Test deliver endpoint
-    if (selectedOrderForDelivery) {
-      console.log('📦 Testing deliver endpoint for order:', selectedOrderForDelivery._id);
+
+    let uploadedFiles: any[] = [];
+
+    // Step 2: Upload files if any
+    if (deliveryData.attachments.length > 0) {
+      const formData = new FormData();
+      deliveryData.attachments.forEach(file => {
+        formData.append('files', file);
+      });
+
+      console.log('📤 Uploading files directly...');
+      
       try {
-        const deliverResponse = await fetch(
-          `http://localhost:3000/marketplace/orders/${selectedOrderForDelivery._id}/deliver-with-email`,
-          { method: 'OPTIONS' }
-        );
-        console.log('✅ Deliver endpoint accessible:', deliverResponse.ok);
-      } catch (error) {
-        console.error('❌ Deliver endpoint not accessible:', error);
+        const uploadResponse = await fetch('http://localhost:3000/marketplace/orders/upload/delivery', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        const uploadData = await uploadResponse.json();
+        console.log('📦 Upload response:', uploadData);
+
+        if (!uploadResponse.ok) {
+          throw new Error(uploadData.error || uploadData.message || 'Upload failed');
+        }
+
+        if (uploadData.success) {
+          uploadedFiles = uploadData.files || uploadData.data?.files || [];
+          console.log('✅ Files uploaded:', uploadedFiles);
+        } else {
+          throw new Error(uploadData.error || 'Upload failed');
+        }
+      } catch (uploadError: any) {
+        console.error('Upload error:', uploadError);
+        toast.error(uploadError.message || 'File upload failed');
+        return;
       }
     }
-    
-    console.log('✅ All tests completed');
-    
-  } catch (error) {
-    console.error('❌ Test failed:', error);
+
+    // Step 3: Determine endpoint based on order status
+    const isRevision = selectedOrderForDelivery?.status === 'in_revision';
+    const endpoint = isRevision 
+      ? `http://localhost:3000/marketplace/orders/${deliveryData.orderId}/complete-revision`
+      : `http://localhost:3000/marketplace/orders/${deliveryData.orderId}/deliver-with-email`;
+
+    // Step 4: Prepare delivery data
+    const deliveryPayload = {
+      deliveryMessage: deliveryData.message,
+      deliveryFiles: uploadedFiles.map(f => f.url),
+      attachments: uploadedFiles,
+      isFinalDelivery: deliveryData.isFinal
+    };
+
+    console.log('📦 Sending delivery to:', endpoint, deliveryPayload);
+
+    // Step 5: Send delivery request
+    const response = await fetch(endpoint, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(deliveryPayload),
+    });
+
+    const responseData = await response.json();
+    console.log('📊 Delivery response:', responseData);
+
+    if (!response.ok) {
+      throw new Error(responseData.error || responseData.message || 'Delivery failed');
+    }
+
+    if (responseData.success) {
+      toast.success(isRevision ? 'Revision completed!' : 'Order delivered!');
+      
+      // Close modal and refresh
+      setDeliveryModalOpen(false);
+      setSelectedOrderForDelivery(null);
+      
+      setTimeout(() => onRefresh(), 1000);
+    } else {
+      throw new Error(responseData.error || 'Delivery failed');
+    }
+
+  } catch (error: any) {
+    console.error('❌ Direct delivery error:', error);
+    toast.error(error.message || 'Delivery failed');
+  } finally {
+    setIsSubmittingDelivery(false);
   }
 };
-
-// OrdersTab mein call karein jab modal open ho
-useEffect(() => {
-  if (deliveryModalOpen && selectedOrderForDelivery) {
-    console.log('🔍 Debug info for delivery:', {
-      order: selectedOrderForDelivery,
-      status: selectedOrderForDelivery.status,
-      id: selectedOrderForDelivery._id
-    });
-    // testDeliveryFlow(); // Uncomment for debugging
-  }
-}, [deliveryModalOpen, selectedOrderForDelivery]);
   // ✅ Handle Start Processing using marketplaceApi
   const handleStartProcessing = async (orderId: string) => {
     try {
