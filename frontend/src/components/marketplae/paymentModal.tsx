@@ -174,7 +174,12 @@ const PaymentForm = ({
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showBillingForm, setShowBillingForm] = useState(false);
-
+ const safeCurrentUser = currentUser || {};
+  const userInfo = {
+    name: safeCurrentUser?.username || billingDetails?.name || 'Customer',
+    email: safeCurrentUser?.email || billingDetails?.email || '',
+    phone: billingDetails?.phone || ''
+  };
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     
@@ -343,6 +348,7 @@ const PaymentForm = ({
             className="text-xs text-yellow-600 hover:text-yellow-500"
           >
             {showBillingForm ? 'Hide' : 'Edit'}
+              <span>{billingDetails?.name || safeCurrentUser?.username || 'Not provided'}</span>
           </button>
         </div>
         
