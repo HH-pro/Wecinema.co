@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FiCheck, FiX, FiUser, FiMail, FiCreditCard, FiAlertCircle, FiLoader, FiImage } from 'react-icons/fi';
 import { Elements, PaymentElement, useStripe, useElements, AddressElement } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
@@ -159,7 +159,33 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 };
 
 // Payment Form Component
-const PaymentForm = ({ 
+interface PaymentFormProps {
+  offerData: any;
+  onSuccess: () => void;
+  onClose: () => void;
+  paymentStatus: 'idle' | 'processing' | 'success' | 'failed';
+  setPaymentStatus: (status: 'idle' | 'processing' | 'success' | 'failed') => void;
+  billingDetails: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    address: {
+      line1?: string;
+      line2?: string;
+      city?: string;
+      state?: string;
+      postal_code?: string;
+      country?: string;
+    };
+  };
+  onBillingDetailsChange: (details: any) => void;
+  currentUser?: {
+    username?: string;
+    email?: string;
+  } | null;
+}
+
+const PaymentForm: React.FC<PaymentFormProps> = ({ 
   offerData, 
   onSuccess, 
   onClose, 
@@ -168,12 +194,31 @@ const PaymentForm = ({
   billingDetails,
   onBillingDetailsChange,
   currentUser
-}: any) => {
+}) => {
   const stripe = useStripe();
   const elements = useElements();
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showBillingForm, setShowBillingForm] = useState(false);
+  
+  // Initialize billing details from currentUser on component mount
+  useEffect(() => {
+    if (currentUser && !billingDetails.name) {
+      onBillingDetailsChange({
+        name: currentUser?.username || '',
+        email: currentUser?.email || '',
+        phone: '',
+        address: {
+          line1: '',
+          line2: '',
+          city: '',
+          state: '',
+          postal_code: '',
+          country: 'US'
+        }
+      });
+    }
+  }, [currentUser]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -190,29 +235,42 @@ const PaymentForm = ({
     try {
       console.log('🔄 Confirming payment...');
 
-      // Get user info
+      // Get user info with safe defaults
       const userInfo = {
-        name: currentUser?.username || billingDetails.name || 'Customer',
-        email: currentUser?.email || billingDetails.email || '',
-        phone: billingDetails.phone || ''
+        name: currentUser?.username || billingDetails?.name || 'Customer',
+        email: currentUser?.email || billingDetails?.email || '',
+        phone: billingDetails?.phone || ''
       };
 
-      // Prepare billing details for confirmPayment
+      // Prepare billing details for confirmPayment with safe defaults
       const billingDetailsForStripe = {
         name: userInfo.name,
         email: userInfo.email || undefined,
         phone: userInfo.phone || undefined,
         address: {
-          line1: billingDetails.address.line1 || 'N/A',
-          line2: billingDetails.address.line2 || undefined,
-          city: billingDetails.address.city || 'N/A',
-          state: billingDetails.address.state || 'N/A',
-          postal_code: billingDetails.address.postal_code || '00000',
-          country: billingDetails.address.country || 'US'
+          line1: billingDetails?.address?.line1 || 'N/A',
+          line2: billingDetails?.address?.line2 || undefined,
+          city: billingDetails?.address?.city || 'N/A',
+          state: billingDetails?.address?.state || 'N/A',
+          postal_code: billingDetails?.address?.postal_code || '00000',
+          country: billingDetails?.address?.country || 'US'
         }
       };
 
       console.log('📋 Billing details for Stripe:', billingDetailsForStripe);
+
+      // Validate required fields before proceeding
+      if (!billingDetailsForStripe.name || billingDetailsForStripe.name === 'Customer') {
+        throw new Error('Please enter your full name');
+      }
+
+      if (!billingDetailsForStripe.email) {
+        throw new Error('Please enter your email address');
+      }
+
+      if (billingDetailsForStripe.address.line1 === 'N/A') {
+        throw new Error('Please enter your billing address');
+      }
 
       // Direct confirmation without submit()
       const { error: stripeError, paymentIntent } = await stripe.confirmPayment({
@@ -316,6 +374,7 @@ const PaymentForm = ({
     if (event.complete) {
       const address = event.value.address;
       onBillingDetailsChange({
+        ...billingDetails,
         address: {
           line1: address.line1 || '',
           line2: address.line2 || '',
@@ -327,6 +386,10 @@ const PaymentForm = ({
       });
     }
   };
+
+  // Get user info with safe defaults
+  const userName = currentUser?.username || billingDetails?.name || '';
+  const userEmail = currentUser?.email || billingDetails?.email || '';
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -351,12 +414,12 @@ const PaymentForm = ({
             {/* Name Input */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
-                Full Name
+                Full Name *
               </label>
               <input
                 type="text"
-                value={billingDetails.name || currentUser?.username || ''}
-                onChange={(e) => onBillingDetailsChange({ name: e.target.value })}
+                value={billingDetails?.name || userName || ''}
+                onChange={(e) => onBillingDetailsChange({ ...billingDetails, name: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
                 placeholder="Enter your full name"
                 required
@@ -366,12 +429,12 @@ const PaymentForm = ({
             {/* Email Input */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
-                Email Address
+                Email Address *
               </label>
               <input
                 type="email"
-                value={billingDetails.email || currentUser?.email || ''}
-                onChange={(e) => onBillingDetailsChange({ email: e.target.value })}
+                value={billingDetails?.email || userEmail || ''}
+                onChange={(e) => onBillingDetailsChange({ ...billingDetails, email: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
                 placeholder="Enter your email"
                 required
@@ -385,8 +448,8 @@ const PaymentForm = ({
               </label>
               <input
                 type="tel"
-                value={billingDetails.phone || ''}
-                onChange={(e) => onBillingDetailsChange({ phone: e.target.value })}
+                value={billingDetails?.phone || ''}
+                onChange={(e) => onBillingDetailsChange({ ...billingDetails, phone: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
                 placeholder="Enter your phone number"
               />
@@ -395,7 +458,7 @@ const PaymentForm = ({
             {/* Address Element */}
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
-                Billing Address
+                Billing Address *
               </label>
               <div className="border border-gray-300 rounded-md overflow-hidden">
                 <AddressElement 
@@ -411,15 +474,15 @@ const PaymentForm = ({
                       }
                     },
                     defaultValues: {
-                      name: billingDetails.name || currentUser?.username || '',
-                      phone: billingDetails.phone || '',
+                      name: billingDetails?.name || userName || '',
+                      phone: billingDetails?.phone || '',
                       address: {
-                        line1: billingDetails.address.line1 || '',
-                        line2: billingDetails.address.line2 || '',
-                        city: billingDetails.address.city || '',
-                        state: billingDetails.address.state || '',
-                        postal_code: billingDetails.address.postal_code || '',
-                        country: billingDetails.address.country || 'US'
+                        line1: billingDetails?.address?.line1 || '',
+                        line2: billingDetails?.address?.line2 || '',
+                        city: billingDetails?.address?.city || '',
+                        state: billingDetails?.address?.state || '',
+                        postal_code: billingDetails?.address?.postal_code || '',
+                        country: billingDetails?.address?.country || 'US'
                       }
                     }
                   }}
@@ -432,11 +495,11 @@ const PaymentForm = ({
           <div className="text-sm text-gray-600">
             <div className="flex items-center gap-2 mb-2">
               <FiUser size={14} />
-              <span>{billingDetails.name || currentUser?.username || 'Not provided'}</span>
+              <span>{userName || 'Not provided'}</span>
             </div>
             <div className="flex items-center gap-2">
               <FiMail size={14} />
-              <span>{billingDetails.email || currentUser?.email || 'Not provided'}</span>
+              <span>{userEmail || 'Not provided'}</span>
             </div>
           </div>
         )}
