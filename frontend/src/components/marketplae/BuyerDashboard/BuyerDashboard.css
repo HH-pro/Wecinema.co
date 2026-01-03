@@ -76,7 +76,7 @@
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, #F97316 , #7C3AED, #F97316 );
+  background: linear-gradient(90deg, #F97316 , #C2410C, #F97316 );
   background-size: 200% 100%;
   animation: gradientShift 3s ease infinite;
 }
