@@ -923,7 +923,7 @@ const Browse: React.FC = () => {
                       
                       {/* Price Tag */}
                       <div className="absolute bottom-3 left-3">
-                        <div className="bg-yellow-600 text-white px-3 py-1.5 rounded-lg shadow-lg">
+                        <div className="bg-black-600 text-white px-3 py-1.5 rounded-lg shadow-lg">
                           <p className="text-lg font-bold">{formatCurrency(listing.price)}</p>
                         </div>
                       </div>
