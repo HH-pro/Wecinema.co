@@ -64,12 +64,12 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
   const [hoveredListing, setHoveredListing] = useState<string | null>(null);
   const [confirmToggle, setConfirmToggle] = useState<string | null>(null);
 
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-    }).format(amount || 0);
-  };
+ const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(amount || 0);
+};
 
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
@@ -442,6 +442,7 @@ const ListingsTab: React.FC<ListingsTabProps> = ({
                       {/* Price Tag */}
                       <div className="absolute bottom-3 left-3">
                         <div className="bg-gradient-to-r from-green-600 to-green-700 text-white px-3 py-1.5 rounded-lg shadow-md">
+                          <p className="text-lg font-bold">{formatCurrency(listing.price)}</p>
                         </div>
                       </div>
                     </div>
