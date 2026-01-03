@@ -1929,7 +1929,12 @@ export const formatCurrency = (
   }).format(valueInDollars);
 };
 
-
+export const formatCurrencyshow = (amount: number, currency: string = 'USD'): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency,
+  }).format(amount || 0);
+};
 // Calculate platform fee (10%)
 export const calculatePlatformFee = (amount: number): number => {
   return parseFloat((amount * 0.10).toFixed(2));
