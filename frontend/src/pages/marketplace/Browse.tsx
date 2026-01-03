@@ -946,10 +946,7 @@ const Browse: React.FC = () => {
                           {listing.description}
                         </p>
                         
-                        <div className="flex items-center justify-between mb-3">
-                         
-                        
-                        </div>
+                  
                       </div>
                       
                       {/* Tags */}
