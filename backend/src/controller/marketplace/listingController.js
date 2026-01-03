@@ -277,71 +277,7 @@ router.get("/:id", async (req, res) => {
     });
   }
 });
-// Get seller's own listings - SIMPLIFIED VERSION
-router.get('/listings/my-listings', authenticateMiddleware, async (req, res) => {
-  try {
-    console.log('🎯 GET /marketplace/listings/my-listings called');
-    console.log('👤 Seller ID:', req.user._id);
-    
-    const sellerId = req.user._id;
-    
-    // SIMPLE: Get all listings for this seller, no filters
-    const listings = await MarketplaceListing.find({ sellerId: sellerId })
-      .populate({
-        path: 'sellerId',
-        select: 'username avatar sellerRating'
-      })
-      .sort({ updatedAt: -1 }) // Latest first
-      .lean();
-    
-    console.log(`📊 Found ${listings.length} listings for seller ${sellerId}`);
-    
-    // Format listings - SIMPLE
-    const formattedListings = listings.map(listing => {
-      return {
-        _id: listing._id.toString(),
-        sellerId: listing.sellerId,
-        title: listing.title || 'Untitled',
-        description: listing.description || '',
-        price: listing.price || 0,
-        formattedPrice: `$${(listing.price || 0).toFixed(2)}`,
-        currency: listing.currency || 'USD',
-        type: listing.type || 'for_sale',
-        category: listing.category || 'Uncategorized',
-        mediaUrls: Array.isArray(listing.mediaUrls) ? listing.mediaUrls : [],
-        thumbnail: listing.mediaUrls?.[0] || null,
-        status: listing.status || 'active',
-        tags: Array.isArray(listing.tags) ? listing.tags : [],
-        createdAt: listing.createdAt,
-        updatedAt: listing.updatedAt,
-        views: listing.viewCount || 0,
-        favoriteCount: listing.favoriteCount || 0,
-        purchaseCount: listing.purchaseCount || 0,
-        seller: listing.sellerId ? {
-          _id: listing.sellerId._id,
-          username: listing.sellerId.username,
-          avatar: listing.sellerId.avatar,
-          sellerRating: listing.sellerId.sellerRating
-        } : null
-      };
-    });
-    
-    // ✅ SIMPLE RESPONSE: Just return the listings array
-    res.status(200).json({
-      success: true,
-      listings: formattedListings,
-      message: `Found ${formattedListings.length} listings`
-    });
-    
-  } catch (error) {
-    console.error('❌ Error in /listings/my-listings:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to fetch your listings',
-      message: error.message
-    });
-  }
-});
+
 
 // Get listing by ID
 router.get("/listings/:id", async (req, res) => {
