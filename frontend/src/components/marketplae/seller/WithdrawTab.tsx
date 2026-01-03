@@ -12,7 +12,6 @@ interface WithdrawTabProps {
   onPageChange: (page: number) => void;
   onWithdrawRequest?: (amountInDollars: number) => Promise<void>;
   onRefresh?: () => Promise<void>;
-  formatCurrency?: (amountInCents: number) => string;
 }
 
 const WithdrawTab: React.FC<WithdrawTabProps> = ({
@@ -24,18 +23,7 @@ const WithdrawTab: React.FC<WithdrawTabProps> = ({
   onPageChange,
   onWithdrawRequest,
   onRefresh,
-  // ✅ DEFAULT VALUE SET FROM MARKETPLACE API
-  formatCurrency = marketplaceApi.utils?.formatCurrency || apiFormatCurrency || ((amount) => {
-    // Fallback if API formatCurrency is not available
-    if (amount === undefined || amount === null || isNaN(amount)) {
-      return '$0.00';
-    }
-    const amountInDollars = amount / 100;
-    return `$${amountInDollars.toLocaleString('en-US', { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 2 
-    })}`;
-  })
+ 
 }) => {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
