@@ -1087,7 +1087,7 @@ const Browse: React.FC = () => {
         onSuccess={handlePaymentSuccess}
         paymentStatus={paymentStatus}
         setPaymentStatus={setPaymentStatus}
-        currentUser={user}
+        currentUser={currentUser}
         getThumbnailUrl={getThumbnailUrl}
         
       />
