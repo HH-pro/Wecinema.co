@@ -272,18 +272,59 @@ const SellerDashboard: React.FC = () => {
     }
   ]);
 
-  // ✅ Calculate order stats from orders
-  const calculateOrderStats = useCallback((orders: Order[]): OrderStats => {
-    const now = new Date();
-    const thisMonth = now.getMonth();
-    const thisYear = now.getFullYear();
-    
-    const thisMonthOrders = orders.filter(order => {
-      const orderDate = new Date(order.createdAt);
-      return orderDate.getMonth() === thisMonth && 
-             orderDate.getFullYear() === thisYear;
-    });
+  // ✅ Calculate order stats from orders - UPDATED for cents to dollars
+const calculateOrderStats = useCallback((orders: Order[]): OrderStats => {
+  const now = new Date();
+  const thisMonth = now.getMonth();
+  const thisYear = now.getFullYear();
+  
+  const thisMonthOrders = orders.filter(order => {
+    const orderDate = new Date(order.createdAt);
+    return orderDate.getMonth() === thisMonth && 
+           orderDate.getFullYear() === thisYear;
+  });
 
+  // ✅ IMPORTANT: Convert cents to dollars when calculating
+  const completedRevenue = orders
+    .filter(order => order.status === 'completed')
+    .reduce((sum, order) => sum + (order.amount || 0), 0) / 100; // Convert to dollars
+
+  const pendingRevenue = orders
+    .filter(order => {
+      const excludedStatuses = ['completed', 'cancelled', 'refunded'];
+      return !excludedStatuses.includes(order.status);
+    })
+    .reduce((sum, order) => sum + (order.amount || 0), 0) / 100; // Convert to dollars
+
+  const thisMonthRevenue = thisMonthOrders
+    .filter(order => order.status === 'completed')
+    .reduce((sum, order) => sum + (order.amount || 0), 0) / 100; // Convert to dollars
+
+  const statusCounts = orders.reduce((acc, order) => {
+    acc[order.status] = (acc[order.status] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  return {
+    totalOrders: orders.length,
+    activeOrders: orders.filter(order => 
+      ['pending', 'pending_payment', 'paid', 'processing', 'in_progress', 
+       'delivered', 'in_revision', 'disputed'].includes(order.status)
+    ).length,
+    pendingPayment: statusCounts['pending_payment'] || 0,
+    processing: statusCounts['processing'] || 0,
+    inProgress: statusCounts['in_progress'] || 0,
+    delivered: statusCounts['delivered'] || 0,
+    completed: statusCounts['completed'] || 0,
+    cancelled: statusCounts['cancelled'] || 0,
+    totalRevenue: completedRevenue, // Already in dollars
+    pendingRevenue: pendingRevenue, // Already in dollars
+    thisMonthOrders: thisMonthOrders.length,
+    thisMonthRevenue: thisMonthRevenue, // Already in dollars
+    availableBalance: stripeStatus?.account?.charges_enabled ? 
+      (stripeStatus.account.balance || 0) / 100 : 0 // Convert cents to dollars
+  };
+}, [stripeStatus]);
     // Calculate total revenue (amount is in cents)
     const totalRevenue = orders
       .filter(order => order.status === 'completed')
