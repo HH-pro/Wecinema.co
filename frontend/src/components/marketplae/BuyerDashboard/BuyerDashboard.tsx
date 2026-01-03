@@ -85,16 +85,8 @@ import {
   FaSun,
   FaMoon,
   FaCloud,
-  FaSnowflake
-} from 'react-icons/fa';
-import { useNavigate } from 'react-router-dom';
-import './BuyerDashboard.css';
-import MarketplaceLayout from '../../Layout';
-import marketplaceAPI, { formatCurrency } from '../../../api/marketplaceApi';
-import { Order, OrderStats } from '../../../api/marketplaceApi';
-import { isAuthenticated } from "../../../utilities/helperfFunction";
-const {
-  FaPalette,
+  FaSnowflake,
+   FaPalette,
   FaPenAlt,
   FaCode,
   FaBullhorn,
@@ -103,7 +95,14 @@ const {
   FaUserTie,
   FaCamera,
   FaLanguage
-} = require('react-icons/fa');
+} from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
+import './BuyerDashboard.css';
+import MarketplaceLayout from '../../Layout';
+import marketplaceAPI, { formatCurrency } from '../../../api/marketplaceApi';
+import { Order, OrderStats } from '../../../api/marketplaceApi';
+import { isAuthenticated } from "../../../utilities/helperfFunction";
+
 // Extend Order interface for buyer dashboard specific needs
 interface BuyerOrder extends Order {
   orderNumber?: string;
