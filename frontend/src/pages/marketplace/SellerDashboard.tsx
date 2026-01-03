@@ -1417,54 +1417,37 @@ const fetchListings = async () => {
                 )}
 
                 {/* Listings Tab */}
-                {activeTab === 'listings' && (
-                  <SafeListingsTab
-                    listings={listings}
-                    loading={listingsLoading}
-                    statusFilter={listingsStatusFilter}
-                    currentPage={listingsPage}
-                    totalPages={Math.ceil(totalListings / listingsLimit)}
-                    onStatusFilterChange={setListingsStatusFilter}
-                    onPageChange={setListingsPage}
-                    onEditListing={handleEditListing}
-                    onDeleteListing={handleDeleteListing}
-                    onToggleStatus={handleToggleListingStatus}
-                    onPlayVideo={handlePlayVideo}
-                    onRefresh={fetchListings}
-                    actionLoading={listingActionLoading}
-                    onCreateListing={() => navigate('/marketplace/create')}
-                    onViewListing={(id) => navigate(`/marketplace/listing/${id}`)}
-                  />
-                )}
+              // SellerDashboard.tsx mein ListingsTab section update karein
 
-                {/* Orders Tab */}
-                {activeTab === 'orders' && (
-                  <SafeOrdersTab
-                    orders={orders}
-                    loading={ordersLoading}
-                    filter={ordersFilter}
-                    onFilterChange={setOrdersFilter}
-                    onViewOrderDetails={handleViewOrderDetails}
-                    onPlayVideo={handlePlayVideo}
-                    onRefresh={() => fetchSellerOrders()}
-                    onStartProcessing={(orderId) => {
-                      const order = orders.find(o => o._id === orderId);
-                      if (order) handleSimpleStartProcessing(order);
-                    }}
-                    onStartWork={(orderId) => {
-                      const order = orders.find(o => o._id === orderId);
-                      if (order) handleSimpleStartWork(order);
-                    }}
-                    onDeliver={(order) => handleSimpleDeliver(order)}
-                    onCancel={(order) => handleSimpleCancel(order)}
-                    onCompleteRevision={() => {}}
-                    actionLoading={orderActionLoading}
-                    stats={orderStats}
-                    onPageChange={setOrdersPage}
-                    currentPage={ordersPage}
-                    totalPages={Math.ceil(orderStats.totalOrders / ordersLimit)}
-                  />
-                )}
+{/* Listings Tab */}
+{activeTab === 'listings' && (
+  <SafeListingsTab
+    // ✅ CHANGE THIS: listings prop ko listingsData ki jagah
+    listingsData={{
+      listings: listings,
+      pagination: {
+        page: listingsPage,
+        limit: listingsLimit,
+        total: listings.length,
+        pages: Math.ceil(listings.length / listingsLimit)
+      }
+    }}
+    loading={listingsLoading}
+    statusFilter={listingsStatusFilter}
+    currentPage={listingsPage}
+    totalPages={Math.ceil(listings.length / listingsLimit)}
+    onStatusFilterChange={setListingsStatusFilter}
+    onPageChange={setListingsPage}
+    onEditListing={handleEditListing}
+    onDeleteListing={handleDeleteListing}
+    onToggleStatus={handleToggleListingStatus}
+    onPlayVideo={handlePlayVideo}
+    onRefresh={fetchListings}
+    actionLoading={listingActionLoading}
+    onCreateListing={() => navigate('/marketplace/create')}
+    onViewListing={(id) => navigate(`/marketplace/listing/${id}`)}
+  />
+)}
 
                 {/* Withdraw Tab */}
                 {activeTab === 'withdraw' && (
