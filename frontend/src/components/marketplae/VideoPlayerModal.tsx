@@ -1,8 +1,10 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { 
   FiX, FiPlay, FiPause, FiVolume2, FiVolumeX, 
-  FiMaximize, FiMinimize, FiAlertCircle 
+  FiMaximize, FiMinimize, FiAlertCircle, FiSettings,
+  FiSkipBack, FiSkipForward
 } from 'react-icons/fi';
+import { MdOutlinePictureInPictureAlt } from 'react-icons/md';
 
 interface VideoPlayerModalProps {
   show: boolean;
@@ -25,17 +27,30 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [showControls, setShowControls] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout>();
+  const [isLoading, setIsLoading] = useState(true);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Close settings when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showSettings && !(e.target as Element).closest('.settings-container')) {
+        setShowSettings(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showSettings]);
 
   // Initialize video settings
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.volume = volume;
       videoRef.current.muted = isMuted;
+      videoRef.current.playbackRate = playbackRate;
     }
-  }, [volume, isMuted]);
+  }, [volume, isMuted, playbackRate]);
 
   // Handle fullscreen changes
   useEffect(() => {
@@ -49,32 +64,30 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     };
   }, []);
 
-  // Reset controls visibility when modal shows
+  // Handle ESC key to close modal
   useEffect(() => {
+    const handleEscKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (document.fullscreenElement) {
+          document.exitFullscreen();
+        } else {
+          onClose();
+        }
+      }
+      // Space bar for play/pause
+      if (e.key === ' ' && videoRef.current) {
+        e.preventDefault();
+        handlePlayPause();
+      }
+    };
+
     if (show) {
-      setShowControls(true);
-      resetControlsTimeout();
+      document.addEventListener('keydown', handleEscKey);
     }
-  }, [show]);
-
-  // Reset error state when URL changes
-  useEffect(() => {
-    setHasError(false);
-  }, [videoUrl]);
-
-  const resetControlsTimeout = () => {
-    if (controlsTimeoutRef.current) {
-      clearTimeout(controlsTimeoutRef.current);
-    }
-    controlsTimeoutRef.current = setTimeout(() => {
-      setShowControls(false);
-    }, 3000);
-  };
-
-  const handleMouseMove = () => {
-    setShowControls(true);
-    resetControlsTimeout();
-  };
+    return () => {
+      document.removeEventListener('keydown', handleEscKey);
+    };
+  }, [show, onClose]);
 
   const isVideoUrl = (url: string): boolean => {
     if (!url) return false;
@@ -109,6 +122,20 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     }
   };
 
+  const handlePictureInPicture = async () => {
+    if (videoRef.current && document.pictureInPictureEnabled) {
+      try {
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture();
+        } else {
+          await videoRef.current.requestPictureInPicture();
+        }
+      } catch (error) {
+        console.error('Picture-in-Picture failed:', error);
+      }
+    }
+  };
+
   const handlePlayPause = () => {
     if (!videoRef.current) return;
 
@@ -121,6 +148,21 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
     } else {
       videoRef.current.pause();
       setIsPlaying(false);
+    }
+  };
+
+  const handleSkipBackward = () => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
+    }
+  };
+
+  const handleSkipForward = () => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = Math.min(
+        duration,
+        videoRef.current.currentTime + 10
+      );
     }
   };
 
@@ -157,14 +199,20 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
   };
 
   const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
     const secs = Math.floor(seconds % 60);
+    
+    if (hrs > 0) {
+      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const handleLoadedMetadata = () => {
     if (videoRef.current) {
       setDuration(videoRef.current.duration);
+      setIsLoading(false);
     }
   };
 
@@ -174,54 +222,56 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
 
   const handleVideoClick = () => {
     handlePlayPause();
-    resetControlsTimeout();
   };
 
   const handleVideoError = () => {
     setHasError(true);
+    setIsLoading(false);
+  };
+
+  const handlePlaybackRateChange = (rate: number) => {
+    setPlaybackRate(rate);
+    setShowSettings(false);
   };
 
   if (!show || !videoUrl) return null;
 
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm p-2 sm:p-4"
-      onClick={onClose}
-      style={{ 
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh'
-      }}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-2 sm:p-4">
       <div 
         ref={containerRef}
-        className="relative w-full max-w-5xl max-h-[90vh] bg-black rounded-lg sm:rounded-xl overflow-hidden shadow-2xl transition-all duration-300"
-        onClick={(e) => e.stopPropagation()}
-        onMouseMove={handleMouseMove}
+        className="relative w-full max-w-5xl max-h-[90vh] bg-gray-900 rounded-2xl overflow-hidden shadow-2xl"
         style={{
-          display: 'flex',
-          flexDirection: 'column',
-          margin: 'auto'
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.75)',
         }}
       >
-        {/* Header - Always visible */}
-        <div className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-black/90 to-transparent p-3 sm:p-4 flex justify-between items-center">
-          <div className="text-white truncate max-w-[70%] sm:max-w-[80%]">
-            <h3 className="text-sm sm:text-base md:text-lg font-semibold truncate">{videoTitle}</h3>
-            <p className="text-xs text-gray-300 truncate hidden sm:block">{videoUrl}</p>
+        {/* Header with Gradient */}
+        <div className="absolute top-0 left-0 right-0 z-30 bg-gradient-to-b from-black/80 via-black/50 to-transparent p-4 flex justify-between items-center">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-white text-lg font-semibold truncate pr-2">
+              {videoTitle}
+            </h3>
+            <p className="text-gray-300 text-sm truncate hidden sm:block">
+              {videoUrl}
+            </p>
           </div>
           <button
             onClick={onClose}
-            className="text-white hover:text-red-400 p-2 rounded-full hover:bg-white/10 transition-all duration-200 flex-shrink-0"
+            className="flex-shrink-0 text-gray-300 hover:text-white p-2 rounded-full hover:bg-white/10 transition-all duration-200 ml-2"
             aria-label="Close"
           >
-            <FiX className="w-5 h-5 sm:w-6 sm:h-6" />
+            <FiX className="w-6 h-6" />
           </button>
         </div>
-        
-        {/* Video Player Area */}
-        <div className="relative w-full flex-1 min-h-[200px] bg-black flex items-center justify-center">
+
+        {/* Video Container */}
+        <div className="relative w-full h-[calc(90vh-120px)] bg-black">
+          {isLoading && isVideoUrl(videoUrl) && !hasError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500"></div>
+            </div>
+          )}
+
           {isVideoUrl(videoUrl) && !hasError ? (
             <>
               <video
@@ -235,92 +285,129 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
                 onError={handleVideoError}
+                onLoadStart={() => setIsLoading(true)}
+                onCanPlay={() => setIsLoading(false)}
                 playsInline
               >
                 Your browser does not support the video tag.
               </video>
 
-              {/* Play/Pause Overlay Button */}
-              <button
-                onClick={handlePlayPause}
-                className={`absolute inset-0 m-auto w-16 h-16 bg-black/50 rounded-full flex items-center justify-center transition-all duration-300 transform hover:scale-110 ${
-                  showControls ? 'opacity-100' : 'opacity-0'
-                } ${isPlaying ? 'invisible' : 'visible'}`}
-                aria-label={isPlaying ? "Pause" : "Play"}
-              >
-                <FiPlay className="w-10 h-10 text-white" />
-              </button>
+              {/* Play/Pause Overlay */}
+              {!isPlaying && (
+                <button
+                  onClick={handlePlayPause}
+                  className="absolute inset-0 m-auto w-20 h-20 bg-black/60 rounded-full flex items-center justify-center transition-all duration-300 transform hover:scale-110 hover:bg-black/70 group"
+                  aria-label="Play"
+                >
+                  <FiPlay className="w-12 h-12 text-white group-hover:text-yellow-400 ml-1" />
+                </button>
+              )}
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-white p-4 sm:p-6 text-center">
-              <FiAlertCircle className="text-red-500 mb-3 sm:mb-4 w-12 h-12 sm:w-16 sm:h-16" />
-              <h4 className="text-base sm:text-lg md:text-xl font-semibold mb-2">
+            <div className="flex flex-col items-center justify-center h-full text-white p-8 text-center">
+              <FiAlertCircle className="text-red-500 mb-4 w-16 h-16" />
+              <h4 className="text-xl font-semibold mb-2">
                 {hasError ? "Video Playback Error" : "Invalid Video URL"}
               </h4>
-              <p className="text-sm sm:text-base text-gray-300 mb-3">
-                {hasError ? "Unable to load the video" : "The provided URL is not a valid video source"}
+              <p className="text-gray-300 mb-4">
+                {hasError 
+                  ? "Unable to load or play the video file" 
+                  : "The URL provided is not a valid video source"}
               </p>
-              <p className="text-xs sm:text-sm text-gray-400 break-all max-w-full px-4">
+              <p className="text-sm text-gray-400 break-words max-w-full">
                 {videoUrl}
               </p>
             </div>
           )}
         </div>
-        
-        {/* Video Controls - Always visible but with opacity changes */}
-        <div 
-          className={`bg-gradient-to-t from-black/95 via-black/80 to-transparent p-3 sm:p-4 transition-opacity duration-300 ${
-            showControls ? 'opacity-100' : 'opacity-20 hover:opacity-100'
-          }`}
-        >
-          {/* Progress Bar - Always visible */}
-          <div className="mb-3 sm:mb-4">
+
+        {/* Controls Container - Fixed at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-4 pt-8">
+          {/* Progress Bar */}
+          <div className="mb-4 px-2">
             <input
               type="range"
               min="0"
               max={duration || 100}
               value={currentTime}
               onChange={handleSeek}
-              className="w-full h-1.5 sm:h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-yellow-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-yellow-500 [&::-moz-range-thumb]:cursor-pointer"
+              className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer
+                [&::-webkit-slider-thumb]:appearance-none 
+                [&::-webkit-slider-thumb]:h-4 
+                [&::-webkit-slider-thumb]:w-4 
+                [&::-webkit-slider-thumb]:rounded-full 
+                [&::-webkit-slider-thumb]:bg-yellow-500 
+                [&::-webkit-slider-thumb]:cursor-pointer
+                [&::-webkit-slider-thumb]:hover:scale-125
+                [&::-webkit-slider-thumb]:transition-transform"
             />
-            <div className="flex justify-between text-xs sm:text-sm text-gray-300 mt-1 px-1">
+            <div className="flex justify-between text-sm text-gray-300 mt-2">
               <span>{formatTime(currentTime)}</span>
               <span>{formatTime(duration)}</span>
             </div>
           </div>
 
-          {/* Control Buttons - Always visible */}
-          <div className="flex items-center justify-between">
-            {/* Left Controls */}
-            <div className="flex items-center gap-3 sm:gap-4">
+          {/* Main Controls */}
+          <div className="flex items-center justify-between px-2">
+            {/* Left Controls Group */}
+            <div className="flex items-center space-x-4">
+              {/* Skip Backward */}
+              <button
+                onClick={handleSkipBackward}
+                className="text-gray-300 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
+                aria-label="Skip backward 10 seconds"
+              >
+                <FiSkipBack className="w-5 h-5" />
+              </button>
+
+              {/* Play/Pause */}
               <button
                 onClick={handlePlayPause}
-                className="text-white hover:text-yellow-400 p-2 rounded-full hover:bg-white/10 transition-all duration-200"
+                className="text-white bg-yellow-600 hover:bg-yellow-700 p-3 rounded-full transition-colors shadow-lg"
                 aria-label={isPlaying ? "Pause" : "Play"}
               >
                 {isPlaying ? (
-                  <FiPause className="w-5 h-5 sm:w-6 sm:h-6" />
+                  <FiPause className="w-6 h-6" />
                 ) : (
-                  <FiPlay className="w-5 h-5 sm:w-6 sm:h-6" />
+                  <FiPlay className="w-6 h-6 ml-0.5" />
                 )}
               </button>
 
+              {/* Skip Forward */}
+              <button
+                onClick={handleSkipForward}
+                className="text-gray-300 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
+                aria-label="Skip forward 10 seconds"
+              >
+                <FiSkipForward className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Center Controls - Time Display for Mobile */}
+            <div className="flex items-center space-x-4 sm:hidden">
+              <span className="text-white text-sm font-medium">
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </span>
+            </div>
+
+            {/* Right Controls Group */}
+            <div className="flex items-center space-x-3">
               {/* Volume Controls */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center space-x-2">
                 <button
                   onClick={handleMuteToggle}
-                  className="text-white hover:text-yellow-400 p-2 rounded-full hover:bg-white/10 transition-all duration-200"
+                  className="text-gray-300 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
                   aria-label={isMuted ? "Unmute" : "Mute"}
                 >
                   {isMuted || volume === 0 ? (
-                    <FiVolumeX className="w-5 h-5 sm:w-6 sm:h-6" />
+                    <FiVolumeX className="w-5 h-5" />
                   ) : (
-                    <FiVolume2 className="w-5 h-5 sm:w-6 sm:h-6" />
+                    <FiVolume2 className="w-5 h-5" />
                   )}
                 </button>
                 
-                {/* Volume Slider - Visible on all screens */}
-                <div className="flex items-center w-20 sm:w-28 md:w-32">
+                {/* Volume Slider */}
+                <div className="w-24">
                   <input
                     type="range"
                     min="0"
@@ -328,32 +415,82 @@ const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({
                     step="0.01"
                     value={isMuted ? 0 : volume}
                     onChange={handleVolumeChange}
-                    className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:cursor-pointer"
+                    className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer
+                      [&::-webkit-slider-thumb]:appearance-none 
+                      [&::-webkit-slider-thumb]:h-3 
+                      [&::-webkit-slider-thumb]:w-3 
+                      [&::-webkit-slider-thumb]:rounded-full 
+                      [&::-webkit-slider-thumb]:bg-white 
+                      [&::-webkit-slider-thumb]:cursor-pointer"
                     aria-label="Volume"
                   />
                 </div>
               </div>
 
-              {/* Time Display - Mobile */}
-              <div className="sm:hidden text-white text-xs font-medium">
-                {formatTime(currentTime)} / {formatTime(duration)}
-              </div>
-            </div>
+              {/* Settings Dropdown */}
+              <div className="relative settings-container">
+                <button
+                  onClick={() => setShowSettings(!showSettings)}
+                  className="text-gray-300 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
+                  aria-label="Settings"
+                >
+                  <FiSettings className="w-5 h-5" />
+                </button>
 
-            {/* Right Controls */}
-            <div className="flex items-center">
+                {showSettings && (
+                  <div className="absolute bottom-full right-0 mb-2 w-48 bg-gray-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden z-40">
+                    <div className="p-2">
+                      <div className="text-gray-300 text-xs font-medium px-3 py-2">
+                        Playback Speed
+                      </div>
+                      {[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((rate) => (
+                        <button
+                          key={rate}
+                          onClick={() => handlePlaybackRateChange(rate)}
+                          className={`w-full px-3 py-2 text-sm text-left hover:bg-gray-700 transition-colors ${
+                            playbackRate === rate 
+                              ? 'text-yellow-400 bg-gray-700/50' 
+                              : 'text-gray-300'
+                          }`}
+                        >
+                          {rate === 1 ? 'Normal' : rate + 'x'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Picture in Picture */}
+              <button
+                onClick={handlePictureInPicture}
+                className="text-gray-300 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors hidden sm:block"
+                aria-label="Picture in Picture"
+              >
+                <MdOutlinePictureInPictureAlt className="w-5 h-5" />
+              </button>
+
+              {/* Fullscreen */}
               <button
                 onClick={handleFullscreen}
-                className="text-white hover:text-yellow-400 p-2 rounded-full hover:bg-white/10 transition-all duration-200"
-                aria-label={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+                className="text-gray-300 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
+                aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
               >
                 {isFullscreen ? (
-                  <FiMinimize className="w-5 h-5 sm:w-6 sm:h-6" />
+                  <FiMinimize className="w-5 h-5" />
                 ) : (
-                  <FiMaximize className="w-5 h-5 sm:w-6 sm:h-6" />
+                  <FiMaximize className="w-5 h-5" />
                 )}
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Keyboard Shortcuts Hint */}
+        <div className="absolute bottom-24 right-4 bg-black/70 text-white text-xs rounded-lg px-3 py-2 hidden sm:block">
+          <div className="flex items-center space-x-4">
+            <span>Space: Play/Pause</span>
+            <span>ESC: Close</span>
           </div>
         </div>
       </div>
