@@ -1079,18 +1079,19 @@ const Browse: React.FC = () => {
       />
 
       {/* Payment Modal */}
-      <PaymentModal
-        show={showPaymentModal}
-        clientSecret={clientSecret}
-        offerData={offerData}
-        onClose={handlePaymentClose}
-        onSuccess={handlePaymentSuccess}
-        paymentStatus={paymentStatus}
-        setPaymentStatus={setPaymentStatus}
-        currentUser={currentUser}
-        getThumbnailUrl={getThumbnailUrl}
-        
-      />
+       <PaymentModal
+             show={showPaymentModal}
+             clientSecret={clientSecret}
+             offerData={offerData}
+             onClose={handlePaymentClose}
+             onSuccess={handlePaymentSuccess}
+             paymentStatus={paymentStatus}
+             setPaymentStatus={setPaymentStatus}
+             billingDetails={billingDetails}
+             onBillingDetailsChange={handleBillingDetailsChange}
+             currentUser={currentUser}
+             getThumbnailUrl={getThumbnailUrl}
+           />
     </MarketplaceLayout>
   );
 };
