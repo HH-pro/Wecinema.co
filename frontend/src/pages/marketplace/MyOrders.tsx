@@ -105,7 +105,7 @@ const MyOrders: React.FC = () => {
       setLoading(true);
       setError('');
       
-      const response = await marketplaceApi.getMyOrders();
+      const response = await marketplaceApi.orders.getMyOrders();
       
       if (response.success && response.data) {
         setOrders(response.data.orders || []);
