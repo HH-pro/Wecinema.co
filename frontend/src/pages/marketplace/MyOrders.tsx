@@ -13,7 +13,7 @@ import {
   FiSearch,
   FiAlertCircle
 } from 'react-icons/fi';
-import { marketplaceApi } from '../api/marketplace'; // Import the API service
+import { marketplaceApi } from '../../../../frontend/src/api/marketplaceApi'; // Import the API service
 
 // Types (keep your existing interfaces)
 interface User {
