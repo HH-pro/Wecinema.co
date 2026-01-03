@@ -170,7 +170,8 @@
 }
 
 .new-order-btn {
-  background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+    background: linear-gradient(135deg, #F97316 0%, #FFEDD5 100%);
+
   color: white;
   box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);
 }
