@@ -108,7 +108,7 @@ const OrderDetailsPage: React.FC = () => {
                 </div>
                 <div className="detail-item">
                   <strong>Amount:</strong>
-                  <span>${order.amount}</span>
+                  <span>${order.listingId.price}</span>
                 </div>
                 <div className="detail-item">
                   <strong>Created:</strong>
