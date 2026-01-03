@@ -445,110 +445,88 @@ export const listingsApi = {
       return handleApiError(error as AxiosError, 'Failed to fetch listings');
     }
   },
-// ✅ SIMPLE getMyListings - no params needed
-getMyListings: async (): Promise<ApiResponse<{ listings: Listing[] }>> => {
-  try {
-    console.log('📡 Calling /marketplace/listings/my-listings (simple)');
-    
-    const response = await axios.get(`${API_BASE_URL}/marketplace/listings/my-listings`, {
-      ...getHeaders()
-    });
-    
-    console.log('✅ API Response received');
-    
-    const data = response.data;
-    
-    // Check if response is successful
-    if (!data.success) {
-      return {
-        success: false,
-        error: data.error || 'Failed to fetch listings',
-        message: data.message
-      };
+ // Get seller's own listings
+  getMyListings: async (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    category?: string;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: string;
+  }): Promise<ApiResponse<{ 
+    listings: Listing[]; 
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      pages: number;
     }
-    
-    // ✅ SIMPLE: Return listings directly
-    return {
-      success: true,
-      data: {
-        listings: data.listings || data.data?.listings || []
-      },
-      message: data.message || 'Listings fetched'
-    };
-    
-  } catch (error: any) {
-    console.error('❌ Error fetching listings:', error);
-    
-    // Create mock data for development
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🛠️ Returning mock data for development');
-      return {
-        success: true,
-        data: {
-          listings: [
-            {
-              _id: '1',
-              title: 'Professional Logo Design',
-              description: 'I will create a unique logo for your business',
-              price: 99,
-              formattedPrice: '$99.00',
-              status: 'active',
-              type: 'service',
-              category: 'Design',
-              tags: ['logo', 'design', 'branding'],
-              currency: 'USD',
-              isDigital: true,
-              mediaUrls: ['https://via.placeholder.com/300'],
-              thumbnail: 'https://via.placeholder.com/300',
-              views: 150,
-              favoriteCount: 12,
-              purchaseCount: 8,
-              sellerId: {
-                _id: 'seller123',
-                username: 'You',
-                avatar: 'https://via.placeholder.com/50',
-                sellerRating: 4.5
-              },
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              createdAtFormatted: 'Today'
-            },
-            {
-              _id: '2',
-              title: 'Website Development',
-              description: 'Full website development service',
-              price: 299,
-              formattedPrice: '$299.00',
-              status: 'active',
-              type: 'service',
-              category: 'Development',
-              tags: ['website', 'development', 'react'],
-              currency: 'USD',
-              isDigital: true,
-              mediaUrls: ['https://via.placeholder.com/300'],
-              thumbnail: 'https://via.placeholder.com/300',
-              views: 89,
-              favoriteCount: 5,
-              purchaseCount: 3,
-              sellerId: {
-                _id: 'seller123',
-                username: 'You',
-                avatar: 'https://via.placeholder.com/50',
-                sellerRating: 4.5
-              },
-              createdAt: new Date(Date.now() - 86400000).toISOString(), // Yesterday
-              updatedAt: new Date(Date.now() - 86400000).toISOString(),
-              createdAtFormatted: 'Yesterday'
-            }
-          ]
-        },
-        message: 'Mock listings loaded'
-      };
+  }>> => {
+    try {
+      console.log('📡 API: Calling GET /marketplace/listings/my-listings');
+      console.log('📋 Params:', params);
+      
+      const response = await axios.get(`${API_BASE_URL}/marketplace/listings/my-listings`, {
+        params,
+        ...getHeaders()
+      });
+      
+      console.log('✅ API Response Structure:', {
+        hasData: !!response.data.data,
+        hasListingsDirect: !!response.data.listings,
+        fullResponse: response.data
+      });
+      
+      // ✅ Handle both response formats:
+      // Format 1: { success: true, data: { listings: [], pagination: {} } }
+      // Format 2: { success: true, listings: [], pagination: {} }
+      
+      if (response.data.success) {
+        let listings: Listing[] = [];
+        let pagination = {
+          page: params?.page || 1,
+          limit: params?.limit || 10,
+          total: 0,
+          pages: 0
+        };
+        
+        // Check which format we received
+        if (response.data.data && response.data.data.listings) {
+          // Format 1: With 'data' wrapper
+          listings = response.data.data.listings || [];
+          pagination = response.data.data.pagination || pagination;
+        } else if (response.data.listings) {
+          // Format 2: Direct 'listings' property
+          listings = response.data.listings || [];
+          pagination = response.data.pagination || pagination;
+        }
+        
+        console.log(`✅ Retrieved ${listings.length} listings`);
+        
+        return {
+          success: true,
+          data: {
+            listings,
+            pagination
+          },
+          message: response.data.message
+        };
+      } else {
+        return {
+          success: false,
+          error: response.data.error || 'Failed to fetch listings',
+          message: response.data.message
+        };
+      }
+      
+    } catch (error) {
+      console.error('❌ API Error in getMyListings:', error);
+      return handleApiError(error as AxiosError, 'Failed to fetch your listings');
     }
-    
-    return handleApiError(error as AxiosError, 'Failed to fetch your listings');
-  }
-},
+  },
+  // ... rest of the API methods
+};
 
   // Create new listing
   createListing: async (listingData: {
