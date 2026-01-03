@@ -1434,42 +1434,7 @@ const BuyerDashboard: React.FC = () => {
         {/* Statistics Overview */}
         {renderStats()}
 
-        {/* Achievements Section */}
-        <div className="achievements-section">
         
-          
-          <div className="achievements-grid">
-            {achievements.map((achievement, index) => (
-              <div 
-                key={index}
-                className={`achievement-card ${achievement.unlocked ? 'unlocked' : 'locked'}`}
-              >
-                <div 
-                  className="achievement-icon"
-                  style={{ 
-                    background: `${achievement.color}15`,
-                    color: achievement.color
-                  }}
-                >
-                  {achievement.icon}
-                </div>
-                <div className="achievement-content">
-                  <h4>{achievement.label}</h4>
-                  <p>{achievement.unlocked ? 'Unlocked' : 'Locked'}</p>
-                </div>
-                {achievement.unlocked && (
-                  <span 
-                    className="achievement-badge"
-                    style={{ background: achievement.color }}
-                  >
-                    <FaCheckCircle />
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* Quick Actions */}
         <div className="quick-actions-section">
           <div className="section-header">
