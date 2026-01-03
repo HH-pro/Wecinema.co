@@ -1,5 +1,5 @@
-// BuyerDashboard.tsx
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+// BuyerDashboard.tsx - Light Theme
+import React, { useEffect, useState, useRef } from 'react';
 import { 
   FaShoppingBag, 
   FaClock, 
@@ -9,7 +9,6 @@ import {
   FaBoxOpen,
   FaSync,
   FaTruck,
-  FaExclamationTriangle,
   FaSearch,
   FaFilter,
   FaDollarSign,
@@ -40,10 +39,8 @@ import {
   FaFileDownload,
   FaFileArchive,
   FaHeadset,
-  FaClipboardCheck,
   FaReceipt,
   FaUndo,
-  FaPaperPlane,
   FaCreditCard as FaCreditCardOutline,
   FaUserCircle,
   FaRegClock,
@@ -51,50 +48,37 @@ import {
   FaRegTimesCircle,
   FaExclamationCircle,
   FaPlus,
-  FaShoppingBasket,
-  FaChartBar,
-  FaBell,
-  FaCog,
-  FaQuestionCircle,
-  FaFileAlt,
-  FaMoneyBillAlt,
   FaArrowLeft,
-  FaArrowUp,
-  FaArrowDown,
   FaCalendarAlt,
   FaExclamation,
   FaInfoCircle,
-  FaLock,
-  FaShieldAlt,
-  FaRocket,
-  FaLightbulb,
-  FaHandshake,
-  FaAward,
-  FaCrown,
-  FaGem,
-  FaMedal,
-  FaTrophy,
-  FaCertificate,
-  FaRibbon,
-  FaLeaf,
-  FaFire,
-  FaBolt,
-  FaWind,
-  FaWater,
-  FaMountain,
-  FaSun,
-  FaMoon,
-  FaCloud,
-  FaSnowflake,
-   FaPalette,
-  FaPenAlt,
+  FaPalette,
+  FaPencilAlt,
   FaCode,
   FaBullhorn,
   FaVideo,
   FaMusic,
   FaUserTie,
   FaCamera,
-  FaLanguage
+  FaLanguage,
+  FaTrophy,
+  FaMedal,
+  FaCertificate,
+  FaCrown,
+  FaRibbon,
+  FaLayerGroup,
+  FaChartPie,
+  FaUsers,
+  FaGlobe,
+  FaLightbulb,
+  FaRocket,
+  FaShieldAlt,
+  FaLock,
+  FaBolt,
+  FaFire,
+  FaLeaf,
+  FaCloud,
+  FaSun
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import './BuyerDashboard.css';
@@ -108,29 +92,6 @@ interface BuyerOrder extends Order {
   orderNumber?: string;
 }
 
-// User interface
-interface User {
-  _id: string;
-  username: string;
-  avatar?: string;
-  email: string;
-  firstName?: string;
-  lastName?: string;
-  sellerRating?: number;
-}
-
-// Listing interface
-interface Listing {
-  _id: string;
-  title: string;
-  mediaUrls?: string[];
-  price: number;
-  category: string;
-  type: string;
-  description?: string;
-  tags?: string[];
-}
-
 const BuyerDashboard: React.FC = () => {
   const [orders, setOrders] = useState<BuyerOrder[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<BuyerOrder[]>([]);
@@ -138,8 +99,6 @@ const BuyerDashboard: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('newest');
-  const [showOrderDetails, setShowOrderDetails] = useState(false);
-  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [showActionsModal, setShowActionsModal] = useState(false);
   const [selectedOrderForActions, setSelectedOrderForActions] = useState<BuyerOrder | null>(null);
   const [stats, setStats] = useState<OrderStats | null>(null);
@@ -153,73 +112,62 @@ const BuyerDashboard: React.FC = () => {
   const actionsModalRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  // Status colors with professional theme
+  // Light theme status colors
   const statusColors = {
     pending_payment: { 
-      color: '#FFA500', 
-      rgb: '255, 165, 0', 
+      color: '#FFB74D', 
+      bgColor: '#FFF3E0',
       icon: <FaRegClock />,
-      gradient: 'linear-gradient(135deg, #FFA500, #FFD700)'
     },
     paid: { 
-      color: '#3498db', 
-      rgb: '52, 152, 219', 
+      color: '#64B5F6', 
+      bgColor: '#E3F2FD',
       icon: <FaCreditCardOutline />,
-      gradient: 'linear-gradient(135deg, #3498db, #2980b9)'
     },
     processing: { 
-      color: '#9b59b6', 
-      rgb: '155, 89, 182', 
+      color: '#9575CD', 
+      bgColor: '#F3E5F5',
       icon: <FaBoxOpen />,
-      gradient: 'linear-gradient(135deg, #9b59b6, #8e44ad)'
     },
     in_progress: { 
-      color: '#2ecc71', 
-      rgb: '46, 204, 113', 
+      color: '#4DB6AC', 
+      bgColor: '#E0F2F1',
       icon: <FaSync />,
-      gradient: 'linear-gradient(135deg, #2ecc71, #27ae60)'
     },
     delivered: { 
-      color: '#1abc9c', 
-      rgb: '26, 188, 156', 
+      color: '#81C784', 
+      bgColor: '#E8F5E9',
       icon: <FaTruck />,
-      gradient: 'linear-gradient(135deg, #1abc9c, #16a085)'
     },
     in_revision: { 
-      color: '#e67e22', 
-      rgb: '230, 126, 34', 
+      color: '#FF8A65', 
+      bgColor: '#FBE9E7',
       icon: <FaUndo />,
-      gradient: 'linear-gradient(135deg, #e67e22, #d35400)'
     },
     completed: { 
-      color: '#27ae60', 
-      rgb: '39, 174, 96', 
+      color: '#66BB6A', 
+      bgColor: '#E8F5E9',
       icon: <FaRegCheckCircle />,
-      gradient: 'linear-gradient(135deg, #27ae60, #229954)'
     },
     cancelled: { 
-      color: '#95a5a6', 
-      rgb: '149, 165, 166', 
+      color: '#90A4AE', 
+      bgColor: '#ECEFF1',
       icon: <FaRegTimesCircle />,
-      gradient: 'linear-gradient(135deg, #95a5a6, #7f8c8d)'
     },
     disputed: { 
-      color: '#e74c3c', 
-      rgb: '231, 76, 60', 
+      color: '#E57373', 
+      bgColor: '#FFEBEE',
       icon: <FaExclamationCircle />,
-      gradient: 'linear-gradient(135deg, #e74c3c, #c0392b)'
     },
     pending: { 
-      color: '#f1c40f', 
-      rgb: '241, 196, 15', 
+      color: '#FFD54F', 
+      bgColor: '#FFFDE7',
       icon: <FaRegClock />,
-      gradient: 'linear-gradient(135deg, #f1c40f, #f39c12)'
     },
     refunded: { 
-      color: '#34495e', 
-      rgb: '52, 73, 94', 
+      color: '#78909C', 
+      bgColor: '#ECEFF1',
       icon: <FaRegTimesCircle />,
-      gradient: 'linear-gradient(135deg, #34495e, #2c3e50)'
     }
   };
 
@@ -238,7 +186,7 @@ const BuyerDashboard: React.FC = () => {
     refunded: 'Refunded'
   };
 
-  // Quick actions configuration
+  // Quick actions configuration - Light theme colors
   const quickActions = [
     {
       icon: <FaShoppingCart />,
@@ -246,9 +194,8 @@ const BuyerDashboard: React.FC = () => {
       description: 'Explore new listings and services',
       action: () => navigate('/marketplace'),
       type: 'primary' as const,
-      color: '#FF6B35',
-      gradient: 'linear-gradient(135deg, #FF6B35, #FF9F1C)',
-      badge: 'Hot'
+      color: '#4F46E5',
+      bgColor: '#EEF2FF'
     },
     {
       icon: <FaComment />,
@@ -256,9 +203,8 @@ const BuyerDashboard: React.FC = () => {
       description: 'Chat with sellers directly',
       action: () => navigate('/marketplace/messages'),
       type: 'secondary' as const,
-      color: '#4361EE',
-      gradient: 'linear-gradient(135deg, #4361EE, #3A0CA3)',
-      badge: '3 New'
+      color: '#0EA5E9',
+      bgColor: '#F0F9FF'
     },
     {
       icon: <FaChartLine />,
@@ -266,8 +212,8 @@ const BuyerDashboard: React.FC = () => {
       description: 'View performance insights',
       action: () => navigate('/marketplace/orders/stats/buyer'),
       type: 'premium' as const,
-      color: '#7209B7',
-      gradient: 'linear-gradient(135deg, #7209B7, #560BAD)'
+      color: '#8B5CF6',
+      bgColor: '#F5F3FF'
     },
     {
       icon: <FaFileAlt />,
@@ -275,8 +221,8 @@ const BuyerDashboard: React.FC = () => {
       description: 'Download order invoices',
       action: () => navigate('/marketplace/orders/invoices'),
       type: 'secondary' as const,
-      color: '#4CC9F0',
-      gradient: 'linear-gradient(135deg, #4CC9F0, #4895EF)'
+      color: '#06B6D4',
+      bgColor: '#ECFEFF'
     },
     {
       icon: <FaHeadset />,
@@ -284,43 +230,42 @@ const BuyerDashboard: React.FC = () => {
       description: 'Get help from our team',
       action: () => navigate('/support'),
       type: 'secondary' as const,
-      color: '#F72585',
-      gradient: 'linear-gradient(135deg, #F72585, #B5179E)'
+      color: '#EC4899',
+      bgColor: '#FDF2F8'
     },
     {
-      icon: <FaAward />,
+      icon: <FaTrophy />,
       label: 'Rewards',
       description: 'Earn points and badges',
       action: () => navigate('/rewards'),
       type: 'premium' as const,
-      color: '#FFD700',
-      gradient: 'linear-gradient(135deg, #FFD700, #FFA500)',
-      badge: 'New'
+      color: '#F59E0B',
+      bgColor: '#FFFBEB'
     }
   ];
 
-  // Category icons mapping with modern icons
-  const categoryIcons: Record<string, { icon: JSX.Element, color: string }> = {
-    'digital_art': { icon: <FaGem />, color: '#9C27B0' },
-    'graphic_design': { icon: <FaPalette />, color: '#2196F3' },
-    'writing': { icon: <FaPenAlt />, color: '#4CAF50' },
-    'programming': { icon: <FaCode />, color: '#FF9800' },
-    'marketing': { icon: <FaBullhorn />, color: '#E91E63' },
-    'video_editing': { icon: <FaVideo />, color: '#009688' },
-    'music': { icon: <FaMusic />, color: '#673AB7' },
-    'consulting': { icon: <FaUserTie />, color: '#3F51B5' },
-    'photography': { icon: <FaCamera />, color: '#795548' },
-    'translation': { icon: <FaLanguage />, color: '#00BCD4' },
-    'default': { icon: <FaBoxOpen />, color: '#607D8B' }
+  // Category icons mapping with light theme colors
+  const categoryIcons: Record<string, { icon: JSX.Element, color: string, bgColor: string }> = {
+    'digital_art': { icon: <FaPalette />, color: '#8B5CF6', bgColor: '#F5F3FF' },
+    'graphic_design': { icon: <FaPencilAlt />, color: '#0EA5E9', bgColor: '#F0F9FF' },
+    'writing': { icon: <FaRegFileAlt />, color: '#10B981', bgColor: '#ECFDF5' },
+    'programming': { icon: <FaCode />, color: '#F59E0B', bgColor: '#FFFBEB' },
+    'marketing': { icon: <FaBullhorn />, color: '#EC4899', bgColor: '#FDF2F8' },
+    'video_editing': { icon: <FaVideo />, color: '#6366F1', bgColor: '#EEF2FF' },
+    'music': { icon: <FaMusic />, color: '#8B5CF6', bgColor: '#F5F3FF' },
+    'consulting': { icon: <FaUserTie />, color: '#06B6D4', bgColor: '#ECFEFF' },
+    'photography': { icon: <FaCamera />, color: '#EF4444', bgColor: '#FEF2F2' },
+    'translation': { icon: <FaLanguage />, color: '#14B8A6', bgColor: '#F0FDFA' },
+    'default': { icon: <FaBoxOpen />, color: '#6B7280', bgColor: '#F9FAFB' }
   };
 
   // Achievement badges for the dashboard
   const achievements = [
-    { icon: <FaTrophy />, label: 'First Order', unlocked: true },
-    { icon: <FaMedal />, label: 'Repeat Buyer', unlocked: true },
-    { icon: <FaCertificate />, label: 'Premium Member', unlocked: false },
-    { icon: <FaCrown />, label: 'Top Spender', unlocked: false },
-    { icon: <FaRibbon />, label: 'Fast Responder', unlocked: true },
+    { icon: <FaTrophy />, label: 'First Order', unlocked: true, color: '#F59E0B' },
+    { icon: <FaMedal />, label: 'Repeat Buyer', unlocked: true, color: '#0EA5E9' },
+    { icon: <FaCertificate />, label: 'Premium Member', unlocked: false, color: '#8B5CF6' },
+    { icon: <FaCrown />, label: 'Top Spender', unlocked: false, color: '#EC4899' },
+    { icon: <FaRibbon />, label: 'Fast Responder', unlocked: true, color: '#10B981' },
   ];
 
   // Fetch data on component mount
@@ -477,19 +422,19 @@ const BuyerDashboard: React.FC = () => {
     return 'General';
   };
 
-  const getCategoryIcon = (order: BuyerOrder): { icon: JSX.Element, color: string } => {
+  const getCategoryIcon = (order: BuyerOrder): { icon: JSX.Element, color: string, bgColor: string } => {
     const category = getListingCategory(order).toLowerCase();
     return categoryIcons[category] || categoryIcons.default;
   };
 
   // Get status color
   const getStatusColor = (status: string): string => {
-    return statusColors[status as keyof typeof statusColors]?.color || '#FF6B35';
+    return statusColors[status as keyof typeof statusColors]?.color || '#6B7280';
   };
 
-  // Get status gradient
-  const getStatusGradient = (status: string): string => {
-    return statusColors[status as keyof typeof statusColors]?.gradient || 'linear-gradient(135deg, #FF6B35, #FF9F1C)';
+  // Get status background color
+  const getStatusBgColor = (status: string): string => {
+    return statusColors[status as keyof typeof statusColors]?.bgColor || '#F9FAFB';
   };
 
   // Get status text
@@ -513,8 +458,8 @@ const BuyerDashboard: React.FC = () => {
       className: 'action-view-details',
       icon: <FaEye />,
       description: 'View complete order information',
-      color: '#4361EE',
-      gradient: 'linear-gradient(135deg, #4361EE, #3A0CA3)'
+      color: '#4F46E5',
+      bgColor: '#EEF2FF'
     });
 
     // Status-specific actions
@@ -527,8 +472,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-complete-payment',
           icon: <FaCreditCard />,
           description: 'Complete your payment securely',
-          color: '#2ECC71',
-          gradient: 'linear-gradient(135deg, #2ECC71, #27AE60)'
+          color: '#10B981',
+          bgColor: '#ECFDF5'
         });
         actions.push({
           label: 'Cancel Order',
@@ -536,8 +481,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-cancel',
           icon: <FaTimes />,
           description: 'Cancel this order',
-          color: '#E74C3C',
-          gradient: 'linear-gradient(135deg, #E74C3C, #C0392B)'
+          color: '#EF4444',
+          bgColor: '#FEF2F2'
         });
         break;
         
@@ -550,8 +495,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-timeline',
           icon: <FaHistory />,
           description: 'Track order progress',
-          color: '#9B59B6',
-          gradient: 'linear-gradient(135deg, #9B59B6, #8E44AD)'
+          color: '#8B5CF6',
+          bgColor: '#F5F3FF'
         });
         actions.push({
           label: 'Contact Seller',
@@ -559,8 +504,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-contact',
           icon: <FaComment />,
           description: 'Message the seller directly',
-          color: '#3498DB',
-          gradient: 'linear-gradient(135deg, #3498DB, #2980B9)'
+          color: '#0EA5E9',
+          bgColor: '#F0F9FF'
         });
         break;
         
@@ -572,8 +517,8 @@ const BuyerDashboard: React.FC = () => {
             className: 'action-revision',
             icon: <FaReply />,
             description: 'Request changes to delivered work',
-            color: '#E67E22',
-            gradient: 'linear-gradient(135deg, #E67E22, #D35400)'
+            color: '#F59E0B',
+            bgColor: '#FFFBEB'
           });
         }
         actions.push({
@@ -582,8 +527,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-download',
           icon: <FaFileDownload />,
           description: 'Download delivered files',
-          color: '#1ABC9C',
-          gradient: 'linear-gradient(135deg, #1ABC9C, #16A085)'
+          color: '#10B981',
+          bgColor: '#ECFDF5'
         });
         actions.push({
           label: 'Mark as Complete',
@@ -591,8 +536,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-complete',
           icon: <FaCheckCircle />,
           description: 'Approve and release payment',
-          color: '#2ECC71',
-          gradient: 'linear-gradient(135deg, #2ECC71, #27AE60)'
+          color: '#10B981',
+          bgColor: '#ECFDF5'
         });
         break;
         
@@ -603,8 +548,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-download',
           icon: <FaDownload />,
           description: 'Download order files',
-          color: '#1ABC9C',
-          gradient: 'linear-gradient(135deg, #1ABC9C, #16A085)'
+          color: '#10B981',
+          bgColor: '#ECFDF5'
         });
         
         actions.push({
@@ -613,8 +558,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-invoice',
           icon: <FaFileInvoiceDollar />,
           description: 'View order invoice',
-          color: '#9B59B6',
-          gradient: 'linear-gradient(135deg, #9B59B6, #8E44AD)'
+          color: '#8B5CF6',
+          bgColor: '#F5F3FF'
         });
         actions.push({
           label: 'Payment Details',
@@ -622,8 +567,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-payment',
           icon: <FaReceipt />,
           description: 'View payment information',
-          color: '#2ECC71',
-          gradient: 'linear-gradient(135deg, #2ECC71, #27AE60)'
+          color: '#10B981',
+          bgColor: '#ECFDF5'
         });
         break;
 
@@ -634,8 +579,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-contact',
           icon: <FaComment />,
           description: 'Discuss revision details',
-          color: '#3498DB',
-          gradient: 'linear-gradient(135deg, #3498DB, #2980B9)'
+          color: '#0EA5E9',
+          bgColor: '#F0F9FF'
         });
         actions.push({
           label: 'Download Latest Files',
@@ -643,8 +588,8 @@ const BuyerDashboard: React.FC = () => {
           className: 'action-download',
           icon: <FaFileArchive />,
           description: 'Download revised files',
-          color: '#1ABC9C',
-          gradient: 'linear-gradient(135deg, #1ABC9C, #16A085)'
+          color: '#10B981',
+          bgColor: '#ECFDF5'
         });
         break;
     }
@@ -656,8 +601,8 @@ const BuyerDashboard: React.FC = () => {
       className: 'action-support',
       icon: <FaHeadset />,
       description: 'Get help from support team',
-      color: '#95A5A6',
-      gradient: 'linear-gradient(135deg, #95A5A6, #7F8C8D)'
+      color: '#6B7280',
+      bgColor: '#F9FAFB'
     });
 
     return actions;
@@ -852,18 +797,19 @@ const BuyerDashboard: React.FC = () => {
           <div className="modal-body">
             <div className="order-summary-card">
               <div className="order-avatar-large">
-                <div className="avatar-icon-wrapper" style={{ 
-                  background: getCategoryIcon(order).color + '20',
-                  borderColor: getCategoryIcon(order).color
-                }}>
-                  <div style={{ color: getCategoryIcon(order).color }}>
-                    {getCategoryIcon(order).icon}
-                  </div>
+                <div 
+                  className="avatar-icon-wrapper" 
+                  style={{ 
+                    background: getCategoryIcon(order).bgColor,
+                    color: getCategoryIcon(order).color
+                  }}
+                >
+                  {getCategoryIcon(order).icon}
                 </div>
                 <div className="order-status-indicator">
                   <span 
                     className="status-dot" 
-                    style={{ background: getStatusGradient(order.status) }}
+                    style={{ background: getStatusColor(order.status) }}
                   />
                 </div>
               </div>
@@ -880,7 +826,11 @@ const BuyerDashboard: React.FC = () => {
                 <div className="order-status-summary">
                   <span 
                     className="status-badge-large"
-                    style={{ background: getStatusGradient(order.status) }}
+                    style={{ 
+                      background: getStatusBgColor(order.status),
+                      color: getStatusColor(order.status),
+                      border: `1px solid ${getStatusColor(order.status)}20`
+                    }}
                   >
                     {getStatusIcon(order.status)}
                     {getStatusText(order.status)}
@@ -898,12 +848,15 @@ const BuyerDashboard: React.FC = () => {
                     handleOrderAction(order._id, action.action);
                     setShowActionsModal(false);
                   }}
-                  style={{ '--action-gradient': action.gradient } as React.CSSProperties}
                 >
-                  <div className="action-card-icon" style={{ background: action.color + '20' }}>
-                    <div style={{ color: action.color }}>
-                      {action.icon}
-                    </div>
+                  <div 
+                    className="action-card-icon"
+                    style={{ 
+                      background: action.bgColor,
+                      color: action.color
+                    }}
+                  >
+                    {action.icon}
                   </div>
                   <div className="action-card-content">
                     <h5>{action.label}</h5>
@@ -946,7 +899,7 @@ const BuyerDashboard: React.FC = () => {
     return (
       <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #4361EE, #3A0CA3)' }}>
+          <div className="stat-icon" style={{ background: '#EEF2FF', color: '#4F46E5' }}>
             <FaShoppingBag />
           </div>
           <div className="stat-info">
@@ -963,7 +916,7 @@ const BuyerDashboard: React.FC = () => {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #4CC9F0, #4895EF)' }}>
+          <div className="stat-icon" style={{ background: '#F0F9FF', color: '#0EA5E9' }}>
             <FaSync />
           </div>
           <div className="stat-info">
@@ -980,7 +933,7 @@ const BuyerDashboard: React.FC = () => {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #2ECC71, #27AE60)' }}>
+          <div className="stat-icon" style={{ background: '#ECFDF5', color: '#10B981' }}>
             <FaCheckCircle />
           </div>
           <div className="stat-info">
@@ -997,7 +950,7 @@ const BuyerDashboard: React.FC = () => {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon" style={{ background: 'linear-gradient(135deg, #FF6B35, #FF9F1C)' }}>
+          <div className="stat-icon" style={{ background: '#FFFBEB', color: '#F59E0B' }}>
             <FaWallet />
           </div>
           <div className="stat-info">
@@ -1028,10 +981,6 @@ const BuyerDashboard: React.FC = () => {
         <button
           className={`status-filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
           onClick={() => setStatusFilter('all')}
-          style={{ 
-            '--status-gradient': 'linear-gradient(135deg, #FF6B35, #FF9F1C)',
-            '--status-color': '#FF6B35'
-          } as React.CSSProperties}
         >
           <FaListAlt />
           <span>All Orders</span>
@@ -1044,10 +993,6 @@ const BuyerDashboard: React.FC = () => {
               key={status}
               className={`status-filter-btn ${statusFilter === status ? 'active' : ''}`}
               onClick={() => setStatusFilter(statusFilter === status ? 'all' : status)}
-              style={{ 
-                '--status-gradient': statusColors[status as keyof typeof statusColors]?.gradient,
-                '--status-color': statusColors[status as keyof typeof statusColors]?.color
-              } as React.CSSProperties}
             >
               {getStatusIcon(status)}
               <span>{getStatusText(status)}</span>
@@ -1073,22 +1018,24 @@ const BuyerDashboard: React.FC = () => {
       <div 
         key={order._id}
         className="order-card"
-        style={{ 
-          '--status-gradient': getStatusGradient(order.status),
-          '--status-color': getStatusColor(order.status)
-        } as React.CSSProperties}
         onClick={() => navigate(`/marketplace/orders/${order._id}`)}
       >
         <div className="order-avatar">
-          <div className="avatar-container" style={{ 
-            background: `${categoryIcon.color}15`,
-            borderColor: `${categoryIcon.color}40`
-          }}>
+          <div 
+            className="avatar-container" 
+            style={{ 
+              background: categoryIcon.bgColor,
+              borderColor: `${categoryIcon.color}20`
+            }}
+          >
             <div className="avatar-icon" style={{ color: categoryIcon.color }}>
               {categoryIcon.icon}
             </div>
             <div className="avatar-badge">
-              <span className="category-badge" style={{ background: categoryIcon.color }}>
+              <span 
+                className="category-badge"
+                style={{ background: categoryIcon.color }}
+              >
                 <FaTag /> {category}
               </span>
             </div>
@@ -1128,7 +1075,7 @@ const BuyerDashboard: React.FC = () => {
           </div>
           
           <div className="order-seller-info">
-            <p className="seller">
+            <div className="seller">
               <FaUserCircle className="seller-icon" style={{ color: categoryIcon.color }} />
               <span className="seller-name">Seller: {seller}</span>
               {sellerRating > 0 && (
@@ -1136,7 +1083,7 @@ const BuyerDashboard: React.FC = () => {
                   <FaStar /> {sellerRating.toFixed(1)}
                 </span>
               )}
-            </p>
+            </div>
           </div>
           
           <div className="order-progress">
@@ -1145,7 +1092,7 @@ const BuyerDashboard: React.FC = () => {
                 className="progress-fill" 
                 style={{ 
                   width: getProgressWidth(order.status),
-                  background: getStatusGradient(order.status)
+                  background: `linear-gradient(90deg, ${getStatusColor(order.status)} 0%, ${getStatusColor(order.status)}80 100%)`
                 }}
               />
             </div>
@@ -1197,7 +1144,11 @@ const BuyerDashboard: React.FC = () => {
           <div className="status-section">
             <div 
               className="status-badge"
-              style={{ background: getStatusGradient(order.status) }}
+              style={{ 
+                background: getStatusBgColor(order.status),
+                color: getStatusColor(order.status),
+                border: `1px solid ${getStatusColor(order.status)}20`
+              }}
             >
               {getStatusIcon(order.status)}
               <span>{getStatusText(order.status)}</span>
@@ -1503,7 +1454,13 @@ const BuyerDashboard: React.FC = () => {
                 key={index}
                 className={`achievement-card ${achievement.unlocked ? 'unlocked' : 'locked'}`}
               >
-                <div className="achievement-icon">
+                <div 
+                  className="achievement-icon"
+                  style={{ 
+                    background: `${achievement.color}15`,
+                    color: achievement.color
+                  }}
+                >
                   {achievement.icon}
                 </div>
                 <div className="achievement-content">
@@ -1511,7 +1468,10 @@ const BuyerDashboard: React.FC = () => {
                   <p>{achievement.unlocked ? 'Unlocked' : 'Locked'}</p>
                 </div>
                 {achievement.unlocked && (
-                  <span className="achievement-badge">
+                  <span 
+                    className="achievement-badge"
+                    style={{ background: achievement.color }}
+                  >
                     <FaCheckCircle />
                   </span>
                 )}
@@ -1540,18 +1500,17 @@ const BuyerDashboard: React.FC = () => {
                 key={index} 
                 className={`quick-action-card ${action.type}`}
                 onClick={action.action}
-                style={{ '--action-gradient': action.gradient } as React.CSSProperties}
               >
                 <div className="action-icon-container">
                   <div 
                     className="action-icon"
-                    style={{ background: action.gradient }}
+                    style={{ 
+                      background: action.bgColor,
+                      color: action.color
+                    }}
                   >
                     {action.icon}
                   </div>
-                  {action.badge && (
-                    <span className="action-badge">{action.badge}</span>
-                  )}
                 </div>
                 <div className="action-content">
                   <h3 className="action-title">{action.label}</h3>
