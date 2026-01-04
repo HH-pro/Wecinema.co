@@ -312,7 +312,7 @@ export const authAPI = {
     postRequest("/api/user/signup", userData, setLoading, "Registration successful"),
 
   signin: (credentials: { email: string; password?: string; isGoogleAuth?: boolean }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/api/user/signin", credentials, setLoading, "Login successful"),
+    postRequest("/user/signin", credentials, setLoading, "Login successful"),
 
   verifyToken: (token: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
     postRequest("/api/user/verify-token", { token }, setLoading),
