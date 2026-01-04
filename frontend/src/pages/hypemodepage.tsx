@@ -25,7 +25,7 @@ const HypeModeProfile = () => {
  let api: string;
 
 if (window.location.hostname === "localhost") {
-  api = "https://wecinema-co.onrender.com/api"; // Local dev backend
+  api = "https://wecinema-co.onrender.com/"; // Local dev backend
 } else {
   api = "https://wecinema.co/api";   // Production backend
 }
