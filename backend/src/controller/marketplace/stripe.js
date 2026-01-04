@@ -642,7 +642,119 @@ async function getAccountBalance(accountId) {
     };
   }
 }
+// routes/stripeRoutes.js mein yeh add karein:
 
+/**
+ * @route   POST /api/stripe/disconnect
+ * @desc    Disconnect Stripe account
+ * @access  Private (Seller only)
+ */
+router.post('/disconnect', auth, async (req, res) => {
+  try {
+    const sellerId = req.user._id;
+    
+    // Check if user is a seller
+    const seller = await User.findById(sellerId);
+    if (!seller) {
+      return res.status(404).json({ success: false, error: 'Seller not found' });
+    }
+
+    // Check if Stripe is connected
+    if (!seller.stripeAccountId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No Stripe account connected' 
+      });
+    }
+
+    // Check for pending balances
+    const stripeAccount = await stripe.accounts.retrieve(seller.stripeAccountId);
+    
+    // If there's pending balance, don't allow disconnect
+    if (stripeAccount.balance && stripeAccount.balance > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot disconnect while you have pending balance',
+        pendingBalance: stripeAccount.balance,
+        message: 'Please withdraw your balance before disconnecting'
+      });
+    }
+
+    // Check for active listings
+    const activeListings = await Listing.countDocuments({
+      sellerId,
+      status: 'active'
+    });
+
+    if (activeListings > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot disconnect with active listings',
+        activeListings,
+        message: 'Please deactivate all your listings before disconnecting Stripe'
+      });
+    }
+
+    // Check for pending orders
+    const pendingOrders = await Order.countDocuments({
+      sellerId,
+      status: { $in: ['pending_payment', 'paid', 'processing', 'in_progress', 'in_revision'] }
+    });
+
+    if (pendingOrders > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot disconnect with pending orders',
+        pendingOrders,
+        message: 'Please complete or cancel all pending orders before disconnecting'
+      });
+    }
+
+    // Create disconnect confirmation record
+    const disconnectRecord = new StripeDisconnect({
+      sellerId,
+      stripeAccountId: seller.stripeAccountId,
+      email: seller.email,
+      balance: stripeAccount.balance || 0,
+      status: 'pending'
+    });
+
+    await disconnectRecord.save();
+
+    // Send email notification
+    await sendEmail({
+      to: seller.email,
+      subject: 'Stripe Account Disconnect Request',
+      template: 'stripeDisconnect',
+      data: {
+        username: seller.username,
+        stripeAccountId: seller.stripeAccountId,
+        date: new Date().toLocaleDateString()
+      }
+    });
+
+    // Log the disconnect request
+    console.log(`🔴 Stripe disconnect requested for seller ${sellerId}, account ${seller.stripeAccountId}`);
+
+    res.json({
+      success: true,
+      message: 'Stripe disconnect request submitted. Our team will review your request within 24-48 hours.',
+      data: {
+        disconnectId: disconnectRecord._id,
+        status: 'pending',
+        reviewTime: '24-48 hours'
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error disconnecting Stripe:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to disconnect Stripe account',
+      details: error.message 
+    });
+  }
+});
 // ✅ Alternative onboarding without business_profile
 router.post('/onboard-seller-retry', authenticateMiddleware, async (req, res) => {
   try {
