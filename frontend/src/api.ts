@@ -1,8 +1,8 @@
-// api.ts - Main API service file
+// api.ts - Complete API service file
 import axios from 'axios';
 
 // Define base URL for your API
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 // Create axios instance with default config
 const api = axios.create({
@@ -10,6 +10,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 10000, // 10 seconds timeout
 });
 
 // Add request interceptor to add auth token to requests
@@ -30,14 +31,18 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      // Redirect to login page if not already there
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
 );
 
-// Define interfaces
-interface User {
+// ==================== INTERFACES ====================
+
+export interface User {
   _id: string;
   username: string;
   email: string;
@@ -53,14 +58,17 @@ interface User {
   isVerified?: boolean;
   authProvider?: 'email' | 'google';
   status?: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
-interface Video {
+export interface Video {
   _id: string;
   title: string;
   description: string;
   url?: string;
   file?: string;
+  thumbnail?: string;
   genre: string | string[];
   theme?: string | string[];
   rating?: string | string[];
@@ -81,7 +89,7 @@ interface Video {
   updatedAt?: Date;
 }
 
-interface Script {
+export interface Script {
   _id: string;
   title: string;
   genre: string;
@@ -92,7 +100,7 @@ interface Script {
   updatedAt?: Date;
 }
 
-interface Comment {
+export interface Comment {
   _id?: string;
   avatar?: string;
   username: string;
@@ -101,14 +109,14 @@ interface Comment {
   replies?: Comment[];
 }
 
-interface History {
+export interface History {
   _id: string;
   userId: string;
   videoId: Video | string;
   watchedAt: Date;
 }
 
-interface Transaction {
+export interface Transaction {
   _id: string;
   userId: string;
   username: string;
@@ -117,10 +125,19 @@ interface Transaction {
   payerId: string;
   amount: number;
   currency: string;
+  subscriptionType?: string;
   createdAt: Date;
 }
 
-interface Subscription {
+export interface ContactMessage {
+  _id: string;
+  name: string;
+  email: string;
+  message: string;
+  createdAt: Date;
+}
+
+export interface Subscription {
   _id: string;
   userId: string;
   subscriptionType: string;
@@ -129,28 +146,46 @@ interface Subscription {
   isActive: boolean;
 }
 
-interface AuthResponse {
+export interface AuthResponse {
   token: string;
   user: User;
   isVerified?: boolean;
 }
 
-interface ApiResponse<T = any> {
+export interface ApiResponse<T = any> {
   data?: T;
   error?: string;
   message?: string;
   count?: number;
   hasPaid?: boolean;
   isSubscribed?: boolean;
+  video?: Video;
+  videos?: Video[];
+  scripts?: Script[];
+  users?: User[];
+  transactions?: Transaction[];
+  likesCount?: number;
+  likes?: string[];
+  isLiked?: boolean;
+  isDisliked?: boolean;
+  views?: number;
+  history?: History[];
+  chartData?: any;
+  averageRating?: number;
+  totalRatings?: number;
 }
 
-// Generic request functions
+// ==================== GENERIC REQUEST FUNCTIONS ====================
+
 export const getRequest = async <T>(endpoint: string, params?: any): Promise<ApiResponse<T>> => {
   try {
     const response = await api.get(endpoint, { params });
     return response.data;
   } catch (error: any) {
-    return { error: error.response?.data?.error || 'Request failed' };
+    console.error(`GET ${endpoint} error:`, error);
+    return { 
+      error: error.response?.data?.error || error.message || 'Request failed' 
+    };
   }
 };
 
@@ -159,7 +194,10 @@ export const postRequest = async <T>(endpoint: string, data: any): Promise<ApiRe
     const response = await api.post(endpoint, data);
     return response.data;
   } catch (error: any) {
-    return { error: error.response?.data?.error || 'Request failed' };
+    console.error(`POST ${endpoint} error:`, error);
+    return { 
+      error: error.response?.data?.error || error.message || 'Request failed' 
+    };
   }
 };
 
@@ -168,7 +206,10 @@ export const putRequest = async <T>(endpoint: string, data: any): Promise<ApiRes
     const response = await api.put(endpoint, data);
     return response.data;
   } catch (error: any) {
-    return { error: error.response?.data?.error || 'Request failed' };
+    console.error(`PUT ${endpoint} error:`, error);
+    return { 
+      error: error.response?.data?.error || error.message || 'Request failed' 
+    };
   }
 };
 
@@ -177,20 +218,28 @@ export const patchRequest = async <T>(endpoint: string, data: any): Promise<ApiR
     const response = await api.patch(endpoint, data);
     return response.data;
   } catch (error: any) {
-    return { error: error.response?.data?.error || 'Request failed' };
+    console.error(`PATCH ${endpoint} error:`, error);
+    return { 
+      error: error.response?.data?.error || error.message || 'Request failed' 
+    };
   }
 };
 
-export const deleteRequest = async <T>(endpoint: string): Promise<ApiResponse<T>> => {
+export const deleteRequest = async <T>(endpoint: string, data?: any): Promise<ApiResponse<T>> => {
   try {
-    const response = await api.delete(endpoint);
+    const config = data ? { data } : {};
+    const response = await api.delete(endpoint, config);
     return response.data;
   } catch (error: any) {
-    return { error: error.response?.data?.error || 'Request failed' };
+    console.error(`DELETE ${endpoint} error:`, error);
+    return { 
+      error: error.response?.data?.error || error.message || 'Request failed' 
+    };
   }
 };
 
-// Authentication API
+// ==================== AUTHENTICATION API ====================
+
 export const authApi = {
   // Admin registration
   adminRegister: async (userData: {
@@ -233,7 +282,7 @@ export const authApi = {
     return result;
   },
 
-  // Google signup
+  // Signup (email or Google)
   signup: async (userData: {
     username: string;
     email: string;
@@ -250,7 +299,7 @@ export const authApi = {
     return result;
   },
 
-  // Google signin
+  // Signin (email or Google)
   signin: async (credentials: {
     email: string;
     password?: string;
@@ -285,6 +334,7 @@ export const authApi = {
   // Logout
   logout: (): void => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
   },
 
   // Check authentication
@@ -301,9 +351,27 @@ export const authApi = {
   setToken: (token: string): void => {
     localStorage.setItem('token', token);
   },
+
+  // Get current user from localStorage
+  getCurrentUser: (): User | null => {
+    const userStr = localStorage.getItem('user');
+    return userStr ? JSON.parse(userStr) : null;
+  },
+
+  // Set current user in localStorage
+  setCurrentUser: (user: User): void => {
+    localStorage.setItem('user', JSON.stringify(user));
+  },
+
+  // Clear auth data
+  clearAuth: (): void => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+  },
 };
 
-// User API
+// ==================== USER API ====================
+
 export const userApi = {
   // Get all users
   getAllUsers: async (): Promise<ApiResponse<User[]>> => {
@@ -330,7 +398,7 @@ export const userApi = {
     return putRequest(`/user/${targetUserId}/follow`, { action, userId });
   },
 
-  // Edit user
+  // Edit user profile
   editUser: async (userId: string, userData: {
     username?: string;
     email?: string;
@@ -380,7 +448,7 @@ export const userApi = {
     return postRequest('/user/update-payment-status', { userId, hasPaid });
   },
 
-  // Submit contact
+  // Submit contact form
   submitContact: async (contactData: {
     name: string;
     email: string;
@@ -399,6 +467,16 @@ export const userApi = {
     return postRequest('/user/orders', orderData);
   },
 
+  // Get all transactions (admin)
+  getTransactions: async (): Promise<ApiResponse<Transaction[]>> => {
+    return getRequest<Transaction[]>('/user/transactions');
+  },
+
+  // Get user transactions (admin)
+  getUserTransactions: async (userId: string): Promise<ApiResponse<Transaction[]>> => {
+    return getRequest<Transaction[]>(`/user/transactions/${userId}`);
+  },
+
   // Change all users status
   changeAllUsersStatus: async (): Promise<ApiResponse> => {
     return putRequest('/user/change-user-status', {});
@@ -408,9 +486,30 @@ export const userApi = {
   changeUserStatus: async (userId: string, status: boolean): Promise<ApiResponse<User>> => {
     return postRequest('/user/change-user-status', { userId, status });
   },
+
+  // Get user's followings
+  getFollowings: async (userId: string): Promise<ApiResponse<User[]>> => {
+    const user = await userApi.getUserById(userId);
+    if (user.data?.followings) {
+      // You might want to fetch detailed user info for each following
+      return { data: [] as User[] }; // Implement based on your needs
+    }
+    return { data: [] };
+  },
+
+  // Get user's followers
+  getFollowers: async (userId: string): Promise<ApiResponse<User[]>> => {
+    const user = await userApi.getUserById(userId);
+    if (user.data?.followers) {
+      // You might want to fetch detailed user info for each follower
+      return { data: [] as User[] }; // Implement based on your needs
+    }
+    return { data: [] };
+  },
 };
 
-// Video API
+// ==================== VIDEO API ====================
+
 export const videoApi = {
   // Create video
   createVideo: async (videoData: {
@@ -441,7 +540,7 @@ export const videoApi = {
     return getRequest<Video[]>(`/user/all/${userId}`);
   },
 
-  // Get video by ID
+  // Get video by ID or slug
   getVideoById: async (id: string): Promise<ApiResponse<Video>> => {
     return getRequest<Video>(`/user/${id}`);
   },
@@ -469,7 +568,7 @@ export const videoApi = {
     return postRequest(`/user/like/${videoId}`, { action, userId });
   },
 
-  // Get likes
+  // Get likes for a video
   getLikes: async (videoId: string): Promise<ApiResponse<{ videoId: string, likesCount: number, likes: string[] }>> => {
     return getRequest(`/user/likes/${videoId}`);
   },
@@ -479,12 +578,12 @@ export const videoApi = {
     return postRequest(`/user/dislike/${videoId}`, { userId });
   },
 
-  // Get dislikes
+  // Get dislikes for a video
   getDislikes: async (videoId: string): Promise<ApiResponse<{ videoId: string, likesCount: number, likes: string[] }>> => {
     return getRequest(`/user/dislike/${videoId}`);
   },
 
-  // Get like status
+  // Get like/dislike status
   getLikeStatus: async (videoId: string, userId: string): Promise<ApiResponse<{ isLiked: boolean, isDisliked: boolean }>> => {
     return getRequest(`/user/${videoId}/like-status/${userId}`);
   },
@@ -499,7 +598,7 @@ export const videoApi = {
     return deleteRequest(`/user/${videoId}/bookmark`, { data: { userId } });
   },
 
-  // Add comment
+  // Add comment to video
   addComment: async (videoId: string, commentData: {
     userId: string;
     text: string;
@@ -570,7 +669,7 @@ export const videoApi = {
     return patchRequest(`/user/unhide/${videoId}`, {});
   },
 
-  // Get genre graph
+  // Get genre analytics
   getGenreGraph: async (from?: string, to?: string): Promise<ApiResponse<any>> => {
     const params: any = {};
     if (from) params.from = from;
@@ -578,7 +677,7 @@ export const videoApi = {
     return getRequest('/user/genres/graph', params);
   },
 
-  // Get theme graph
+  // Get theme analytics
   getThemeGraph: async (from?: string, to?: string): Promise<ApiResponse<any>> => {
     const params: any = {};
     if (from) params.from = from;
@@ -586,16 +685,47 @@ export const videoApi = {
     return getRequest('/user/themes/graph', params);
   },
 
-  // Get rating graph
+  // Get rating analytics
   getRatingGraph: async (from?: string, to?: string): Promise<ApiResponse<any>> => {
     const params: any = {};
     if (from) params.from = from;
     if (to) params.to = to;
     return getRequest('/user/ratings/graph', params);
   },
+
+  // Search videos by title or description
+  searchVideos: async (query: string): Promise<ApiResponse<Video[]>> => {
+    // This might need backend implementation
+    return getRequest<Video[]>(`/user/search?q=${query}`);
+  },
+
+  // Get trending videos
+  getTrendingVideos: async (limit = 10): Promise<ApiResponse<Video[]>> => {
+    // This might need backend implementation
+    return getRequest<Video[]>(`/user/trending?limit=${limit}`);
+  },
+
+  // Get recommended videos for user
+  getRecommendedVideos: async (userId: string): Promise<ApiResponse<Video[]>> => {
+    // This might need backend implementation
+    return getRequest<Video[]>(`/user/recommended/${userId}`);
+  },
+
+  // Get videos bookmarked by user
+  getBookmarkedVideos: async (userId: string): Promise<ApiResponse<Video[]>> => {
+    // This might need backend implementation
+    return getRequest<Video[]>(`/user/bookmarks/${userId}`);
+  },
+
+  // Get liked videos by user
+  getLikedVideos: async (userId: string): Promise<ApiResponse<Video[]>> => {
+    // This might need backend implementation
+    return getRequest<Video[]>(`/user/liked/${userId}`);
+  },
 };
 
-// Script API
+// ==================== SCRIPT API ====================
+
 export const scriptApi = {
   // Create script
   createScript: async (scriptData: {
@@ -632,9 +762,26 @@ export const scriptApi = {
   deleteScript: async (scriptId: string): Promise<ApiResponse> => {
     return deleteRequest(`/user/scripts/${scriptId}`);
   },
+
+  // Get script by ID
+  getScriptById: async (scriptId: string): Promise<ApiResponse<Script>> => {
+    return getRequest<Script>(`/user/scripts/${scriptId}`);
+  },
+
+  // Search scripts
+  searchScripts: async (query: string): Promise<ApiResponse<Script[]>> => {
+    // This might need backend implementation
+    return getRequest<Script[]>(`/user/scripts/search?q=${query}`);
+  },
+
+  // Get scripts by genre
+  getScriptsByGenre: async (genre: string): Promise<ApiResponse<Script[]>> => {
+    return getRequest<Script[]>(`/user/scripts/genre/${genre}`);
+  },
 };
 
-// Admin API
+// ==================== ADMIN API ====================
+
 export const adminApi = {
   // Get privileged users
   getPrivilegedUsers: async (role?: 'admin' | 'subadmin' | 'both'): Promise<ApiResponse<{ users: User[], count: number }>> => {
@@ -657,7 +804,7 @@ export const adminApi = {
   },
 
   // Get all transactions
-  getTransactions: async (): Promise<ApiResponse<Transaction[]>> => {
+  getAllTransactions: async (): Promise<ApiResponse<Transaction[]>> => {
     return getRequest<Transaction[]>('/user/transactions');
   },
 
@@ -675,36 +822,120 @@ export const adminApi = {
   changeVideoStatus: async (videoId: string, status: boolean): Promise<ApiResponse<Video>> => {
     return postRequest('/user/change-video-status', { videoId, status });
   },
+
+  // Get all contact messages
+  getContactMessages: async (): Promise<ApiResponse<ContactMessage[]>> => {
+    // This might need backend implementation
+    return getRequest<ContactMessage[]>('/admin/contact');
+  },
+
+  // Get system statistics
+  getSystemStats: async (): Promise<ApiResponse<any>> => {
+    // This might need backend implementation
+    return getRequest('/admin/stats');
+  },
+
+  // Get user analytics
+  getUserAnalytics: async (): Promise<ApiResponse<any>> => {
+    // This might need backend implementation
+    return getRequest('/admin/analytics/users');
+  },
+
+  // Get video analytics
+  getVideoAnalytics: async (): Promise<ApiResponse<any>> => {
+    // This might need backend implementation
+    return getRequest('/admin/analytics/videos');
+  },
+};
+
+// ==================== UTILITY FUNCTIONS ====================
+
+// Upload file function
+export const uploadFile = async (file: File, type: 'video' | 'image' | 'script' = 'image'): Promise<ApiResponse<{ url: string }>> => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', type);
+
+    const response = await api.post('/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
+    return response.data;
+  } catch (error: any) {
+    console.error('Upload error:', error);
+    return { 
+      error: error.response?.data?.error || error.message || 'Upload failed' 
+    };
+  }
+};
+
+// Check if user is admin
+export const isAdmin = (): boolean => {
+  const user = authApi.getCurrentUser();
+  return user?.isAdmin === true;
+};
+
+// Check if user is subadmin
+export const isSubAdmin = (): boolean => {
+  const user = authApi.getCurrentUser();
+  return user?.isSubAdmin === true;
+};
+
+// Check if user has paid
+export const hasPaid = (): boolean => {
+  const user = authApi.getCurrentUser();
+  return user?.hasPaid === true;
+};
+
+// Format date
+export const formatDate = (date: Date | string): string => {
+  const d = new Date(date);
+  return d.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
+// Format time
+export const formatTime = (date: Date | string): string => {
+  const d = new Date(date);
+  return d.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 };
 
 // Export default API instance
 export default api;
 
-// Example usage:
-/*
-import { getRequest, postRequest, authApi, videoApi } from './api';
-
-// Using generic request functions
-const fetchUsers = async () => {
-  const result = await getRequest<User[]>('/user/');
-  if (result.data) {
-    console.log(result.data);
-  }
+// Export everything as a single object
+export const API = {
+  // Generic request methods
+  get: getRequest,
+  post: postRequest,
+  put: putRequest,
+  patch: patchRequest,
+  delete: deleteRequest,
+  
+  // API modules
+  auth: authApi,
+  user: userApi,
+  video: videoApi,
+  script: scriptApi,
+  admin: adminApi,
+  
+  // Utility functions
+  uploadFile,
+  isAdmin,
+  isSubAdmin,
+  hasPaid,
+  formatDate,
+  formatTime,
+  
+  // Axios instance
+  instance: api,
 };
-
-// Using specific API modules
-const login = async () => {
-  const result = await authApi.login('email@example.com', 'password');
-  if (result.token) {
-    console.log('Logged in successfully');
-  }
-};
-
-// Video operations
-const fetchVideos = async () => {
-  const result = await videoApi.getAllVideos();
-  if (result.data) {
-    console.log(result.data);
-  }
-};
-*/
