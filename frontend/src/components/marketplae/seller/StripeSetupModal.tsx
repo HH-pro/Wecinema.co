@@ -9,7 +9,7 @@ interface StripeSetupModalProps {
   onSuccess: () => void;
   onDisconnectSuccess?: () => void;
   stripeConnected: boolean;
-  showDisconnectInModal?: boolean;
+  showDisconnectInModal?: boolean; // ✅ NEW: Control disconnect button in modal
 }
 
 const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
@@ -18,13 +18,14 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
   onSuccess,
   onDisconnectSuccess,
   stripeConnected,
-  showDisconnectInModal = true
+  showDisconnectInModal = true // ✅ Default true to show disconnect in modal
 }) => {
   const [loading, setLoading] = useState(false);
   const [stripeLoading, setStripeLoading] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<any>(null);
   const [checkingStatus, setCheckingStatus] = useState(false);
   
+  // Disconnect states
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
   const [disconnectReason, setDisconnectReason] = useState('');
   const [disconnectLoading, setDisconnectLoading] = useState(false);
@@ -36,6 +37,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
     message: ''
   });
 
+  // ✅ Check if can disconnect
   const checkDisconnectRequirements = async () => {
     try {
       const newRequirements = {
@@ -47,6 +49,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
       
       let allRequirements = [];
       
+      // Check for pending balance
       const stripeStatus = await marketplaceApi.stripe.getStripeAccountStatus();
       if (stripeStatus.success && stripeStatus.data?.account?.balance) {
         const balance = stripeStatus.data.account.balance;
@@ -56,6 +59,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
         }
       }
 
+      // Check for active listings
       const listingsResponse = await marketplaceApi.listings.getMyListings({ status: 'active' });
       if (listingsResponse.success) {
         const activeListings = listingsResponse.data?.listings || [];
@@ -65,6 +69,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
         }
       }
 
+      // Check for pending orders
       const ordersResponse = await marketplaceApi.orders.getMySales();
       if (ordersResponse.success) {
         const orders = ordersResponse.data?.sales || [];
@@ -77,6 +82,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
         }
       }
 
+      // Create message with all requirements
       if (allRequirements.length > 0) {
         newRequirements.message = `You have ${allRequirements.join(', ')}`;
       }
@@ -92,6 +98,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
     }
   };
 
+  // Check Stripe verification status
   const checkVerificationStatus = async () => {
     if (!stripeConnected) return;
     
@@ -116,6 +123,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
         checkDisconnectRequirements();
       }
     } else {
+      // Reset states when modal closes
       setShowDisconnectConfirm(false);
       setDisconnectReason('');
     }
@@ -125,16 +133,22 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
     try {
       setStripeLoading(true);
       
+      // Check current status first
       const statusResponse = await marketplaceApi.stripe.getStripeAccountStatus();
       
       let response;
       if (statusResponse.success && statusResponse.data?.account?.id) {
+        // Account exists, continue onboarding
+        console.log('Account exists, continuing onboarding...');
         response = await marketplaceApi.stripe.continueStripeOnboarding();
       } else {
+        // New account, start fresh onboarding
+        console.log('Starting new onboarding...');
         response = await marketplaceApi.stripe.startStripeOnboarding();
       }
       
       if (response.success && response.data?.url) {
+        // Redirect to Stripe
         window.location.href = response.data.url;
       } else {
         toast.error(response.error || 'Failed to start Stripe setup');
@@ -147,6 +161,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
     }
   };
 
+  // ✅ Handle disconnect
   const handleDisconnect = async () => {
     if (!disconnectReason.trim() && canDisconnect) {
       toast.error('Please provide a reason for disconnecting');
@@ -166,6 +181,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
           onDisconnectSuccess();
         }
         
+        // Close modal after successful disconnect request
         setTimeout(() => {
           onClose();
         }, 1500);
@@ -181,6 +197,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
     }
   };
 
+  // ✅ Get simplified requirements list
   const getSimplifiedRequirements = () => {
     if (!verificationStatus?.account?.requirements) return [];
     
@@ -199,6 +216,20 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
     });
   };
 
+  // ✅ Quick Disconnect Button Component (for main modal)
+  const QuickDisconnectButton = () => (
+    <button
+      onClick={() => setShowDisconnectConfirm(true)}
+      className="mt-4 w-full px-4 py-2.5 bg-white hover:bg-red-50 text-red-600 border border-red-300 font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow flex items-center justify-center"
+    >
+      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+      </svg>
+      Disconnect Stripe Account
+    </button>
+  );
+
+  // ✅ Main Modal Content
   const MainModalContent = () => (
     <div className="p-6">
       <div className="flex items-center mb-6">
@@ -217,6 +248,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
         </div>
       </div>
 
+      {/* Status Overview */}
       {stripeConnected && verificationStatus && (
         <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
           <div className="flex items-center justify-between">
@@ -244,6 +276,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
         </div>
       )}
 
+      {/* Verification Requirements */}
       {stripeConnected && verificationStatus && getSimplifiedRequirements().length > 0 && (
         <div className="mb-6">
           <h4 className="font-medium text-gray-900 mb-3">Verification Required</h4>
@@ -269,6 +302,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
         </div>
       )}
 
+      {/* Action Buttons */}
       <div className="space-y-4 pt-6 border-t border-gray-200">
         <div className="flex flex-col sm:flex-row gap-3">
           {!stripeConnected ? (
@@ -304,7 +338,9 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
             </>
           ) : (
             <>
+              {/* Manage Account Buttons */}
               <div className="flex-1 flex flex-col sm:flex-row gap-3">
+                {/* Complete Verification Button */}
                 {(getSimplifiedRequirements().length > 0 || !verificationStatus?.account?.charges_enabled) && (
                   <button
                     onClick={startStripeSetup}
@@ -330,6 +366,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
                   </button>
                 )}
 
+                {/* View Dashboard Button */}
                 {verificationStatus?.account?.id && (
                   <a
                     href={`https://dashboard.stripe.com/connect/accounts/${verificationStatus.account.id}`}
@@ -355,6 +392,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
           )}
         </div>
 
+        {/* ✅ ADDED: Disconnect Button below main actions */}
         {stripeConnected && showDisconnectInModal && (
           <div className="pt-4 border-t border-gray-100">
             <div className="text-center">
@@ -376,6 +414,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
     </div>
   );
 
+  // ✅ Disconnect Confirmation Modal Content
   const DisconnectConfirmContent = () => (
     <div className="p-6">
       <div className="flex items-center mb-6">
@@ -390,6 +429,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
         </div>
       </div>
 
+      {/* Important Notice */}
       <div className="mb-6">
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl mb-4">
           <h4 className="font-medium text-red-800 mb-2">⚠️ Important Notice</h4>
@@ -401,6 +441,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
           </ul>
         </div>
 
+        {/* Disconnect Requirements Check */}
         {!canDisconnect && (
           <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl mb-4">
             <h4 className="font-medium text-yellow-800 mb-2">Cannot Disconnect</h4>
@@ -436,6 +477,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
           </div>
         )}
 
+        {/* Reason Input */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Reason for disconnecting
@@ -454,6 +496,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
         </div>
       </div>
 
+      {/* Action Buttons */}
       <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
         <button
           onClick={() => {
@@ -507,12 +550,14 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
           </button>
         </div>
 
+        {/* Content */}
         {showDisconnectConfirm ? <DisconnectConfirmContent /> : <MainModalContent />}
       </div>
     </div>
   );
 };
 
+// ✅ Export a standalone DisconnectButton component for use outside the modal
 export const StripeDisconnectButton: React.FC<{
   onDisconnectClick: () => void;
   disabled?: boolean;
