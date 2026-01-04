@@ -9,7 +9,7 @@ import { toast } from "react-toastify";
 // Create an axios instance with default configurations
 const api = axios.create({
   baseURL: import.meta.env.DEV
-    ? "http://localhost:3000/"
+    ? "http://localhost:3000/api/"
     : "https://wecinema-co.onrender.com/",
   withCredentials: true,
   headers: {
@@ -312,7 +312,7 @@ export const authAPI = {
     postRequest("/api/user/signup", userData, setLoading, "Registration successful"),
 
   signin: (credentials: { email: string; password?: string; isGoogleAuth?: boolean }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/user/signin", credentials, setLoading, "Login successful"),
+    postRequest("/api/user/signin", credentials, setLoading, "Login successful"),
 
   verifyToken: (token: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
     postRequest("/api/user/verify-token", { token }, setLoading),
