@@ -1,438 +1,517 @@
-import React, { ReactNode, useEffect, useState } from "react";
-import { Header, Modal, Sidebar } from "..";
-import { ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-import "quill/dist/quill.snow.css";
-import { Itoken, decodeToken } from "../../utilities/helperfFunction";
+import React, { useEffect, useState } from "react";
 import { IoMdHome } from "react-icons/io";
 import {
-  RiMovie2Line,
   RiHeartLine,
   RiHistoryLine,
   RiFlagLine,
-  RiCustomerService2Line,
   RiStoreLine,
   RiAddCircleLine,
-  RiListCheck,
   RiShoppingBagLine,
+  RiListCheck,
+  RiMessageLine,
+  RiMovie2Line,
+  RiCustomerService2Line
 } from "react-icons/ri";
-import { MdChatBubbleOutline, MdOutlinePrivacyTip } from "react-icons/md";
-import { TbVideoPlus } from "react-icons/tb";
+import { LiaSignInAltSolid } from "react-icons/lia";
+import { HiUserAdd } from "react-icons/hi";
+import { FaMoon } from "react-icons/fa";
+import { MdOutlineDescription, MdChatBubbleOutline, MdOutlinePrivacyTip } from "react-icons/md";
+import { IoSunnyOutline } from "react-icons/io5";
 import { CgProfile } from "react-icons/cg";
-import { FaSignOutAlt, FaMoon } from "react-icons/fa";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { TbVideoPlus } from "react-icons/tb";
+import { FaUser, FaSignOutAlt, FaUserTie, FaShoppingCart, FaInfoCircle } from "react-icons/fa";
+import { toast } from "react-toastify";
+import { decodeToken } from "../../utilities/helperfFunction";
+import "./Sidebar.css";
+import { useNavigate, useLocation } from "react-router-dom";
+import axios from "axios";
 
-export const theme = [
-  "Love",
-  "Redemption",
-  "Family",
-  "Oppression",
-  "Corruption",
-  "Survival",
-  "Revenge",
-  "Death",
-  "Justice",
-  "Perseverance",
-  "War",
-  "Bravery",
-  "Freedom",
-  "Friendship",
-  "Hope",
-  "Society",
-  "Isolation",
-  "Peace",
-];
-
-interface LayoutProps {
-  hasHeader?: boolean;
-  children: ReactNode;
+interface SidebarProps {
   expand: boolean;
-  hideSidebar?: boolean;
+  darkMode: boolean;
+  toggleSigninModal?: any;
+  toggleSignupModal?: any;
+  toggleUploadScriptModal?: any;
+  toggleUploadModal?: any;
+  setDarkMode: any;
+  isLoggedIn: any;
+  toggleSignoutModal?: any;
+  setLightMode: any;
+  currentPath?: string; // Added from Layout
 }
 
-const Layout: React.FC<LayoutProps> = ({
-  children,
-  hasHeader = true,  // ✅ Added default value here
-  hideSidebar = false,
+const Sidebar: React.FC<SidebarProps> = ({
+  expand,
+  toggleSigninModal,
+  toggleSignupModal,
+  toggleSignoutModal,
+  setLightMode,
+  setDarkMode,
+  darkMode,
+  isLoggedIn,
+  toggleUploadScriptModal,
+  toggleUploadModal,
+  currentPath = "/"
 }) => {
-  const [screenWidth, setScreenWidth] = useState(window.innerWidth);
-  const [token, _] = useState<string | null>(
-    localStorage.getItem("token") || null
-  );
-  const [decodedToken, setDecodedToken] = useState<Itoken | null>(null);
-  const isDarkMode = localStorage.getItem("isDarkMode") ?? false;
-  const [darkMode, setDarkMode] = useState<boolean>(!!isDarkMode);
-  const [expanded, setExpanded] = useState<boolean>(false);
-  const [modalShow, setModalShow] = useState(false);
-  const [type, setType] = useState("");
-  const [show, setShow] = useState<boolean>(false);
-  const [viewPageSidebarVisible, setViewPageSidebarVisible] =
-    useState<boolean>(!hideSidebar);
-
+  const token = localStorage.getItem("token") || null;
+  const tokenData = decodeToken(token);
+  const [hasPaid, setHasPaid] = useState(false);
+  const [userType, setUserType] = useState<'buyer' | 'seller'>('buyer');
+  const [userData, setUserData] = useState<any>(null);
+  const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    const handleResize = () => setScreenWidth(window.innerWidth);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+    if (tokenData) {
+      fetchPaymentStatus(tokenData.userId);
+      fetchUserData(tokenData.userId);
+    }
+  }, [tokenData]);
 
-  useEffect(() => {
-    const decoded = decodeToken(token);
-    setDecodedToken(decoded);
-    return () => setDecodedToken(null);
-  }, [token]);
-
-  const setLightMode = () => {
-    localStorage.removeItem("isDarkMode");
-    setDarkMode(false);
+  const fetchPaymentStatus = async (userId: any) => {
+    try {
+      const response = await axios.get(
+        `https://wecinema.co/api/user/payment-status/${userId}`
+      );
+      setHasPaid(response.data.hasPaid);
+    } catch (error) {
+      console.error("Payment status error:", error);
+    }
   };
 
-  const setDarkiMode = () => {
-    localStorage.setItem("isDarkMode", "dark");
-    setDarkMode(true);
+  const fetchUserData = async (userId: any) => {
+    try {
+      const response = await axios.get(
+        `http://localhost:3000/user/${userId}`
+      );
+      setUserData(response.data);
+      if (response.data.userType) {
+        setUserType(response.data.userType);
+      }
+    } catch (error) {
+      console.error("User data fetch error:", error);
+    }
   };
 
-  const handleType = (str: string) => {
-    setType(str);
-    setModalShow(!modalShow);
+  const handleHypemodeClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (hasPaid) {
+      event.preventDefault();
+      toast.info("You are already subscribed to Hypemode!");
+    } else if (!hasPaid) {
+      navigate("/hypemode");
+    }
   };
 
-  useEffect(() => {
-    setShow(!!type);
-  }, [type, modalShow]);
+  // Helper function to check active path (improved)
+  const getActiveClass = (path: string) => {
+    if (path === "/" && location.pathname === "/") {
+      return "text-active";
+    }
+    if (path !== "/" && location.pathname.startsWith(path)) {
+      return "text-active";
+    }
+    return "";
+  };
 
-  // ✅ Breakpoints
-  const isTabletOrMobile = screenWidth <= 1120;
-  const isMobile = screenWidth <= 420;
+  // Function to change user type
+  const changeUserType = async (newType: 'buyer' | 'seller') => {
+    if (!tokenData) {
+      toast.error("Please login first");
+      return;
+    }
 
-  const isSidebarVisible = hideSidebar ? viewPageSidebarVisible : true;
-
-  // 🆕 Removed HypeMode check
-  const isMarketplaceRoute = location.pathname.startsWith("/marketplace");
-
-  return (
-    <div className="text-lg md:text-sm sm:text-xs">
-      <ToastContainer />
-      {hasHeader && (  // ✅ Only render Header if hasHeader is true
-        <Header
-          expand={expanded}
-          isMobile={isMobile}
-          toggler={() => setExpanded(!expanded)}
-          darkMode={darkMode}
-          toggleUploadModal={() => handleType("video")}
-          toggleUploadScriptModal={() => handleType("script")}
-          toggleSidebar={
-            hideSidebar
-              ? () => setViewPageSidebarVisible((prev) => !prev)
-              : undefined
+    try {
+      const response = await axios.put(
+        `http://localhost:3000/user/change-type/${tokenData.userId}`,
+        { userType: newType },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
           }
-          isMarketplaceRoute={isMarketplaceRoute}
-        />
-      )}
+        }
+      );
 
-      {/* ✅ Sidebar Overlay for Tablet + Mobile */}
-      {expanded && isTabletOrMobile && isSidebarVisible && (
-        <div className="fixed top-0 left-0 z-40 h-full w-full bg-black bg-opacity-90 backdrop-blur-md transition-opacity ease-in-out duration-300">
-          <section
-            className={`mt-16 fixed inset-0 w-4/5 max-w-xs border-r border-gray-200 overflow-auto z-50 ${
-              darkMode ? "bg-dark text-light" : "bg-light text-dark"
+      if (response.data) {
+        setUserType(newType);
+        setUserData((prev: any) => ({ ...prev, userType: newType }));
+        localStorage.setItem('marketplaceMode', newType);
+        toast.success(`Switched to ${newType} mode successfully!`);
+      }
+    } catch (error: any) {
+      console.error("Error changing user type:", error);
+      toast.error(error.response?.data?.error || "Failed to switch mode");
+    }
+  };
+
+  // Render marketplace section based on user type
+  const renderMarketplaceSection = () => {
+    if (!tokenData) return null;
+
+    return (
+      <nav className="sidebar-section-container">
+        <div className="sidebar-section-header">
+          <h2 className={`sidebar-section-title ${expand ? "" : "collapsed"}`}>
+            Marketplace
+          </h2>
+          {expand && (
+            <div className="user-type-switcher">
+              <button
+                className={`type-btn ${userType === 'buyer' ? 'active' : ''}`}
+                onClick={() => changeUserType('buyer')}
+                title="Switch to Buyer Mode"
+              >
+                <FaShoppingCart size={12} />
+              </button>
+              <button
+                className={`type-btn ${userType === 'seller' ? 'active' : ''}`}
+                onClick={() => changeUserType('seller')}
+                title="Switch to Seller Mode"
+              >
+                <FaUserTie size={12} />
+              </button>
+            </div>
+          )}
+        </div>
+        
+        <ul className="sidebar-section">
+          {/* Common Links for Both */}
+          <Link
+            to="/marketplace"
+            className={`sidebar-item ${getActiveClass("/marketplace")} ${
+              expand ? "" : "collapsed"
             }`}
           >
-            {/* Main Nav */}
-            <nav className="flex items-center justify-between p-2 my-3 pb-6">
-              <ul className="border-b w-full border-gray-200 pb-4">
-                {/* Home */}
-                <Link
-                  to="/"
-                  className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                    location.pathname === "/"
-                      ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
-                      : ""
-                  }`}
-                >
-                  <IoMdHome size="20" />
-                  <span>Home</span>
-                </Link>
+            <RiStoreLine className="sidebar-icon" />
+            <span className="sidebar-text">Browse Listings</span>
+          </Link>
 
-                {/* ✅ Marketplace for logged-in users */}
-                {decodedToken && (
-                  <>
-                    <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Marketplace
-                    </div>
+          <Link
+            to="/marketplace/messages"
+            className={`sidebar-item ${getActiveClass(
+              "/marketplace/messages"
+            )} ${expand ? "" : "collapsed"}`}
+          >
+            <RiMessageLine className="sidebar-icon" />
+            <span className="sidebar-text">Messages</span>
+          </Link>
 
-                    <Link
-                      to="/marketplace"
-                      className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                        location.pathname === "/marketplace"
-                          ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
-                          : ""
-                      }`}
-                    >
-                      <RiStoreLine size="20" />
-                      <span>Browse Listings</span>
-                    </Link>
-
-                    <Link
-                      to="/marketplace/create"
-                      className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                        location.pathname === "/marketplace/create"
-                          ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
-                          : ""
-                      }`}
-                    >
-                      <RiAddCircleLine size="20" />
-                      <span>Create Listing</span>
-                    </Link>
-
-                    <Link
-                      to="/marketplace/orders"
-                      className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                        location.pathname === "/marketplace/orders"
-                          ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
-                          : ""
-                      }`}
-                    >
-                      <RiShoppingBagLine size="20" />
-                      <span>My Orders</span>
-                    </Link>
-
-                    <Link
-                      to="/marketplace/dashboard"
-                      className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                        location.pathname === "/marketplace/dashboard"
-                          ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
-                          : ""
-                      }`}
-                    >
-                      <RiListCheck size="20" />
-                      <span>Seller Dashboard</span>
-                    </Link>
-
-                    <Link
-                      to="/marketplace/messages"
-                      className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                        location.pathname.startsWith("/marketplace/messages")
-                          ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
-                          : ""
-                      }`}
-                    >
-                      <MdChatBubbleOutline size="20" />
-                      <span>Messages</span>
-                    </Link>
-
-                    <div className="border-t border-gray-200 my-2"></div>
-                  </>
-                )}
-
-                {/* Video Editor */}
-                <Link
-                  to="/videoeditor"
-                  className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                    location.pathname === "/videoeditor"
-                      ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
-                      : ""
-                  }`}
-                >
-                  <TbVideoPlus size="20" />
-                  <span>Video Editor</span>
-                </Link>
-
-                {/* Profile */}
-                {decodedToken && (
-                  <Link
-                    to={`/user/${decodedToken?.userId}`}
-                    className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                      location.pathname === `/user/${decodedToken?.userId}`
-                        ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
-                        : ""
-                    }`}
-                  >
-                    <CgProfile size="20" />
-                    <span>Profile</span>
-                  </Link>
-                )}
-
-                {/* Liked Videos */}
-                {decodedToken && (
-                  <Link
-                    to="/likedvideos"
-                    className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                      location.pathname === "/likedvideos"
-                        ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
-                        : ""
-                    }`}
-                  >
-                    <RiHeartLine size="20" />
-                    <span>Liked Videos</span>
-                  </Link>
-                )}
-
-                {/* History */}
-                {decodedToken && (
-                  <Link
-                    to="/history"
-                    className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                      location.pathname === "/history"
-                        ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
-                        : ""
-                    }`}
-                  >
-                    <RiHistoryLine size="20" />
-                    <span>History</span>
-                  </Link>
-                )}
-
-                {/* Chat Bot */}
-                <Link
-                  to="/chatbot"
-                  className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                    location.pathname === "/chatbot"
-                      ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
-                      : ""
-                  }`}
-                >
-                  <MdChatBubbleOutline size="20" />
-                  <span>Chat Bot</span>
-                </Link>
-
-                {/* Support */}
-                <Link
-                  to="/customersupport"
-                  className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${
-                    location.pathname === "/customersupport"
-                      ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
-                      : ""
-                  }`}
-                >
-                  <RiCustomerService2Line size="20" />
-                  <span>Support</span>
-                </Link>
-              </ul>
-            </nav>
-
-            {/* Theme Settings */}
-            <nav className="px-4 py-2 border-b border-gray-200">
-              <h2 className="font-bold mb-2">Theme</h2>
-              <div
-                className="flex items-center gap-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
-                onClick={setDarkiMode}
-              >
-                <FaMoon size="20" color={darkMode ? "green" : ""} />
-                <span className="text-sm">Dark Mode</span>
-              </div>
-              <div
-                className="flex items-center gap-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
-                onClick={setLightMode}
-              >
-                <IoMdHome size="20" color={!darkMode ? "green" : ""} />
-                <span className="text-sm">Light Mode</span>
-              </div>
-              
+          {/* Buyer Specific Links */}
+          {userType === 'buyer' && (
+            <>
               <Link
-                to="/privacy-policy"
-                className={`flex items-center gap-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 ${
-                  location.pathname === "/privacy-policy"
-                    ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
-                    : ""
-                }`}
+                to="/marketplace/buyer-dashboard"
+                className={`sidebar-item ${getActiveClass(
+                  "/marketplace/buyer-dashboard"
+                )} ${expand ? "" : "collapsed"}`}
               >
+                <RiListCheck className="sidebar-icon" />
+                <span className="sidebar-text">Buyer Dashboard</span>
               </Link>
-            </nav>
+              <Link
+                to="/marketplace/my-orders"
+                className={`sidebar-item ${getActiveClass(
+                  "/marketplace/my-orders"
+                )} ${expand ? "" : "collapsed"}`}
+              >
+                <RiShoppingBagLine className="sidebar-icon" />
+                <span className="sidebar-text">My Orders</span>
+              </Link>
+            </>
+          )}
 
-            {/* Auth */}
-            <nav className="px-4 py-3">
-              {!decodedToken ? (
+          {/* Seller Specific Links */}
+          {userType === 'seller' && (
+            <>
+              <div
+                className={`sidebar-item ${expand ? "" : "collapsed"}`}
+                onClick={toggleUploadModal}
+              >
+                <RiAddCircleLine className="sidebar-icon" />
+                <span className="sidebar-text">Create Listing</span>
+              </div>
+
+              <Link
+                to="/marketplace/dashboard"
+                className={`sidebar-item ${getActiveClass(
+                  "/marketplace/dashboard"
+                )} ${expand ? "" : "collapsed"}`}
+              >
+                <RiListCheck className="sidebar-icon" />
+                <span className="sidebar-text">Seller Dashboard</span>
+              </Link>
+            </>
+          )}
+        </ul>
+
+        {/* User Type Badge */}
+        {expand && (
+          <div className="user-type-badge">
+            <span className={`badge ${userType}`}>
+              {userType === 'seller' ? (
                 <>
-                  <li
-                    onClick={() => handleType("login")}
-                    className="flex items-center gap-3 py-2 cursor-pointer hover:text-green-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
-                  >
-                    <FaSignOutAlt size="16" />
-                    <span>Sign In</span>
-                  </li>
-                  <li
-                    onClick={() => handleType("register")}
-                    className="flex items-center gap-3 py-2 cursor-pointer hover:text-green-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
-                  >
-                    <FaSignOutAlt size="16" />
-                    <span>Sign Up</span>
-                  </li>
+                  <FaUserTie className="badge-icon" />
+                  Seller Mode
                 </>
               ) : (
-                <li
-                  onClick={() => handleType("logout")}
-                  className="flex items-center gap-3 py-2 cursor-pointer hover:text-green-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
-                >
-                  <FaSignOutAlt size="16" />
-                  <span>Log Out</span>
-                </li>
+                <>
+                  <FaShoppingCart className="badge-icon" />
+                  Buyer Mode
+                </>
               )}
-            </nav>
-          </section>
-        </div>
-      )}
-
-      {/* ✅ Desktop Layout */}
-      <div className="flex">
-        {!isTabletOrMobile && isSidebarVisible && (
-          <Sidebar
-            expand={expanded}
-            setLightMode={setLightMode}
-            setDarkMode={setDarkiMode}
-            toggleSigninModal={() => handleType("login")}
-            toggleSignupModal={() => handleType("register")}
-            toggleSignoutModal={() => handleType("logout")}
-            darkMode={darkMode}
-            toggleUploadModal={() => handleType("video")}
-            toggleUploadScriptModal={() => handleType("script")}
-            isLoggedIn={decodedToken}
-            currentPath={location.pathname}
-          />
+            </span>
+          </div>
         )}
+      </nav>
+    );
+  };
 
-        <main
-          className={`flex flex-col min-h-screen ${hasHeader ? 'mt-12' : 'mt-0'} ${
-            darkMode ? "body-dark text-dark" : "body-light text-light"
-          } bg-gray-200 w-full transition-all duration-300`}
-          style={{
-            marginLeft: !isSidebarVisible
-              ? "0px"
-              : !isTabletOrMobile
-              ? expanded
-                ? "16.8%"
-                : "150px"
-              : "0px",
-          }}
-        >
-          <Modal type={type} authorized={!!token} show={modalShow} />
-          <div className="flex-grow">{children}</div>
+  // Upload buttons section (from Layout)
+  const renderUploadButtons = () => {
+    if (!isLoggedIn) return null;
 
-          {/* Footer */}
-          <footer
-            className={`w-full text-center py-4 ${
-              darkMode
-                ? "bg-gray-900 text-gray-300"
-                : "bg-gray-100 text-gray-700"
+    return (
+      <nav className="sidebar-section-container">
+        <h2 className={`sidebar-section-title ${expand ? "" : "collapsed"}`}>
+          Upload
+        </h2>
+        <ul className="sidebar-section">
+          <div
+            className={`sidebar-item ${expand ? "" : "collapsed"}`}
+            onClick={toggleUploadModal}
+          >
+            <TbVideoPlus className="sidebar-icon" />
+            <span className="sidebar-text">Upload Video</span>
+          </div>
+          <div
+            className={`sidebar-item ${expand ? "" : "collapsed"}`}
+            onClick={toggleUploadScriptModal}
+          >
+            <MdOutlineDescription className="sidebar-icon" />
+            <span className="sidebar-text">Upload Script</span>
+          </div>
+        </ul>
+      </nav>
+    );
+  };
+
+  return (
+    <section
+      className={`sidebar-container ${expand ? "expanded" : "collapsed"} ${
+        darkMode ? "dark" : "light"
+      }`}
+    >
+      {/* -------- MAIN NAV -------- */}
+      <nav className="sidebar-nav">
+        <ul className="sidebar-section">
+          <Link
+            to="/"
+            className={`sidebar-item ${getActiveClass("/")} ${
+              expand ? "" : "collapsed"
             }`}
           >
-            © {new Date().getFullYear()} All rights reserved by{" "}
-            <a
-              href="https://wecinema.co"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold hover:underline"
-            >
-              wecinema.co
-            </a>
-          </footer>
-        </main>
-      </div>
-    </div>
+            <IoMdHome className="sidebar-icon" />
+            <span className="sidebar-text">Home</span>
+          </Link>
+          
+          {isLoggedIn && (
+            <>
+              <Link
+                to="/hypemode"
+                onClick={handleHypemodeClick}
+                className={`sidebar-item ${getActiveClass("/hypemode")} ${
+                  expand ? "" : "collapsed"
+                }`}
+              >
+                <RiMovie2Line className="sidebar-icon" />
+                <span className="sidebar-text">Hype mode</span>
+              </Link>
+              
+              <Link
+                to="/videoeditor"
+                className={`sidebar-item ${getActiveClass("/videoeditor")} ${
+                  expand ? "" : "collapsed"
+                }`}
+              >
+                <TbVideoPlus className="sidebar-icon" />
+                <span className="sidebar-text">Video Editor</span>
+              </Link>
+
+              <Link
+                to={`/user/${tokenData?.userId}`}
+                className={`sidebar-item ${getActiveClass(
+                  `/user/${tokenData?.userId}`
+                )} ${expand ? "" : "collapsed"}`}
+              >
+                <CgProfile className="sidebar-icon" />
+                <span className="sidebar-text">Profile</span>
+              </Link>
+
+              <Link
+                to="/likedvideos"
+                className={`sidebar-item ${getActiveClass("/likedvideos")} ${
+                  expand ? "" : "collapsed"
+                }`}
+              >
+                <RiHeartLine className="sidebar-icon" />
+                <span className="sidebar-text">Liked Videos</span>
+              </Link>
+
+              <Link
+                to="/history"
+                className={`sidebar-item ${getActiveClass("/history")} ${
+                  expand ? "" : "collapsed"
+                }`}
+              >
+                <RiHistoryLine className="sidebar-icon" />
+                <span className="sidebar-text">History</span>
+              </Link>
+            </>
+          )}
+          
+          <Link
+            to="/chatbot"
+            className={`sidebar-item ${getActiveClass("/chatbot")} ${
+              expand ? "" : "collapsed"
+            }`}
+          >
+            <MdChatBubbleOutline className="sidebar-icon" />
+            <span className="sidebar-text">ChatBot</span>
+          </Link>
+        </ul>
+      </nav>
+
+      {/* -------- UPLOAD SECTION -------- */}
+      {renderUploadButtons()}
+
+      {/* -------- MARKETPLACE -------- */}
+      {renderMarketplaceSection()}
+
+      {/* -------- SETTINGS / ACCOUNT -------- */}
+      <nav className="sidebar-section-container">
+        <h2 className={`sidebar-section-title ${expand ? "" : "collapsed"}`}>
+          Settings
+        </h2>
+        <ul className="sidebar-section">
+          <div
+            className={`sidebar-item ${darkMode ? "text-active" : ""} ${
+              expand ? "" : "collapsed"
+            }`}
+            onClick={setDarkMode}
+          >
+            <FaMoon className="sidebar-icon" />
+            <span className="sidebar-text">Dark mode</span>
+          </div>
+          <div
+            className={`sidebar-item ${!darkMode ? "text-active" : ""} ${
+              expand ? "" : "collapsed"
+            }`}
+            onClick={setLightMode}
+          >
+            <IoSunnyOutline className="sidebar-icon" />
+            <span className="sidebar-text">Light mode</span>
+          </div>
+
+          <Link
+            to="/customersupport"
+            className={`sidebar-item ${getActiveClass("/customersupport")} ${
+              expand ? "" : "collapsed"
+            }`}
+          >
+            <RiCustomerService2Line className="sidebar-icon" />
+            <span className="sidebar-text">Support</span>
+          </Link>
+
+          <Link
+            to="/privacy-policy"
+            className={`sidebar-item ${getActiveClass("/privacy-policy")} ${
+              expand ? "" : "collapsed"
+            }`}
+          >
+            <MdOutlinePrivacyTip className="sidebar-icon" />
+            <span className="sidebar-text">Privacy</span>
+          </Link>
+
+          <Link
+            to="/about"
+            className={`sidebar-item ${getActiveClass("/about")} ${
+              expand ? "" : "collapsed"
+            }`}
+          >
+            <FaInfoCircle className="sidebar-icon" />
+            <span className="sidebar-text">About</span>
+          </Link>
+
+          <Link
+            to="/report"
+            className={`sidebar-item ${getActiveClass("/report")} ${
+              expand ? "" : "collapsed"
+            }`}
+          >
+            <RiFlagLine className="sidebar-icon" />
+            <span className="sidebar-text">Report</span>
+          </Link>
+
+          <Link
+            to="/terms-and-conditions"
+            className={`sidebar-item ${getActiveClass(
+              "/terms-and-conditions"
+            )} ${expand ? "" : "collapsed"}`}
+          >
+            <MdOutlineDescription className="sidebar-icon" />
+            <span className="sidebar-text">Terms</span>
+          </Link>
+        </ul>
+      </nav>
+
+      {/* -------- AUTH SECTION -------- */}
+      <nav className="sidebar-section-container">
+        <h2 className={`sidebar-section-title ${expand ? "" : "collapsed"}`}>
+          Account
+        </h2>
+        <ul className="sidebar-section">
+          {isLoggedIn ? (
+            <>
+              <Link
+                to={`/user/${tokenData?.userId}`}
+                className={`sidebar-item ${getActiveClass(
+                  `/user/${tokenData?.userId}`
+                )} ${expand ? "" : "collapsed"}`}
+              >
+                <FaUser className="sidebar-icon" />
+                <span className="sidebar-text">{isLoggedIn.username || "Profile"}</span>
+              </Link>
+              <div
+                className={`sidebar-item ${expand ? "" : "collapsed"}`}
+                onClick={toggleSignoutModal}
+              >
+                <FaSignOutAlt className="sidebar-icon" />
+                <span className="sidebar-text">Sign out</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div
+                className={`sidebar-item ${expand ? "" : "collapsed"}`}
+                onClick={toggleSigninModal}
+              >
+                <LiaSignInAltSolid className="sidebar-icon" />
+                <span className="sidebar-text">Sign in</span>
+              </div>
+              <div
+                className={`sidebar-item ${expand ? "" : "collapsed"}`}
+                onClick={toggleSignupModal}
+              >
+                <HiUserAdd className="sidebar-icon" />
+                <span className="sidebar-text">Sign up</span>
+              </div>
+            </>
+          )}
+        </ul>
+      </nav>
+    </section>
   );
 };
 
-// ✅ REMOVED: Layout.defaultProps = { hasHeader: true };
-
-export default Layout;
+export default Sidebar;
