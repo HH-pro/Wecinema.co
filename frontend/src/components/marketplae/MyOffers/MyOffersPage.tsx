@@ -15,7 +15,7 @@ import {
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import MarketplaceLayout from '../../Layout/';
-import { marketplaceApi } from '../../../api/marketplaceApi';
+import marketplaceApi from '../../../api/marketplaceApi';
 import './MyOffersPage.css';
 
 interface Offer {
@@ -38,8 +38,9 @@ interface Offer {
     firstName?: string;
     lastName?: string;
   };
-  amount: number;
-  status: 'pending' | 'accepted' | 'rejected' | 'cancelled' | 'expired';
+  offeredPrice: number;
+  amount?: number;
+  status: 'pending' | 'accepted' | 'rejected' | 'cancelled' | 'expired' | 'pending_payment' | 'paid';
   message?: string;
   createdAt: string;
   updatedAt: string;
@@ -64,12 +65,21 @@ const MyOffersPage: React.FC = () => {
   const fetchMyOffers = async () => {
     try {
       setLoading(true);
-      const response = await marketplaceApi.offers.getMy(setLoading) as any;
+      const response = await marketplaceApi.offers.getMyOffers();
       
-      if (response.success && response.offers) {
-        setOffers(response.offers);
+      if (response?.success) {
+        // Handle different response formats
+        if (response.data?.offers) {
+          setOffers(response.data.offers);
+        } else if (Array.isArray(response.data)) {
+          setOffers(response.data);
+        } else if (Array.isArray(response)) {
+          setOffers(response);
+        } else {
+          toast.error('Unexpected response format from server');
+        }
       } else {
-        toast.error(response.error || 'Failed to fetch offers');
+        toast.error(response?.error || 'Failed to fetch offers');
       }
     } catch (error: any) {
       toast.error(error.message || 'Error loading offers');
@@ -91,11 +101,18 @@ const MyOffersPage: React.FC = () => {
     if (window.confirm('Are you sure you want to cancel this offer?')) {
       try {
         setLoading(true);
-        await marketplaceApi.offers.cancel(offerId, setLoading);
-        toast.success('Offer cancelled successfully');
-        fetchMyOffers();
+        const response = await marketplaceApi.offers.cancelOffer(offerId);
+        
+        if (response.success) {
+          toast.success('Offer cancelled successfully');
+          fetchMyOffers();
+        } else {
+          toast.error(response.error || 'Failed to cancel offer');
+        }
       } catch (error: any) {
         toast.error(error.message || 'Failed to cancel offer');
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -106,13 +123,24 @@ const MyOffersPage: React.FC = () => {
       accepted: '#27ae60',
       rejected: '#e74c3c',
       cancelled: '#95a5a6',
-      expired: '#7f8c8d'
+      expired: '#7f8c8d',
+      pending_payment: '#3498db',
+      paid: '#2ecc71'
     };
     return colors[status] || '#95a5a6';
   };
 
   const getStatusText = (status: string) => {
-    return status.charAt(0).toUpperCase() + status.slice(1);
+    const statusMap: Record<string, string> = {
+      pending: 'Pending',
+      accepted: 'Accepted',
+      rejected: 'Rejected',
+      cancelled: 'Cancelled',
+      expired: 'Expired',
+      pending_payment: 'Pending Payment',
+      paid: 'Paid'
+    };
+    return statusMap[status] || status.charAt(0).toUpperCase() + status.slice(1);
   };
 
   const formatDate = (dateString: string) => {
@@ -124,15 +152,17 @@ const MyOffersPage: React.FC = () => {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
+    return marketplaceApi.utils.formatCurrencyshow(amount || 0);
+  };
+
+  const getOfferAmount = (offer: Offer) => {
+    // Handle different amount field names
+    return offer.amount || offer.offeredPrice || 0;
   };
 
   const filteredOffers = offers.filter(offer => {
     const matchesSearch = 
-      offer.listingId.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      offer.listingId?.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       offer.message?.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || offer.status === statusFilter;
@@ -145,7 +175,7 @@ const MyOffersPage: React.FC = () => {
     const pending = offers.filter(o => o.status === 'pending').length;
     const accepted = offers.filter(o => o.status === 'accepted').length;
     const rejected = offers.filter(o => o.status === 'rejected').length;
-    const totalAmount = offers.reduce((sum, offer) => sum + offer.amount, 0);
+    const totalAmount = offers.reduce((sum, offer) => sum + getOfferAmount(offer), 0);
     
     return { total, pending, accepted, rejected, totalAmount };
   };
@@ -246,6 +276,8 @@ const MyOffersPage: React.FC = () => {
               <option value="rejected">Rejected</option>
               <option value="cancelled">Cancelled</option>
               <option value="expired">Expired</option>
+              <option value="pending_payment">Pending Payment</option>
+              <option value="paid">Paid</option>
             </select>
           </div>
           
@@ -260,7 +292,7 @@ const MyOffersPage: React.FC = () => {
             filteredOffers.map(offer => (
               <div key={offer._id} className="offer-card">
                 <div className="offer-header">
-                  <h3 className="listing-title">{offer.listingId.title}</h3>
+                  <h3 className="listing-title">{offer.listingId?.title || 'Unknown Listing'}</h3>
                   <div className="offer-status" style={{ color: getStatusColor(offer.status) }}>
                     {getStatusText(offer.status)}
                   </div>
@@ -269,20 +301,22 @@ const MyOffersPage: React.FC = () => {
                 <div className="offer-details">
                   <div className="detail-row">
                     <span className="detail-label">Offered Amount:</span>
-                    <span className="detail-value amount">{formatCurrency(offer.amount)}</span>
+                    <span className="detail-value amount">{formatCurrency(getOfferAmount(offer))}</span>
                   </div>
                   
-                  <div className="detail-row">
-                    <span className="detail-label">Listing Price:</span>
-                    <span className="detail-value">{formatCurrency(offer.listingId.price)}</span>
-                  </div>
+                  {offer.listingId?.price && (
+                    <div className="detail-row">
+                      <span className="detail-label">Listing Price:</span>
+                      <span className="detail-value">{formatCurrency(offer.listingId.price)}</span>
+                    </div>
+                  )}
                   
                   <div className="detail-row">
                     <span className="detail-label">Seller:</span>
                     <span className="detail-value">
-                      {offer.sellerId.firstName ? 
+                      {offer.sellerId?.firstName ? 
                         `${offer.sellerId.firstName} ${offer.sellerId.lastName || ''}`.trim() : 
-                        offer.sellerId.username}
+                        offer.sellerId?.username || 'Unknown Seller'}
                     </span>
                   </div>
                   
@@ -317,19 +351,23 @@ const MyOffersPage: React.FC = () => {
                 </div>
                 
                 <div className="offer-actions">
-                  <button 
-                    className="action-btn view-listing"
-                    onClick={() => handleViewListing(offer.listingId._id)}
-                  >
-                    <FaEye /> View Listing
-                  </button>
+                  {offer.listingId?._id && (
+                    <button 
+                      className="action-btn view-listing"
+                      onClick={() => handleViewListing(offer.listingId._id)}
+                    >
+                      <FaEye /> View Listing
+                    </button>
+                  )}
                   
-                  <button 
-                    className="action-btn contact-seller"
-                    onClick={() => handleContactSeller(offer.sellerId._id)}
-                  >
-                    <FaComment /> Contact Seller
-                  </button>
+                  {offer.sellerId?._id && (
+                    <button 
+                      className="action-btn contact-seller"
+                      onClick={() => handleContactSeller(offer.sellerId._id)}
+                    >
+                      <FaComment /> Contact Seller
+                    </button>
+                  )}
                   
                   {offer.status === 'pending' && (
                     <button 
