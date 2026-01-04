@@ -644,7 +644,7 @@ async function getAccountBalance(accountId) {
   }
 }
 
-router.post('/disconnect', auth, async (req, res) => {
+router.post('/disconnect', authenticateMiddleware, async (req, res) => {
   try {
     const sellerId = req.user._id;
     
