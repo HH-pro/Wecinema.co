@@ -1,4 +1,4 @@
-// StripeAccountStatus.tsx - UPDATED VERSION
+// StripeAccountStatus.tsx - UPDATED WITH DISCONNECT BUTTON
 import React, { useState } from 'react';
 
 interface StripeAccountStatusProps {
@@ -33,15 +33,20 @@ interface StripeAccountStatusProps {
     };
   };
   onSetupClick: () => void;
+  onDisconnectClick: () => void; // ✅ NEW: Disconnect handler
   isLoading: boolean;
+  showDisconnectButton?: boolean; // ✅ NEW: Control disconnect button display
 }
 
 const StripeAccountStatus: React.FC<StripeAccountStatusProps> = ({
   stripeStatus,
   onSetupClick,
-  isLoading
+  onDisconnectClick, // ✅ NEW
+  isLoading,
+  showDisconnectButton = true // ✅ Default true to show disconnect button
 }) => {
   const [showDetails, setShowDetails] = useState(false);
+  const [disconnectLoading, setDisconnectLoading] = useState(false);
 
   // ✅ Check for verification requirements using new API structure
   const hasVerificationRequirements = () => {
@@ -81,6 +86,18 @@ const StripeAccountStatus: React.FC<StripeAccountStatusProps> = ({
         .replace(/\b\w/g, l => l.toUpperCase()),
       isDocument: req.includes('document') || req.includes('verification')
     }));
+  };
+
+  // ✅ Handle disconnect with loading state
+  const handleDisconnect = async () => {
+    if (window.confirm('Are you sure you want to disconnect your Stripe account? This will prevent you from receiving payments.')) {
+      setDisconnectLoading(true);
+      try {
+        await onDisconnectClick();
+      } finally {
+        setDisconnectLoading(false);
+      }
+    }
   };
 
   const requirements = getRequirements();
@@ -245,6 +262,37 @@ const StripeAccountStatus: React.FC<StripeAccountStatusProps> = ({
                   </button>
                 )}
               </div>
+
+              {/* ✅ Disconnect Button (Below Status) */}
+              {stripeStatus.connected && showDisconnectButton && (
+                <div className="mt-4">
+                  <button
+                    onClick={handleDisconnect}
+                    disabled={disconnectLoading}
+                    className="px-4 py-2 bg-white hover:bg-red-50 text-red-600 border border-red-300 font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  >
+                    {disconnectLoading ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-red-600" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Disconnecting...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Disconnect Stripe Account
+                      </>
+                    )}
+                  </button>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Disconnecting will prevent you from receiving payments until you reconnect.
+                  </p>
+                </div>
+              )}
 
               {/* Requirements Details */}
               {showDetails && hasRequirements && (
@@ -423,6 +471,52 @@ const StripeAccountStatus: React.FC<StripeAccountStatusProps> = ({
         </div>
       )}
     </div>
+  );
+};
+
+// ✅ Export a standalone DisconnectButton for use anywhere
+export const StripeDisconnectButtonInline: React.FC<{
+  onDisconnectClick: () => Promise<void> | void;
+  disabled?: boolean;
+  loading?: boolean;
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
+}> = ({ onDisconnectClick, disabled = false, loading = false, size = 'md', className = '' }) => {
+  const sizeClasses = {
+    sm: 'px-3 py-1.5 text-sm',
+    md: 'px-4 py-2 text-sm',
+    lg: 'px-6 py-3 text-base'
+  };
+
+  const handleClick = async () => {
+    if (window.confirm('Are you sure you want to disconnect your Stripe account? This will prevent you from receiving payments.')) {
+      await onDisconnectClick();
+    }
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={disabled || loading}
+      className={`${sizeClasses[size]} ${className} bg-white hover:bg-red-50 text-red-600 border border-red-300 font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center`}
+    >
+      {loading ? (
+        <>
+          <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-red-600" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Disconnecting...
+        </>
+      ) : (
+        <>
+          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          Disconnect Stripe
+        </>
+      )}
+    </button>
   );
 };
 
