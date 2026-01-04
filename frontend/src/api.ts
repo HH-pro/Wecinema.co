@@ -10,7 +10,7 @@ import { toast } from "react-toastify";
 
 const api = axios.create({
   baseURL: import.meta.env.DEV
-    ? "https://wecinema-co.onrender.com/"
+    ? "http://localhost:3000/"
     : "https://wecinema-co.onrender.com/",
   withCredentials: true,
   headers: {
@@ -283,6 +283,7 @@ export const authAPI = {
   isAuthenticated: () => !!localStorage.getItem("token"),
   getToken: () => localStorage.getItem("token"),
 };
+
 
 export const formatDate = (dateString: string): string => {
   if (!dateString) return 'N/A';
