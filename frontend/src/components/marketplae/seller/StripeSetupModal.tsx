@@ -1,4 +1,4 @@
-// StripeSetupModal.tsx - UPDATED WITH DISCONNECT BELOW MAIN ACTIONS
+// StripeSetupModal.tsx - UPDATED WITH DISCONNECT IMPROVEMENTS
 import React, { useState, useEffect } from 'react';
 import marketplaceApi from '../../../api/marketplaceApi';
 import { toast } from 'react-toastify';
@@ -276,6 +276,13 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
         </div>
       )}
 
+      {/* Quick Disconnect Button (Below Status) */}
+      {stripeConnected && showDisconnectInModal && (
+        <div className="mb-6">
+          <QuickDisconnectButton />
+        </div>
+      )}
+
       {/* Verification Requirements */}
       {stripeConnected && verificationStatus && getSimplifiedRequirements().length > 0 && (
         <div className="mb-6">
@@ -303,112 +310,91 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
       )}
 
       {/* Action Buttons */}
-      <div className="space-y-4 pt-6 border-t border-gray-200">
-        <div className="flex flex-col sm:flex-row gap-3">
-          {!stripeConnected ? (
-            <>
-              <button
-                onClick={startStripeSetup}
-                disabled={stripeLoading || checkingStatus}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-medium rounded-xl transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-              >
-                {stripeLoading ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Connecting to Stripe...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    Connect Stripe Account
-                  </>
-                )}
-              </button>
-              <button
-                onClick={onClose}
-                className="px-6 py-3 text-gray-700 hover:text-gray-900 font-medium border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
-            <>
-              {/* Manage Account Buttons */}
-              <div className="flex-1 flex flex-col sm:flex-row gap-3">
-                {/* Complete Verification Button */}
-                {(getSimplifiedRequirements().length > 0 || !verificationStatus?.account?.charges_enabled) && (
-                  <button
-                    onClick={startStripeSetup}
-                    disabled={stripeLoading}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-600 hover:to-amber-700 text-white font-medium rounded-xl transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 flex items-center justify-center"
-                  >
-                    {stripeLoading ? (
-                      <>
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Loading...
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                        </svg>
-                        {verificationStatus?.account?.charges_enabled ? 'Update Account' : 'Complete Setup'}
-                      </>
-                    )}
-                  </button>
-                )}
+      <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
+        {!stripeConnected ? (
+          <>
+            <button
+              onClick={startStripeSetup}
+              disabled={stripeLoading || checkingStatus}
+              className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-medium rounded-xl transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+            >
+              {stripeLoading ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Connecting to Stripe...
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  Connect Stripe Account
+                </>
+              )}
+            </button>
+            <button
+              onClick={onClose}
+              className="px-6 py-3 text-gray-700 hover:text-gray-900 font-medium border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          <>
+            {/* Manage Account Buttons */}
+            <div className="flex-1 flex flex-col sm:flex-row gap-3">
+              {/* Complete Verification Button */}
+              {(getSimplifiedRequirements().length > 0 || !verificationStatus?.account?.charges_enabled) && (
+                <button
+                  onClick={startStripeSetup}
+                  disabled={stripeLoading}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-600 hover:to-amber-700 text-white font-medium rounded-xl transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 flex items-center justify-center"
+                >
+                  {stripeLoading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                      {verificationStatus?.account?.charges_enabled ? 'Update Account' : 'Complete Setup'}
+                    </>
+                  )}
+                </button>
+              )}
 
-                {/* View Dashboard Button */}
-                {verificationStatus?.account?.id && (
-                  <a
-                    href={`https://dashboard.stripe.com/connect/accounts/${verificationStatus.account.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 px-6 py-3 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow flex items-center justify-center"
-                  >
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                    View Stripe Dashboard
-                  </a>
-                )}
-              </div>
-
-              <button
-                onClick={onClose}
-                className="px-6 py-3 text-gray-700 hover:text-gray-900 font-medium border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
-              >
-                Close
-              </button>
-            </>
-          )}
-        </div>
-
-        {/* ✅ ADDED: Disconnect Button below main actions */}
-        {stripeConnected && showDisconnectInModal && (
-          <div className="pt-4 border-t border-gray-100">
-            <div className="text-center">
-              <p className="text-sm text-gray-500 mb-3">Need to remove your Stripe connection?</p>
-              <button
-                onClick={() => setShowDisconnectConfirm(true)}
-                className="w-full max-w-xs mx-auto px-4 py-2.5 bg-white hover:bg-red-50 text-red-600 border border-red-300 font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow flex items-center justify-center"
-              >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                Disconnect Stripe Account
-              </button>
-              <p className="text-xs text-gray-400 mt-2">This action requires manual review</p>
+              {/* View Dashboard Button */}
+              {verificationStatus?.account?.id && (
+                <a
+                  href={`https://dashboard.stripe.com/connect/accounts/${verificationStatus.account.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 px-6 py-3 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow flex items-center justify-center"
+                >
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  View Stripe Dashboard
+                </a>
+              )}
             </div>
-          </div>
+
+            <button
+              onClick={onClose}
+              className="px-6 py-3 text-gray-700 hover:text-gray-900 font-medium border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+            >
+              Close
+            </button>
+          </>
         )}
       </div>
     </div>
