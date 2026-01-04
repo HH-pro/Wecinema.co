@@ -9,7 +9,7 @@ import { toast } from "react-toastify";
 // Create an axios instance with default configurations
 const api = axios.create({
   baseURL: import.meta.env.DEV
-    ? "http://localhost:3000/api/"
+    ? "http://localhost:3000/"
     : "https://wecinema-co.onrender.com/",
   withCredentials: true,
   headers: {
