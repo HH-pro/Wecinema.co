@@ -15,7 +15,7 @@ import {
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import MarketplaceLayout from '../../Layout/';
-import { marketplaceAPI } from '../../../api';
+import { marketplaceAPI } from '../../../api/marketplaceApi';
 import './MyOffersPage.css';
 
 interface Offer {
@@ -64,7 +64,7 @@ const MyOffersPage: React.FC = () => {
   const fetchMyOffers = async () => {
     try {
       setLoading(true);
-      const response = await marketplaceAPI.offers.getMy(setLoading) as any;
+      const response = await marketplaceApi.offers.getMy(setLoading) as any;
       
       if (response.success && response.offers) {
         setOffers(response.offers);
@@ -91,7 +91,7 @@ const MyOffersPage: React.FC = () => {
     if (window.confirm('Are you sure you want to cancel this offer?')) {
       try {
         setLoading(true);
-        await marketplaceAPI.offers.cancel(offerId, setLoading);
+        await marketplaceApi.offers.cancel(offerId, setLoading);
         toast.success('Offer cancelled successfully');
         fetchMyOffers();
       } catch (error: any) {
