@@ -21,27 +21,27 @@ const listingsApi = marketplaceApi.listings;
 const ordersApi = marketplaceApi.orders;
 
 // Import components
-import DashboardHeader from '../../components/marketplace/seller/DashboardHeader';
-import TabNavigation from '../../components/marketplace/seller/TabNavigation';
-import WelcomeCard from '../../components/marketplace/seller/WelcomeCard';
-import RecentOrders from '../../components/marketplace/seller/RecentOrders';
-import ActionCard from '../../components/marketplace/seller/ActionCard';
-import OrderWorkflowGuide from '../../components/marketplace/seller/OrderWorkflowGuide';
-import StripeAccountStatus from '../../components/marketplace/seller/StripeAccountStatus';
-import StripeSuccessAlert from '../../components/marketplace/seller/StripeSuccessAlert';
+import DashboardHeader from '../../components/marketplae/seller/DashboardHeader';
+import TabNavigation from '../../components/marketplae/seller/TabNavigation';
+import WelcomeCard from '../../components/marketplae/seller/WelcomeCard';
+import RecentOrders from '../../components/marketplae/seller/RecentOrders';
+import ActionCard from '../../components/marketplae/seller/ActionCard';
+import OrderWorkflowGuide from '../../components/marketplae/seller/OrderWorkflowGuide';
+import StripeAccountStatus from '../../components/marketplae/seller/StripeAccountStatus';
+import StripeSuccessAlert from '../../components/marketplae/seller/StripeSuccessAlert';
 
 // Import tab components
-import ListingsTab from '../../components/marketplace/seller/ListingsTab';
-import OrdersTab from '../../components/marketplace/seller/OrdersTab';
-import WithdrawTab from '../../components/marketplace/seller/WithdrawTab';
-import EarningsTab from '../../components/marketplace/seller/EarningsTab';
+import ListingsTab from '../../components/marketplae/seller/ListingsTab';
+import OrdersTab from '../../components/marketplae/seller/OrdersTab';
+import WithdrawTab from '../../components/marketplae/seller/WithdrawTab';
+import EarningsTab from '../../components/marketplae/seller/EarningsTab';
 
 // Import modals
-import StripeSetupModal from '../../components/marketplace/seller/StripeSetupModal';
-import OrderDetailsModal from '../../components/marketplace/seller/OrderDetailsModal';
-import EditListingModal from '../../components/marketplace/seller/EditListingModal';
-import DeleteListingModal from '../../components/marketplace/seller/DeleteListingModal';
-import VideoPlayerModal from '../../components/marketplace/seller/VideoPlayerModal';
+import StripeSetupModal from '../../components/marketplae/seller/StripeSetupModal';
+import OrderDetailsModal from '../../components/marketplae/seller/OrderDetailsModal';
+import EditListingModal from '../../components/marketplae/seller/EditListingModal';
+import DeleteListingModal from '../../components/marketplae/seller/DeleteListingModal';
+import VideoPlayerModal from '../../components/marketplae/seller/VideoPlayerModal';
 
 // Define local interfaces
 interface OrderStats {
