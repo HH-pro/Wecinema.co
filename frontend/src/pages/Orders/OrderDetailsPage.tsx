@@ -3,14 +3,33 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { FaArrowLeft, FaSpinner, FaExclamationCircle } from 'react-icons/fa';
 import MarketplaceLayout from '../../../src/components/Layout';
-import { marketplaceAPI } from '../../api';
+import marketplaceApi from '../../api/marketplaceApi';
 import { OrderTimeline, OrderSummary, PaymentDetails } from '../../components/marketplae/BuyerDashboard';
 import './OrderDetailsPage.css';
+
+interface Order {
+  _id: string;
+  orderNumber?: string;
+  listingId: any;
+  buyerId: any;
+  sellerId: any;
+  amount: number;
+  status: string;
+  paymentStatus: string;
+  orderType: string;
+  deliveryMessage?: string;
+  deliveryFiles?: string[];
+  deliveries?: any[];
+  timeline?: any[];
+  payment?: any;
+  createdAt: string;
+  updatedAt: string;
+}
 
 const OrderDetailsPage: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
   const [searchParams] = useSearchParams();
-  const [order, setOrder] = useState<any>(null);
+  const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('details');
@@ -25,18 +44,33 @@ const OrderDetailsPage: React.FC = () => {
   }, [orderId]);
 
   const fetchOrderDetails = async () => {
+    if (!orderId) {
+      setError('Order ID is required');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
-      const response = await marketplaceAPI.orders.getDetails(orderId!, setLoading) as any;
+      const response = await marketplaceApi.orders.getOrderDetails(orderId);
       
       if (response.success) {
-        setOrder(response.order);
+        // Handle different response formats
+        const orderData = response.data?.order || response.data || response.order;
+        
+        if (orderData) {
+          setOrder(orderData);
+        } else {
+          setError('Order data not found in response');
+          toast.error('Failed to load order details');
+        }
       } else {
         setError(response.error || 'Failed to fetch order details');
         toast.error(response.error || 'Failed to load order');
       }
     } catch (error: any) {
+      console.error('Error fetching order details:', error);
       setError(error.message || 'Error loading order details');
       toast.error(error.message || 'Error loading order');
     } finally {
@@ -49,27 +83,51 @@ const OrderDetailsPage: React.FC = () => {
     navigate(`?tab=${tab}`, { replace: true });
   };
 
+  const formatCurrency = (amount: number) => {
+    return marketplaceApi.utils.formatCurrencyshow(amount || 0);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   const renderTabContent = () => {
+    if (!order) return null;
+
     switch (activeTab) {
       case 'timeline':
-        return <OrderTimeline events={order?.timeline || []} loading={loading} />;
+        const timelineEvents = order.timeline || [];
+        return <OrderTimeline events={timelineEvents} loading={loading} />;
       
       case 'summary':
-        return order ? <OrderSummary order={order} /> : null;
+        return <OrderSummary order={order} />;
       
       case 'payment':
-        return order?.payment ? <PaymentDetails payment={order.payment} /> : (
-          <div className="no-payment">
-            <FaExclamationCircle />
-            <p>No payment information available</p>
-          </div>
-        );
+        if (order.payment) {
+          return <PaymentDetails payment={order.payment} />;
+        } else {
+          // Create payment details from order data
+          const paymentDetails = {
+            amount: order.amount,
+            status: order.paymentStatus,
+            method: 'Credit Card',
+            transactionId: order._id,
+            date: order.createdAt
+          };
+          return <PaymentDetails payment={paymentDetails} />;
+        }
       
       case 'files':
         return (
           <div className="files-tab">
             <h3>Order Files</h3>
-            {order?.deliveryFiles && order.deliveryFiles.length > 0 ? (
+            {order.deliveryFiles && order.deliveryFiles.length > 0 ? (
               <div className="files-list">
                 {order.deliveryFiles.map((file: string, index: number) => (
                   <div key={index} className="file-item">
@@ -91,7 +149,7 @@ const OrderDetailsPage: React.FC = () => {
       
       case 'details':
       default:
-        return order ? (
+        return (
           <div className="order-details-tab">
             <div className="details-grid">
               <div className="detail-section">
@@ -101,34 +159,86 @@ const OrderDetailsPage: React.FC = () => {
                   <span>{order._id}</span>
                 </div>
                 <div className="detail-item">
+                  <strong>Order Number:</strong>
+                  <span>{order.orderNumber || 'N/A'}</span>
+                </div>
+                <div className="detail-item">
                   <strong>Status:</strong>
                   <span className={`status-badge status-${order.status}`}>
                     {order.status.replace('_', ' ')}
                   </span>
                 </div>
                 <div className="detail-item">
+                  <strong>Payment Status:</strong>
+                  <span className={`status-badge status-${order.paymentStatus}`}>
+                    {order.paymentStatus.replace('_', ' ')}
+                  </span>
+                </div>
+                <div className="detail-item">
+                  <strong>Order Type:</strong>
+                  <span>{order.orderType || 'N/A'}</span>
+                </div>
+                <div className="detail-item">
                   <strong>Amount:</strong>
-                  <span>${order.listingId.price}</span>
+                  <span>{formatCurrency(order.amount)}</span>
                 </div>
                 <div className="detail-item">
                   <strong>Created:</strong>
-                  <span>{new Date(order.createdAt).toLocaleDateString()}</span>
+                  <span>{formatDate(order.createdAt)}</span>
                 </div>
+                {order.updatedAt !== order.createdAt && (
+                  <div className="detail-item">
+                    <strong>Last Updated:</strong>
+                    <span>{formatDate(order.updatedAt)}</span>
+                  </div>
+                )}
               </div>
               
               <div className="detail-section">
                 <h4>Listing Details</h4>
-                {typeof order.listingId === 'object' && (
+                {typeof order.listingId === 'object' && order.listingId ? (
                   <>
                     <div className="detail-item">
                       <strong>Title:</strong>
                       <span>{order.listingId.title}</span>
                     </div>
                     <div className="detail-item">
-                      <strong>Price:</strong>
-                      <span>${order.listingId.price}</span>
+                      <strong>Category:</strong>
+                      <span>{order.listingId.category || 'N/A'}</span>
+                    </div>
+                    <div className="detail-item">
+                      <strong>Type:</strong>
+                      <span>{order.listingId.type || 'N/A'}</span>
                     </div>
                   </>
+                ) : (
+                  <p>Listing details not available</p>
+                )}
+              </div>
+              
+              <div className="detail-section">
+                <h4>Seller Information</h4>
+                {typeof order.sellerId === 'object' && order.sellerId ? (
+                  <>
+                    <div className="detail-item">
+                      <strong>Username:</strong>
+                      <span>{order.sellerId.username}</span>
+                    </div>
+                    <div className="detail-item">
+                      <strong>Name:</strong>
+                      <span>
+                        {order.sellerId.firstName || order.sellerId.lastName 
+                          ? `${order.sellerId.firstName || ''} ${order.sellerId.lastName || ''}`.trim()
+                          : 'N/A'}
+                      </span>
+                    </div>
+                    <div className="detail-item">
+                      <strong>Rating:</strong>
+                      <span>{order.sellerId.sellerRating || 'Not rated'}</span>
+                    </div>
+                  </>
+                ) : (
+                  <p>Seller information not available</p>
                 )}
               </div>
               
@@ -138,22 +248,44 @@ const OrderDetailsPage: React.FC = () => {
                   <p className="delivery-message">{order.deliveryMessage}</p>
                 </div>
               )}
+
+              {order.deliveries && order.deliveries.length > 0 && (
+                <div className="detail-section">
+                  <h4>Deliveries ({order.deliveries.length})</h4>
+                  <div className="deliveries-list">
+                    {order.deliveries.slice(0, 3).map((delivery: any, index: number) => (
+                      <div key={index} className="delivery-item">
+                        <strong>Delivery {index + 1}:</strong>
+                        <span>{delivery.message || 'No message'}</span>
+                        <small>{formatDate(delivery.createdAt)}</small>
+                      </div>
+                    ))}
+                    {order.deliveries.length > 3 && (
+                      <button 
+                        className="view-all-deliveries"
+                        onClick={() => handleTabChange('files')}
+                      >
+                        View all {order.deliveries.length} deliveries
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        ) : null;
+        );
     }
   };
 
   if (loading) {
     return (
       <MarketplaceLayout>
-         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-                    <p className="text-lg text-gray-800 font-medium">Loading your Order Details...</p>
-                  </div>
-                </div>
-       
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+            <p className="text-lg text-gray-800 font-medium">Loading your Order Details...</p>
+          </div>
+        </div>
       </MarketplaceLayout>
     );
   }
@@ -230,24 +362,57 @@ const OrderDetailsPage: React.FC = () => {
           >
             Contact Seller
           </button>
-        {order.status === 'delivered' && (
-  <button 
-    className="action-btn success"
-    onClick={() => {
-      toast.info('Review feature coming soon!');
-      // Ya phir
-      alert('Review feature is under development. Please check back later.');
-    }}
-  >
-    Leave Review
-  </button>
-)}
+          
+          {order.status === 'delivered' && (
+            <button 
+              className="action-btn success"
+              onClick={() => {
+                toast.info('Review feature coming soon!');
+              }}
+            >
+              Leave Review
+            </button>
+          )}
+          
           {order.status === 'pending_payment' && (
             <button 
               className="action-btn warning"
               onClick={() => navigate(`/marketplace/payment/${orderId}`)}
             >
               Complete Payment
+            </button>
+          )}
+
+          {order.status === 'in_progress' && (
+            <button 
+              className="action-btn info"
+              onClick={() => {
+                toast.info('Work in progress...');
+              }}
+            >
+              View Progress
+            </button>
+          )}
+
+          {['in_revision', 'delivered'].includes(order.status) && (
+            <button 
+              className="action-btn revision"
+              onClick={() => navigate(`/marketplace/orders/${orderId}/revision`)}
+            >
+              Request Revision
+            </button>
+          )}
+
+          {['pending', 'pending_payment'].includes(order.status) && (
+            <button 
+              className="action-btn danger"
+              onClick={() => {
+                if (window.confirm('Are you sure you want to cancel this order?')) {
+                  toast.info('Cancellation feature coming soon!');
+                }
+              }}
+            >
+              Cancel Order
             </button>
           )}
         </div>
