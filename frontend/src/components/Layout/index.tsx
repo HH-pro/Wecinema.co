@@ -498,7 +498,7 @@ const Layout: React.FC<LayoutProps> = ({
         )}
 
         <main
-          className={`flex flex-col min-h-screen ${hasHeader ? 'mt-12' : 'mt-0'} ${
+          className={`flex flex-col min-h-screen ${hasHeader ? 'mt-2' : 'mt-0'} ${
             darkMode ? "body-dark text-dark" : "body-light text-light"
           } bg-gray-200 w-full transition-all duration-300`}
           style={{
