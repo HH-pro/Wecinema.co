@@ -162,33 +162,6 @@ export const deleteRequest = <T>(
     .catch((error) => handleError(error, "delete", setLoading));
 
 
-// ========================
-// AUTH APIs
-// ========================
-
-export const authAPI = {
-  login: (credentials: { email: string; password: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/api/auth/login", credentials, setLoading, "Login successful"),
-
-  register: (userData: { username: string; email: string; password: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/api/auth/register", userData, setLoading, "Registration successful"),
-
-  getCurrentUser: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest("/api/auth/me", setLoading),
-
-  updateProfile: (userData: any, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest("/api/auth/profile", userData, setLoading, "Profile updated"),
-
-  logout: () => {
-    localStorage.removeItem("token");
-    window.location.href = '/';
-  },
-
-  isAuthenticated: () => !!localStorage.getItem("token"),
-  getToken: () => localStorage.getItem("token"),
-};
-
-
 export const formatDate = (dateString: string): string => {
   if (!dateString) return 'N/A';
   const date = new Date(dateString);
