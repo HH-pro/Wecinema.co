@@ -15,7 +15,7 @@ import {
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import MarketplaceLayout from '../../Layout/';
-import { marketplaceAPI } from '../../../api/marketplaceApi';
+import { marketplaceApi } from '../../../api/marketplaceApi';
 import './MyOffersPage.css';
 
 interface Offer {
