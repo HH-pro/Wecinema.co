@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
 import { Listing, Order, Offer, User } from '../types/marketplace';
-import { marketplaceAPI } from '../api';
+import marketplaceApi from '../api/marketplaceApi';
 
 interface MarketplaceState {
   listings: Listing[];
@@ -88,22 +88,35 @@ interface MarketplaceContextType extends MarketplaceState {
   // Listings
   fetchListings: (filters?: any) => Promise<void>;
   fetchMyListings: () => Promise<void>;
-  createListing: (formData: FormData) => Promise<void>;
-  updateListing: (id: string, data: Partial<Listing>) => Promise<void>;
+  createListing: (listingData: any) => Promise<Listing>;
+  updateListing: (id: string, data: Partial<Listing>) => Promise<Listing>;
   deleteListing: (id: string) => Promise<void>;
   
   // Orders
   fetchMyOrders: () => Promise<void>;
   fetchSellerOrders: () => Promise<void>;
-  createOrder: (orderData: any) => Promise<void>;
-  updateOrderStatus: (orderId: string, status: string) => Promise<void>;
-  deliverOrder: (orderId: string, deliveryData: any) => Promise<void>;
+  createOrder: (orderData: any) => Promise<Order>;
+  updateOrderStatus: (orderId: string, status: string) => Promise<Order>;
+  deliverOrder: (orderId: string, deliveryData: any) => Promise<Order>;
+  getOrderDetails: (orderId: string) => Promise<any>;
   
   // Offers
   fetchOffers: () => Promise<void>;
-  makeOffer: (offerData: any) => Promise<void>;
-  acceptOffer: (offerId: string) => Promise<void>;
-  rejectOffer: (offerId: string) => Promise<void>;
+  fetchReceivedOffers: () => Promise<void>;
+  fetchMyOffers: () => Promise<void>;
+  makeOffer: (offerData: any) => Promise<any>;
+  acceptOffer: (offerId: string) => Promise<any>;
+  rejectOffer: (offerId: string, rejectionReason?: string) => Promise<any>;
+  cancelOffer: (offerId: string) => Promise<any>;
+  
+  // Payments
+  createPaymentIntent: (data: any) => Promise<any>;
+  confirmPayment: (data: any) => Promise<any>;
+  
+  // Stripe
+  getStripeAccountStatus: () => Promise<any>;
+  startStripeOnboarding: () => Promise<any>;
+  continueStripeOnboarding: () => Promise<any>;
   
   // User
   setUser: (user: User | null) => void;
@@ -132,8 +145,13 @@ export const MarketplaceProvider: React.FC<MarketplaceProviderProps> = ({
   const fetchListings = useCallback(async (filters?: any) => {
     try {
       setLoading(true);
-      const listings = await marketplaceAPI.listings.get(filters);
-      dispatch({ type: 'SET_LISTINGS', payload: listings });
+      const response = await marketplaceApi.listings.getAllListings(filters);
+      
+      if (response.success && response.data) {
+        dispatch({ type: 'SET_LISTINGS', payload: response.data.listings || [] });
+      } else {
+        setError(response.error || 'Failed to fetch listings');
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to fetch listings');
     } finally {
@@ -144,8 +162,13 @@ export const MarketplaceProvider: React.FC<MarketplaceProviderProps> = ({
   const fetchMyListings = useCallback(async () => {
     try {
       setLoading(true);
-      const listings = await marketplaceAPI.listings.getMy();
-      dispatch({ type: 'SET_MY_LISTINGS', payload: listings });
+      const response = await marketplaceApi.listings.getMyListings();
+      
+      if (response.success && response.data) {
+        dispatch({ type: 'SET_MY_LISTINGS', payload: response.data.listings || [] });
+      } else {
+        setError(response.error || 'Failed to fetch your listings');
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to fetch your listings');
     } finally {
@@ -153,12 +176,18 @@ export const MarketplaceProvider: React.FC<MarketplaceProviderProps> = ({
     }
   }, [setLoading, setError]);
 
-  const createListing = useCallback(async (formData: FormData) => {
+  const createListing = useCallback(async (listingData: any) => {
     try {
       setLoading(true);
-      const newListing = await marketplaceAPI.listings.create(formData, setLoading);
-      dispatch({ type: 'ADD_LISTING', payload: newListing });
-      return newListing;
+      const response = await marketplaceApi.listings.createListing(listingData);
+      
+      if (response.success && response.data) {
+        const newListing = response.data.listing;
+        dispatch({ type: 'ADD_LISTING', payload: newListing });
+        return newListing;
+      } else {
+        throw new Error(response.error || 'Failed to create listing');
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to create listing');
       throw error;
@@ -170,9 +199,15 @@ export const MarketplaceProvider: React.FC<MarketplaceProviderProps> = ({
   const updateListing = useCallback(async (id: string, data: Partial<Listing>) => {
     try {
       setLoading(true);
-      const updatedListing = await marketplaceAPI.listings.update(id, data, setLoading);
-      dispatch({ type: 'UPDATE_LISTING', payload: updatedListing });
-      return updatedListing;
+      const response = await marketplaceApi.listings.editListing(id, data);
+      
+      if (response.success && response.data) {
+        const updatedListing = response.data.listing;
+        dispatch({ type: 'UPDATE_LISTING', payload: updatedListing });
+        return updatedListing;
+      } else {
+        throw new Error(response.error || 'Failed to update listing');
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to update listing');
       throw error;
@@ -184,8 +219,13 @@ export const MarketplaceProvider: React.FC<MarketplaceProviderProps> = ({
   const deleteListing = useCallback(async (id: string) => {
     try {
       setLoading(true);
-      await marketplaceAPI.listings.delete(id, setLoading);
-      dispatch({ type: 'DELETE_LISTING', payload: id });
+      const response = await marketplaceApi.listings.deleteListing(id);
+      
+      if (response.success) {
+        dispatch({ type: 'DELETE_LISTING', payload: id });
+      } else {
+        throw new Error(response.error || 'Failed to delete listing');
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to delete listing');
       throw error;
@@ -198,8 +238,13 @@ export const MarketplaceProvider: React.FC<MarketplaceProviderProps> = ({
   const fetchMyOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const orders = await marketplaceAPI.orders.getMy();
-      dispatch({ type: 'SET_ORDERS', payload: orders });
+      const response = await marketplaceApi.orders.getMyOrders();
+      
+      if (response.success && response.data) {
+        dispatch({ type: 'SET_ORDERS', payload: response.data.orders || [] });
+      } else {
+        setError(response.error || 'Failed to fetch orders');
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to fetch orders');
     } finally {
@@ -210,8 +255,13 @@ export const MarketplaceProvider: React.FC<MarketplaceProviderProps> = ({
   const fetchSellerOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const orders = await marketplaceAPI.orders.getSeller();
-      dispatch({ type: 'SET_SELLER_ORDERS', payload: orders });
+      const response = await marketplaceApi.orders.getMySales();
+      
+      if (response.success && response.data) {
+        dispatch({ type: 'SET_SELLER_ORDERS', payload: response.data.sales || [] });
+      } else {
+        setError(response.error || 'Failed to fetch seller orders');
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to fetch seller orders');
     } finally {
@@ -222,9 +272,15 @@ export const MarketplaceProvider: React.FC<MarketplaceProviderProps> = ({
   const createOrder = useCallback(async (orderData: any) => {
     try {
       setLoading(true);
-      const newOrder = await marketplaceAPI.orders.create(orderData, setLoading);
-      dispatch({ type: 'ADD_ORDER', payload: newOrder });
-      return newOrder;
+      const response = await marketplaceApi.orders.createOrder(orderData);
+      
+      if (response.success && response.data) {
+        const newOrder = response.data.order;
+        dispatch({ type: 'ADD_ORDER', payload: newOrder });
+        return newOrder;
+      } else {
+        throw new Error(response.error || 'Failed to create order');
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to create order');
       throw error;
@@ -236,9 +292,15 @@ export const MarketplaceProvider: React.FC<MarketplaceProviderProps> = ({
   const updateOrderStatus = useCallback(async (orderId: string, status: string) => {
     try {
       setLoading(true);
-      const updatedOrder = await marketplaceAPI.orders.updateStatus(orderId, status, setLoading);
-      dispatch({ type: 'UPDATE_ORDER', payload: updatedOrder });
-      return updatedOrder;
+      const response = await marketplaceApi.orders.updateOrderStatus(orderId, status);
+      
+      if (response.success && response.data) {
+        const updatedOrder = response.data.order;
+        dispatch({ type: 'UPDATE_ORDER', payload: updatedOrder });
+        return updatedOrder;
+      } else {
+        throw new Error(response.error || 'Failed to update order status');
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to update order status');
       throw error;
@@ -250,11 +312,35 @@ export const MarketplaceProvider: React.FC<MarketplaceProviderProps> = ({
   const deliverOrder = useCallback(async (orderId: string, deliveryData: any) => {
     try {
       setLoading(true);
-      const updatedOrder = await marketplaceAPI.orders.deliver(orderId, deliveryData, setLoading);
-      dispatch({ type: 'UPDATE_ORDER', payload: updatedOrder });
-      return updatedOrder;
+      const response = await marketplaceApi.orders.deliverOrder(orderId, deliveryData);
+      
+      if (response.success && response.data) {
+        const updatedOrder = response.data.order;
+        dispatch({ type: 'UPDATE_ORDER', payload: updatedOrder });
+        return updatedOrder;
+      } else {
+        throw new Error(response.error || 'Failed to deliver order');
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to deliver order');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [setLoading, setError]);
+
+  const getOrderDetails = useCallback(async (orderId: string) => {
+    try {
+      setLoading(true);
+      const response = await marketplaceApi.orders.getOrderDetails(orderId);
+      
+      if (response.success && response.data) {
+        return response.data;
+      } else {
+        throw new Error(response.error || 'Failed to fetch order details');
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to fetch order details');
       throw error;
     } finally {
       setLoading(false);
@@ -265,10 +351,36 @@ export const MarketplaceProvider: React.FC<MarketplaceProviderProps> = ({
   const fetchOffers = useCallback(async () => {
     try {
       setLoading(true);
-      const offers = await marketplaceAPI.offers.getReceived();
-      dispatch({ type: 'SET_OFFERS', payload: offers });
+      const response = await marketplaceApi.offers.getReceivedOffers();
+      
+      if (response.success && response.data) {
+        dispatch({ type: 'SET_OFFERS', payload: response.data.offers || [] });
+      } else {
+        setError(response.error || 'Failed to fetch offers');
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to fetch offers');
+    } finally {
+      setLoading(false);
+    }
+  }, [setLoading, setError]);
+
+  const fetchReceivedOffers = useCallback(async () => {
+    return fetchOffers();
+  }, [fetchOffers]);
+
+  const fetchMyOffers = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await marketplaceApi.offers.getMyOffers();
+      
+      if (response.success && response.data) {
+        dispatch({ type: 'SET_OFFERS', payload: response.data.offers || [] });
+      } else {
+        setError(response.error || 'Failed to fetch your offers');
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to fetch your offers');
     } finally {
       setLoading(false);
     }
@@ -277,8 +389,13 @@ export const MarketplaceProvider: React.FC<MarketplaceProviderProps> = ({
   const makeOffer = useCallback(async (offerData: any) => {
     try {
       setLoading(true);
-      const offer = await marketplaceAPI.offers.make(offerData, setLoading);
-      return offer;
+      const response = await marketplaceApi.offers.makeOffer(offerData);
+      
+      if (response.success && response.data) {
+        return response.data;
+      } else {
+        throw new Error(response.error || 'Failed to make offer');
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to make offer');
       throw error;
@@ -290,10 +407,15 @@ export const MarketplaceProvider: React.FC<MarketplaceProviderProps> = ({
   const acceptOffer = useCallback(async (offerId: string) => {
     try {
       setLoading(true);
-      const result = await marketplaceAPI.offers.accept(offerId, setLoading);
-      // Refresh offers after acceptance
-      await fetchOffers();
-      return result;
+      const response = await marketplaceApi.offers.acceptOffer(offerId);
+      
+      if (response.success && response.data) {
+        // Refresh offers after acceptance
+        await fetchOffers();
+        return response.data;
+      } else {
+        throw new Error(response.error || 'Failed to accept offer');
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to accept offer');
       throw error;
@@ -302,13 +424,18 @@ export const MarketplaceProvider: React.FC<MarketplaceProviderProps> = ({
     }
   }, [setLoading, setError, fetchOffers]);
 
-  const rejectOffer = useCallback(async (offerId: string) => {
+  const rejectOffer = useCallback(async (offerId: string, rejectionReason?: string) => {
     try {
       setLoading(true);
-      const result = await marketplaceAPI.offers.reject(offerId, setLoading);
-      // Refresh offers after rejection
-      await fetchOffers();
-      return result;
+      const response = await marketplaceApi.offers.rejectOffer(offerId, rejectionReason);
+      
+      if (response.success && response.data) {
+        // Refresh offers after rejection
+        await fetchOffers();
+        return response.data;
+      } else {
+        throw new Error(response.error || 'Failed to reject offer');
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to reject offer');
       throw error;
@@ -316,6 +443,118 @@ export const MarketplaceProvider: React.FC<MarketplaceProviderProps> = ({
       setLoading(false);
     }
   }, [setLoading, setError, fetchOffers]);
+
+  const cancelOffer = useCallback(async (offerId: string) => {
+    try {
+      setLoading(true);
+      const response = await marketplaceApi.offers.cancelOffer(offerId);
+      
+      if (response.success && response.data) {
+        // Refresh offers after cancellation
+        await fetchMyOffers();
+        return response.data;
+      } else {
+        throw new Error(response.error || 'Failed to cancel offer');
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to cancel offer');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [setLoading, setError, fetchMyOffers]);
+
+  // Payments
+  const createPaymentIntent = useCallback(async (data: any) => {
+    try {
+      setLoading(true);
+      const response = await marketplaceApi.payments.createPaymentIntent(data);
+      
+      if (response.success && response.data) {
+        return response.data;
+      } else {
+        throw new Error(response.error || 'Failed to create payment intent');
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to create payment intent');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [setLoading, setError]);
+
+  const confirmPayment = useCallback(async (data: any) => {
+    try {
+      setLoading(true);
+      const response = await marketplaceApi.payments.confirmPayment(data);
+      
+      if (response.success && response.data) {
+        return response.data;
+      } else {
+        throw new Error(response.error || 'Failed to confirm payment');
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to confirm payment');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [setLoading, setError]);
+
+  // Stripe
+  const getStripeAccountStatus = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await marketplaceApi.stripe.getStripeAccountStatus();
+      
+      if (response.success && response.data) {
+        return response.data;
+      } else {
+        throw new Error(response.error || 'Failed to get Stripe account status');
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to get Stripe account status');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [setLoading, setError]);
+
+  const startStripeOnboarding = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await marketplaceApi.stripe.startStripeOnboarding();
+      
+      if (response.success && response.data) {
+        return response.data;
+      } else {
+        throw new Error(response.error || 'Failed to start Stripe onboarding');
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to start Stripe onboarding');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [setLoading, setError]);
+
+  const continueStripeOnboarding = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await marketplaceApi.stripe.continueStripeOnboarding();
+      
+      if (response.success && response.data) {
+        return response.data;
+      } else {
+        throw new Error(response.error || 'Failed to continue Stripe onboarding');
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to continue Stripe onboarding');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, [setLoading, setError]);
 
   // User
   const setUser = useCallback((user: User | null) => {
@@ -344,10 +583,19 @@ export const MarketplaceProvider: React.FC<MarketplaceProviderProps> = ({
     createOrder,
     updateOrderStatus,
     deliverOrder,
+    getOrderDetails,
     fetchOffers,
+    fetchReceivedOffers,
+    fetchMyOffers,
     makeOffer,
     acceptOffer,
     rejectOffer,
+    cancelOffer,
+    createPaymentIntent,
+    confirmPayment,
+    getStripeAccountStatus,
+    startStripeOnboarding,
+    continueStripeOnboarding,
     setUser,
     clearError,
   };
