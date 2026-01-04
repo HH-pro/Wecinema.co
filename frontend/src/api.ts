@@ -7,13 +7,18 @@ import { toast } from "react-toastify";
 // ========================
 
 // Create an axios instance with default configurations
+
 const api = axios.create({
-  baseURL: "http://localhost:3000/", // Base URL for all requests
+  baseURL: import.meta.env.DEV
+    ? "http://localhost:3000"
+    : "https://wecinema-co.vercel.app",
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
 });
+
+
 
 // Request interceptor for adding tokens
 api.interceptors.request.use(
