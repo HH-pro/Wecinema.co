@@ -65,6 +65,7 @@ const allowedOrigins = [
   "https://wecinema-admin.onrender.com",
   "https://wecinema-main.vercel.app/",
   "https://wecinema-21d00.firebaseapp.com",
+  "https://wecinema-co.vercel.app/"
 ];
 
 const corsOptions = {
