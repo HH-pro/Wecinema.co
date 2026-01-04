@@ -12,7 +12,7 @@ import {
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import MarketplaceLayout from '../../Layout';
-import { marketplaceAPI } from '../../../api';
+import { marketplaceApi } from '../../../api';
 import './BuyerStatsPage.css';
 
 interface BuyerStats {
@@ -50,11 +50,11 @@ const BuyerStatsPage: React.FC = () => {
       let response;
       
       try {
-        response = await marketplaceAPI.dashboard.getBuyerStats(setLoading) as any;
+        response = await marketplaceApi.dashboard.getBuyerStats(setLoading) as any;
       } catch (error) {
         console.log('Trying alternative endpoint...');
         // Try orders stats endpoint
-        response = await marketplaceAPI.orders.getBuyerStats(setLoading) as any;
+        response = await marketplaceApi.orders.getBuyerStats(setLoading) as any;
       }
       
       if (response?.success) {
@@ -74,7 +74,7 @@ const BuyerStatsPage: React.FC = () => {
 
   const calculateStatsFromOrders = async () => {
     try {
-      const ordersResponse = await marketplaceAPI.orders.getMy(setLoading) as any;
+      const ordersResponse = await marketplaceApi.orders.getMy(setLoading) as any;
       if (ordersResponse.success && ordersResponse.orders) {
         const orders = ordersResponse.orders;
         
