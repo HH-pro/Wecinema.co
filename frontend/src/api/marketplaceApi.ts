@@ -2378,5 +2378,22 @@ const marketplaceApi = {
     validateOfferAmount
   }
 };
+// Add this to your marketplaceApi.ts file, in the utils section
+export const getOrderStatusInfo = (status: string) => {
+  const statusConfig: Record<string, { icon: string; text: string; color: string; bgColor: string }> = {
+    pending: { icon: '⏳', text: 'Pending', color: '#f39c12', bgColor: '#fef9e7' },
+    pending_payment: { icon: '💳', text: 'Pending Payment', color: '#3498db', bgColor: '#ebf5fb' },
+    paid: { icon: '✅', text: 'Paid', color: '#27ae60', bgColor: '#eafaf1' },
+    processing: { icon: '🔄', text: 'Processing', color: '#3498db', bgColor: '#ebf5fb' },
+    in_progress: { icon: '⚡', text: 'In Progress', color: '#f39c12', bgColor: '#fef9e7' },
+    delivered: { icon: '📦', text: 'Delivered', color: '#8e44ad', bgColor: '#f4ecf7' },
+    in_revision: { icon: '✏️', text: 'In Revision', color: '#e74c3c', bgColor: '#fdedec' },
+    completed: { icon: '🎉', text: 'Completed', color: '#27ae60', bgColor: '#eafaf1' },
+    cancelled: { icon: '❌', text: 'Cancelled', color: '#e74c3c', bgColor: '#fdedec' },
+    refunded: { icon: '💰', text: 'Refunded', color: '#7f8c8d', bgColor: '#f2f3f4' },
+    disputed: { icon: '⚖️', text: 'Disputed', color: '#e74c3c', bgColor: '#fdedec' }
+  };
 
+  return statusConfig[status] || { icon: '❓', text: 'Unknown', color: '#95a5a6', bgColor: '#ecf0f1' };
+};
 export default marketplaceApi;
