@@ -12,7 +12,7 @@ import {
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import MarketplaceLayout from '../../Layout';
-import { marketplaceApi } from '../../../api/marketplaceApi';
+import marketplaceApi from '../../../api/marketplaceApi';
 import './BuyerStatsPage.css';
 
 interface BuyerStats {
@@ -46,21 +46,48 @@ const BuyerStatsPage: React.FC = () => {
   const fetchBuyerStats = async () => {
     try {
       setLoading(true);
-      // Try different endpoints if one fails
-      let response;
       
-      try {
-        response = await marketplaceApi.dashboard.getBuyerStats(setLoading) as any;
-      } catch (error) {
-        console.log('Trying alternative endpoint...');
-        // Try orders stats endpoint
-        response = await marketplaceApi.orders.getBuyerStats(setLoading) as any;
-      }
+      // Try the buyer stats endpoint first
+      const response = await marketplaceApi.orders.getBuyerStats();
       
       if (response?.success) {
-        setStats(response.stats || response);
+        // Handle different response formats
+        if (response.data?.stats) {
+          // Format: { success: true, data: { stats: [...], totals: {...} } }
+          const statsData = response.data;
+          
+          // Check if stats is an array or object
+          if (Array.isArray(statsData.stats)) {
+            // Convert array format to object format
+            const totals = statsData.totals || {};
+            setStats({
+              totalOrders: totals.totalOrders || 0,
+              completedOrders: totals.completedOrders || 0,
+              pendingOrders: totals.pendingOrders || 0,
+              cancelledOrders: totals.cancelledOrders || 0,
+              activeOrders: totals.activeOrders || 0,
+              totalSpent: totals.totalSpent || 0,
+              monthlySpent: 0, // You might need to calculate this
+              averageOrderValue: totals.totalSpent && totals.totalOrders > 0 
+                ? totals.totalSpent / totals.totalOrders 
+                : 0,
+              successRate: totals.totalOrders > 0 
+                ? ((totals.completedOrders || 0) / totals.totalOrders) * 100 
+                : 0
+            });
+          } else {
+            // Already in object format
+            setStats(statsData.stats);
+          }
+        } else if (response.data) {
+          // Direct stats object
+          setStats(response.data);
+        } else {
+          // Fallback to calculating from orders
+          await calculateStatsFromOrders();
+        }
       } else {
-        // Calculate stats from orders if API doesn't provide
+        // API failed, calculate from orders
         await calculateStatsFromOrders();
       }
     } catch (error) {
@@ -74,9 +101,9 @@ const BuyerStatsPage: React.FC = () => {
 
   const calculateStatsFromOrders = async () => {
     try {
-      const ordersResponse = await marketplaceApi.orders.getMy(setLoading) as any;
-      if (ordersResponse.success && ordersResponse.orders) {
-        const orders = ordersResponse.orders;
+      const ordersResponse = await marketplaceApi.orders.getMyOrders();
+      if (ordersResponse.success && ordersResponse.data?.orders) {
+        const orders = ordersResponse.data.orders;
         
         const totalOrders = orders.length;
         const completedOrders = orders.filter((o: any) => o.status === 'completed').length;
@@ -90,7 +117,7 @@ const BuyerStatsPage: React.FC = () => {
           ['completed', 'delivered', 'in_progress', 'paid', 'processing'].includes(o.status)
         );
         
-        const totalSpent = completedAndActiveOrders.reduce((sum: number, order: any) => sum + order.amount, 0);
+        const totalSpent = completedAndActiveOrders.reduce((sum: number, order: any) => sum + (order.amount || 0), 0);
         
         // Calculate monthly spent (last 30 days)
         const thirtyDaysAgo = new Date();
@@ -100,7 +127,7 @@ const BuyerStatsPage: React.FC = () => {
           return orderDate >= thirtyDaysAgo && 
                  ['completed', 'delivered', 'in_progress', 'paid', 'processing'].includes(order.status);
         });
-        const monthlySpent = monthlyOrders.reduce((sum: number, order: any) => sum + order.amount, 0);
+        const monthlySpent = monthlyOrders.reduce((sum: number, order: any) => sum + (order.amount || 0), 0);
         
         const averageOrderValue = completedAndActiveOrders.length > 0 
           ? totalSpent / completedAndActiveOrders.length 
@@ -119,17 +146,39 @@ const BuyerStatsPage: React.FC = () => {
           averageOrderValue,
           successRate
         });
+      } else {
+        // If no orders, set default empty stats
+        setStats({
+          totalOrders: 0,
+          completedOrders: 0,
+          pendingOrders: 0,
+          cancelledOrders: 0,
+          activeOrders: 0,
+          totalSpent: 0,
+          monthlySpent: 0,
+          averageOrderValue: 0,
+          successRate: 0
+        });
       }
     } catch (error) {
       console.error('Error calculating stats from orders:', error);
+      // Set default stats on error
+      setStats({
+        totalOrders: 0,
+        completedOrders: 0,
+        pendingOrders: 0,
+        cancelledOrders: 0,
+        activeOrders: 0,
+        totalSpent: 0,
+        monthlySpent: 0,
+        averageOrderValue: 0,
+        successRate: 0
+      });
     }
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
+    return marketplaceApi.utils.formatCurrencyshow(amount);
   };
 
   const formatPercentage = (value: number) => {
@@ -139,13 +188,12 @@ const BuyerStatsPage: React.FC = () => {
   if (loading) {
     return (
       <MarketplaceLayout>
-           <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-                 <div className="text-center">
-                   <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-                   <p className="text-lg text-gray-800 font-medium">Loading statistics...</p>
-                 </div>
-                 </div>
-         
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+            <p className="text-lg text-gray-800 font-medium">Loading statistics...</p>
+          </div>
+        </div>
       </MarketplaceLayout>
     );
   }
