@@ -348,7 +348,6 @@ const Layout: React.FC<LayoutProps> = ({
                     : ""
                 }`}
               >
-                <MdOutlinePrivacyTip size="20" />
               </Link>
             </nav>
 
