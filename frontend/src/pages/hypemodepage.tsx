@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
+import axios from 'axios';
+import { Layout } from "../components";
 import { useNavigate } from 'react-router-dom';
 import { getAuth, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { googleProvider } from "../firebase/config";
 import { motion } from "framer-motion";
 import Confetti from "react-confetti";
-import { Layout } from "../components";
-import { authAPI } from "../api"; // Import from your api file
 import "../css/HypeModeProfile.css";
 
 const HypeModeProfile = () => {
@@ -23,23 +23,19 @@ const HypeModeProfile = () => {
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer");
   const [isLoading, setIsLoading] = useState(false);
 
-  // Register user with backend using api.ts
+  // Register user with backend
   const registerUser = async (username: string, email: string, avatar: string, userType: string) => {
-    setIsLoading(true);
     try {
-      const res = await authAPI.signup(
-        {
-          username,
-          email,
-          avatar,
-          userType,
-          dob: "--------"
-        },
-        setIsLoading
-      );
+      const res = await axios.post('https://wecinema.co/api/user/signup', {
+        username,
+        email,
+        avatar,
+        userType,
+        dob: "--------"
+      });
 
-      const token = res.token;
-      const userId = res.user?.id;
+      const token = res.data.token;
+      const userId = res.data.id;
 
       setPopupMessage(`Registration successful as ${userType}!`);
       setShowPopup(true);
@@ -47,44 +43,41 @@ const HypeModeProfile = () => {
       if (token) {
         localStorage.setItem('token', token);
         setIsLoggedIn(true);
-        if (userId) setUserId(userId);
+        setUserId(userId);
         return true;
       }
-      return false;
     } catch (error: any) {
-      setPopupMessage(error.message || 'Registration failed. Please try again.');
+      if (error.response && error.response.data && error.response.data.error === 'Email already exists.') {
+        setPopupMessage('Email already exists. Please sign in.');
+      } else {
+        setPopupMessage('Registration failed. Please try again.');
+      }
       setShowPopup(true);
       return false;
     }
   };
 
-  // Login user with backend using api.ts
-  const loginUser = async (email: string, isGoogleAuth?: boolean, password?: string) => {
-    setIsLoading(true);
+  // Login user with backend
+  const loginUser = async (email: string) => {
     try {
-      const res = await authAPI.signin(
-        { 
-          email, 
-          password: isGoogleAuth ? undefined : password,
-          isGoogleAuth 
-        },
-        setIsLoading
-      );
+      const res = await axios.post('https://wecinema.co/api/user/signin', { email });
+      const backendToken = res.data.token;
+      const userId = res.data.id;
 
-      const token = res.token;
-      const userId = res.user?.id;
-
-      if (token) {
-        localStorage.setItem('token', token);
+      if (backendToken) {
+        localStorage.setItem('token', backendToken);
         setIsLoggedIn(true);
-        if (userId) setUserId(userId);
+        setUserId(userId);
         setPopupMessage('Login successful!');
         setShowPopup(true);
         return true;
       }
-      return false;
     } catch (error: any) {
-      setPopupMessage(error.message || 'Login failed.');
+      if (error.response) {
+        setPopupMessage(error.response.data.message || 'Login failed.');
+      } else {
+        setPopupMessage('Login failed.');
+      }
       setShowPopup(true);
       return false;
     }
@@ -104,7 +97,7 @@ const HypeModeProfile = () => {
           navigateToPayment();
         }
       } else {
-        const success = await loginUser(email, !isEmailAuth);
+        const success = await loginUser(email);
         if (success) {
           navigateToPayment();
         }
@@ -177,16 +170,7 @@ const HypeModeProfile = () => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      
-      // Call backend signup through API
-      const success = await registerUser(username, email, 
-        `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`, 
-        userType
-      );
-      
-      if (success) {
-        navigateToPayment();
-      }
+      await onLoginSuccess(user, true);
     } catch (error: any) {
       setIsLoading(false);
       if (error.code === 'auth/email-already-in-use') {
@@ -221,13 +205,7 @@ const HypeModeProfile = () => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      
-      // Call backend login through API
-      const success = await loginUser(email, false, password);
-      
-      if (success) {
-        navigateToPayment();
-      }
+      await onLoginSuccess(user, true);
     } catch (error: any) {
       setIsLoading(false);
       if (error.code === 'auth/user-not-found') {
@@ -248,7 +226,7 @@ const HypeModeProfile = () => {
     const auth = getAuth();
     try {
       await signOut(auth);
-      authAPI.logout(); // Use API logout function
+      localStorage.removeItem('token');
       setIsLoggedIn(false);
       setPopupMessage('Logout successful.');
       setShowPopup(true);
@@ -315,17 +293,7 @@ const HypeModeProfile = () => {
 
         {isLoggedIn ? (
           <div className="cards-container-small">
-            <div className="subscription-box-small">
-              <h3 className="subscription-title-small">Welcome Back!</h3>
-              <p className="subscription-description-small">You are already logged in.</p>
-              <button 
-                className="subscription-button-small" 
-                onClick={handleGoogleLogout}
-                disabled={isLoading}
-              >
-                {isLoading ? "Processing..." : "Logout"}
-              </button>
-            </div>
+            
           </div>
         ) : (
           <>
@@ -369,11 +337,7 @@ const HypeModeProfile = () => {
 
                 {selectedSubscription === "user" && (
                   <div className="auth-section-small">
-                    <button 
-                      className="subscription-button-small google-auth-button-small" 
-                      onClick={handleGoogleLogin} 
-                      disabled={isLoading}
-                    >
+                    <button className="subscription-button-small google-auth-button-small" onClick={handleGoogleLogin} disabled={isLoading}>
                       <span className="google-icon-small">G</span>
                       {isLoading ? "Processing..." : (isSignup ? "Google Sign up" : "Google Sign in")}
                     </button>
@@ -409,11 +373,7 @@ const HypeModeProfile = () => {
                         onChange={(e) => setPassword(e.target.value)}
                         disabled={isLoading}
                       />
-                      <button 
-                        className="subscription-button-small email-submit-button-small" 
-                        onClick={handleEmailSubmit} 
-                        disabled={isLoading}
-                      >
+                      <button className="subscription-button-small email-submit-button-small" onClick={handleEmailSubmit} disabled={isLoading}>
                         {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
                       </button>
                     </div>
@@ -440,11 +400,7 @@ const HypeModeProfile = () => {
 
                 {selectedSubscription === "studio" && (
                   <div className="auth-section-small">
-                    <button 
-                      className="subscription-button-small google-auth-button-small" 
-                      onClick={handleGoogleLogin} 
-                      disabled={isLoading}
-                    >
+                    <button className="subscription-button-small google-auth-button-small" onClick={handleGoogleLogin} disabled={isLoading}>
                       <span className="google-icon-small">G</span>
                       {isLoading ? "Processing..." : (isSignup ? "Google Sign up" : "Google Sign in")}
                     </button>
@@ -480,11 +436,7 @@ const HypeModeProfile = () => {
                         onChange={(e) => setPassword(e.target.value)}
                         disabled={isLoading}
                       />
-                      <button 
-                        className="subscription-button-small email-submit-button-small" 
-                        onClick={handleEmailSubmit} 
-                        disabled={isLoading}
-                      >
+                      <button className="subscription-button-small email-submit-button-small" onClick={handleEmailSubmit} disabled={isLoading}>
                         {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
                       </button>
                     </div>
