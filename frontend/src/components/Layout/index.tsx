@@ -23,7 +23,7 @@ import { TbVideoPlus } from "react-icons/tb";
 import { FaUser, FaSignOutAlt, FaUserTie, FaShoppingCart, FaInfoCircle } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { decodeToken } from "../../utilities/helperfFunction";
-import "./Sidebar.css";
+import "../sidebar/Sidebar.css";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 
