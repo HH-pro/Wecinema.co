@@ -385,7 +385,13 @@ export interface StripeAccountRequirements {
 // ✅ API CONFIGURATION
 // ============================================
 
-const API_BASE_URL = 'http://localhost:3000';
+const API_BASE_URL =
+  import.meta.env.MODE === 'development'
+    ? 'http://localhost:3000'
+    : 'https://wecinema-co.vercel.app';
+
+
+
 
 // Helper function to get auth token
 const getAuthToken = (): string | null => {
