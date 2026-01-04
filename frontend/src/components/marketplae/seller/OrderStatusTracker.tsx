@@ -1,6 +1,6 @@
 // src/components/marketplace/seller/OrderStatusTracker.tsx
 import React from 'react';
-import { marketplaceApi } from '../../../api/marketplaceApi';
+import marketplaceApi  from '../../../api/marketplaceApi';
 
 interface OrderStatusTrackerProps {
   currentStatus: string;
