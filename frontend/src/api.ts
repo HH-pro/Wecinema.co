@@ -189,10 +189,6 @@ export const formatDateTime = (dateString: string): string => {
 // ========================
 
 // Auth exports
-export const loginUser = authAPI.login;
-export const registerUser = authAPI.register;
-export const getCurrentUser = authAPI.getCurrentUser;
-export const updateProfile = authAPI.updateProfile;
 
 
 export default api;
