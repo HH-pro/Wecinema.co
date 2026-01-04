@@ -642,13 +642,7 @@ async function getAccountBalance(accountId) {
     };
   }
 }
-// routes/stripeRoutes.js mein yeh add karein:
 
-/**
- * @route   POST /api/stripe/disconnect
- * @desc    Disconnect Stripe account
- * @access  Private (Seller only)
- */
 router.post('/disconnect', auth, async (req, res) => {
   try {
     const sellerId = req.user._id;
