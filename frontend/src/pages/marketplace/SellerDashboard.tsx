@@ -1333,16 +1333,22 @@ const SellerDashboard: React.FC = () => {
           {/* ✅ Stripe Account Status - UPDATED: Shows setup prompt OR ready to earn status WITH DISCONNECT OPTION */}
           {!stripeStatus?.account?.charges_enabled ? (
             // Show setup prompt when NOT connected
-            <SafeStripeAccountStatus
-              stripeStatus={{
-                connected: stripeStatus?.account?.charges_enabled || false,
-                chargesEnabled: stripeStatus?.account?.charges_enabled || false,
-                detailsSubmitted: stripeStatus?.account?.details_submitted || false,
-                status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive'
-              }}
-              onSetupClick={handleOpenStripeSetup}
-              isLoading={stripeStatus === null}
-            />
+            // SellerDashboard.tsx mein StripeAccountStatus section:
+<SafeStripeAccountStatus
+  stripeStatus={{
+    connected: stripeStatus?.account?.charges_enabled || false,
+    chargesEnabled: stripeStatus?.account?.charges_enabled || false,
+    detailsSubmitted: stripeStatus?.account?.details_submitted || false,
+    status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive',
+    requirements: stripeStatus?.account?.requirements || undefined,
+    verificationNeeded: stripeStatus?.account?.requirements?.past_due?.includes('individual.verification.document') || false,
+    missingRequirements: stripeStatus?.status?.missingRequirements,
+    pendingVerification: stripeStatus?.status?.pendingVerification,
+    disabledReason: stripeStatus?.account?.requirements?.disabled_reason || stripeStatus?.status?.disabledReason
+  }}
+  onSetupClick={handleOpenStripeSetup}
+  isLoading={stripeStatus === null}
+/>
           ) : (
             // Show earning status when connected
             <div className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-5 shadow-sm">
