@@ -1,4 +1,4 @@
-// api.ts - UPDATED WITH ALL NEW BUYER ROUTES
+// api.ts - COMPLETE API FILE WITH ALL ROUTES
 import axios, { AxiosResponse, AxiosError, Method } from "axios";
 import { toast } from "react-toastify";
 
@@ -7,7 +7,6 @@ import { toast } from "react-toastify";
 // ========================
 
 // Create an axios instance with default configurations
-
 const api = axios.create({
   baseURL: import.meta.env.DEV
     ? "http://localhost:3000/"
@@ -17,8 +16,6 @@ const api = axios.create({
     "Content-Type": "application/json",
   },
 });
-
-
 
 // Request interceptor for adding tokens
 api.interceptors.request.use(
@@ -259,31 +256,8 @@ export const validateFile = (file: File): string | null => {
 };
 
 // ========================
-// AUTH APIs
+// UTILITY FUNCTIONS
 // ========================
-
-export const authAPI = {
-  login: (credentials: { email: string; password: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/api/auth/login", credentials, setLoading, "Login successful"),
-
-  register: (userData: { username: string; email: string; password: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/api/auth/register", userData, setLoading, "Registration successful"),
-
-  getCurrentUser: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest("/api/auth/me", setLoading),
-
-  updateProfile: (userData: any, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest("/api/auth/profile", userData, setLoading, "Profile updated"),
-
-  logout: () => {
-    localStorage.removeItem("token");
-    window.location.href = '/';
-  },
-
-  isAuthenticated: () => !!localStorage.getItem("token"),
-  getToken: () => localStorage.getItem("token"),
-};
-
 
 export const formatDate = (dateString: string): string => {
   if (!dateString) return 'N/A';
@@ -308,6 +282,183 @@ export const formatDateTime = (dateString: string): string => {
 };
 
 // ========================
+// AUTH APIs
+// ========================
+
+export const authAPI = {
+  // Standard auth
+  login: (credentials: { email: string; password: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    postRequest("/api/auth/login", credentials, setLoading, "Login successful"),
+
+  register: (userData: { username: string; email: string; password: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    postRequest("/api/auth/register", userData, setLoading, "Registration successful"),
+
+  getCurrentUser: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest("/api/auth/me", setLoading),
+
+  updateProfile: (userData: any, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    putRequest("/api/auth/profile", userData, setLoading, "Profile updated"),
+
+  logout: () => {
+    localStorage.removeItem("token");
+    window.location.href = '/';
+  },
+
+  isAuthenticated: () => !!localStorage.getItem("token"),
+  getToken: () => localStorage.getItem("token"),
+
+  // Google/Firebase auth
+  signup: (userData: { username: string; email: string; password?: string; avatar?: string; dob?: string; userType?: string; isGoogleAuth?: boolean }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    postRequest("/api/auth/signup", userData, setLoading, "Registration successful"),
+
+  signin: (credentials: { email: string; password?: string; isGoogleAuth?: boolean }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    postRequest("/api/auth/signin", credentials, setLoading, "Login successful"),
+
+  verifyToken: (token: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    postRequest("/api/auth/verify-token", { token }, setLoading),
+
+  verifyEmail: (email: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest(`/api/auth/verify-email?email=${email}`, setLoading),
+
+  // Password management
+  changePassword: (data: { email: string; currentPassword: string; newPassword: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    putRequest("/api/auth/change-password", data, setLoading, "Password changed successfully"),
+};
+
+// ========================
+// USER APIs
+// ========================
+
+export const userAPI = {
+  // User CRUD operations
+  getAllUsers: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest("/api/auth/", setLoading),
+
+  getUserById: (id: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest(`/api/auth/${id}`, setLoading),
+
+  getPaymentUserById: (id: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest(`/api/auth/payment/user/${id}`, setLoading),
+
+  updateUser: (id: string, data: { username?: string; email?: string; password?: string; avatar?: string; dob?: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    putRequest(`/api/auth/edit/${id}`, data, setLoading, "User updated successfully"),
+
+  deleteUser: (id: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    deleteRequest(`/api/auth/delete/${id}`, setLoading, "User deleted successfully"),
+
+  // User type management
+  changeUserType: (id: string, userType: 'buyer' | 'seller', setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    putRequest(`/api/auth/change-type/${id}`, { userType }, setLoading, "User type updated"),
+
+  // Follow/unfollow
+  followUser: (targetUserId: string, userId: string, action: 'follow' | 'unfollow', setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    putRequest(`/api/auth/${targetUserId}/follow`, { action, userId }, setLoading, action === 'follow' ? "Followed successfully" : "Unfollowed successfully"),
+
+  // Paid users
+  getPaidUsers: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest("/api/auth/paid-users", setLoading),
+
+  // Payment status
+  getPaymentStatus: (userId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest(`/api/auth/payment-status/${userId}`, setLoading),
+
+  updatePaymentStatus: (data: { userId: string; hasPaid: boolean }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    postRequest("/api/auth/update-payment-status", data, setLoading, "Payment status updated"),
+
+  // User status management
+  changeUserStatusAll: (setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    putRequest("/api/auth/change-user-status", {}, setLoading, "All user statuses updated"),
+
+  changeUserStatus: (data: { userId: string; status: boolean }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    postRequest("/api/auth/change-user-status", data, setLoading, "User status updated"),
+};
+
+// ========================
+// ADMIN APIs
+// ========================
+
+export const adminAPI = {
+  // Admin auth
+  adminRegister: (data: { email: string; password: string; username: string; dob: string; isAdmin?: boolean; isSubAdmin?: boolean }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    postRequest("/api/auth/admin/register", data, setLoading, "Admin registered successfully"),
+
+  adminLogin: (credentials: { email: string; password: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    postRequest("/api/auth/admin/login", credentials, setLoading, "Admin login successful"),
+
+  // Admin user management
+  getPrivilegedUsers: (role?: 'admin' | 'subadmin' | 'both', setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest(role ? `/api/auth/admin/users?role=${role}` : "/api/auth/admin/users", setLoading),
+
+  addAdmin: (email: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    putRequest("/api/auth/admin/add", { email }, setLoading, "Admin privileges added"),
+
+  removePrivileges: (userId: string, data: { removeAll?: boolean; removeAdmin?: boolean; removeSubAdmin?: boolean }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    putRequest(`/api/auth/admin/remove/${userId}`, data, setLoading, "Privileges removed"),
+
+  // Admin user operations
+  getAllUsersAdmin: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest("/api/auth/admin/users", setLoading),
+
+  deleteUserAdmin: (id: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    deleteRequest(`/api/auth/admin/users/${id}`, setLoading, "User deleted successfully"),
+
+  updateUserAdmin: (id: string, data: { username?: string; email?: string; password?: string; avatar?: string; dob?: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    putRequest(`/api/auth/admin/edit/${id}`, data, setLoading, "User updated successfully"),
+
+  // Admin video management
+  getAllVideos: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest("/api/auth/admin/videos", setLoading),
+
+  addVideo: (data: { title: string; description: string; url: string; genre: string; duration: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    postRequest("/api/auth/admin/videos", data, setLoading, "Video added successfully"),
+
+  updateVideo: (id: string, data: { title?: string; description?: string; url?: string; genre?: string; duration?: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    putRequest(`/api/user/admin/videos/${id}`, data, setLoading, "Video updated successfully"),
+
+  deleteVideo: (id: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    deleteRequest(`/api/user/admin/videos/${id}`, setLoading, "Video deleted successfully"),
+
+  createVideo: (data: { title: string; description: string; genre: string; theme: string; rating: string; isForSale: boolean; file: string; author: string; role: string; slug: string; status?: boolean; users?: string[]; hasPaid?: boolean }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    postRequest("/api/auth/admin/create", data, setLoading, "Video created successfully"),
+};
+
+// ========================
+// SUBSCRIPTION APIs
+// ========================
+
+export const subscriptionAPI = {
+  getSubscriptionStatus: (userId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest(`/api/auth/status/${userId}`, setLoading),
+
+  saveTransaction: (data: { userId: string; username: string; email: string; orderId: string; payerId: string; amount: number; currency: string; subscriptionType: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    postRequest("/api/auth/save-transaction", data, setLoading, "Transaction saved successfully"),
+
+  getAllTransactions: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest("/api/auth/transactions", setLoading),
+
+  getUserTransactions: (userId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest(`/api/auth/transactions/${userId}`, setLoading),
+};
+
+// ========================
+// CONTACT API
+// ========================
+
+export const contactAPI = {
+  sendMessage: (data: { name: string; email: string; message: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    postRequest("/api/auth/contact", data, setLoading, "Message sent successfully"),
+};
+
+// ========================
+// ORDERS API (Firebase/Realtime Database)
+// ========================
+
+export const ordersAPI = {
+  createOrder: (data: { chatId: string; description: string; price: number; createdBy: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    postRequest("/api/auth/orders", data, setLoading, "Order created successfully"),
+};
+
+// ========================
 // LEGACY INDIVIDUAL EXPORTS (for backward compatibility)
 // ========================
 
@@ -317,5 +468,26 @@ export const registerUser = authAPI.register;
 export const getCurrentUser = authAPI.getCurrentUser;
 export const updateProfile = authAPI.updateProfile;
 
+// User exports
+export const getUserById = userAPI.getUserById;
+export const updateUser = userAPI.updateUser;
+export const deleteUser = userAPI.deleteUser;
+export const getPaymentStatus = userAPI.getPaymentStatus;
+
+// Admin exports
+export const adminLogin = adminAPI.adminLogin;
+export const adminRegister = adminAPI.adminRegister;
+export const getAllVideos = adminAPI.getAllVideos;
+
+// Subscription exports
+export const saveTransaction = subscriptionAPI.saveTransaction;
+export const getAllTransactions = subscriptionAPI.getAllTransactions;
+
+// Contact export
+export const sendContactMessage = contactAPI.sendMessage;
+
+// ========================
+// DEFAULT EXPORT
+// ========================
 
 export default api;
