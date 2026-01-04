@@ -12,7 +12,7 @@ import {
 } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import MarketplaceLayout from '../../Layout';
-import { marketplaceApi } from '../../../api';
+import { marketplaceApi } from '../../../api/marketplaceApi';
 import './BuyerStatsPage.css';
 
 interface BuyerStats {
