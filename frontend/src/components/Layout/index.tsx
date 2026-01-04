@@ -329,17 +329,7 @@ const Layout: React.FC<LayoutProps> = ({
                 <IoMdHome size="20" color={!darkMode ? "green" : ""} />
                 <span className="text-sm">Light Mode</span>
               </div>
-              <Link
-                to="/report"
-                className={`flex items-center gap-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 ${
-                  location.pathname === "/report"
-                    ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
-                    : ""
-                }`}
-              >
-                <RiFlagLine size="20" />
-                <span className="text-sm">Report</span>
-              </Link>
+              
               <Link
                 to="/privacy-policy"
                 className={`flex items-center gap-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 ${
