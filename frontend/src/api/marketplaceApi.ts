@@ -388,7 +388,7 @@ export interface StripeAccountRequirements {
 const API_BASE_URL =
   import.meta.env.MODE === 'development'
     ? 'http://localhost:3000'
-    : 'https://wecinema-co.vercel.app';
+    : 'https://wecinema-main.onrender.com';
 
 
 
