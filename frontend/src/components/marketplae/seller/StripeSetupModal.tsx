@@ -1,3 +1,4 @@
+// StripeSetupModal.tsx - UPDATED VERSION
 import React, { useState, useEffect } from 'react';
 import marketplaceApi from '../../../api/marketplaceApi';
 import { toast } from 'react-toastify';
@@ -6,7 +7,7 @@ interface StripeSetupModalProps {
   show: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  onDisconnectSuccess?: () => void; // ✅ NEW: For disconnect success
+  onDisconnectSuccess?: () => void;
   stripeConnected: boolean;
 }
 
@@ -22,7 +23,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
   const [verificationStatus, setVerificationStatus] = useState<any>(null);
   const [checkingStatus, setCheckingStatus] = useState(false);
   
-  // ✅ NEW: Disconnect states
+  // Disconnect states
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
   const [disconnectReason, setDisconnectReason] = useState('');
   const [disconnectLoading, setDisconnectLoading] = useState(false);
@@ -37,26 +38,32 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
   // ✅ Check if can disconnect
   const checkDisconnectRequirements = async () => {
     try {
+      const newRequirements = {
+        hasPendingBalance: false,
+        hasActiveListings: false,
+        hasPendingOrders: false,
+        message: ''
+      };
+      
       // Check for pending balance
       const stripeStatus = await marketplaceApi.orders.getSellerAccountStatus();
-      if (stripeStatus.success && stripeStatus.data?.account?.balance && stripeStatus.data.account.balance > 0) {
-        setDisconnectRequirements(prev => ({
-          ...prev,
-          hasPendingBalance: true,
-          message: 'You have pending balance to withdraw'
-        }));
+      if (stripeStatus.success && stripeStatus.data?.account?.balance) {
+        const balance = stripeStatus.data.account.balance;
+        if ((balance.available > 0) || (balance.pending > 0)) {
+          newRequirements.hasPendingBalance = true;
+          newRequirements.message = 'You have pending balance to withdraw';
+        }
       }
 
       // Check for active listings
       const listingsResponse = await marketplaceApi.listings.getMyListings({ status: 'active' });
       if (listingsResponse.success) {
-        const activeListings = listingsResponse.data?.listings || listingsResponse.data?.data?.listings || [];
+        const activeListings = listingsResponse.data?.listings || [];
         if (activeListings.length > 0) {
-          setDisconnectRequirements(prev => ({
-            ...prev,
-            hasActiveListings: true,
-            message: prev.message ? `${prev.message} and active listings` : 'You have active listings'
-          }));
+          newRequirements.hasActiveListings = true;
+          newRequirements.message = newRequirements.message 
+            ? `${newRequirements.message} and active listings` 
+            : 'You have active listings';
         }
       }
 
@@ -68,18 +75,18 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
           ['pending_payment', 'paid', 'processing', 'in_progress', 'in_revision'].includes(order.status)
         );
         if (pendingOrders.length > 0) {
-          setDisconnectRequirements(prev => ({
-            ...prev,
-            hasPendingOrders: true,
-            message: prev.message ? `${prev.message} and pending orders` : 'You have pending orders'
-          }));
+          newRequirements.hasPendingOrders = true;
+          newRequirements.message = newRequirements.message 
+            ? `${newRequirements.message} and pending orders` 
+            : 'You have pending orders';
         }
       }
 
-      const canDisconnect = !disconnectRequirements.hasPendingBalance && 
-                           !disconnectRequirements.hasActiveListings && 
-                           !disconnectRequirements.hasPendingOrders;
-      setCanDisconnect(canDisconnect);
+      setDisconnectRequirements(newRequirements);
+      const canDisconnectNow = !newRequirements.hasPendingBalance && 
+                               !newRequirements.hasActiveListings && 
+                               !newRequirements.hasPendingOrders;
+      setCanDisconnect(canDisconnectNow);
 
     } catch (error) {
       console.error('Error checking disconnect requirements:', error);
@@ -92,16 +99,16 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
     
     try {
       setCheckingStatus(true);
-      const response = await marketplaceApi.orders.getSellerAccountStatus();
+      const response = await marketplaceApi.stripe.getStripeAccountStatus();
       
       if (response.success && response.data) {
         setVerificationStatus(response.data);
         
         // Check if verification is needed
         if (response.data.status?.needsAction || 
-            response.data.account?.requirements?.past_due?.includes('individual.verification.document')) {
-          // Auto-start verification if needed
-          startStripeSetup();
+            response.data.account?.requirements?.currently_due?.length > 0 ||
+            response.data.account?.requirements?.past_due?.length > 0) {
+          console.log('Verification needed, updating status...');
         }
       }
     } catch (error) {
@@ -129,7 +136,19 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
     try {
       setStripeLoading(true);
       
-      const response = await marketplaceApi.stripe.startStripeOnboarding();
+      // Check current status first
+      const statusResponse = await marketplaceApi.stripe.getStripeAccountStatus();
+      
+      let response;
+      if (statusResponse.success && statusResponse.data?.account?.id) {
+        // Account exists, continue onboarding
+        console.log('Account exists, continuing onboarding...');
+        response = await marketplaceApi.stripe.continueStripeOnboarding();
+      } else {
+        // New account, start fresh onboarding
+        console.log('Starting new onboarding...');
+        response = await marketplaceApi.stripe.startStripeOnboarding();
+      }
       
       if (response.success && response.data?.url) {
         // Redirect to Stripe
@@ -145,7 +164,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
     }
   };
 
-  // ✅ NEW: Handle disconnect
+  // ✅ Handle disconnect
   const handleDisconnect = async () => {
     if (!disconnectReason.trim()) {
       toast.error('Please provide a reason for disconnecting');
@@ -154,7 +173,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
 
     setDisconnectLoading(true);
     try {
-      const response = await marketplaceApi.stripe.disconnectAccount(disconnectReason);
+      const response = await marketplaceApi.stripe.disconnectStripeAccount();
       
       if (response.success) {
         toast.success(response.message || 'Disconnect request submitted successfully');
@@ -179,6 +198,25 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
     } finally {
       setDisconnectLoading(false);
     }
+  };
+
+  // ✅ Get simplified requirements list
+  const getSimplifiedRequirements = () => {
+    if (!verificationStatus?.account?.requirements) return [];
+    
+    const requirements = [
+      ...(verificationStatus.account.requirements.currently_due || []),
+      ...(verificationStatus.account.requirements.past_due || []),
+      ...(verificationStatus.account.requirements.pending_verification || [])
+    ];
+    
+    return Array.from(new Set(requirements)).map(req => {
+      return req
+        .replace(/individual\.verification\.|company\.verification\./g, '')
+        .replace(/\./g, ' ')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, l => l.toUpperCase());
+    });
   };
 
   // ✅ Main Modal Content
@@ -211,31 +249,29 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
               <div>
                 <h4 className="font-semibold text-green-800">Account Status</h4>
                 <p className="text-sm text-green-700">
-                  {verificationStatus.status?.canReceivePayments 
+                  {verificationStatus.account?.charges_enabled 
                     ? 'Ready to accept payments' 
-                    : verificationStatus.status?.needsAction
-                      ? 'Verification required'
-                      : 'Setup in progress'}
+                    : 'Setup required'}
                 </p>
               </div>
             </div>
             <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-              verificationStatus.status?.canReceivePayments 
+              verificationStatus.account?.charges_enabled 
                 ? 'bg-green-100 text-green-800' 
                 : 'bg-yellow-100 text-yellow-800'
             }`}>
-              {verificationStatus.status?.canReceivePayments ? 'Active' : 'Action Required'}
+              {verificationStatus.account?.charges_enabled ? 'Active' : 'Action Required'}
             </span>
           </div>
         </div>
       )}
 
       {/* Verification Requirements */}
-      {stripeConnected && verificationStatus && verificationStatus.status?.missingRequirements && (
+      {stripeConnected && verificationStatus && getSimplifiedRequirements().length > 0 && (
         <div className="mb-6">
           <h4 className="font-medium text-gray-900 mb-3">Verification Required</h4>
           <div className="space-y-3">
-            {verificationStatus.status.missingRequirements.map((req: string, index: number) => (
+            {getSimplifiedRequirements().map((req: string, index: number) => (
               <div key={index} className="flex items-start p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                 <div className="w-5 h-5 bg-yellow-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0 mt-0.5">
                   <svg className="w-3 h-3 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -243,13 +279,8 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-yellow-800">
-                    {req.replace(/individual\.verification\.|company\.verification\./g, '')
-                      .replace(/\./g, ' ')
-                      .replace(/_/g, ' ')
-                      .replace(/\b\w/g, l => l.toUpperCase())}
-                  </p>
-                  {req.includes('document') && (
+                  <p className="text-sm font-medium text-yellow-800">{req}</p>
+                  {req.toLowerCase().includes('document') && (
                     <p className="text-xs text-yellow-700 mt-1">
                       Upload a clear photo of your government-issued ID
                     </p>
@@ -269,7 +300,9 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
             <div className="p-3 bg-gray-50 rounded-lg">
               <p className="text-xs text-gray-500">Account ID</p>
               <p className="text-sm font-medium text-gray-900 truncate">
-                {verificationStatus.accountId?.substring(0, 8)}...
+                {verificationStatus.account?.id ? 
+                  `${verificationStatus.account.id.substring(0, 8)}...` : 
+                  'Not available'}
               </p>
             </div>
             <div className="p-3 bg-gray-50 rounded-lg">
@@ -344,7 +377,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
             {/* Manage Account Buttons */}
             <div className="flex-1 flex flex-col sm:flex-row gap-3">
               {/* Complete Verification Button */}
-              {verificationStatus?.status?.needsAction && (
+              {(getSimplifiedRequirements().length > 0 || !verificationStatus?.account?.charges_enabled) && (
                 <button
                   onClick={startStripeSetup}
                   disabled={stripeLoading}
@@ -363,16 +396,16 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                       </svg>
-                      Complete Verification
+                      {verificationStatus?.account?.charges_enabled ? 'Update Account' : 'Complete Setup'}
                     </>
                   )}
                 </button>
               )}
 
               {/* View Dashboard Button */}
-              {verificationStatus?.accountId && (
+              {verificationStatus?.account?.id && (
                 <a
-                  href={`https://dashboard.stripe.com/connect/accounts/${verificationStatus.accountId}`}
+                  href={`https://dashboard.stripe.com/connect/accounts/${verificationStatus.account.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 px-6 py-3 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 font-medium rounded-xl transition-all duration-200 shadow-sm hover:shadow flex items-center justify-center"
