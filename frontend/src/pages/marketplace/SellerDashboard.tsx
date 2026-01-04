@@ -19,6 +19,7 @@ import marketplaceApi, {
 // Access API methods
 const listingsApi = marketplaceApi.listings;
 const ordersApi = marketplaceApi.orders;
+const paymentsApi = marketplaceApi.payments;
 
 // Import components
 import DashboardHeader from '../../components/marketplae/seller/DashboardHeader';
@@ -86,7 +87,22 @@ interface WithdrawalHistory {
   };
 }
 
-// ✅ UPDATED: Safe format function for display (already in dollars)
+// ✅ UPDATED: Improved formatCurrency function that always converts cents to dollars
+const formatCurrency = (amount: number | undefined): string => {
+  if (amount === undefined || amount === null || isNaN(amount)) {
+    return '$0.00';
+  }
+  
+  // ✅ ALWAYS convert from cents to dollars (divide by 100)
+  const amountInDollars = amount / 100;
+  
+  return `$${amountInDollars.toLocaleString('en-US', { 
+    minimumFractionDigits: 2, 
+    maximumFractionDigits: 2 
+  })}`;
+};
+
+// ✅ NEW: Safe format function for display (already in dollars)
 const safeFormatCurrency = (amount: number | undefined): string => {
   if (amount === undefined || amount === null || isNaN(amount)) {
     return '$0.00';
@@ -202,8 +218,7 @@ const SellerDashboard: React.FC = () => {
   
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
-  // ✅ NEW: Stripe disconnect loading state
-  const [stripeDisconnectLoading, setStripeDisconnectLoading] = useState(false);
+  // ✅ UPDATED: Disconnect state is now handled within StripeSetupModal
 
   // Calculate derived stats
   const totalListings = listings.length;
@@ -252,28 +267,7 @@ const SellerDashboard: React.FC = () => {
     }
   ]);
 
-  // ✅ NEW: Function to handle Stripe disconnect
-  const handleStripeDisconnect = async () => {
-    try {
-      setStripeDisconnectLoading(true);
-      const response = await marketplaceApi.stripe.disconnectStripeAccount();
-      
-      if (response.success) {
-        setSuccessMessage('Stripe disconnect request submitted successfully. Our team will review it within 24-48 hours.');
-        // Refresh Stripe status after disconnect request
-        checkStripeAccountStatus();
-      } else {
-        setError(response.error || 'Failed to disconnect Stripe account');
-      }
-    } catch (error: any) {
-      console.error('Error disconnecting Stripe:', error);
-      setError(error.message || 'Failed to disconnect Stripe account');
-    } finally {
-      setStripeDisconnectLoading(false);
-    }
-  };
-
-  // ✅ Function to auto-refresh everything
+  // ✅ NEW: Function to auto-refresh everything
   const refreshAllData = useCallback(async () => {
     console.log('🔄 AUTO-REFRESHING ALL DATA...');
     
@@ -299,7 +293,7 @@ const SellerDashboard: React.FC = () => {
     }
   }, []);
 
-  // ✅ Function to refresh specific data after actions
+  // ✅ UPDATED: Function to refresh specific data after actions
   const refreshDataAfterAction = useCallback(async (actionType: 'listing' | 'order' | 'stripe' | 'withdrawal' | 'earnings' | 'all') => {
     console.log(`🔄 Refreshing data after ${actionType} action...`);
     
@@ -354,7 +348,7 @@ const SellerDashboard: React.FC = () => {
     }
   }, [activeTab, refreshAllData]);
 
-  // ✅ Calculate order stats from orders - COMPLETED ORDERS FOCUS
+  // ✅ UPDATED: Calculate order stats from orders - COMPLETED ORDERS FOCUS
   const calculateOrderStats = useCallback((orders: Order[]): OrderStats => {
     const now = new Date();
     const thisMonth = now.getMonth();
@@ -460,7 +454,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Handle Stripe disconnect success from modal
+  // ✅ NEW: Handle Stripe disconnect success
   const handleStripeDisconnectSuccess = () => {
     setSuccessMessage('Stripe account disconnected successfully!');
     setTimeout(() => {
@@ -468,7 +462,7 @@ const SellerDashboard: React.FC = () => {
     }, 1000);
   };
 
-  // ✅ Fetch seller statistics - FOCUS ON COMPLETED ORDERS
+  // ✅ UPDATED: Fetch seller statistics - FOCUS ON COMPLETED ORDERS
   const fetchSellerStats = async () => {
     try {
       setEarningsLoading(true);
@@ -578,7 +572,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Fetch seller orders with auto-refresh capability
+  // ✅ UPDATED: Fetch seller orders with auto-refresh capability
   const fetchSellerOrders = async () => {
     try {
       setOrdersLoading(true);
@@ -634,7 +628,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Fetch listings with auto-refresh capability
+  // ✅ UPDATED: Fetch listings with auto-refresh capability
   const fetchListings = async () => {
     try {
       setListingsLoading(true);
@@ -820,7 +814,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Handle Edit Listing with auto-refresh
+  // ✅ UPDATED: Handle Edit Listing with auto-refresh
   const handleEditListing = (listing: Listing) => {
     setEditingListing(listing);
     setShowEditModal(true);
@@ -861,7 +855,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Handle Delete Listing with auto-refresh
+  // ✅ UPDATED: Handle Delete Listing with auto-refresh
   const handleDeleteListing = (listing: Listing) => {
     setDeletingListing(listing);
     setShowDeleteModal(true);
@@ -898,7 +892,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Handle Toggle Listing Status with auto-refresh
+  // ✅ UPDATED: Handle Toggle Listing Status with auto-refresh
   const handleToggleListingStatus = async (listing: Listing) => {
     try {
       setListingActionLoading(`toggle-${listing._id}`);
@@ -931,7 +925,7 @@ const SellerDashboard: React.FC = () => {
     }
   };
 
-  // ✅ Order management functions with auto-refresh
+  // ✅ UPDATED: Order management functions with auto-refresh
   const handleSimpleStartProcessing = async (order: Order) => {
     try {
       setOrderActionLoading(order._id);
@@ -1174,6 +1168,21 @@ const SellerDashboard: React.FC = () => {
     }
   }, [refreshCounter]);
 
+  // Show loading only on initial load
+  if (loading && !initialDataLoaded) {
+    return (
+      <MarketplaceLayout>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+            <p className="text-lg text-gray-800 font-medium">Loading your dashboard...</p>
+            <p className="text-gray-600 mt-2">This may take a few moments</p>
+          </div>
+        </div>
+      </MarketplaceLayout>
+    );
+  }
+
   // Helper to get buyer name from order
   const getBuyerName = (order: Order): string => {
     if (typeof order.buyerId === 'object' && order.buyerId.username) {
@@ -1196,21 +1205,6 @@ const SellerDashboard: React.FC = () => {
     buyerName: getBuyerName(order),
     listingTitle: getListingTitle(order)
   }));
-
-  // Show loading only on initial load
-  if (loading && !initialDataLoaded) {
-    return (
-      <MarketplaceLayout>
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-            <p className="text-lg text-gray-800 font-medium">Loading your dashboard...</p>
-            <p className="text-gray-600 mt-2">This may take a few moments</p>
-          </div>
-        </div>
-      </MarketplaceLayout>
-    );
-  }
 
   return (
     <MarketplaceLayout>
@@ -1336,27 +1330,172 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* ✅ UPDATED: Stripe Account Status Section - Now includes disconnect functionality */}
-          <SafeStripeAccountStatus
-            stripeStatus={{
-              connected: stripeStatus?.account?.charges_enabled || false,
-              chargesEnabled: stripeStatus?.account?.charges_enabled || false,
-              detailsSubmitted: stripeStatus?.account?.details_submitted || false,
-              status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive',
-              accountId: stripeStatus?.account?.id,
-              requirements: stripeStatus?.account?.requirements || undefined,
-              verificationNeeded: stripeStatus?.status?.needsAction || false,
-              missingRequirements: stripeStatus?.status?.missingRequirements || [],
-              pendingVerification: stripeStatus?.account?.requirements?.pending_verification || [],
-              disabledReason: stripeStatus?.account?.requirements?.disabled_reason,
-              status: stripeStatus?.status,
-              account: stripeStatus?.account
-            }}
-            onSetupClick={handleOpenStripeSetup}
-            onDisconnectClick={handleStripeDisconnect} // ✅ NEW: Pass disconnect handler
-            isLoading={stripeStatus === null}
-            showDisconnectButton={true} // ✅ Show disconnect button below payment status
-          />
+          {/* ✅ Stripe Account Status - UPDATED: Shows setup prompt OR ready to earn status WITH DISCONNECT OPTION */}
+          {!stripeStatus?.account?.charges_enabled ? (
+            // Show setup prompt when NOT connected
+            // SellerDashboard.tsx mein StripeAccountStatus section:
+<SafeStripeAccountStatus
+  stripeStatus={{
+    connected: stripeStatus?.account?.charges_enabled || false,
+    chargesEnabled: stripeStatus?.account?.charges_enabled || false,
+    detailsSubmitted: stripeStatus?.account?.details_submitted || false,
+    status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive',
+    requirements: stripeStatus?.account?.requirements || undefined,
+    verificationNeeded: stripeStatus?.account?.requirements?.past_due?.includes('individual.verification.document') || false,
+    missingRequirements: stripeStatus?.status?.missingRequirements,
+    pendingVerification: stripeStatus?.status?.pendingVerification,
+    disabledReason: stripeStatus?.account?.requirements?.disabled_reason || stripeStatus?.status?.disabledReason
+  }}
+  onSetupClick={handleOpenStripeSetup}
+  isLoading={stripeStatus === null}
+/>
+          ) : (
+            // Show earning status when connected
+            <div className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-5 shadow-sm">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                <div className="flex items-start">
+                  <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-3 rounded-xl mr-4 shadow-sm flex-shrink-0">
+                    <span className="text-xl text-white">💰</span>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Ready to Earn! 🎉
+                      </h3>
+                      <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                        Connected
+                      </span>
+                    </div>
+                    <p className="text-gray-600 mt-1">
+                      Your Stripe account is connected and ready to accept payments.
+                    </p>
+                    
+                    {/* Account Info */}
+                    <div className="mt-3 space-y-3">
+                      {/* Status Indicators */}
+                      <div className="flex flex-wrap gap-3">
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <span className="text-xs text-gray-700">Charges Enabled</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <span className="text-xs text-gray-700">Payouts Enabled</span>
+                        </div>
+                      </div>
+
+                      {/* Balance Info */}
+                      <div className="p-3 bg-green-100/30 rounded-lg border border-green-200">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          {orderStats.availableBalance !== undefined && (
+                            <div>
+                              <p className="text-xs text-gray-500">Available Balance</p>
+                              <p className="text-lg font-semibold text-gray-900">
+                                {safeFormatCurrency(orderStats.availableBalance)}
+                              </p>
+                            </div>
+                          )}
+                          {orderStats.pendingRevenue !== undefined && orderStats.pendingRevenue > 0 && (
+                            <div>
+                              <p className="text-xs text-gray-500">Pending Revenue</p>
+                              <p className="text-lg font-semibold text-yellow-600">
+                                {safeFormatCurrency(orderStats.pendingRevenue)}
+                              </p>
+                            </div>
+                          )}
+                          {orderStats.totalRevenue !== undefined && (
+                            <div>
+                              <p className="text-xs text-gray-500">Total Earnings</p>
+                              <p className="text-lg font-semibold text-green-700">
+                                {safeFormatCurrency(orderStats.totalRevenue)}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Account ID (if available) */}
+                      {stripeStatus?.account?.id && (
+                        <div className="text-xs text-gray-500">
+                          <span className="font-medium">Account ID:</span>{' '}
+                          <span className="font-mono text-gray-700">
+                            {stripeStatus.account.id.substring(0, 8)}...
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex flex-col sm:flex-row lg:flex-col gap-3 flex-shrink-0">
+                  {/* Action Buttons */}
+                  <div className="flex gap-3">
+                    {/* Stripe Dashboard Link */}
+                    {stripeStatus?.account?.id && (
+                      <a
+                        href={`https://dashboard.stripe.com/connect/accounts/${stripeStatus.account.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium py-3 px-4 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 whitespace-nowrap text-center"
+                      >
+                        <div className="flex items-center justify-center gap-2">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                          Dashboard
+                        </div>
+                      </a>
+                    )}
+                    
+                    {/* Withdraw Button if there's available balance */}
+                    {orderStats.availableBalance !== undefined && orderStats.availableBalance > 0 && (
+                      <button
+                        onClick={() => setActiveTab('withdraw')}
+                        className="flex-1 bg-white hover:bg-gray-50 text-green-600 border border-green-300 font-medium py-3 px-4 rounded-xl transition-all duration-200 shadow-sm hover:shadow whitespace-nowrap text-center"
+                      >
+                        <div className="flex items-center justify-center gap-2">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                          Withdraw
+                        </div>
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Manage & Disconnect Buttons */}
+                  <div className="flex gap-3">
+                    {/* Manage Account Button */}
+                    <button
+                      onClick={handleOpenStripeSetup}
+                      className="flex-1 bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 font-medium py-3 px-4 rounded-xl transition-all duration-200 shadow-sm hover:shadow whitespace-nowrap text-center"
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Manage
+                      </div>
+                    </button>
+                    
+                    {/* Disconnect Button - Now opens StripeSetupModal which shows disconnect flow */}
+                    <button
+                      onClick={handleOpenStripeSetup}
+                      className="flex-1 bg-white hover:bg-red-50 text-red-600 border border-red-300 font-medium py-3 px-4 rounded-xl transition-all duration-200 shadow-sm hover:shadow whitespace-nowrap text-center"
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Disconnect
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ✅ Navigation */}
           <SafeTabNavigation
@@ -1581,7 +1720,6 @@ const SellerDashboard: React.FC = () => {
               onSuccess={handleStripeSetupSuccess}
               onDisconnectSuccess={handleStripeDisconnectSuccess}
               stripeConnected={stripeStatus?.account?.charges_enabled || false}
-              showDisconnectInModal={true} // ✅ Show disconnect button inside modal
             />
           )}
 
