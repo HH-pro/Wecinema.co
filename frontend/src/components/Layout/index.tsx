@@ -214,7 +214,7 @@ const Layout: React.FC<LayoutProps> = ({
       {expanded && isTabletOrMobile && isSidebarVisible && (
         <div className="fixed top-0 left-0 z-40 h-full w-full bg-black bg-opacity-90 backdrop-blur-md transition-opacity ease-in-out duration-300">
           <section
-            className={`mt-16 fixed inset-0 w-4/5 max-w-xs border-r border-gray-200 overflow-auto z-50 ${
+            className={`mt-1 fixed inset-0 w-4/5 max-w-xs border-r border-gray-200 overflow-auto z-50 ${
               darkMode ? "bg-dark text-light" : "bg-light text-dark"
             }`}
           >
