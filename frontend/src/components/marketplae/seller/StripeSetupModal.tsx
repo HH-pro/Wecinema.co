@@ -129,7 +129,7 @@ const StripeSetupModal: React.FC<StripeSetupModalProps> = ({
     try {
       setStripeLoading(true);
       
-      const response = await marketplaceApi.stripe.onboardSeller();
+      const response = await marketplaceApi.stripe.startStripeOnboarding();
       
       if (response.success && response.data?.url) {
         // Redirect to Stripe
