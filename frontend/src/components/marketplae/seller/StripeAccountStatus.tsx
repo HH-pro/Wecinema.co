@@ -1,3 +1,4 @@
+// StripeAccountStatus.tsx - UPDATED VERSION
 import React, { useState } from 'react';
 
 interface StripeAccountStatusProps {
@@ -5,7 +6,7 @@ interface StripeAccountStatusProps {
     connected: boolean;
     chargesEnabled: boolean;
     detailsSubmitted: boolean;
-    status: string;
+    accountId?: string;
     requirements?: {
       currently_due: string[];
       eventually_due: string[];
@@ -17,6 +18,19 @@ interface StripeAccountStatusProps {
     missingRequirements?: string[];
     pendingVerification?: string[];
     disabledReason?: string;
+    status?: {
+      canReceivePayments: boolean;
+      missingRequirements: string[];
+      needsAction: boolean;
+      isActive: boolean;
+    };
+    account?: {
+      id: string;
+      charges_enabled: boolean;
+      payouts_enabled: boolean;
+      details_submitted: boolean;
+      requirements?: any;
+    };
   };
   onSetupClick: () => void;
   isLoading: boolean;
@@ -29,13 +43,48 @@ const StripeAccountStatus: React.FC<StripeAccountStatusProps> = ({
 }) => {
   const [showDetails, setShowDetails] = useState(false);
 
-  // ✅ Check for verification requirements
-  const hasVerificationRequirements = stripeStatus.verificationNeeded || 
-    stripeStatus.requirements?.past_due?.includes('individual.verification.document') ||
-    stripeStatus.missingRequirements?.includes('individual.verification.document');
+  // ✅ Check for verification requirements using new API structure
+  const hasVerificationRequirements = () => {
+    if (stripeStatus.status?.needsAction) return true;
+    if (stripeStatus.account?.requirements) {
+      const req = stripeStatus.account.requirements;
+      return (req.currently_due?.length > 0 || req.past_due?.length > 0);
+    }
+    return false;
+  };
 
-  const hasPendingVerification = stripeStatus.requirements?.pending_verification?.length > 0 ||
-    stripeStatus.pendingVerification?.length > 0;
+  const hasPendingVerification = () => {
+    if (stripeStatus.account?.requirements?.pending_verification?.length > 0) return true;
+    return false;
+  };
+
+  const getRequirements = () => {
+    const requirements = [];
+    
+    if (stripeStatus.account?.requirements) {
+      const req = stripeStatus.account.requirements;
+      requirements.push(...(req.currently_due || []));
+      requirements.push(...(req.past_due || []));
+      requirements.push(...(req.pending_verification || []));
+    }
+    
+    if (stripeStatus.missingRequirements) {
+      requirements.push(...stripeStatus.missingRequirements);
+    }
+    
+    return Array.from(new Set(requirements)).map(req => ({
+      original: req,
+      display: req
+        .replace(/individual\.verification\.|company\.verification\./g, '')
+        .replace(/\./g, ' ')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, l => l.toUpperCase()),
+      isDocument: req.includes('document') || req.includes('verification')
+    }));
+  };
+
+  const requirements = getRequirements();
+  const hasRequirements = requirements.length > 0;
 
   // ✅ Get status message based on conditions
   const getStatusMessage = () => {
@@ -47,15 +96,15 @@ const StripeAccountStatus: React.FC<StripeAccountStatusProps> = ({
       return 'Connect your Stripe account to accept payments';
     }
 
-    if (stripeStatus.connected && stripeStatus.chargesEnabled) {
+    if (stripeStatus.account?.charges_enabled) {
       return 'Stripe account is active and ready to accept payments';
     }
 
-    if (hasPendingVerification) {
+    if (hasPendingVerification()) {
       return 'Your documents are under review. This usually takes 1-3 business days.';
     }
 
-    if (hasVerificationRequirements) {
+    if (hasVerificationRequirements()) {
       return 'Additional verification required to enable payments';
     }
 
@@ -68,15 +117,15 @@ const StripeAccountStatus: React.FC<StripeAccountStatusProps> = ({
 
   // ✅ Get status color
   const getStatusColor = () => {
-    if (stripeStatus.connected && stripeStatus.chargesEnabled) {
+    if (stripeStatus.account?.charges_enabled) {
       return 'bg-green-100 text-green-800 border-green-200';
     }
     
-    if (hasPendingVerification) {
+    if (hasPendingVerification()) {
       return 'bg-yellow-100 text-yellow-800 border-yellow-200';
     }
     
-    if (hasVerificationRequirements) {
+    if (hasVerificationRequirements()) {
       return 'bg-orange-100 text-orange-800 border-orange-200';
     }
     
@@ -93,11 +142,11 @@ const StripeAccountStatus: React.FC<StripeAccountStatusProps> = ({
       return 'Loading...';
     }
 
-    if (hasPendingVerification) {
+    if (hasPendingVerification()) {
       return 'Check Verification Status';
     }
 
-    if (hasVerificationRequirements) {
+    if (hasVerificationRequirements()) {
       return 'Complete Verification';
     }
 
@@ -110,11 +159,11 @@ const StripeAccountStatus: React.FC<StripeAccountStatusProps> = ({
 
   // ✅ Get button variant
   const getButtonVariant = () => {
-    if (hasPendingVerification) {
+    if (hasPendingVerification()) {
       return 'bg-yellow-500 hover:bg-yellow-600 text-white';
     }
 
-    if (hasVerificationRequirements) {
+    if (hasVerificationRequirements()) {
       return 'bg-orange-500 hover:bg-orange-600 text-white';
     }
 
@@ -123,15 +172,15 @@ const StripeAccountStatus: React.FC<StripeAccountStatusProps> = ({
 
   // ✅ Get icon
   const getIcon = () => {
-    if (stripeStatus.connected && stripeStatus.chargesEnabled) {
+    if (stripeStatus.account?.charges_enabled) {
       return '✅';
     }
     
-    if (hasPendingVerification) {
+    if (hasPendingVerification()) {
       return '⏳';
     }
     
-    if (hasVerificationRequirements) {
+    if (hasVerificationRequirements()) {
       return '📄';
     }
     
@@ -142,57 +191,20 @@ const StripeAccountStatus: React.FC<StripeAccountStatusProps> = ({
     return '💰';
   };
 
-  // ✅ Get requirements list
-  const getRequirementsList = () => {
-    const requirements = [];
-    
-    if (stripeStatus.requirements?.currently_due?.length > 0) {
-      requirements.push(...stripeStatus.requirements.currently_due);
-    }
-    
-    if (stripeStatus.requirements?.past_due?.length > 0) {
-      requirements.push(...stripeStatus.requirements.past_due);
-    }
-    
-    if (stripeStatus.missingRequirements?.length > 0) {
-      requirements.push(...stripeStatus.missingRequirements);
-    }
-    
-    // Format requirements for display
-    return requirements.map(req => {
-      // Clean up requirement names
-      const cleanReq = req
-        .replace(/individual\.verification\./g, '')
-        .replace(/company\.verification\./g, '')
-        .replace(/\./g, ' ')
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, l => l.toUpperCase());
-      
-      return {
-        original: req,
-        display: cleanReq,
-        isDocument: req.includes('document') || req.includes('verification')
-      };
-    });
-  };
-
-  const requirementsList = getRequirementsList();
-  const hasRequirements = requirementsList.length > 0;
-
   return (
     <div className="mb-6">
       {/* Stripe Status Banner */}
-      <div className={`bg-gradient-to-r ${hasVerificationRequirements ? 'from-orange-50 to-amber-100' : 'from-blue-50 to-indigo-100'} border ${hasVerificationRequirements ? 'border-orange-200' : 'border-blue-200'} rounded-2xl p-6`}>
+      <div className={`bg-gradient-to-r ${hasVerificationRequirements() ? 'from-orange-50 to-amber-100' : 'from-blue-50 to-indigo-100'} border ${hasVerificationRequirements() ? 'border-orange-200' : 'border-blue-200'} rounded-2xl p-6`}>
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="flex items-start">
-            <div className={`p-3 rounded-xl mr-4 ${hasVerificationRequirements ? 'bg-orange-100' : 'bg-blue-100'}`}>
+            <div className={`p-3 rounded-xl mr-4 ${hasVerificationRequirements() ? 'bg-orange-100' : 'bg-blue-100'}`}>
               <span className="text-2xl">{getIcon()}</span>
             </div>
             <div className="flex-1">
               <h3 className="font-bold text-gray-900 text-lg mb-2">
-                {hasVerificationRequirements 
+                {hasVerificationRequirements() 
                   ? 'Verification Required' 
-                  : stripeStatus.connected && stripeStatus.chargesEnabled 
+                  : stripeStatus.account?.charges_enabled
                     ? 'Stripe Connected' 
                     : 'Stripe Setup Required'}
               </h3>
@@ -210,11 +222,11 @@ const StripeAccountStatus: React.FC<StripeAccountStatusProps> = ({
                                     getStatusColor().includes('blue') ? '#3B82F6' :
                                     getStatusColor().includes('red') ? '#EF4444' : '#6B7280'
                   }}></span>
-                  {stripeStatus.connected && stripeStatus.chargesEnabled 
+                  {stripeStatus.account?.charges_enabled 
                     ? 'Active' 
-                    : hasPendingVerification 
+                    : hasPendingVerification() 
                       ? 'Under Review' 
-                      : hasVerificationRequirements 
+                      : hasVerificationRequirements() 
                         ? 'Verification Needed' 
                         : stripeStatus.detailsSubmitted 
                           ? 'Setup Incomplete' 
@@ -239,7 +251,7 @@ const StripeAccountStatus: React.FC<StripeAccountStatusProps> = ({
                 <div className="mt-4 p-4 bg-white border border-gray-200 rounded-lg">
                   <h4 className="font-medium text-gray-900 mb-3">Required Documents/Information:</h4>
                   <ul className="space-y-2">
-                    {requirementsList.map((req, index) => (
+                    {requirements.map((req, index) => (
                       <li key={index} className="flex items-start">
                         <div className="w-5 h-5 bg-red-100 rounded-full flex items-center justify-center mr-2 flex-shrink-0 mt-0.5">
                           <svg className="w-3 h-3 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -268,7 +280,7 @@ const StripeAccountStatus: React.FC<StripeAccountStatusProps> = ({
               )}
 
               {/* Additional Information */}
-              {hasVerificationRequirements && (
+              {hasVerificationRequirements() && (
                 <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
                   <div className="flex">
                     <div className="mr-3 flex-shrink-0">
@@ -309,14 +321,14 @@ const StripeAccountStatus: React.FC<StripeAccountStatusProps> = ({
                 </>
               ) : (
                 <>
-                  {hasVerificationRequirements ? (
+                  {hasVerificationRequirements() ? (
                     <>
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                       </svg>
                       {getButtonText()}
                     </>
-                  ) : hasPendingVerification ? (
+                  ) : hasPendingVerification() ? (
                     <>
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -337,21 +349,21 @@ const StripeAccountStatus: React.FC<StripeAccountStatusProps> = ({
             
             {/* Additional Info */}
             <div className="mt-4 text-sm">
-              {stripeStatus.connected && stripeStatus.chargesEnabled ? (
+              {stripeStatus.account?.charges_enabled ? (
                 <p className="text-green-600">
                   <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                   Ready to accept payments
                 </p>
-              ) : hasPendingVerification ? (
+              ) : hasPendingVerification() ? (
                 <p className="text-yellow-600">
                   <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   Verification in progress
                 </p>
-              ) : hasVerificationRequirements ? (
+              ) : hasVerificationRequirements() ? (
                 <p className="text-orange-600">
                   <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.998-.833-2.732 0L4.302 16.5c-.77.833.192 2.5 1.732 2.5z" />
@@ -369,7 +381,7 @@ const StripeAccountStatus: React.FC<StripeAccountStatusProps> = ({
       </div>
 
       {/* Quick Stats (If connected) */}
-      {stripeStatus.connected && stripeStatus.chargesEnabled && (
+      {stripeStatus.account?.charges_enabled && (
         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="flex items-center">
@@ -391,7 +403,7 @@ const StripeAccountStatus: React.FC<StripeAccountStatusProps> = ({
               <div>
                 <p className="text-sm font-medium text-gray-600">Payouts</p>
                 <p className="text-lg font-bold text-blue-600">
-                  {stripeStatus.requirements?.payouts_enabled ? 'Enabled' : 'Pending'}
+                  {stripeStatus.account?.payouts_enabled ? 'Enabled' : 'Pending'}
                 </p>
               </div>
             </div>
