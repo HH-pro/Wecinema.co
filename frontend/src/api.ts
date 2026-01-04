@@ -1,4 +1,4 @@
-// api.ts - COMPLETE API FILE WITH ALL ROUTES
+// api.ts - UPDATED WITH ALL NEW BUYER ROUTES
 import axios, { AxiosResponse, AxiosError, Method } from "axios";
 import { toast } from "react-toastify";
 
@@ -7,6 +7,7 @@ import { toast } from "react-toastify";
 // ========================
 
 // Create an axios instance with default configurations
+
 const api = axios.create({
   baseURL: import.meta.env.DEV
     ? "http://localhost:3000/"
@@ -16,6 +17,8 @@ const api = axios.create({
     "Content-Type": "application/json",
   },
 });
+
+
 
 // Request interceptor for adding tokens
 api.interceptors.request.use(
@@ -158,106 +161,33 @@ export const deleteRequest = <T>(
     .then((response) => handleSuccess(response, "delete", setLoading, message))
     .catch((error) => handleError(error, "delete", setLoading));
 
+
 // ========================
-// FILE UPLOAD FUNCTIONS
+// AUTH APIs
 // ========================
-export const uploadFiles = async (
-  files: File[],
-  setLoading: React.Dispatch<React.SetStateAction<boolean>>
-): Promise<Array<{
-  filename: string;
-  originalName: string;
-  mimeType: string;
-  size: number;
-  url: string;
-  path: string;
-}>> => {
-  try {
-    setLoading(true);
-    const formData = new FormData();
-    
-    files.forEach((file) => {
-      formData.append('files', file);
-    });
 
-    const token = localStorage.getItem("token");
-    
-    const response = await fetch('http://localhost:3000/marketplace/orders/upload/delivery', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-      body: formData,
-    });
+export const authAPI = {
+  login: (credentials: { email: string; password: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    postRequest("/api/auth/login", credentials, setLoading, "Login successful"),
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Upload failed');
-    }
+  register: (userData: { username: string; email: string; password: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    postRequest("/api/auth/register", userData, setLoading, "Registration successful"),
 
-    const data = await response.json();
-    
-    if (data.success) {
-      toast.success(`Uploaded ${data.count} file(s) successfully`);
-      return data.files;
-    } else {
-      throw new Error(data.error || 'Upload failed');
-    }
-  } catch (error: any) {
-    console.error('Upload error:', error);
-    toast.error(error.message || 'File upload failed');
-    throw error;
-  } finally {
-    setLoading(false);
-  }
+  getCurrentUser: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
+    getRequest("/api/auth/me", setLoading),
+
+  updateProfile: (userData: any, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
+    putRequest("/api/auth/profile", userData, setLoading, "Profile updated"),
+
+  logout: () => {
+    localStorage.removeItem("token");
+    window.location.href = '/';
+  },
+
+  isAuthenticated: () => !!localStorage.getItem("token"),
+  getToken: () => localStorage.getItem("token"),
 };
 
-export const getUploadedFile = (filename: string): string => {
-  return `http://localhost:3000/marketplace/orders/upload/delivery/${filename}`;
-};
-
-export const ALLOWED_FILE_TYPES = [
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-  'video/mp4', 'video/quicktime', 'video/x-msvideo',
-  'application/pdf',
-  'application/zip',
-  'application/x-zip-compressed',
-  'application/x-rar-compressed',
-  'application/x-7z-compressed',
-  'text/plain',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'audio/mpeg', 'audio/wav', 'audio/ogg',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-];
-
-export const ALLOWED_FILE_EXTENSIONS = [
-  '.jpg', '.jpeg', '.png', '.gif', '.webp',
-  '.mp4', '.mov', '.avi',
-  '.pdf', '.zip', '.rar', '.7z', '.tar', '.gz', '.bz2',
-  '.txt', '.doc', '.docx',
-  '.mp3', '.wav', '.ogg',
-  '.xls', '.xlsx'
-];
-
-export const validateFile = (file: File): string | null => {
-  const extension = '.' + file.name.split('.').pop()?.toLowerCase();
-  
-  if (ALLOWED_FILE_TYPES.includes(file.type)) {
-    return null;
-  }
-  
-  if (extension && ALLOWED_FILE_EXTENSIONS.includes(extension)) {
-    return null;
-  }
-  
-  return `File type not supported. Allowed: ${ALLOWED_FILE_EXTENSIONS.join(', ')}`;
-};
-
-// ========================
-// UTILITY FUNCTIONS
-// ========================
 
 export const formatDate = (dateString: string): string => {
   if (!dateString) return 'N/A';
@@ -282,183 +212,6 @@ export const formatDateTime = (dateString: string): string => {
 };
 
 // ========================
-// AUTH APIs
-// ========================
-
-export const authAPI = {
-  // Standard auth
-  login: (credentials: { email: string; password: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/api/user/login", credentials, setLoading, "Login successful"),
-
-  register: (userData: { username: string; email: string; password: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/api/user/register", userData, setLoading, "Registration successful"),
-
-  getCurrentUser: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest("/api/user/me", setLoading),
-
-  updateProfile: (userData: any, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest("/api/user/profile", userData, setLoading, "Profile updated"),
-
-  logout: () => {
-    localStorage.removeItem("token");
-    window.location.href = '/';
-  },
-
-  isAuthenticated: () => !!localStorage.getItem("token"),
-  getToken: () => localStorage.getItem("token"),
-
-  // Google/Firebase auth
-  signup: (userData: { username: string; email: string; password?: string; avatar?: string; dob?: string; userType?: string; isGoogleAuth?: boolean }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/api/user/signup", userData, setLoading, "Registration successful"),
-
-  signin: (credentials: { email: string; password?: string; isGoogleAuth?: boolean }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/api/user/signin", credentials, setLoading, "Login successful"),
-
-  verifyToken: (token: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/api/user/verify-token", { token }, setLoading),
-
-  verifyEmail: (email: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(`/api/user/verify-email?email=${email}`, setLoading),
-
-  // Password management
-  changePassword: (data: { email: string; currentPassword: string; newPassword: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest("/api/user/change-password", data, setLoading, "Password changed successfully"),
-};
-
-// ========================
-// USER APIs
-// ========================
-
-export const userAPI = {
-  // User CRUD operations
-  getAllUsers: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest("/api/user/", setLoading),
-
-  getUserById: (id: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(`/api/user/${id}`, setLoading),
-
-  getPaymentUserById: (id: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(`/api/user/payment/user/${id}`, setLoading),
-
-  updateUser: (id: string, data: { username?: string; email?: string; password?: string; avatar?: string; dob?: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/api/user/edit/${id}`, data, setLoading, "User updated successfully"),
-
-  deleteUser: (id: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    deleteRequest(`/api/user/delete/${id}`, setLoading, "User deleted successfully"),
-
-  // User type management
-  changeUserType: (id: string, userType: 'buyer' | 'seller', setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/api/user/change-type/${id}`, { userType }, setLoading, "User type updated"),
-
-  // Follow/unfollow
-  followUser: (targetUserId: string, userId: string, action: 'follow' | 'unfollow', setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/api/user/${targetUserId}/follow`, { action, userId }, setLoading, action === 'follow' ? "Followed successfully" : "Unfollowed successfully"),
-
-  // Paid users
-  getPaidUsers: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest("/api/user/paid-users", setLoading),
-
-  // Payment status
-  getPaymentStatus: (userId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(`/api/user/payment-status/${userId}`, setLoading),
-
-  updatePaymentStatus: (data: { userId: string; hasPaid: boolean }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/api/user/update-payment-status", data, setLoading, "Payment status updated"),
-
-  // User status management
-  changeUserStatusAll: (setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest("/api/user/change-user-status", {}, setLoading, "All user statuses updated"),
-
-  changeUserStatus: (data: { userId: string; status: boolean }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/api/user/change-user-status", data, setLoading, "User status updated"),
-};
-
-// ========================
-// ADMIN APIs
-// ========================
-
-export const adminAPI = {
-  // Admin auth
-  adminRegister: (data: { email: string; password: string; username: string; dob: string; isAdmin?: boolean; isSubAdmin?: boolean }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/api/user/admin/register", data, setLoading, "Admin registered successfully"),
-
-  adminLogin: (credentials: { email: string; password: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/api/user/admin/login", credentials, setLoading, "Admin login successful"),
-
-  // Admin user management
-  getPrivilegedUsers: (role?: 'admin' | 'subadmin' | 'both', setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(role ? `/api/user/admin/users?role=${role}` : "/api/user/admin/users", setLoading),
-
-  addAdmin: (email: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest("/api/user/admin/add", { email }, setLoading, "Admin privileges added"),
-
-  removePrivileges: (userId: string, data: { removeAll?: boolean; removeAdmin?: boolean; removeSubAdmin?: boolean }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/api/user/admin/remove/${userId}`, data, setLoading, "Privileges removed"),
-
-  // Admin user operations
-  getAllUsersAdmin: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest("/api/user/admin/users", setLoading),
-
-  deleteUserAdmin: (id: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    deleteRequest(`/api/user/admin/users/${id}`, setLoading, "User deleted successfully"),
-
-  updateUserAdmin: (id: string, data: { username?: string; email?: string; password?: string; avatar?: string; dob?: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/api/user/admin/edit/${id}`, data, setLoading, "User updated successfully"),
-
-  // Admin video management
-  getAllVideos: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest("/api/user/admin/videos", setLoading),
-
-  addVideo: (data: { title: string; description: string; url: string; genre: string; duration: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/api/user/admin/videos", data, setLoading, "Video added successfully"),
-
-  updateVideo: (id: string, data: { title?: string; description?: string; url?: string; genre?: string; duration?: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    putRequest(`/api/user/admin/videos/${id}`, data, setLoading, "Video updated successfully"),
-
-  deleteVideo: (id: string, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    deleteRequest(`/api/user/admin/videos/${id}`, setLoading, "Video deleted successfully"),
-
-  createVideo: (data: { title: string; description: string; genre: string; theme: string; rating: string; isForSale: boolean; file: string; author: string; role: string; slug: string; status?: boolean; users?: string[]; hasPaid?: boolean }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/api/user/admin/create", data, setLoading, "Video created successfully"),
-};
-
-// ========================
-// SUBSCRIPTION APIs
-// ========================
-
-export const subscriptionAPI = {
-  getSubscriptionStatus: (userId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(`/api/user/status/${userId}`, setLoading),
-
-  saveTransaction: (data: { userId: string; username: string; email: string; orderId: string; payerId: string; amount: number; currency: string; subscriptionType: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/api/user/save-transaction", data, setLoading, "Transaction saved successfully"),
-
-  getAllTransactions: (setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest("/api/user/transactions", setLoading),
-
-  getUserTransactions: (userId: string, setLoading?: React.Dispatch<React.SetStateAction<boolean>>) =>
-    getRequest(`/api/user/transactions/${userId}`, setLoading),
-};
-
-// ========================
-// CONTACT API
-// ========================
-
-export const contactAPI = {
-  sendMessage: (data: { name: string; email: string; message: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/api/user/contact", data, setLoading, "Message sent successfully"),
-};
-
-// ========================
-// ORDERS API (Firebase/Realtime Database)
-// ========================
-
-export const ordersAPI = {
-  createOrder: (data: { chatId: string; description: string; price: number; createdBy: string }, setLoading: React.Dispatch<React.SetStateAction<boolean>>) =>
-    postRequest("/api/user/orders", data, setLoading, "Order created successfully"),
-};
-
-// ========================
 // LEGACY INDIVIDUAL EXPORTS (for backward compatibility)
 // ========================
 
@@ -468,26 +221,5 @@ export const registerUser = authAPI.register;
 export const getCurrentUser = authAPI.getCurrentUser;
 export const updateProfile = authAPI.updateProfile;
 
-// User exports
-export const getUserById = userAPI.getUserById;
-export const updateUser = userAPI.updateUser;
-export const deleteUser = userAPI.deleteUser;
-export const getPaymentStatus = userAPI.getPaymentStatus;
-
-// Admin exports
-export const adminLogin = adminAPI.adminLogin;
-export const adminRegister = adminAPI.adminRegister;
-export const getAllVideos = adminAPI.getAllVideos;
-
-// Subscription exports
-export const saveTransaction = subscriptionAPI.saveTransaction;
-export const getAllTransactions = subscriptionAPI.getAllTransactions;
-
-// Contact export
-export const sendContactMessage = contactAPI.sendMessage;
-
-// ========================
-// DEFAULT EXPORT
-// ========================
 
 export default api;
