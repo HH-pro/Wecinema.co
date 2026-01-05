@@ -28,6 +28,10 @@ import "./Sidebar.css";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
+// ✅ API Base URL - same as other components
+const API_BASE_URL = "https://wecinema.co/api"; // Production
+// const API_BASE_URL = "http://localhost:5000/api"; // Local
+
 interface SidebarProps {
   expand: boolean;
   darkMode: boolean;
@@ -69,8 +73,9 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const fetchPaymentStatus = async (userId: any) => {
     try {
+      // ✅ Use API_BASE_URL here
       const response = await axios.get(
-        `https://wecinema.co/api/user/payment-status/${userId}`
+        `${API_BASE_URL}/user/payment-status/${userId}`
       );
       setHasPaid(response.data.hasPaid);
     } catch (error) {
@@ -80,8 +85,9 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const fetchUserData = async (userId: any) => {
     try {
+      // ✅ Use API_BASE_URL here
       const response = await axios.get(
-        `http://localhost:3000/user/${userId}`
+        `${API_BASE_URL}/user/${userId}`
       );
       setUserData(response.data);
       if (response.data.userType) {
@@ -113,8 +119,9 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
 
     try {
+      // ✅ Use API_BASE_URL here
       const response = await axios.put(
-        `http://localhost:3000/user/change-type/${tokenData.userId}`,
+        `${API_BASE_URL}/user/change-type/${tokenData.userId}`,
         { userType: newType },
         {
           headers: {
@@ -148,8 +155,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           </h2>
           {expand && (
             <div className="user-type-switcher">
-              
-              
+              {/* User type switch button could be added here if needed */}
             </div>
           )}
         </div>
