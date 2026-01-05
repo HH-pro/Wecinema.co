@@ -10,7 +10,9 @@ import axios from 'axios';
 import { getDatabase, ref, push, serverTimestamp } from 'firebase/database'
 
 // ✅ Environment variable se API URL - automatic switch hoga
-const API_BASE_URL = process.env.REACT_APP_API_URL || "https://wecinema-co.onrender.com";
+// ✅ Simple solution - comment/uncomment karein
+const API_BASE_URL = "https://wecinema-co.onrender.com"; // Production
+// const API_BASE_URL = "http://localhost:5000/api"; // Local
 
 // Debugging ke liye (optional)
 console.log("Current API Base URL:", API_BASE_URL);
