@@ -21,8 +21,8 @@ const createTransporter = () => {
     port: process.env.EMAIL_PORT || 587,
     secure: false,
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD
     },
     tls: {
       rejectUnauthorized: false
@@ -37,7 +37,7 @@ const sendVerificationEmail = async (email, username, verificationToken) => {
     const verificationLink = `${process.env.BASE_URL || 'http://localhost:3000'}/api/user/verify-email?token=${verificationToken}`;
     
     const mailOptions = {
-      from: `"Wecinema" <${process.env.EMAIL_USER}>`,
+      from: `"Wecinema" <${process.env.GMAIL_USER}>`,
       to: email,
       subject: 'Verify Your Wecinema Account',
       html: `
