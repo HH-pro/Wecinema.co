@@ -148,25 +148,8 @@ const Sidebar: React.FC<SidebarProps> = ({
           </h2>
           {expand && (
             <div className="user-type-switcher">
-<<<<<<< HEAD
-              <button
-                className={`type-btn ${userType === 'buyer' ? 'active' : ''}`}
-                onClick={() => changeUserType('buyer')}
-                title="Switch to Buyer Mode"
-              >
-                <FaShoppingCart size={12} />
-              </button>
-              <button
-                className={`type-btn ${userType === 'seller' ? 'active' : ''}`}
-                onClick={() => changeUserType('seller')}
-                title="Switch to Seller Mode"
-              >
-                <FaUserTie size={12} />
-              </button>
-=======
               
               
->>>>>>> 70c98a51 (yes)
             </div>
           )}
         </div>
