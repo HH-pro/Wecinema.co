@@ -9,6 +9,9 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import PayPalButtonWrapper from './PayPalButtonWrapper';
 
+// ✅ Environment variable se API URL - same as GenrePage
+const API_BASE_URL = process.env.REACT_APP_API_URL || "https://wecinema-co.onrender.com";
+
 const Container = styled.div`
   display: flex;
   justify-content: center;
@@ -99,46 +102,41 @@ const TransactionPopup: React.FC<TransactionPopupProps> = ({ message, onClose, i
 
 const PaymentComponent = () => {
   const location = useLocation();
-  const navigate = useNavigate(); // Initialize useNavigate
+  const navigate = useNavigate();
   const { subscriptionType, amount } = location.state as { subscriptionType: string, amount: number };
 
   const [showPopup, setShowPopup] = useState(false);
   const [popupMessage, setPopupMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [userHasPaid, setUserHasPaid] = useState(false);
-  const [setLoading] = useState<any>({});
-  const [setUser] = useState<any>({});
-  const [redirect, setRedirect] = useState(false); // New state for redirect
-
+  const [loading, setLoading] = useState<any>({});
+  const [user, setUser] = useState<any>({});
+  const [redirect, setRedirect] = useState(false);
   const [showOverlay, setShowOverlay] = useState(false);
+  
   const token = localStorage.getItem("token") || null;
   let userId = null;
   let username = null;
 
   if (token) {
     const tokenData = decodeToken(token);
-    // console.log('Token Data:', tokenData);
-
-    userId = tokenData.userId;
-    username = tokenData.username;
-
-    // console.log("User ID:", userId);
-    // console.log("Username:", username);
+    userId = tokenData?.userId || tokenData?.id || null;
+    username = tokenData?.username || null;
   }
 
   useEffect(() => {
     if (!userId) {
-      // console.error('User ID is not defined.');
+      console.error('User ID is not defined.');
       return;
     }
 
     const fetchData = async () => {
       try {
-        const result = await getRequest("/user/" + userId, setLoading);
-        // console.log('Fetched user data:', result);
+        // ✅ Use API_BASE_URL here
+        const result = await getRequest(`/user/${userId}`, setLoading);
         setUser(result);
       } catch (error) {
-        // console.error("Error fetching data:", error);
+        console.error("Error fetching data:", error);
       }
     }
 
@@ -146,12 +144,12 @@ const PaymentComponent = () => {
 
     const checkUserPaymentStatus = async () => {
       try {
-        const response = await axios.get(`https://wecinema.co/api/user/${userId}`);
-        console.log("id", userId)
+        // ✅ Use API_BASE_URL here
+        const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
         const user = response.data;
     
         if (!user.hasPaid) {
-          return; // Stay on payment page
+          return;
         }
     
         if (user.subscriptionType !== subscriptionType) {
@@ -168,28 +166,31 @@ const PaymentComponent = () => {
         }
     
         const today: any = new Date();
-        const lastPayment: any = new Date(user.lastPayment); // <-- FIXED HERE
+        const lastPayment: any = new Date(user.lastPayment);
         const diffTime = Math.abs(today - lastPayment);
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
         if (diffDays >= 30) {
-          await axios.post(`https://wecinema.co/api/user/update-payment-status`, { userId, hasPaid: false });
+          // ✅ Use API_BASE_URL here
+          await axios.post(`${API_BASE_URL}/user/update-payment-status`, { 
+            userId, 
+            hasPaid: false 
+          });
           setUserHasPaid(false);
           setPopupMessage('Your subscription has expired. Please renew to continue.');
           setIsError(true);
           setShowPopup(true);
         } else if (diffDays > 28) {
-          setPopupMessage('It’s been over 28 days since your last payment. Please update your subscription.');
+          setPopupMessage('It\'s been over 28 days since your last payment. Please update your subscription.');
           setShowPopup(true);
         } else {
           setUserHasPaid(user.hasPaid);
         }
     
       } catch (error) {
-        // console.error('Error fetching user payment status:', error);
+        console.error('Error fetching user payment status:', error);
       }
     };
-    
 
     checkUserPaymentStatus();
   }, [userId]);
@@ -198,17 +199,16 @@ const PaymentComponent = () => {
     if (redirect) {
       navigate('/');
     }
-  }, [redirect, navigate]); // Redirect when the state changes
+  }, [redirect, navigate]);
 
-  const handlePaymentSuccess = async (details:any) => {
+  const handlePaymentSuccess = async (details: any) => {
     try {
-      // console.log('Payment details:', details);
-      
       if (!details.id || !details.payer) {
         throw new Error('Incomplete transaction details');
       }
 
-      const response = await axios.post('https://wecinema.co/api/user/save-transaction', {
+      // ✅ Use API_BASE_URL here
+      const response = await axios.post(`${API_BASE_URL}/user/save-transaction`, {
         userId: userId,
         username: username,
         email: details.payer.email_address,
@@ -218,7 +218,6 @@ const PaymentComponent = () => {
         currency: 'USD',
         subscriptionType
       });
-      // console.log('Transaction saved:', response.data);
 
       setPopupMessage('Transaction completed successfully!');
       setIsError(false);
@@ -227,18 +226,17 @@ const PaymentComponent = () => {
       
       toast.success('Transaction successful! Redirecting to profile...');
 
-      // Set redirect to true after showing the popup
       setTimeout(() => {
         setRedirect(true);
-      }, 2000); // Adjust the delay to match your popup display time
+      }, 2000);
 
     } catch (error) {
-      // console.error('Failed to save transaction:', error);
+      console.error('Failed to save transaction:', error);
       handlePaymentError('Failed to save transaction. Please try again.');
     }
   };
 
-  const handlePaymentError = (message:any) => {
+  const handlePaymentError = (message: any) => {
     setPopupMessage(message);
     setIsError(true);
     setShowPopup(true);
@@ -247,31 +245,30 @@ const PaymentComponent = () => {
 
   return (
     <Layout expand={false} hasHeader={true}>
-      
       <Container>
-      {showOverlay && (
-  <div style={{
-    position: "fixed",
-    top: 0,
-    left: 0,
-    width: "100%",
-    height: "100%",
-    backgroundColor: "rgba(0, 0, 0, 0.7)", // Dark overlay
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 1000
-  }}>
-    <div style={{
-      backgroundColor: "#fff",
-      padding: "20px",
-      borderRadius: "8px",
-      textAlign: "center"
-    }}>
-      <p>{popupMessage}</p>
-    </div>
-  </div>
-)}
+        {showOverlay && (
+          <div style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            backgroundColor: "rgba(0, 0, 0, 0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000
+          }}>
+            <div style={{
+              backgroundColor: "#fff",
+              padding: "20px",
+              borderRadius: "8px",
+              textAlign: "center"
+            }}>
+              <p>{popupMessage}</p>
+            </div>
+          </div>
+        )}
 
         {!userHasPaid ? (
           <>
@@ -281,10 +278,21 @@ const PaymentComponent = () => {
                 <Description>Your subscription type: {subscriptionType}</Description>
                 <Description>Amount: ${amount}</Description>
                 <Description>Pay with PayPal or Debit Card</Description>
-                <PayPalButtonWrapper amount={amount} userId={userId} onSuccess={handlePaymentSuccess} onError={handlePaymentError} />
+                <PayPalButtonWrapper 
+                  amount={amount} 
+                  userId={userId} 
+                  onSuccess={handlePaymentSuccess} 
+                  onError={handlePaymentError} 
+                />
               </div>
             </SubscriptionBox>
-            {showPopup && <TransactionPopup message={popupMessage} onClose={() => setShowPopup(false)} isError={isError} />}
+            {showPopup && (
+              <TransactionPopup 
+                message={popupMessage} 
+                onClose={() => setShowPopup(false)} 
+                isError={isError} 
+              />
+            )}
           </>
         ) : (
           <SubscriptionBox>
