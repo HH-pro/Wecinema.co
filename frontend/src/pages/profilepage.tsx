@@ -556,7 +556,7 @@ const GenrePage: React.FC = () => {
 
     if (loading) {
         return (
-            <Layout expand={false} hasHeader={false}>
+            <Layout expand={false} hasHeader={true}>
                 <div className="mt-12 px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-center items-center min-h-[60vh]">
                         <div className="text-center">
