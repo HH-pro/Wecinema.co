@@ -174,7 +174,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     currency,
   }).format(valueInDollars);
 };
-
+const formatCurrencyshow = (amount: number, currency: string = 'USD'): string => { return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency, }).format(amount || 0); };
 
   const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleDateString('en-IN', {
@@ -467,7 +467,7 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <p className="text-sm text-gray-600">Listed Price</p>
-                              <p className="text-sm font-medium text-gray-900">{$(orderDetails.listingId?.price || 0)}</p>
+                              <p className="text-sm font-medium text-gray-900">{formatCurrencyshow(orderDetails.listingId?.price || 0)}</p>
                             </div>
                             <div>
                               <p className="text-sm text-gray-600">Sold For</p>
