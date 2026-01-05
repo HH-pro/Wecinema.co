@@ -10,7 +10,7 @@ const Video = require("../models/videos");
 const Contact = require("../models/contact");
 const Subscription  = require("../models/subscription");
 const Transaction = require("../models/transaction"); 
-// const admin = require('../firebaseAdmin');
+const admin = require('../firebaseAdmin');
 
 
 
@@ -284,11 +284,10 @@ router.post("/contact", async (req, res) => {
     }
 });
 
-// User registration route (for both Email/Password and Google)
+// User registration route
 router.post('/signup', async (req, res) => {
 	try {
-		const { username, email, password, avatar, dob, userType, isGoogleAuth } = req.body;
-		
+		const { username, email, password, avatar, dob } = req.body;
 		// Check if the user already exists
 		const existingUser = await User.findOne({ email });
 		if (existingUser) {
@@ -297,21 +296,9 @@ router.post('/signup', async (req, res) => {
 				.json({ error: "User already exists with this email" });
 		}
 
-		// For Google auth, username and email are required
-		// For email/password auth, username, email and password are required
-		if (isGoogleAuth) {
-			if (!username || !email) {
-				return res.status(400).json({ error: "Username and email are required for Google signup" });
-			}
-		} else {
-			if (!username || !email || !password) {
-				return res.status(400).json({ error: "Username, email and password are required" });
-			}
-		}
-
-		// Hash the password - different approach for Google vs Email
-		const hashedPassword = isGoogleAuth 
-			? await argon2.hash("wecinema_google_auth") // Fixed password for Google users
+		// Hash the password using bcrypt
+		const hashedPassword = !password
+			? await argon2.hash("wecinema")
 			: await argon2.hash(password);
 
 		// Create a new user
@@ -319,41 +306,24 @@ router.post('/signup', async (req, res) => {
 			username,
 			email,
 			password: hashedPassword,
-			userType: userType || 'buyer',
-			avatar: avatar || "https://icon-library.com/images/anonymous-avatar-icon/anonymous-avatar-icon-25.jpg",
-			dob: dob || "--------",
-			authProvider: isGoogleAuth ? 'google' : 'email' // Track auth method
+			avatar: avatar
+				? avatar
+				: "https://icon-library.com/images/anonymous-avatar-icon/anonymous-avatar-icon-25.jpg",
+			dob,
 		});
-
-		// Generate token for immediate login
-		const key = "weloremcium.secret_key";
-		const token = jwt.sign(
-			{ userId: newUser._id, username: newUser.username, avatar: newUser.avatar },
-			key,
-			{ expiresIn: "8h" }
-		);
-
-		res.status(201).json({ 
-			message: "User registered successfully", 
-			token,
-			user: {
-				id: newUser._id,
-				username: newUser.username,
-				email: newUser.email,
-				userType: newUser.userType,
-				avatar: newUser.avatar
-			}
-		});
+		res
+			.status(201)
+			.json({ message: "User registered successfully", user: newUser.email });
 	} catch (error) {
 		console.error("Error creating user:", error);
 		res.status(500).json({ error: "Internal Server Error" });
 	}
-});
-
-// User login route (for both Email/Password and Google)
-router.post('/signin',authenticateMiddleware,async (req, res) => {
+  });
+  
+  // User login route
+  router.post('/signin', async (req, res) => {
 	try {
-		const { email, password, isGoogleAuth } = req.body;
+		const { email } = req.body;
 
 		// Find the user by email
 		const user = await User.findOne({ email });
@@ -362,61 +332,28 @@ router.post('/signin',authenticateMiddleware,async (req, res) => {
 		if (!user) {
 			return res.status(401).json({ error: "Invalid credentials" });
 		}
+		// Compare the provided password with the hashed password in the database
 
-		// For Google login
-		if (isGoogleAuth) {
+		if (email) {
 			const key = "weloremcium.secret_key";
+			// If the passwords match, generate a JWT token for authentication
 			const token = jwt.sign(
 				{ userId: user._id, username: user.username, avatar: user.avatar },
 				key,
-				{ expiresIn: "8h" }
+				{
+					expiresIn: "8h",
+				}
 			);
 
-			return res.status(200).json({ 
-				token,
-				user: {
-					id: user._id,
-					username: user.username,
-					email: user.email,
-					userType: user.userType,
-					avatar: user.avatar
-				}
-			});
+			res.status(200).json({ token });
+		} else {
+			res.status(401).json({ error: "Invalid credentials" });
 		}
-
-		// For email/password login
-		if (password) {
-			const isPasswordValid = await argon2.verify(user.password, password);
-			
-			if (isPasswordValid) {
-				const key = "weloremcium.secret_key";
-				const token = jwt.sign(
-					{ userId: user._id, username: user.username, avatar: user.avatar },
-					key,
-					{ expiresIn: "8h" }
-				);
-
-				return res.status(200).json({ 
-					token,
-					user: {
-						id: user._id,
-						username: user.username,
-						email: user.email,
-						userType: user.userType,
-						avatar: user.avatar
-					}
-				});
-			} else {
-				return res.status(401).json({ error: "Invalid credentials" });
-			}
-		}
-
-		res.status(401).json({ error: "Invalid credentials" });
 	} catch (error) {
 		console.error("Error during login:", error);
 		res.status(500).json({ error: "Internal Server Error" });
 	}
-});
+  });
   
   // Route for creating a user account
   router.post("/register", async (req, res) => {
@@ -691,44 +628,6 @@ router.put("/edit/:id", authenticateMiddleware, async (req, res) => {
 	}
 });
 
-
-// Change user type (buyer/seller)
-router.put("/change-type/:id", authenticateMiddleware, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { userType } = req.body;
-
-        // Validate userType
-        if (!userType || !['buyer', 'seller'].includes(userType)) {
-            return res.status(400).json({ error: "Invalid user type. Must be 'buyer' or 'seller'" });
-        }
-
-        // Find the user by ID
-        const user = await User.findById(id);
-        if (!user) {
-            return res.status(404).json({ error: "User not found" });
-        }
-
-        // Update user type
-        user.userType = userType;
-
-        // Save the updated user
-        await user.save();
-
-        res.status(200).json({ 
-            message: "User type updated successfully", 
-            user: {
-                id: user._id,
-                username: user.username,
-                email: user.email,
-                userType: user.userType
-            }
-        });
-    } catch (error) {
-        console.error("Error updating user type:", error);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-});
 //delete a particular user - only admin function
 router.delete("/delete/:id",   authenticateMiddleware, isAdmin,async (req, res) => {
 	try {
