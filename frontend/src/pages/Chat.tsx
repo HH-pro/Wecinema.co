@@ -144,7 +144,7 @@ const Chat = () => {
   }
 
   return (
-    <Layout expand={false} hasHeader={false}>
+    <Layout expand={false} hasHeader={true}>
       <div style={styles.chatContainer}>
         <div style={styles.messageBox}>
           {messages.map((msg, index) => (
