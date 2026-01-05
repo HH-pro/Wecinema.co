@@ -1,4 +1,4 @@
-/* Header.css - Fixed Mobile Dropdown Widths */
+/* Header.css - Dropdowns Open on Left Side */
 
 :root {
   /* Spacing */
@@ -349,7 +349,7 @@
 .dropdown-menu {
   position: absolute;
   top: calc(100% + 8px);
-  left: 0;
+  left: 0; /* Changed from right: 0 to left: 0 */
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--border-radius-md);
@@ -392,12 +392,12 @@
 }
 
 .dropdown-menu--genre {
-  min-width: 280px; /* Fixed desktop width */
+  min-width: 280px;
   max-height: 400px;
 }
 
 .dropdown-menu--rating {
-  min-width: 180px; /* Fixed desktop width */
+  min-width: 180px;
 }
 
 .dropdown-menu__header {
@@ -565,7 +565,7 @@
   flex-shrink: 0;
 }
 
-/* Mobile Styles - UPDATED DROPDOWN WIDTHS */
+/* Mobile Styles */
 @media (max-width: 768px) {
   .header {
     height: var(--header-height-mobile);
@@ -621,35 +621,18 @@
     padding: 0;
   }
   
-  /* Mobile dropdowns - FIXED WIDTHS */
+  /* Mobile dropdowns - Center aligned */
   .dropdown-menu {
     position: fixed !important;
     top: var(--header-height-mobile) !important;
-    left: 50% !important;
+    left: 50% !important; /* Center on mobile */
     right: auto !important;
     transform: translateX(-50%) !important;
-    width: 90% !important; /* Changed from calc(100vw - 32px) */
-    max-width: 350px !important; /* Reduced max width */
+    width: calc(100vw - 32px) !important;
+    max-width: 400px;
     max-height: 70vh;
     overflow-y: auto;
     background: var(--color-bg) !important;
-  }
-  
-  /* Specific widths for different dropdowns on mobile */
-  .dropdown-menu--upload {
-    width: 250px !important; /* Smaller width for upload menu */
-    max-width: 250px !important;
-  }
-  
-  .dropdown-menu--genre {
-    width: 300px !important; /* Moderate width for genre menu */
-    max-width: 300px !important;
-    max-height: 60vh;
-  }
-  
-  .dropdown-menu--rating {
-    width: 220px !important; /* Compact width for rating menu */
-    max-width: 220px !important;
   }
   
   /* Mobile light mode */
@@ -660,6 +643,10 @@
   /* Mobile dark mode */
   .header--dark .dropdown-menu {
     background: var(--color-dark-bg) !important;
+  }
+  
+  .dropdown-menu--genre {
+    max-height: 60vh;
   }
   
   .dropdown-menu__list {
@@ -814,31 +801,13 @@
   }
 }
 
-/* Extra Small Screens (480px and below) */
 @media (max-width: 480px) {
   .header__container {
     padding: 0 var(--spacing-sm);
   }
   
-  /* Even smaller dropdowns on very small screens */
   .dropdown-menu {
-    width: 85% !important;
-    max-width: 300px !important;
-  }
-  
-  .dropdown-menu--upload {
-    width: 220px !important;
-    max-width: 220px !important;
-  }
-  
-  .dropdown-menu--genre {
-    width: 280px !important;
-    max-width: 280px !important;
-  }
-  
-  .dropdown-menu--rating {
-    width: 200px !important;
-    max-width: 200px !important;
+    width: calc(100vw - 24px) !important;
   }
   
   .mobile-search-panel {
@@ -865,25 +834,11 @@
 @media (min-width: 769px) {
   /* Desktop dropdowns - Left aligned with light background */
   .dropdown-menu {
-    left: 0 !important;
+    left: 0 !important; /* Force left alignment on desktop */
     right: auto !important;
     background: #ffffff !important;
     border: 1px solid #e5e7eb;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-  }
-  
-  /* Desktop specific widths */
-  .dropdown-menu--upload {
-    min-width: 200px;
-  }
-  
-  .dropdown-menu--genre {
-    min-width: 280px;
-    max-height: 400px;
-  }
-  
-  .dropdown-menu--rating {
-    min-width: 180px;
   }
   
   .dropdown-menu__header {
