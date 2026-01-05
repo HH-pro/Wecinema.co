@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MdMenu, MdMic, MdMicOff } from "react-icons/md";
+import { MdMenu, MdMic, MdMicOff, MdExpandMore, MdUpload } from "react-icons/md";
 import logo from "../../assets/wecinema.png";
-import { FaUpload, FaVideo, FaFileAlt, FaChevronDown } from "react-icons/fa";
+import { FaVideo, FaFileAlt } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { categories, ratings } from "../../App";
 import { Search, X } from "lucide-react";
@@ -200,7 +200,8 @@ const Header: React.FC<HeaderProps> = ({
                             aria-expanded={isUploadMenuOpen}
                             aria-label="Upload options"
                         >
-                            <FaUpload size={16} />
+                            <MdUpload size={18} />
+                            {!isMobile && <span>Upload</span>}
                         </button>
 
                         {isUploadMenuOpen && (
@@ -235,8 +236,8 @@ const Header: React.FC<HeaderProps> = ({
                             aria-expanded={isGenreMenuOpen}
                         >
                             <span>Genre</span>
-                            <FaChevronDown 
-                                size={10} 
+                            <MdExpandMore 
+                                size={16} 
                                 className={`header__dropdown-arrow ${isGenreMenuOpen ? 'header__dropdown-arrow--open' : ''}`} 
                             />
                         </button>
@@ -244,7 +245,7 @@ const Header: React.FC<HeaderProps> = ({
                         {isGenreMenuOpen && categories && categories.length > 0 && (
                             <div className="dropdown-menu dropdown-menu--genre">
                                 <div className="dropdown-menu__header">
-                                    <h3 className="dropdown-menu__title">Genres</h3>
+                                    <h3 className="dropdown-menu__title">Browse Genres</h3>
                                     <span className="dropdown-menu__count">{categories.length}</span>
                                 </div>
                                 <div className="dropdown-menu__list">
@@ -275,8 +276,8 @@ const Header: React.FC<HeaderProps> = ({
                             aria-expanded={isRatingMenuOpen}
                         >
                             <span>Rating</span>
-                            <FaChevronDown 
-                                size={10} 
+                            <MdExpandMore 
+                                size={16} 
                                 className={`header__dropdown-arrow ${isRatingMenuOpen ? 'header__dropdown-arrow--open' : ''}`} 
                             />
                         </button>
@@ -284,7 +285,7 @@ const Header: React.FC<HeaderProps> = ({
                         {isRatingMenuOpen && ratings && ratings.length > 0 && (
                             <div className="dropdown-menu dropdown-menu--rating">
                                 <div className="dropdown-menu__header">
-                                    <h3 className="dropdown-menu__title">Ratings</h3>
+                                    <h3 className="dropdown-menu__title">Content Ratings</h3>
                                 </div>
                                 <div className="dropdown-menu__list">
                                     {ratings.map((rating, index) => (
