@@ -28,9 +28,8 @@ import "./Sidebar.css";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
-// ✅ API Base URL - same as other components
-const API_BASE_URL = "https://wecinema.co/api"; // Production
-// const API_BASE_URL = "http://localhost:5000/api"; // Local
+import { API_BASE_URL } from "../api";
+
 
 interface SidebarProps {
   expand: boolean;
