@@ -5,7 +5,7 @@ import { Layout } from '../components';
 
 const TermsAndConditions = () => {
   return (
-    <Layout expand={false} hasHeader={false}>
+    <Layout expand={false} hasHeader={true}>
     <div className="terms-conditions">
       <h1>Partnership with WeCinema.co Agreement</h1>
       <p>This Partnership with WeCinema.co Agreement ("Agreement") is made and entered into as of [Date], by and between:</p>
