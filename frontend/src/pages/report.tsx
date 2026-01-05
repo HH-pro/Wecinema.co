@@ -47,7 +47,7 @@ const ReportPage = () => {
   };
  
   return (
-    <Layout expand={false} hasHeader={false}>
+    <Layout expand={false} hasHeader={true}>
 
     <div className="max-w-lg mx-auto p-10 bg-white shadow-lg rounded-xl mt-10">
       <h2 className="text-xl font-bold mb-4">Report Content</h2>
