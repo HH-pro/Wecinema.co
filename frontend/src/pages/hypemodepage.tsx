@@ -26,7 +26,7 @@ const HypeModeProfile = () => {
   // Register user with backend
   const registerUser = async (username: string, email: string, avatar: string, userType: string) => {
     try {
-      const res = await axios.post('https://wecinema.co/api/user/signup', {
+      const res = await axios.post('http://localhost:3000/user/signup', {
         username,
         email,
         avatar,
