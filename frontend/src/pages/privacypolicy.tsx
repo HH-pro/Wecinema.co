@@ -35,7 +35,7 @@ const ListItem = styled.li`
 
 const PrivacyPolicy = () => {
   return (
-    <Layout expand={false} hasHeader={false}>
+    <Layout expand={false} hasHeader={true}>
       <Container>
         <Title>Privacy Policy</Title>
         
