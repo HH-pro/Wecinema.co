@@ -240,11 +240,7 @@ const Header: React.FC<HeaderProps> = ({
                         </button>
 
                         {isUploadMenuOpen && (
-<<<<<<< HEAD
-                            <div className="dropdown-menu dropdown-menu--upload">
-=======
                             <div className="dropdown-menu dropdown-menu--upload dropdown-menu--left">
->>>>>>> 70c98a51 (yes)
                                 <button
                                     className="dropdown-menu__item"
                                     onClick={handleUploadVideo}
@@ -282,11 +278,7 @@ const Header: React.FC<HeaderProps> = ({
                         </button>
                         
                         {isGenreMenuOpen && (
-<<<<<<< HEAD
-                            <div className="dropdown-menu dropdown-menu--genre">
-=======
                             <div className="dropdown-menu dropdown-menu--genre dropdown-menu--left">
->>>>>>> 70c98a51 (yes)
                                 <div className="dropdown-menu__header">
                                     <h3 className="dropdown-menu__title">Browse Genres</h3>
                                     <span className="dropdown-menu__count">{categories?.length || 0}</span>
@@ -331,11 +323,7 @@ const Header: React.FC<HeaderProps> = ({
                         </button>
                         
                         {isRatingMenuOpen && (
-<<<<<<< HEAD
-                            <div className="dropdown-menu dropdown-menu--rating">
-=======
                             <div className="dropdown-menu dropdown-menu--rating dropdown-menu--left">
->>>>>>> 70c98a51 (yes)
                                 <div className="dropdown-menu__header">
                                     <h3 className="dropdown-menu__title">Content Ratings</h3>
                                 </div>
