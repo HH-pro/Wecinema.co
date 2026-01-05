@@ -785,6 +785,35 @@ router.post("/login", async (req, res) => {
   }
 });
 
+// Legacy signup route (for backward compatibility)
+router.post('/signup', async (req, res) => {
+  try {
+    const { username, email, password, avatar, dob } = req.body;
+    
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: "User already exists with this email" });
+    }
+
+    const hashedPassword = !password
+      ? await argon2.hash("wecinema")
+      : await argon2.hash(password);
+
+    const newUser = await User.create({
+      username,
+      email,
+      password: hashedPassword,
+      avatar: avatar || "https://icon-library.com/images/anonymous-avatar-icon/anonymous-avatar-icon-25.jpg",
+      dob,
+    });
+    
+    res.status(201).json({ message: "User registered successfully", user: newUser.email });
+  } catch (error) {
+    console.error("Error creating user:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 // Legacy signin route
 router.post('/signin', async (req, res) => {
   try {
