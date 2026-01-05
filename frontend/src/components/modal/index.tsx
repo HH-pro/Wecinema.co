@@ -291,78 +291,96 @@ const Popup: React.FC<IPopupProps> = React.memo(
 			}
 		};
 
-		// Handle login
 		const handleLoginSubmit = async (e: React.FormEvent) => {
-			e.preventDefault();
-			setFormErrors({});
-			
-			// Basic validation
-			if (!validateEmail(email)) {
-				setFormErrors({ email: "Please enter a valid email address" });
-				toast.error("Please enter a valid email address");
-				return;
-			}
-			
-			if (!password) {
-				setFormErrors({ password: "Password is required" });
-				toast.error("Password is required");
-				return;
-			}
+  e.preventDefault();
+  setFormErrors({});
+  setLoading(true);
 
-			try {
-				setLoading(true);
-				const payload = { email, password };
+  try {
+    const payload = { 
+      email: email.trim().toLowerCase(), 
+      password: password.trim() 
+    };
 
-				const result: any = await postRequest("user/login", payload, setLoading);
+    console.log("Sending login request with payload:", payload);
 
-				// Handle unverified email
-				if (result.error && result.error.includes("verify your email")) {
-					setPendingVerificationEmail(email);
-					setVerificationModal(true);
-					toast.error("Please verify your email before logging in", {
-						duration: 4000,
-						position: "top-center",
-						icon: '📧'
-					});
-					return;
-				}
+    const result: any = await postRequest("user/login", payload, setLoading);
 
-				if (result.token && result.user) {
-					console.log("Login success:", result);
-					setShow(false);
-					setToken(result.token);
-					localStorage.setItem("token", result.token);
-					localStorage.setItem("loggedIn", "true");
-					localStorage.setItem("user", JSON.stringify(result.user));
+    console.log("Login response:", result);
 
-					toast.success("Login successful! 🎉", {
-						duration: 3000,
-						position: "top-center",
-						icon: '🎬'
-					});
+    if (result.error && result.error.includes("verify your email")) {
+      setPendingVerificationEmail(email);
+      setPendingVerificationUsername(result.user?.username || email.split('@')[0]);
+      setVerificationModal(true);
+      
+      toast.error("Please verify your email before logging in", {
+        duration: 4000,
+        position: "top-center",
+        icon: '📧'
+      });
+      return;
+    }
 
-					setTimeout(() => {
-						window.location.reload();
-					}, 1000);
-				}
-			} catch (error: any) {
-				setLoading(false);
-				const errorMessage = error?.response?.data?.error || "Login failed. Please try again.";
-				
-				if (error?.response?.status === 401) {
-					toast.error("Invalid email or password", {
-						duration: 4000,
-						position: "top-center",
-						icon: '🔒'
-					});
-				} else {
-					toast.error(errorMessage, {
-						duration: 4000,
-						position: "top-center",
-					});
-				}
-			}
-		};
+    if (result.token && result.user) {
+      console.log("Login successful, storing token");
+      
+      setShow(false);
+      setToken(result.token);
+      
+      localStorage.setItem("token", result.token);
+      localStorage.setItem("loggedIn", "true");
+      localStorage.setItem("user", JSON.stringify(result.user));
+
+      toast.success("Login successful! 🎉", {
+        duration: 3000,
+        position: "top-center",
+        icon: '🎬'
+      });
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    }
+  } catch (error: any) {
+    setLoading(false);
+    
+    console.error("Login error details:", {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
+    });
+
+    const errorMessage = error?.response?.data?.error || 
+                        error?.response?.data?.message || 
+                        "Login failed. Please try again.";
+    
+    if (error?.response?.status === 401) {
+      if (error.response?.data?.isVerified === false) {
+        // Email not verified
+        setPendingVerificationEmail(email);
+        setVerificationModal(true);
+        
+        toast.error("Please verify your email before logging in", {
+          duration: 4000,
+          position: "top-center",
+          icon: '📧'
+        });
+      } else {
+        // Invalid credentials
+        toast.error("Invalid email or password", {
+          duration: 4000,
+          position: "top-center",
+          icon: '🔒'
+        });
+      }
+    } else {
+      toast.error(errorMessage, {
+        duration: 4000,
+        position: "top-center",
+      });
+    }
+  }
+};
 
 		// Resend verification email
 		const resendVerificationEmail = async () => {
