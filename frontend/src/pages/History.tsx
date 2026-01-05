@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { Layout } from "../components";
-import { decodeToken, generateSlug } from "../utilities/helperfFunction"; // Import generateSlug
+import { decodeToken, generateSlug } from "../utilities/helperfFunction";
 import VideoThumbnail from "react-video-thumbnail";
 import { useNavigate } from "react-router-dom";
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || "https://wecinema-co.onrender.com";
 
 const HistoryView = () => {
   const [history, setHistory] = useState([]);
   const [error, setError] = useState("");
   const [userId, setUserId] = useState(null);
-  const nav = useNavigate(); // Initialize navigation
+  const nav = useNavigate();
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -26,13 +28,11 @@ const HistoryView = () => {
 
     const fetchHistory = async () => {
       try {
-        const response = await axios.get(`https://wecinema.co/api/video/history/${userId}`);
-
-        console.log("Fetched history data:", response.data);
+        // ✅ Use API_BASE_URL here
+        const response = await axios.get(`${API_BASE_URL}/video/history/${userId}`);
 
         setHistory(Array.isArray(response.data) ? response.data : []);
       } catch (error) {
-        console.error("Error fetching user history:", error);
         setError("Failed to load history.");
       }
     };
@@ -40,13 +40,11 @@ const HistoryView = () => {
     fetchHistory();
   }, [userId]);
 
-  const handleVideoClick = (video:any) => {
-  
+  const handleVideoClick = (video: any) => {
     nav(video.slug ?? "/video/" + generateSlug(video._id), {
-        state: video,
+      state: video,
     });
     localStorage.setItem("video", JSON.stringify(video));
-
   };
 
   return (
