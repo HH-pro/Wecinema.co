@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { HypemodeGallery} from "../components";
+import { HypemodeGallery } from "../components";
 import { MdForwardToInbox } from "react-icons/md";
 import { Layout } from "../components";
 import { getRequest } from "../api";
@@ -9,12 +9,16 @@ import Modal from 'react-modal';
 import axios from 'axios';
 import { getDatabase, ref, push, serverTimestamp } from 'firebase/database'
 
+// ✅ Environment variable se API URL - automatic switch hoga
+const API_BASE_URL = process.env.REACT_APP_API_URL || "https://wecinema-co.onrender.com";
 
-
+// Debugging ke liye (optional)
+console.log("Current API Base URL:", API_BASE_URL);
+console.log("Environment:", process.env.NODE_ENV);
 
 const GenrePage: React.FC = () => {
-  const [setLoading] = useState<any>({});
-  const [setUser] = useState<any>({});
+  const [loading, setLoading] = useState<boolean>(false);
+  const [user, setUser] = useState<any>({});
   const [userHasPaid, setUserHasPaid] = useState(false);
   const [showPaidUsersModal, setShowPaidUsersModal] = useState(false);
   const [paidUsers, setPaidUsers] = useState<any[]>([]);
@@ -26,12 +30,13 @@ const GenrePage: React.FC = () => {
 
   if (token) {
     const tokenData = decodeToken(token);
- 
+    userId = tokenData?.userId || tokenData?.id || null;
+    username = tokenData?.username || null;
   }
 
   useEffect(() => {
     if (!userId) {
-      // console.error('User ID is not defined.');
+      console.error('User ID is not defined.');
       return;
     }
 
@@ -40,28 +45,28 @@ const GenrePage: React.FC = () => {
         const result = await getRequest(`/user/${userId}`, setLoading);
         setUser(result);
       } catch (error) {
-        // console.error("Error fetching data.:", error);
+        console.error("Error fetching user data:", error);
       }
     };
 
     const checkUserPaymentStatus = async () => {
       try {
-        const response = await axios.get(`https://wecinema.co/api/user/payment-status/${userId}`);
+        const response = await axios.get(`${API_BASE_URL}/user/payment-status/${userId}`);
         const { hasPaid } = response.data;
         setUserHasPaid(hasPaid);
       } catch (error) {
-        // console.error('Error fetching user payment status:', error);
+        console.error('Error fetching user payment status:', error);
       }
     };
 
     const fetchPaidUsers = async () => {
       try {
-        const response = await axios.get(`https://wecinema.co/api/user/paid-users`);
+        const response = await axios.get(`${API_BASE_URL}/user/paid-users`);
         const users = response.data;
         const filteredUsers = users.filter((paidUser: any) => paidUser._id !== userId);
         setPaidUsers(filteredUsers);
       } catch (error) {
-        // console.error('Error fetching paid users:', error);
+        console.error('Error fetching paid users:', error);
       }
     };
 
@@ -79,14 +84,12 @@ const GenrePage: React.FC = () => {
     setShowPaidUsersModal(true);
   };
 
- 
-
   return (
     <Layout expand={false} hasHeader={true}>
       <div style={{ position: 'fixed', top: '100px', right: '20px', zIndex: 999 }}>
         <button onClick={handleOpenPaidUsersModal} style={{
           padding: '5px 12px',
-          background: '#f1c40f	',
+          background: '#f1c40f',
           color: '#fff',
           border: 'none',
           borderRadius: '',
@@ -94,7 +97,7 @@ const GenrePage: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
         }}>
-          <MdForwardToInbox size="40"  />
+          <MdForwardToInbox size="40" />
         </button>
       </div>
 
@@ -131,8 +134,6 @@ const GenrePage: React.FC = () => {
                 <img src={paidUser.avatar} alt={`${paidUser.username}'s avatar`} style={{ width: '30px', height: '30px', borderRadius: '50%', marginRight: '10px' }} />
               </Link>
               <span style={{ fontWeight: 'bold' }}>{paidUser.username}</span>
-             
-              
             </li>
           ))}
         </ul>
@@ -173,14 +174,13 @@ const GenrePage: React.FC = () => {
         </Modal>
       )}
       <HypemodeGallery title="Action" category="Action" length={5} isFirst />
-			<HypemodeGallery title="Comedy" length={5} category="Comedy" />
-			<HypemodeGallery title="Horror" length={5} category="Horror" />
-			<HypemodeGallery title="Drama" length={5} category="Drama" />
-			<HypemodeGallery title="Romance" length={5} category="Romance" />
-			<HypemodeGallery title="Mystery" length={5} category="Mystery" />
-			<HypemodeGallery title="Adventure" length={5} category="Adventure" />
-			<HypemodeGallery title="Thriller " length={5} category="Thriller" />
-
+      <HypemodeGallery title="Comedy" length={5} category="Comedy" />
+      <HypemodeGallery title="Horror" length={5} category="Horror" />
+      <HypemodeGallery title="Drama" length={5} category="Drama" />
+      <HypemodeGallery title="Romance" length={5} category="Romance" />
+      <HypemodeGallery title="Mystery" length={5} category="Mystery" />
+      <HypemodeGallery title="Adventure" length={5} category="Adventure" />
+      <HypemodeGallery title="Thriller " length={5} category="Thriller" />
     </Layout>
   );
 };
