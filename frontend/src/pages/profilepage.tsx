@@ -571,7 +571,7 @@ const GenrePage: React.FC = () => {
     }
 
     return (
-        <Layout expand={false} hasHeader={false}>
+        <Layout expand={false} hasHeader={true}>
             <div className="mt-12 px-4 sm:px-6 lg:px-8">
                 {/* Header Section */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
