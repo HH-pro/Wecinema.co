@@ -992,7 +992,7 @@ router.put("/edit/:id", authenticateMiddleware, async (req, res) => {
 
 
 //delete a particular user - only admin function
-router.delete("/delete/:id",   authenticateMiddleware, isAdmin,async (req, res) => {
+router.delete("/users/:id",   authenticateMiddleware, isAdmin,async (req, res) => {
 	try {
 		const { id } = req.params;
 
