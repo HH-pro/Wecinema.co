@@ -1,10 +1,11 @@
 /* HypeModeProfile.css */
 .banner-small {
-  background: linear-gradient(90deg, #ff6b6b, #ffa500, #ffef78, #6bff6b, #78c4ff, #9d78ff, #ff78c4);
+  background: linear-gradient(90deg, #ff6b6b, #ffa500, #ffef78);
   background-size: 400% 400%;
   animation: gradientShift 3s ease infinite;
   color: white;
   text-align: center;
+  margin-top: 20;
   padding: 6px;
   font-size: 12px;
   font-weight: bold;
