@@ -88,7 +88,7 @@ const VideoEditor = () => {
 
     
       return (
-        <Layout expand={false} hasHeader={false}>
+        <Layout expand={false} hasHeader={true}>
           <div className="video-editor" style={{ display: "flex", height: "100vh", background: "#1E1E1E" }}>
             {/* Video and canvas section */}
             <div style={{ flex: 3, display: "flex", justifyContent: "center", alignItems: "center", background: "#222" }}>
