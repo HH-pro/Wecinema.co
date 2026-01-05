@@ -5,7 +5,8 @@ import { decodeToken, generateSlug } from "../utilities/helperfFunction";
 import VideoThumbnail from "react-video-thumbnail";
 import { useNavigate } from "react-router-dom";
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || "https://wecinema-co.onrender.com";
+import { API_BASE_URL } from "../api";
+
 
 const HistoryView = () => {
   const [history, setHistory] = useState([]);
