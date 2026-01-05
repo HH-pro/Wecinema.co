@@ -82,7 +82,7 @@ const GenrePage: React.FC = () => {
  
 
   return (
-    <Layout expand={false} hasHeader={false}>
+    <Layout expand={false} hasHeader={true}>
       <div style={{ position: 'fixed', top: '100px', right: '20px', zIndex: 999 }}>
         <button onClick={handleOpenPaidUsersModal} style={{
           padding: '5px 12px',
