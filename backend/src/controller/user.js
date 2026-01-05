@@ -453,7 +453,7 @@ router.get("/verify-email", async (req, res) => {
             <p class="error">This verification link has expired.</p>
             <p>Verification links are valid for 24 hours only.</p>
             <div>
-              <a href="/login" class="btn">Go to Login</a>
+              <a href="/" class="btn">Go to Login</a>
               <a href="/resend-verification" class="btn" style="background: #3498db;">Resend Email</a>
             </div>
           </div>
@@ -535,7 +535,7 @@ router.get("/verify-email", async (req, res) => {
           <p style="color: #777; margin: 20px 0;">
             You can now log in to your account and start enjoying Wecinema's amazing movie collection.
           </p>
-          <a href="/login" class="btn">Go to Login</a>
+          <a href="/" class="btn">Go to Login</a>
         </div>
       </body>
       </html>
