@@ -9,8 +9,8 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import PayPalButtonWrapper from './PayPalButtonWrapper';
 
-// ✅ Environment variable se API URL - same as GenrePage
-const API_BASE_URL = process.env.REACT_APP_API_URL || "https://wecinema-co.onrender.com";
+import { API_BASE_URL } from "../api";
+
 
 const Container = styled.div`
   display: flex;
