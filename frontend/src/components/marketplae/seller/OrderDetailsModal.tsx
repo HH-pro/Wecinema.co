@@ -163,18 +163,13 @@ const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     }
   };
 
-  const formatCurrency = (
-  amount: number,
-  currency: string = 'USD'
-): string => {
-  const valueInDollars = (amount || 0) / 100;
-
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(valueInDollars);
-};
-
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+    }).format(amount || 0);
+  };
 
   const formatDate = (dateString: string): string => {
     return new Date(dateString).toLocaleDateString('en-IN', {
