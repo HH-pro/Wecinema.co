@@ -35,7 +35,7 @@ const CustomerCarePage = () => {
   };
 
   return (
-		<Layout expand={false} hasHeader={false}>
+		<Layout expand={false} hasHeader={true}>
 
     <div className="contact-form-container">
       <h2>Contact Us</h2>
