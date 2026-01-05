@@ -3,7 +3,7 @@ import { Layout } from "../components";
 
 const ChatbotIframe = () => {
   return (
-    <Layout expand={false} hasHeader={false}>
+    <Layout expand={false} hasHeader={true}>
 
     <div style={{ 
         width: "100%", 
