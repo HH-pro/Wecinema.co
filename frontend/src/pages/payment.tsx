@@ -246,7 +246,7 @@ const PaymentComponent = () => {
   };
 
   return (
-    <Layout expand={false} hasHeader={false}>
+    <Layout expand={false} hasHeader={true}>
       
       <Container>
       {showOverlay && (
