@@ -48,7 +48,8 @@ export interface RequestOptions {
 // ========================
 // CONFIGURATION & INTERCEPTORS
 // ========================
-
+export const API_BASE_URL = "https://wecinema-co.onrender.com"; // Production
+// export const API_BASE_URL = "http://localhost:5000/api"; // Local
 // Environment-based configuration
 const getBaseURL = () => {
   if (import.meta.env.DEV) {
