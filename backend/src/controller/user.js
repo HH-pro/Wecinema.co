@@ -351,7 +351,7 @@ router.post('/signup', async (req, res) => {
 });
 
 // User login route (for both Email/Password and Google)
-router.post('/signin', async (req, res) => {
+router.post('/signin',authenticateMiddleware,async (req, res) => {
 	try {
 		const { email, password, isGoogleAuth } = req.body;
 
