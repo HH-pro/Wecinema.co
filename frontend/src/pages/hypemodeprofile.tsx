@@ -8,9 +8,9 @@ import { decodeToken } from "../utilities/helperfFunction";
 import Modal from 'react-modal';
 import axios from 'axios';
 import { getDatabase, ref, push, serverTimestamp } from 'firebase/database'
+import { API_BASE_URL } from "../api";
 
-// ✅ Environment variable se API URL - automatic switch hoga
-const API_BASE_URL = process.env.REACT_APP_API_URL || "https://wecinema-co.onrender.com";
+// Use ${API_BASE_URL}/video/liked/${userId}
 
 // Debugging ke liye (optional)
 console.log("Current API Base URL:", API_BASE_URL);
