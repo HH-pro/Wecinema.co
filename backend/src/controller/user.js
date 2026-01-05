@@ -351,7 +351,7 @@ router.post('/signup', async (req, res) => {
 });
 
 // User login route (for both Email/Password and Google)
-router.post('/signin', async (req, res) => {
+router.post('/signin', authenticateMiddleware, async (req, res) => {
 	try {
 		const { email, password, isGoogleAuth } = req.body;
 
@@ -419,7 +419,7 @@ router.post('/signin', async (req, res) => {
 });
   
   // Route for creating a user account
-  router.post("/register", async (req, res) => {
+  router.post("/register", authenticateMiddleware , async (req, res) => {
 	  try {
 		  const { username, email, password, avatar, dob } = req.body;
 		  // Check if the user already exists
