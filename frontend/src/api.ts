@@ -40,7 +40,7 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
-      window.location.href = '/';
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }
@@ -97,46 +97,38 @@ const handleError = (
     return Promise.reject(error.message || "An unexpected error occurred.");
   }
 };
-// api.ts - Update your postRequest function
-export const postRequest = async (
-  endpoint: string,
-  payload: any,
-  setLoading?: (loading: boolean) => void
-) => {
-  if (setLoading) setLoading(true);
-  
+
+// CRUD operations
+export const postRequest = <T>(
+  url: string,
+  data: any,
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>,
+  message?: string
+): Promise<T> =>
+  api
+    .post(url, data)
+    .then((response) => handleSuccess(response, "post", setLoading, message))
+    .catch((error) => handleError(error, "post", setLoading));
+
+export const getRequest = async <T>(
+  url: string,
+  setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+): Promise<T> => {
   try {
-    const response = await axios.post(
-      `https://wecinema.co/api/${endpoint}`,
-      payload,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        timeout: 10000 // 10 second timeout
-      }
-    );
-    
-    if (setLoading) setLoading(false);
+    setLoading?.(true);
+    const response = await api.get<T>(url);
     return response.data;
-  } catch (error: any) {
-    if (setLoading) setLoading(false);
-    
-    if (error.response) {
-      // Server responded with error
-      console.error(`API Error (${error.response.status}):`, error.response.data);
-      throw error;
-    } else if (error.request) {
-      // No response received
-      console.error('No response received:', error.request);
-      throw new Error('Network error. Please check your connection.');
-    } else {
-      // Request setup error
-      console.error('Request setup error:', error.message);
-      throw error;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const errorMsg = error.response?.data?.error || error.message;
+      throw new Error(errorMsg);
     }
+    throw new Error('Network error occurred');
+  } finally {
+    setLoading?.(false);
   }
 };
+
 export const putRequest = <T>(
   url: string,
   data: any,
@@ -208,6 +200,35 @@ export const calculatePlatformFee = (amount: number, feePercent: number = 0.15) 
   };
 };
 
+export const formatOrderStatus = (status: string) => {
+  const statusMap: { [key: string]: string } = {
+    pending_payment: 'Payment Pending',
+    paid: 'Paid',
+    processing: 'Processing',
+    in_progress: 'In Progress',
+    delivered: 'Delivered',
+    in_revision: 'Revision Requested',
+    completed: 'Completed',
+    cancelled: 'Cancelled',
+    disputed: 'Disputed'
+  };
+  return statusMap[status] || status;
+};
+
+export const getStatusColor = (status: string) => {
+  const statusColors: { [key: string]: string } = {
+    pending_payment: 'var(--warning)',
+    paid: 'var(--info)',
+    processing: 'var(--primary)',
+    in_progress: 'var(--primary)',
+    delivered: 'var(--success)',
+    in_revision: 'var(--warning)',
+    completed: 'var(--success)',
+    cancelled: 'var(--danger)',
+    disputed: 'var(--danger)'
+  };
+  return statusColors[status] || 'var(--secondary)';
+};
 
 export const validateListingData = (data: {
   title: string;
