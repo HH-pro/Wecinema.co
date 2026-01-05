@@ -19,7 +19,7 @@
 /* Mobile Margins */
 @media (max-width: 767px) {
   .analytics-wrapper {
-    margin: 46px auto;
+    margin: 36px auto;
     padding: 0 16px;
   }
 }
