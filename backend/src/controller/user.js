@@ -144,61 +144,66 @@ router.post("/admin/register", async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+ router.post("/admin/login", async (req, res) => {
+	try {
+	  const { email, password } = req.body;
+  
+	  // Find the user by email
+	  const user = await User.findOne({ email });
+  
+	  // Check if the user exists
+	  if (!user) {
+		return res.status(401).json({ error: "Invalid credentials" });
+	  }
+  
+	  // Check if the user has admin or subadmin privileges
+	  if (!user.isAdmin && !user.isSubAdmin) {
+		return res.status(403).json({ 
+		  error: "Access denied. Requires admin or subadmin privileges." 
+		});
+	  }
+  
+	  // Compare the provided password with the hashed password in the database
+	  const passwordMatch = await argon2.verify(user.password, password);
+  
+	  if (passwordMatch) {
+		const key = "weloremcium.secret_key";
+  
+		// Generate a JWT token for authentication
+		const token = jwt.sign(
+		  { 
+			userId: user._id, 
+			username: user.username, 
+			avatar: user.avatar, 
+			isAdmin: user.isAdmin,
+			isSubAdmin: user.isSubAdmin 
+		  },
+		  key,
+		  { expiresIn: "8h" }
+		);
+  
+		// Return user role information in the response
+		res.status(200).json({ 
+		  token,
+		  user: {
+			_id: user._id,
+			username: user.username,
+			email: user.email,
+			isAdmin: user.isAdmin,
+			isSubAdmin: user.isSubAdmin,
+			avatar: user.avatar
+		  }
+		});
+	  } else {
+		// If passwords do not match, return an error
+		res.status(401).json({ error: "Invalid credentials" });
+	  }
+	} catch (error) {
+	  console.error("Error during admin login:", error);
+	  res.status(500).json({ error: "Internal Server Error" });
+	}
+  });
 
-// Admin login
-router.post("/admin/login", async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
-
-    if (!user.isAdmin && !user.isSubAdmin) {
-      return res.status(403).json({ 
-        error: "Access denied. Requires admin or subadmin privileges." 
-      });
-    }
-
-    const passwordMatch = await argon2.verify(user.password, password);
-
-    if (passwordMatch) {
-      const key = "weloremcium.secret_key";
-
-      const token = jwt.sign(
-        { 
-          userId: user._id, 
-          username: user.username, 
-          avatar: user.avatar, 
-          isAdmin: user.isAdmin,
-          isSubAdmin: user.isSubAdmin 
-        },
-        key,
-        { expiresIn: "8h" }
-      );
-
-      res.status(200).json({ 
-        token,
-        user: {
-          _id: user._id,
-          username: user.username,
-          email: user.email,
-          isAdmin: user.isAdmin,
-          isSubAdmin: user.isSubAdmin,
-          avatar: user.avatar,
-          isVerified: user.isVerified
-        }
-      });
-    } else {
-      res.status(401).json({ error: "Invalid credentials" });
-    }
-  } catch (error) {
-    console.error("Error during admin login:", error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
 
 // Get all privileged users
 router.get("/admin/users", async (req, res) => {
