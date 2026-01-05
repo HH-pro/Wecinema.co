@@ -60,7 +60,7 @@ const HypeModeProfile = () => {
   // Login user with backend
   const loginUser = async (email: string) => {
     try {
-      const res = await axios.post('https://wecinema-co.onrender.com/user/signin', { email });
+      const res = await axios.post('https://wecinema.co/user/signin', { email });
       const backendToken = res.data.token;
       const userId = res.data.id;
 
