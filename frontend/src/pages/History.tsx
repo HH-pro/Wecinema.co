@@ -50,7 +50,7 @@ const HistoryView = () => {
   };
 
   return (
-    <Layout expand={false} hasHeader={false}>
+    <Layout expand={false} hasHeader={true}>
       <div className="p-4">
         <h2 className="text-xl font-bold mb-4">Watch History</h2>
         {error ? (
