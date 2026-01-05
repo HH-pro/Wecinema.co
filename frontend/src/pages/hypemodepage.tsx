@@ -26,7 +26,7 @@ const HypeModeProfile = () => {
   // Register user with backend
   const registerUser = async (username: string, email: string, avatar: string, userType: string) => {
     try {
-      const res = await axios.post('https://wecinema-co.vercel.app/user/signup', {
+      const res = await axios.post('https://wecinema-co.onrender.com/user/signup', {
         username,
         email,
         avatar,
@@ -60,7 +60,7 @@ const HypeModeProfile = () => {
   // Login user with backend
   const loginUser = async (email: string) => {
     try {
-      const res = await axios.post('https://wecinema-co.vercel.app/user/signin', { email });
+      const res = await axios.post('https://wecinema-co.onrender.com/user/signin', { email });
       const backendToken = res.data.token;
       const userId = res.data.id;
 
