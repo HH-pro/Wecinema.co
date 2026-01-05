@@ -918,7 +918,7 @@
 
 @media (max-width: 768px) {
   .analytics-wrapper {
-    margin: 20px 0;
+    margin-top: 20px 0;
   }
   
   .yellow-compact-bar {
