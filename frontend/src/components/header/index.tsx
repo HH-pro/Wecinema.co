@@ -42,26 +42,41 @@ const Header: React.FC<HeaderProps> = ({
     // Close dropdowns when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (genreMenuRef.current && !genreMenuRef.current.contains(event.target as Node)) {
+            const target = event.target as Node;
+            
+            if (genreMenuRef.current && !genreMenuRef.current.contains(target)) {
                 setIsGenreMenuOpen(false);
             }
-            if (ratingMenuRef.current && !ratingMenuRef.current.contains(event.target as Node)) {
+            
+            if (ratingMenuRef.current && !ratingMenuRef.current.contains(target)) {
                 setIsRatingMenuOpen(false);
             }
-            if (uploadMenuRef.current && !uploadMenuRef.current.contains(event.target as Node)) {
+            
+            if (uploadMenuRef.current && !uploadMenuRef.current.contains(target)) {
                 setIsUploadMenuOpen(false);
             }
+            
             if (mobileSearchRef.current && isSearchExpanded && 
-                !mobileSearchRef.current.contains(event.target as Node)) {
+                !mobileSearchRef.current.contains(target)) {
                 setIsSearchExpanded(false);
             }
         };
 
         document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        document.addEventListener('touchstart', handleClickOutside as any);
+        
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('touchstart', handleClickOutside as any);
+        };
     }, [isSearchExpanded]);
 
-    const toggleSearch = () => setIsSearchExpanded(!isSearchExpanded);
+    const toggleSearch = () => {
+        setIsSearchExpanded(!isSearchExpanded);
+        setIsGenreMenuOpen(false);
+        setIsRatingMenuOpen(false);
+        setIsUploadMenuOpen(false);
+    };
     
     const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -108,17 +123,39 @@ const Header: React.FC<HeaderProps> = ({
     };
 
     const handleUploadVideo = () => {
-        toggleUploadModal?.();
+        if (toggleUploadModal) {
+            toggleUploadModal();
+        }
         setIsUploadMenuOpen(false);
     };
 
     const handleUploadScript = () => {
-        toggleUploadScriptModal?.();
+        if (toggleUploadScriptModal) {
+            toggleUploadScriptModal();
+        }
         setIsUploadMenuOpen(false);
     };
 
     const handleLogoClick = () => {
         navigate("/");
+    };
+
+    const toggleUploadMenu = () => {
+        setIsUploadMenuOpen(!isUploadMenuOpen);
+        setIsGenreMenuOpen(false);
+        setIsRatingMenuOpen(false);
+    };
+
+    const toggleGenreMenu = () => {
+        setIsGenreMenuOpen(!isGenreMenuOpen);
+        setIsRatingMenuOpen(false);
+        setIsUploadMenuOpen(false);
+    };
+
+    const toggleRatingMenu = () => {
+        setIsRatingMenuOpen(!isRatingMenuOpen);
+        setIsGenreMenuOpen(false);
+        setIsUploadMenuOpen(false);
     };
 
     return (
@@ -140,6 +177,7 @@ const Header: React.FC<HeaderProps> = ({
                         role="button"
                         tabIndex={0}
                         aria-label="Go to homepage"
+                        onKeyDown={(e) => e.key === 'Enter' && handleLogoClick()}
                     >
                         <img src={logo} alt="WeCinema" className="header__logo-img" />
                         {!isMobile && <span className="header__logo-text">WeCinema</span>}
@@ -192,13 +230,10 @@ const Header: React.FC<HeaderProps> = ({
                     <div className="header__dropdown" ref={uploadMenuRef}>
                         <button
                             className="header__action-btn header__action-btn--upload"
-                            onClick={() => {
-                                setIsUploadMenuOpen(!isUploadMenuOpen);
-                                setIsGenreMenuOpen(false);
-                                setIsRatingMenuOpen(false);
-                            }}
+                            onClick={toggleUploadMenu}
                             aria-expanded={isUploadMenuOpen}
                             aria-label="Upload options"
+                            aria-haspopup="true"
                         >
                             <MdUpload size={18} />
                             {!isMobile && <span>Upload</span>}
@@ -209,6 +244,7 @@ const Header: React.FC<HeaderProps> = ({
                                 <button
                                     className="dropdown-menu__item"
                                     onClick={handleUploadVideo}
+                                    aria-label="Upload video"
                                 >
                                     <FaVideo className="dropdown-menu__icon" />
                                     <span>Upload Video</span>
@@ -216,6 +252,7 @@ const Header: React.FC<HeaderProps> = ({
                                 <button
                                     className="dropdown-menu__item"
                                     onClick={handleUploadScript}
+                                    aria-label="Upload script"
                                 >
                                     <FaFileAlt className="dropdown-menu__icon" />
                                     <span>Upload Script</span>
@@ -228,12 +265,10 @@ const Header: React.FC<HeaderProps> = ({
                     <div className="header__dropdown" ref={genreMenuRef}>
                         <button
                             className="header__action-btn"
-                            onClick={() => {
-                                setIsGenreMenuOpen(!isGenreMenuOpen);
-                                setIsRatingMenuOpen(false);
-                                setIsUploadMenuOpen(false);
-                            }}
+                            onClick={toggleGenreMenu}
                             aria-expanded={isGenreMenuOpen}
+                            aria-haspopup="true"
+                            aria-label="Browse genres"
                         >
                             <span>Genre</span>
                             <MdExpandMore 
@@ -242,23 +277,30 @@ const Header: React.FC<HeaderProps> = ({
                             />
                         </button>
                         
-                        {isGenreMenuOpen && categories && categories.length > 0 && (
+                        {isGenreMenuOpen && (
                             <div className="dropdown-menu dropdown-menu--genre">
                                 <div className="dropdown-menu__header">
                                     <h3 className="dropdown-menu__title">Browse Genres</h3>
-                                    <span className="dropdown-menu__count">{categories.length}</span>
+                                    <span className="dropdown-menu__count">{categories?.length || 0}</span>
                                 </div>
                                 <div className="dropdown-menu__list">
-                                    {categories.map((genre, index) => (
-                                        <button
-                                            key={`genre-${index}`}
-                                            className="dropdown-menu__item"
-                                            onClick={() => handleGenreSelect(genre)}
-                                        >
-                                            <span className="dropdown-menu__genre-dot"></span>
-                                            <span className="dropdown-menu__text">{genre}</span>
-                                        </button>
-                                    ))}
+                                    {categories && categories.length > 0 ? (
+                                        categories.map((genre, index) => (
+                                            <button
+                                                key={`genre-${index}`}
+                                                className="dropdown-menu__item"
+                                                onClick={() => handleGenreSelect(genre)}
+                                                aria-label={`Select ${genre} genre`}
+                                            >
+                                                <span className="dropdown-menu__genre-dot"></span>
+                                                <span className="dropdown-menu__text">{genre}</span>
+                                            </button>
+                                        ))
+                                    ) : (
+                                        <div className="dropdown-menu__empty">
+                                            No genres available
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -268,12 +310,10 @@ const Header: React.FC<HeaderProps> = ({
                     <div className="header__dropdown" ref={ratingMenuRef}>
                         <button
                             className="header__action-btn"
-                            onClick={() => {
-                                setIsRatingMenuOpen(!isRatingMenuOpen);
-                                setIsGenreMenuOpen(false);
-                                setIsUploadMenuOpen(false);
-                            }}
+                            onClick={toggleRatingMenu}
                             aria-expanded={isRatingMenuOpen}
+                            aria-haspopup="true"
+                            aria-label="Browse ratings"
                         >
                             <span>Rating</span>
                             <MdExpandMore 
@@ -282,22 +322,29 @@ const Header: React.FC<HeaderProps> = ({
                             />
                         </button>
                         
-                        {isRatingMenuOpen && ratings && ratings.length > 0 && (
+                        {isRatingMenuOpen && (
                             <div className="dropdown-menu dropdown-menu--rating">
                                 <div className="dropdown-menu__header">
                                     <h3 className="dropdown-menu__title">Content Ratings</h3>
                                 </div>
                                 <div className="dropdown-menu__list">
-                                    {ratings.map((rating, index) => (
-                                        <button
-                                            key={`rating-${index}`}
-                                            className="dropdown-menu__item dropdown-menu__item--rating"
-                                            onClick={() => handleRatingSelect(rating)}
-                                        >
-                                            <span className="dropdown-menu__rating-tag">{rating}</span>
-                                            <span className="dropdown-menu__text">{rating}</span>
-                                        </button>
-                                    ))}
+                                    {ratings && ratings.length > 0 ? (
+                                        ratings.map((rating, index) => (
+                                            <button
+                                                key={`rating-${index}`}
+                                                className="dropdown-menu__item dropdown-menu__item--rating"
+                                                onClick={() => handleRatingSelect(rating)}
+                                                aria-label={`Select ${rating} rating`}
+                                            >
+                                                <span className="dropdown-menu__rating-tag">{rating}</span>
+                                                <span className="dropdown-menu__text">{rating}</span>
+                                            </button>
+                                        ))
+                                    ) : (
+                                        <div className="dropdown-menu__empty">
+                                            No ratings available
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -309,13 +356,9 @@ const Header: React.FC<HeaderProps> = ({
                     <div className="header__mobile-search" ref={mobileSearchRef}>
                         <button 
                             className="header__mobile-search-toggle"
-                            onClick={() => {
-                                toggleSearch();
-                                setIsGenreMenuOpen(false);
-                                setIsRatingMenuOpen(false);
-                                setIsUploadMenuOpen(false);
-                            }}
+                            onClick={toggleSearch}
                             aria-label={isSearchExpanded ? "Close search" : "Open search"}
+                            aria-expanded={isSearchExpanded}
                         >
                             {isSearchExpanded ? <X size={20} /> : <Search size={20} />}
                         </button>
@@ -331,7 +374,7 @@ const Header: React.FC<HeaderProps> = ({
                                             className="mobile-search-form__input"
                                             value={searchTerm}
                                             onChange={handleSearchInputChange}
-                                            autoFocus
+                                            autoFocus={isSearchExpanded}
                                             aria-label="Search"
                                         />
                                         {searchTerm && (
