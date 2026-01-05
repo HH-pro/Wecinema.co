@@ -1,7 +1,9 @@
-import  { useState } from 'react';
+import { useState } from 'react';
 import '../components/header/drowpdown.css';
 import axios from 'axios';
-import {  Layout } from "../components";
+import { Layout } from "../components";
+import { API_BASE_URL } from "../api"; // Import API_BASE_URL
+
 const CustomerCarePage = () => {
   const [formData, setFormData] = useState({
     name: '',
@@ -12,15 +14,16 @@ const CustomerCarePage = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState('');
 
-  const handleChange = (e:any) => {
+  const handleChange = (e: any) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
   };
 
-  const handleSubmit = async (e:any) => {
+  const handleSubmit = async (e: any) => {
     e.preventDefault();
     try {
-      await axios.post('https://wecinema-main.vercel.app/user/contact', formData);
+      // ✅ Use API_BASE_URL here
+      await axios.post(`${API_BASE_URL}/user/contact`, formData);
       setIsSubmitted(true);
       setFormData({
         name: '',
@@ -35,73 +38,70 @@ const CustomerCarePage = () => {
   };
 
   return (
-		<Layout expand={false} hasHeader={true}>
+    <Layout expand={false} hasHeader={true}>
+      <div className="contact-form-container">
+        <h2>Contact Us</h2>
+        {isSubmitted && <div className="success-message">Message sent successfully!</div>}
+        {error && <div className="error-message">{error}</div>}
+        <form onSubmit={handleSubmit} className="contact-form">
+          <div className="form-group">
+            <label htmlFor="name">Name</label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              required
+            />
+          </div>
 
-    <div className="contact-form-container">
-      <h2>Contact Us</h2>
-      {isSubmitted && <div className="success-message">Message sent successfully!</div>}
-      {error && <div className="error-message">{error}</div>}
-      <form onSubmit={handleSubmit} className="contact-form">
-        <div className="form-group">
-          <label htmlFor="name">Name</label>
-          <input
-            type="text"
-            id="name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            required
-          />
+          <div className="form-group">
+            <label htmlFor="email">Email</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="subject">Subject</label>
+            <input
+              type="text"
+              id="subject"
+              name="subject"
+              value={formData.subject}
+              onChange={handleChange}
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="message">Message</label>
+            <textarea
+              id="message"
+              name="message"
+              value={formData.message}
+              onChange={handleChange}
+              required
+            />
+          </div>
+
+          <button type="submit" className="submit-button">Submit</button>
+        </form>
+
+        <div className="whatsapp-button">
+          <a href="https://wa.me/1234567890?text=Hello!%20I%20need%20help%20with%20customer%20care." target="_blank" rel="noopener noreferrer">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" />
+          </a>
         </div>
-
-        <div className="form-group">
-          <label htmlFor="email">Email</label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            required
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="subject">Subject</label>
-          <input
-            type="text"
-            id="subject"
-            name="subject"
-            value={formData.subject}
-            onChange={handleChange}
-            required
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="message">Message</label>
-          <textarea
-            id="message"
-            name="message"
-            value={formData.message}
-            onChange={handleChange}
-            required
-          />
-        </div>
-
-        <button type="submit" className="submit-button">Submit</button>
-      </form>
-
-      <div className="whatsapp-button">
-        <a href="https://wa.me/1234567890?text=Hello!%20I%20need%20help%20with%20customer%20care." target="_blank" rel="noopener noreferrer">
-          <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" />
-        </a>
       </div>
-    </div>
-</Layout>
-
+    </Layout>
   );
 };
-
 
 export default CustomerCarePage;
