@@ -706,50 +706,62 @@ router.post("/register", async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
-
-// User login with verification check
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
+    console.log("Login attempt for email:", email);
+    
     if (!email || !password) {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
-    const user = await User.findOne({ email });
+    // Find user (case-insensitive search)
+    const user = await User.findOne({ 
+      email: { $regex: new RegExp(`^${email}$`, 'i') } 
+    });
 
     if (!user) {
-      return res.status(401).json({ error: "Invalid credentials" });
+      console.log("User not found for email:", email);
+      return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    const passwordMatch = await argon2.verify(user.password, password);
-    
-    if (!passwordMatch) {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
+    console.log("User found:", user.email, "isVerified:", user.isVerified);
 
-    // Check if email is verified
+    // Check if user is verified
     if (!user.isVerified) {
       return res.status(401).json({ 
         error: "Please verify your email before logging in",
         isVerified: false,
-        email: user.email,
-        canResend: !user.verificationTokenExpiry || user.verificationTokenExpiry < Date.now()
+        email: user.email
       });
     }
 
-    const key = "weloremcium.secret_key";
+    // Verify password
+    const passwordMatch = await argon2.verify(user.password, password);
+    
+    if (!passwordMatch) {
+      console.log("Password mismatch for user:", user.email);
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    // Generate JWT token
+    const key = process.env.JWT_SECRET || "weloremcium.secret_key";
     const token = jwt.sign(
       {
         userId: user._id,
         username: user.username,
-        avatar: user.avatar,
         email: user.email,
-        isVerified: user.isVerified
+        avatar: user.avatar,
+        isVerified: user.isVerified,
+        isAdmin: user.isAdmin,
+        isSubAdmin: user.isSubAdmin
       },
       key,
       { expiresIn: "8h" }
     );
+
+    console.log("Login successful for user:", user.email);
 
     res.status(200).json({
       token,
@@ -758,7 +770,7 @@ router.post("/login", async (req, res) => {
         username: user.username,
         email: user.email,
         avatar: user.avatar,
-        isVerified: true,
+        isVerified: user.isVerified,
         hasPaid: user.hasPaid,
         isAdmin: user.isAdmin,
         isSubAdmin: user.isSubAdmin
@@ -766,7 +778,10 @@ router.post("/login", async (req, res) => {
     });
   } catch (error) {
     console.error("Error during login:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ 
+      error: "Internal Server Error",
+      details: error.message 
+    });
   }
 });
 
