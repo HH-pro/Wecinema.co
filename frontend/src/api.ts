@@ -56,7 +56,11 @@ const getBaseURL = () => {
   } else if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   } else {
+<<<<<<< HEAD
     return "https://wecinema.co/api";
+=======
+    return "https://wecinema-co.onrender.com";
+>>>>>>> 70c98a51 (yes)
   }
 };
 

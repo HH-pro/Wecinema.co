@@ -188,7 +188,11 @@ const Layout: React.FC<LayoutProps> = ({
 
   // Get active class for sidebar items
   const getActiveClass = (path: string) => {
+<<<<<<< HEAD
     return location.pathname === path ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400" : "";
+=======
+    return location.pathname === path ? "bg-yellow-50 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-400" : "";
+>>>>>>> 70c98a51 (yes)
   };
 
   return (
@@ -214,7 +218,11 @@ const Layout: React.FC<LayoutProps> = ({
       {expanded && isTabletOrMobile && isSidebarVisible && (
         <div className="fixed top-0 left-0 z-40 h-full w-full bg-black bg-opacity-90 backdrop-blur-md transition-opacity ease-in-out duration-300">
           <section
+<<<<<<< HEAD
             className={`mt-16 fixed inset-0 w-4/5 max-w-xs border-r border-gray-200 overflow-auto z-50 ${
+=======
+            className={`fixed inset-0 w-4/5 max-w-xs border-r border-gray-200 overflow-auto z-50 ${
+>>>>>>> 70c98a51 (yes)
               darkMode ? "bg-dark text-light" : "bg-light text-dark"
             }`}
           >
@@ -298,14 +306,22 @@ const Layout: React.FC<LayoutProps> = ({
                       <span>Marketplace</span>
                       <div className="flex gap-1">
                         <button
+<<<<<<< HEAD
                           className={`p-1 rounded ${userType === 'buyer' ? 'bg-blue-100 dark:bg-blue-900' : 'bg-gray-100 dark:bg-gray-700'}`}
+=======
+                          className={`p-1 rounded ${userType === 'buyer' ? 'bg-yellow-100 dark:bg-yellow-900' : 'bg-gray-100 dark:bg-gray-700'}`}
+>>>>>>> 70c98a51 (yes)
                           onClick={() => changeUserType('buyer')}
                           title="Switch to Buyer Mode"
                         >
                           <FaShoppingCart size="12" />
                         </button>
                         <button
+<<<<<<< HEAD
                           className={`p-1 rounded ${userType === 'seller' ? 'bg-blue-100 dark:bg-blue-900' : 'bg-gray-100 dark:bg-gray-700'}`}
+=======
+                          className={`p-1 rounded ${userType === 'seller' ? 'bg-yellow-100 dark:bg-yellow-900' : 'bg-gray-100 dark:bg-gray-700'}`}
+>>>>>>> 70c98a51 (yes)
                           onClick={() => changeUserType('seller')}
                           title="Switch to Seller Mode"
                         >
@@ -360,7 +376,11 @@ const Layout: React.FC<LayoutProps> = ({
 
                     {/* User Type Badge */}
                     <div className="px-4 py-2">
+<<<<<<< HEAD
                       <span className={`text-xs px-2 py-1 rounded-full ${userType === 'seller' ? 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300' : 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300'}`}>
+=======
+                      <span className={`text-xs px-2 py-1 rounded-full ${userType === 'seller' ? 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300' : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-300'}`}>
+>>>>>>> 70c98a51 (yes)
                         {userType === 'seller' ? (
                           <>
                             <FaUserTie className="inline mr-1" size="10" />
@@ -394,14 +414,22 @@ const Layout: React.FC<LayoutProps> = ({
             <nav className="px-4 py-2 border-b border-gray-200">
               <h2 className="font-bold mb-2">Settings</h2>
               <div
+<<<<<<< HEAD
                 className={`flex items-center gap-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 ${darkMode ? "text-blue-600 dark:text-blue-400" : ""}`}
+=======
+                className={`flex items-center gap-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 ${darkMode ? "text-yellow-600 dark:text-yellow-400" : ""}`}
+>>>>>>> 70c98a51 (yes)
                 onClick={setDarkiMode}
               >
                 <FaMoon size="20" />
                 <span className="text-sm">Dark Mode</span>
               </div>
               <div
+<<<<<<< HEAD
                 className={`flex items-center gap-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 ${!darkMode ? "text-blue-600 dark:text-blue-400" : ""}`}
+=======
+                className={`flex items-center gap-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 ${!darkMode ? "text-yellow-600 dark:text-yellow-400" : ""}`}
+>>>>>>> 70c98a51 (yes)
                 onClick={setLightMode}
               >
                 <IoSunnyOutline size="20" />
@@ -447,14 +475,22 @@ const Layout: React.FC<LayoutProps> = ({
                 <>
                   <div
                     onClick={() => handleType("login")}
+<<<<<<< HEAD
                     className="flex items-center gap-3 py-2 cursor-pointer hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
+=======
+                    className="flex items-center gap-3 py-2 cursor-pointer hover:text-yellow-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
+>>>>>>> 70c98a51 (yes)
                   >
                     <LiaSignInAltSolid size="20" />
                     <span>Sign In</span>
                   </div>
                   <div
                     onClick={() => handleType("register")}
+<<<<<<< HEAD
                     className="flex items-center gap-3 py-2 cursor-pointer hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
+=======
+                    className="flex items-center gap-3 py-2 cursor-pointer hover:text-yellow-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
+>>>>>>> 70c98a51 (yes)
                   >
                     <HiUserAdd size="20" />
                     <span>Sign Up</span>
