@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import Select from "react-dropdown-select";
-import { FaTimes, FaEnvelope, FaLock, FaUser, FaCalendarAlt, FaVideo, FaFileAlt } from "react-icons/fa";
+import { FaTimes } from "react-icons/fa";
 import ReactQuill from "react-quill";
 import { postRequest } from "../../api";
 import { Itoken, decodeToken } from "../../utilities/helperfFunction";
@@ -8,10 +8,12 @@ import moment from "moment";
 import axios from "axios";
 import '../header/drowpdown.css';
 import TermsAndConditionsPopup from "../../pages/TermsAndConditionsPopup"; 
-import { motion } from "framer-motion";
-import toast, { Toaster } from "react-hot-toast";
-import { X, CheckCircle, Mail, Loader2, AlertCircle, Upload, LogOut } from "lucide-react";
 
+import { motion } from "framer-motion"; // Animation library
+import emailjs from "emailjs-com";
+import toast from "react-hot-toast";
+import { X } from "lucide-react"; // Or use any icon you want
+import { FaEnvelope, FaLock } from "react-icons/fa6";
 interface IPopupProps {
 	type: string | undefined;
 	show?: boolean;
@@ -22,614 +24,274 @@ interface IPopupProps {
 	className?: string;
 }
 
-// Verification Modal Component
-const VerificationModal: React.FC<{
-	email: string;
-	username: string;
-	onResend: () => Promise<void>;
-	onClose: () => void;
-	isResending?: boolean;
-}> = ({ email, username, onResend, onClose, isResending }) => (
-	<div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm">
-		<motion.div
-			initial={{ opacity: 0, scale: 0.9, y: 20 }}
-			animate={{ opacity: 1, scale: 1, y: 0 }}
-			transition={{ type: "spring", damping: 25, stiffness: 300 }}
-			className="relative w-[90%] max-w-md bg-gradient-to-b from-white to-yellow-50 border-2 border-yellow-200 rounded-2xl shadow-2xl overflow-hidden"
-		>
-			{/* Decorative header */}
-			<div className="h-2 bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-400" />
-			
-			<div className="p-8">
-				<div className="text-center mb-6">
-					<div className="relative inline-block mb-4">
-						<div className="w-24 h-24 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-full flex items-center justify-center shadow-lg">
-							<Mail className="w-12 h-12 text-yellow-600" />
-						</div>
-						<div className="absolute -top-2 -right-2 w-10 h-10 bg-yellow-500 rounded-full flex items-center justify-center shadow-lg animate-pulse">
-							<span className="text-white text-sm font-bold">!</span>
-						</div>
-					</div>
-					
-					<h2 className="text-3xl font-bold text-gray-800 mb-2">Verify Your Email</h2>
-					<p className="text-gray-600 mb-6">
-						Welcome to Wecinema, <span className="font-semibold text-yellow-600">{username}</span>!
-					</p>
-				</div>
-				
-				<div className="space-y-4 mb-8">
-					<div className="bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl p-4">
-						<div className="flex items-start space-x-3">
-							<CheckCircle className="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" />
-							<div className="text-left">
-								<p className="font-medium text-gray-800">We've sent a verification email to:</p>
-								<p className="text-yellow-700 font-bold text-lg mt-1 break-all">{email}</p>
-							</div>
-						</div>
-					</div>
-					
-					<div className="bg-white/60 border border-yellow-100 rounded-lg p-4">
-						<h4 className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
-							<AlertCircle className="w-5 h-5 text-blue-500" />
-							Next Steps:
-						</h4>
-						<ol className="list-decimal list-inside space-y-2 text-sm text-gray-600">
-							<li>Check your inbox (and spam folder)</li>
-							<li>Click the verification link in the email</li>
-							<li>Return here to log in</li>
-						</ol>
-					</div>
-				</div>
-				
-				<div className="space-y-3">
-					<button
-						onClick={onResend}
-						disabled={isResending}
-						className={`w-full py-4 rounded-xl font-bold text-white transition-all duration-300 flex items-center justify-center gap-3 ${
-							isResending
-								? 'bg-gray-400 cursor-not-allowed'
-								: 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 shadow-lg hover:shadow-xl active:scale-[0.98]'
-						}`}
-					>
-						{isResending ? (
-							<>
-								<Loader2 className="w-5 h-5 animate-spin" />
-								<span>Sending Email...</span>
-							</>
-						) : (
-							<>
-								<Mail className="w-5 h-5" />
-								<span>Resend Verification Email</span>
-							</>
-						)}
-					</button>
-					
-					<button
-						onClick={onClose}
-						className="w-full py-3 text-gray-600 hover:text-gray-800 font-medium transition hover:bg-gray-100 rounded-xl"
-					>
-						I'll verify later
-					</button>
-				</div>
-				
-				<p className="text-xs text-gray-500 text-center mt-6">
-					Verification links expire in 24 hours
-				</p>
-			</div>
-		</motion.div>
-	</div>
-);
-
-// Success Modal Component
-const RegistrationSuccessModal: React.FC<{
-	email: string;
-	username: string;
-	onClose: () => void;
-}> = ({ email, username, onClose }) => (
-	<div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm">
-		<motion.div
-			initial={{ opacity: 0, scale: 0.9, y: 20 }}
-			animate={{ opacity: 1, scale: 1, y: 0 }}
-			transition={{ type: "spring", damping: 25, stiffness: 300 }}
-			className="relative w-[90%] max-w-md bg-gradient-to-b from-white to-green-50 border-2 border-green-200 rounded-2xl shadow-2xl overflow-hidden"
-		>
-			<div className="h-2 bg-gradient-to-r from-green-400 to-emerald-500" />
-			
-			<div className="p-8 text-center">
-				<div className="mb-6">
-					<div className="w-20 h-20 bg-gradient-to-br from-green-100 to-emerald-200 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-						<CheckCircle className="w-12 h-12 text-green-600" />
-					</div>
-					
-					<motion.div
-						initial={{ scale: 0 }}
-						animate={{ scale: 1 }}
-						transition={{ delay: 0.2, type: "spring" }}
-						className="mb-2"
-					>
-						<h2 className="text-3xl font-bold text-gray-800">Welcome Aboard! 🎉</h2>
-					</motion.div>
-					
-					<p className="text-gray-600 mb-6">
-						Hey <span className="font-bold text-green-600">{username}</span>, you're almost there!
-					</p>
-				</div>
-				
-				<div className="space-y-4 mb-8">
-					<div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4">
-						<p className="text-gray-700 mb-2">
-							We've sent a verification email to:
-						</p>
-						<p className="text-green-700 font-bold text-lg break-all bg-white/60 py-2 px-4 rounded-lg">
-							{email}
-						</p>
-					</div>
-					
-					<div className="bg-white/60 border border-green-100 rounded-lg p-4">
-						<p className="text-gray-700 text-sm leading-relaxed">
-							<strong className="text-green-600">Important:</strong> You must verify your email before you can log in. 
-							Check your inbox and click the verification link to activate your account.
-						</p>
-					</div>
-				</div>
-				
-				<button
-					onClick={onClose}
-					className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-emerald-700 shadow-lg hover:shadow-xl transition-all duration-300 active:scale-[0.98]"
-				>
-					Got it! 👍
-				</button>
-				
-				<p className="text-xs text-gray-500 mt-6">
-					Didn't receive the email? Check your spam folder or try resending from the verification screen.
-				</p>
-			</div>
-		</motion.div>
-	</div>
-);
 
 const Popup: React.FC<IPopupProps> = React.memo(
 	({ type, className, background, show }) => {
-		// Authentication states
-		const [token, setToken] = useState<string | null>(localStorage.getItem("token") || null);
+		const [token, setToken] = useState<string | null>(
+			localStorage.getItem("token") || null
+		);
 		const [decodedToken, setDecodedToken] = useState<Itoken | null>(null);
 		const [isShow, setShow] = useState<boolean>(false);
+		const [selectedFile, setSelectedFile] = useState<any>(null);
 		const [loading, setLoading] = useState<boolean>(false);
-		
-		// Registration/Login states
 		const [username, setUsername] = useState<string>("");
 		const [dob, setDob] = useState("");
-		const [email, setEmail] = useState("");
-		const [password, setPassword] = useState<string>("");
-		
-		// Video upload states
-		const [selectedFile, setSelectedFile] = useState<any>(null);
 		const [rating, setRating] = useState<string>("");
+		const [email, setEmail] = useState("");
 		const [title, setTitle] = useState("");
 		const [description, setDescription] = useState("");
+		const [password, setPassword] = useState<string>("");
 		const [hasPaid, setHasPaid] = useState<boolean>(false);
-		const [sellVideo, setSellVideo] = useState<boolean>(false);
+		const fileInputRef: any = useRef(null);
 		const [selectedItems, setSelectedItems] = useState<string[]>([]);
 		const [selectItems, setSelectItems] = useState<string[]>([]);
-		const fileInputRef: any = useRef(null);
-		
-		// Modal states
-		const [showTermsPopup, setShowTermsPopup] = useState(false);
-		const [verificationModal, setVerificationModal] = useState(false);
+		const [sellVideo, setSellVideo] = useState<boolean>(false); // Track if the user wants to sell the video
 		const [successModal, setSuccessModal] = useState(false);
-		const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
-		const [pendingVerificationUsername, setPendingVerificationUsername] = useState("");
-		const [isResending, setIsResending] = useState(false);
-		const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-
-		// Initialize show state
+		const [errorModal, setErrorModal] = useState(false);
+		
+		
+		const handleFileChange = (e: any) => {
+			const file = e.target.files[0];
+			setSelectedFile(file);
+			console.log("Selected File:", selectedFile);
+		};
+		
+		const handleProcedureContentChange = (content: any) => {
+			setDescription(content);
+		};
+		
+		const handleThumbnailClick = () => {
+			fileInputRef?.current.click();
+		};
+		const showVerificationToast = () => {
+			toast.custom((t) => (
+			  <div
+				className={`max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5 px-4 py-3 ${
+				  t.visible ? "animate-enter" : "animate-leave"
+				}`}
+			  >
+				<div className="flex-1 w-0">
+				  <p className="text-sm font-semibold text-gray-900">
+					📩 Verification Email Sent
+				  </p>
+				  <p className="mt-1 text-sm text-gray-500">
+					Please check your inbox to verify your account.
+				  </p>
+				</div>
+				<div className="ml-4 flex-shrink-0 flex items-start">
+				  <button
+					onClick={() => toast.dismiss(t.id)}
+					className="text-gray-400 hover:text-gray-600 transition"
+				  >
+					<X className="h-5 w-5" />
+				  </button>
+				</div>
+			  </div>
+			));
+		  };
 		useEffect(() => {
 			setShow(!!type);
+			console.log("This is refreshing");
 		}, [type]);
-
-		// Decode token and check payment status
+		
 		useEffect(() => {
+			// Decode token when the component mounts or when the token changes
 			const decoded = decodeToken(token);
 			setDecodedToken(decoded);
 			
-			if (decoded?.userId) {
-				checkUserPaymentStatus(decoded.userId);
-			}
+			// Check if user has paid
+const checkUserPaymentStatus = async () => {
+	if (!decoded || !decoded.userId) {
+		// User is not logged in, skip payment check
+		return;
+	}
+
+	try {
+		const response = await axios.get(`https://wecinema.co/api/user/payment-status/${decoded.userId}`);
+		setHasPaid(response.data.hasPaid);
+	} catch (error) {
+		console.error("Error checking payment status:", error);
+	}
+};
+
+checkUserPaymentStatus();
+
+			
+			// Clean-up function
+			return () => {
+				// Clear the decoded token when the component unmounts
+				setDecodedToken(null);
+			};
 		}, [token]);
-
-		// Check if user has accepted terms
-		useEffect(() => {
-			const hasAcceptedTerms = localStorage.getItem("acceptedTerms");
-			if (!hasAcceptedTerms && type === "register") {
-				setShowTermsPopup(true);
-			}
-		}, [type]);
-
-		// Validate email format
-		const validateEmail = (email: string): boolean => {
-			const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-			return re.test(email);
-		};
-
-		// Validate password strength
-		const validatePassword = (password: string): string | null => {
-			if (password.length < 6) {
-				return "Password must be at least 6 characters long";
-			}
-			return null;
-		};
-
-		// Validate age from DOB
-		const validateAge = (dob: string): string | null => {
-			const birthDate = new Date(dob);
-			const today = new Date();
-			let age = today.getFullYear() - birthDate.getFullYear();
-			const monthDiff = today.getMonth() - birthDate.getMonth();
-			
-			if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-				age--;
-			}
-			
-			if (age < 13) {
-				return "You must be at least 13 years old to register";
-			}
-			
-			if (age > 120) {
-				return "Please enter a valid date of birth";
-			}
-			
-			return null;
-		};
-
-		// Check payment status
-		const checkUserPaymentStatus = async (userId: string) => {
-			try {
-				const response = await axios.get(`https://wecinema.co/api/user/payment-status/${userId}`);
-				setHasPaid(response.data.hasPaid);
-			} catch (error) {
-				console.error("Error checking payment status:", error);
-			}
-		};
-
-		// Handle login
-		const handleLoginSubmit = async (e: React.FormEvent) => {
+		
+		const handleLoginSubmit = async (e: any) => {
 			e.preventDefault();
-			setFormErrors({});
-			
-			// Basic validation
-			if (!validateEmail(email)) {
-				setFormErrors({ email: "Please enter a valid email address" });
-				toast.error("Please enter a valid email address");
-				return;
-			}
-			
-			if (!password) {
-				setFormErrors({ password: "Password is required" });
-				toast.error("Password is required");
-				return;
-			}
-
 			try {
-				setLoading(true);
-				const payload = { email, password };
-
-				const result: any = await postRequest("user/login", payload, setLoading);
-
-				// Handle unverified email
-				if (result.error && result.error.includes("verify your email")) {
-					setPendingVerificationEmail(email);
-					setVerificationModal(true);
-					toast.error("Please verify your email before logging in", {
-						duration: 4000,
-						position: "top-center",
-						icon: '📧'
-					});
-					return;
-				}
-
-				if (result.token && result.user) {
-					console.log("Login success:", result);
-					setShow(false);
-					setToken(result.token);
-					localStorage.setItem("token", result.token);
-					localStorage.setItem("loggedIn", "true");
-					localStorage.setItem("user", JSON.stringify(result.user));
-
-					toast.success("Login successful! 🎉", {
-						duration: 3000,
-						position: "top-center",
-						icon: '🎬'
-					});
-
-					setTimeout(() => {
-						window.location.reload();
-					}, 1000);
-				}
-			} catch (error: any) {
+			  setLoading(true);
+			  const payload = { email, password };
+		  
+			  const result: any = await postRequest("user/login", payload, setLoading);
+		  
+			  if (!result.isVerified) {
 				setLoading(false);
-				const errorMessage = error?.response?.data?.error || "Login failed. Please try again.";
-				
-				if (error?.response?.status === 401) {
-					toast.error("Invalid email or password", {
-						duration: 4000,
-						position: "top-center",
-						icon: '🔒'
-					});
-				} else {
-					toast.error(errorMessage, {
-						duration: 4000,
-						position: "top-center",
-					});
-				}
-			}
-		};
-
-		// Resend verification email
-		const resendVerificationEmail = async () => {
-			try {
-				setIsResending(true);
-				const response = await axios.post("https://wecinema.co/api/user/resend-verification", {
-					email: pendingVerificationEmail,
-				});
-				
-				toast.success("Verification email sent! 📧", {
-					duration: 4000,
-					position: "top-center",
-					icon: '✅'
-				});
-				
-				// Close modal after 2 seconds
-				setTimeout(() => {
-					setVerificationModal(false);
-				}, 2000);
-			} catch (error: any) {
-				const errorMsg = error.response?.data?.error || "Failed to resend email";
-				toast.error(errorMsg, {
-					duration: 4000,
-					position: "top-center",
-				});
-			} finally {
-				setIsResending(false);
-			}
-		};
-
-		// Handle registration
-		const handleRegisterSubmit = async (e: React.FormEvent) => {
-			e.preventDefault();
-			setFormErrors({});
-			
-			// Validate form
-			const errors: Record<string, string> = {};
-			
-			if (!username || username.length < 3) {
-				errors.username = "Username must be at least 3 characters";
-			}
-			
-			if (!validateEmail(email)) {
-				errors.email = "Please enter a valid email address";
-			}
-			
-			const passwordError = validatePassword(password);
-			if (passwordError) {
-				errors.password = passwordError;
-			}
-			
-			const ageError = validateAge(dob);
-			if (ageError) {
-				errors.dob = ageError;
-			}
-			
-			if (Object.keys(errors).length > 0) {
-				setFormErrors(errors);
-				toast.error("Please fix the errors in the form", {
-					duration: 4000,
-				});
+				alert("Please verify your email before logging in.");
 				return;
-			}
-
-			try {
-				setLoading(true);
-
-				const payload = {
-					email,
-					password,
-					username,
-					dob: moment(dob).format("MMM DD, YYYY"),
-				};
-
-				const result = await postRequest("user/register", payload, setLoading);
-				
-				if (result.message && result.message.includes("verification email sent")) {
-					setPendingVerificationEmail(email);
-					setPendingVerificationUsername(username);
-					setSuccessModal(true);
-					
-					toast.success("Registration successful! Check your email to verify your account.", {
-						duration: 5000,
-						position: "top-center",
-						icon: '🎉'
-					});
-				}
-
-				setLoading(false);
-				setShow(false);
+			  }
+		  
+			  console.log("Post success:", result);
+			  setShow(false);
+			  setToken(result.token);
+			  localStorage.setItem("token", result.token);
+			  localStorage.setItem("loggedIn", "true");
+		  
+			  setTimeout(() => {
+				window.location.reload();
+			  }, 1000);
 			} catch (error: any) {
-				setLoading(false);
-				const errorMessage = error.response?.data?.error || "Registration failed. Please try again.";
-				
-				if (error.response?.status === 400 && errorMessage.includes("already exists")) {
-					toast.error("An account with this email already exists", {
-						duration: 4000,
-						position: "top-center",
-					});
-				} else {
-					toast.error(errorMessage, {
-						duration: 4000,
-						position: "top-center",
-					});
-				}
+			  setLoading(false);
+			  if (error?.response?.data?.error) {
+				alert(error.response.data.error);
+			  } else {
+				console.error("Post error:", error);
+			  }
 			}
-		};
+		  };
+		  const [showTermsPopup, setShowTermsPopup] = useState(false);
 
-		// Handle logout
-		const handleLogoutSubmit = async (e: React.FormEvent) => {
+useEffect(() => {
+  const hasAcceptedTerms = localStorage.getItem("acceptedTerms");
+  if (!hasAcceptedTerms) {
+    setShowTermsPopup(true);
+  }
+}, []);
+
+const handleAcceptTerms = () => {
+  localStorage.setItem("acceptedTerms", "true");
+  setShowTermsPopup(false);
+};
+
+		
+		const handleLogoutSubmit = async (e: any) => {
 			e.preventDefault();
 			localStorage.removeItem("token");
 			localStorage.removeItem("loggedIn");
-			localStorage.removeItem("user");
-			
-			toast.success("Logged out successfully", {
-				duration: 2000,
-				position: "top-center",
-				icon: '👋'
-			});
-			
 			setTimeout(() => {
 				window.location.reload();
 			}, 500);
 		};
-
-		// Handle terms acceptance
-		const handleAcceptTerms = () => {
-			localStorage.setItem("acceptedTerms", "true");
-			setShowTermsPopup(false);
-		};
-
-		// Video upload handlers
-		const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-			const file = e.target.files?.[0];
-			if (file) {
-				// Check file size (max 500MB)
-				if (file.size > 500 * 1024 * 1024) {
-					toast.error("File size must be less than 500MB");
-					return;
-				}
-				
-				// Check file type
-				if (!file.type.startsWith('video/')) {
-					toast.error("Please select a video file");
-					return;
-				}
-				
-				setSelectedFile(file);
-			}
-		};
-
-		const handleThumbnailClick = () => {
-			fileInputRef?.current.click();
-		};
-
-		const handleProcedureContentChange = (content: any) => {
-			setDescription(content);
-		};
-
-		const handleVideoUploadSubmit = async (e: React.FormEvent) => {
+		
+		const handleRegisterSubmit = async (e: any) => {
 			e.preventDefault();
-			
-			if (!decodedToken?.userId) {
-				toast.error("You must log in first before uploading!", {
-					duration: 4000,
-				});
-				return;
-			}
-
-			// Validation
-			if (!title.trim()) {
-				toast.error("Please enter a title for your video");
-				return;
-			}
-
-			if (!selectedFile) {
-				toast.error("Please select a video file");
-				return;
-			}
-
 			try {
-				const formData = new FormData();
-				setLoading(true);
-				formData.append("file", selectedFile);
-				formData.append("upload_preset", "zoahguuq");
-				
-				const uploadResult = await axios.post(
-					"https://api.cloudinary.com/v1_1/folajimidev/video/upload",
-					formData
+			  setLoading(true);
+		  
+			  const payload = {
+				email,
+				password,
+				username,
+				dob: moment(dob, "DD-MM-YYYY").format("MMM DD, YYYY"),
+			  };
+		  
+			  const result = await postRequest("user/register", payload, setLoading);
+			  console.log("Register result:", result);
+		  
+			  const verificationLink = `https://wecinema.co/api/user/verify-email?email=${encodeURIComponent(email)}`;
+		  
+			  try {
+				const emailResult = await emailjs.send(
+				  "service_zqol7n4",
+				  "template_mdpiipr",
+				  {
+					to_name: username,
+					to_email: email,
+					verification_link: verificationLink,
+				  },
+				  "1r7HTd-O6zTnCC-J-"
 				);
-				
-				const payload = {
-					title,
-					description,
-					genre: selectedItems.map((category: any) => category.value),
-					theme: selectItems.map((category: any) => category.value),
-					rating,
-					file: uploadResult.data["secure_url"],
-					author: decodedToken.userId,
-					hasPaid,
-					isForSale: sellVideo,
-				};
-				
-				await postRequest("video/create", payload, setLoading);
-				setShow(false);
-				
-				toast.success("Video uploaded successfully! 🎬", {
-					duration: 3000,
-					position: "top-center",
-				});
+		  
+				console.log("EmailJS result:", emailResult);
+		  
+				// ✅ Show your custom modal here
+				setSuccessModal(true); // show modal
+				setTimeout(() => {
+				  setSuccessModal(false); // auto close after 5 seconds (optional)
+				  setShow(false); // close registration modal
+				}, 5000);
+			  } catch (emailError) {
+				console.error("EmailJS error:", emailError);
+				setErrorModal(true); // or show error message modal
+			  }
+		  
 			} catch (error) {
-				setLoading(false);
-				console.error("Upload error:", error);
-				toast.error("Failed to upload video. Please try again.", {
-					duration: 4000,
-				});
+			  setLoading(false);
+			  console.error("Post error:", error);
+			  setErrorModal(true);
 			}
-		};
-
-		const handleScriptUploadSubmit = async (e: React.FormEvent) => {
+		  };
+		  
+		  
+		const handleVideoUploadSubmit = async (e: any) => {
 			e.preventDefault();
-			
-			if (!decodedToken?.userId) {
-				toast.error("You must log in first before uploading!", {
-					duration: 4000,
-				});
-				return;
-			}
-
-			if (!title.trim()) {
-				toast.error("Please enter a title for your script");
-				return;
-			}
-
-			if (!description.trim() || description === '<p><br></p>') {
-				toast.error("Please write your script content");
-				return;
-			}
-
-			try {
-				setLoading(true);
-				const payload = {
-					title,
-					script: description,
-					genre: selectedItems.map((category: any) => category.value),
-					theme: selectItems.map((category: any) => category.value),
-					author: decodedToken.userId,
-				};
-				
-				await postRequest("video/scripts", payload, setLoading);
-				setShow(false);
-				
-				toast.success("Script uploaded successfully! 📝", {
-					duration: 3000,
-					position: "top-center",
-				});
-			} catch (error) {
-				setLoading(false);
-				toast.error("Failed to upload script. Please try again.", {
-					duration: 4000,
-				});
+			if (decodedToken?.userId) {
+				try {
+					const formData = new FormData();
+					setLoading(true);
+					formData.append("file", selectedFile);
+					formData.append("upload_preset", "zoahguuq");
+					
+					axios
+						.post(
+							"https://api.cloudinary.com/v1_1/folajimidev/video/upload",
+							formData
+						)
+						.then(async (res: any) => {
+							const payload = {
+								title,
+								description,
+								genre: selectedItems.map((category: any) => category.value),
+								theme: selectItems.map((category: any) => category.value),
+								rating,
+								file: res.data["secure_url"],
+								author: decodedToken?.userId,
+								hasPaid: hasPaid,  // Add hasPaid field to payload
+								isForSale: sellVideo, // Include the sell flag
+							};
+							await postRequest("video/create", payload, setLoading);
+							setShow(false);
+						});
+				} catch (error) {
+					setLoading(false);
+					console.error("Post error:", error);
+				}
+			} else {
+				toast.error("You must log in first before uploading!");
 			}
 		};
-
-		// Categories
-		const CAT = [
+		
+		const handleScriptUploadSubmit = async (e: any) => {
+			e.preventDefault();
+			if (decodedToken?.userId) {
+				try {
+					setLoading(true);
+					const payload = {
+						title,
+						script: description,
+						genre: selectedItems.map((category: any) => category.value),
+						theme: selectItems.map((category: any) => category.value),
+						author: decodedToken?.userId,
+					};
+					await postRequest("video/scripts", payload, setLoading);
+					setShow(false);
+				} catch (error) {
+					setLoading(false);
+					console.error("Post error:", error);
+				}
+			} else {
+				toast.error("You must log in first before uploading!");
+			}
+		};
+		
+		const CAT: any = [
 			{ value: "Action", label: "Action" },
 			{ value: "Adventure", label: "Adventure" },
 			{ value: "Comedy", label: "Comedy" },
@@ -640,15 +302,14 @@ const Popup: React.FC<IPopupProps> = React.memo(
 			{ value: "Romance", label: "Romance" },
 			{ value: "Thriller", label: "Thriller" },
 		];
-
-		const CATS = [
+		const CATS: any = [
 			{ value: "Coming-of-age story", label: "Coming-of-age story" },
 			{ value: "Good versus evil", label: "Good versus evil" },
 			{ value: "Love", label: "Love" },
 			{ value: "Redemption", label: "Redemption" },
 			{ value: "Family", label: "Family" },
 			{ value: "Death", label: "Death" },
-			{ value: "Oppression", label: "Oppression" },
+			{ value: "Opperession", label: "Opperession" },
 			{ value: "Survival", label: "Survival" },
 			{ value: "Revenge", label: "Revenge" },
 			{ value: "Justice", label: "Justice" },
@@ -656,739 +317,611 @@ const Popup: React.FC<IPopupProps> = React.memo(
 			{ value: "Bravery", label: "Bravery" },
 			{ value: "Freedom", label: "Freedom" },
 			{ value: "Friendship", label: "Friendship" },
+			{ value: "Death", label: "Death" },
 			{ value: "Isolation", label: "Isolation" },
 			{ value: "Peace", label: "Peace" },
 			{ value: "Perseverance", label: "Perseverance" },
+
+
+
 		];
 
 		const formats = [
-			"header", "height", "bold", "italic", "underline", "strike", "blockquote",
-			"list", "color", "bullet", "indent", "link", "image", "align", "size",
+			"header",
+			"height",
+			"bold",
+			"italic",
+			"underline",
+			"strike",
+			"blockquote",
+			"list",
+			"color",
+			"bullet",
+			"indent",
+			"link",
+			"image",
+			"align",
+			"size",
 		];
-
+		
 		const modules = {
 			toolbar: [
 				[{ size: ["small", false, "large", "huge"] }],
 				["bold", "italic", "underline", "strike", "blockquote"],
 				[{ list: "ordered" }, { list: "bullet" }],
 				["link", "image"],
-				[{ list: "ordered" }, { list: "bullet" }, { indent: "-1" }, { indent: "+1" }, { align: [] }],
-				[{
-					color: [
-						"#000000", "#e60000", "#ff9900", "#ffff00", "#008a00", "#0066cc",
-						"#9933ff", "#ffffff", "#facccc", "#ffebcc", "#ffffcc", "#cce8cc",
-						"#cce0f5", "#ebd6ff", "#bbbbbb", "#f06666", "#ffc266", "#ffff66",
-						"#66b966", "#66a3e0", "#c285ff", "#888888", "#a10000", "#b26b00",
-						"#b2b200", "#006100", "#0047b2", "#6b24b2", "#444444", "#5c0000",
-						"#663d00", "#666600", "#003700", "#002966", "#3d1466", "custom-color",
-					],
-				}],
+				[
+					{ list: "ordered" },
+					{ list: "bullet" },
+					{ indent: "-1" },
+					{ indent: "+1" },
+					{ align: [] },
+				],
+				[
+					{
+						color: [
+							"#000000",
+							"#e60000",
+							"#ff9900",
+							"#ffff00",
+							"#008a00",
+							"#0066cc",
+							"#9933ff",
+							"#ffffff",
+							"#facccc",
+							"#ffebcc",
+							"#ffffcc",
+							"#cce8cc",
+							"#cce0f5",
+							"#ebd6ff",
+							"#bbbbbb",
+							"#f06666",
+							"#ffc266",
+							"#ffff66",
+							"#66b966",
+							"#66a3e0",
+							"#c285ff",
+							"#888888",
+							"#a10000",
+							"#b26b00",
+							"#b2b200",
+							 "#006100",
+							"#0047b2",
+							"#6b24b2",
+							"#444444",
+							"#5c0000",
+							"#663d00",
+							"#666600",
+							"#003700",
+							"#002966",
+							"#3d1466",
+							"custom-color",
+						],
+					},
+				],
 			],
 		};
 
-		// Render based on popup type
 		if (type === "script") {
-			return (
-				<>
-					<div className={`fixed inset-0 z-50 flex justify-center items-center ${isShow && show ? "visible" : "invisible"} ${className || ""}`}>
-						<div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-50 to-yellow-200 opacity-80 backdrop-blur-sm" />
-						
-						<motion.div
-							initial={{ opacity: 0, scale: 0.95, y: 20 }}
-							animate={{ opacity: 1, scale: 1, y: 0 }}
-							transition={{ type: "spring", damping: 25, stiffness: 300 }}
-							className="relative z-50 w-[90%] max-w-2xl bg-white border-2 border-yellow-300 backdrop-blur-xl rounded-2xl shadow-2xl p-8"
-						>
-							<header className="flex justify-between items-center mb-6">
-								<div className="flex items-center gap-3">
-									<div className="p-2 bg-yellow-100 rounded-lg">
-										<FaFileAlt className="w-6 h-6 text-yellow-600" />
-									</div>
-									<h2 className="text-2xl font-bold text-gray-800">Upload Script</h2>
-								</div>
-								<FaTimes
-									onClick={() => setShow(false)}
-									className="cursor-pointer text-gray-600 hover:text-red-500 transition duration-200 w-6 h-6"
-								/>
-							</header>
+  return (
+    <div
+      className={`fixed inset-0 z-50 flex justify-center items-center ${
+        isShow && show ? "visible" : "invisible"
+      } ${className || ""}`}
+    >
+      {/* Transparent gradient background */}
+      <div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-50 to-yellow-200 opacity-80 backdrop-blur-sm" />
 
-							<form onSubmit={handleScriptUploadSubmit} className="space-y-6">
-								<div>
-									<label className="block text-gray-700 text-sm font-medium mb-2">Title *</label>
-									<input
-										className="w-full px-4 py-3 rounded-xl border-2 border-yellow-200 bg-white/80 text-gray-900 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 outline-none transition"
-										placeholder="Enter script title"
-										type="text"
-										value={title}
-										onChange={(e) => setTitle(e.target.value)}
-										required
-									/>
-								</div>
+      {/* Modal container */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.4 }}
+        className="relative z-50 sm:w-2/6 w-5/6 bg-white
+		 border border-yellow-300 backdrop-blur-xl rounded-2xl shadow-2xl p-8"
+      >
+        {/* Header */}
+        <header className="flex gap-4 justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold text-gray-800">Upload Script</h2>
+          <FaTimes
+            onClick={() => setShow(false)}
+            className="cursor-pointer text-gray-600 hover:text-red-500 transition duration-200"
+          />
+        </header>
 
-								<div>
-									<label className="block text-gray-700 text-sm font-medium mb-2">Script Content *</label>
-									<div className="rounded-xl border-2 border-yellow-200 bg-white/80 overflow-hidden">
-										<ReactQuill
-											theme="snow"
-											modules={modules}
-											formats={formats}
-											placeholder="Write your script here..."
-											onChange={handleProcedureContentChange}
-											className="rounded-xl"
-											style={{ height: "200px" }}
-										/>
-									</div>
-								</div>
+        {/* Form */}
+        <form onSubmit={handleScriptUploadSubmit} className="space-y-4">
+          {/* Title */}
+          <input
+            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 outline-none"
+            placeholder="Title"
+            type="text"
+            value={title}
+            onChange={(e: any) => setTitle(e.target.value)}
+          />
 
-								<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-									<div>
-										<label className="block text-gray-700 text-sm font-medium mb-2">Genre(s) *</label>
-										<Select
-											values={selectedItems}
-											options={CAT}
-											placeholder="Select genre(s)..."
-											required
-											multi
-											className="rounded-xl border-2 border-yellow-200 bg-white/80"
-											onChange={(values: any) => setSelectedItems(values)}
-										/>
-									</div>
-									
-									<div>
-										<label className="block text-gray-700 text-sm font-medium mb-2">Theme(s)</label>
-										<Select
-											values={selectItems}
-											options={CATS}
-											placeholder="Select theme(s)..."
-											multi
-											className="rounded-xl border-2 border-yellow-200 bg-white/80"
-											onChange={(values: any) => setSelectItems(values)}
-										/>
-									</div>
-								</div>
+          {/* Script Editor */}
+          <div className="rounded-lg border border-yellow-200 bg-white/60 w-full outline-none overflow-hidden">
+            <ReactQuill
+              theme="snow"
+              modules={modules}
+              formats={formats}
+              placeholder="Write your script here..."
+              onChange={handleProcedureContentChange}
+              style={{ height: "150px", width: "100%" }}
+              className="rounded-lg"
+            />
+          </div>
 
-								{hasPaid && (
-									<div className="flex items-center gap-3 p-4 bg-yellow-50 rounded-xl border border-yellow-200">
-										<input
-											type="checkbox"
-											id="forSale"
-											checked={sellVideo}
-											onChange={(e) => setSellVideo(e.target.checked)}
-											className="w-5 h-5 text-yellow-500 rounded"
-										/>
-										<label htmlFor="forSale" className="text-gray-700 font-medium">
-											Make this script available for sale
-										</label>
-									</div>
-								)}
+          {/* Genre */}
+          <Select
+            values={selectedItems}
+            options={CAT}
+            placeholder="Select genre(s).."
+            required
+            multi
+            className="rounded-lg px-4 py-2 w-full border border-yellow-200 bg-white/60 outline-none"
+            onChange={(values: any) => setSelectedItems(values)}
+          />
 
-								<button
-									type="submit"
-									disabled={loading}
-									className={`w-full py-4 rounded-xl font-bold text-white transition-all duration-300 ${
-										loading
-											? "bg-yellow-300 cursor-not-allowed"
-											: "bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 shadow-lg hover:shadow-xl active:scale-[0.98]"
-									}`}
-								>
-									{loading ? (
-										<div className="flex items-center justify-center gap-3">
-											<Loader2 className="w-5 h-5 animate-spin" />
-											<span>Uploading Script...</span>
-										</div>
-									) : (
-										<div className="flex items-center justify-center gap-3">
-											<Upload className="w-5 h-5" />
-											<span>Upload Script</span>
-										</div>
-									)}
-								</button>
-							</form>
-						</motion.div>
-					</div>
-					<Toaster />
-				</>
-			);
-		}
+          {/* Theme */}
+          <Select
+            values={selectItems}
+            options={CATS}
+            placeholder="Select theme(s).."
+            required
+            multi
+            className="rounded-lg px-4 py-2 w-full border border-yellow-200 bg-white/60 outline-none"
+            onChange={(values: any) => setSelectItems(values)}
+          />
 
-		if (type === "video") {
-			return (
-				<>
-					<div className={`fixed inset-0 z-50 flex justify-center items-center ${isShow && show ? "visible" : "invisible"} ${className || ""}`}>
-						<div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-50 to-yellow-200 opacity-80 backdrop-blur-sm" />
-						
-						<motion.div
-							initial={{ opacity: 0, scale: 0.95, y: 20 }}
-							animate={{ opacity: 1, scale: 1, y: 0 }}
-							transition={{ type: "spring", damping: 25, stiffness: 300 }}
-							className="relative z-50 w-[90%] max-w-2xl bg-white border-2 border-yellow-300 backdrop-blur-xl rounded-2xl shadow-2xl p-8"
-						>
-							<header className="flex justify-between items-center mb-6">
-								<div className="flex items-center gap-3">
-									<div className="p-2 bg-yellow-100 rounded-lg">
-										<FaVideo className="w-6 h-6 text-yellow-600" />
-									</div>
-									<h2 className="text-2xl font-bold text-gray-800">Upload Video</h2>
-								</div>
-								<FaTimes
-									onClick={() => setShow(false)}
-									className="cursor-pointer text-gray-600 hover:text-red-500 transition duration-200 w-6 h-6"
-								/>
-							</header>
+          {/* For Sale */}
+          {hasPaid && (
+            <div className="my-4">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={sellVideo}
+                  onChange={(e) => setSellVideo(e.target.checked)}
+                />
+                For Sale
+              </label>
+            </div>
+          )}
 
-							<form onSubmit={handleVideoUploadSubmit} className="space-y-6">
-								<div>
-									<label className="block text-gray-700 text-sm font-medium mb-2">Title *</label>
-									<input
-										className="w-full px-4 py-3 rounded-xl border-2 border-yellow-200 bg-white/80 text-gray-900 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 outline-none transition"
-										placeholder="Enter video title"
-										type="text"
-										value={title}
-										onChange={(e) => setTitle(e.target.value)}
-										required
-									/>
-								</div>
+          {/* Submit */}
+          <button
+            disabled={loading}
+            className="bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold mt-5 py-2 px-4 rounded-lg shadow-md transition w-full"
+          >
+            {loading ? "Uploading..." : "Upload"}
+          </button>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
 
-								<div>
-									<label className="block text-gray-700 text-sm font-medium mb-2">Description</label>
-									<textarea
-										className="w-full px-4 py-3 rounded-xl border-2 border-yellow-200 bg-white/80 text-gray-900 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 outline-none transition resize-none"
-										placeholder="Describe your video..."
-										rows={4}
-										value={description}
-										onChange={(e) => setDescription(e.target.value)}
-									/>
-								</div>
 
-								<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-									<div>
-										<label className="block text-gray-700 text-sm font-medium mb-2">Genre(s) *</label>
-										<Select
-											values={selectedItems}
-											options={CAT}
-											placeholder="Select genre(s)..."
-											required
-											multi
-											className="rounded-xl border-2 border-yellow-200 bg-white/80"
-											onChange={(values: any) => setSelectedItems(values)}
-										/>
-									</div>
-									
-									<div>
-										<label className="block text-gray-700 text-sm font-medium mb-2">Theme(s)</label>
-										<Select
-											values={selectItems}
-											options={CATS}
-											placeholder="Select theme(s)..."
-											multi
-											className="rounded-xl border-2 border-yellow-200 bg-white/80"
-											onChange={(values: any) => setSelectItems(values)}
-										/>
-									</div>
-								</div>
+ if (type === "video") {
+    return (
+      <div
+        className={`fixed inset-0 z-50 flex justify-center items-center ${
+          isShow && show ? "visible" : "invisible"
+        } ${className || ""}`}
+      >
+        {/* Transparent gradient background */}
+        <div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-50 to-yellow-200 opacity-80 backdrop-blur-sm" />
 
-								<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-									<div>
-										<label className="block text-gray-700 text-sm font-medium mb-2">Rating *</label>
-										<select
-											value={rating}
-											onChange={(e) => setRating(e.target.value)}
-											className="w-full px-4 py-3 rounded-xl border-2 border-yellow-200 bg-white/80 text-gray-900 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 outline-none transition"
-											required
-										>
-											<option value="">Select Rating</option>
-											<option value="G">G - General Audience</option>
-											<option value="PG">PG - Parental Guidance</option>
-											<option value="PG-13">PG-13 - Parents Strongly Cautioned</option>
-											<option value="R">R - Restricted</option>
-											<option value="X">X - Adults Only</option>
-										</select>
-									</div>
+        {/* Modal container */}
+        <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4 }}
+        className="relative z-50 w-[90%] max-w-md sm:w-2/5 bg-white border border-yellow-300 backdrop-blur-xl rounded-2xl shadow-2xl p-8"
+>
+          {/* Header */}
+          <header className="flex gap-4 justify-between items-center mb-4">
+            <h2 className="text-2xl font-bold text-gray-800">Upload Video</h2>
+            <FaTimes
+              onClick={() => setShow(false)}
+              className="cursor-pointer text-gray-600 hover:text-red-500 transition duration-200"
+            />
+          </header>
 
-									<div>
-										<label className="block text-gray-700 text-sm font-medium mb-2">Video File *</label>
-										<div 
-											className="border-2 border-dashed border-yellow-300 rounded-xl p-8 text-center cursor-pointer hover:border-yellow-400 hover:bg-yellow-50 transition"
-											onClick={handleThumbnailClick}
-										>
-											<input
-												type="file"
-												accept="video/*"
-												className="hidden"
-												onChange={handleFileChange}
-												ref={fileInputRef}
-											/>
-											
-											{selectedFile ? (
-												<div className="space-y-4">
-													<video
-														src={URL.createObjectURL(selectedFile)}
-														className="w-32 h-32 object-cover rounded-lg mx-auto"
-														controls
-													/>
-													<p className="text-green-600 font-medium">{selectedFile.name}</p>
-													<button
-														type="button"
-														onClick={(e) => {
-															e.stopPropagation();
-															setSelectedFile(null);
-														}}
-														className="text-sm text-red-500 hover:text-red-700"
-													>
-														Remove file
-													</button>
-												</div>
-											) : (
-												<div className="space-y-3">
-													<div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto">
-														<Upload className="w-8 h-8 text-yellow-500" />
-													</div>
-													<div>
-														<p className="font-medium text-gray-700">Click to upload video</p>
-														<p className="text-sm text-gray-500 mt-1">MP4, MOV, AVI up to 500MB</p>
-													</div>
-												</div>
-											)}
-										</div>
-									</div>
-								</div>
+          {/* Form */}
+          <form onSubmit={handleVideoUploadSubmit} className="space-y-4">
+            {/* Title */}
+            <input
+              className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 outline-none"
+              placeholder="Title"
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
 
-								{hasPaid && (
-									<div className="flex items-center gap-3 p-4 bg-yellow-50 rounded-xl border border-yellow-200">
-										<input
-											type="checkbox"
-											id="videoForSale"
-											checked={sellVideo}
-											onChange={(e) => setSellVideo(e.target.checked)}
-											className="w-5 h-5 text-yellow-500 rounded"
-										/>
-										<label htmlFor="videoForSale" className="text-gray-700 font-medium">
-											Make this video available for sale
-										</label>
-									</div>
-								)}
+            {/* Description */}
+            <textarea
+              className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 outline-none"
+              placeholder="Description..."
+              rows={5}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
 
-								<button
-									type="submit"
-									disabled={loading || !selectedFile}
-									className={`w-full py-4 rounded-xl font-bold text-white transition-all duration-300 ${
-										loading || !selectedFile
-											? "bg-yellow-300 cursor-not-allowed"
-											: "bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 shadow-lg hover:shadow-xl active:scale-[0.98]"
-									}`}
-								>
-									{loading ? (
-										<div className="flex items-center justify-center gap-3">
-											<Loader2 className="w-5 h-5 animate-spin" />
-											<span>Uploading Video...</span>
-										</div>
-									) : (
-										<div className="flex items-center justify-center gap-3">
-											<Upload className="w-5 h-5" />
-											<span>Upload Video</span>
-										</div>
-									)}
-								</button>
-							</form>
-						</motion.div>
-					</div>
-					<Toaster />
-				</>
-			);
-		}
+            {/* Genre */}
+            <Select
+              values={selectedItems}
+              options={CAT}
+              placeholder="Select genre(s).."
+              required
+              multi
+              className="rounded-lg px-4 py-2 w-full border border-yellow-200 bg-white/60 outline-none"
+              onChange={(values: any) => setSelectedItems(values)}
+            />
 
-		if (type === "login") {
-			return (
-				<>
-					<div className={`fixed inset-0 z-50 flex justify-center items-center ${isShow && show ? "visible" : "invisible"} ${className}`}>
-						<div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-100 to-yellow-300 opacity-90 backdrop-blur-md" />
-						
-						<motion.div
-							initial={{ opacity: 0, scale: 0.95, y: 20 }}
-							animate={{ opacity: 1, scale: 1, y: 0 }}
-							transition={{ type: "spring", damping: 25, stiffness: 300 }}
-							className="relative z-50 w-[90%] max-w-md bg-gradient-to-b from-white to-yellow-50 border-2 border-yellow-300 backdrop-blur-xl rounded-2xl shadow-2xl p-8"
-						>
-							{/* Decorative header */}
-							<div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-400" />
-							
-							<div className="flex justify-between items-center mb-8">
-								<div className="flex items-center gap-3">
-									<div className="p-2 bg-yellow-100 rounded-lg">
-										<FaEnvelope className="w-6 h-6 text-yellow-600" />
-									</div>
-									<h2 className="text-2xl font-bold text-gray-800">
-										Sign in to <span className="text-yellow-500">Wecinema</span>
-									</h2>
-								</div>
-								<FaTimes
-									size={20}
-									onClick={() => setShow(false)}
-									className="cursor-pointer text-gray-600 hover:text-red-500 transition duration-200 hover:rotate-90"
-								/>
-							</div>
+            {/* Theme */}
+            <Select
+              values={selectItems}
+              options={CATS}
+              placeholder="Select theme(s).."
+              required
+              multi
+              className="rounded-lg px-4 py-2 w-full border border-yellow-200 bg-white/60 outline-none"
+              onChange={(values: any) => setSelectItems(values)}
+            />
 
-							<motion.div
-								initial={{ opacity: 0, y: 10 }}
-								animate={{ opacity: 1, y: 0 }}
-								transition={{ delay: 0.1 }}
-							>
-								<h3 className="text-center text-gray-700 text-lg mb-8">
-									Welcome Back <span className="text-yellow-500 animate-pulse">👋</span>
-								</h3>
+            {/* Rating */}
+            <select
+              id="rating"
+              required
+              value={rating}
+              onChange={(e) => setRating(e.target.value)}
+              className="rounded-lg px-4 py-2 w-full border border-yellow-200 bg-white/60 outline-none"
+            >
+              <option value="">Select Rating</option>
+              <option value="p">G</option>
+              <option value="pg">PG</option>
+              <option value="pg-13">PG-13</option>
+              <option value="R">R</option>
+              <option value="X">X</option>
+            </select>
 
-								<form onSubmit={handleLoginSubmit} className="space-y-6">
-									<div className="space-y-2">
-										<label className="block text-gray-700 text-sm font-medium">Email Address *</label>
-										<div className="relative">
-											<FaEnvelope className="absolute left-4 top-1/2 transform -translate-y-1/2 text-yellow-500 w-5 h-5" />
-											<input
-												type="email"
-												value={email}
-												onChange={(e) => setEmail(e.target.value)}
-												placeholder="you@example.com"
-												className={`w-full pl-12 pr-4 py-3 rounded-xl border-2 ${
-													formErrors.email ? 'border-red-300' : 'border-yellow-200'
-												} bg-white/80 text-gray-900 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 outline-none transition`}
-												required
-											/>
-										</div>
-										{formErrors.email && (
-											<p className="text-red-500 text-sm">{formErrors.email}</p>
-										)}
-									</div>
+            {/* Video Upload */}
+            <div className="flex flex-col items-center p-3 border border-yellow-200 rounded-lg bg-white/60">
+              <div className="relative">
+                <input
+                  type="file"
+                  accept="video/*"
+                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                  onChange={handleFileChange}
+                  ref={fileInputRef}
+                />
+                <div
+                  className="bg-gray-100 p-4 rounded-md mt-3 cursor-pointer"
+                  onClick={handleThumbnailClick}
+                >
+                  {selectedFile ? (
+                    <video
+                      src={URL.createObjectURL(selectedFile)}
+                      height={100}
+                      width={100}
+                      className="object-cover"
+                    />
+                  ) : (
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-6 w-6 text-gray-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M3 7h18M3 12h18m-9 5h9"
+                      />
+                    </svg>
+                  )}
+                </div>
+              </div>
+            </div>
 
-									<div className="space-y-2">
-										<label className="block text-gray-700 text-sm font-medium">Password *</label>
-										<div className="relative">
-											<FaLock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-yellow-500 w-5 h-5" />
-											<input
-												type="password"
-												value={password}
-												onChange={(e) => setPassword(e.target.value)}
-												placeholder="••••••••"
-												className={`w-full pl-12 pr-4 py-3 rounded-xl border-2 ${
-													formErrors.password ? 'border-red-300' : 'border-yellow-200'
-												} bg-white/80 text-gray-900 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 outline-none transition`}
-												required
-											/>
-										</div>
-										{formErrors.password && (
-											<p className="text-red-500 text-sm">{formErrors.password}</p>
-										)}
-									</div>
+            {/* For Sale Checkbox */}
+            {hasPaid && (
+              <div className="my-4">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={sellVideo}
+                    onChange={(e) => setSellVideo(e.target.checked)}
+                  />
+                  For Sale
+                </label>
+              </div>
+            )}
 
-									<div className="flex justify-between items-center text-sm">
-										<button
-											type="button"
-											onClick={() => {
-												// Add forgot password functionality here
-												toast.info("Forgot password feature coming soon!", {
-													duration: 3000,
-												});
-											}}
-											className="text-yellow-600 hover:text-yellow-800 font-medium transition"
-										>
-											Forgot password?
-										</button>
-										<a
-											href="/hypemode"
-											className="text-yellow-600 hover:text-yellow-800 font-medium transition"
-										>
-											Hypemode?
-										</a>
-									</div>
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold mt-5 py-2 px-4 rounded-lg shadow-md transition"
+            >
+              {loading ? "Uploading..." : "Upload Video"}
+            </button>
+          </form>
+        </motion.div>
+      </div>
+    );
+  }
+if (type === "login") {
+  return (
+    <div
+      className={`fixed inset-0 z-50 flex justify-center items-center ${
+        isShow && show ? "visible" : "invisible"
+      } ${className}`}
+    >
+      {/* Background Gradient */}
+      <div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-100 to-yellow-300 opacity-90 backdrop-blur-md transition-all duration-300" />
 
-									<motion.button
-										whileTap={{ scale: 0.98 }}
-										disabled={loading}
-										className={`w-full py-4 rounded-xl font-bold text-white transition-all duration-300 shadow-lg ${
-											loading
-												? "bg-yellow-300 cursor-not-allowed"
-												: "bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 hover:shadow-xl active:scale-[0.98]"
-										}`}
-									>
-										{loading ? (
-											<div className="flex items-center justify-center gap-3">
-												<Loader2 className="w-5 h-5 animate-spin" />
-												<span>Signing in...</span>
-											</div>
-										) : (
-											"Sign in"
-										)}
-									</motion.button>
+      {/* Modal Container */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4 }}
+        className="relative z-50 w-[90%] max-w-md sm:w-2/5 bg-white/80 border border-yellow-300 backdrop-blur-xl rounded-2xl shadow-2xl p-8"
+>
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-800">Sign in to <span className="text-yellow-500">Wecinema</span></h2>
+          <FaTimes
+            size={18}
+            onClick={() => setShow(false)}
+            className="cursor-pointer text-gray-600 hover:text-red-500 transition duration-200"
+          />
+        </div>
 
-									<div className="text-center text-sm text-gray-600 pt-4 border-t border-yellow-100">
-										Don't have an account?{" "}
-										<button
-											type="button"
-											onClick={() => {
-												setShow(false);
-												// Dispatch event to open register modal
-												window.dispatchEvent(new CustomEvent('openPopup', { detail: { type: 'register' } }));
-											}}
-											className="text-yellow-600 hover:text-yellow-800 font-bold transition"
-										>
-											Create Account
-										</button>
-									</div>
-								</form>
-							</motion.div>
-						</motion.div>
-					</div>
+        {/* Form Body */}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <h3 className="text-center text-gray-700 text-lg mb-6">Welcome Back 👋</h3>
 
-					{verificationModal && (
-						<VerificationModal
-							email={pendingVerificationEmail}
-							username={pendingVerificationUsername || email.split('@')[0]}
-							onResend={resendVerificationEmail}
-							onClose={() => setVerificationModal(false)}
-							isResending={isResending}
-						/>
-					)}
+          <form onSubmit={handleLoginSubmit} className="space-y-5">
+            {/* Email */}
+            <div className="relative">
+              <label className="block text-gray-700 text-sm mb-1">Email</label>
+              <div className="relative">
+                <FaEnvelope className="absolute left-3 top-3.5 text-yellow-500" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="w-full pl-10 pr-4 py-3 rounded-lg bg-white/60 text-gray-900 border border-yellow-200 focus:ring-2 focus:ring-yellow-400 outline-none transition placeholder:text-gray-500"
+                />
+              </div>
+            </div>
 
-					<Toaster />
-				</>
-			);
-		}
+            {/* Password */}
+            <div className="relative">
+              <label className="block text-gray-700 text-sm mb-1">Password</label>
+              <div className="relative">
+                <FaLock className="absolute left-3 top-3.5 text-yellow-500" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-4 py-3 rounded-lg bg-white/60 text-gray-900 border border-yellow-200 focus:ring-2 focus:ring-yellow-400 outline-none transition placeholder:text-gray-500"
+                />
+              </div>
+            </div>
 
-		if (type === "register") {
-			return (
-				<>
-					<div className={`fixed inset-0 z-50 flex justify-center items-center ${isShow && show ? "visible" : "invisible"} ${className}`}>
-						<div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-50 to-yellow-200 opacity-80 backdrop-blur-sm" />
-						
-						<motion.div
-							initial={{ opacity: 0, scale: 0.95, y: 20 }}
-							animate={{ opacity: 1, scale: 1, y: 0 }}
-							transition={{ type: "spring", damping: 25, stiffness: 300 }}
-							className="relative z-50 w-[90%] max-w-md bg-gradient-to-b from-white to-yellow-50 border-2 border-yellow-300 backdrop-blur-xl rounded-2xl shadow-2xl p-8"
-						>
-							{/* Decorative header */}
-							<div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-400" />
-							
-							<div className="flex justify-between items-center mb-8">
-								<div className="flex items-center gap-3">
-									<div className="p-2 bg-yellow-100 rounded-lg">
-										<FaUser className="w-6 h-6 text-yellow-600" />
-									</div>
-									<h2 className="text-2xl font-bold text-gray-800">
-										Join <span className="text-yellow-500">Wecinema</span>
-									</h2>
-								</div>
-								<FaTimes
-									size={20}
-									onClick={() => setShow(false)}
-									className="cursor-pointer text-gray-600 hover:text-red-500 transition duration-200 hover:rotate-90"
-								/>
-							</div>
+            {/* Sign-in Button */}
+            <motion.button
+              whileTap={{ scale: 0.98 }}
+              disabled={loading}
+              className={`w-full py-3 mt-2 rounded-lg font-semibold text-white transition-all duration-300 text-lg shadow-md ${
+                loading
+                  ? "bg-yellow-300 cursor-not-allowed"
+                  : "bg-gradient-to-r from-yellow-500 to-yellow-400 hover:from-yellow-600 hover:to-yellow-500"
+              }`}
+            >
+              {loading ? (
+                <div className="flex items-center justify-center gap-2">
+                  <span className="animate-spin border-2 border-t-transparent border-white rounded-full w-5 h-5"></span>
+                  Signing in...
+                </div>
+              ) : (
+                "Sign in"
+              )}
+            </motion.button>
 
-							<form onSubmit={handleRegisterSubmit} className="space-y-6">
-								<div className="space-y-2">
-									<label className="block text-gray-700 text-sm font-medium">Username *</label>
-									<div className="relative">
-										<FaUser className="absolute left-4 top-1/2 transform -translate-y-1/2 text-yellow-500 w-5 h-5" />
-										<input
-											className={`w-full pl-12 pr-4 py-3 rounded-xl border-2 ${
-												formErrors.username ? 'border-red-300' : 'border-yellow-200'
-											} bg-white/80 text-gray-900 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 outline-none transition`}
-											placeholder="Choose a username"
-											type="text"
-											value={username}
-											onChange={(e) => setUsername(e.target.value)}
-											required
-											minLength={3}
-										/>
-									</div>
-									{formErrors.username && (
-										<p className="text-red-500 text-sm">{formErrors.username}</p>
-									)}
-								</div>
+            {/* Links */}
+            <div className="flex justify-between items-center text-sm mt-4 text-gray-600">
+              <a href="#" className="hover:text-yellow-500 transition">Forgot password?</a>
+              <a href="/hypemode" className="hover:text-yellow-500 transition">Hypemode?</a>
+            </div>
 
-								<div className="space-y-2">
-									<label className="block text-gray-700 text-sm font-medium">Email Address *</label>
-									<div className="relative">
-										<FaEnvelope className="absolute left-4 top-1/2 transform -translate-y-1/2 text-yellow-500 w-5 h-5" />
-										<input
-											className={`w-full pl-12 pr-4 py-3 rounded-xl border-2 ${
-												formErrors.email ? 'border-red-300' : 'border-yellow-200'
-											} bg-white/80 text-gray-900 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 outline-none transition`}
-											placeholder="you@example.com"
-											type="email"
-											value={email}
-											onChange={(e) => setEmail(e.target.value)}
-											required
-										/>
-									</div>
-									{formErrors.email && (
-										<p className="text-red-500 text-sm">{formErrors.email}</p>
-									)}
-								</div>
+            <div className="mt-6 text-center text-sm text-gray-600">
+              {/* New here? <a href="/signup" className="text-yellow-500 hover:underline">Create an account</a> */}
+            </div>
+          </form>
+        </motion.div>
+      </motion.div>
+    </div>
+  );
+}
 
-								<div className="space-y-2">
-									<label className="block text-gray-700 text-sm font-medium">Password *</label>
-									<div className="relative">
-										<FaLock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-yellow-500 w-5 h-5" />
-										<input
-											className={`w-full pl-12 pr-4 py-3 rounded-xl border-2 ${
-												formErrors.password ? 'border-red-300' : 'border-yellow-200'
-											} bg-white/80 text-gray-900 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 outline-none transition`}
-											placeholder="Create a password (min. 6 characters)"
-											type="password"
-											value={password}
-											onChange={(e) => setPassword(e.target.value)}
-											required
-											minLength={6}
-										/>
-									</div>
-									{formErrors.password && (
-										<p className="text-red-500 text-sm">{formErrors.password}</p>
-									)}
-									<p className="text-xs text-gray-500">Minimum 6 characters</p>
-								</div>
 
-								<div className="space-y-2">
-									<label className="block text-gray-700 text-sm font-medium">Date of Birth *</label>
-									<div className="relative">
-										<FaCalendarAlt className="absolute left-4 top-1/2 transform -translate-y-1/2 text-yellow-500 w-5 h-5" />
-										<input
-											className={`w-full pl-12 pr-4 py-3 rounded-xl border-2 ${
-												formErrors.dob ? 'border-red-300' : 'border-yellow-200'
-											} bg-white/80 text-gray-900 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 outline-none transition`}
-											type="date"
-											value={dob}
-											onChange={(e) => setDob(e.target.value)}
-											required
-										/>
-									</div>
-									{formErrors.dob && (
-										<p className="text-red-500 text-sm">{formErrors.dob}</p>
-									)}
-									<p className="text-xs text-gray-500">You must be at least 13 years old</p>
-								</div>
+	
+	
+	if (type === "register") {
+  return (
 
-								<div className="flex items-start gap-3 p-4 bg-yellow-50 rounded-xl border border-yellow-200">
-									<input
-										type="checkbox"
-										id="terms"
-										required
-										className="w-5 h-5 text-yellow-500 rounded mt-1 flex-shrink-0"
-									/>
-									<label htmlFor="terms" className="text-sm text-gray-700">
-										I agree to the{" "}
-										<button
-											type="button"
-											onClick={() => setShowTermsPopup(true)}
-											className="text-yellow-600 hover:text-yellow-800 font-medium underline"
-										>
-											Terms and Conditions
-										</button>
-									</label>
-								</div>
+    <div
+      className={`fixed inset-0 z-50 flex justify-center items-center ${
+        isShow && show ? "visible" : "invisible"
+      } ${className}`}
+    >
 
-								<motion.button
-									whileTap={{ scale: 0.98 }}
-									disabled={loading}
-									className={`w-full py-4 rounded-xl font-bold text-white transition-all duration-300 shadow-lg ${
-										loading
-											? "bg-yellow-300 cursor-not-allowed"
-											: "bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 hover:shadow-xl active:scale-[0.98]"
-									}`}
-								>
-									{loading ? (
-										<div className="flex items-center justify-center gap-3">
-											<Loader2 className="w-5 h-5 animate-spin" />
-											<span>Creating Account...</span>
-										</div>
-									) : (
-										"Create Account"
-									)}
-								</motion.button>
+      {/* Background Gradient */}
+      <div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-50 to-yellow-200 opacity-80 backdrop-blur-sm transition-all duration-300" />
 
-								<div className="text-center text-sm text-gray-600 pt-4 border-t border-yellow-100">
-									Already have an account?{" "}
-									<button
-										type="button"
-										onClick={() => {
-											setShow(false);
-											window.dispatchEvent(new CustomEvent('openPopup', { detail: { type: 'login' } }));
-										}}
-										className="text-yellow-600 hover:text-yellow-800 font-bold transition"
-									>
-										Sign in
-									</button>
-								</div>
-							</form>
-						</motion.div>
-					</div>
+      {/* Modal Container */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.4 }}
+        className="relative z-50 w-[90%] max-w-md sm:w-2/5 bg-white/80 border border-yellow-300 backdrop-blur-xl rounded-2xl shadow-2xl p-8"
+      >
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-800">
+            Sign up to <span className="text-yellow-500">Wecinema</span>
+          </h2>
+          <FaTimes
+            size={18}
+            onClick={() => setShow(false)}
+            className="cursor-pointer text-gray-600 hover:text-red-500 transition duration-200"
+          />
+        </div>
 
-					{successModal && (
-						<RegistrationSuccessModal
-							email={pendingVerificationEmail}
-							username={pendingVerificationUsername}
-							onClose={() => setSuccessModal(false)}
-						/>
-					)}
+        {/* Form */}
+        <form onSubmit={handleRegisterSubmit} className="space-y-5">
+          <input
+            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition placeholder:text-gray-500"
+            placeholder="Username"
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+          />
+          <input
+            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition placeholder:text-gray-500"
+            placeholder="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <input
+            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition placeholder:text-gray-500"
+            placeholder="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          <input
+            className="rounded-lg px-4 py-3 w-full border border-yellow-200 bg-white/60 text-gray-900 focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none transition"
+            type="date"
+            value={dob}
+            onChange={(e) => setDob(e.target.value)}
+            required
+          />
 
-					{showTermsPopup && (
-						<TermsAndConditionsPopup onAccept={handleAcceptTerms} />
-					)}
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            disabled={loading}
+            className={`w-full py-3 mt-2 rounded-lg font-semibold text-white transition-all duration-300 text-lg shadow-md ${
+              loading
+                ? "bg-yellow-300 cursor-not-allowed"
+                : "bg-gradient-to-r from-yellow-500 to-yellow-400 hover:from-yellow-600 hover:to-yellow-500"
+            }`}
+          >
+            {loading ? "Signing up..." : "Sign up"}
+          </motion.button>
 
-					<Toaster />
-				</>
-			);
-		}
+          <div className="flex flex-col sm:flex-row justify-between items-center mt-3 text-sm text-gray-600">
+            <a href="#" className="hover:text-yellow-500 transition">
+              Already have an account?
+            </a>
+            <a href="/hypemode" className="hover:text-yellow-500 transition">
+              Hypemode?
+            </a>
+          </div>
+        </form>
+
+        {/* Success Modal */}
+        {successModal && (
+          <div className="fixed top-0 left-0 w-full h-full flex justify-center items-center bg-black bg-opacity-50 z-50">
+            <div className="bg-white p-6 rounded shadow-lg text-center">
+              <h2 className="text-green-600 text-xl font-semibold">✅ Registration Successful!</h2>
+              <p className="mt-2">
+                A verification email has been sent to <strong>{email}</strong>.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Error Modal */}
+        {errorModal && (
+          <div className="fixed top-0 left-0 w-full h-full flex justify-center items-center bg-black bg-opacity-50 z-50">
+            <div className="bg-white p-6 rounded shadow-lg text-center">
+              <h2 className="text-red-600 text-xl font-semibold">❌ Something went wrong!</h2>
+              <p className="mt-2">Please try again later.</p>
+            </div>
+          </div>
+        )}
+      </motion.div>
+	{showTermsPopup && <TermsAndConditionsPopup onAccept={handleAcceptTerms} />}
+
+    </div>
+  );
+}
 
 		if (type === "logout") {
 			return (
-				<div className={`fixed inset-0 z-50 flex justify-center items-center ${isShow && show ? "visible" : "invisible"} ${className}`}>
-					<div className="fixed inset-0 bg-black/70 backdrop-blur-sm" />
-					
-					<motion.div
-						initial={{ opacity: 0, scale: 0.95, y: 20 }}
-						animate={{ opacity: 1, scale: 1, y: 0 }}
-						transition={{ type: "spring", damping: 25, stiffness: 300 }}
-						className="relative z-50 w-[90%] max-w-md bg-gradient-to-b from-white to-red-50 border-2 border-red-200 backdrop-blur-xl rounded-2xl shadow-2xl p-8"
+				<div
+					style={{ background }}
+					className={`fixed sm:top-0 z-50 left-0 sm:h-screen w-full flex justify-center items-center ${
+						isShow && show ? "visible" : "invisible"
+					} ${className}`}
+				>
+					<div
+						className={`fixed top-0 left-0 h-full w-full  ${
+							background ?? "bg-black "
+						} bg-opacity-90 backdrop-filter backdrop-blur-15 flex items-center justify-center transition-opacity ease-in-out duration-300`}
 					>
-						{/* Decorative header */}
-						<div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-red-400 via-red-500 to-red-400" />
-						
-						<div className="text-center mb-8">
-							<div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-								<LogOut className="w-10 h-10 text-red-500" />
-							</div>
-							<h2 className="text-2xl font-bold text-gray-800 mb-2">Log Out?</h2>
-							<p className="text-gray-600">Are you sure you want to log out of your account?</p>
-						</div>
-
-						<form onSubmit={handleLogoutSubmit} className="space-y-4">
-							<div className="grid grid-cols-2 gap-4">
+						<div
+							className={`sm:w-2/6 modal min-h-2/6 w-5/6 bg-white rounded-md p-6
+              transition-transform transform translate-y-0 ease-in-out relative cursor-pointer shadow-md
+              }`}
+						>
+							<header className="flex gap-4 justify-between items-center my-3">
+								<h2>Are you sure you want to log Out?</h2>
+							</header>
+							<form onSubmit={handleLogoutSubmit} className="flex gap-2">
 								<button
 									type="button"
-									onClick={() => setShow(false)}
-									className="py-3 px-6 rounded-xl border-2 border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition active:scale-[0.98]"
+									className="rounded-md px-4 py-2 w-full my-3 bg-white 500"
+									onClick={() => {
+										setShow(false);
+									}}
 								>
-									Cancel
+									No
 								</button>
-								<button
-									type="submit"
-									className="py-3 px-6 rounded-xl bg-gradient-to-r from-red-500 to-red-600 text-white font-medium hover:from-red-600 hover:to-red-700 shadow-lg hover:shadow-xl transition active:scale-[0.98]"
-								>
-									Log Out
+								<button className="rounded-md px-4 py-2 w-full my-3 bg-blue-500 text-white">
+									Yes
 								</button>
-							</div>
-						</form>
-
-						<p className="text-center text-sm text-gray-500 mt-6">
-							You'll need to sign in again to access your account.
-						</p>
-					</motion.div>
+							</form>
+						</div>
+					</div>
 				</div>
 			);
 		}
-
-		return null;
+		if (type === "") {
+			return <div>Hello</div>;
+		}
 	}
 );
+
 
 export default Popup;
