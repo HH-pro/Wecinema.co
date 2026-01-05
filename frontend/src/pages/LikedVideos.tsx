@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { Layout } from "../components";
-import { decodeToken, generateSlug } from "../utilities/helperfFunction"; // Import helper functions
+import { decodeToken, generateSlug } from "../utilities/helperfFunction";
 import VideoThumbnail from "react-video-thumbnail";
 import { useNavigate } from "react-router-dom";
+
+// ✅ Environment variable se API URL - same as GenrePage
+const API_BASE_URL = process.env.REACT_APP_API_URL || "https://wecinema-co.onrender.com";
 
 const LikedVideos = () => {
   const [likedVideos, setLikedVideos] = useState([]);
   const [error, setError] = useState("");
   const [userId, setUserId] = useState(null);
-  const nav = useNavigate(); // Initialize navigation
+  const nav = useNavigate();
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -26,13 +29,11 @@ const LikedVideos = () => {
 
     const fetchLikedVideos = async () => {
       try {
-        const response = await axios.get(`https://wecinema.co/api/video/liked/${userId}`);
-
-        // console.log("Fetched liked videos:", response.data);
+        // ✅ Use API_BASE_URL here
+        const response = await axios.get(`${API_BASE_URL}/video/liked/${userId}`);
 
         setLikedVideos(Array.isArray(response.data) ? response.data : []);
       } catch (error) {
-        // console.error("Error fetching liked videos:", error);
         setError("Failed to load liked videos.");
       }
     };
