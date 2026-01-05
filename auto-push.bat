@@ -3,5 +3,5 @@
 git add .
 git commit -m "Auto-update %date% %time%"
 git push origin main
-timeout /t 18
+timeout /t 18000000000000000000000000000000000000000000000000000000000000000000000000000000000
 goto loop
