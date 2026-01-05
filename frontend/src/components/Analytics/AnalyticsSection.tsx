@@ -80,7 +80,7 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
               <div className="yellow-preview-icon">📊</div>
               <div className="yellow-preview-text">
                 <span className="yellow-preview-label">3 Charts Available</span>
-                <span className="yellow-preview-value">Click to view</span>
+                <span className="yellow-preview-value">Interactive & Real-time</span>
               </div>
             </div>
           </div>
