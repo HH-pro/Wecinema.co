@@ -11,6 +11,19 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
 }) => {
   const [showGraphs, setShowGraphs] = useState(true);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Check screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Check localStorage for user preference
   useEffect(() => {
@@ -50,9 +63,11 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
               <div className="yellow-bar-text">
                 <span className="yellow-bar-title">
                   <span className="yellow-title-icon">📈</span>
-                  Analytics Dashboard
+                  {isMobile ? "Analytics" : "Analytics Dashboard"}
                 </span>
-                <span className="yellow-bar-subtitle">Hidden - Click to show insights</span>
+                <span className="yellow-bar-subtitle">
+                  {isMobile ? "Tap to show insights" : "Hidden - Click to show insights"}
+                </span>
               </div>
             </div>
             
@@ -63,7 +78,9 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
               title="Show Analytics Dashboard"
             >
               <span className="yellow-toggle-content">
-                <span className="yellow-toggle-text">Show Graphs</span>
+                <span className="yellow-toggle-text">
+                  {isMobile ? "Show" : "Show Graphs"}
+                </span>
                 <div className="yellow-arrow-animation">
                   <svg className="yellow-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
@@ -80,7 +97,9 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
               <div className="yellow-preview-icon">📊</div>
               <div className="yellow-preview-text">
                 <span className="yellow-preview-label">3 Charts Available</span>
-                <span className="yellow-preview-value">Interactive & Real-time</span>
+                <span className="yellow-preview-value">
+                  {isMobile ? "Tap to view" : "Interactive & Real-time"}
+                </span>
               </div>
             </div>
           </div>
@@ -107,8 +126,12 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
                   </svg>
                 </div>
                 <div className="yellow-header-text">
-                  <h2 className="yellow-header-title">Analytics Dashboard</h2>
-                  <p className="yellow-header-subtitle">Real-time insights & visualization</p>
+                  <h2 className="yellow-header-title">
+                    {isMobile ? "Analytics" : "Analytics Dashboard"}
+                  </h2>
+                  <p className="yellow-header-subtitle">
+                    {isMobile ? "Real-time insights" : "Real-time insights & visualization"}
+                  </p>
                 </div>
               </div>
               
@@ -119,7 +142,9 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
                 title="Hide Analytics"
               >
                 <span className="yellow-close-content">
-                  <span className="yellow-close-text">Hide</span>
+                  <span className="yellow-close-text">
+                    {isMobile ? "Hide" : "Hide Dashboard"}
+                  </span>
                   <svg className="yellow-close-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
                   </svg>
@@ -134,18 +159,24 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
           {/* Charts Container */}
           <div className="yellow-charts-container">
             <div className="yellow-charts-intro">
-              <h3 className="yellow-intro-title">Visual Analytics</h3>
-              <p className="yellow-intro-subtitle">Interactive charts showing trends over time</p>
+              <h3 className="yellow-intro-title">
+                {isMobile ? "Charts" : "Visual Analytics"}
+              </h3>
+              <p className="yellow-intro-subtitle">
+                {isMobile ? "Interactive trends" : "Interactive charts showing trends over time"}
+              </p>
             </div>
             
-            <Charts />
+            <Charts isMobile={isMobile} />
           </div>
 
           {/* Yellow Footer */}
           <div className="yellow-footer">
             <div className="yellow-footer-left">
               <div className="yellow-legend">
-                <span className="yellow-legend-title">Live Data</span>
+                <span className="yellow-legend-title">
+                  {isMobile ? "Live" : "Live Data"}
+                </span>
                 <div className="yellow-legend-dots">
                   <span className="yellow-legend-dot" style={{ backgroundColor: '#f59e0b' }}></span>
                   <span className="yellow-legend-dot" style={{ backgroundColor: '#fbbf24' }}></span>
@@ -157,7 +188,9 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
             <div className="yellow-footer-right">
               <span className="yellow-data-info">
                 <span className="yellow-info-icon">⏱️</span>
-                <span className="yellow-info-text">Last 330 days</span>
+                <span className="yellow-info-text">
+                  {isMobile ? "330 days" : "Last 330 days"}
+                </span>
               </span>
               <button className="yellow-refresh-btn" title="Refresh data">
                 <svg className="yellow-refresh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
