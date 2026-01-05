@@ -188,7 +188,7 @@ const Layout: React.FC<LayoutProps> = ({
 
   // Get active class for sidebar items
   const getActiveClass = (path: string) => {
-    return location.pathname === path ? "bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400" : "";
+    return location.pathname === path ? "bg-yellow-50 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-400" : "";
   };
 
   return (
@@ -298,14 +298,14 @@ const Layout: React.FC<LayoutProps> = ({
                       <span>Marketplace</span>
                       <div className="flex gap-1">
                         <button
-                          className={`p-1 rounded ${userType === 'buyer' ? 'bg-blue-100 dark:bg-blue-900' : 'bg-gray-100 dark:bg-gray-700'}`}
+                          className={`p-1 rounded ${userType === 'buyer' ? 'bg-yellow-100 dark:bg-yellow-900' : 'bg-gray-100 dark:bg-gray-700'}`}
                           onClick={() => changeUserType('buyer')}
                           title="Switch to Buyer Mode"
                         >
                           <FaShoppingCart size="12" />
                         </button>
                         <button
-                          className={`p-1 rounded ${userType === 'seller' ? 'bg-blue-100 dark:bg-blue-900' : 'bg-gray-100 dark:bg-gray-700'}`}
+                          className={`p-1 rounded ${userType === 'seller' ? 'bg-yellow-100 dark:bg-yellow-900' : 'bg-gray-100 dark:bg-gray-700'}`}
                           onClick={() => changeUserType('seller')}
                           title="Switch to Seller Mode"
                         >
@@ -360,7 +360,7 @@ const Layout: React.FC<LayoutProps> = ({
 
                     {/* User Type Badge */}
                     <div className="px-4 py-2">
-                      <span className={`text-xs px-2 py-1 rounded-full ${userType === 'seller' ? 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300' : 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300'}`}>
+                      <span className={`text-xs px-2 py-1 rounded-full ${userType === 'seller' ? 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300' : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-300'}`}>
                         {userType === 'seller' ? (
                           <>
                             <FaUserTie className="inline mr-1" size="10" />
@@ -394,14 +394,14 @@ const Layout: React.FC<LayoutProps> = ({
             <nav className="px-4 py-2 border-b border-gray-200">
               <h2 className="font-bold mb-2">Settings</h2>
               <div
-                className={`flex items-center gap-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 ${darkMode ? "text-blue-600 dark:text-blue-400" : ""}`}
+                className={`flex items-center gap-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 ${darkMode ? "text-yellow-600 dark:text-yellow-400" : ""}`}
                 onClick={setDarkiMode}
               >
                 <FaMoon size="20" />
                 <span className="text-sm">Dark Mode</span>
               </div>
               <div
-                className={`flex items-center gap-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 ${!darkMode ? "text-blue-600 dark:text-blue-400" : ""}`}
+                className={`flex items-center gap-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 ${!darkMode ? "text-yellow-600 dark:text-yellow-400" : ""}`}
                 onClick={setLightMode}
               >
                 <IoSunnyOutline size="20" />
@@ -447,14 +447,14 @@ const Layout: React.FC<LayoutProps> = ({
                 <>
                   <div
                     onClick={() => handleType("login")}
-                    className="flex items-center gap-3 py-2 cursor-pointer hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
+                    className="flex items-center gap-3 py-2 cursor-pointer hover:text-yellow-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
                   >
                     <LiaSignInAltSolid size="20" />
                     <span>Sign In</span>
                   </div>
                   <div
                     onClick={() => handleType("register")}
-                    className="flex items-center gap-3 py-2 cursor-pointer hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
+                    className="flex items-center gap-3 py-2 cursor-pointer hover:text-yellow-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
                   >
                     <HiUserAdd size="20" />
                     <span>Sign Up</span>
