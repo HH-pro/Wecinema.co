@@ -34,7 +34,7 @@ const createTransporter = () => {
 const sendVerificationEmail = async (email, username, verificationToken) => {
   try {
     const transporter = createTransporter();
-    const verificationLink = `${process.env.BASE_URL || 'http://localhost:3000'}/api/user/verify-email?token=${verificationToken}`;
+    const verificationLink = `${process.env.BASE_URL || 'http://localhost:3000'}/user/verify-email?token=${verificationToken}`;
     
     const mailOptions = {
       from: `"Wecinema" <${process.env.GMAIL_USER}>`,
