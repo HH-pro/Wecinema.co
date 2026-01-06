@@ -46,5 +46,5 @@ nav {
   will-change: transform, opacity;
   transition: opacity 0.15s ease;
   z-index: 999999;
-  opacity: 1; /* always visible now */
+  opacity: 1;
 }
