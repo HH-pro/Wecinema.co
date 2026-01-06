@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import axios from 'axios';
 import { Layout } from "../components";
 import { useNavigate } from 'react-router-dom';
@@ -7,7 +7,6 @@ import { googleProvider } from "../firebase/config";
 import { motion } from "framer-motion";
 import Confetti from "react-confetti";
 import styled from 'styled-components';
-import { decodeToken } from "../utilities/helperfFunction";
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import "../css/HypeModeProfile.css";
@@ -16,6 +15,9 @@ import { API_BASE_URL } from "../api";
 // Import new components
 import PaymentComponent from "../../src/components/PaymentComponent/Payment";
 import SuccessPopup from "../../src/components/PaymentComponent/SuccessPopup";
+
+// Import AuthContext
+import { useAuthContext } from "../../src/context/AuthContext";
 
 // Loading Spinner Component
 const LoadingSpinner = styled.div`
@@ -65,17 +67,28 @@ const PopupContent = styled.div`
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 `;
 
+// User interface
+interface User {
+  _id?: string;
+  id?: string;
+  username: string;
+  email: string;
+  userType: string;
+  hasPaid: boolean;
+  avatar?: string;
+}
+
 // Main HypeModeProfile Component
 const HypeModeProfile = () => {
   const navigate = useNavigate();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const auth = useAuthContext();
+  
   const [popupMessage, setPopupMessage] = useState('');
   const [showPopup, setShowPopup] = useState(false);
   const [isSignup, setIsSignup] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
-  const [userId, setUserId] = useState('');
   const [showFireworks, setShowFireworks] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState<"user" | "studio" | null>(null);
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer");
@@ -83,58 +96,21 @@ const HypeModeProfile = () => {
   const [showPaymentComponent, setShowPaymentComponent] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [countdown, setCountdown] = useState(3);
-  const [authCheckComplete, setAuthCheckComplete] = useState(false);
-  
-  const redirectAttempted = useRef(false);
 
-  // Initial auth check
+  // Check if user is already authenticated and paid
   useEffect(() => {
-    const checkInitialAuth = async () => {
-      if (redirectAttempted.current) return;
-      
-      const token = localStorage.getItem("token");
-      if (!token) {
-        setAuthCheckComplete(true);
-        return;
-      }
-
-      try {
-        const tokenData = decodeToken(token);
-        const userId = tokenData?.userId || tokenData?.id;
-        
-        if (!userId) {
-          localStorage.removeItem("token");
-          setAuthCheckComplete(true);
-          return;
-        }
-
-        const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
-        const user = response.data;
-        
-        if (user.hasPaid) {
-          redirectAttempted.current = true;
-          navigate('/');
-          return;
-        } else {
-          setUserId(userId);
-          setIsLoggedIn(true);
-          setShowPaymentComponent(true);
-        }
-      } catch (error) {
-        console.error('Error checking initial auth:', error);
-        localStorage.removeItem("token");
-      } finally {
-        setAuthCheckComplete(true);
-      }
-    };
-
-    checkInitialAuth();
-  }, [navigate]);
+    if (auth.isAuthenticated && auth.hasPaid && !auth.loading) {
+      // User is already logged in and paid, show success
+      setLoginSuccess(true);
+    } else if (auth.isAuthenticated && !auth.hasPaid && auth.userId && !auth.loading) {
+      // User is logged in but hasn't paid
+      setShowPaymentComponent(true);
+    }
+  }, [auth.isAuthenticated, auth.hasPaid, auth.userId, auth.loading]);
 
   // Handle redirect after login success
   useEffect(() => {
     if (loginSuccess) {
-      redirectAttempted.current = true;
       const timer = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
@@ -150,28 +126,7 @@ const HypeModeProfile = () => {
     }
   }, [loginSuccess, navigate]);
 
-  const checkPaymentStatus = async (userId: string) => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
-      const user = response.data;
-      
-      if (user.hasPaid) {
-        setUserId(userId);
-        setIsLoggedIn(true);
-        setLoginSuccess(true);
-      } else {
-        setUserId(userId);
-        setIsLoggedIn(true);
-        setShowPaymentComponent(true);
-      }
-    } catch (error) {
-      console.error('Error checking payment status:', error);
-      setPopupMessage('Error checking payment status. Please try again.');
-      setShowPopup(true);
-    }
-  };
-
-  // Auth functions (same as before but cleaner)
+  // Register user with backend
   const registerUser = async (username: string, email: string, avatar: string, userType: string) => {
     try {
       const res = await axios.post(`${API_BASE_URL}/user/signup`, {
@@ -186,9 +141,17 @@ const HypeModeProfile = () => {
       const userId = res.data.id;
 
       if (token) {
-        localStorage.setItem('token', token);
-        setIsLoggedIn(true);
-        setUserId(userId);
+        // Use AuthContext to login
+        const userData: User = {
+          id: userId,
+          username,
+          email,
+          userType,
+          hasPaid: false,
+          avatar
+        };
+        
+        auth.login(userData, token);
         return { success: true, userId };
       }
     } catch (error: any) {
@@ -202,17 +165,23 @@ const HypeModeProfile = () => {
     }
   };
 
+  // Login user with backend
   const loginUser = async (email: string) => {
     try {
       const res = await axios.post(`${API_BASE_URL}/user/signin`, { email });
-      const backendToken = res.data.token;
+      const token = res.data.token;
       const userId = res.data.id;
 
-      if (backendToken) {
-        localStorage.setItem('token', backendToken);
-        setIsLoggedIn(true);
-        setUserId(userId);
-        return { success: true, userId };
+      if (token && userId) {
+        // Get user data
+        const userResponse = await axios.get(`${API_BASE_URL}/user/${userId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (userResponse.data) {
+          auth.login(userResponse.data, token);
+          return { success: true, userId };
+        }
       }
     } catch (error: any) {
       setPopupMessage(error.response?.data?.message || 'Login failed.');
@@ -221,6 +190,7 @@ const HypeModeProfile = () => {
     }
   };
 
+  // Handle successful authentication
   const onLoginSuccess = async (user: any, isEmailAuth: boolean = false) => {
     const profile = user.providerData[0];
     const email = profile.email;
@@ -236,6 +206,7 @@ const HypeModeProfile = () => {
       }
       
       if (result.success && result.userId) {
+        // Check if user has paid
         await checkPaymentStatus(result.userId);
       }
     } catch (error) {
@@ -246,6 +217,24 @@ const HypeModeProfile = () => {
     }
   };
 
+  // Check payment status
+  const checkPaymentStatus = async (userId: string) => {
+    try {
+      await auth.verifyTokenAndPayment();
+      
+      if (auth.hasPaid) {
+        setLoginSuccess(true);
+      } else {
+        setShowPaymentComponent(true);
+      }
+    } catch (error) {
+      console.error('Error checking payment status:', error);
+      setPopupMessage('Error checking payment status. Please try again.');
+      setShowPopup(true);
+    }
+  };
+
+  // Google Signin
   const handleGoogleLogin = async () => {
     if (!selectedSubscription) {
       setPopupMessage("Please select a subscription plan first.");
@@ -254,14 +243,70 @@ const HypeModeProfile = () => {
     }
 
     setIsLoading(true);
-    const auth = getAuth();
+    const firebaseAuth = getAuth();
     try {
-      const result = await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(firebaseAuth, googleProvider);
       await onLoginSuccess(result.user);
     } catch (error: any) {
       setIsLoading(false);
       setPopupMessage('Google login failed. Please try again.');
       setShowPopup(true);
+    }
+  };
+
+  // Email Signup
+  const handleEmailSignup = async () => {
+    if (!selectedSubscription) {
+      setPopupMessage("Please select a subscription plan first.");
+      setShowPopup(true);
+      return;
+    }
+
+    if (!email || !password || !username) {
+      setPopupMessage("Please enter username, email and password.");
+      setShowPopup(true);
+      return;
+    }
+
+    if (password.length < 6) {
+      setPopupMessage("Password should be at least 6 characters long.");
+      setShowPopup(true);
+      return;
+    }
+
+    setIsLoading(true);
+    const firebaseAuth = getAuth();
+    try {
+      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+      await onLoginSuccess(userCredential.user, true);
+    } catch (error: any) {
+      setIsLoading(false);
+      handleAuthError(error);
+    }
+  };
+
+  // Email Login
+  const handleEmailLogin = async () => {
+    if (!selectedSubscription) {
+      setPopupMessage("Please select a subscription plan first.");
+      setShowPopup(true);
+      return;
+    }
+
+    if (!email || !password) {
+      setPopupMessage("Please enter both email and password.");
+      setShowPopup(true);
+      return;
+    }
+
+    setIsLoading(true);
+    const firebaseAuth = getAuth();
+    try {
+      const userCredential = await signInWithEmailAndPassword(firebaseAuth, email, password);
+      await onLoginSuccess(userCredential.user, true);
+    } catch (error: any) {
+      setIsLoading(false);
+      handleAuthError(error);
     }
   };
 
@@ -276,48 +321,6 @@ const HypeModeProfile = () => {
       handleEmailSignup();
     } else {
       handleEmailLogin();
-    }
-  };
-
-  const handleEmailSignup = async () => {
-    if (!email || !password || !username) {
-      setPopupMessage("Please enter username, email and password.");
-      setShowPopup(true);
-      return;
-    }
-
-    if (password.length < 6) {
-      setPopupMessage("Password should be at least 6 characters long.");
-      setShowPopup(true);
-      return;
-    }
-
-    setIsLoading(true);
-    const auth = getAuth();
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await onLoginSuccess(userCredential.user, true);
-    } catch (error: any) {
-      setIsLoading(false);
-      handleAuthError(error);
-    }
-  };
-
-  const handleEmailLogin = async () => {
-    if (!email || !password) {
-      setPopupMessage("Please enter both email and password.");
-      setShowPopup(true);
-      return;
-    }
-
-    setIsLoading(true);
-    const auth = getAuth();
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      await onLoginSuccess(userCredential.user, true);
-    } catch (error: any) {
-      setIsLoading(false);
-      handleAuthError(error);
     }
   };
 
@@ -368,21 +371,21 @@ const HypeModeProfile = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Show loading while checking auth
-  if (!authCheckComplete) {
+  // If auth is still loading
+  if (auth.loading) {
     return (
       <Layout expand={false} hasHeader={true}>
         <LoadingSpinner>
           <div>
             <div className="spinner"></div>
-            <p style={{ color: '#4b5563', fontSize: '16px' }}>Checking authentication status...</p>
+            <p style={{ color: '#4b5563', fontSize: '16px' }}>Loading authentication...</p>
           </div>
         </LoadingSpinner>
       </Layout>
     );
   }
 
-  // Show success popup
+  // If user is already logged in and paid, show success
   if (loginSuccess) {
     return <SuccessPopup 
       countdown={countdown} 
@@ -390,15 +393,16 @@ const HypeModeProfile = () => {
     />;
   }
 
-  // Show payment component
-  if (showPaymentComponent && selectedSubscription && userId) {
+  // If user needs to pay
+  if (showPaymentComponent && selectedSubscription && auth.userId) {
     return (
       <Layout expand={false} hasHeader={true}>
         <PaymentComponent
           selectedSubscription={selectedSubscription}
           userType={userType}
-          userId={userId}
+          userId={auth.userId}
           onPaymentSuccess={() => {
+            auth.setPaymentStatus(true);
             setLoginSuccess(true);
           }}
           onPaymentError={(msg) => {
@@ -413,7 +417,21 @@ const HypeModeProfile = () => {
     );
   }
 
-  // Main render
+  // If user is already authenticated and paid but still on this page
+  if (auth.isAuthenticated && auth.hasPaid) {
+    return (
+      <Layout expand={false} hasHeader={true}>
+        <LoadingSpinner>
+          <div>
+            <div className="spinner"></div>
+            <p style={{ color: '#4b5563', fontSize: '16px' }}>Redirecting to home...</p>
+          </div>
+        </LoadingSpinner>
+      </Layout>
+    );
+  }
+
+  // Main render - show login/signup
   return (
     <Layout expand={false} hasHeader={true}>
       <div className="banner-small">
@@ -456,7 +474,7 @@ const HypeModeProfile = () => {
           {isLoading ? "Processing..." : (isSignup ? "Already have an account? Sign in" : "Don't have an account? Sign up")}
         </button>
 
-        {!isLoggedIn && (
+        {!auth.isAuthenticated && (
           <>
             {isSignup && (
               <div className="user-type-selector-small">
@@ -478,7 +496,6 @@ const HypeModeProfile = () => {
             )}
 
             <div className="cards-container-small">
-              {/* Subscription cards - simplified version */}
               {/* Basic Plan Card */}
               <div
                 className={`subscription-box-small ${selectedSubscription === "user" ? "selected-small" : ""}`}
@@ -497,7 +514,6 @@ const HypeModeProfile = () => {
                   <li>5GB Storage</li>
                 </ul>
 
-                {/* Auth section for Basic Plan */}
                 {selectedSubscription === "user" && (
                   <AuthSection
                     isLoading={isLoading}
@@ -531,7 +547,6 @@ const HypeModeProfile = () => {
                   <li>Team Collaboration</li>
                 </ul>
 
-                {/* Auth section for Pro Plan */}
                 {selectedSubscription === "studio" && (
                   <AuthSection
                     isLoading={isLoading}
@@ -582,7 +597,7 @@ const HypeModeProfile = () => {
   );
 };
 
-// Auth Section Component (optional - for more modularity)
+// Auth Section Component
 interface AuthSectionProps {
   isLoading: boolean;
   isSignup: boolean;
