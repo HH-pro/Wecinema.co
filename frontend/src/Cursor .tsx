@@ -3,12 +3,12 @@ import { useEffect, useRef } from "react";
 const TouchCursor = () => {
   const circle = useRef<HTMLDivElement>(null);
 
-  const mouse = useRef({ x: 0, y: 0 });
-  const pos = useRef({ x: 0, y: 0 });
+  const mouse = useRef({ x: window.innerWidth / 2, y: window.innerHeight / 2 }); // initial center
+  const pos = useRef({ x: window.innerWidth / 2, y: window.innerHeight / 2 }); // start from center
   const raf = useRef<number>();
 
   useEffect(() => {
-    const speed = 0.08; // Lower = slower & smoother
+    const speed = 0.08; // smooth & slow
 
     const move = (e: MouseEvent) => {
       mouse.current.x = e.clientX;
@@ -22,7 +22,7 @@ const TouchCursor = () => {
     };
 
     const animate = () => {
-      // Smooth lerp
+      // Lerp / Smooth follow
       pos.current.x += (mouse.current.x - pos.current.x) * speed;
       pos.current.y += (mouse.current.y - pos.current.y) * speed;
 
@@ -36,6 +36,12 @@ const TouchCursor = () => {
 
     window.addEventListener("mousemove", move);
     document.addEventListener("mouseout", hide);
+
+    // Initialize circle at mouse start position
+    if (circle.current) {
+      circle.current.style.left = `${mouse.current.x}px`;
+      circle.current.style.top = `${mouse.current.y}px`;
+    }
 
     return () => {
       window.removeEventListener("mousemove", move);
