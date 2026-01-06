@@ -825,7 +825,158 @@ export const removeStorageItem = (key: string): void => {
     console.error(`Error removing item ${key} from localStorage:`, error);
   }
 };
+// ========================
+// AUTO REDIRECT LOGIC FOR HYPE MODE
+// ========================
 
+/**
+ * Check if user is logged in and has paid, then redirect to home
+ * This should be called on HypeModeProfile page
+ */
+export const checkAuthAndRedirect = async (): Promise<boolean> => {
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      return false; // No token, stay on page
+    }
+
+    // Decode token to get userId
+    const decoded = getCurrentUserFromToken();
+    if (!decoded || (!decoded.userId && !decoded.id)) {
+      localStorage.removeItem("token");
+      return false;
+    }
+
+    const userId = decoded.userId || decoded.id;
+    
+    // Get user data to check payment status
+    const user = await getUser(userId);
+    
+    // Check if user has paid (check multiple possible locations)
+    const hasPaid = user?.hasPaid || user?.data?.hasPaid || user?.payment?.hasPaid;
+    
+    if (hasPaid) {
+      // User has paid, redirect to home immediately
+      console.log('User has paid, redirecting to home...');
+      
+      // Use both methods to ensure redirect
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 100);
+      
+      // Also use navigate if available
+      if (typeof window !== 'undefined') {
+        window.location.href = '/';
+      }
+      
+      return true;
+    }
+    
+    // User hasn't paid, stay on HypeMode page
+    return false;
+  } catch (error) {
+    console.error('Error in checkAuthAndRedirect:', error);
+    return false;
+  }
+};
+
+/**
+ * Complete login flow - for use in HypeModeProfile
+ * Handles both signin and signup with automatic redirect
+ */
+export const completeLoginFlow = async (
+  email: string,
+  isSignup: boolean = false,
+  username?: string,
+  avatar?: string,
+  userType: string = 'buyer',
+  setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+): Promise<{success: boolean; userId?: string; shouldRedirect?: boolean}> => {
+  try {
+    setLoading?.(true);
+    
+    let response;
+    if (isSignup) {
+      // Signup flow
+      if (!username || !avatar) {
+        throw new Error('Username and avatar are required for signup');
+      }
+      response = await signup(username, email, avatar, userType, setLoading);
+    } else {
+      // Signin flow
+      response = await signin(email, setLoading);
+    }
+    
+    // Extract token and userId from response
+    const token = response?.token || response?.data?.token;
+    const userId = response?.id || response?.data?.id || response?.user?.id;
+    
+    if (token && userId) {
+      // Save token
+      localStorage.setItem('token', token);
+      
+      // Immediately check payment status and redirect if paid
+      const userData = await getUser(userId);
+      const hasPaid = userData?.hasPaid || userData?.data?.hasPaid || userData?.payment?.hasPaid;
+      
+      if (hasPaid) {
+        // Auto redirect to home
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 100);
+        
+        return {
+          success: true,
+          userId,
+          shouldRedirect: true
+        };
+      }
+      
+      // Not paid, return userId for payment flow
+      return {
+        success: true,
+        userId,
+        shouldRedirect: false
+      };
+    }
+    
+    return { success: false };
+  } catch (error: any) {
+    console.error('Login flow error:', error);
+    setLoading?.(false);
+    
+    // Return structured error
+    return {
+      success: false
+    };
+  }
+};
+
+/**
+ * Quick check - returns true if user should be redirected to home
+ * Useful for useEffect hooks
+ */
+export const shouldRedirectToHome = async (): Promise<boolean> => {
+  const token = localStorage.getItem("token");
+  if (!token) return false;
+  
+  try {
+    const decoded = getCurrentUserFromToken();
+    if (!decoded || (!decoded.userId && !decoded.id)) {
+      localStorage.removeItem("token");
+      return false;
+    }
+    
+    const userId = decoded.userId || decoded.id;
+    const user = await getUser(userId);
+    const hasPaid = user?.hasPaid || user?.data?.hasPaid || user?.payment?.hasPaid;
+    
+    return !!hasPaid;
+  } catch (error) {
+    console.error('Error in shouldRedirectToHome:', error);
+    return false;
+  }
+};
 // ========================
 // EXPORT DEFAULT
 // ========================
