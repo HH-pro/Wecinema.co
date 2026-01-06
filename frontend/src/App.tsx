@@ -7,9 +7,9 @@ import { MarketplaceProvider } from "./context/MarketplaceContext";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-// 🆕 Import touch scroll and custom cursor
-import TouchScroll from "./TouchScroll";
-import TouchCursor from "../src/Cursor ";
+// // 🆕 Import touch scroll and custom cursor
+// import TouchScroll from "./TouchScroll";
+// import TouchCursor from "../src/Cursor ";
 
 export const categories = [
   "Action ",
@@ -61,8 +61,8 @@ export default function App() {
       {/* 🆕 WRAP EVERYTHING WITH MARKETPLACE PROVIDER */}
       <MarketplaceProvider>
         {/* 🆕 Touch scroll and custom cursor */}
-        <TouchScroll />
-        <TouchCursor />
+        {/* <TouchScroll />
+        <TouchCursor /> */}
 
         <AICustomerSupport />
         <Router />
