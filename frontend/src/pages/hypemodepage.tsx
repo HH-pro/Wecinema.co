@@ -27,35 +27,16 @@ const HypeModeProfile = () => {
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer");
   const [isLoading, setIsLoading] = useState(false);
   const [showPaymentComponent, setShowPaymentComponent] = useState(false);
-  const [loginSuccess, setLoginSuccess] = useState(false);
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
-  const [countdown, setCountdown] = useState(3);
-  const [shouldRedirect, setShouldRedirect] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   
   const redirectAttempted = useRef(false);
-  const authCheckedRef = useRef(false);
 
-  // Check if user is already logged in on initial load
+  // Check if user is already logged in and paid
   useEffect(() => {
-    const checkInitialAuth = async () => {
-      if (authCheckedRef.current) return;
-      authCheckedRef.current = true;
-      
-      // Check if we just logged in and need to redirect
-      const justLoggedIn = localStorage.getItem('hypeModeJustLoggedIn');
-      if (justLoggedIn === 'true') {
-        console.log('Detected recent login, redirecting to home...');
-        localStorage.removeItem('hypeModeJustLoggedIn');
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 100);
-        return;
-      }
-      
+    const checkAuthAndPayment = async () => {
       const token = localStorage.getItem("token");
-      if (!token) {
-        return;
-      }
+      if (!token) return;
 
       try {
         const tokenData = decodeToken(token);
@@ -66,13 +47,13 @@ const HypeModeProfile = () => {
           return;
         }
 
-        // Check user payment status
+        // Check payment status
         const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
         const user = response.data;
         
         if (user.hasPaid) {
-          // User has paid, redirect to home
-          console.log('User already paid, redirecting...');
+          // User has paid, redirect immediately
+          console.log('User already paid, redirecting to home...');
           window.location.href = '/';
         } else {
           // User hasn't paid, show payment flow
@@ -81,65 +62,24 @@ const HypeModeProfile = () => {
           setShowPaymentComponent(true);
         }
       } catch (error) {
-        console.error('Error checking initial auth:', error);
+        console.error('Error checking auth:', error);
         localStorage.removeItem("token");
       }
     };
 
-    checkInitialAuth();
-  }, [navigate]);
+    checkAuthAndPayment();
+  }, []);
 
-  // Handle redirect after login success
-  useEffect(() => {
-    if (loginSuccess && !redirectAttempted.current) {
-      redirectAttempted.current = true;
-      
-      const timer = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            // Set localStorage marker and redirect
-            localStorage.setItem('hypeModeJustLoggedIn', 'true');
-            window.location.href = '/';
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-      
-      return () => clearInterval(timer);
-    }
-  }, [loginSuccess, navigate]);
-
-  // NEW: Check if we should redirect immediately
-  useEffect(() => {
-    const checkRedirect = () => {
-      const token = localStorage.getItem("token");
-      if (token && !shouldRedirect) {
-        // If user has token but we're still on login page, redirect
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 500);
-      }
-    };
-
-    checkRedirect();
-  }, [shouldRedirect]);
-
+  // Simplified checkPaymentStatus function
   const checkPaymentStatus = async (userId: string) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
       const user = response.data;
       
       if (user.hasPaid) {
-        // User has paid - set success state
-        setUserId(userId);
-        setIsLoggedIn(true);
-        setLoginSuccess(true);
-        setShouldRedirect(true);
-        
-        // Store marker for immediate redirect
-        localStorage.setItem('hypeModeJustLoggedIn', 'true');
+        // User has paid - redirect immediately
+        console.log('Payment verified, redirecting to home...');
+        window.location.href = '/';
       } else {
         // User hasn't paid, show payment component
         setUserId(userId);
@@ -147,8 +87,8 @@ const HypeModeProfile = () => {
         setShowPaymentComponent(true);
       }
     } catch (error) {
-      console.error('Error checking payment status:', error);
-      setPopupMessage('Error checking payment status. Please try again.');
+      console.error('Error checking payment:', error);
+      setPopupMessage('Error checking payment status.');
       setShowPopup(true);
       setIsLoading(false);
     }
@@ -168,9 +108,8 @@ const HypeModeProfile = () => {
       const token = res.data.token;
       const userId = res.data.id;
 
-      if (token) {
+      if (token && userId) {
         localStorage.setItem('token', token);
-        localStorage.setItem('hypeModeJustLoggedIn', 'true'); // Add marker
         setIsLoggedIn(true);
         setUserId(userId);
         return { success: true, userId };
@@ -180,7 +119,7 @@ const HypeModeProfile = () => {
       if (error.response?.data?.error === 'Email already exists.') {
         setPopupMessage('Email already exists. Please sign in.');
       } else {
-        setPopupMessage('Registration failed. Please try again.');
+        setPopupMessage('Registration failed.');
       }
       setShowPopup(true);
       return { success: false };
@@ -194,9 +133,8 @@ const HypeModeProfile = () => {
       const backendToken = res.data.token;
       const userId = res.data.id;
 
-      if (backendToken) {
+      if (backendToken && userId) {
         localStorage.setItem('token', backendToken);
-        localStorage.setItem('hypeModeJustLoggedIn', 'true'); // Add marker
         setIsLoggedIn(true);
         setUserId(userId);
         return { success: true, userId };
@@ -209,7 +147,7 @@ const HypeModeProfile = () => {
     }
   };
 
-  // Handle successful authentication - SIMPLIFIED
+  // Handle successful authentication
   const onLoginSuccess = async (user: any, isEmailAuth: boolean = false) => {
     const profile = user.providerData[0];
     const email = profile.email;
@@ -225,13 +163,13 @@ const HypeModeProfile = () => {
       }
       
       if (result.success && result.userId) {
-        // Check payment status after successful registration/login
+        // Check payment status
         await checkPaymentStatus(result.userId);
       } else {
         setIsLoading(false);
       }
     } catch (error) {
-      setPopupMessage('Authentication failed. Please try again.');
+      setPopupMessage('Authentication failed.');
       setShowPopup(true);
       setIsLoading(false);
     }
@@ -253,7 +191,7 @@ const HypeModeProfile = () => {
       await onLoginSuccess(user);
     } catch (error: any) {
       setIsLoading(false);
-      setPopupMessage('Google login failed. Please try again.');
+      setPopupMessage('Google login failed.');
       setShowPopup(true);
     }
   };
@@ -267,13 +205,13 @@ const HypeModeProfile = () => {
     }
 
     if (!email || !password || !username) {
-      setPopupMessage("Please enter username, email and password.");
+      setPopupMessage("Please enter all fields.");
       setShowPopup(true);
       return;
     }
 
     if (password.length < 6) {
-      setPopupMessage("Password should be at least 6 characters long.");
+      setPopupMessage("Password should be at least 6 characters.");
       setShowPopup(true);
       return;
     }
@@ -287,13 +225,11 @@ const HypeModeProfile = () => {
     } catch (error: any) {
       setIsLoading(false);
       if (error.code === 'auth/email-already-in-use') {
-        setPopupMessage('Email already in use. Please try logging in.');
+        setPopupMessage('Email already in use. Please login.');
       } else if (error.code === 'auth/weak-password') {
         setPopupMessage('Password should be at least 6 characters.');
-      } else if (error.code === 'auth/invalid-email') {
-        setPopupMessage('Invalid email address.');
       } else {
-        setPopupMessage('Email signup failed. Please try again.');
+        setPopupMessage('Signup failed.');
       }
       setShowPopup(true);
     }
@@ -308,7 +244,7 @@ const HypeModeProfile = () => {
     }
 
     if (!email || !password) {
-      setPopupMessage("Please enter both email and password.");
+      setPopupMessage("Please enter email and password.");
       setShowPopup(true);
       return;
     }
@@ -322,13 +258,11 @@ const HypeModeProfile = () => {
     } catch (error: any) {
       setIsLoading(false);
       if (error.code === 'auth/user-not-found') {
-        setPopupMessage('No user found with this email. Please sign up.');
+        setPopupMessage('No user found. Please sign up.');
       } else if (error.code === 'auth/wrong-password') {
-        setPopupMessage('Incorrect password. Please try again.');
-      } else if (error.code === 'auth/invalid-email') {
-        setPopupMessage('Invalid email address.');
+        setPopupMessage('Incorrect password.');
       } else {
-        setPopupMessage('Email login failed. Please try again.');
+        setPopupMessage('Login failed.');
       }
       setShowPopup(true);
     }
@@ -363,16 +297,10 @@ const HypeModeProfile = () => {
     setShowPaymentSuccess(true);
     setShowPaymentComponent(false);
     
-    // Auto redirect after payment success
+    // Redirect after 2 seconds
     setTimeout(() => {
-      localStorage.setItem('hypeModeJustLoggedIn', 'true');
       window.location.href = '/';
-    }, 3000);
-  };
-
-  const handleForceRedirect = () => {
-    localStorage.setItem('hypeModeJustLoggedIn', 'true');
-    window.location.href = '/';
+    }, 2000);
   };
 
   // Show payment success popup
@@ -385,32 +313,9 @@ const HypeModeProfile = () => {
         amount={selectedSubscription === 'user' ? 5 : 10}
         onClose={() => {
           setShowPaymentSuccess(false);
-          localStorage.setItem('hypeModeJustLoggedIn', 'true');
           window.location.href = '/';
         }}
       />
-    );
-  }
-
-  // Show success popup when login is successful
-  if (loginSuccess || shouldRedirect) {
-    return (
-      <>
-        <div className="overlay" />
-        <div className="success-popup">
-          <div className="success-icon">✅</div>
-          <h2 className="success-title">Login Successful!</h2>
-          <p className="success-message">
-            You're being redirected to the home page.
-          </p>
-          <div className="countdown-text">
-            Redirecting in {countdown} second{countdown !== 1 ? 's' : ''}...
-          </div>
-          <button className="close-button" onClick={handleForceRedirect}>
-            Go Now
-          </button>
-        </div>
-      </>
     );
   }
 
@@ -422,12 +327,11 @@ const HypeModeProfile = () => {
           <div className="payment-subscription-box">
             <div>
               <h2 className="payment-title">Complete Your Subscription</h2>
-              <p className="payment-description">Subscription Plan: {selectedSubscription === "user" ? "Basic Plan" : "Pro Plan"}</p>
+              <p className="payment-description">Plan: {selectedSubscription === "user" ? "Basic" : "Pro"}</p>
               <p className="payment-description">User Type: {userType === "buyer" ? "👤 Buyer" : "🏪 Seller"}</p>
               <p className="payment-amount">
-                Total Amount: ${selectedSubscription === 'user' ? 5 : 10}
+                Amount: ${selectedSubscription === 'user' ? 5 : 10}
               </p>
-              <p className="payment-description">Secure payment powered by PayPal</p>
               <PayPalButtonWrapper 
                 amount={selectedSubscription === 'user' ? 5 : 10} 
                 userId={userId}
@@ -443,10 +347,7 @@ const HypeModeProfile = () => {
                 className="payment-skip-button"
                 onClick={() => {
                   toast.info('You can complete payment later');
-                  setTimeout(() => {
-                    localStorage.setItem('hypeModeJustLoggedIn', 'true');
-                    window.location.href = '/';
-                  }, 1000);
+                  window.location.href = '/';
                 }}
               >
                 Skip for Now
@@ -500,14 +401,12 @@ const HypeModeProfile = () => {
                 <div className="premium-badge-small">Popular</div>
                 <h3 className="subscription-title-small">Basic Plan</h3>
                 <div className="subscription-price-small">$5/month</div>
-                <p className="subscription-description-small">Perfect for individual users</p>
+                <p className="subscription-description-small">For individual users</p>
                 
                 <ul className="features-list-small">
                   <li>Buy Films & Scripts</li>
                   <li>Sell Your Content</li>
                   <li>Basic Support</li>
-                  <li>Access to Community</li>
-                  <li>5GB Storage</li>
                 </ul>
 
                 {selectedSubscription === "user" && (
@@ -572,11 +471,10 @@ const HypeModeProfile = () => {
                 <div className="premium-badge-small">Pro</div>
                 <h3 className="subscription-title-small">Pro Plan</h3>
                 <div className="subscription-price-small">$10/month</div>
-                <p className="subscription-description-small">Advanced features for professionals</p>
+                <p className="subscription-description-small">For professionals</p>
                 
                 <ul className="features-list-small">
                   <li>All Basic Features</li>
-                  <li>Early Feature Access</li>
                   <li>Priority Support</li>
                   <li>Team Collaboration</li>
                 </ul>
