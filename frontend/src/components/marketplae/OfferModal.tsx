@@ -74,7 +74,7 @@ const OfferModal: React.FC<OfferModalProps> = ({
                 <p className="text-gray-600 text-xs mt-1 line-clamp-2">{selectedListing.description}</p>
                 <div className="flex items-center gap-2 mt-2">
                   <span className="text-green-600 text-base sm:text-lg font-bold">
-                    {marketplaceApi.utils.formatCurrency(selectedListing.price)}
+                    {marketplaceApi.utils.formatCurrencyshow(selectedListing.price)}
                   </span>
                   <span className="bg-blue-100 text-blue-800 text-[10px] font-medium px-2 py-0.5 rounded-full">
                     {selectedListing.category}
