@@ -11,6 +11,7 @@ import { decodeToken } from "../utilities/helperfFunction";
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import "../css/HypeModeProfile.css";
+import { API_BASE_URL } from "../api";
 
 // Import new components
 import PaymentComponent from "../../src/components/PaymentComponent/Payment";
