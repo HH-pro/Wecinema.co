@@ -34,9 +34,9 @@ body {
    SINGLE TOUCH CIRCLE
 /* Single touch circle – smooth & professional */
 .touch-circle {
-  width: 8px;
-  height: 8px;
-  background: #6b7280;
+  width: 15px;
+  height: 15px;
+  background: #4c4e53;
   border-radius: 50%;
   position: fixed;
   pointer-events: none;
