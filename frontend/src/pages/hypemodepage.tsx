@@ -288,9 +288,8 @@ const HypeModeProfile = () => {
   const [showPaymentComponent, setShowPaymentComponent] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [countdown, setCountdown] = useState(3);
-  const [initialCheckDone, setInitialCheckDone] = useState(false);
 
-  // Check initial authentication status on component mount
+  // Check payment status on component mount
   useEffect(() => {
     const checkInitialAuth = async () => {
       const token = localStorage.getItem("token");
@@ -307,18 +306,15 @@ const HypeModeProfile = () => {
               // User has paid and is logged in, redirect to home
               navigate('/');
             } else {
-              // User hasn't paid, set states for payment component
+              // User hasn't paid, show payment component if subscription is selected
               setUserId(userId);
               setIsLoggedIn(true);
             }
           }
         } catch (error) {
           console.error('Error checking initial auth:', error);
-          // If token is invalid, clear it
-          localStorage.removeItem("token");
         }
       }
-      setInitialCheckDone(true);
     };
 
     checkInitialAuth();
@@ -342,7 +338,6 @@ const HypeModeProfile = () => {
     }
   }, [loginSuccess, navigate]);
 
-  // Check payment status after login/registration
   const checkPaymentStatus = async (userId: string) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
@@ -361,8 +356,6 @@ const HypeModeProfile = () => {
       }
     } catch (error) {
       console.error('Error checking payment status:', error);
-      setPopupMessage('Error checking payment status. Please try again.');
-      setShowPopup(true);
     }
   };
 
@@ -382,6 +375,8 @@ const HypeModeProfile = () => {
 
       if (token) {
         localStorage.setItem('token', token);
+        setIsLoggedIn(true);
+        setUserId(userId);
         return { success: true, userId };
       }
     } catch (error: any) {
@@ -404,6 +399,8 @@ const HypeModeProfile = () => {
 
       if (backendToken) {
         localStorage.setItem('token', backendToken);
+        setIsLoggedIn(true);
+        setUserId(userId);
         return { success: true, userId };
       }
     } catch (error: any) {
@@ -573,29 +570,6 @@ const HypeModeProfile = () => {
     setTimeout(() => setShowFireworks(false), 1000);
   }, []);
 
-  // Don't render anything until initial check is done
-  if (!initialCheckDone) {
-    return (
-      <Layout expand={false} hasHeader={true}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '100vh',
-          background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)'
-        }}>
-          <div style={{
-            fontSize: '24px',
-            fontWeight: 'bold',
-            color: '#b45309'
-          }}>
-            Loading...
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
   // Show professional success popup when login is successful
   if (loginSuccess) {
     return (
@@ -657,27 +631,28 @@ const HypeModeProfile = () => {
     );
   }
 
-  // If user is already logged in (from previous session), check and redirect
+  // If user is already logged in and has subscription, redirect to home
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (token && initialCheckDone) {
-      const checkAndRedirect = async () => {
-        try {
-          const tokenData = decodeToken(token);
-          const userId = tokenData?.userId || tokenData?.id;
-          if (userId) {
+    if (token) {
+      const tokenData = decodeToken(token);
+      if (tokenData?.userId || tokenData?.id) {
+        // User is logged in, check if they should be redirected
+        const checkAndRedirect = async () => {
+          try {
+            const userId = tokenData?.userId || tokenData?.id;
             const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
             if (response.data.hasPaid) {
               navigate('/');
             }
+          } catch (error) {
+            console.error('Error checking user status:', error);
           }
-        } catch (error) {
-          console.error('Error checking user status:', error);
-        }
-      };
-      checkAndRedirect();
+        };
+        checkAndRedirect();
+      }
     }
-  }, [initialCheckDone, navigate]);
+  }, [navigate]);
 
   // Render the main component
   return (
@@ -728,10 +703,9 @@ const HypeModeProfile = () => {
           {isSignup ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
         </button>
 
-        {isLoggedIn && !showPaymentComponent ? (
-          <div className="cards-container-small" style={{ textAlign: 'center', padding: '40px' }}>
-            <h3 style={{ color: '#b45309', marginBottom: '20px' }}>Redirecting...</h3>
-            <p>Please wait while we check your subscription status.</p>
+        {isLoggedIn ? (
+          <div className="cards-container-small" style={{ display: 'none' }}>
+            {/* Hide logout button when logged in */}
           </div>
         ) : (
           <>
