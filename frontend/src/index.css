@@ -41,7 +41,6 @@ body {
   position: fixed;
   pointer-events: none;
   z-index: 10000;
-  transform: translate(-50%, -50%);
   will-change: transform, opacity;
   transition: opacity 0.2s ease;
   opacity: 0;
