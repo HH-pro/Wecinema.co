@@ -56,7 +56,6 @@ export default function App() {
     <div>
       {/* 🆕 WRAP EVERYTHING WITH MARKETPLACE PROVIDER */}
        <TouchCursor />
-            <TouchScroll />
       <MarketplaceProvider>
         <AICustomerSupport />
         <Router />
