@@ -785,16 +785,28 @@ export const signup = async (
   });
 };
 
+// signin function ko update karein
 export const signin = async (
   email: string,
   setLoading?: React.Dispatch<React.SetStateAction<boolean>>
 ) => {
-  return await postRequest('/user/signin', {
-    email
-  }, setLoading, {
-    message: 'Login successful!',
-    showToast: true
-  });
+  try {
+    console.log("Signin request for email:", email);
+    const response = await postRequest('/user/signin', {
+      email
+    }, setLoading, {
+      message: 'Login successful!',
+      showToast: true
+    });
+    
+    console.log("Signin response:", response);
+    console.log("Response structure:", JSON.stringify(response, null, 2));
+    
+    return response;
+  } catch (error) {
+    console.error("Signin error details:", error);
+    throw error;
+  }
 };
 
 export const getUser = async (
