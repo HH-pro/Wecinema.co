@@ -356,6 +356,8 @@ const HypeModeProfile = () => {
         setCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(timer);
+            window.location.reload();
+
             navigate('/');
             return 0;
           }
