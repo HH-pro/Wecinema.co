@@ -6,7 +6,7 @@ import AICustomerSupport from "./components/AICustomerSupport";
 import { MarketplaceProvider } from "./context/MarketplaceContext"; // 🆕 ADD MARKETPLACE PROVIDER
 import { ToastContainer } from 'react-toastify'; // 🆕 ADD TOAST CONTAINER
 import 'react-toastify/dist/ReactToastify.css'; // 🆕 ADD TOAST STYLES
-import TouchApp from './Cursor ';
+import TouchApp from './TouchScroll';
 
 export const categories = [
   "Action ",
