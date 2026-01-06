@@ -7,6 +7,7 @@ import { MarketplaceProvider } from "./context/MarketplaceContext"; // 🆕 ADD 
 import { ToastContainer } from 'react-toastify'; // 🆕 ADD TOAST CONTAINER
 import 'react-toastify/dist/ReactToastify.css'; // 🆕 ADD TOAST STYLES
 import TouchCursor from ".././src/Cursor ";
+import TouchScroll from "./TouchScroll";
 export const categories = [
   "Action ",
   "Adventure ",
@@ -56,6 +57,7 @@ export default function App() {
     <div>
       {/* 🆕 WRAP EVERYTHING WITH MARKETPLACE PROVIDER */}
        <TouchCursor />
+            <TouchScroll />
       <MarketplaceProvider>
         <AICustomerSupport />
         <Router />
