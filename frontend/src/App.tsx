@@ -1,6 +1,6 @@
 import { default as Router } from "./routes";
 import "./App.css";
-import { useEffect, useState, useRef, TouchEvent } from "react";
+import { useEffect, useState } from "react"; // 🆕 ADD useState FOR LOADING STATE
 import * as Sentry from "@sentry/react";
 import AICustomerSupport from "./components/AICustomerSupport";
 import { MarketplaceProvider } from "./context/MarketplaceContext";
@@ -41,24 +41,102 @@ export const themes = [
 
 export const ratings = ["g ", "pg ", "pg-13 ", "r ", "x "];
 
+// 🆕 ADD BEAUTIFUL LOADING COMPONENT
+const WeCinemaLoading = () => {
+  return (
+    <div className="fixed inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-900 flex flex-col items-center justify-center z-50">
+      {/* Animated Background Elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -left-40 w-80 h-80 bg-yellow-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/2 -right-20 w-60 h-60 bg-yellow-500/5 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 left-1/3 w-72 h-72 bg-yellow-500/10 rounded-full blur-3xl"></div>
+      </div>
+      
+      {/* Main Loading Container */}
+      <div className="relative z-10 flex flex-col items-center justify-center">
+        {/* Film Reel Animation */}
+        <div className="relative mb-8">
+          <div className="w-32 h-32 rounded-full border-4 border-yellow-400/30 flex items-center justify-center">
+            {/* Film Reel Holes */}
+            <div className="absolute w-24 h-24 rounded-full border-2 border-yellow-400/20"></div>
+            {[...Array(8)].map((_, i) => (
+              <div
+                key={i}
+                className="absolute w-4 h-4 bg-yellow-500/40 rounded-full"
+                style={{
+                  transform: `rotate(${i * 45}deg) translateX(44px)`,
+                }}
+              />
+            ))}
+            
+            {/* Spinning Center */}
+            <div className="w-16 h-16 rounded-full border-4 border-yellow-500 animate-spin border-t-transparent border-r-transparent"></div>
+            
+            {/* Outer Ring Animation */}
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-yellow-500 animate-spin"></div>
+          </div>
+          
+          {/* Film Strip Effects */}
+          <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-40 h-2 bg-gradient-to-r from-transparent via-yellow-500 to-transparent rounded-full"></div>
+          <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-40 h-2 bg-gradient-to-r from-transparent via-yellow-500 to-transparent rounded-full"></div>
+        </div>
+        
+        {/* WeCinema Logo/Text */}
+        <div className="text-center mb-6">
+          <h1 className="text-5xl font-bold mb-2">
+            <span className="bg-gradient-to-r from-yellow-300 via-yellow-500 to-yellow-600 bg-clip-text text-transparent animate-pulse">
+              WeCinema
+            </span>
+          </h1>
+          <p className="text-yellow-400/70 text-lg font-medium tracking-wider">
+            Your Ultimate Movie Experience
+          </p>
+        </div>
+        
+        {/* Progress Bar */}
+        <div className="w-64 h-2 bg-gray-800 rounded-full overflow-hidden mb-4">
+          <div className="h-full bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 rounded-full animate-[loading_2s_ease-in-out_infinite]"></div>
+        </div>
+        
+        {/* Loading Dots */}
+        <div className="flex space-x-2">
+          {[...Array(3)].map((_, i) => (
+            <div
+              key={i}
+              className="w-3 h-3 bg-yellow-500 rounded-full animate-bounce"
+              style={{ animationDelay: `${i * 0.1}s` }}
+            ></div>
+          ))}
+        </div>
+        
+        {/* Subtle Loading Text */}
+        <p className="mt-6 text-yellow-500/60 text-sm font-light tracking-wider animate-pulse">
+          Loading cinematic experience...
+        </p>
+      </div>
+      
+      {/* Footer Note */}
+      <div className="absolute bottom-8 text-center">
+        <p className="text-yellow-500/30 text-xs font-light">
+          Experience movies like never before
+        </p>
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
-  // Custom Cursor States
-  const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 });
-  const [isClicking, setIsClicking] = useState(false);
-  const [isHovering, setIsHovering] = useState(false);
-  const [showCursor, setShowCursor] = useState(true);
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  // 🆕 ADD LOADING STATE
+  const [isLoading, setIsLoading] = useState(true);
   
-  // Touch Hold to Scroll States
-  const [isTouchHolding, setIsTouchHolding] = useState(false);
-  const [touchStartY, setTouchStartY] = useState(0);
-  const [scrollVelocity, setScrollVelocity] = useState(0);
-  const [showScrollIndicator, setShowScrollIndicator] = useState(false);
-  
-  const cursorRef = useRef<HTMLDivElement>(null);
-  const touchHoldTimerRef = useRef<NodeJS.Timeout>();
-  const scrollIntervalRef = useRef<NodeJS.Timeout>();
-  const touchStartRef = useRef<{y: number, time: number} | null>(null);
+  useEffect(() => {
+    // Simulate loading for 2 seconds
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 2000);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   // ✅ Tawk.to Live Chat Widget Setup
   useEffect(() => {
@@ -70,376 +148,31 @@ export default function App() {
     document.body.appendChild(script);
   }, []);
 
-  // Detect touch device
-  useEffect(() => {
-    const checkTouchDevice = () => {
-      const isTouch = 'ontouchstart' in window || 
-                     navigator.maxTouchPoints > 0 || 
-                     (navigator as any).msMaxTouchPoints > 0;
-      setIsTouchDevice(isTouch);
-      
-      if (isTouch) {
-        setShowCursor(false);
-        document.body.classList.add('touch-device');
-      } else {
-        document.body.classList.remove('touch-device');
-      }
-    };
-    
-    checkTouchDevice();
-    window.addEventListener('resize', checkTouchDevice);
-    
-    return () => window.removeEventListener('resize', checkTouchDevice);
-  }, []);
-
-  // Custom Cursor Effect (for non-touch devices)
-  useEffect(() => {
-    if (isTouchDevice) return;
-
-    const updateCursor = (e: MouseEvent) => {
-      setCursorPosition({ x: e.clientX, y: e.clientY });
-    };
-
-    const handleMouseDown = () => setIsClicking(true);
-    const handleMouseUp = () => setIsClicking(false);
-
-    // Auto-hide cursor when not moving
-    let hideTimeout: NodeJS.Timeout;
-    const handleMouseMove = () => {
-      setShowCursor(true);
-      clearTimeout(hideTimeout);
-      hideTimeout = setTimeout(() => {
-        setShowCursor(false);
-      }, 2000);
-    };
-
-    // Hide cursor on leaving window
-    const handleMouseLeave = () => setShowCursor(false);
-    const handleMouseEnter = () => setShowCursor(true);
-
-    window.addEventListener('mousemove', updateCursor);
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mousedown', handleMouseDown);
-    window.addEventListener('mouseup', handleMouseUp);
-    document.addEventListener('mouseleave', handleMouseLeave);
-    document.addEventListener('mouseenter', handleMouseEnter);
-
-    // Hide default cursor
-    document.body.style.cursor = 'none';
-
-    // Detect interactive elements
-    const interactiveSelectors = 'button, a, input, textarea, select, [role="button"], [onclick]';
-    
-    const handleMouseEnterElement = () => setIsHovering(true);
-    const handleMouseLeaveElement = () => setIsHovering(false);
-
-    const observer = new MutationObserver(() => {
-      const elements = document.querySelectorAll(interactiveSelectors);
-      elements.forEach(el => {
-        el.addEventListener('mouseenter', handleMouseEnterElement);
-        el.addEventListener('mouseleave', handleMouseLeaveElement);
-      });
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    // Initial setup
-    const initialElements = document.querySelectorAll(interactiveSelectors);
-    initialElements.forEach(el => {
-      el.addEventListener('mouseenter', handleMouseEnterElement);
-      el.addEventListener('mouseleave', handleMouseLeaveElement);
-    });
-
-    return () => {
-      window.removeEventListener('mousemove', updateCursor);
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mousedown', handleMouseDown);
-      window.removeEventListener('mouseup', handleMouseUp);
-      document.removeEventListener('mouseleave', handleMouseLeave);
-      document.removeEventListener('mouseenter', handleMouseEnter);
-      document.body.style.cursor = 'auto';
-      
-      clearTimeout(hideTimeout);
-      observer.disconnect();
-      
-      const elements = document.querySelectorAll(interactiveSelectors);
-      elements.forEach(el => {
-        el.removeEventListener('mouseenter', handleMouseEnterElement);
-        el.removeEventListener('mouseleave', handleMouseLeaveElement);
-      });
-    };
-  }, [isTouchDevice]);
-
-  // Touch Hold to Scroll Logic
-  useEffect(() => {
-    if (!isTouchDevice) return;
-
-    const handleTouchStart = (e: TouchEvent) => {
-      const touch = e.touches[0];
-      touchStartRef.current = {
-        y: touch.clientY,
-        time: Date.now()
-      };
-      setTouchStartY(touch.clientY);
-      setScrollVelocity(0);
-      
-      // Show scroll indicator
-      setShowScrollIndicator(true);
-      
-      // Start timer for touch hold
-      touchHoldTimerRef.current = setTimeout(() => {
-        setIsTouchHolding(true);
-        // Start auto-scroll
-        startAutoScroll(touch.clientY);
-      }, 800); // Hold for 800ms to activate
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      if (!isTouchHolding) {
-        const touch = e.touches[0];
-        const deltaY = touchStartY - touch.clientY;
-        
-        // Calculate scroll velocity for smooth scrolling
-        if (touchStartRef.current) {
-          const timeDiff = Date.now() - touchStartRef.current.time;
-          const distance = Math.abs(touchStartRef.current.y - touch.clientY);
-          const velocity = distance / timeDiff;
-          setScrollVelocity(velocity * 10); // Scale for better UX
-        }
-      }
-    };
-
-    const handleTouchEnd = () => {
-      clearTimeout(touchHoldTimerRef.current);
-      clearInterval(scrollIntervalRef.current);
-      setIsTouchHolding(false);
-      
-      // Hide scroll indicator with delay
-      setTimeout(() => {
-        setShowScrollIndicator(false);
-      }, 1000);
-    };
-
-    const startAutoScroll = (startY: number) => {
-      let lastY = startY;
-      let scrollDirection: 'up' | 'down' = 'down';
-      
-      scrollIntervalRef.current = setInterval(() => {
-        const currentScroll = window.scrollY;
-        const windowHeight = window.innerHeight;
-        const scrollAmount = 30; // Pixels to scroll per interval
-        
-        // Determine scroll direction based on touch position
-        if (lastY < windowHeight / 3) {
-          scrollDirection = 'down';
-        } else if (lastY > windowHeight * 2/3) {
-          scrollDirection = 'up';
-        }
-        
-        // Scroll the page
-        if (scrollDirection === 'down') {
-          window.scrollTo({
-            top: currentScroll + scrollAmount,
-            behavior: 'smooth'
-          });
-        } else {
-          window.scrollTo({
-            top: Math.max(0, currentScroll - scrollAmount),
-            behavior: 'smooth'
-          });
-        }
-      }, 50); // Scroll every 50ms
-    };
-
-    // Add touch event listeners
-    document.addEventListener('touchstart', handleTouchStart as any);
-    document.addEventListener('touchmove', handleTouchMove as any);
-    document.addEventListener('touchend', handleTouchEnd);
-    document.addEventListener('touchcancel', handleTouchEnd);
-
-    return () => {
-      document.removeEventListener('touchstart', handleTouchStart as any);
-      document.removeEventListener('touchmove', handleTouchMove as any);
-      document.removeEventListener('touchend', handleTouchEnd);
-      document.removeEventListener('touchcancel', handleTouchEnd);
-      clearTimeout(touchHoldTimerRef.current);
-      clearInterval(scrollIntervalRef.current);
-    };
-  }, [isTouchDevice, isTouchHolding, touchStartY]);
-
-  // Click animation effect for cursor
-  useEffect(() => {
-    if (isClicking && cursorRef.current) {
-      cursorRef.current.style.transform = `translate(${cursorPosition.x}px, ${cursorPosition.y}px) scale(0.7)`;
-      
-      setTimeout(() => {
-        if (cursorRef.current) {
-          cursorRef.current.style.transform = `translate(${cursorPosition.x}px, ${cursorPosition.y}px) scale(1)`;
-        }
-      }, 150);
-    }
-  }, [isClicking, cursorPosition]);
-
-  // Cursor style (for non-touch devices)
-  const cursorStyle: React.CSSProperties = {
-    position: 'fixed',
-    left: 0,
-    top: 0,
-    width: isHovering ? '40px' : '30px',
-    height: isHovering ? '40px' : '30px',
-    borderRadius: '50%',
-    backgroundColor: isHovering 
-      ? 'rgba(0, 123, 255, 0.2)' 
-      : isClicking 
-        ? 'rgba(220, 53, 69, 0.3)' 
-        : 'rgba(0, 0, 0, 0.15)',
-    border: isHovering 
-      ? '2px solid #007bff' 
-      : isClicking 
-        ? '2px solid #dc3545' 
-        : '2px solid #333',
-    pointerEvents: 'none',
-    transform: `translate(${cursorPosition.x}px, ${cursorPosition.y}px)`,
-    transition: 'all 0.15s ease, transform 0.1s ease',
-    zIndex: 999999,
-    display: showCursor ? 'flex' : 'none',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transformOrigin: 'center',
-    boxShadow: isHovering 
-      ? '0 0 20px rgba(0, 123, 255, 0.3)' 
-      : isClicking 
-        ? '0 0 20px rgba(220, 53, 69, 0.3)' 
-        : '0 0 10px rgba(0, 0, 0, 0.1)'
-  };
-
-  const innerDotStyle: React.CSSProperties = {
-    width: isHovering ? '12px' : '6px',
-    height: isHovering ? '12px' : '6px',
-    borderRadius: '50%',
-    backgroundColor: isHovering 
-      ? '#007bff' 
-      : isClicking 
-        ? '#dc3545' 
-        : '#333',
-    transition: 'all 0.15s ease'
-  };
-
-  // Trail effect for cursor
-  const trailCount = 3;
-  const trails = [];
-  
-  for (let i = 0; i < trailCount; i++) {
-    const delay = i * 30;
-    const size = 24 - (i * 6);
-    const opacity = 0.2 - (i * 0.06);
-    
-    trails.push(
-      <div
-        key={i}
-        style={{
-          position: 'fixed',
-          left: 0,
-          top: 0,
-          width: `${size}px`,
-          height: `${size}px`,
-          borderRadius: '50%',
-          backgroundColor: `rgba(0, 123, 255, ${opacity})`,
-          transform: `translate(${cursorPosition.x}px, ${cursorPosition.y}px)`,
-          transition: `transform ${0.2 + (i * 0.05)}s linear ${delay}ms`,
-          pointerEvents: 'none',
-          zIndex: 999998 - i,
-          display: showCursor ? 'block' : 'none'
-        }}
-      />
-    );
-  }
-
   return (
-    <div className="app-container">
-      {/* Custom Circle Cursor (for non-touch devices) */}
-      {!isTouchDevice && trails}
-      {!isTouchDevice && (
-        <div 
-          ref={cursorRef} 
-          style={cursorStyle}
-          className="custom-cursor"
-        >
-          <div style={innerDotStyle} />
-          {isHovering && (
-            <span style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              fontSize: '20px',
-              opacity: 0.8
-            }}>
-              👆
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Touch Hold Scroll Indicator (for touch devices) */}
-      {isTouchDevice && showScrollIndicator && (
-        <div className="touch-scroll-indicator">
-          <div className="scroll-indicator-content">
-            <div className="scroll-icon">
-              {isTouchHolding ? (
-                <div className="scrolling-animation">
-                  <div className="arrow up">↑</div>
-                  <div className="arrow down">↓</div>
-                </div>
-              ) : (
-                <div className="hold-to-scroll">
-                  <div className="touch-circle">
-                    <span className="touch-dot"></span>
-                  </div>
-                  <span className="hold-text">Hold to scroll</span>
-                </div>
-              )}
-            </div>
-            <div className="scroll-speed">
-              Speed: {scrollVelocity.toFixed(1)}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Touch Scroll Guide Overlay */}
-      {isTouchDevice && isTouchHolding && (
-        <div className="scroll-guide-overlay">
-          <div className="scroll-zone top">
-            <div className="zone-indicator">Scroll Up ↑</div>
-          </div>
-          <div className="scroll-zone middle">
-            <div className="zone-indicator">Release to stop</div>
-          </div>
-          <div className="scroll-zone bottom">
-            <div className="zone-indicator">Scroll Down ↓</div>
-          </div>
-        </div>
-      )}
-
-      {/* Main App Content */}
-      <MarketplaceProvider>
-        <AICustomerSupport />
-        <Router />
-        
-        <ToastContainer
-          position="top-right"
-          autoClose={5000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="light"
-        />
-      </MarketplaceProvider>
+    <div>
+      {/* 🆕 SHOW LOADING SCREEN FIRST */}
+      {isLoading && <WeCinemaLoading />}
+      
+      {/* MAIN APP CONTENT */}
+      <div className={isLoading ? "hidden" : "block"}>
+        <MarketplaceProvider>
+          <AICustomerSupport />
+          <Router />
+          
+          <ToastContainer
+            position="top-right"
+            autoClose={5000}
+            hideProgressBar={false}
+            newestOnTop={false}
+            closeOnClick
+            rtl={false}
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+            theme="light"
+          />
+        </MarketplaceProvider>
+      </div>
     </div>
   );
 }
