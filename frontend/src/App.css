@@ -16,33 +16,44 @@
   }
   /* Add to your existing App.css */
 
-@keyframes loading {
+@keyframes shimmer {
   0% {
-    width: 0%;
-    transform: translateX(0);
-  }
-  50% {
-    width: 100%;
-    transform: translateX(0);
+    transform: translateX(-100%);
   }
   100% {
-    width: 0%;
     transform: translateX(100%);
   }
 }
 
-/* Custom animation for the spinning effect */
-@keyframes spin-slow {
-  from {
-    transform: rotate(0deg);
+@keyframes slide {
+  0% {
+    transform: translateX(-100%);
   }
-  to {
-    transform: rotate(360deg);
+  100% {
+    transform: translateX(300%);
   }
 }
 
-.animate-spin-slow {
-  animation: spin-slow 3s linear infinite;
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+/* Ensure animations work with Tailwind */
+@layer utilities {
+  .animate-shimmer {
+    animation: shimmer 2s infinite;
+  }
+  
+  .animate-slide {
+    animation: slide 1.5s infinite;
+  }
 }
   body {
 	background-color: var(--bg-color);
