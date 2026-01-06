@@ -1,43 +1,76 @@
-import { useEffect, useRef } from "react";
+// hooks/useSwipe.ts
+import { useState, useCallback } from 'react';
 
-const TouchScroll = () => {
-  const isDown = useRef(false);
-  const startY = useRef(0);
-  const scrollStart = useRef(0);
+interface SwipeHandlers {
+  onTouchStart: (e: TouchEvent) => void;
+  onTouchMove: (e: TouchEvent) => void;
+  onTouchEnd: () => void;
+}
 
-  useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      isDown.current = true;
-      startY.current = e.clientY;
-      scrollStart.current = window.scrollY;
-      document.body.style.userSelect = "none";
-    };
+interface UseSwipeOptions {
+  onSwipeLeft?: () => void;
+  onSwipeRight?: () => void;
+  onSwipeUp?: () => void;
+  onSwipeDown?: () => void;
+  threshold?: number;
+}
 
-    const onMove = (e: MouseEvent) => {
-      if (!isDown.current) return;
-      const deltaY = (startY.current - e.clientY) * 0.5; // smoother scrolling
-      window.scrollTo({ top: scrollStart.current + deltaY });
-    };
+export const useSwipe = (options: UseSwipeOptions = {}) => {
+  const {
+    threshold = 50,
+    onSwipeLeft,
+    onSwipeRight,
+    onSwipeUp,
+    onSwipeDown
+  } = options;
 
-    const onUp = () => {
-      isDown.current = false;
-      document.body.style.userSelect = "auto";
-    };
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
+  const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null);
 
-    window.addEventListener("mousedown", onDown);
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-    window.addEventListener("mouseleave", onUp);
-
-    return () => {
-      window.removeEventListener("mousedown", onDown);
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-      window.removeEventListener("mouseleave", onUp);
-    };
+  const handleTouchStart = useCallback((e: TouchEvent) => {
+    setTouchStart({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY
+    });
+    setTouchEnd(null);
   }, []);
 
-  return null;
-};
+  const handleTouchMove = useCallback((e: TouchEvent) => {
+    setTouchEnd({
+      x: e.targetTouches[0].clientX,
+      y: e.targetTouches[0].clientY
+    });
+  }, []);
 
-export default TouchScroll;
+  const handleTouchEnd = useCallback(() => {
+    if (!touchStart || !touchEnd) return;
+
+    const distanceX = touchStart.x - touchEnd.x;
+    const distanceY = touchStart.y - touchEnd.y;
+    const isHorizontalSwipe = Math.abs(distanceX) > Math.abs(distanceY);
+
+    if (isHorizontalSwipe) {
+      if (Math.abs(distanceX) > threshold) {
+        if (distanceX > 0 && onSwipeLeft) {
+          onSwipeLeft();
+        } else if (onSwipeRight) {
+          onSwipeRight();
+        }
+      }
+    } else {
+      if (Math.abs(distanceY) > threshold) {
+        if (distanceY > 0 && onSwipeUp) {
+          onSwipeUp();
+        } else if (onSwipeDown) {
+          onSwipeDown();
+        }
+      }
+    }
+  }, [touchStart, touchEnd, threshold]);
+
+  return {
+    onTouchStart: handleTouchStart,
+    onTouchMove: handleTouchMove,
+    onTouchEnd: handleTouchEnd
+  };
+};
