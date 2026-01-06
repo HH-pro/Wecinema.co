@@ -1,6 +1,7 @@
 @echo off
 :loop
 git add .
-git commit -m "Auto-update %date% %time%"
+git diff --cached --quiet || git commit -m "Auto-update %date% %time%"
 git push origin main
-timeout /t 1800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+timeout /t 3600
+goto loop
