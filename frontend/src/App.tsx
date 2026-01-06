@@ -4,12 +4,9 @@ import { useEffect } from "react";
 import * as Sentry from "@sentry/react";
 import AICustomerSupport from "./components/AICustomerSupport";
 import { MarketplaceProvider } from "./context/MarketplaceContext";
+import { AuthProvider } from "./context/AuthContext"; // Import AuthProvider
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-
-// // 🆕 Import touch scroll and custom cursor
-// import TouchScroll from "./TouchScroll";
-// import TouchCursor from "../src/Cursor ";
 
 export const categories = [
   "Action ",
@@ -58,29 +55,31 @@ export default function App() {
 
   return (
     <div>
-      {/* 🆕 WRAP EVERYTHING WITH MARKETPLACE PROVIDER */}
-      <MarketplaceProvider>
-        {/* 🆕 Touch scroll and custom cursor */}
-        {/* <TouchScroll />
-        <TouchCursor /> */}
+      {/* Wrap with AuthProvider for authentication context */}
+      <AuthProvider>
+        {/* Wrap with MarketplaceProvider for marketplace context */}
+        <MarketplaceProvider>
+          {/* AI Customer Support Component */}
+          <AICustomerSupport />
+          
+          {/* Main Router Component */}
+          <Router />
 
-        <AICustomerSupport />
-        <Router />
-
-        {/* 🆕 Toast Container for notifications */}
-        <ToastContainer
-          position="top-right"
-          autoClose={5000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="light"
-        />
-      </MarketplaceProvider>
+          {/* Toast Container for notifications */}
+          <ToastContainer
+            position="top-right"
+            autoClose={5000}
+            hideProgressBar={false}
+            newestOnTop={false}
+            closeOnClick
+            rtl={false}
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+            theme="light"
+          />
+        </MarketplaceProvider>
+      </AuthProvider>
     </div>
   );
 }
