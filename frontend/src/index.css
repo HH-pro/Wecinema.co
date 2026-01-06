@@ -24,3 +24,25 @@ body {
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
 }
+/* Add this to your global CSS or style tag */
+.touch-area {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  button, 
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  input, 
+  select, 
+  textarea {
+    font-size: 16px; /* Prevents iOS zoom */
+  }
+}
