@@ -622,22 +622,7 @@ const Layout: React.FC<LayoutProps> = ({
                     <>
                       <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider flex justify-between items-center">
                         <span>Marketplace</span>
-                        <div className="flex gap-1">
-                          <button
-                            className={`p-1 rounded ${userType === 'buyer' ? 'bg-yellow-100 dark:bg-yellow-900' : 'bg-gray-100 dark:bg-gray-700'}`}
-                            onClick={() => changeUserType('buyer')}
-                            title="Switch to Buyer Mode"
-                          >
-                            <FaShoppingCart size="12" />
-                          </button>
-                          <button
-                            className={`p-1 rounded ${userType === 'seller' ? 'bg-yellow-100 dark:bg-yellow-900' : 'bg-gray-100 dark:bg-gray-700'}`}
-                            onClick={() => changeUserType('seller')}
-                            title="Switch to Seller Mode"
-                          >
-                            <FaUserTie size="12" />
-                          </button>
-                        </div>
+                       
                       </div>
 
                       <Link
