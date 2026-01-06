@@ -10,13 +10,12 @@ const TouchScroll = () => {
       isDown.current = true;
       startY.current = e.clientY;
       scrollStart.current = window.scrollY;
-      document.body.style.userSelect = "none"; // prevent text selection
+      document.body.style.userSelect = "none";
     };
 
     const onMove = (e: MouseEvent) => {
       if (!isDown.current) return;
-
-      const deltaY = startY.current - e.clientY;
+      const deltaY = (startY.current - e.clientY) * 0.5; // smoother scrolling
       window.scrollTo({ top: scrollStart.current + deltaY });
     };
 
@@ -28,7 +27,7 @@ const TouchScroll = () => {
     window.addEventListener("mousedown", onDown);
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-    window.addEventListener("mouseleave", onUp); // fixes stuck if mouse leaves window
+    window.addEventListener("mouseleave", onUp);
 
     return () => {
       window.removeEventListener("mousedown", onDown);
