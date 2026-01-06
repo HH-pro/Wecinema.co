@@ -8,7 +8,7 @@ const TouchCursor = () => {
   const raf = useRef<number>();
 
   useEffect(() => {
-    const speed = 0.10; // lower = more smooth
+    const speed = 0.30; // lower = more smooth
 
     const move = (e: MouseEvent) => {
       mouse.current.x = e.clientX;
