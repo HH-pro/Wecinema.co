@@ -16,264 +16,7 @@
 .sidebar-container.collapsed {
   width: 150px;
 }
-/* Hypemode Modal Styles */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-  backdrop-filter: blur(4px);
-}
 
-.subscription-modal {
-  width: 90%;
-  max-width: 500px;
-  border-radius: 20px;
-  padding: 30px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  animation: modalSlideIn 0.3s ease-out;
-  position: relative;
-}
-
-.subscription-modal.dark-mode {
-  background: linear-gradient(145deg, #2d3748, #1a202c);
-  color: white;
-}
-
-.subscription-modal.light-mode {
-  background: white;
-  color: #2d3748;
-}
-
-@keyframes modalSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 25px;
-  position: relative;
-}
-
-.modal-icon {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 15px;
-}
-
-.subscription-modal.dark-mode .modal-icon {
-  background: linear-gradient(135deg, #667eea, #764ba2);
-}
-
-.subscription-modal.light-mode .modal-icon {
-  background: linear-gradient(135deg, #4299e1, #667eea);
-}
-
-.crown-icon {
-  font-size: 24px;
-  color: white;
-}
-
-.modal-title {
-  font-size: 24px;
-  font-weight: bold;
-  flex: 1;
-}
-
-.modal-close-btn {
-  position: absolute;
-  top: -10px;
-  right: -10px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-
-.subscription-modal.dark-mode .modal-close-btn {
-  background: #4a5568;
-  color: white;
-}
-
-.subscription-modal.light-mode .modal-close-btn {
-  background: #e2e8f0;
-  color: #4a5568;
-}
-
-.modal-close-btn:hover {
-  transform: scale(1.1);
-}
-
-.modal-body {
-  text-align: center;
-  margin-bottom: 30px;
-}
-
-.success-animation {
-  margin-bottom: 20px;
-}
-
-.success-icon {
-  font-size: 64px;
-  color: #48bb78;
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.1);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-.subscription-details h3 {
-  font-size: 22px;
-  margin-bottom: 15px;
-  color: #48bb78;
-}
-
-.modal-description {
-  font-size: 16px;
-  line-height: 1.6;
-  margin-bottom: 25px;
-  opacity: 0.9;
-}
-
-.benefits-list {
-  text-align: left;
-  margin-top: 20px;
-}
-
-.benefit-item {
-  display: flex;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.subscription-modal.light-mode .benefit-item {
-  border-bottom-color: rgba(0, 0, 0, 0.1);
-}
-
-.benefit-icon {
-  color: #48bb78;
-  font-weight: bold;
-  margin-right: 15px;
-  font-size: 18px;
-}
-
-.benefit-text {
-  font-size: 16px;
-}
-
-.modal-footer {
-  display: flex;
-  gap: 15px;
-  justify-content: center;
-}
-
-.modal-primary-btn {
-  padding: 14px 32px;
-  border-radius: 10px;
-  border: none;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
-  flex: 1;
-}
-
-.modal-primary-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
-}
-
-.modal-secondary-btn {
-  padding: 14px 32px;
-  border-radius: 10px;
-  border: 2px solid;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s;
-  background: transparent;
-  flex: 1;
-}
-
-.subscription-modal.dark-mode .modal-secondary-btn {
-  border-color: #4a5568;
-  color: #a0aec0;
-}
-
-.subscription-modal.light-mode .modal-secondary-btn {
-  border-color: #cbd5e0;
-  color: #4a5568;
-}
-
-.modal-secondary-btn:hover {
-  transform: translateY(-2px);
-}
-
-/* Subscription badge for sidebar item */
-.sidebar-icon-container {
-  position: relative;
-}
-
-.subscription-badge {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  font-size: 12px;
-  color: #fbbf24;
-  background: #2d3748;
-  border-radius: 50%;
-  padding: 2px;
-}
-
-.subscribed-item {
-  position: relative;
-}
-
-.subscribed-item::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 10%;
-  width: 80%;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, #fbbf24, transparent);
-}
 .sidebar-container.light {
   background-color: #ffffff;
   color: #333333;
@@ -373,7 +116,292 @@
 .sidebar-container.light .text-active {
   color: #4361ee;
 }
+/* Hypemode Modal Styles - Compact Version */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
 
+.subscription-modal {
+  width: 90%;
+  max-width: 380px;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
+  animation: modalSlideIn 0.3s ease-out;
+  position: relative;
+}
+
+.subscription-modal.dark-mode {
+  background: linear-gradient(145deg, #2d3748, #1a202c);
+  color: white;
+  border: 1px solid #4a5568;
+}
+
+.subscription-modal.light-mode {
+  background: white;
+  color: #2d3748;
+  border: 1px solid #e2e8f0;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+  position: relative;
+}
+
+.modal-icon {
+  width: 45px; /* Reduced */
+  height: 45px; /* Reduced */
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+}
+
+.subscription-modal.dark-mode .modal-icon {
+  background: linear-gradient(135deg, #eab308, #fbbf24); /* Yellow gradient */
+}
+
+.subscription-modal.light-mode .modal-icon {
+  background: linear-gradient(135deg, #eab308, #f59e0b); /* Yellow gradient */
+}
+
+.crown-icon {
+  font-size: 20px; /* Reduced */
+  color: #1f2937;
+}
+
+.modal-title {
+  font-size: 20px; /* Reduced */
+  font-weight: bold;
+  flex: 1;
+}
+
+.modal-close-btn {
+  position: absolute;
+  top: -8px; /* Reduced */
+  right: -8px; /* Reduced */
+  width: 30px; /* Reduced */
+  height: 30px; /* Reduced */
+  border-radius: 50%;
+  border: none;
+  font-size: 20px; /* Reduced */
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.subscription-modal.dark-mode .modal-close-btn {
+  background: #4a5568;
+  color: #fbbf24; /* Yellow text */
+}
+
+.subscription-modal.light-mode .modal-close-btn {
+  background: #fef3c7; /* Yellow-100 */
+  color: #92400e; /* Yellow-800 */
+}
+
+.modal-close-btn:hover {
+  transform: scale(1.1);
+}
+
+.modal-body {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.success-animation {
+  margin-bottom: 15px;
+}
+
+.success-icon {
+  font-size: 52px; /* Reduced */
+  color: #22c55e; /* Green-500 */
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.subscription-details h3 {
+  font-size: 18px; /* Reduced */
+  margin-bottom: 12px;
+  color: #fbbf24; /* Yellow-400 */
+}
+
+.modal-description {
+  font-size: 14px; /* Reduced */
+  line-height: 1.5;
+  margin-bottom: 20px;
+  opacity: 0.9;
+}
+
+.benefits-list {
+  text-align: left;
+  margin-top: 15px;
+}
+
+.benefit-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 0; /* Reduced */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.subscription-modal.light-mode .benefit-item {
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+.benefit-icon {
+  color: #fbbf24; /* Yellow-400 */
+  font-weight: bold;
+  margin-right: 10px;
+  font-size: 16px;
+}
+
+.benefit-text {
+  font-size: 14px;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.modal-primary-btn {
+  padding: 12px 24px; /* Reduced */
+  border-radius: 8px;
+  border: none;
+  font-size: 14px; /* Reduced */
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  background: linear-gradient(135deg, #eab308, #f59e0b); /* Yellow-500 gradient */
+  color: #1f2937; /* Dark text for contrast */
+  flex: 1;
+}
+
+.modal-primary-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(234, 179, 8, 0.3); /* Yellow shadow */
+  background: linear-gradient(135deg, #f59e0b, #eab308);
+}
+
+.modal-secondary-btn {
+  padding: 12px 24px; /* Reduced */
+  border-radius: 8px;
+  border: 2px solid;
+  font-size: 14px; /* Reduced */
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  background: transparent;
+  flex: 1;
+}
+
+.subscription-modal.dark-mode .modal-secondary-btn {
+  border-color: #fbbf24; /* Yellow-400 */
+  color: #fbbf24;
+}
+
+.subscription-modal.light-mode .modal-secondary-btn {
+  border-color: #f59e0b; /* Yellow-500 */
+  color: #92400e; /* Yellow-800 */
+}
+
+.modal-secondary-btn:hover {
+  transform: translateY(-2px);
+  background: rgba(251, 191, 36, 0.1); /* Yellow background on hover */
+}
+
+/* Subscription badge for sidebar item */
+.sidebar-icon-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.subscription-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  font-size: 10px;
+  color: #fbbf24; /* Yellow-400 */
+  background: #1f2937;
+  border-radius: 50%;
+  padding: 2px;
+  border: 1px solid #fbbf24;
+}
+
+.subscribed-item {
+  position: relative;
+}
+
+.subscribed-item .sidebar-icon {
+  color: #fbbf24; /* Yellow icon for subscribed users */
+}
+
+.subscribed-item::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 10%;
+  width: 80%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #fbbf24, transparent);
+}
+
+/* Sidebar item styling for subscribed users */
+.sidebar-item.subscribed-item:hover {
+  background: rgba(251, 191, 36, 0.1);
+}
+
+/* Modal header gradient for better yellow theme */
+.modal-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #eab308, #fbbf24, #eab308);
+}
 /* Smooth transitions */
 .sidebar-item, .sidebar-icon, .sidebar-text {
   transition: all 0.2s ease;
