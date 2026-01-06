@@ -1,140 +1,156 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
-interface AuthContextType {
-  user: any | null;
-  token: string | null;
-  loading: boolean;
-  isAuthenticated: boolean;
-  hasPaid: boolean;
-  userId: string | null;
-  login: (userData: any, token: string) => void;
-  logout: () => void;
-  setPaymentStatus: (hasPaid: boolean) => void;
-  verifyTokenAndPayment: () => Promise<boolean>;
-}
+// Create context
+const AuthContext = createContext();
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Global auth instance
+let authInstance = null;
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [authState, setAuthState] = useState({
-    user: null,
-    token: null,
-    loading: true,
-    isAuthenticated: false,
-    hasPaid: false,
-    userId: null
-  });
+// Auth service class
+class AuthService {
+  constructor() {
+    this.listeners = new Set();
+    this.user = null;
+    this.loading = true;
+    this.initialized = false;
+  }
 
-  useEffect(() => {
+  initialize() {
+    if (this.initialized) return;
+    
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
-    const storedHasPaid = localStorage.getItem('hasPaid');
-
+    
     if (token && userData) {
       try {
-        const user = JSON.parse(userData);
-        const hasPaid = storedHasPaid === 'true';
-        
-        setAuthState({
-          user,
-          token,
-          loading: false,
-          isAuthenticated: true,
-          hasPaid,
-          userId: user._id || user.id
-        });
+        this.user = JSON.parse(userData);
+        this.token = token;
       } catch (error) {
         console.error('Error parsing user data:', error);
-        logout();
+        this.clearAuth();
       }
-    } else {
-      setAuthState(prev => ({ ...prev, loading: false }));
     }
-  }, []);
+    
+    this.loading = false;
+    this.initialized = true;
+    this.notifyListeners();
+  }
 
-  const login = (userData: any, token: string) => {
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  notifyListeners() {
+    this.listeners.forEach(listener => listener(this.getState()));
+  }
+
+  getState() {
+    return {
+      user: this.user,
+      loading: this.loading,
+      isAuthenticated: !!this.user
+    };
+  }
+
+  login(userData, token) {
+    this.user = userData;
+    this.token = token;
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
-    localStorage.setItem('hasPaid', String(userData.hasPaid || false));
+    this.notifyListeners();
+  }
 
-    setAuthState({
-      user: userData,
-      token,
-      loading: false,
-      isAuthenticated: true,
-      hasPaid: userData.hasPaid || false,
-      userId: userData._id || userData.id || null
+  logout() {
+    this.clearAuth();
+    this.notifyListeners();
+  }
+
+  clearAuth() {
+    this.user = null;
+    this.token = null;
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+  }
+
+  getToken() {
+    return this.token;
+  }
+
+  isAuthenticated() {
+    return !!this.user;
+  }
+
+  getUserId() {
+    return this.user?._id || this.user?.id;
+  }
+}
+
+// Create singleton instance
+authInstance = new AuthService();
+
+// React Hook
+export const useAuth = () => {
+  const [state, setState] = useState(authInstance.getState());
+
+  useEffect(() => {
+    // Initialize auth on first use
+    authInstance.initialize();
+    
+    // Subscribe to auth changes
+    const unsubscribe = authInstance.subscribe((newState) => {
+      setState(newState);
     });
+
+    return unsubscribe;
+  }, []);
+
+  const login = (userData, token) => {
+    authInstance.login(userData, token);
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('hasPaid');
-    
-    setAuthState({
-      user: null,
-      token: null,
-      loading: false,
-      isAuthenticated: false,
-      hasPaid: false,
-      userId: null
-    });
+    authInstance.logout();
   };
 
-  const setPaymentStatus = (hasPaid: boolean) => {
-    if (authState.user) {
-      const updatedUser = { ...authState.user, hasPaid };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      localStorage.setItem('hasPaid', String(hasPaid));
-      
-      setAuthState(prev => ({
-        ...prev,
-        user: updatedUser,
-        hasPaid
-      }));
-    }
+  const getToken = () => {
+    return authInstance.getToken();
   };
 
-  const verifyTokenAndPayment = async (): Promise<boolean> => {
-    // Implementation for token verification
-    return true;
+  const isAuthenticated = () => {
+    return authInstance.isAuthenticated();
   };
 
-  const contextValue: AuthContextType = {
-    ...authState,
+  const getUserId = () => {
+    return authInstance.getUserId();
+  };
+
+  return {
+    ...state,
     login,
     logout,
-    setPaymentStatus,
-    verifyTokenAndPayment
+    getToken,
+    isAuthenticated,
+    getUserId
   };
-
-  if (authState.loading) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh'
-      }}>
-        <div className="loading-spinner"></div>
-      </div>
-    );
-  }
-
-  return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
-    </AuthContext.Provider>
-  );
 };
 
-export const useAuthContext = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuthContext must be used within AuthProvider');
-  }
-  return context;
+// Higher Order Component (alternative approach)
+export const withAuth = (Component) => {
+  return function AuthComponent(props) {
+    const auth = useAuth();
+    return <Component {...props} auth={auth} />;
+  };
+};
+
+// Export the auth instance for direct use outside React components
+export const auth = {
+  getToken: () => authInstance?.getToken(),
+  isAuthenticated: () => authInstance?.isAuthenticated(),
+  getUserId: () => authInstance?.getUserId(),
+  getUser: () => authInstance?.user,
+  // Initialize auth system (call this once at app startup)
+  initialize: () => authInstance?.initialize()
 };
 
 export default AuthContext;
