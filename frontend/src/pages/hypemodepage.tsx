@@ -325,8 +325,8 @@ const HypeModeProfile = () => {
   const [selectedSubscription, setSelectedSubscription] = useState<"user" | "studio" | null>(null);
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer");
   const [isLoading, setIsLoading] = useState(false);
-  const [userHasPaid, setUserHasPaid] = useState(false);
   const [showPaymentComponent, setShowPaymentComponent] = useState(false);
+  const [loginSuccess, setLoginSuccess] = useState(false);
 
   // Check if user has paid on component mount
   useEffect(() => {
@@ -341,18 +341,31 @@ const HypeModeProfile = () => {
     }
   }, []);
 
+  // Handle redirect after login success
+  useEffect(() => {
+    if (loginSuccess) {
+      const timer = setTimeout(() => {
+        navigate('/');
+      }, 3000); // 3 seconds delay
+      
+      return () => clearTimeout(timer);
+    }
+  }, [loginSuccess, navigate]);
+
   const checkPaymentStatus = async (userId: string) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
       const user = response.data;
       
       if (user.hasPaid) {
-        // User has paid, redirect to home
-        setUserHasPaid(true);
-        navigate('/');
+        // User has paid, set login success
+        setUserId(userId);
+        setIsLoggedIn(true);
+        setLoginSuccess(true);
+        setPopupMessage('Login successful! Redirecting to home...');
+        setShowPopup(true);
       } else {
         // User hasn't paid, show payment component
-        setUserHasPaid(false);
         setUserId(userId);
         setIsLoggedIn(true);
         setShowPaymentComponent(true);
@@ -375,9 +388,6 @@ const HypeModeProfile = () => {
 
       const token = res.data.token;
       const userId = res.data.id;
-
-      setPopupMessage(`Registration successful as ${userType}!`);
-      setShowPopup(true);
 
       if (token) {
         localStorage.setItem('token', token);
@@ -407,8 +417,6 @@ const HypeModeProfile = () => {
         localStorage.setItem('token', backendToken);
         setIsLoggedIn(true);
         setUserId(userId);
-        setPopupMessage('Login successful!');
-        setShowPopup(true);
         return { success: true, userId };
       }
     } catch (error: any) {
@@ -555,6 +563,7 @@ const HypeModeProfile = () => {
       await signOut(auth);
       localStorage.removeItem('token');
       setIsLoggedIn(false);
+      setLoginSuccess(false);
       setShowPaymentComponent(false);
       setPopupMessage('Logout successful.');
       setShowPopup(true);
@@ -594,9 +603,23 @@ const HypeModeProfile = () => {
     setTimeout(() => setShowFireworks(false), 1000);
   }, []);
 
-  // If user has paid, redirect to home (handled in useEffect)
-  if (userHasPaid) {
-    return null; // Will redirect to home
+  // If login is successful and user has paid, show success popup (will auto redirect)
+  if (loginSuccess) {
+    return (
+      <Layout expand={false} hasHeader={true}>
+        <div className="main-container-small">
+          {showPopup && (
+            <>
+              <div className="overlay" onClick={closePopup} />
+              <div className="popup-small">
+                <p className="popup-text-small">{popupMessage}</p>
+                <button className="subscription-button-small" onClick={closePopup}>Close</button>
+              </div>
+            </>
+          )}
+        </div>
+      </Layout>
+    );
   }
 
   // If user is logged in but hasn't paid, show payment component
@@ -797,7 +820,7 @@ const HypeModeProfile = () => {
         )}
       </div>
 
-      {showPopup && (
+      {showPopup && !loginSuccess && (
         <>
           <div className="overlay" onClick={closePopup} />
           <div className="popup-small">
