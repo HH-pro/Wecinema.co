@@ -7,66 +7,6 @@ import { googleProvider } from "../firebase/config";
 import { motion } from "framer-motion";
 import Confetti from "react-confetti";
 import "../css/HypeModeProfile.css";
-import { toast } from "react-toastify";
-import PayPalButtonWrapper from './PayPalButtonWrapper';
-import styled from 'styled-components';
-import { decodeToken } from "../utilities/helperfFunction";
-
-// ✅ API Base URL
-import { API_BASE_URL } from "../api";
-
-// ✅ Payment Component Styles
-const PaymentContainer = styled.div`
-  display: flex;
-  justify-content: center;
-  padding: 40px 20px;
-  background: linear-gradient(to right, #ffffa1 0%, #ffc800 100%);
-  color: #333;
-  border-radius: 20px;
-  margin: 20px auto;
-  max-width: 800px;
-`;
-
-const SubscriptionBox = styled.div`
-  padding: 30px;
-  border: 2px dashed #000;
-  text-align: center;
-  width: 100%;
-  max-width: 500px;
-  background-color: #fff;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-  border-radius: 15px;
-`;
-
-const Title = styled.h2`
-  margin-bottom: 20px;
-  font-size: 28px;
-  font-weight: bold;
-  color: #333;
-`;
-
-const Description = styled.p`
-  font-size: 16px;
-  margin-bottom: 20px;
-  color: #555;
-`;
-
-const Button = styled.button`
-  background: #28a745;
-  color: #fff;
-  border: none;
-  padding: 12px 24px;
-  cursor: pointer;
-  font-size: 16px;
-  border-radius: 8px;
-  transition: background 0.3s, transform 0.2s;
-  margin-top: 20px;
-
-  &:hover {
-    background: #218838;
-    transform: scale(1.05);
-  }
-`;
 
 const HypeModeProfile = () => {
   const navigate = useNavigate();
@@ -82,48 +22,11 @@ const HypeModeProfile = () => {
   const [selectedSubscription, setSelectedSubscription] = useState<"user" | "studio" | null>(null);
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer");
   const [isLoading, setIsLoading] = useState(false);
-  
-  // ✅ New states
-  const [showPayment, setShowPayment] = useState(false);
-  const [paymentProcessing, setPaymentProcessing] = useState(false);
-  const [paymentAmount, setPaymentAmount] = useState(0);
-  const [userHasPaid, setUserHasPaid] = useState(false);
-  const [checkingPaymentStatus, setCheckingPaymentStatus] = useState(false);
-
-  // ✅ Check payment status when component mounts or user logs in
-  useEffect(() => {
-    checkUserPaymentStatus();
-  }, [userId]);
-
-  // ✅ Function to check if user has already paid
-  const checkUserPaymentStatus = async () => {
-    if (!userId) return;
-    
-    setCheckingPaymentStatus(true);
-    try {
-      const response = await axios.get(`${API_BASE_URL}/user/payment-status/${userId}`);
-      const { hasPaid } = response.data;
-      setUserHasPaid(hasPaid);
-      
-      // ✅ If user has already paid, redirect to home
-      if (hasPaid) {
-        toast.info("You already have an active subscription!");
-        setTimeout(() => {
-          navigate('/');
-        }, 2000);
-      }
-    } catch (error) {
-      console.error('Error checking payment status:', error);
-      setUserHasPaid(false);
-    } finally {
-      setCheckingPaymentStatus(false);
-    }
-  };
 
   // Register user with backend
   const registerUser = async (username: string, email: string, avatar: string, userType: string) => {
     try {
-      const res = await axios.post(`${API_BASE_URL}/user/signup`, {
+      const res = await axios.post('https://wecinema-co.onrender.com/user/signup', {
         username,
         email,
         avatar,
@@ -134,23 +37,13 @@ const HypeModeProfile = () => {
       const token = res.data.token;
       const userId = res.data.id;
 
+      setPopupMessage(`Registration successful as ${userType}!`);
+      setShowPopup(true);
+
       if (token) {
         localStorage.setItem('token', token);
         setIsLoggedIn(true);
         setUserId(userId);
-        
-        // ✅ Check payment status after registration
-        await checkUserPaymentStatus();
-        
-        // ✅ Only show payment if user hasn't paid
-        if (!userHasPaid && selectedSubscription) {
-          setPopupMessage(`Registration successful as ${userType}!`);
-          setShowPopup(true);
-          const amount = selectedSubscription === 'user' ? 5 : 10;
-          setPaymentAmount(amount);
-          setShowPayment(true);
-        }
-        
         return true;
       }
     } catch (error: any) {
@@ -167,7 +60,7 @@ const HypeModeProfile = () => {
   // Login user with backend
   const loginUser = async (email: string) => {
     try {
-      const res = await axios.post(`${API_BASE_URL}/user/signin`, { email });
+      const res = await axios.post('https://wecinema-co.onrender.com/user/signin', { email });
       const backendToken = res.data.token;
       const userId = res.data.id;
 
@@ -175,19 +68,8 @@ const HypeModeProfile = () => {
         localStorage.setItem('token', backendToken);
         setIsLoggedIn(true);
         setUserId(userId);
-        
-        // ✅ Check payment status after login
-        await checkUserPaymentStatus();
-        
-        // ✅ Only show payment if user hasn't paid AND selected a subscription
-        if (!userHasPaid && selectedSubscription) {
-          setPopupMessage('Login successful!');
-          setShowPopup(true);
-          const amount = selectedSubscription === 'user' ? 5 : 10;
-          setPaymentAmount(amount);
-          setShowPayment(true);
-        }
-        
+        setPopupMessage('Login successful!');
+        setShowPopup(true);
         return true;
       }
     } catch (error: any) {
@@ -201,7 +83,7 @@ const HypeModeProfile = () => {
     }
   };
 
-  // ✅ Updated onLoginSuccess function
+  // Handle successful authentication
   const onLoginSuccess = async (user: any, isEmailAuth: boolean = false) => {
     const profile = user.providerData[0];
     const email = profile.email;
@@ -211,87 +93,35 @@ const HypeModeProfile = () => {
     try {
       if (isSignup) {
         const success = await registerUser(username, email, avatar, userType);
-        if (!success) {
-          setIsLoading(false);
+        if (success) {
+          navigateToPayment();
         }
       } else {
         const success = await loginUser(email);
-        if (!success) {
-          setIsLoading(false);
+        if (success) {
+          navigateToPayment();
         }
       }
     } catch (error) {
       setPopupMessage('Authentication failed. Please try again.');
       setShowPopup(true);
+    } finally {
       setIsLoading(false);
     }
   };
 
-  // HypeModeProfile.tsx mein handlePaymentSuccess function update karein
-const handlePaymentSuccess = async (details: any) => {
-  try {
-    if (!details.id || !details.payer) {
-      throw new Error('Incomplete transaction details');
-    }
-
-    setPaymentProcessing(true);
-    
-    console.log('Sending transaction data:', {
-      userId: userId,
-      username: username,
-      email: details.payer.email_address,
-      orderId: details.id,
-      payerId: details.payer.payer_id,
-      amount: paymentAmount,
-      currency: 'USD',
-      subscriptionType: selectedSubscription
-    });
-
-    const response = await axios.post(`${API_BASE_URL}/user/save-transaction`, {
-      userId: userId,
-      username: username,
-      email: details.payer.email_address,
-      orderId: details.id,
-      payerId: details.payer.payer_id,
-      amount: paymentAmount,
-      currency: 'USD',
-      subscriptionType: selectedSubscription
-    });
-
-    console.log('Transaction response:', response.data);
-    
-    toast.success('Payment successful! Welcome to HypeMode! 🎉');
-    setUserHasPaid(true);
-    setShowPayment(false);
-    
-    // Redirect to home after successful payment
+  const navigateToPayment = () => {
     setTimeout(() => {
-      navigate('/');
+      setShowPopup(false);
+      navigate('/payment', { 
+        state: { 
+          subscriptionType: selectedSubscription, 
+          amount: selectedSubscription === 'user' ? 5 : 10, 
+          userId,
+          userType 
+        } 
+      });
     }, 2000);
-
-  } catch (error: any) {
-    console.error('Failed to save transaction:', error);
-    
-    // ✅ Detailed error logging
-    if (error.response) {
-      console.error('Server response:', error.response.data);
-      console.error('Status:', error.response.status);
-      toast.error(`Payment failed: ${error.response.data.message || 'Server error'}`);
-    } else if (error.request) {
-      console.error('No response received:', error.request);
-      toast.error('No response from server. Please check your connection.');
-    } else {
-      console.error('Error setting up request:', error.message);
-      toast.error(`Payment failed: ${error.message}`);
-    }
-  } finally {
-    setPaymentProcessing(false);
-  }
-};
-  const handlePaymentError = (message: any) => {
-    setPopupMessage(message);
-    setShowPopup(true);
-    setTimeout(() => setShowPopup(false), 3000);
   };
 
   // Google Signin
@@ -391,6 +221,21 @@ const handlePaymentSuccess = async (details: any) => {
     }
   };
 
+  // Google Logout
+  const handleGoogleLogout = async () => {
+    const auth = getAuth();
+    try {
+      await signOut(auth);
+      localStorage.removeItem('token');
+      setIsLoggedIn(false);
+      setPopupMessage('Logout successful.');
+      setShowPopup(true);
+    } catch (error) {
+      setPopupMessage('Logout failed. Please try again.');
+      setShowPopup(true);
+    }
+  };
+
   const handleEmailSubmit = () => {
     if (isSignup) {
       handleEmailSignup();
@@ -416,48 +261,10 @@ const handlePaymentSuccess = async (details: any) => {
     setSelectedSubscription(null);
   };
 
-  // ✅ Close payment modal
-  const closePayment = () => {
-    setShowPayment(false);
-    setSelectedSubscription(null);
-  };
-
   useEffect(() => {
     setShowFireworks(true);
     setTimeout(() => setShowFireworks(false), 1000);
   }, []);
-
-  // ✅ If user has already paid, show message and redirect
-  if (userHasPaid) {
-    return (
-      <Layout expand={false} hasHeader={true}>
-        <div className="main-container-small">
-          <div style={{ textAlign: 'center', padding: '50px' }}>
-            <h2 style={{ color: 'green', fontSize: '28px', marginBottom: '20px' }}>
-              ✅ You already have an active subscription!
-            </h2>
-            <p style={{ fontSize: '18px', marginBottom: '30px' }}>
-              Redirecting to home page...
-            </p>
-            <button 
-              onClick={() => navigate('/')}
-              style={{
-                background: '#007bff',
-                color: 'white',
-                padding: '12px 30px',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '16px',
-                cursor: 'pointer'
-              }}
-            >
-              Go to Home Now
-            </button>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout expand={false} hasHeader={true}>
@@ -480,207 +287,163 @@ const handlePaymentSuccess = async (details: any) => {
       )}
 
       <div className="main-container-small">
-        <button className="toggle-button-small" onClick={toggleSignupSignin} disabled={isLoading || checkingPaymentStatus}>
+        <button className="toggle-button-small" onClick={toggleSignupSignin} disabled={isLoading}>
           {isSignup ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
         </button>
 
-        {checkingPaymentStatus ? (
-          <div style={{ textAlign: 'center', padding: '50px' }}>
-            <div className="spinner" style={{ 
-              border: '4px solid #f3f3f3',
-              borderTop: '4px solid #3498db',
-              borderRadius: '50%',
-              width: '50px',
-              height: '50px',
-              animation: 'spin 2s linear infinite',
-              margin: '0 auto 20px'
-            }}></div>
-            <p>Checking your subscription status...</p>
+        {isLoggedIn ? (
+          <div className="cards-container-small">
+            
           </div>
         ) : (
           <>
-            {!showPayment ? (
-              <>
-                {isSignup && (
-                  <div className="user-type-selector-small">
-                    <button 
-                      className={`user-type-button-small ${userType === "buyer" ? "active-small" : ""}`}
-                      onClick={() => setUserType("buyer")}
-                      disabled={isLoading}
-                    >
-                      👤 Buyer
+            {isSignup && (
+              <div className="user-type-selector-small">
+                <button 
+                  className={`user-type-button-small ${userType === "buyer" ? "active-small" : ""}`}
+                  onClick={() => setUserType("buyer")}
+                  disabled={isLoading}
+                >
+                  👤 Buyer
+                </button>
+                <button 
+                  className={`user-type-button-small ${userType === "seller" ? "active-small" : ""}`}
+                  onClick={() => setUserType("seller")}
+                  disabled={isLoading}
+                >
+                  🏪 Seller
+                </button>
+              </div>
+            )}
+
+            <div className="cards-container-small">
+              {/* Basic Plan */}
+              <div
+                className={`subscription-box-small ${selectedSubscription === "user" ? "selected-small" : ""}`}
+                onClick={() => !isLoading && handleSubscriptionClick("user")}
+              >
+                <div className="premium-badge-small">Popular</div>
+                <h3 className="subscription-title-small">Basic Plan</h3>
+                <div className="subscription-price-small">$5/month</div>
+                <p className="subscription-description-small">Perfect for individual users</p>
+                
+                <ul className="features-list-small">
+                  <li>Buy Films & Scripts</li>
+                  <li>Sell Your Content</li>
+                  <li>Basic Support</li>
+                  <li>Access to Community</li>
+                  <li>5GB Storage</li>
+                </ul>
+
+                {selectedSubscription === "user" && (
+                  <div className="auth-section-small">
+                    <button className="subscription-button-small google-auth-button-small" onClick={handleGoogleLogin} disabled={isLoading}>
+                      <span className="google-icon-small">G</span>
+                      {isLoading ? "Processing..." : (isSignup ? "Google Sign up" : "Google Sign in")}
                     </button>
-                    <button 
-                      className={`user-type-button-small ${userType === "seller" ? "active-small" : ""}`}
-                      onClick={() => setUserType("seller")}
-                      disabled={isLoading}
-                    >
-                      🏪 Seller
-                    </button>
+
+                    <div className="auth-divider-small">
+                      <span>or</span>
+                    </div>
+
+                    <div className="email-form-small">
+                      {isSignup && (
+                        <input
+                          type="text"
+                          className="form-input-small"
+                          placeholder="Username"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          disabled={isLoading}
+                        />
+                      )}
+                      <input
+                        type="email"
+                        className="form-input-small"
+                        placeholder="Email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        disabled={isLoading}
+                      />
+                      <input
+                        type="password"
+                        className="form-input-small"
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disabled={isLoading}
+                      />
+                      <button className="subscription-button-small email-submit-button-small" onClick={handleEmailSubmit} disabled={isLoading}>
+                        {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
+                      </button>
+                    </div>
                   </div>
                 )}
+              </div>
 
-                <div className="cards-container-small">
-                  {/* Basic Plan */}
-                  <div
-                    className={`subscription-box-small ${selectedSubscription === "user" ? "selected-small" : ""}`}
-                    onClick={() => !isLoading && handleSubscriptionClick("user")}
-                  >
-                    <div className="premium-badge-small">Popular</div>
-                    <h3 className="subscription-title-small">Basic Plan</h3>
-                    <div className="subscription-price-small">$5/month</div>
-                    <p className="subscription-description-small">Perfect for individual users</p>
-                    
-                    <ul className="features-list-small">
-                      <li>Buy Films & Scripts</li>
-                      <li>Sell Your Content</li>
-                      <li>Basic Support</li>
-                      <li>Access to Community</li>
-                      <li>5GB Storage</li>
-                    </ul>
+              {/* Pro Plan */}
+              <div
+                className={`subscription-box-small ${selectedSubscription === "studio" ? "selected-small" : ""}`}
+                onClick={() => !isLoading && handleSubscriptionClick("studio")}
+              >
+                <div className="premium-badge-small">Pro</div>
+                <h3 className="subscription-title-small">Pro Plan</h3>
+                <div className="subscription-price-small">$10/month</div>
+                <p className="subscription-description-small">Advanced features for professionals</p>
+                
+                <ul className="features-list-small">
+                  <li>All Basic Features</li>
+                  <li>Early Feature Access</li>
+                  <li>Priority Support</li>
+                  <li>Team Collaboration</li>
+                </ul>
 
-                    {selectedSubscription === "user" && (
-                      <div className="auth-section-small">
-                        <button className="subscription-button-small google-auth-button-small" onClick={handleGoogleLogin} disabled={isLoading}>
-                          <span className="google-icon-small">G</span>
-                          {isLoading ? "Processing..." : (isSignup ? "Google Sign up" : "Google Sign in")}
-                        </button>
+                {selectedSubscription === "studio" && (
+                  <div className="auth-section-small">
+                    <button className="subscription-button-small google-auth-button-small" onClick={handleGoogleLogin} disabled={isLoading}>
+                      <span className="google-icon-small">G</span>
+                      {isLoading ? "Processing..." : (isSignup ? "Google Sign up" : "Google Sign in")}
+                    </button>
 
-                        <div className="auth-divider-small">
-                          <span>or</span>
-                        </div>
+                    <div className="auth-divider-small">
+                      <span>or</span>
+                    </div>
 
-                        <div className="email-form-small">
-                          {isSignup && (
-                            <input
-                              type="text"
-                              className="form-input-small"
-                              placeholder="Username"
-                              value={username}
-                              onChange={(e) => setUsername(e.target.value)}
-                              disabled={isLoading}
-                            />
-                          )}
-                          <input
-                            type="email"
-                            className="form-input-small"
-                            placeholder="Email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            disabled={isLoading}
-                          />
-                          <input
-                            type="password"
-                            className="form-input-small"
-                            placeholder="Password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            disabled={isLoading}
-                          />
-                          <button className="subscription-button-small email-submit-button-small" onClick={handleEmailSubmit} disabled={isLoading}>
-                            {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    <div className="email-form-small">
+                      {isSignup && (
+                        <input
+                          type="text"
+                          className="form-input-small"
+                          placeholder="Username"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          disabled={isLoading}
+                        />
+                      )}
+                      <input
+                        type="email"
+                        className="form-input-small"
+                        placeholder="Email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        disabled={isLoading}
+                      />
+                      <input
+                        type="password"
+                        className="form-input-small"
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disabled={isLoading}
+                      />
+                      <button className="subscription-button-small email-submit-button-small" onClick={handleEmailSubmit} disabled={isLoading}>
+                        {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
+                      </button>
+                    </div>
                   </div>
-
-                  {/* Pro Plan */}
-                  <div
-                    className={`subscription-box-small ${selectedSubscription === "studio" ? "selected-small" : ""}`}
-                    onClick={() => !isLoading && handleSubscriptionClick("studio")}
-                  >
-                    <div className="premium-badge-small">Pro</div>
-                    <h3 className="subscription-title-small">Pro Plan</h3>
-                    <div className="subscription-price-small">$10/month</div>
-                    <p className="subscription-description-small">Advanced features for professionals</p>
-                    
-                    <ul className="features-list-small">
-                      <li>All Basic Features</li>
-                      <li>Early Feature Access</li>
-                      <li>Priority Support</li>
-                      <li>Team Collaboration</li>
-                    </ul>
-
-                    {selectedSubscription === "studio" && (
-                      <div className="auth-section-small">
-                        <button className="subscription-button-small google-auth-button-small" onClick={handleGoogleLogin} disabled={isLoading}>
-                          <span className="google-icon-small">G</span>
-                          {isLoading ? "Processing..." : (isSignup ? "Google Sign up" : "Google Sign in")}
-                        </button>
-
-                        <div className="auth-divider-small">
-                          <span>or</span>
-                        </div>
-
-                        <div className="email-form-small">
-                          {isSignup && (
-                            <input
-                              type="text"
-                              className="form-input-small"
-                              placeholder="Username"
-                              value={username}
-                              onChange={(e) => setUsername(e.target.value)}
-                              disabled={isLoading}
-                            />
-                          )}
-                          <input
-                            type="email"
-                            className="form-input-small"
-                            placeholder="Email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            disabled={isLoading}
-                          />
-                          <input
-                            type="password"
-                            className="form-input-small"
-                            placeholder="Password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            disabled={isLoading}
-                          />
-                          <button className="subscription-button-small email-submit-button-small" onClick={handleEmailSubmit} disabled={isLoading}>
-                            {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </>
-            ) : (
-              // ✅ Payment Component (Same page pe show ho rha hai)
-              <PaymentContainer>
-                <SubscriptionBox>
-                  <Title>Complete Your Subscription</Title>
-                  <Description>Subscription: {selectedSubscription === 'user' ? 'Basic Plan' : 'Pro Plan'}</Description>
-                  <Description>Amount: ${paymentAmount}/month</Description>
-                  <Description>Pay with PayPal or Debit Card</Description>
-                  
-                  <PayPalButtonWrapper 
-                    amount={paymentAmount} 
-                    userId={userId} 
-                    onSuccess={handlePaymentSuccess} 
-                    onError={handlePaymentError} 
-                  />
-                  
-                  <Button 
-                    onClick={closePayment}
-                    style={{ background: '#dc3545', marginLeft: '10px' }}
-                    disabled={paymentProcessing}
-                  >
-                    Cancel
-                  </Button>
-                  
-                  {paymentProcessing && (
-                    <p style={{ marginTop: '20px', color: '#28a745' }}>
-                      Processing your payment...
-                    </p>
-                  )}
-                </SubscriptionBox>
-              </PaymentContainer>
-            )}
+                )}
+              </div>
+            </div>
           </>
         )}
       </div>
