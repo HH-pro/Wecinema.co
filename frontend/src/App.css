@@ -14,46 +14,33 @@
 	
 
   }
-  /* Add to your existing App.css */
+  /* LoadingAnimations.css */
 
 @keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 
 @keyframes slide {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(300%);
-  }
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
 }
 
 @keyframes pulse {
-  0%, 100% {
-    opacity: 0.4;
-    transform: scale(0.9);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.1);
-  }
+  0%, 100% { opacity: 0.4; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.1); }
 }
 
-/* Ensure animations work with Tailwind */
-@layer utilities {
-  .animate-shimmer {
-    animation: shimmer 2s infinite;
-  }
-  
-  .animate-slide {
-    animation: slide 1.5s infinite;
-  }
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+
+.animate-slide {
+  animation: slide 1.5s infinite;
+}
+
+.animate-pulse-custom {
+  animation: pulse 1.5s ease-in-out infinite;
 }
   body {
 	background-color: var(--bg-color);
