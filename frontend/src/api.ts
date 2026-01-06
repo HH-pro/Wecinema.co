@@ -797,8 +797,6 @@ export const signin = async (
     const response = await postRequest('/user/signin', {
       email
     }, setLoading, {
-      message: 'Login successful!',
-      showToast: true
     });
     
     console.log("Signin response:", response);
