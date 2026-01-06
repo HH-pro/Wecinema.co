@@ -44,7 +44,25 @@ export const ratings = ["g ", "pg ", "pg-13 ", "r ", "x "];
 
 export default function App() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-
+// In your App.tsx or main component, add this:
+useEffect(() => {
+  // Check for login marker on app load
+  const justLoggedIn = localStorage.getItem('hypeModeJustLoggedIn');
+  if (justLoggedIn === 'true') {
+    console.log('Clearing login marker...');
+    localStorage.removeItem('hypeModeJustLoggedIn');
+    
+    // Optional: Force a small delay to ensure state is loaded
+    setTimeout(() => {
+      // Check if we need to refresh
+      const token = localStorage.getItem('token');
+      if (token) {
+        // User is logged in, ensure proper state
+        console.log('User logged in, ensuring proper state...');
+      }
+    }, 100);
+  }
+}, []);
   // ✅ Handle authentication state on app load
   useEffect(() => {
     const checkAuthAndRedirect = async () => {
