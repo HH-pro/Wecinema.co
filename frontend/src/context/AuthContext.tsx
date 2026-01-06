@@ -2,13 +2,11 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 
 // API Base URL
-const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+import { API_BASE_URL } from "../api";
+
 
 // Create context
 const AuthContext = createContext();
-
-// Global auth instance
-let authInstance = null;
 
 // Auth service class
 class AuthService {
@@ -39,6 +37,9 @@ class AuthService {
         console.error('Error parsing user data:', error);
         this.clearAuth();
       }
+    } else {
+      // Clear any partial auth data
+      this.clearAuth();
     }
     
     this.loading = false;
@@ -60,9 +61,9 @@ class AuthService {
       user: this.user,
       token: this.token,
       loading: this.loading,
-      isAuthenticated: !!this.user,
+      isAuthenticated: !!this.user && !!this.token,
       hasPaid: this.hasPaid,
-      userId: this.user?._id || this.user?.id
+      userId: this.user?._id || this.user?.id || null
     };
   }
 
@@ -99,6 +100,7 @@ class AuthService {
       if (response.data) {
         return this.login(response.data, token);
       }
+      throw new Error('No user data received from server');
     } catch (error) {
       console.error('Error logging in with token:', error);
       this.clearAuth();
@@ -115,6 +117,8 @@ class AuthService {
     this.user = null;
     this.token = null;
     this.hasPaid = false;
+    this.loading = false;
+    
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('hasPaid');
@@ -134,7 +138,10 @@ class AuthService {
   }
 
   async verifyTokenAndPayment() {
-    if (!this.token || !this.user) return false;
+    if (!this.token || !this.user) {
+      this.clearAuth();
+      return false;
+    }
     
     try {
       const userId = this.user._id || this.user.id;
@@ -158,11 +165,12 @@ class AuthService {
     } catch (error) {
       console.error('Token verification failed:', error);
       // If token is invalid, clear auth
-      if (error.response?.status === 401) {
+      if (error.response?.status === 401 || error.response?.status === 403) {
         this.clearAuth();
       }
       return false;
     }
+    return false;
   }
 
   getToken() {
@@ -174,7 +182,7 @@ class AuthService {
   }
 
   getUserId() {
-    return this.user?._id || this.user?.id;
+    return this.user?._id || this.user?.id || null;
   }
 
   getUserType() {
@@ -204,13 +212,17 @@ class AuthService {
       }
     } catch (error) {
       console.error('Error refreshing user data:', error);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        this.clearAuth();
+      }
       return null;
     }
+    return null;
   }
 }
 
 // Create singleton instance
-authInstance = new AuthService();
+const authInstance = new AuthService();
 
 // React Hook
 export const useAuth = () => {
@@ -218,7 +230,10 @@ export const useAuth = () => {
 
   useEffect(() => {
     // Initialize auth on first use
-    authInstance.initialize();
+    const initAuth = async () => {
+      await authInstance.initialize();
+    };
+    initAuth();
     
     // Subscribe to auth changes
     const unsubscribe = authInstance.subscribe((newState) => {
@@ -292,6 +307,44 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const auth = useAuth();
   
+  // Show loading state while initializing
+  if (auth.loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        backgroundColor: '#f5f5f5'
+      }}>
+        <div style={{
+          textAlign: 'center',
+          padding: '40px',
+          borderRadius: '12px',
+          backgroundColor: 'white',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+        }}>
+          <div style={{
+            border: '4px solid #f3f3f3',
+            borderTop: '4px solid #3498db',
+            borderRadius: '50%',
+            width: '50px',
+            height: '50px',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 20px'
+          }}></div>
+          <p style={{ color: '#666', fontSize: '16px' }}>Loading authentication...</p>
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <AuthContext.Provider value={auth}>
       {children}
@@ -334,6 +387,56 @@ export const useAuthContext = () => {
     throw new Error('useAuthContext must be used within AuthProvider');
   }
   return context;
+};
+
+// Helper function to check if user is authenticated and paid
+export const useAuthCheck = () => {
+  const auth = useAuthContext();
+  
+  return {
+    isReady: !auth.loading,
+    isAuthenticated: auth.isAuthenticated,
+    hasPaid: auth.hasPaid,
+    shouldRedirectToLogin: !auth.loading && !auth.isAuthenticated,
+    shouldRedirectToPayment: !auth.loading && auth.isAuthenticated && !auth.hasPaid,
+    shouldAccessApp: !auth.loading && auth.isAuthenticated && auth.hasPaid
+  };
+};
+
+// Protected Route wrapper component
+export const ProtectedRoute = ({ children }) => {
+  const { isReady, shouldRedirectToLogin, shouldRedirectToPayment, shouldAccessApp } = useAuthCheck();
+  
+  if (!isReady) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh'
+      }}>
+        <div className="loading-spinner"></div>
+      </div>
+    );
+  }
+  
+  if (shouldRedirectToLogin) {
+    // You can redirect to login page here
+    window.location.href = '/hype-mode';
+    return null;
+  }
+  
+  if (shouldRedirectToPayment) {
+    // You can redirect to payment page here
+    window.location.href = '/hype-mode';
+    return null;
+  }
+  
+  if (shouldAccessApp) {
+    return children;
+  }
+  
+  return null;
 };
 
 export default AuthContext;
