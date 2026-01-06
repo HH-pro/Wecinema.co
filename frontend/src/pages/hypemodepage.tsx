@@ -359,7 +359,6 @@ const HypeModeProfile = () => {
             clearInterval(timer);
 
             navigate('/');
-            window.location.reload();
 
             return 0;
           }
