@@ -1183,7 +1183,7 @@ const Popup: React.FC<IPopupProps> = React.memo(
 							className="relative z-50 w-[90%] max-w-md bg-gradient-to-b from-white to-yellow-50 border-2 border-yellow-300 backdrop-blur-xl rounded-2xl shadow-2xl p-8"
 						>
 							{/* Decorative header */}
-							<div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-400" />
+							<div className="absolute top-50 left-0 right-0 h-2 bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-400" />
 							
 							<div className="flex justify-between items-center mb-8">
 								<div className="flex items-center gap-3">
