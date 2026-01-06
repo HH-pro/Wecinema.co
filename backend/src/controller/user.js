@@ -1110,51 +1110,56 @@ router.get('/payment-status/:userId', async (req, res) => {
   }
 });
 
-// Save transaction
+
 router.post('/save-transaction', async (req, res) => {
-  const { userId, username, email, orderId, payerId, amount, currency, subscriptionType } = req.body;
-
-  try {
-    const newTransaction = new Transaction({
-      userId,
-      username,
-      email,
-      orderId,
-      payerId,
-      amount,
-      currency
-    });
-
-    await newTransaction.save();
-
-    const user = await User.findOne({ _id: userId });
+	const { userId, username, email, orderId, payerId, amount, currency,subscriptionType } = req.body;
+  
+	try {
+	  const newTransaction = new Transaction({
+		userId,
+		username,
+		email,
+		orderId,
+		payerId,
+		amount,
+		currency
+	  });
+  
+	  await newTransaction.save();
+	// Find user and log before updating
+	const user = await User.findOne({ _id: userId });
 
     if (!user) {
       return res.status(404).send({ message: 'User not found' });
     }
 
+    // Log user data before attempting update
+    console.log('Before update:', user);
+
+    // Now attempt the update with findOneAndUpdate
     const updatedUser = await User.findOneAndUpdate(
       { _id: userId }, 
       {
         $set: {
           hasPaid: true,
-          lastPayment: new Date(),
-          subscriptionType: subscriptionType
+          lastPayment: new Date() ,
+		  subscriptionType: subscriptionType // Ensure the current date is used here
+
         }
       },
-      { new: true }
+      { new: true }  // Ensure that the updated document is returned
     );
 
-    res.status(201).send({ 
-      message: 'Transaction saved and user payment status updated successfully!',
-      user: updatedUser
-    });
-  } catch (error) {
-    console.error('Error saving transaction:', error);
-    res.status(500).send({ message: 'Failed to save transaction and update user payment status.' });
-  }
-});
-
+    // Log the updated user document
+    console.log('Updated user:', updatedUser);
+  
+	  res.status(201).send({ message: 'Transaction saved and user payment status updated successfully!' });
+	} catch (error) {
+	  console.error('Error saving transaction:', error);
+	  res.status(500).send({ message: 'Failed to save transaction and update user payment status.' });
+	}
+  });
+  
 // Get all transactions (admin)
 router.get("/transactions", authenticateMiddleware, isAdmin, async (req, res) => {
   try {
