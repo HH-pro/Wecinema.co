@@ -12,6 +12,9 @@ import avatar from '.././assets/public/avatar.jpg';
 import '../App.css';
 import { FaEllipsisV } from "react-icons/fa";
 
+import { API_BASE_URL } from "../api";
+
+
 const token = localStorage.getItem("token") || null;
 
 const GenrePage: React.FC = () => {
@@ -41,8 +44,9 @@ const GenrePage: React.FC = () => {
             setChangingMode(true);
             const token = localStorage.getItem("token");
             
+            // ✅ Use API_BASE_URL here
             const response = await axios.put(
-                `https://wecinema-co.onrender.com/user/change-type/${userId}`,
+                `${API_BASE_URL}/user/change-type/${userId}`,
                 { userType },
                 {
                     headers: {
@@ -104,19 +108,19 @@ const GenrePage: React.FC = () => {
                 setIsCurrentUser(true);
             }
 
-            // Fetch payment status for profile user
+            // ✅ Use API_BASE_URL here for payment status
             try {
-                const paymentResponse = await axios.get(`https://wecinema.co/api/user/payment-status/${id}`);
+                const paymentResponse = await axios.get(`${API_BASE_URL}/user/payment-status/${id}`);
                 setUserHasPaid(paymentResponse.data.hasPaid);
             } catch (error) {
                 console.error("Error fetching payment status:", error);
                 setUserHasPaid(false);
             }
 
-            // Fetch payment status for current logged-in user
+            // ✅ Use API_BASE_URL here for current user payment status
             if (tokenData) {
                 try {
-                    const currentUserResponse = await axios.get(`https://wecinema.co/api/user/payment-status/${tokenData.userId}`);
+                    const currentUserResponse = await axios.get(`${API_BASE_URL}/user/payment-status/${tokenData.userId}`);
                     setCurrentUserHasPaid(currentUserResponse.data.hasPaid);
                 } catch (error) {
                     console.error("Error fetching current user payment status:", error);
@@ -183,7 +187,7 @@ const GenrePage: React.FC = () => {
                 setUser(prev => ({ ...prev, userType: newMode }));
                 localStorage.setItem('marketplaceMode', newMode);
                 
-              
+                toast.success(`✅ Switched to ${newMode} mode`);
             }
         } catch (error: any) {
             console.error("Error changing user type:", error);
@@ -260,7 +264,12 @@ const GenrePage: React.FC = () => {
         }
 
         try {
-            // Implement follow functionality here
+            // ✅ Use API_BASE_URL here for follow functionality
+            // Example:
+            // await axios.post(`${API_BASE_URL}/user/follow/${id}`, {}, {
+            //     headers: { Authorization: `Bearer ${token}` }
+            // });
+            
             toast.info("👥 Follow functionality coming soon!");
         } catch (error) {
             console.error("Error following user:", error);
@@ -556,7 +565,7 @@ const GenrePage: React.FC = () => {
 
     if (loading) {
         return (
-            <Layout expand={false} hasHeader={false}>
+            <Layout expand={false} hasHeader={true}>
                 <div className="mt-12 px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-center items-center min-h-[60vh]">
                         <div className="text-center">
@@ -571,7 +580,7 @@ const GenrePage: React.FC = () => {
     }
 
     return (
-        <Layout expand={false} hasHeader={false}>
+        <Layout expand={false} hasHeader={true}>
             <div className="mt-12 px-4 sm:px-6 lg:px-8">
                 {/* Header Section */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
