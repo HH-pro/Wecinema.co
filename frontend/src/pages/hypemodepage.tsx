@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from 'axios';
 import { Layout } from "../components";
 import { useNavigate } from 'react-router-dom';
@@ -7,17 +7,14 @@ import { googleProvider } from "../firebase/config";
 import { motion } from "framer-motion";
 import Confetti from "react-confetti";
 import styled from 'styled-components';
+import { decodeToken } from "../utilities/helperfFunction";
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import "../css/HypeModeProfile.css";
-import { API_BASE_URL } from "../api";
 
 // Import new components
 import PaymentComponent from "../../src/components/PaymentComponent/Payment";
 import SuccessPopup from "../../src/components/PaymentComponent/SuccessPopup";
-
-// Import AuthContext
-import { useAuthContext } from "../../src/context/AuthContext";
 
 // Loading Spinner Component
 const LoadingSpinner = styled.div`
@@ -61,52 +58,23 @@ const PopupContent = styled.div`
   background: white;
   padding: 30px;
   border-radius: 20px;
-  max-width: 500px;
+  max-width: 400px;
   width: 90%;
   text-align: center;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 `;
 
-const DebugInfo = styled.div`
-  margin-top: 20px;
-  padding: 10px;
-  background: #f8f9fa;
-  border-radius: 8px;
-  border-left: 4px solid #007bff;
-  text-align: left;
-  font-size: 12px;
-  max-height: 200px;
-  overflow-y: auto;
-  
-  pre {
-    margin: 0;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-  }
-`;
-
-// User interface
-interface User {
-  _id?: string;
-  id?: string;
-  username: string;
-  email: string;
-  userType: string;
-  hasPaid: boolean;
-  avatar?: string;
-}
-
 // Main HypeModeProfile Component
 const HypeModeProfile = () => {
   const navigate = useNavigate();
-  const auth = useAuthContext();
-  
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [popupMessage, setPopupMessage] = useState('');
   const [showPopup, setShowPopup] = useState(false);
   const [isSignup, setIsSignup] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
+  const [userId, setUserId] = useState('');
   const [showFireworks, setShowFireworks] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState<"user" | "studio" | null>(null);
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer");
@@ -114,30 +82,58 @@ const HypeModeProfile = () => {
   const [showPaymentComponent, setShowPaymentComponent] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [countdown, setCountdown] = useState(3);
-  const [debugInfo, setDebugInfo] = useState<string[]>([]);
+  const [authCheckComplete, setAuthCheckComplete] = useState(false);
+  
+  const redirectAttempted = useRef(false);
 
-  // Debug logging function
-  const addDebugLog = (message: string) => {
-    const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
-    setDebugInfo(prev => [...prev.slice(-10), `[${timestamp}] ${message}`]);
-    console.log(message);
-  };
-
-  // Check if user is already authenticated and paid
+  // Initial auth check
   useEffect(() => {
-    if (auth.isAuthenticated && auth.hasPaid && !auth.loading) {
-      addDebugLog('User already authenticated and paid, redirecting...');
-      setLoginSuccess(true);
-    } else if (auth.isAuthenticated && !auth.hasPaid && auth.userId && !auth.loading) {
-      addDebugLog('User authenticated but not paid, showing payment...');
-      setShowPaymentComponent(true);
-    }
-  }, [auth.isAuthenticated, auth.hasPaid, auth.userId, auth.loading]);
+    const checkInitialAuth = async () => {
+      if (redirectAttempted.current) return;
+      
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setAuthCheckComplete(true);
+        return;
+      }
+
+      try {
+        const tokenData = decodeToken(token);
+        const userId = tokenData?.userId || tokenData?.id;
+        
+        if (!userId) {
+          localStorage.removeItem("token");
+          setAuthCheckComplete(true);
+          return;
+        }
+
+        const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
+        const user = response.data;
+        
+        if (user.hasPaid) {
+          redirectAttempted.current = true;
+          navigate('/');
+          return;
+        } else {
+          setUserId(userId);
+          setIsLoggedIn(true);
+          setShowPaymentComponent(true);
+        }
+      } catch (error) {
+        console.error('Error checking initial auth:', error);
+        localStorage.removeItem("token");
+      } finally {
+        setAuthCheckComplete(true);
+      }
+    };
+
+    checkInitialAuth();
+  }, [navigate]);
 
   // Handle redirect after login success
   useEffect(() => {
     if (loginSuccess) {
-      addDebugLog('Login success, starting countdown...');
+      redirectAttempted.current = true;
       const timer = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
@@ -153,10 +149,29 @@ const HypeModeProfile = () => {
     }
   }, [loginSuccess, navigate]);
 
-  // Register user with backend
+  const checkPaymentStatus = async (userId: string) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
+      const user = response.data;
+      
+      if (user.hasPaid) {
+        setUserId(userId);
+        setIsLoggedIn(true);
+        setLoginSuccess(true);
+      } else {
+        setUserId(userId);
+        setIsLoggedIn(true);
+        setShowPaymentComponent(true);
+      }
+    } catch (error) {
+      console.error('Error checking payment status:', error);
+      setPopupMessage('Error checking payment status. Please try again.');
+      setShowPopup(true);
+    }
+  };
+
+  // Auth functions (same as before but cleaner)
   const registerUser = async (username: string, email: string, avatar: string, userType: string) => {
-    addDebugLog(`Attempting to register user: ${email} (${userType})`);
-    
     try {
       const res = await axios.post(`${API_BASE_URL}/user/signup`, {
         username,
@@ -166,212 +181,70 @@ const HypeModeProfile = () => {
         dob: "--------"
       });
 
-      addDebugLog(`Backend registration response received: ${res.status}`);
-      
       const token = res.data.token;
       const userId = res.data.id;
 
-      if (token && userId) {
-        addDebugLog(`Registration successful! Token: ${token.substring(0, 20)}..., UserID: ${userId}`);
-        
-        // Use AuthContext to login
-        const userData: User = {
-          id: userId,
-          username,
-          email,
-          userType,
-          hasPaid: res.data.hasPaid || false,
-          avatar
-        };
-        
-        auth.login(userData, token);
-        return { success: true, userId, hasPaid: res.data.hasPaid || false };
-      } else {
-        addDebugLog('Registration failed: No token or user ID in response');
-        return { success: false };
+      if (token) {
+        localStorage.setItem('token', token);
+        setIsLoggedIn(true);
+        setUserId(userId);
+        return { success: true, userId };
       }
     } catch (error: any) {
-      addDebugLog(`Registration error: ${error.message}`);
-      
       if (error.response?.data?.error === 'Email already exists.') {
         setPopupMessage('Email already exists. Please sign in.');
-      } else if (error.response?.status === 0) {
-        setPopupMessage('Cannot connect to server. Please check if backend is running.');
       } else {
-        setPopupMessage(`Registration failed: ${error.response?.data?.message || 'Please try again.'}`);
+        setPopupMessage('Registration failed. Please try again.');
       }
       setShowPopup(true);
       return { success: false };
     }
   };
 
-  // Login user with backend
-const loginUser = async (email: string) => {
-  addDebugLog(`Attempting to login user: ${email}`);
-  
-  try {
-    const res = await axios.post(`${API_BASE_URL}/user/signin`, { email });
-    
-    addDebugLog(`Backend login response received: ${res.status}`);
-    addDebugLog(`Response data: ${JSON.stringify(res.data)}`);
-    
-    const token = res.data.token;
-    const userId = res.data.id || res.data.userId || res.data._id;
-    const userData = res.data.user || res.data;
-
-    if (token && userId) {
-      addDebugLog(`Login successful! Token: ${token.substring(0, 20)}..., UserID: ${userId}`);
-      
-      // Check if we need to fetch user data separately
-      if (!userData || !userData.username) {
-        addDebugLog('Fetching user data separately...');
-        try {
-          const userResponse = await axios.get(`${API_BASE_URL}/user/${userId}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          
-          addDebugLog(`User data fetched: ${userResponse.data?.username || 'No username'}`);
-          
-          if (userResponse.data) {
-            auth.login(userResponse.data, token);
-            return { success: true, userId, hasPaid: userResponse.data.hasPaid || false };
-          }
-        } catch (fetchError: any) {
-          addDebugLog(`Error fetching user data: ${fetchError.message}`);
-        }
-      }
-      
-      // Use the data from initial response
-      const loginData = {
-        id: userId,
-        username: userData?.username || email.split('@')[0],
-        email: email,
-        userType: userData?.userType || 'buyer',
-        hasPaid: userData?.hasPaid || false,
-        avatar: userData?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(email.split('@')[0])}&background=random`
-      };
-      
-      auth.login(loginData, token);
-      return { success: true, userId, hasPaid: loginData.hasPaid };
-    } else {
-      addDebugLog(`Login failed - Response structure:`);
-      addDebugLog(`- Token exists: ${!!token}`);
-      addDebugLog(`- User ID exists: ${!!userId}`);
-      addDebugLog(`- Full response: ${JSON.stringify(res.data, null, 2)}`);
-      
-      // Try alternative response formats
-      if (res.data.data) {
-        addDebugLog('Checking nested data property...');
-        const nestedToken = res.data.data.token;
-        const nestedUserId = res.data.data.id || res.data.data.userId;
-        
-        if (nestedToken && nestedUserId) {
-          addDebugLog(`Found token and ID in nested data property`);
-          const loginData = {
-            id: nestedUserId,
-            username: res.data.data.username || email.split('@')[0],
-            email: email,
-            userType: res.data.data.userType || 'buyer',
-            hasPaid: res.data.data.hasPaid || false,
-            avatar: res.data.data.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(email.split('@')[0])}&background=random`
-          };
-          
-          auth.login(loginData, nestedToken);
-          return { success: true, userId: nestedUserId, hasPaid: loginData.hasPaid };
-        }
-      }
-      
-      return { success: false };
-    }
-    
-  } catch (error: any) {
-    addDebugLog(`Login error: ${error.message}`);
-    addDebugLog(`Error response: ${JSON.stringify(error.response?.data, null, 2)}`);
-    
-    if (error.response?.status === 0) {
-      setPopupMessage('Cannot connect to server. Please check if backend is running.');
-    } else if (error.response?.status === 404) {
-      setPopupMessage('User not found. Please sign up first.');
-    } else if (error.response?.data?.message) {
-      setPopupMessage(error.response.data.message);
-    } else {
-      setPopupMessage('Login failed. Please try again.');
-    }
-    setShowPopup(true);
-    return { success: false };
-  }
-};
-
-  // Check payment status
-  const checkPaymentStatus = async (userId: string) => {
-    addDebugLog(`Checking payment status for user: ${userId}`);
-    
+  const loginUser = async (email: string) => {
     try {
-      await auth.verifyTokenAndPayment();
-      
-      if (auth.hasPaid) {
-        addDebugLog('User has paid, showing success screen');
-        setLoginSuccess(true);
-      } else {
-        addDebugLog('User has not paid, showing payment component');
-        setShowPaymentComponent(true);
+      const res = await axios.post(`${API_BASE_URL}/user/signin`, { email });
+      const backendToken = res.data.token;
+      const userId = res.data.id;
+
+      if (backendToken) {
+        localStorage.setItem('token', backendToken);
+        setIsLoggedIn(true);
+        setUserId(userId);
+        return { success: true, userId };
       }
-    } catch (error) {
-      addDebugLog(`Error checking payment status: ${error}`);
-      setPopupMessage('Error checking payment status. Please try again.');
+    } catch (error: any) {
+      setPopupMessage(error.response?.data?.message || 'Login failed.');
       setShowPopup(true);
+      return { success: false };
     }
   };
 
   const onLoginSuccess = async (user: any, isEmailAuth: boolean = false) => {
-  addDebugLog(`Firebase authentication successful: ${user.email}`);
-  addDebugLog(`Firebase UID: ${user.uid}`);
-  addDebugLog(`Firebase Provider: ${user.providerId}`);
-  
-  try {
     const profile = user.providerData[0];
-    const email = profile?.email || user.email;
-    const username = profile?.displayName || email?.split('@')[0] || 'User';
-    const avatar = profile?.photoURL || user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`;
+    const email = profile.email;
+    const username = profile.displayName || email.split('@')[0];
+    const avatar = profile.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`;
 
-    addDebugLog(`Profile data - Email: ${email}, Username: ${username}`);
-
-    let result;
-    if (isSignup) {
-      addDebugLog('Processing signup...');
-      result = await registerUser(username, email, avatar, userType);
-    } else {
-      addDebugLog('Processing login...');
-      result = await loginUser(email);
-    }
-    
-    addDebugLog(`Backend result: ${JSON.stringify(result, null, 2)}`);
-    
-    if (result?.success && result.userId) {
-      addDebugLog('Authentication successful, checking payment status...');
-      // Check if user has paid
-      await checkPaymentStatus(result.userId);
-    } else {
-      addDebugLog('Backend authentication failed');
-      
-      // Show more detailed error
-      if (result?.error) {
-        setPopupMessage(result.error);
+    try {
+      let result;
+      if (isSignup) {
+        result = await registerUser(username, email, avatar, userType);
       } else {
-        setPopupMessage('Authentication failed. Please try again or contact support.');
+        result = await loginUser(email);
       }
+      
+      if (result.success && result.userId) {
+        await checkPaymentStatus(result.userId);
+      }
+    } catch (error) {
+      setPopupMessage('Authentication failed. Please try again.');
       setShowPopup(true);
+    } finally {
+      setIsLoading(false);
     }
-  } catch (error: any) {
-    addDebugLog(`Error in onLoginSuccess: ${error.message}`);
-    addDebugLog(`Error stack: ${error.stack}`);
-    setPopupMessage(`Authentication error: ${error.message || 'Please try again.'}`);
-    setShowPopup(true);
-  } finally {
-    setIsLoading(false);
-  }
-};
-  // Google Signin
+  };
+
   const handleGoogleLogin = async () => {
     if (!selectedSubscription) {
       setPopupMessage("Please select a subscription plan first.");
@@ -380,81 +253,14 @@ const loginUser = async (email: string) => {
     }
 
     setIsLoading(true);
-    addDebugLog('Starting Google login...');
-    
-    const firebaseAuth = getAuth();
+    const auth = getAuth();
     try {
-      const result = await signInWithPopup(firebaseAuth, googleProvider);
-      addDebugLog('Google login successful via Firebase');
+      const result = await signInWithPopup(auth, googleProvider);
       await onLoginSuccess(result.user);
     } catch (error: any) {
-      addDebugLog(`Google login error: ${error.code} - ${error.message}`);
       setIsLoading(false);
-      handleAuthError(error);
-    }
-  };
-
-  // Email Signup
-  const handleEmailSignup = async () => {
-    if (!selectedSubscription) {
-      setPopupMessage("Please select a subscription plan first.");
+      setPopupMessage('Google login failed. Please try again.');
       setShowPopup(true);
-      return;
-    }
-
-    if (!email || !password || !username) {
-      setPopupMessage("Please enter username, email and password.");
-      setShowPopup(true);
-      return;
-    }
-
-    if (password.length < 6) {
-      setPopupMessage("Password should be at least 6 characters long.");
-      setShowPopup(true);
-      return;
-    }
-
-    setIsLoading(true);
-    addDebugLog(`Starting email signup: ${email}`);
-    
-    const firebaseAuth = getAuth();
-    try {
-      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
-      addDebugLog('Firebase email signup successful');
-      await onLoginSuccess(userCredential.user, true);
-    } catch (error: any) {
-      addDebugLog(`Email signup error: ${error.code} - ${error.message}`);
-      setIsLoading(false);
-      handleAuthError(error);
-    }
-  };
-
-  // Email Login
-  const handleEmailLogin = async () => {
-    if (!selectedSubscription) {
-      setPopupMessage("Please select a subscription plan first.");
-      setShowPopup(true);
-      return;
-    }
-
-    if (!email || !password) {
-      setPopupMessage("Please enter both email and password.");
-      setShowPopup(true);
-      return;
-    }
-
-    setIsLoading(true);
-    addDebugLog(`Starting email login: ${email}`);
-    
-    const firebaseAuth = getAuth();
-    try {
-      const userCredential = await signInWithEmailAndPassword(firebaseAuth, email, password);
-      addDebugLog('Firebase email login successful');
-      await onLoginSuccess(userCredential.user, true);
-    } catch (error: any) {
-      addDebugLog(`Email login error: ${error.code} - ${error.message}`);
-      setIsLoading(false);
-      handleAuthError(error);
     }
   };
 
@@ -472,12 +278,49 @@ const loginUser = async (email: string) => {
     }
   };
 
+  const handleEmailSignup = async () => {
+    if (!email || !password || !username) {
+      setPopupMessage("Please enter username, email and password.");
+      setShowPopup(true);
+      return;
+    }
+
+    if (password.length < 6) {
+      setPopupMessage("Password should be at least 6 characters long.");
+      setShowPopup(true);
+      return;
+    }
+
+    setIsLoading(true);
+    const auth = getAuth();
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      await onLoginSuccess(userCredential.user, true);
+    } catch (error: any) {
+      setIsLoading(false);
+      handleAuthError(error);
+    }
+  };
+
+  const handleEmailLogin = async () => {
+    if (!email || !password) {
+      setPopupMessage("Please enter both email and password.");
+      setShowPopup(true);
+      return;
+    }
+
+    setIsLoading(true);
+    const auth = getAuth();
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      await onLoginSuccess(userCredential.user, true);
+    } catch (error: any) {
+      setIsLoading(false);
+      handleAuthError(error);
+    }
+  };
+
   const handleAuthError = (error: any) => {
-    addDebugLog(`Authentication Error Details:`);
-    addDebugLog(`- Code: ${error.code}`);
-    addDebugLog(`- Message: ${error.message}`);
-    addDebugLog(`- Full Error: ${JSON.stringify(error)}`);
-    
     switch (error.code) {
       case 'auth/email-already-in-use':
         setPopupMessage('Email already in use. Please try logging in.');
@@ -494,20 +337,8 @@ const loginUser = async (email: string) => {
       case 'auth/wrong-password':
         setPopupMessage('Incorrect password. Please try again.');
         break;
-      case 'auth/network-request-failed':
-        setPopupMessage('Network error. Please check your internet connection.');
-        break;
-      case 'auth/too-many-requests':
-        setPopupMessage('Too many attempts. Please try again later.');
-        break;
-      case 'auth/user-disabled':
-        setPopupMessage('This account has been disabled.');
-        break;
-      case 'auth/operation-not-allowed':
-        setPopupMessage('Email/password accounts are not enabled. Please contact support.');
-        break;
       default:
-        setPopupMessage(`Authentication failed: ${error.message || 'Please try again.'}`);
+        setPopupMessage('Authentication failed. Please try again.');
     }
     setShowPopup(true);
   };
@@ -519,7 +350,6 @@ const loginUser = async (email: string) => {
 
   const handleSubscriptionClick = (subscriptionType: "user" | "studio") => {
     setSelectedSubscription(subscriptionType);
-    addDebugLog(`Selected subscription: ${subscriptionType}`);
   };
 
   const toggleSignupSignin = () => {
@@ -528,20 +358,6 @@ const loginUser = async (email: string) => {
     setPassword('');
     setUsername('');
     setSelectedSubscription(null);
-    addDebugLog(`Toggled to ${!isSignup ? 'Sign Up' : 'Sign In'} mode`);
-  };
-
-  // Test backend connection
-  const testBackendConnection = async () => {
-    addDebugLog('Testing backend connection...');
-    try {
-      const response = await axios.get(`${API_BASE_URL}/health`);
-      addDebugLog(`Backend health check: ${response.status} - ${response.data?.message || 'OK'}`);
-      toast.success('Backend is connected!');
-    } catch (error) {
-      addDebugLog(`Backend connection failed: ${error}`);
-      toast.error('Cannot connect to backend server');
-    }
   };
 
   // Fireworks effect
@@ -551,26 +367,21 @@ const loginUser = async (email: string) => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Test backend on component mount
-  useEffect(() => {
-    testBackendConnection();
-  }, []);
-
-  // If auth is still loading
-  if (auth.loading) {
+  // Show loading while checking auth
+  if (!authCheckComplete) {
     return (
       <Layout expand={false} hasHeader={true}>
         <LoadingSpinner>
           <div>
             <div className="spinner"></div>
-            <p style={{ color: '#4b5563', fontSize: '16px' }}>Loading authentication...</p>
+            <p style={{ color: '#4b5563', fontSize: '16px' }}>Checking authentication status...</p>
           </div>
         </LoadingSpinner>
       </Layout>
     );
   }
 
-  // If user is already logged in and paid, show success
+  // Show success popup
   if (loginSuccess) {
     return <SuccessPopup 
       countdown={countdown} 
@@ -578,16 +389,15 @@ const loginUser = async (email: string) => {
     />;
   }
 
-  // If user needs to pay
-  if (showPaymentComponent && selectedSubscription && auth.userId) {
+  // Show payment component
+  if (showPaymentComponent && selectedSubscription && userId) {
     return (
       <Layout expand={false} hasHeader={true}>
         <PaymentComponent
           selectedSubscription={selectedSubscription}
           userType={userType}
-          userId={auth.userId}
+          userId={userId}
           onPaymentSuccess={() => {
-            auth.setPaymentStatus(true);
             setLoginSuccess(true);
           }}
           onPaymentError={(msg) => {
@@ -602,21 +412,7 @@ const loginUser = async (email: string) => {
     );
   }
 
-  // If user is already authenticated and paid but still on this page
-  if (auth.isAuthenticated && auth.hasPaid) {
-    return (
-      <Layout expand={false} hasHeader={true}>
-        <LoadingSpinner>
-          <div>
-            <div className="spinner"></div>
-            <p style={{ color: '#4b5563', fontSize: '16px' }}>Redirecting to home...</p>
-          </div>
-        </LoadingSpinner>
-      </Layout>
-    );
-  }
-
-  // Main render - show login/signup
+  // Main render
   return (
     <Layout expand={false} hasHeader={true}>
       <div className="banner-small">
@@ -638,25 +434,6 @@ const loginUser = async (email: string) => {
       )}
 
       <div className="main-container-small">
-        {/* Debug Info Button */}
-        <button 
-          onClick={testBackendConnection}
-          style={{
-            position: 'absolute',
-            top: '10px',
-            right: '10px',
-            background: '#6b7280',
-            color: 'white',
-            border: 'none',
-            padding: '8px 12px',
-            borderRadius: '5px',
-            fontSize: '12px',
-            cursor: 'pointer'
-          }}
-        >
-          Test Backend
-        </button>
-
         {/* Toggle Button */}
         <button 
           className="toggle-button-small"
@@ -678,7 +455,7 @@ const loginUser = async (email: string) => {
           {isLoading ? "Processing..." : (isSignup ? "Already have an account? Sign in" : "Don't have an account? Sign up")}
         </button>
 
-        {!auth.isAuthenticated && (
+        {!isLoggedIn && (
           <>
             {isSignup && (
               <div className="user-type-selector-small">
@@ -700,6 +477,7 @@ const loginUser = async (email: string) => {
             )}
 
             <div className="cards-container-small">
+              {/* Subscription cards - simplified version */}
               {/* Basic Plan Card */}
               <div
                 className={`subscription-box-small ${selectedSubscription === "user" ? "selected-small" : ""}`}
@@ -718,6 +496,7 @@ const loginUser = async (email: string) => {
                   <li>5GB Storage</li>
                 </ul>
 
+                {/* Auth section for Basic Plan */}
                 {selectedSubscription === "user" && (
                   <AuthSection
                     isLoading={isLoading}
@@ -751,6 +530,7 @@ const loginUser = async (email: string) => {
                   <li>Team Collaboration</li>
                 </ul>
 
+                {/* Auth section for Pro Plan */}
                 {selectedSubscription === "studio" && (
                   <AuthSection
                     isLoading={isLoading}
@@ -771,58 +551,29 @@ const loginUser = async (email: string) => {
         )}
       </div>
 
-      {/* Popup with Debug Info */}
+      {/* Popup */}
       {showPopup && (
         <PopupOverlay onClick={closePopup}>
           <PopupContent onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ color: '#b45309', marginBottom: '15px' }}>Authentication Error</h3>
             <p style={{ marginBottom: '20px', fontSize: '16px', color: '#4b5563' }}>
               {popupMessage}
             </p>
-            
-            {/* Debug Info */}
-            {debugInfo.length > 0 && (
-              <DebugInfo>
-                <strong>Debug Info:</strong>
-                <pre>{debugInfo.join('\n')}</pre>
-              </DebugInfo>
-            )}
-            
-            <div style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
-              <button 
-                onClick={closePopup}
-                style={{
-                  background: 'linear-gradient(135deg, #fbbf24, #b45309)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '10px 20px',
-                  borderRadius: '25px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  boxShadow: '0 4px 15px rgba(251, 191, 36, 0.3)'
-                }}
-              >
-                Close
-              </button>
-              <button 
-                onClick={() => {
-                  addDebugLog('User requested retry...');
-                  closePopup();
-                }}
-                style={{
-                  background: '#4b5563',
-                  color: 'white',
-                  border: 'none',
-                  padding: '10px 20px',
-                  borderRadius: '25px',
-                  fontWeight: '600',
-                  cursor: 'pointer'
-                }}
-              >
-                Retry
-              </button>
-            </div>
+            <button 
+              onClick={closePopup}
+              style={{
+                background: 'linear-gradient(135deg, #fbbf24, #b45309)',
+                color: 'white',
+                border: 'none',
+                padding: '12px 30px',
+                borderRadius: '25px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 4px 15px rgba(251, 191, 36, 0.3)'
+              }}
+            >
+              Close
+            </button>
           </PopupContent>
         </PopupOverlay>
       )}
@@ -830,7 +581,7 @@ const loginUser = async (email: string) => {
   );
 };
 
-// Auth Section Component
+// Auth Section Component (optional - for more modularity)
 interface AuthSectionProps {
   isLoading: boolean;
   isSignup: boolean;
