@@ -8,16 +8,22 @@ const TouchCursor = () => {
   const raf = useRef<number>();
 
   useEffect(() => {
-    const speed = 0.30; // lower = more smooth
+    const speed = 0.2;
 
     const move = (e: MouseEvent) => {
       mouse.current.x = e.clientX;
       mouse.current.y = e.clientY;
-      if (circle.current) circle.current.style.opacity = "1";
+
+      if (circle.current) {
+        circle.current.style.opacity = "1";
+      }
     };
 
-    const hide = () => {
-      if (circle.current) circle.current.style.opacity = "0";
+    const hideIfOutside = (e: MouseEvent) => {
+      // Only hide if actually leaving viewport
+      if (!e.relatedTarget && circle.current) {
+        circle.current.style.opacity = "0";
+      }
     };
 
     const animate = () => {
@@ -34,13 +40,11 @@ const TouchCursor = () => {
     raf.current = requestAnimationFrame(animate);
 
     window.addEventListener("mousemove", move);
-    window.addEventListener("mouseleave", hide);
-    document.addEventListener("mouseleave", hide);
+    document.addEventListener("mouseout", hideIfOutside);
 
     return () => {
       window.removeEventListener("mousemove", move);
-      window.removeEventListener("mouseleave", hide);
-      document.removeEventListener("mouseleave", hide);
+      document.removeEventListener("mouseout", hideIfOutside);
       cancelAnimationFrame(raf.current!);
     };
   }, []);
