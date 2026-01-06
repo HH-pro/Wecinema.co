@@ -289,38 +289,67 @@ const HypeModeProfile = () => {
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [countdown, setCountdown] = useState(3);
   const [hasCheckedInitialAuth, setHasCheckedInitialAuth] = useState(false);
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+
+  // Force redirect when shouldRedirect is true
+  useEffect(() => {
+    if (shouldRedirect) {
+      console.log("Force redirect to home triggered");
+      navigate('/');
+    }
+  }, [shouldRedirect, navigate]);
 
   // Check payment status on component mount
   useEffect(() => {
     const checkInitialAuth = async () => {
+      console.log("🔍 Checking initial authentication...");
       const token = localStorage.getItem("token");
+      
       if (token) {
         try {
+          console.log("✅ Token found in localStorage");
           const tokenData = decodeToken(token);
           const userId = tokenData?.userId || tokenData?.id;
           
           if (userId) {
-            const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
-            const user = response.data;
-            
-            if (user.hasPaid) {
-              // User has paid and is logged in, redirect to home immediately
-              navigate('/');
-              return;
-            } else {
-              // User hasn't paid, set states for payment flow
-              setUserId(userId);
-              setIsLoggedIn(true);
-              setShowPaymentComponent(true);
+            console.log("👤 User ID found:", userId);
+            try {
+              const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
+              const user = response.data;
+              
+              if (user.hasPaid) {
+                console.log("💰 User has paid, setting redirect flag");
+                // User has paid and is logged in, redirect to home
+                setShouldRedirect(true);
+                return;
+              } else {
+                console.log("❌ User hasn't paid, showing payment flow");
+                // User hasn't paid, set states for payment flow
+                setUserId(userId);
+                setIsLoggedIn(true);
+                setShowPaymentComponent(true);
+                setHasCheckedInitialAuth(true);
+              }
+            } catch (apiError) {
+              console.error("API Error:", apiError);
+              setIsLoggedIn(false);
+              setHasCheckedInitialAuth(true);
             }
+          } else {
+            console.log("❌ No user ID in token");
+            setIsLoggedIn(false);
+            setHasCheckedInitialAuth(true);
           }
-        } catch (error) {
-          console.error('Error checking initial auth:', error);
-          // On error, show login screen
+        } catch (tokenError) {
+          console.error("Token decode error:", tokenError);
           setIsLoggedIn(false);
+          setHasCheckedInitialAuth(true);
         }
+      } else {
+        console.log("❌ No token found");
+        setIsLoggedIn(false);
+        setHasCheckedInitialAuth(true);
       }
-      setHasCheckedInitialAuth(true);
     };
 
     checkInitialAuth();
@@ -329,10 +358,12 @@ const HypeModeProfile = () => {
   // Handle redirect after login success
   useEffect(() => {
     if (loginSuccess) {
+      console.log("🎉 Login success detected, starting redirect countdown");
       const timer = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(timer);
+            console.log("🚀 Redirecting to home from login success");
             navigate('/');
             return 0;
           }
@@ -345,18 +376,19 @@ const HypeModeProfile = () => {
   }, [loginSuccess, navigate]);
 
   const checkPaymentStatus = async (userId: string) => {
+    console.log("🔍 Checking payment status for user:", userId);
     try {
       const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
       const user = response.data;
       
       if (user.hasPaid) {
+        console.log("✅ Payment found, user has paid");
         // User has paid, set login success and redirect
         setUserId(userId);
         setIsLoggedIn(true);
         setLoginSuccess(true);
-        // Set immediate redirect flag
-        localStorage.setItem("shouldRedirect", "true");
       } else {
+        console.log("❌ No payment found, showing payment component");
         // User hasn't paid, show payment component
         setUserId(userId);
         setIsLoggedIn(true);
@@ -369,19 +401,9 @@ const HypeModeProfile = () => {
     }
   };
 
-  // Additional check for immediate redirect
-  useEffect(() => {
-    if (hasCheckedInitialAuth) {
-      const shouldRedirect = localStorage.getItem("shouldRedirect");
-      if (shouldRedirect === "true") {
-        navigate('/');
-        localStorage.removeItem("shouldRedirect");
-      }
-    }
-  }, [hasCheckedInitialAuth, navigate]);
-
   // Register user with backend
   const registerUser = async (username: string, email: string, avatar: string, userType: string) => {
+    console.log("📝 Registering user:", { username, email, userType });
     try {
       const res = await axios.post(`${API_BASE_URL}/user/signup`, {
         username,
@@ -395,12 +417,14 @@ const HypeModeProfile = () => {
       const userId = res.data.id;
 
       if (token) {
+        console.log("✅ Registration successful, token received");
         localStorage.setItem('token', token);
         setIsLoggedIn(true);
         setUserId(userId);
         return { success: true, userId };
       }
     } catch (error: any) {
+      console.error("Registration error:", error);
       if (error.response && error.response.data && error.response.data.error === 'Email already exists.') {
         setPopupMessage('Email already exists. Please sign in.');
       } else {
@@ -413,18 +437,21 @@ const HypeModeProfile = () => {
 
   // Login user with backend
   const loginUser = async (email: string) => {
+    console.log("🔐 Logging in user with email:", email);
     try {
       const res = await axios.post(`${API_BASE_URL}/user/signin`, { email });
       const backendToken = res.data.token;
       const userId = res.data.id;
 
       if (backendToken) {
+        console.log("✅ Login successful, token received");
         localStorage.setItem('token', backendToken);
         setIsLoggedIn(true);
         setUserId(userId);
         return { success: true, userId };
       }
     } catch (error: any) {
+      console.error("Login error:", error);
       if (error.response) {
         setPopupMessage(error.response.data.message || 'Login failed.');
       } else {
@@ -437,6 +464,7 @@ const HypeModeProfile = () => {
 
   // Handle successful authentication
   const onLoginSuccess = async (user: any, isEmailAuth: boolean = false) => {
+    console.log("👤 Authentication successful");
     const profile = user.providerData[0];
     const email = profile.email;
     const username = profile.displayName || email.split('@')[0];
@@ -451,10 +479,14 @@ const HypeModeProfile = () => {
       }
       
       if (result.success && result.userId) {
+        console.log("✅ Auth backend call successful, checking payment status");
         // Check payment status after successful registration/login
         await checkPaymentStatus(result.userId);
+      } else {
+        console.log("❌ Auth backend call failed");
       }
     } catch (error) {
+      console.error("Auth process error:", error);
       setPopupMessage('Authentication failed. Please try again.');
       setShowPopup(true);
     } finally {
@@ -471,12 +503,15 @@ const HypeModeProfile = () => {
     }
 
     setIsLoading(true);
+    console.log("🔐 Starting Google login...");
     const auth = getAuth();
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
+      console.log("✅ Google login successful");
       await onLoginSuccess(user);
     } catch (error: any) {
+      console.error("Google login error:", error);
       setIsLoading(false);
       setPopupMessage('Google login failed. Please try again.');
       setShowPopup(true);
@@ -504,12 +539,15 @@ const HypeModeProfile = () => {
     }
 
     setIsLoading(true);
+    console.log("📝 Starting email signup...");
     const auth = getAuth();
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+      console.log("✅ Email signup successful");
       await onLoginSuccess(user, true);
     } catch (error: any) {
+      console.error("Email signup error:", error);
       setIsLoading(false);
       if (error.code === 'auth/email-already-in-use') {
         setPopupMessage('Email already in use. Please try logging in.');
@@ -539,12 +577,15 @@ const HypeModeProfile = () => {
     }
 
     setIsLoading(true);
+    console.log("🔐 Starting email login...");
     const auth = getAuth();
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+      console.log("✅ Email login successful");
       await onLoginSuccess(user, true);
     } catch (error: any) {
+      console.error("Email login error:", error);
       setIsLoading(false);
       if (error.code === 'auth/user-not-found') {
         setPopupMessage('No user found with this email. Please sign up.');
@@ -584,28 +625,7 @@ const HypeModeProfile = () => {
     setSelectedSubscription(null);
   };
 
-  // Redirect to home if already logged in and paid
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token && hasCheckedInitialAuth) {
-      const tokenData = decodeToken(token);
-      if (tokenData?.userId || tokenData?.id) {
-        const checkAndRedirect = async () => {
-          try {
-            const userId = tokenData?.userId || tokenData?.id;
-            const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
-            if (response.data.hasPaid && !showPaymentComponent && !loginSuccess) {
-              navigate('/');
-            }
-          } catch (error) {
-            console.error('Error checking user status:', error);
-          }
-        };
-        checkAndRedirect();
-      }
-    }
-  }, [navigate, hasCheckedInitialAuth, showPaymentComponent, loginSuccess]);
-
+  // Show fireworks animation
   useEffect(() => {
     setShowFireworks(true);
     setTimeout(() => setShowFireworks(false), 1000);
@@ -656,7 +676,10 @@ const HypeModeProfile = () => {
                 <CountdownText>
                   Redirecting in {countdown} second{countdown !== 1 ? 's' : ''}...
                 </CountdownText>
-                <CloseButton onClick={() => navigate('/')}>
+                <CloseButton onClick={() => {
+                  console.log("🏠 Manual redirect to home clicked");
+                  navigate('/');
+                }}>
                   Go Now
                 </CloseButton>
               </ProfessionalSuccessPopup>
@@ -685,17 +708,22 @@ const HypeModeProfile = () => {
                 amount={selectedSubscription === 'user' ? 5 : 10} 
                 userId={userId} 
                 onSuccess={() => {
-                  toast.success('Payment successful! Redirecting to home...');
+                  console.log("💳 Payment successful, redirecting...");
+                  toast.success('Payment successful!');
+                  // Force redirect on payment success
                   setTimeout(() => navigate('/'), 1500);
                 }}
                 onError={(msg) => {
+                  console.error("Payment error:", msg);
                   setPopupMessage(msg);
                   setShowPopup(true);
                 }}
               />
               <PaymentButton 
                 onClick={() => {
+                  console.log("⏭️ Skip payment clicked");
                   toast.info('You can complete payment later');
+                  // Force redirect when skipping payment
                   setTimeout(() => navigate('/'), 1000);
                 }}
                 style={{ marginTop: '15px', background: 'linear-gradient(135deg, #6b7280, #4b5563)' }}
@@ -709,27 +737,18 @@ const HypeModeProfile = () => {
     );
   }
 
-  // If user is already logged in and has paid, redirect immediately
-  if (isLoggedIn && !showPaymentComponent && !loginSuccess) {
-    return (
-      <Layout expand={false} hasHeader={true}>
-        <div className="main-container-small" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div className="loading-spinner" style={{
-              border: '4px solid #f3f3f3',
-              borderTop: '4px solid #fbbf24',
-              borderRadius: '50%',
-              width: '50px',
-              height: '50px',
-              animation: 'spin 1s linear infinite',
-              margin: '0 auto 20px'
-            }}></div>
-            <p style={{ color: '#4b5563', fontSize: '16px' }}>Redirecting to home...</p>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
+  // If user is already logged in and has paid, show redirect immediately
+  useEffect(() => {
+    if (isLoggedIn && !showPaymentComponent && !loginSuccess && hasCheckedInitialAuth) {
+      console.log("✅ User is logged in and paid, forcing redirect...");
+      // Force redirect after a short delay
+      const timer = setTimeout(() => {
+        navigate('/');
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isLoggedIn, showPaymentComponent, loginSuccess, hasCheckedInitialAuth, navigate]);
 
   // Render the main component
   return (
