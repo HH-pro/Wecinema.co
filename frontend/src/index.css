@@ -32,15 +32,17 @@ body {
 
 /* =========================
    SINGLE TOUCH CIRCLE
-   ========================= */
+/* Single touch circle – smooth & professional */
 .touch-circle {
-  width: 15px;
-  height: 15px;
-  background: #6b7280; /* soft grey */
+  width: 8px;
+  height: 8px;
+  background: #6b7280;
   border-radius: 50%;
   position: fixed;
   pointer-events: none;
   z-index: 10000;
   transform: translate(-50%, -50%);
-  transition: transform 0.12s ease-out;
+  will-change: transform, opacity;
+  transition: opacity 0.2s ease;
+  opacity: 0;
 }
