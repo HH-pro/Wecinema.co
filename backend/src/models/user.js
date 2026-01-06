@@ -99,4 +99,4 @@ userSchema.methods.calculateAge = function () {
 };
 
 const userModel = mongoose.model("User", userSchema);
-module.exports = userModel;
+module.exports = userModel; 
