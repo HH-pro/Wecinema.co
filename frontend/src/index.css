@@ -13,3 +13,13 @@
 
   font-family: 'Poppins', sans-serif !important;
 }
+html,
+body {
+  height: 100%;
+}
+
+body {
+  overflow-y: auto;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
