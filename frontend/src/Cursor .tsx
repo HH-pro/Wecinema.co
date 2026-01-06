@@ -1,35 +1,36 @@
 import { useEffect, useRef } from "react";
 
 const TouchCursor = () => {
-  const dot = useRef<HTMLDivElement>(null);
-  const ring = useRef<HTMLDivElement>(null);
+  const circle = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const move = (e: MouseEvent) => {
-      if (!dot.current || !ring.current) return;
+      if (!circle.current) return;
 
-      dot.current.style.left = `${e.clientX}px`;
-      dot.current.style.top = `${e.clientY}px`;
+      circle.current.style.left = `${e.clientX}px`;
+      circle.current.style.top = `${e.clientY}px`;
+    };
 
-      ring.current.animate(
-        {
-          left: `${e.clientX}px`,
-          top: `${e.clientY}px`,
-        },
-        { duration: 120, fill: "forwards" }
-      );
+    const down = () => {
+      circle.current?.classList.add("active");
+    };
+
+    const up = () => {
+      circle.current?.classList.remove("active");
     };
 
     window.addEventListener("mousemove", move);
-    return () => window.removeEventListener("mousemove", move);
+    window.addEventListener("mousedown", down);
+    window.addEventListener("mouseup", up);
+
+    return () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mousedown", down);
+      window.removeEventListener("mouseup", up);
+    };
   }, []);
 
-  return (
-    <>
-      <div ref={dot} className="touch-dot" />
-      <div ref={ring} className="touch-ring" />
-    </>
-  );
+  return <div ref={circle} className="touch-circle" />;
 };
 
 export default TouchCursor;
