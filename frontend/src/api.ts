@@ -484,13 +484,12 @@ export const clearAuthAndRedirect = (redirectTo: string = "/login") => {
     window.location.href = redirectTo;
   }
 };
-
 export const getCurrentUserFromToken = (): any | null => {
   const token = localStorage.getItem("token");
   if (!token) return null;
   
   try {
-    // Decode JWT token (assuming it's a standard JWT)
+    // Decode JWT token
     const base64Url = token.split('.')[1];
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
     const jsonPayload = decodeURIComponent(
@@ -500,7 +499,10 @@ export const getCurrentUserFromToken = (): any | null => {
         .join('')
     );
     
-    return JSON.parse(jsonPayload);
+    const decoded = JSON.parse(jsonPayload);
+    console.log("getCurrentUserFromToken decoded:", decoded);
+    
+    return decoded;
   } catch (error) {
     console.error('Error decoding token:', error);
     return null;
@@ -849,48 +851,74 @@ export const checkAuthAndRedirect = async (): Promise<boolean> => {
   try {
     const token = localStorage.getItem("token");
     if (!token) {
+      console.log("No token found, staying on page");
       return false; // No token, stay on page
     }
 
     // Decode token to get userId
-    const decoded = getCurrentUserFromToken();
-    if (!decoded || (!decoded.userId && !decoded.id)) {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      
+      const decodedToken = JSON.parse(jsonPayload);
+      console.log("Decoded token in checkAuthAndRedirect:", decodedToken);
+      
+      const userId = decodedToken.userId || decodedToken.id || decodedToken.userID;
+      
+      if (!userId) {
+        console.log("No userId in token, clearing token");
+        localStorage.removeItem("token");
+        return false;
+      }
+      
+      // Get user data to check payment status
+      const user = await getUser(userId);
+      console.log("User data in checkAuthAndRedirect:", user);
+      
+      // Check if user has paid
+      const hasPaid = user?.hasPaid || user?.data?.hasPaid || user?.payment?.hasPaid;
+      
+      console.log("hasPaid in checkAuthAndRedirect:", hasPaid);
+      
+      if (hasPaid) {
+        // User has paid, redirect to home immediately
+        console.log('User has paid, redirecting to home...');
+        
+        // Use both methods to ensure redirect
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 100);
+        
+        // Also use navigate if available
+        if (typeof window !== 'undefined') {
+          window.location.href = '/';
+        }
+        
+        return true;
+      }
+      
+      // User hasn't paid, stay on HypeMode page
+      console.log("User hasn't paid, staying on page");
+      return false;
+    } catch (decodeError) {
+      console.error("Error decoding token:", decodeError);
       localStorage.removeItem("token");
       return false;
     }
-
-    const userId = decoded.userId || decoded.id;
-    
-    // Get user data to check payment status
-    const user = await getUser(userId);
-    
-    // Check if user has paid (check multiple possible locations)
-    const hasPaid = user?.hasPaid || user?.data?.hasPaid || user?.payment?.hasPaid;
-    
-    if (hasPaid) {
-      // User has paid, redirect to home immediately
-      console.log('User has paid, redirecting to home...');
-      
-      // Use both methods to ensure redirect
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 100);
-      
-      // Also use navigate if available
-      if (typeof window !== 'undefined') {
-        window.location.href = '/';
-      }
-      
-      return true;
-    }
-    
-    // User hasn't paid, stay on HypeMode page
-    return false;
   } catch (error) {
     console.error('Error in checkAuthAndRedirect:', error);
     return false;
   }
 };
+/**
+ * Complete login flow - for use in HypeModeProfile
+ * Handles both signin and signup with automatic redirect
 
 /**
  * Complete login flow - for use in HypeModeProfile
@@ -903,9 +931,11 @@ export const completeLoginFlow = async (
   avatar?: string,
   userType: string = 'buyer',
   setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-): Promise<{success: boolean; userId?: string; shouldRedirect?: boolean}> => {
+): Promise<{success: boolean; userId?: string; shouldRedirect?: boolean; error?: string}> => {
   try {
     setLoading?.(true);
+    
+    console.log(`Starting ${isSignup ? 'signup' : 'signin'} flow for:`, email);
     
     let response;
     if (isSignup) {
@@ -914,56 +944,117 @@ export const completeLoginFlow = async (
         throw new Error('Username and avatar are required for signup');
       }
       response = await signup(username, email, avatar, userType, setLoading);
+      console.log("Signup API response:", response);
     } else {
       // Signin flow
       response = await signin(email, setLoading);
+      console.log("Signin API response:", response);
     }
     
-    // Extract token and userId from response
-    const token = response?.token || response?.data?.token;
-    const userId = response?.id || response?.data?.id || response?.user?.id;
+    // DEBUG: Log full response structure
+    console.log("Full response structure:", JSON.stringify(response, null, 2));
     
-    if (token && userId) {
+    // Extract token from response
+    const token = response?.token || response?.data?.token || response?.accessToken;
+    
+    console.log("Extracted token:", token ? "Yes" : "No");
+    
+    if (token) {
       // Save token
       localStorage.setItem('token', token);
+      console.log("Token saved to localStorage");
       
-      // Immediately check payment status and redirect if paid
-      const userData = await getUser(userId);
-      const hasPaid = userData?.hasPaid || userData?.data?.hasPaid || userData?.payment?.hasPaid;
-      
-      if (hasPaid) {
-        // Auto redirect to home
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 100);
+      // DECODE TOKEN to get userId
+      try {
+        // Decode JWT token to get userId
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(
+          atob(base64)
+            .split('')
+            .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+            .join('')
+        );
         
+        const decodedToken = JSON.parse(jsonPayload);
+        console.log("Decoded token:", decodedToken);
+        
+        const userId = decodedToken.userId || decodedToken.id || decodedToken.userID;
+        console.log("Extracted userId from token:", userId);
+        
+        if (userId) {
+          try {
+            // Check payment status
+            const userData = await getUser(userId);
+            console.log("User data from getUser:", userData);
+            
+            // Check if user has paid
+            const hasPaid = userData?.hasPaid || userData?.data?.hasPaid || userData?.payment?.hasPaid;
+            
+            console.log("hasPaid value:", hasPaid);
+            
+            if (hasPaid) {
+              // Auto redirect to home
+              console.log("User has paid, redirecting to home...");
+              setTimeout(() => {
+                window.location.href = '/';
+              }, 100);
+              
+              return {
+                success: true,
+                userId,
+                shouldRedirect: true
+              };
+            }
+            
+            // Not paid, return userId for payment flow
+            console.log("User hasn't paid, returning userId for payment");
+            return {
+              success: true,
+              userId,
+              shouldRedirect: false
+            };
+          } catch (error) {
+            console.error("Error checking payment status:", error);
+            // Continue even if payment check fails
+            return {
+              success: true,
+              userId,
+              shouldRedirect: false
+            };
+          }
+        } else {
+          console.error("userId not found in decoded token");
+          return {
+            success: false,
+            error: 'User ID not found in token'
+          };
+        }
+      } catch (decodeError) {
+        console.error("Error decoding token:", decodeError);
         return {
-          success: true,
-          userId,
-          shouldRedirect: true
+          success: false,
+          error: 'Invalid token format'
         };
       }
-      
-      // Not paid, return userId for payment flow
+    } else {
+      console.error("Token missing in response");
       return {
-        success: true,
-        userId,
-        shouldRedirect: false
+        success: false,
+        error: 'Invalid response from server - no token'
       };
     }
-    
-    return { success: false };
   } catch (error: any) {
     console.error('Login flow error:', error);
     setLoading?.(false);
     
     // Return structured error
     return {
-      success: false
+      success: false,
+      error: error.message || 'Login failed'
     };
   }
 };
-
 /**
  * Quick check - returns true if user should be redirected to home
  * Useful for useEffect hooks
