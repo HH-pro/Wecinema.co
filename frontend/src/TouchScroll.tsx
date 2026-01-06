@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 const TouchScroll = () => {
   const isDown = useRef(false);
@@ -10,24 +10,19 @@ const TouchScroll = () => {
       isDown.current = true;
       startY.current = e.clientY;
       scrollStart.current = window.scrollY;
-
-      // prevent text selection while dragging
-      document.body.style.userSelect = "none";
+      document.body.style.userSelect = "none"; // prevent text selection
     };
 
     const onMove = (e: MouseEvent) => {
       if (!isDown.current) return;
-      e.preventDefault(); // stop text/image drag
 
       const deltaY = startY.current - e.clientY;
-      window.scrollTo({
-        top: scrollStart.current + deltaY,
-      });
+      window.scrollTo({ top: scrollStart.current + deltaY });
     };
 
     const onUp = () => {
       isDown.current = false;
-      document.body.style.userSelect = "auto"; // restore select
+      document.body.style.userSelect = "auto";
     };
 
     window.addEventListener("mousedown", onDown);
