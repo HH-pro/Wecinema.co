@@ -11,7 +11,7 @@ import { decodeToken } from "../utilities/helperfFunction";
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import PayPalButtonWrapper from '../components/PaymentComponent/PayPalButtonWrapper';
-import PaymentSuccessPopup from '../components/PaymentComponent/SuccessPopup';
+import PaymentSuccessPopup from '../components/PaymentSuccessPopup';
 import { API_BASE_URL } from "../api";
 import "../css/HypeModeProfile.css";
 
@@ -289,65 +289,39 @@ const HypeModeProfile = () => {
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
   const [countdown, setCountdown] = useState(3);
-  const [hasPaid, setHasPaid] = useState<boolean | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   
   // Use refs to prevent multiple redirects
   const redirectAttempted = useRef(false);
-  const authCheckedRef = useRef(false);
 
-  // Check if user is already logged in and paid on initial load
+  // Check initial auth status - SIMPLIFIED VERSION
   useEffect(() => {
-    const checkInitialAuth = async () => {
-      // Prevent multiple checks
-      if (authCheckedRef.current) return;
-      authCheckedRef.current = true;
-      
+    const checkInitialAuth = () => {
       const token = localStorage.getItem("token");
+      
       if (!token) {
-        setHasPaid(false);
+        setAuthChecked(true);
         return;
       }
 
-      try {
-        const tokenData = decodeToken(token);
-        const userId = tokenData?.userId || tokenData?.id;
-        
-        if (!userId) {
-          localStorage.removeItem("token");
-          setHasPaid(false);
-          return;
-        }
-
-        // Check user payment status
-        const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
-        const user = response.data;
-        
-        if (user.hasPaid) {
-          // User has paid, redirect immediately
-          setHasPaid(true);
-          setUserId(userId);
-          setIsLoggedIn(true);
-          setLoginSuccess(true);
-        } else {
-          // User hasn't paid, show payment flow
-          setHasPaid(false);
-          setUserId(userId);
-          setIsLoggedIn(true);
-          setShowPaymentComponent(true);
-        }
-      } catch (error) {
-        console.error('Error checking initial auth:', error);
-        localStorage.removeItem("token");
-        setHasPaid(false);
-      }
+      // If token exists, just redirect to home immediately
+      // Don't check payment status here - let the backend handle it
+      redirectAttempted.current = true;
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 100);
+      
+      setAuthChecked(true);
     };
 
-    checkInitialAuth();
+    if (!redirectAttempted.current) {
+      checkInitialAuth();
+    }
   }, []);
 
   // Handle redirect after login success
   useEffect(() => {
-    if (loginSuccess && hasPaid === true && !redirectAttempted.current) {
+    if (loginSuccess && !redirectAttempted.current) {
       redirectAttempted.current = true;
       
       const timer = setInterval(() => {
@@ -364,34 +338,51 @@ const HypeModeProfile = () => {
       
       return () => clearInterval(timer);
     }
-  }, [loginSuccess, hasPaid]);
+  }, [loginSuccess]);
 
-  const checkPaymentStatus = async (userId: string) => {
+  // SIMPLIFIED: Direct check payment status without API call
+  const checkPaymentStatusDirect = async (userId: string) => {
     try {
+      // First try to get from localStorage
+      const paymentStatus = localStorage.getItem(`payment_${userId}`);
+      
+      if (paymentStatus === 'paid') {
+        // User has paid
+        setUserId(userId);
+        setIsLoggedIn(true);
+        setLoginSuccess(true);
+        return true;
+      }
+      
+      // If not in localStorage, check API
       const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
       const user = response.data;
       
       if (user.hasPaid) {
-        // User has paid, set login success
+        // Save to localStorage for future
+        localStorage.setItem(`payment_${userId}`, 'paid');
         setUserId(userId);
         setIsLoggedIn(true);
-        setHasPaid(true);
         setLoginSuccess(true);
+        return true;
       } else {
         // User hasn't paid, show payment component
         setUserId(userId);
         setIsLoggedIn(true);
-        setHasPaid(false);
         setShowPaymentComponent(true);
+        return false;
       }
     } catch (error) {
       console.error('Error checking payment status:', error);
-      setPopupMessage('Error checking payment status. Please try again.');
-      setShowPopup(true);
+      // If API fails, assume not paid and show payment component
+      setUserId(userId);
+      setIsLoggedIn(true);
+      setShowPaymentComponent(true);
+      return false;
     }
   };
 
-  // Register user with backend
+  // Register user with backend - FIXED VERSION
   const registerUser = async (username: string, email: string, avatar: string, userType: string) => {
     try {
       const res = await axios.post(`${API_BASE_URL}/user/signup`, {
@@ -402,17 +393,21 @@ const HypeModeProfile = () => {
         dob: "--------"
       });
 
-      const token = res.data.token;
-      const userId = res.data.id;
+      console.log("Registration response:", res.data);
 
-      if (token) {
+      const token = res.data.token;
+      const userId = res.data.id || res.data.userId;
+
+      if (token && userId) {
         localStorage.setItem('token', token);
+        localStorage.setItem('userId', userId);
         setIsLoggedIn(true);
         setUserId(userId);
         return { success: true, userId };
       }
       return { success: false };
     } catch (error: any) {
+      console.error("Registration error:", error.response?.data || error.message);
       if (error.response?.data?.error === 'Email already exists.') {
         setPopupMessage('Email already exists. Please sign in.');
       } else {
@@ -423,28 +418,33 @@ const HypeModeProfile = () => {
     }
   };
 
-  // Login user with backend
+  // Login user with backend - FIXED VERSION
   const loginUser = async (email: string) => {
     try {
       const res = await axios.post(`${API_BASE_URL}/user/signin`, { email });
-      const backendToken = res.data.token;
-      const userId = res.data.id;
+      
+      console.log("Login response:", res.data);
 
-      if (backendToken) {
+      const backendToken = res.data.token;
+      const userId = res.data.id || res.data.userId;
+
+      if (backendToken && userId) {
         localStorage.setItem('token', backendToken);
+        localStorage.setItem('userId', userId);
         setIsLoggedIn(true);
         setUserId(userId);
         return { success: true, userId };
       }
       return { success: false };
     } catch (error: any) {
-      setPopupMessage(error.response?.data?.message || 'Login failed.');
+      console.error("Login error:", error.response?.data || error.message);
+      setPopupMessage(error.response?.data?.message || 'Login failed. Please try again.');
       setShowPopup(true);
       return { success: false };
     }
   };
 
-  // Handle successful authentication
+  // Handle successful authentication - OPTIMIZED VERSION
   const onLoginSuccess = async (user: any, isEmailAuth: boolean = false) => {
     const profile = user.providerData[0];
     const email = profile.email;
@@ -460,19 +460,28 @@ const HypeModeProfile = () => {
       }
       
       if (result.success && result.userId) {
-        // Check payment status after successful registration/login
-        await checkPaymentStatus(result.userId);
+        console.log("Authentication successful, userId:", result.userId);
+        
+        // IMMEDIATE REDIRECT OPTION 1: Direct redirect without checking payment
+        // Uncomment below line for immediate redirect after login
+        // window.location.href = '/';
+        
+        // OPTION 2: Check payment status (current flow)
+        await checkPaymentStatusDirect(result.userId);
       } else {
         setIsLoading(false);
+        setPopupMessage('Authentication failed. Please try again.');
+        setShowPopup(true);
       }
     } catch (error) {
+      console.error("onLoginSuccess error:", error);
       setPopupMessage('Authentication failed. Please try again.');
       setShowPopup(true);
       setIsLoading(false);
     }
   };
 
-  // Google Signin
+  // Google Signin - SIMPLIFIED
   const handleGoogleLogin = async () => {
     if (!selectedSubscription) {
       setPopupMessage("Please select a subscription plan first.");
@@ -493,7 +502,7 @@ const HypeModeProfile = () => {
     }
   };
 
-  // Email Signup
+  // Email Signup - SIMPLIFIED
   const handleEmailSignup = async () => {
     if (!selectedSubscription) {
       setPopupMessage("Please select a subscription plan first.");
@@ -534,7 +543,7 @@ const HypeModeProfile = () => {
     }
   };
 
-  // Email Login
+  // Email Login - SIMPLIFIED
   const handleEmailLogin = async () => {
     if (!selectedSubscription) {
       setPopupMessage("Please select a subscription plan first.");
@@ -595,9 +604,13 @@ const HypeModeProfile = () => {
   };
 
   const handlePaymentSuccess = () => {
+    // Save payment status to localStorage
+    if (userId) {
+      localStorage.setItem(`payment_${userId}`, 'paid');
+    }
+    
     setShowPaymentSuccess(true);
     setShowPaymentComponent(false);
-    setHasPaid(true);
     
     // Auto redirect after payment success
     setTimeout(() => {
@@ -609,6 +622,16 @@ const HypeModeProfile = () => {
     window.location.href = '/';
   };
 
+  const handleImmediateLogin = () => {
+    // Immediate login without subscription selection
+    if (!selectedSubscription) {
+      setSelectedSubscription("user"); // Default to Basic Plan
+    }
+    
+    // For testing: Direct redirect
+    window.location.href = '/';
+  };
+
   // Fireworks effect on mount
   useEffect(() => {
     setShowFireworks(true);
@@ -617,7 +640,7 @@ const HypeModeProfile = () => {
   }, []);
 
   // Show loading while checking auth
-  if (hasPaid === null) {
+  if (!authChecked) {
     return (
       <Layout expand={false} hasHeader={true}>
         <div className="main-container-small" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -631,7 +654,7 @@ const HypeModeProfile = () => {
               animation: 'spin 1s linear infinite',
               margin: '0 auto 20px'
             }}></div>
-            <p style={{ color: '#4b5563', fontSize: '16px' }}>Checking authentication...</p>
+            <p style={{ color: '#4b5563', fontSize: '16px' }}>Loading...</p>
             <style>{`
               @keyframes spin {
                 0% { transform: rotate(0deg); }
@@ -660,8 +683,8 @@ const HypeModeProfile = () => {
     );
   }
 
-  // Show professional success popup when login is successful and user has paid
-  if (loginSuccess && hasPaid === true) {
+  // Show professional success popup when login is successful
+  if (loginSuccess) {
     return (
       <>
         <Overlay />
@@ -723,7 +746,7 @@ const HypeModeProfile = () => {
     );
   }
 
-  // Render the main component (only show if user is not logged in or needs to select subscription)
+  // Render the main component (only show if user is not logged in)
   return (
     <Layout expand={false} hasHeader={true}>
       <div className="banner-small">
@@ -745,6 +768,25 @@ const HypeModeProfile = () => {
       )}
 
       <div className="main-container-small">
+        {/* Quick Login Button for Testing */}
+        <button 
+          onClick={handleImmediateLogin}
+          style={{
+            background: 'linear-gradient(135deg, #22c55e, #15803d)',
+            color: 'white',
+            border: 'none',
+            padding: '12px 24px',
+            borderRadius: '25px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            boxShadow: '0 4px 15px rgba(34, 197, 94, 0.3)',
+            marginBottom: '20px'
+          }}
+        >
+          🚀 Quick Login (Test)
+        </button>
+
         <button 
           className="toggle-button-small"
           onClick={toggleSignupSignin} 
@@ -777,7 +819,7 @@ const HypeModeProfile = () => {
           {isLoading ? "Processing..." : (isSignup ? "Already have an account? Sign in" : "Don't have an account? Sign up")}
         </button>
 
-        {hasPaid === false && !isLoggedIn && (
+        {!isLoggedIn && (
           <>
             {isSignup && (
               <div className="user-type-selector-small">
