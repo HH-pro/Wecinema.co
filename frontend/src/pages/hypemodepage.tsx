@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Layout } from "../components";
 import { getAuth, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { googleProvider } from "../firebase/config";
@@ -6,7 +6,7 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import PayPalButtonWrapper from '../components/PaymentComponent/PayPalButtonWrapper';
 import PaymentSuccessPopup from '../components/PaymentComponent/SuccessPopup';
-import { checkAuthAndRedirect, completeLoginFlow, getUser, updatePaymentStatus } from "../api";
+import { checkAuthAndRedirect, completeLoginFlow, updatePaymentStatus } from "../api";
 import "../css/HypeModeProfile.css";
 
 // Main HypeModeProfile Component
@@ -24,20 +24,25 @@ const HypeModeProfile = () => {
   const [showPaymentComponent, setShowPaymentComponent] = useState(false);
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
 
-  // Check auth and redirect on initial load
+  const authCheckedRef = useRef(false);
+
+  // Check if user is already logged in and paid on initial load
   useEffect(() => {
-    const initCheck = async () => {
-      const shouldRedirect = await checkAuthAndRedirect();
-      if (shouldRedirect) {
-        // Already redirected by checkAuthAndRedirect
-        return;
-      }
+    const checkInitialAuth = async () => {
+      if (authCheckedRef.current) return;
+      authCheckedRef.current = true;
+      
+      // Use the new API function for auto-redirect
+      await checkAuthAndRedirect();
+      
+      // If not redirected, user is either not logged in or hasn't paid
+      // We'll remain on this page
     };
-    
-    initCheck();
+
+    checkInitialAuth();
   }, []);
 
-  // Handle Google Login
+  // Handle Google Login with new API flow
   const handleGoogleLogin = async () => {
     if (!selectedSubscription) {
       setPopupMessage("Please select a subscription plan first.");
@@ -52,15 +57,15 @@ const HypeModeProfile = () => {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
       const profile = user.providerData[0];
-      const email = profile.email;
-      const username = profile.displayName || email.split('@')[0];
-      const avatar = profile.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`;
+      const userEmail = profile.email;
+      const userName = profile.displayName || userEmail.split('@')[0];
+      const avatar = profile.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=random`;
 
       // Use the new completeLoginFlow function
       const loginResult = await completeLoginFlow(
-        email,
+        userEmail,
         isSignup,
-        username,
+        userName,
         avatar,
         userType,
         setIsLoading
@@ -71,13 +76,14 @@ const HypeModeProfile = () => {
           // Already redirected by completeLoginFlow
           return;
         } else {
-          // Not paid, show payment
+          // Not paid, show payment component
           setUserId(loginResult.userId);
           setShowPaymentComponent(true);
         }
       } else {
         setPopupMessage('Authentication failed. Please try again.');
         setShowPopup(true);
+        setIsLoading(false);
       }
     } catch (error: any) {
       setIsLoading(false);
@@ -90,7 +96,7 @@ const HypeModeProfile = () => {
     }
   };
 
-  // Handle Email Signup/Login
+  // Handle Email Signup/Login with new API flow
   const handleEmailAuth = async () => {
     if (!selectedSubscription) {
       setPopupMessage("Please select a subscription plan first.");
@@ -132,15 +138,15 @@ const HypeModeProfile = () => {
       }
       
       const profile = user.providerData[0];
-      const emailAddr = profile.email;
-      const usernameForAPI = username || emailAddr.split('@')[0];
-      const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(usernameForAPI)}&background=random`;
+      const userEmail = profile.email;
+      const userName = username || userEmail.split('@')[0];
+      const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=random`;
 
       // Use the new completeLoginFlow function
       const loginResult = await completeLoginFlow(
-        emailAddr,
+        userEmail,
         isSignup,
-        usernameForAPI,
+        userName,
         avatar,
         userType,
         setIsLoading
@@ -151,13 +157,14 @@ const HypeModeProfile = () => {
           // Already redirected by completeLoginFlow
           return;
         } else {
-          // Not paid, show payment
+          // Not paid, show payment component
           setUserId(loginResult.userId);
           setShowPaymentComponent(true);
         }
       } else {
         setPopupMessage(isSignup ? 'Registration failed.' : 'Login failed.');
         setShowPopup(true);
+        setIsLoading(false);
       }
     } catch (error: any) {
       setIsLoading(false);
@@ -200,7 +207,7 @@ const HypeModeProfile = () => {
 
   const handlePaymentSuccess = async () => {
     try {
-      // Update payment status
+      // Update payment status in backend
       if (userId) {
         await updatePaymentStatus(userId, true);
       }
@@ -208,7 +215,7 @@ const HypeModeProfile = () => {
       setShowPaymentSuccess(true);
       setShowPaymentComponent(false);
       
-      // Redirect after 2 seconds
+      // Auto redirect after payment success
       setTimeout(() => {
         window.location.href = '/';
       }, 2000);
@@ -243,25 +250,44 @@ const HypeModeProfile = () => {
           <div className="payment-subscription-box">
             <div>
               <h2 className="payment-title">Complete Your Subscription</h2>
-              <p className="payment-description">Plan: {selectedSubscription === "user" ? "Basic" : "Pro"}</p>
-              <p className="payment-description">User Type: {userType === "buyer" ? "👤 Buyer" : "🏪 Seller"}</p>
-              <p className="payment-amount">Amount: ${selectedSubscription === 'user' ? 5 : 10}</p>
-              <PayPalButtonWrapper 
-                amount={selectedSubscription === 'user' ? 5 : 10} 
-                userId={userId}
-                subscriptionType={selectedSubscription}
-                userType={userType}
-                onSuccess={handlePaymentSuccess}
-                onError={(msg) => {
-                  setPopupMessage(msg);
-                  setShowPopup(true);
-                }}
-              />
+              <p className="payment-description">
+                {selectedSubscription === "user" ? "Basic Plan ($5/month)" : "Pro Plan ($10/month)"}
+              </p>
+              <p className="payment-description">
+                User Type: {userType === "buyer" ? "👤 Buyer" : "🏪 Seller"}
+              </p>
+              <p className="payment-amount">
+                Total Amount: ${selectedSubscription === 'user' ? 5 : 10}
+              </p>
+              <p className="payment-description">Secure payment powered by PayPal</p>
+              
+              <div style={{ margin: "20px 0" }}>
+                <PayPalButtonWrapper 
+                  amount={selectedSubscription === 'user' ? 5 : 10} 
+                  userId={userId}
+                  subscriptionType={selectedSubscription}
+                  userType={userType}
+                  onSuccess={handlePaymentSuccess}
+                  onError={(msg) => {
+                    setPopupMessage(msg);
+                    setShowPopup(true);
+                  }}
+                />
+              </div>
+              
               <button 
                 className="payment-skip-button"
                 onClick={() => {
                   toast.info('You can complete payment later');
                   window.location.href = '/';
+                }}
+                style={{
+                  marginTop: "15px",
+                  padding: "10px 20px",
+                  background: "transparent",
+                  border: "1px solid #ccc",
+                  borderRadius: "5px",
+                  cursor: "pointer"
                 }}
               >
                 Skip for Now
@@ -273,7 +299,7 @@ const HypeModeProfile = () => {
     );
   }
 
-  // Main render
+  // Render the main component
   return (
     <Layout expand={false} hasHeader={true}>
       <div className="main-container-small">
@@ -316,10 +342,13 @@ const HypeModeProfile = () => {
                 <h3 className="subscription-title-small">Basic Plan</h3>
                 <div className="subscription-price-small">$5/month</div>
                 <p className="subscription-description-small">Perfect for individual users</p>
+                
                 <ul className="features-list-small">
                   <li>Buy Films & Scripts</li>
                   <li>Sell Your Content</li>
                   <li>Basic Support</li>
+                  <li>Access to Community</li>
+                  <li>5GB Storage</li>
                 </ul>
 
                 {selectedSubscription === "user" && (
@@ -385,8 +414,10 @@ const HypeModeProfile = () => {
                 <h3 className="subscription-title-small">Pro Plan</h3>
                 <div className="subscription-price-small">$10/month</div>
                 <p className="subscription-description-small">Advanced features for professionals</p>
+                
                 <ul className="features-list-small">
                   <li>All Basic Features</li>
+                  <li>Early Feature Access</li>
                   <li>Priority Support</li>
                   <li>Team Collaboration</li>
                 </ul>
