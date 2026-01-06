@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import "./TouchCursor.css"; // CSS for cursor
+import "./index.css"; // CSS for cursor
 
 const TouchCursor = () => {
   const circle = useRef<HTMLDivElement>(null);
