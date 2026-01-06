@@ -1,4 +1,4 @@
-// src/pages/seller/SellerDashboard.tsx - COMPLETE UPDATED VERSION WITH DISCONNECT OPTION
+// src/pages/seller/SellerDashboard.tsx - COMPLETE UPDATED VERSION WITH RESPONSIVE DESIGN
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -224,16 +224,16 @@ const SellerDashboard: React.FC = () => {
   const totalListings = listings.length;
   const activeListings = listings.filter(listing => listing.status === 'active').length;
 
-  // ✅ UPDATED: Tab configuration
+  // ✅ UPDATED: Tab configuration for mobile responsiveness
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊', badge: null },
     { id: 'earnings', label: 'Earnings', icon: '💰', badge: null },
-    { id: 'listings', label: 'My Listings', icon: '🏠', badge: totalListings > 0 ? totalListings : null },
-    { id: 'orders', label: 'My Orders', icon: '📦', badge: orderStats.activeOrders > 0 ? orderStats.activeOrders : null },
+    { id: 'listings', label: 'Listings', icon: '🏠', badge: totalListings > 0 ? totalListings : null },
+    { id: 'orders', label: 'Orders', icon: '📦', badge: orderStats.activeOrders > 0 ? orderStats.activeOrders : null },
     { id: 'withdraw', label: 'Withdraw', icon: '💸', badge: null }
   ];
 
-  // Action Cards
+  // ✅ UPDATED: Action Cards for responsive design
   const [actionCards] = useState([
     {
       title: 'Analytics Dashboard',
@@ -262,6 +262,21 @@ const SellerDashboard: React.FC = () => {
           label: 'Learn More',
           onClick: () => navigate('/marketplace/seller/resources'),
           variant: 'secondary' as const
+        }
+      ]
+    },
+    {
+      title: 'Quick Start Guide',
+      description: 'Get started with selling on our platform with our step-by-step guide.',
+      icon: '🚀',
+      iconBg: 'from-purple-500 to-purple-600',
+      bgGradient: 'from-purple-50 to-violet-50',
+      borderColor: 'border-purple-200',
+      actions: [
+        {
+          label: 'Get Started',
+          onClick: () => navigate('/marketplace/seller/guide'),
+          variant: 'primary' as const
         }
       ]
     }
@@ -1172,11 +1187,16 @@ const SellerDashboard: React.FC = () => {
   if (loading && !initialDataLoaded) {
     return (
       <MarketplaceLayout>
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-            <p className="text-lg text-gray-800 font-medium">Loading your dashboard...</p>
-            <p className="text-gray-600 mt-2">This may take a few moments</p>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4">
+          <div className="text-center max-w-md w-full">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-yellow-500 mx-auto mb-6"></div>
+            <p className="text-lg text-gray-800 font-medium mb-2">Loading your dashboard...</p>
+            <p className="text-gray-600 text-sm">This may take a few moments</p>
+            <div className="mt-6">
+              <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-full bg-yellow-500 animate-pulse"></div>
+              </div>
+            </div>
           </div>
         </div>
       </MarketplaceLayout>
@@ -1208,17 +1228,17 @@ const SellerDashboard: React.FC = () => {
 
   return (
     <MarketplaceLayout>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-4 sm:py-6 lg:py-8">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
           
-          {/* ✅ Auto-Refresh Indicator */}
+          {/* ✅ Mobile Auto-Refresh Indicator */}
           {showAutoRefreshIndicator && (
             <div className="fixed top-4 right-4 z-50 animate-bounce">
-              <div className="bg-green-100 border border-green-300 text-green-800 px-4 py-2 rounded-lg shadow-lg flex items-center">
-                <svg className="w-4 h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="bg-green-100 border border-green-300 text-green-800 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg shadow-lg flex items-center">
+                <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
-                <span className="text-sm font-medium">Data Updated!</span>
+                <span className="text-xs sm:text-sm font-medium">Updated!</span>
               </div>
             </div>
           )}
@@ -1231,7 +1251,7 @@ const SellerDashboard: React.FC = () => {
             />
           )}
 
-          {/* Header */}
+          {/* Header - Mobile Responsive */}
           <SafeDashboardHeader
             title="Seller Dashboard"
             subtitle="Manage orders, track earnings, and grow your business"
@@ -1248,31 +1268,31 @@ const SellerDashboard: React.FC = () => {
             onCheckStripe={checkStripeAccountStatus}
           />
 
-          {/* ✅ Development Mode Banner - IMPROVED UI */}
+          {/* ✅ Development Mode Banner - RESPONSIVE */}
           {(process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost') && (
-            <div className="mb-6 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-4">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center">
-                  <div className="bg-purple-100 p-2 rounded-lg mr-3">
-                    <span className="text-purple-600 text-xl">🔄</span>
+            <div className="mb-4 sm:mb-6 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-3 sm:p-4">
+              <div className="flex flex-col gap-3 sm:gap-4">
+                <div className="flex items-start sm:items-center">
+                  <div className="bg-purple-100 p-2 rounded-lg mr-3 flex-shrink-0">
+                    <span className="text-purple-600 text-lg sm:text-xl">🔄</span>
                   </div>
-                  <div>
-                    <h3 className="font-medium text-purple-800">Auto-Refresh Active</h3>
-                    <p className="text-sm text-purple-700">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-purple-800 text-sm sm:text-base">Auto-Refresh Active</h3>
+                    <p className="text-xs sm:text-sm text-purple-700 mt-0.5">
                       Data automatically refreshes after every action
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <div className="flex items-center text-sm text-purple-700">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                    <span>Real-time updates</span>
+                <div className="flex flex-col xs:flex-row items-stretch xs:items-center justify-between gap-2">
+                  <div className="flex items-center text-xs sm:text-sm text-purple-700">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse flex-shrink-0"></div>
+                    <span className="truncate">Real-time updates enabled</span>
                   </div>
                   <button
                     onClick={handleRefresh}
-                    className="px-4 py-2 bg-white border border-purple-300 text-purple-600 hover:bg-purple-50 text-sm font-medium rounded-lg transition duration-200 flex items-center"
+                    className="px-3 py-1.5 sm:px-4 sm:py-2 bg-white border border-purple-300 text-purple-600 hover:bg-purple-50 text-xs sm:text-sm font-medium rounded-lg transition duration-200 flex items-center justify-center"
                   >
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                     Refresh Now
@@ -1282,21 +1302,21 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* ✅ Success Message - IMPROVED UI */}
+          {/* ✅ Success Message - RESPONSIVE */}
           {successMessage && (
-            <div className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 animate-fade-in">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="w-5 h-5 text-green-600 mr-3 flex-shrink-0">
+            <div className="mb-4 sm:mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-3 sm:p-4 animate-fade-in">
+              <div className="flex items-start sm:items-center justify-between gap-2">
+                <div className="flex items-start sm:items-center min-w-0">
+                  <div className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 mr-2 sm:mr-3 flex-shrink-0 mt-0.5 sm:mt-0">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
-                  <p className="text-sm text-green-800 font-medium">{successMessage}</p>
+                  <p className="text-xs sm:text-sm text-green-800 font-medium truncate">{successMessage}</p>
                 </div>
                 <button
                   onClick={() => setSuccessMessage('')}
-                  className="text-green-600 hover:text-green-800 ml-4"
+                  className="text-green-600 hover:text-green-800 ml-2 flex-shrink-0"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1306,21 +1326,21 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* ✅ Error Message - IMPROVED UI */}
+          {/* ✅ Error Message - RESPONSIVE */}
           {error && (
-            <div className="mb-6 bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-xl p-4 animate-fade-in">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className="w-5 h-5 text-red-600 mr-3 flex-shrink-0">
+            <div className="mb-4 sm:mb-6 bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-xl p-3 sm:p-4 animate-fade-in">
+              <div className="flex items-start sm:items-center justify-between gap-2">
+                <div className="flex items-start sm:items-center min-w-0">
+                  <div className="w-4 h-4 sm:w-5 sm:h-5 text-red-600 mr-2 sm:mr-3 flex-shrink-0 mt-0.5 sm:mt-0">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
-                  <p className="text-sm text-red-800 font-medium">{error}</p>
+                  <p className="text-xs sm:text-sm text-red-800 font-medium truncate">{error}</p>
                 </div>
                 <button
                   onClick={() => setError('')}
-                  className="text-red-600 hover:text-red-800 ml-4"
+                  className="text-red-600 hover:text-red-800 ml-2 flex-shrink-0"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1330,83 +1350,80 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* ✅ Stripe Account Status - UPDATED: Shows setup prompt OR ready to earn status WITH DISCONNECT OPTION */}
+          {/* ✅ Stripe Account Status - RESPONSIVE DESIGN */}
           {!stripeStatus?.account?.charges_enabled ? (
-            // Show setup prompt when NOT connected
-            // SellerDashboard.tsx mein StripeAccountStatus section:
-<SafeStripeAccountStatus
-  stripeStatus={{
-    connected: stripeStatus?.account?.charges_enabled || false,
-    chargesEnabled: stripeStatus?.account?.charges_enabled || false,
-    detailsSubmitted: stripeStatus?.account?.details_submitted || false,
-    status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive',
-    requirements: stripeStatus?.account?.requirements || undefined,
-    verificationNeeded: stripeStatus?.account?.requirements?.past_due?.includes('individual.verification.document') || false,
-    missingRequirements: stripeStatus?.status?.missingRequirements,
-    pendingVerification: stripeStatus?.status?.pendingVerification,
-    disabledReason: stripeStatus?.account?.requirements?.disabled_reason || stripeStatus?.status?.disabledReason
-  }}
-  onSetupClick={handleOpenStripeSetup}
-  isLoading={stripeStatus === null}
-/>
+            <SafeStripeAccountStatus
+              stripeStatus={{
+                connected: stripeStatus?.account?.charges_enabled || false,
+                chargesEnabled: stripeStatus?.account?.charges_enabled || false,
+                detailsSubmitted: stripeStatus?.account?.details_submitted || false,
+                status: stripeStatus?.account?.charges_enabled ? 'active' : 'inactive',
+                requirements: stripeStatus?.account?.requirements || undefined,
+                verificationNeeded: stripeStatus?.account?.requirements?.past_due?.includes('individual.verification.document') || false,
+                missingRequirements: stripeStatus?.status?.missingRequirements,
+                pendingVerification: stripeStatus?.status?.pendingVerification,
+                disabledReason: stripeStatus?.account?.requirements?.disabled_reason || stripeStatus?.status?.disabledReason
+              }}
+              onSetupClick={handleOpenStripeSetup}
+              isLoading={stripeStatus === null}
+            />
           ) : (
-            // Show earning status when connected
-            <div className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-5 shadow-sm">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                <div className="flex items-start">
-                  <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-3 rounded-xl mr-4 shadow-sm flex-shrink-0">
-                    <span className="text-xl text-white">💰</span>
+            <div className="mb-4 sm:mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-4 sm:p-5 shadow-sm">
+              <div className="flex flex-col lg:flex-row lg:items-center gap-4 sm:gap-6">
+                <div className="flex items-start flex-1 min-w-0">
+                  <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-2.5 sm:p-3 rounded-xl mr-3 sm:mr-4 shadow-sm flex-shrink-0">
+                    <span className="text-lg sm:text-xl text-white">💰</span>
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-lg font-semibold text-gray-900">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-col xs:flex-row xs:items-center gap-1.5 sm:gap-2 mb-1">
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
                         Ready to Earn! 🎉
                       </h3>
-                      <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                      <span className="px-2 py-0.5 sm:py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full whitespace-nowrap">
                         Connected
                       </span>
                     </div>
-                    <p className="text-gray-600 mt-1">
+                    <p className="text-gray-600 text-xs sm:text-sm mt-0.5 sm:mt-1">
                       Your Stripe account is connected and ready to accept payments.
                     </p>
                     
                     {/* Account Info */}
                     <div className="mt-3 space-y-3">
                       {/* Status Indicators */}
-                      <div className="flex flex-wrap gap-3">
+                      <div className="flex flex-wrap gap-2 sm:gap-3">
                         <div className="flex items-center gap-1">
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          <span className="text-xs text-gray-700">Charges Enabled</span>
+                          <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                          <span className="text-xs text-gray-700 whitespace-nowrap">Charges Enabled</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          <span className="text-xs text-gray-700">Payouts Enabled</span>
+                          <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                          <span className="text-xs text-gray-700 whitespace-nowrap">Payouts Enabled</span>
                         </div>
                       </div>
 
-                      {/* Balance Info */}
+                      {/* Balance Info - RESPONSIVE GRID */}
                       <div className="p-3 bg-green-100/30 rounded-lg border border-green-200">
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                           {orderStats.availableBalance !== undefined && (
-                            <div>
-                              <p className="text-xs text-gray-500">Available Balance</p>
-                              <p className="text-lg font-semibold text-gray-900">
+                            <div className="min-w-0">
+                              <p className="text-xs text-gray-500 truncate">Available Balance</p>
+                              <p className="text-base sm:text-lg font-semibold text-gray-900 truncate">
                                 {safeFormatCurrency(orderStats.availableBalance)}
                               </p>
                             </div>
                           )}
                           {orderStats.pendingRevenue !== undefined && orderStats.pendingRevenue > 0 && (
-                            <div>
-                              <p className="text-xs text-gray-500">Pending Revenue</p>
-                              <p className="text-lg font-semibold text-yellow-600">
+                            <div className="min-w-0">
+                              <p className="text-xs text-gray-500 truncate">Pending Revenue</p>
+                              <p className="text-base sm:text-lg font-semibold text-yellow-600 truncate">
                                 {safeFormatCurrency(orderStats.pendingRevenue)}
                               </p>
                             </div>
                           )}
                           {orderStats.totalRevenue !== undefined && (
-                            <div>
-                              <p className="text-xs text-gray-500">Total Earnings</p>
-                              <p className="text-lg font-semibold text-green-700">
+                            <div className="min-w-0">
+                              <p className="text-xs text-gray-500 truncate">Total Earnings</p>
+                              <p className="text-base sm:text-lg font-semibold text-green-700 truncate">
                                 {safeFormatCurrency(orderStats.totalRevenue)}
                               </p>
                             </div>
@@ -1416,7 +1433,7 @@ const SellerDashboard: React.FC = () => {
 
                       {/* Account ID (if available) */}
                       {stripeStatus?.account?.id && (
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-gray-500 truncate">
                           <span className="font-medium">Account ID:</span>{' '}
                           <span className="font-mono text-gray-700">
                             {stripeStatus.account.id.substring(0, 8)}...
@@ -1427,19 +1444,20 @@ const SellerDashboard: React.FC = () => {
                   </div>
                 </div>
                 
-                <div className="flex flex-col sm:flex-row lg:flex-col gap-3 flex-shrink-0">
-                  {/* Action Buttons */}
-                  <div className="flex gap-3">
+                {/* Action Buttons - RESPONSIVE */}
+                <div className="flex flex-col gap-3 flex-shrink-0">
+                  {/* Primary Action Buttons */}
+                  <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
                     {/* Stripe Dashboard Link */}
                     {stripeStatus?.account?.id && (
                       <a
                         href={`https://dashboard.stripe.com/connect/accounts/${stripeStatus.account.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium py-3 px-4 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 whitespace-nowrap text-center"
+                        className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 whitespace-nowrap text-center text-sm sm:text-base"
                       >
-                        <div className="flex items-center justify-center gap-2">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="flex items-center justify-center gap-1.5 sm:gap-2">
+                          <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                           </svg>
                           Dashboard
@@ -1451,10 +1469,10 @@ const SellerDashboard: React.FC = () => {
                     {orderStats.availableBalance !== undefined && orderStats.availableBalance > 0 && (
                       <button
                         onClick={() => setActiveTab('withdraw')}
-                        className="flex-1 bg-white hover:bg-gray-50 text-green-600 border border-green-300 font-medium py-3 px-4 rounded-xl transition-all duration-200 shadow-sm hover:shadow whitespace-nowrap text-center"
+                        className="bg-white hover:bg-gray-50 text-green-600 border border-green-300 font-medium py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl transition-all duration-200 shadow-sm hover:shadow whitespace-nowrap text-center text-sm sm:text-base"
                       >
-                        <div className="flex items-center justify-center gap-2">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div className="flex items-center justify-center gap-1.5 sm:gap-2">
+                          <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                           </svg>
                           Withdraw
@@ -1464,14 +1482,14 @@ const SellerDashboard: React.FC = () => {
                   </div>
                   
                   {/* Manage & Disconnect Buttons */}
-                  <div className="flex gap-3">
+                  <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
                     {/* Manage Account Button */}
                     <button
                       onClick={handleOpenStripeSetup}
-                      className="flex-1 bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 font-medium py-3 px-4 rounded-xl transition-all duration-200 shadow-sm hover:shadow whitespace-nowrap text-center"
+                      className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 font-medium py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl transition-all duration-200 shadow-sm hover:shadow whitespace-nowrap text-center text-sm sm:text-base"
                     >
-                      <div className="flex items-center justify-center gap-2">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="flex items-center justify-center gap-1.5 sm:gap-2">
+                        <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
@@ -1479,13 +1497,13 @@ const SellerDashboard: React.FC = () => {
                       </div>
                     </button>
                     
-                    {/* Disconnect Button - Now opens StripeSetupModal which shows disconnect flow */}
+                    {/* Disconnect Button */}
                     <button
                       onClick={handleOpenStripeSetup}
-                      className="flex-1 bg-white hover:bg-red-50 text-red-600 border border-red-300 font-medium py-3 px-4 rounded-xl transition-all duration-200 shadow-sm hover:shadow whitespace-nowrap text-center"
+                      className="bg-white hover:bg-red-50 text-red-600 border border-red-300 font-medium py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl transition-all duration-200 shadow-sm hover:shadow whitespace-nowrap text-center text-sm sm:text-base"
                     >
-                      <div className="flex items-center justify-center gap-2">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="flex items-center justify-center gap-1.5 sm:gap-2">
+                        <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                         </svg>
                         Disconnect
@@ -1497,7 +1515,7 @@ const SellerDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* ✅ Navigation */}
+          {/* ✅ Navigation - MOBILE FRIENDLY */}
           <SafeTabNavigation
             tabs={tabs}
             activeTab={activeTab}
@@ -1505,25 +1523,25 @@ const SellerDashboard: React.FC = () => {
           />
 
           {/* Tab Content */}
-          <div className="mt-2">
+          <div className="mt-2 sm:mt-3">
             {currentLoading ? (
-              <div className="flex items-center justify-center py-12">
+              <div className="flex items-center justify-center py-8 sm:py-12">
                 <div className="text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Loading {activeTab}...</p>
+                  <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-t-2 border-b-2 border-yellow-500 mx-auto mb-3 sm:mb-4"></div>
+                  <p className="text-gray-600 text-sm sm:text-base">Loading {activeTab}...</p>
                 </div>
               </div>
             ) : (
               <>
                 {/* Overview Tab */}
                 {activeTab === 'overview' && (
-                  <div className="space-y-8">
+                  <div className="space-y-6 sm:space-y-8">
                     {/* Welcome Card */}
                     <SafeWelcomeCard
                       title="Welcome back, Seller! 👋"
                       subtitle="Manage your business efficiently with real-time insights and quick actions."
                       primaryAction={{
-                        label: '+ Create New Listing',
+                        label: '+ Create Listing',
                         onClick: () => navigate('/marketplace/create')
                       }}
                       secondaryAction={{
@@ -1533,8 +1551,10 @@ const SellerDashboard: React.FC = () => {
                       }}
                     />
 
-                    {/* Order Workflow Guide */}
-                    <SafeOrderWorkflowGuide />
+                    {/* Order Workflow Guide - Hidden on very small screens */}
+                    <div className="hidden sm:block">
+                      <SafeOrderWorkflowGuide />
+                    </div>
 
                     {/* Recent Orders */}
                     {orders.length > 0 ? (
@@ -1551,26 +1571,26 @@ const SellerDashboard: React.FC = () => {
                         orderActionLoading={orderActionLoading}
                       />
                     ) : (
-                      <div className="bg-white rounded-2xl shadow-sm border border-yellow-200 p-8 text-center">
-                        <div className="text-5xl mb-4 text-gray-300">📦</div>
-                        <h3 className="text-lg font-medium text-gray-900">No Orders Yet</h3>
-                        <p className="mt-2 text-gray-500 mb-6">
+                      <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-yellow-200 p-6 sm:p-8 text-center">
+                        <div className="text-4xl sm:text-5xl mb-3 sm:mb-4 text-gray-300">📦</div>
+                        <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-1">No Orders Yet</h3>
+                        <p className="text-sm sm:text-base text-gray-500 mb-4 sm:mb-6">
                           {stripeStatus?.account?.charges_enabled 
                             ? 'You can accept payments. Create listings to start receiving orders!'
                             : 'Create listings to start receiving orders.'
                           }
                         </p>
-                        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center">
                           <button
                             onClick={() => navigate('/marketplace/create')}
-                            className="px-6 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 shadow-md hover:shadow"
+                            className="px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white font-medium rounded-lg sm:rounded-xl hover:from-yellow-600 hover:to-yellow-700 transition-all duration-200 shadow-md hover:shadow text-sm sm:text-base"
                           >
                             + Create Your First Listing
                           </button>
                           {!stripeStatus?.account?.charges_enabled && (
                             <button
                               onClick={handleOpenStripeSetup}
-                              className="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow"
+                              className="px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-medium rounded-lg sm:rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-md hover:shadow text-sm sm:text-base"
                             >
                               💰 Setup Payments
                             </button>
@@ -1579,8 +1599,8 @@ const SellerDashboard: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Action Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {/* Action Cards - RESPONSIVE GRID */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                       {actionCards.map((card, index) => (
                         <SafeActionCard
                           key={index}
@@ -1597,7 +1617,7 @@ const SellerDashboard: React.FC = () => {
                   </div>
                 )}
 
-                {/* Earnings Tab - ENHANCED: Shows detailed completed orders earnings */}
+                {/* Earnings Tab - RESPONSIVE */}
                 {activeTab === 'earnings' && (
                   <SafeEarningsTab
                     stripeStatus={{
@@ -1712,7 +1732,7 @@ const SellerDashboard: React.FC = () => {
             )}
           </div>
 
-          {/* ✅ Stripe Setup/Disconnect Modal */}
+          {/* ✅ Modals */}
           {showStripeSetup && (
             <SafeStripeSetupModal
               show={showStripeSetup}
