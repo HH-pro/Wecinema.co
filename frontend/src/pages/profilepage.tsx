@@ -39,32 +39,91 @@ const GenrePage: React.FC = () => {
     const [contentLoading, setContentLoading] = useState(false);
 
     // Direct API call for changing user type
-    const changeUserTypeDirect = async (userId: string, userType: string) => {
-        try {
-            setChangingMode(true);
-            const token = localStorage.getItem("token");
-            
-            // ✅ Use API_BASE_URL here
-            const response = await axios.put(
-                `${API_BASE_URL}/user/change-type/${userId}`,
-                { userType },
-                {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    timeout: 10000
-                }
-            );
-
-            return response.data;
-        } catch (error: any) {
-            console.error("Error changing user type:", error);
-            throw new Error(error.response?.data?.error || "Failed to change user type");
-        } finally {
-            setChangingMode(false);
+   // Direct API call for changing user type
+const changeUserTypeDirect = async (userId: string, userType: string) => {
+    try {
+        setChangingMode(true);
+        
+        // ✅ Get token from localStorage with better error handling
+        const token = localStorage.getItem("token");
+        
+        if (!token) {
+            toast.error("Please login first");
+            throw new Error("No authentication token found");
         }
-    };
+
+        // ✅ Decode token to verify it's valid
+        const tokenData = decodeToken(token);
+        if (!tokenData || !tokenData.userId) {
+            toast.error("Invalid authentication. Please login again.");
+            throw new Error("Invalid token structure");
+        }
+
+        // ✅ Log for debugging (remove in production)
+        console.log("Changing user type with:", { userId, userType, token: token.substring(0, 20) + "..." });
+
+        // ✅ Use API_BASE_URL here with better error handling
+        const response = await axios.put(
+            `${API_BASE_URL}/user/change-type/${userId}`,
+            { userType },
+            {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 10000,
+                // ✅ Add responseType to handle JSON properly
+                responseType: 'json'
+            }
+        );
+
+        // ✅ Validate response
+        if (!response.data) {
+            throw new Error("No response data received");
+        }
+
+        return response.data;
+    } catch (error: any) {
+        console.error("Error changing user type:", error);
+        
+        // ✅ Better error messages based on response
+        let errorMessage = "Failed to change user type";
+        
+        if (error.response) {
+            // The request was made and the server responded with a status code
+            // that falls out of the range of 2xx
+            console.error("Response status:", error.response.status);
+            console.error("Response data:", error.response.data);
+            
+            if (error.response.status === 401) {
+                errorMessage = "Unauthorized: Invalid or expired token. Please login again.";
+                // ✅ Clear invalid token
+                localStorage.removeItem("token");
+                // ✅ Redirect to login
+                setTimeout(() => nav("/login"), 2000);
+            } else if (error.response.status === 403) {
+                errorMessage = "Forbidden: You don't have permission to perform this action.";
+            } else if (error.response.status === 404) {
+                errorMessage = "User not found.";
+            } else if (error.response.status === 400) {
+                errorMessage = error.response.data.error || "Invalid request.";
+            } else {
+                errorMessage = error.response.data.error || `Server error: ${error.response.status}`;
+            }
+        } else if (error.request) {
+            // The request was made but no response was received
+            console.error("No response received:", error.request);
+            errorMessage = "No response from server. Please check your connection.";
+        } else {
+            // Something happened in setting up the request that triggered an Error
+            errorMessage = error.message || "Network error";
+        }
+        
+        throw new Error(errorMessage);
+    } finally {
+        setChangingMode(false);
+    }
+};
 
     useEffect(() => {
         if (!id) {
