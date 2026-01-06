@@ -1112,7 +1112,7 @@ router.get('/payment-status/:userId', async (req, res) => {
 
 
 // Change user type (buyer/seller)
-router.put("/change-type/:id", async (req, res) => {
+router.put("/change-type/:id", authenticateMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
         const { userType } = req.body;
