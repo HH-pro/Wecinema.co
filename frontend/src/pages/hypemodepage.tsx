@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from 'axios';
 import { Layout } from "../components";
 import { useNavigate } from 'react-router-dom';
@@ -289,38 +289,60 @@ const HypeModeProfile = () => {
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [countdown, setCountdown] = useState(3);
   const [hasCheckedInitialAuth, setHasCheckedInitialAuth] = useState(false);
+  const [authCheckComplete, setAuthCheckComplete] = useState(false);
+  
+  // Use refs to prevent multiple redirects
+  const redirectAttempted = useRef(false);
 
-  // Check payment status on component mount
+  // Simplified initial auth check - only run once on mount
   useEffect(() => {
     const checkInitialAuth = async () => {
+      // Prevent multiple checks
+      if (redirectAttempted.current) return;
+      
       const token = localStorage.getItem("token");
-      if (token) {
-        try {
-          const tokenData = decodeToken(token);
-          const userId = tokenData?.userId || tokenData?.id;
-          
-          if (userId) {
-            const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
-            const user = response.data;
-            
-            if (user.hasPaid) {
-              // User has paid and is logged in, redirect to home immediately
-              navigate('/');
-              return;
-            } else {
-              // User hasn't paid, set states for payment flow
-              setUserId(userId);
-              setIsLoggedIn(true);
-              setShowPaymentComponent(true);
-            }
-          }
-        } catch (error) {
-          console.error('Error checking initial auth:', error);
-          // On error, show login screen
-          setIsLoggedIn(false);
-        }
+      if (!token) {
+        setHasCheckedInitialAuth(true);
+        setAuthCheckComplete(true);
+        return;
       }
-      setHasCheckedInitialAuth(true);
+
+      try {
+        const tokenData = decodeToken(token);
+        const userId = tokenData?.userId || tokenData?.id;
+        
+        if (!userId) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("shouldRedirect");
+          setHasCheckedInitialAuth(true);
+          setAuthCheckComplete(true);
+          return;
+        }
+
+        // Check user payment status
+        const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
+        const user = response.data;
+        
+        if (user.hasPaid) {
+          // User has paid, redirect immediately
+          redirectAttempted.current = true;
+          navigate('/');
+          return;
+        } else {
+          // User hasn't paid, show payment flow
+          setUserId(userId);
+          setIsLoggedIn(true);
+          setShowPaymentComponent(true);
+        }
+      } catch (error) {
+        console.error('Error checking initial auth:', error);
+        // Clear invalid token
+        localStorage.removeItem("token");
+        localStorage.removeItem("shouldRedirect");
+      } finally {
+        setHasCheckedInitialAuth(true);
+        setAuthCheckComplete(true);
+      }
     };
 
     checkInitialAuth();
@@ -329,6 +351,7 @@ const HypeModeProfile = () => {
   // Handle redirect after login success
   useEffect(() => {
     if (loginSuccess) {
+      redirectAttempted.current = true;
       const timer = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
@@ -350,12 +373,10 @@ const HypeModeProfile = () => {
       const user = response.data;
       
       if (user.hasPaid) {
-        // User has paid, set login success and redirect
+        // User has paid, set login success
         setUserId(userId);
         setIsLoggedIn(true);
         setLoginSuccess(true);
-        // Set immediate redirect flag
-        localStorage.setItem("shouldRedirect", "true");
       } else {
         // User hasn't paid, show payment component
         setUserId(userId);
@@ -364,21 +385,10 @@ const HypeModeProfile = () => {
       }
     } catch (error) {
       console.error('Error checking payment status:', error);
-      // On error, proceed to payment component
-      setShowPaymentComponent(true);
+      setPopupMessage('Error checking payment status. Please try again.');
+      setShowPopup(true);
     }
   };
-
-  // Additional check for immediate redirect
-  useEffect(() => {
-    if (hasCheckedInitialAuth) {
-      const shouldRedirect = localStorage.getItem("shouldRedirect");
-      if (shouldRedirect === "true") {
-        navigate('/');
-        localStorage.removeItem("shouldRedirect");
-      }
-    }
-  }, [hasCheckedInitialAuth, navigate]);
 
   // Register user with backend
   const registerUser = async (username: string, email: string, avatar: string, userType: string) => {
@@ -584,35 +594,15 @@ const HypeModeProfile = () => {
     setSelectedSubscription(null);
   };
 
-  // Redirect to home if already logged in and paid
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token && hasCheckedInitialAuth) {
-      const tokenData = decodeToken(token);
-      if (tokenData?.userId || tokenData?.id) {
-        const checkAndRedirect = async () => {
-          try {
-            const userId = tokenData?.userId || tokenData?.id;
-            const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
-            if (response.data.hasPaid && !showPaymentComponent && !loginSuccess) {
-              navigate('/');
-            }
-          } catch (error) {
-            console.error('Error checking user status:', error);
-          }
-        };
-        checkAndRedirect();
-      }
-    }
-  }, [navigate, hasCheckedInitialAuth, showPaymentComponent, loginSuccess]);
-
+  // Fireworks effect on mount
   useEffect(() => {
     setShowFireworks(true);
-    setTimeout(() => setShowFireworks(false), 1000);
+    const timer = setTimeout(() => setShowFireworks(false), 3000);
+    return () => clearTimeout(timer);
   }, []);
 
   // If still checking initial auth, show loading
-  if (!hasCheckedInitialAuth) {
+  if (!authCheckComplete) {
     return (
       <Layout expand={false} hasHeader={true}>
         <div className="main-container-small" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -709,28 +699,6 @@ const HypeModeProfile = () => {
     );
   }
 
-  // If user is already logged in and has paid, redirect immediately
-  if (isLoggedIn && !showPaymentComponent && !loginSuccess) {
-    return (
-      <Layout expand={false} hasHeader={true}>
-        <div className="main-container-small" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div className="loading-spinner" style={{
-              border: '4px solid #f3f3f3',
-              borderTop: '4px solid #fbbf24',
-              borderRadius: '50%',
-              width: '50px',
-              height: '50px',
-              animation: 'spin 1s linear infinite',
-              margin: '0 auto 20px'
-            }}></div>
-            <p style={{ color: '#4b5563', fontSize: '16px' }}>Redirecting to home...</p>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
   // Render the main component
   return (
     <Layout expand={false} hasHeader={true}>
@@ -764,17 +732,22 @@ const HypeModeProfile = () => {
             padding: '12px 24px',
             borderRadius: '25px',
             fontWeight: '600',
-            cursor: 'pointer',
+            cursor: isLoading ? 'not-allowed' : 'pointer',
             transition: 'all 0.3s ease',
-            boxShadow: '0 4px 15px rgba(251, 191, 36, 0.3)'
+            boxShadow: '0 4px 15px rgba(251, 191, 36, 0.3)',
+            opacity: isLoading ? 0.7 : 1
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 6px 20px rgba(251, 191, 36, 0.4)';
+            if (!isLoading) {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 20px rgba(251, 191, 36, 0.4)';
+            }
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 4px 15px rgba(251, 191, 36, 0.3)';
+            if (!isLoading) {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 15px rgba(251, 191, 36, 0.3)';
+            }
           }}
         >
           {isLoading ? "Processing..." : (isSignup ? "Already have an account? Sign in" : "Don't have an account? Sign up")}
@@ -797,8 +770,9 @@ const HypeModeProfile = () => {
                     padding: '12px 20px',
                     borderRadius: '20px',
                     fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease'
+                    cursor: isLoading ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.3s ease',
+                    opacity: isLoading ? 0.7 : 1
                   }}
                 >
                   👤 Buyer
@@ -816,8 +790,9 @@ const HypeModeProfile = () => {
                     padding: '12px 20px',
                     borderRadius: '20px',
                     fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease'
+                    cursor: isLoading ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.3s ease',
+                    opacity: isLoading ? 0.7 : 1
                   }}
                 >
                   🏪 Seller
