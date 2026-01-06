@@ -114,7 +114,6 @@ const WeCinemaLoading = () => {
           {/* Loading Status Text */}
           <div className="flex items-center space-x-3 mb-6">
             <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-            <p className="text-gray-700 font-medium">Initializing movie database...</p>
           </div>
           
           {/* Subtle Dots Animation */}
