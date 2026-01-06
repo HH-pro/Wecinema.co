@@ -44,7 +44,7 @@ nav {
   position: fixed;
   pointer-events: none;
   will-change: transform, opacity;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.15s ease;
   z-index: 999999;
-  opacity: 0;
+  opacity: 1; /* always visible now */
 }
