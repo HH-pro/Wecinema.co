@@ -24,7 +24,7 @@ body {
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
 }
-nav {
+/* nav {
   pointer-events: auto;
 }
 
@@ -47,4 +47,4 @@ nav {
   transition: opacity 0.15s ease;
   z-index: 999999;
   opacity: 0; /* start hidden */
-}
+} */
