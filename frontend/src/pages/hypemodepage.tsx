@@ -30,6 +30,7 @@ const HypeModeProfile = () => {
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
   const [countdown, setCountdown] = useState(3);
+  const [shouldRedirect, setShouldRedirect] = useState(false);
   
   const redirectAttempted = useRef(false);
   const authCheckedRef = useRef(false);
@@ -39,6 +40,17 @@ const HypeModeProfile = () => {
     const checkInitialAuth = async () => {
       if (authCheckedRef.current) return;
       authCheckedRef.current = true;
+      
+      // Check if we just logged in and need to redirect
+      const justLoggedIn = localStorage.getItem('hypeModeJustLoggedIn');
+      if (justLoggedIn === 'true') {
+        console.log('Detected recent login, redirecting to home...');
+        localStorage.removeItem('hypeModeJustLoggedIn');
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 100);
+        return;
+      }
       
       const token = localStorage.getItem("token");
       if (!token) {
@@ -60,7 +72,8 @@ const HypeModeProfile = () => {
         
         if (user.hasPaid) {
           // User has paid, redirect to home
-          navigate('/', { replace: true });
+          console.log('User already paid, redirecting...');
+          window.location.href = '/';
         } else {
           // User hasn't paid, show payment flow
           setUserId(userId);
@@ -85,8 +98,9 @@ const HypeModeProfile = () => {
         setCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(timer);
-            // Redirect to home
-            navigate('/', { replace: true });
+            // Set localStorage marker and redirect
+            localStorage.setItem('hypeModeJustLoggedIn', 'true');
+            window.location.href = '/';
             return 0;
           }
           return prev - 1;
@@ -97,14 +111,35 @@ const HypeModeProfile = () => {
     }
   }, [loginSuccess, navigate]);
 
+  // NEW: Check if we should redirect immediately
+  useEffect(() => {
+    const checkRedirect = () => {
+      const token = localStorage.getItem("token");
+      if (token && !shouldRedirect) {
+        // If user has token but we're still on login page, redirect
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 500);
+      }
+    };
+
+    checkRedirect();
+  }, [shouldRedirect]);
+
   const checkPaymentStatus = async (userId: string) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
       const user = response.data;
       
       if (user.hasPaid) {
-        // User has paid, redirect to home
-        navigate('/', { replace: true });
+        // User has paid - set success state
+        setUserId(userId);
+        setIsLoggedIn(true);
+        setLoginSuccess(true);
+        setShouldRedirect(true);
+        
+        // Store marker for immediate redirect
+        localStorage.setItem('hypeModeJustLoggedIn', 'true');
       } else {
         // User hasn't paid, show payment component
         setUserId(userId);
@@ -115,6 +150,7 @@ const HypeModeProfile = () => {
       console.error('Error checking payment status:', error);
       setPopupMessage('Error checking payment status. Please try again.');
       setShowPopup(true);
+      setIsLoading(false);
     }
   };
 
@@ -134,6 +170,7 @@ const HypeModeProfile = () => {
 
       if (token) {
         localStorage.setItem('token', token);
+        localStorage.setItem('hypeModeJustLoggedIn', 'true'); // Add marker
         setIsLoggedIn(true);
         setUserId(userId);
         return { success: true, userId };
@@ -159,6 +196,7 @@ const HypeModeProfile = () => {
 
       if (backendToken) {
         localStorage.setItem('token', backendToken);
+        localStorage.setItem('hypeModeJustLoggedIn', 'true'); // Add marker
         setIsLoggedIn(true);
         setUserId(userId);
         return { success: true, userId };
@@ -171,7 +209,7 @@ const HypeModeProfile = () => {
     }
   };
 
-  // Handle successful authentication
+  // Handle successful authentication - SIMPLIFIED
   const onLoginSuccess = async (user: any, isEmailAuth: boolean = false) => {
     const profile = user.providerData[0];
     const email = profile.email;
@@ -327,12 +365,14 @@ const HypeModeProfile = () => {
     
     // Auto redirect after payment success
     setTimeout(() => {
-      navigate('/', { replace: true });
+      localStorage.setItem('hypeModeJustLoggedIn', 'true');
+      window.location.href = '/';
     }, 3000);
   };
 
   const handleForceRedirect = () => {
-    navigate('/', { replace: true });
+    localStorage.setItem('hypeModeJustLoggedIn', 'true');
+    window.location.href = '/';
   };
 
   // Show payment success popup
@@ -345,14 +385,15 @@ const HypeModeProfile = () => {
         amount={selectedSubscription === 'user' ? 5 : 10}
         onClose={() => {
           setShowPaymentSuccess(false);
-          navigate('/', { replace: true });
+          localStorage.setItem('hypeModeJustLoggedIn', 'true');
+          window.location.href = '/';
         }}
       />
     );
   }
 
   // Show success popup when login is successful
-  if (loginSuccess) {
+  if (loginSuccess || shouldRedirect) {
     return (
       <>
         <div className="overlay" />
@@ -403,7 +444,8 @@ const HypeModeProfile = () => {
                 onClick={() => {
                   toast.info('You can complete payment later');
                   setTimeout(() => {
-                    navigate('/', { replace: true });
+                    localStorage.setItem('hypeModeJustLoggedIn', 'true');
+                    window.location.href = '/';
                   }, 1000);
                 }}
               >
