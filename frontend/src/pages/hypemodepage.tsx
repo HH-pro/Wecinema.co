@@ -13,8 +13,8 @@ import 'react-toastify/dist/ReactToastify.css';
 import "../css/HypeModeProfile.css";
 
 // Import new components
-import PaymentComponent from "../components/PaymentComponent";
-import SuccessPopup from "../components/SuccessPopup";
+import PaymentComponent from "../../src/components/PaymentComponent/Payment";
+import SuccessPopup from "../../src/components/PaymentComponent/SuccessPopup";
 
 // Loading Spinner Component
 const LoadingSpinner = styled.div`
