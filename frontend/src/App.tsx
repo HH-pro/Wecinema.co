@@ -1,6 +1,6 @@
 import { default as Router } from "./routes";
 import "./App.css";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, TouchEvent } from "react";
 import * as Sentry from "@sentry/react";
 import AICustomerSupport from "./components/AICustomerSupport";
 import { MarketplaceProvider } from "./context/MarketplaceContext";
@@ -47,7 +47,18 @@ export default function App() {
   const [isClicking, setIsClicking] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
   const [showCursor, setShowCursor] = useState(true);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  
+  // Touch Hold to Scroll States
+  const [isTouchHolding, setIsTouchHolding] = useState(false);
+  const [touchStartY, setTouchStartY] = useState(0);
+  const [scrollVelocity, setScrollVelocity] = useState(0);
+  const [showScrollIndicator, setShowScrollIndicator] = useState(false);
+  
   const cursorRef = useRef<HTMLDivElement>(null);
+  const touchHoldTimerRef = useRef<NodeJS.Timeout>();
+  const scrollIntervalRef = useRef<NodeJS.Timeout>();
+  const touchStartRef = useRef<{y: number, time: number} | null>(null);
 
   // ✅ Tawk.to Live Chat Widget Setup
   useEffect(() => {
@@ -59,15 +70,31 @@ export default function App() {
     document.body.appendChild(script);
   }, []);
 
-  // Custom Cursor Effect
+  // Detect touch device
   useEffect(() => {
-    // Check if device supports touch
-    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const checkTouchDevice = () => {
+      const isTouch = 'ontouchstart' in window || 
+                     navigator.maxTouchPoints > 0 || 
+                     (navigator as any).msMaxTouchPoints > 0;
+      setIsTouchDevice(isTouch);
+      
+      if (isTouch) {
+        setShowCursor(false);
+        document.body.classList.add('touch-device');
+      } else {
+        document.body.classList.remove('touch-device');
+      }
+    };
     
-    if (isTouchDevice) {
-      setShowCursor(false);
-      return;
-    }
+    checkTouchDevice();
+    window.addEventListener('resize', checkTouchDevice);
+    
+    return () => window.removeEventListener('resize', checkTouchDevice);
+  }, []);
+
+  // Custom Cursor Effect (for non-touch devices)
+  useEffect(() => {
+    if (isTouchDevice) return;
 
     const updateCursor = (e: MouseEvent) => {
       setCursorPosition({ x: e.clientX, y: e.clientY });
@@ -141,9 +168,106 @@ export default function App() {
         el.removeEventListener('mouseleave', handleMouseLeaveElement);
       });
     };
-  }, []);
+  }, [isTouchDevice]);
 
-  // Click animation effect
+  // Touch Hold to Scroll Logic
+  useEffect(() => {
+    if (!isTouchDevice) return;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      touchStartRef.current = {
+        y: touch.clientY,
+        time: Date.now()
+      };
+      setTouchStartY(touch.clientY);
+      setScrollVelocity(0);
+      
+      // Show scroll indicator
+      setShowScrollIndicator(true);
+      
+      // Start timer for touch hold
+      touchHoldTimerRef.current = setTimeout(() => {
+        setIsTouchHolding(true);
+        // Start auto-scroll
+        startAutoScroll(touch.clientY);
+      }, 800); // Hold for 800ms to activate
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isTouchHolding) {
+        const touch = e.touches[0];
+        const deltaY = touchStartY - touch.clientY;
+        
+        // Calculate scroll velocity for smooth scrolling
+        if (touchStartRef.current) {
+          const timeDiff = Date.now() - touchStartRef.current.time;
+          const distance = Math.abs(touchStartRef.current.y - touch.clientY);
+          const velocity = distance / timeDiff;
+          setScrollVelocity(velocity * 10); // Scale for better UX
+        }
+      }
+    };
+
+    const handleTouchEnd = () => {
+      clearTimeout(touchHoldTimerRef.current);
+      clearInterval(scrollIntervalRef.current);
+      setIsTouchHolding(false);
+      
+      // Hide scroll indicator with delay
+      setTimeout(() => {
+        setShowScrollIndicator(false);
+      }, 1000);
+    };
+
+    const startAutoScroll = (startY: number) => {
+      let lastY = startY;
+      let scrollDirection: 'up' | 'down' = 'down';
+      
+      scrollIntervalRef.current = setInterval(() => {
+        const currentScroll = window.scrollY;
+        const windowHeight = window.innerHeight;
+        const scrollAmount = 30; // Pixels to scroll per interval
+        
+        // Determine scroll direction based on touch position
+        if (lastY < windowHeight / 3) {
+          scrollDirection = 'down';
+        } else if (lastY > windowHeight * 2/3) {
+          scrollDirection = 'up';
+        }
+        
+        // Scroll the page
+        if (scrollDirection === 'down') {
+          window.scrollTo({
+            top: currentScroll + scrollAmount,
+            behavior: 'smooth'
+          });
+        } else {
+          window.scrollTo({
+            top: Math.max(0, currentScroll - scrollAmount),
+            behavior: 'smooth'
+          });
+        }
+      }, 50); // Scroll every 50ms
+    };
+
+    // Add touch event listeners
+    document.addEventListener('touchstart', handleTouchStart as any);
+    document.addEventListener('touchmove', handleTouchMove as any);
+    document.addEventListener('touchend', handleTouchEnd);
+    document.addEventListener('touchcancel', handleTouchEnd);
+
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart as any);
+      document.removeEventListener('touchmove', handleTouchMove as any);
+      document.removeEventListener('touchend', handleTouchEnd);
+      document.removeEventListener('touchcancel', handleTouchEnd);
+      clearTimeout(touchHoldTimerRef.current);
+      clearInterval(scrollIntervalRef.current);
+    };
+  }, [isTouchDevice, isTouchHolding, touchStartY]);
+
+  // Click animation effect for cursor
   useEffect(() => {
     if (isClicking && cursorRef.current) {
       cursorRef.current.style.transform = `translate(${cursorPosition.x}px, ${cursorPosition.y}px) scale(0.7)`;
@@ -156,7 +280,7 @@ export default function App() {
     }
   }, [isClicking, cursorPosition]);
 
-  // Cursor style
+  // Cursor style (for non-touch devices)
   const cursorStyle: React.CSSProperties = {
     position: 'fixed',
     left: 0,
@@ -201,7 +325,7 @@ export default function App() {
     transition: 'all 0.15s ease'
   };
 
-  // Trail effect
+  // Trail effect for cursor
   const trailCount = 3;
   const trails = [];
   
@@ -233,27 +357,70 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {/* Custom Circle Cursor */}
-      {trails}
-      <div 
-        ref={cursorRef} 
-        style={cursorStyle}
-        className="custom-cursor"
-      >
-        <div style={innerDotStyle} />
-        {isHovering && (
-          <span style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            fontSize: '20px',
-            opacity: 0.8
-          }}>
-            👆
-          </span>
-        )}
-      </div>
+      {/* Custom Circle Cursor (for non-touch devices) */}
+      {!isTouchDevice && trails}
+      {!isTouchDevice && (
+        <div 
+          ref={cursorRef} 
+          style={cursorStyle}
+          className="custom-cursor"
+        >
+          <div style={innerDotStyle} />
+          {isHovering && (
+            <span style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              fontSize: '20px',
+              opacity: 0.8
+            }}>
+              👆
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Touch Hold Scroll Indicator (for touch devices) */}
+      {isTouchDevice && showScrollIndicator && (
+        <div className="touch-scroll-indicator">
+          <div className="scroll-indicator-content">
+            <div className="scroll-icon">
+              {isTouchHolding ? (
+                <div className="scrolling-animation">
+                  <div className="arrow up">↑</div>
+                  <div className="arrow down">↓</div>
+                </div>
+              ) : (
+                <div className="hold-to-scroll">
+                  <div className="touch-circle">
+                    <span className="touch-dot"></span>
+                  </div>
+                  <span className="hold-text">Hold to scroll</span>
+                </div>
+              )}
+            </div>
+            <div className="scroll-speed">
+              Speed: {scrollVelocity.toFixed(1)}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Touch Scroll Guide Overlay */}
+      {isTouchDevice && isTouchHolding && (
+        <div className="scroll-guide-overlay">
+          <div className="scroll-zone top">
+            <div className="zone-indicator">Scroll Up ↑</div>
+          </div>
+          <div className="scroll-zone middle">
+            <div className="zone-indicator">Release to stop</div>
+          </div>
+          <div className="scroll-zone bottom">
+            <div className="zone-indicator">Scroll Down ↓</div>
+          </div>
+        </div>
+      )}
 
       {/* Main App Content */}
       <MarketplaceProvider>
