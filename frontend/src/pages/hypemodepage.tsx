@@ -227,43 +227,67 @@ const HypeModeProfile = () => {
     }
   };
 
-  // ✅ PayPal payment success handler
-  const handlePaymentSuccess = async (details: any) => {
-    try {
-      if (!details.id || !details.payer) {
-        throw new Error('Incomplete transaction details');
-      }
-
-      setPaymentProcessing(true);
-      
-      const response = await axios.post(`${API_BASE_URL}/user/save-transaction`, {
-        userId: userId,
-        username: username,
-        email: details.payer.email_address,
-        orderId: details.id,
-        payerId: details.payer.payer_id,
-        amount: paymentAmount,
-        currency: 'USD',
-        subscriptionType: selectedSubscription
-      });
-
-      toast.success('Payment successful! Welcome to HypeMode! 🎉');
-      setUserHasPaid(true);
-      setShowPayment(false);
-      
-      // Redirect to home after successful payment
-      setTimeout(() => {
-        navigate('/');
-      }, 2000);
-
-    } catch (error) {
-      console.error('Failed to save transaction:', error);
-      toast.error('Payment failed. Please try again.');
-    } finally {
-      setPaymentProcessing(false);
+  // HypeModeProfile.tsx mein handlePaymentSuccess function update karein
+const handlePaymentSuccess = async (details: any) => {
+  try {
+    if (!details.id || !details.payer) {
+      throw new Error('Incomplete transaction details');
     }
-  };
 
+    setPaymentProcessing(true);
+    
+    console.log('Sending transaction data:', {
+      userId: userId,
+      username: username,
+      email: details.payer.email_address,
+      orderId: details.id,
+      payerId: details.payer.payer_id,
+      amount: paymentAmount,
+      currency: 'USD',
+      subscriptionType: selectedSubscription
+    });
+
+    const response = await axios.post(`${API_BASE_URL}/user/save-transaction`, {
+      userId: userId,
+      username: username,
+      email: details.payer.email_address,
+      orderId: details.id,
+      payerId: details.payer.payer_id,
+      amount: paymentAmount,
+      currency: 'USD',
+      subscriptionType: selectedSubscription
+    });
+
+    console.log('Transaction response:', response.data);
+    
+    toast.success('Payment successful! Welcome to HypeMode! 🎉');
+    setUserHasPaid(true);
+    setShowPayment(false);
+    
+    // Redirect to home after successful payment
+    setTimeout(() => {
+      navigate('/');
+    }, 2000);
+
+  } catch (error: any) {
+    console.error('Failed to save transaction:', error);
+    
+    // ✅ Detailed error logging
+    if (error.response) {
+      console.error('Server response:', error.response.data);
+      console.error('Status:', error.response.status);
+      toast.error(`Payment failed: ${error.response.data.message || 'Server error'}`);
+    } else if (error.request) {
+      console.error('No response received:', error.request);
+      toast.error('No response from server. Please check your connection.');
+    } else {
+      console.error('Error setting up request:', error.message);
+      toast.error(`Payment failed: ${error.message}`);
+    }
+  } finally {
+    setPaymentProcessing(false);
+  }
+};
   const handlePaymentError = (message: any) => {
     setPopupMessage(message);
     setShowPopup(true);
