@@ -11,7 +11,7 @@ import { decodeToken } from "../utilities/helperfFunction";
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import PayPalButtonWrapper from '../components/PaymentComponent/PayPalButtonWrapper';
-import PaymentSuccessPopup from '../components/PaymentSuccessPopup';
+import PaymentSuccessPopup from '../components/PaymentComponent/SuccessPopup';
 import { API_BASE_URL } from "../api";
 import "../css/HypeModeProfile.css";
 
