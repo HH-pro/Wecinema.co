@@ -1,18 +1,23 @@
 import { useEffect, useRef } from "react";
 
-const Cursor = () => {
-  const dotRef = useRef<HTMLDivElement>(null);
-  const ringRef = useRef<HTMLDivElement>(null);
+const TouchCursor = () => {
+  const dot = useRef<HTMLDivElement>(null);
+  const ring = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const move = (e: MouseEvent) => {
-      if (dotRef.current && ringRef.current) {
-        dotRef.current.style.left = `${e.clientX}px`;
-        dotRef.current.style.top = `${e.clientY}px`;
+      if (!dot.current || !ring.current) return;
 
-        ringRef.current.style.left = `${e.clientX}px`;
-        ringRef.current.style.top = `${e.clientY}px`;
-      }
+      dot.current.style.left = `${e.clientX}px`;
+      dot.current.style.top = `${e.clientY}px`;
+
+      ring.current.animate(
+        {
+          left: `${e.clientX}px`,
+          top: `${e.clientY}px`,
+        },
+        { duration: 120, fill: "forwards" }
+      );
     };
 
     window.addEventListener("mousemove", move);
@@ -21,10 +26,10 @@ const Cursor = () => {
 
   return (
     <>
-      <div ref={dotRef} className="cursor" />
-      <div ref={ringRef} className="cursor-ring" />
+      <div ref={dot} className="touch-dot" />
+      <div ref={ring} className="touch-ring" />
     </>
   );
 };
 
-export default Cursor;
+export default TouchCursor;
