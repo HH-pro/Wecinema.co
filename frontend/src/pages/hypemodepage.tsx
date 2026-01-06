@@ -11,7 +11,7 @@ import { decodeToken } from "../utilities/helperfFunction";
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import PayPalButtonWrapper from '../components/PaymentComponent/PayPalButtonWrapper';
-import PaymentSuccessPopup from '../components/PaymentComponent/SuccessPopup';
+import PaymentSuccessPopup from '../components/PaymentSuccessPopup';
 import { API_BASE_URL } from "../api";
 import "../css/HypeModeProfile.css";
 
@@ -289,19 +289,22 @@ const HypeModeProfile = () => {
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
   const [countdown, setCountdown] = useState(3);
-  const [hasPaid, setHasPaid] = useState(false);
+  const [hasPaid, setHasPaid] = useState<boolean | null>(null);
   
   // Use refs to prevent multiple redirects
   const redirectAttempted = useRef(false);
+  const authCheckedRef = useRef(false);
 
   // Check if user is already logged in and paid on initial load
   useEffect(() => {
     const checkInitialAuth = async () => {
       // Prevent multiple checks
-      if (redirectAttempted.current) return;
+      if (authCheckedRef.current) return;
+      authCheckedRef.current = true;
       
       const token = localStorage.getItem("token");
       if (!token) {
+        setHasPaid(false);
         return;
       }
 
@@ -311,6 +314,7 @@ const HypeModeProfile = () => {
         
         if (!userId) {
           localStorage.removeItem("token");
+          setHasPaid(false);
           return;
         }
 
@@ -319,14 +323,14 @@ const HypeModeProfile = () => {
         const user = response.data;
         
         if (user.hasPaid) {
-          // User has paid, redirect immediately with page refresh
-          redirectAttempted.current = true;
+          // User has paid, redirect immediately
           setHasPaid(true);
-          setTimeout(() => {
-            window.location.href = '/';
-          }, 500);
+          setUserId(userId);
+          setIsLoggedIn(true);
+          setLoginSuccess(true);
         } else {
           // User hasn't paid, show payment flow
+          setHasPaid(false);
           setUserId(userId);
           setIsLoggedIn(true);
           setShowPaymentComponent(true);
@@ -334,6 +338,7 @@ const HypeModeProfile = () => {
       } catch (error) {
         console.error('Error checking initial auth:', error);
         localStorage.removeItem("token");
+        setHasPaid(false);
       }
     };
 
@@ -342,8 +347,9 @@ const HypeModeProfile = () => {
 
   // Handle redirect after login success
   useEffect(() => {
-    if (loginSuccess && hasPaid) {
+    if (loginSuccess && hasPaid === true && !redirectAttempted.current) {
       redirectAttempted.current = true;
+      
       const timer = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
@@ -375,6 +381,7 @@ const HypeModeProfile = () => {
         // User hasn't paid, show payment component
         setUserId(userId);
         setIsLoggedIn(true);
+        setHasPaid(false);
         setShowPaymentComponent(true);
       }
     } catch (error) {
@@ -404,6 +411,7 @@ const HypeModeProfile = () => {
         setUserId(userId);
         return { success: true, userId };
       }
+      return { success: false };
     } catch (error: any) {
       if (error.response?.data?.error === 'Email already exists.') {
         setPopupMessage('Email already exists. Please sign in.');
@@ -428,6 +436,7 @@ const HypeModeProfile = () => {
         setUserId(userId);
         return { success: true, userId };
       }
+      return { success: false };
     } catch (error: any) {
       setPopupMessage(error.response?.data?.message || 'Login failed.');
       setShowPopup(true);
@@ -453,11 +462,12 @@ const HypeModeProfile = () => {
       if (result.success && result.userId) {
         // Check payment status after successful registration/login
         await checkPaymentStatus(result.userId);
+      } else {
+        setIsLoading(false);
       }
     } catch (error) {
       setPopupMessage('Authentication failed. Please try again.');
       setShowPopup(true);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -606,6 +616,34 @@ const HypeModeProfile = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  // Show loading while checking auth
+  if (hasPaid === null) {
+    return (
+      <Layout expand={false} hasHeader={true}>
+        <div className="main-container-small" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div className="loading-spinner" style={{
+              border: '4px solid #f3f3f3',
+              borderTop: '4px solid #fbbf24',
+              borderRadius: '50%',
+              width: '50px',
+              height: '50px',
+              animation: 'spin 1s linear infinite',
+              margin: '0 auto 20px'
+            }}></div>
+            <p style={{ color: '#4b5563', fontSize: '16px' }}>Checking authentication...</p>
+            <style>{`
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+            `}</style>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   // Show payment success popup
   if (showPaymentSuccess && selectedSubscription) {
     return (
@@ -623,7 +661,7 @@ const HypeModeProfile = () => {
   }
 
   // Show professional success popup when login is successful and user has paid
-  if (loginSuccess && hasPaid) {
+  if (loginSuccess && hasPaid === true) {
     return (
       <>
         <Overlay />
@@ -685,7 +723,7 @@ const HypeModeProfile = () => {
     );
   }
 
-  // Render the main component
+  // Render the main component (only show if user is not logged in or needs to select subscription)
   return (
     <Layout expand={false} hasHeader={true}>
       <div className="banner-small">
@@ -739,7 +777,7 @@ const HypeModeProfile = () => {
           {isLoading ? "Processing..." : (isSignup ? "Already have an account? Sign in" : "Don't have an account? Sign up")}
         </button>
 
-        {!isLoggedIn && (
+        {hasPaid === false && !isLoggedIn && (
           <>
             {isSignup && (
               <div className="user-type-selector-small">
