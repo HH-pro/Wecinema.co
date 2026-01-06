@@ -6,6 +6,7 @@ import AICustomerSupport from "./components/AICustomerSupport";
 import { MarketplaceProvider } from "./context/MarketplaceContext"; // 🆕 ADD MARKETPLACE PROVIDER
 import { ToastContainer } from 'react-toastify'; // 🆕 ADD TOAST CONTAINER
 import 'react-toastify/dist/ReactToastify.css'; // 🆕 ADD TOAST STYLES
+import TouchApp from './Cursor ';
 
 export const categories = [
   "Action ",
@@ -55,6 +56,7 @@ export default function App() {
   return (
     <div>
       {/* 🆕 WRAP EVERYTHING WITH MARKETPLACE PROVIDER */}
+      <TouchApp />
       <MarketplaceProvider>
         <AICustomerSupport />
         <Router />
