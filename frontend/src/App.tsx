@@ -3,11 +3,14 @@ import "./App.css";
 import { useEffect } from "react";
 import * as Sentry from "@sentry/react";
 import AICustomerSupport from "./components/AICustomerSupport";
-import { MarketplaceProvider } from "./context/MarketplaceContext"; // 🆕 ADD MARKETPLACE PROVIDER
-import { ToastContainer } from 'react-toastify'; // 🆕 ADD TOAST CONTAINER
-import 'react-toastify/dist/ReactToastify.css'; // 🆕 ADD TOAST STYLES
-import TouchCursor from ".././src/Cursor ";
+import { MarketplaceProvider } from "./context/MarketplaceContext";
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
+// 🆕 Import touch scroll and custom cursor
 import TouchScroll from "./TouchScroll";
+import TouchCursor from "./TouchScroll";
+
 export const categories = [
   "Action ",
   "Adventure ",
@@ -56,13 +59,15 @@ export default function App() {
   return (
     <div>
       {/* 🆕 WRAP EVERYTHING WITH MARKETPLACE PROVIDER */}
-       <TouchCursor />
-            <TouchScroll />
       <MarketplaceProvider>
+        {/* 🆕 Touch scroll and custom cursor */}
+        <TouchScroll />
+        <TouchCursor />
+
         <AICustomerSupport />
         <Router />
-        
-        {/* 🆕 ADD TOAST CONTAINER FOR NOTIFICATIONS */}
+
+        {/* 🆕 Toast Container for notifications */}
         <ToastContainer
           position="top-right"
           autoClose={5000}
