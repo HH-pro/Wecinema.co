@@ -1,10 +1,11 @@
 import { default as Router } from "./routes";
 import "./App.css";
 import { useEffect } from "react";
+import * as Sentry from "@sentry/react";
 import AICustomerSupport from "./components/AICustomerSupport";
-import { MarketplaceProvider } from "./context/MarketplaceContext";
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { MarketplaceProvider } from "./context/MarketplaceContext"; // 🆕 ADD MARKETPLACE PROVIDER
+import { ToastContainer } from 'react-toastify'; // 🆕 ADD TOAST CONTAINER
+import 'react-toastify/dist/ReactToastify.css'; // 🆕 ADD TOAST STYLES
 
 export const categories = [
   "Action ",
@@ -41,20 +42,6 @@ export const themes = [
 export const ratings = ["g ", "pg ", "pg-13 ", "r ", "x "];
 
 export default function App() {
-  // Simple check on app load
-  useEffect(() => {
-    // Check if we need to redirect after login
-    const shouldRedirect = sessionStorage.getItem('redirectAfterLogin');
-    
-    if (shouldRedirect === 'true') {
-      sessionStorage.removeItem('redirectAfterLogin');
-      // Small delay to ensure everything is loaded
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 50);
-    }
-  }, []);
-
   // ✅ Tawk.to Live Chat Widget Setup
   useEffect(() => {
     const script = document.createElement("script");
@@ -67,10 +54,12 @@ export default function App() {
 
   return (
     <div>
+      {/* 🆕 WRAP EVERYTHING WITH MARKETPLACE PROVIDER */}
       <MarketplaceProvider>
         <AICustomerSupport />
         <Router />
         
+        {/* 🆕 ADD TOAST CONTAINER FOR NOTIFICATIONS */}
         <ToastContainer
           position="top-right"
           autoClose={5000}
