@@ -326,7 +326,6 @@ const HypeModeProfile = () => {
         if (user.hasPaid) {
           // User has paid, redirect immediately
           redirectAttempted.current = true;
-            window.location.reload();
 
           navigate('/');
           return;
