@@ -762,7 +762,62 @@ export const setStorageItem = (key: string, value: any): void => {
     console.error(`Error setting item ${key} in localStorage:`, error);
   }
 };
+// ========================
+// AUTH FUNCTIONS
+// ========================
 
+export const signup = async (
+  username: string, 
+  email: string, 
+  avatar: string, 
+  userType: string,
+  setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+) => {
+  return await postRequest('/user/signup', {
+    username,
+    email,
+    avatar,
+    userType,
+    dob: "01-01-2000"
+  }, setLoading, {
+    message: 'Registration successful!',
+    showToast: true
+  });
+};
+
+export const signin = async (
+  email: string,
+  setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+) => {
+  return await postRequest('/user/signin', {
+    email
+  }, setLoading, {
+    message: 'Login successful!',
+    showToast: true
+  });
+};
+
+export const getUser = async (
+  userId: string,
+  setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+) => {
+  return await getRequest(`/user/${userId}`, setLoading, {
+    showToast: false
+  });
+};
+
+export const updatePaymentStatus = async (
+  userId: string,
+  hasPaid: boolean = true,
+  setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+) => {
+  return await putRequest(`/user/${userId}`, {
+    hasPaid
+  }, setLoading, {
+    message: 'Payment status updated!',
+    showToast: true
+  });
+};
 export const removeStorageItem = (key: string): void => {
   try {
     localStorage.removeItem(key);
