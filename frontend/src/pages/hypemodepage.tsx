@@ -290,10 +290,12 @@ const HypeModeProfile = () => {
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
   const [countdown, setCountdown] = useState(3);
   const [hasPaid, setHasPaid] = useState<boolean | null>(null);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   
   // Use refs to prevent multiple redirects
   const redirectAttempted = useRef(false);
   const authCheckedRef = useRef(false);
+  const paymentStatusCheckedRef = useRef(false);
 
   // Check if user is already logged in and paid on initial load
   useEffect(() => {
@@ -318,22 +320,13 @@ const HypeModeProfile = () => {
           return;
         }
 
-        // Check user payment status
-        const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
-        const user = response.data;
+        setUserId(userId);
+        setIsLoggedIn(true);
         
-        if (user.hasPaid) {
-          // User has paid, redirect immediately
-          setHasPaid(true);
-          setUserId(userId);
-          setIsLoggedIn(true);
-          setLoginSuccess(true);
-        } else {
-          // User hasn't paid, show payment flow
-          setHasPaid(false);
-          setUserId(userId);
-          setIsLoggedIn(true);
-          setShowPaymentComponent(true);
+        // Check user payment status
+        if (!paymentStatusCheckedRef.current) {
+          paymentStatusCheckedRef.current = true;
+          await checkPaymentStatus(userId);
         }
       } catch (error) {
         console.error('Error checking initial auth:', error);
@@ -349,13 +342,22 @@ const HypeModeProfile = () => {
   useEffect(() => {
     if (loginSuccess && hasPaid === true && !redirectAttempted.current) {
       redirectAttempted.current = true;
+      setIsRedirecting(true);
+      
+      // Store login state in localStorage to persist across refresh
+      localStorage.setItem('justLoggedIn', 'true');
+      localStorage.setItem('lastLoginTime', Date.now().toString());
       
       const timer = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(timer);
-            // Force full page refresh and redirect
-            window.location.href = '/';
+            // Use navigate instead of window.location.href for SPA navigation
+            navigate('/', { replace: true });
+            // Force reload only if needed
+            setTimeout(() => {
+              window.location.reload();
+            }, 100);
             return 0;
           }
           return prev - 1;
@@ -364,8 +366,9 @@ const HypeModeProfile = () => {
       
       return () => clearInterval(timer);
     }
-  }, [loginSuccess, hasPaid]);
+  }, [loginSuccess, hasPaid, navigate]);
 
+  // Check payment status
   const checkPaymentStatus = async (userId: string) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
@@ -373,14 +376,10 @@ const HypeModeProfile = () => {
       
       if (user.hasPaid) {
         // User has paid, set login success
-        setUserId(userId);
-        setIsLoggedIn(true);
         setHasPaid(true);
         setLoginSuccess(true);
       } else {
         // User hasn't paid, show payment component
-        setUserId(userId);
-        setIsLoggedIn(true);
         setHasPaid(false);
         setShowPaymentComponent(true);
       }
@@ -388,6 +387,7 @@ const HypeModeProfile = () => {
       console.error('Error checking payment status:', error);
       setPopupMessage('Error checking payment status. Please try again.');
       setShowPopup(true);
+      setHasPaid(false);
     }
   };
 
@@ -594,19 +594,34 @@ const HypeModeProfile = () => {
     setSelectedSubscription(null);
   };
 
-  const handlePaymentSuccess = () => {
-    setShowPaymentSuccess(true);
-    setShowPaymentComponent(false);
-    setHasPaid(true);
-    
-    // Auto redirect after payment success
-    setTimeout(() => {
-      window.location.href = '/';
-    }, 3000);
+  const handlePaymentSuccess = async () => {
+    try {
+      // Update local state first
+      setShowPaymentSuccess(true);
+      setShowPaymentComponent(false);
+      setHasPaid(true);
+      setLoginSuccess(true);
+      
+      // Update user payment status in backend
+      if (userId) {
+        await axios.put(`${API_BASE_URL}/user/${userId}/update-payment`, {
+          hasPaid: true
+        });
+      }
+      
+      // Store success state
+      localStorage.setItem('paymentCompleted', 'true');
+      
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+    }
   };
 
   const handleForceRedirect = () => {
-    window.location.href = '/';
+    navigate('/', { replace: true });
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
   };
 
   // Fireworks effect on mount
@@ -654,7 +669,8 @@ const HypeModeProfile = () => {
         amount={selectedSubscription === 'user' ? 5 : 10}
         onClose={() => {
           setShowPaymentSuccess(false);
-          window.location.href = '/';
+          navigate('/', { replace: true });
+          setTimeout(() => window.location.reload(), 100);
         }}
       />
     );
@@ -672,10 +688,10 @@ const HypeModeProfile = () => {
             You're being redirected to the home page. The page will refresh automatically.
           </SuccessMessage>
           <CountdownText>
-            Refreshing page in {countdown} second{countdown !== 1 ? 's' : ''}...
+            {isRedirecting ? `Redirecting in ${countdown} second${countdown !== 1 ? 's' : ''}...` : 'Preparing redirect...'}
           </CountdownText>
           <CloseButton onClick={handleForceRedirect}>
-            Go Now (Refresh)
+            {isRedirecting ? 'Go Now' : 'Redirect Now'}
           </CloseButton>
         </ProfessionalSuccessPopup>
       </>
@@ -710,7 +726,10 @@ const HypeModeProfile = () => {
               <PaymentButton 
                 onClick={() => {
                   toast.info('You can complete payment later');
-                  setTimeout(() => window.location.href = '/', 1000);
+                  setTimeout(() => {
+                    navigate('/');
+                    setTimeout(() => window.location.reload(), 100);
+                  }, 1000);
                 }}
                 style={{ marginTop: '15px', background: 'linear-gradient(135deg, #6b7280, #4b5563)' }}
               >
