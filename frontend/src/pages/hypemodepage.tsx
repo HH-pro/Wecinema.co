@@ -288,6 +288,7 @@ const HypeModeProfile = () => {
   const [showPaymentComponent, setShowPaymentComponent] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [countdown, setCountdown] = useState(3);
+  const [hasCheckedInitialAuth, setHasCheckedInitialAuth] = useState(false);
 
   // Check payment status on component mount
   useEffect(() => {
@@ -303,18 +304,23 @@ const HypeModeProfile = () => {
             const user = response.data;
             
             if (user.hasPaid) {
-              // User has paid and is logged in, redirect to home
+              // User has paid and is logged in, redirect to home immediately
               navigate('/');
+              return;
             } else {
-              // User hasn't paid, show payment component if subscription is selected
+              // User hasn't paid, set states for payment flow
               setUserId(userId);
               setIsLoggedIn(true);
+              setShowPaymentComponent(true);
             }
           }
         } catch (error) {
           console.error('Error checking initial auth:', error);
+          // On error, show login screen
+          setIsLoggedIn(false);
         }
       }
+      setHasCheckedInitialAuth(true);
     };
 
     checkInitialAuth();
@@ -344,10 +350,12 @@ const HypeModeProfile = () => {
       const user = response.data;
       
       if (user.hasPaid) {
-        // User has paid, set login success
+        // User has paid, set login success and redirect
         setUserId(userId);
         setIsLoggedIn(true);
         setLoginSuccess(true);
+        // Set immediate redirect flag
+        localStorage.setItem("shouldRedirect", "true");
       } else {
         // User hasn't paid, show payment component
         setUserId(userId);
@@ -356,13 +364,26 @@ const HypeModeProfile = () => {
       }
     } catch (error) {
       console.error('Error checking payment status:', error);
+      // On error, proceed to payment component
+      setShowPaymentComponent(true);
     }
   };
+
+  // Additional check for immediate redirect
+  useEffect(() => {
+    if (hasCheckedInitialAuth) {
+      const shouldRedirect = localStorage.getItem("shouldRedirect");
+      if (shouldRedirect === "true") {
+        navigate('/');
+        localStorage.removeItem("shouldRedirect");
+      }
+    }
+  }, [hasCheckedInitialAuth, navigate]);
 
   // Register user with backend
   const registerUser = async (username: string, email: string, avatar: string, userType: string) => {
     try {
-      const res = await axios.post('https://wecinema-co.onrender.com/user/signup', {
+      const res = await axios.post(`${API_BASE_URL}/user/signup`, {
         username,
         email,
         avatar,
@@ -393,7 +414,7 @@ const HypeModeProfile = () => {
   // Login user with backend
   const loginUser = async (email: string) => {
     try {
-      const res = await axios.post('https://wecinema-co.onrender.com/user/signin', { email });
+      const res = await axios.post(`${API_BASE_URL}/user/signin`, { email });
       const backendToken = res.data.token;
       const userId = res.data.id;
 
@@ -422,18 +443,16 @@ const HypeModeProfile = () => {
     const avatar = profile.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`;
 
     try {
+      let result;
       if (isSignup) {
-        const result = await registerUser(username, email, avatar, userType);
-        if (result.success && result.userId) {
-          // Check payment status after successful registration
-          await checkPaymentStatus(result.userId);
-        }
+        result = await registerUser(username, email, avatar, userType);
       } else {
-        const result = await loginUser(email);
-        if (result.success && result.userId) {
-          // Check payment status after successful login
-          await checkPaymentStatus(result.userId);
-        }
+        result = await loginUser(email);
+      }
+      
+      if (result.success && result.userId) {
+        // Check payment status after successful registration/login
+        await checkPaymentStatus(result.userId);
       }
     } catch (error) {
       setPopupMessage('Authentication failed. Please try again.');
@@ -565,10 +584,60 @@ const HypeModeProfile = () => {
     setSelectedSubscription(null);
   };
 
+  // Redirect to home if already logged in and paid
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token && hasCheckedInitialAuth) {
+      const tokenData = decodeToken(token);
+      if (tokenData?.userId || tokenData?.id) {
+        const checkAndRedirect = async () => {
+          try {
+            const userId = tokenData?.userId || tokenData?.id;
+            const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
+            if (response.data.hasPaid && !showPaymentComponent && !loginSuccess) {
+              navigate('/');
+            }
+          } catch (error) {
+            console.error('Error checking user status:', error);
+          }
+        };
+        checkAndRedirect();
+      }
+    }
+  }, [navigate, hasCheckedInitialAuth, showPaymentComponent, loginSuccess]);
+
   useEffect(() => {
     setShowFireworks(true);
     setTimeout(() => setShowFireworks(false), 1000);
   }, []);
+
+  // If still checking initial auth, show loading
+  if (!hasCheckedInitialAuth) {
+    return (
+      <Layout expand={false} hasHeader={true}>
+        <div className="main-container-small" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div className="loading-spinner" style={{
+              border: '4px solid #f3f3f3',
+              borderTop: '4px solid #fbbf24',
+              borderRadius: '50%',
+              width: '50px',
+              height: '50px',
+              animation: 'spin 1s linear infinite',
+              margin: '0 auto 20px'
+            }}></div>
+            <p style={{ color: '#4b5563', fontSize: '16px' }}>Checking authentication status...</p>
+            <style>{`
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+            `}</style>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   // Show professional success popup when login is successful
   if (loginSuccess) {
@@ -606,7 +675,7 @@ const HypeModeProfile = () => {
           <PaymentSubscriptionBox>
             <div>
               <Title>Complete Your Subscription</Title>
-              <Description>Subscription Plan: {subscriptionType === "user" ? "Basic Plan" : "Pro Plan"}</Description>
+              <Description>Subscription Plan: {selectedSubscription === "user" ? "Basic Plan" : "Pro Plan"}</Description>
               <Description>User Type: {userType === "buyer" ? "👤 Buyer" : "🏪 Seller"}</Description>
               <Description style={{ fontSize: '28px', fontWeight: 'bold', color: '#1f2937', margin: '25px 0' }}>
                 Total Amount: ${selectedSubscription === 'user' ? 5 : 10}
@@ -616,14 +685,23 @@ const HypeModeProfile = () => {
                 amount={selectedSubscription === 'user' ? 5 : 10} 
                 userId={userId} 
                 onSuccess={() => {
-                  toast.success('Payment successful!');
-                  setTimeout(() => navigate('/'), 2000);
+                  toast.success('Payment successful! Redirecting to home...');
+                  setTimeout(() => navigate('/'), 1500);
                 }}
                 onError={(msg) => {
                   setPopupMessage(msg);
                   setShowPopup(true);
                 }}
               />
+              <PaymentButton 
+                onClick={() => {
+                  toast.info('You can complete payment later');
+                  setTimeout(() => navigate('/'), 1000);
+                }}
+                style={{ marginTop: '15px', background: 'linear-gradient(135deg, #6b7280, #4b5563)' }}
+              >
+                Skip for Now
+              </PaymentButton>
             </div>
           </PaymentSubscriptionBox>
         </Container>
@@ -631,28 +709,27 @@ const HypeModeProfile = () => {
     );
   }
 
-  // If user is already logged in and has subscription, redirect to home
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      const tokenData = decodeToken(token);
-      if (tokenData?.userId || tokenData?.id) {
-        // User is logged in, check if they should be redirected
-        const checkAndRedirect = async () => {
-          try {
-            const userId = tokenData?.userId || tokenData?.id;
-            const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
-            if (response.data.hasPaid) {
-              navigate('/');
-            }
-          } catch (error) {
-            console.error('Error checking user status:', error);
-          }
-        };
-        checkAndRedirect();
-      }
-    }
-  }, [navigate]);
+  // If user is already logged in and has paid, redirect immediately
+  if (isLoggedIn && !showPaymentComponent && !loginSuccess) {
+    return (
+      <Layout expand={false} hasHeader={true}>
+        <div className="main-container-small" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div className="loading-spinner" style={{
+              border: '4px solid #f3f3f3',
+              borderTop: '4px solid #fbbf24',
+              borderRadius: '50%',
+              width: '50px',
+              height: '50px',
+              animation: 'spin 1s linear infinite',
+              margin: '0 auto 20px'
+            }}></div>
+            <p style={{ color: '#4b5563', fontSize: '16px' }}>Redirecting to home...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   // Render the main component
   return (
@@ -700,14 +777,10 @@ const HypeModeProfile = () => {
             e.currentTarget.style.boxShadow = '0 4px 15px rgba(251, 191, 36, 0.3)';
           }}
         >
-          {isSignup ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
+          {isLoading ? "Processing..." : (isSignup ? "Already have an account? Sign in" : "Don't have an account? Sign up")}
         </button>
 
-        {isLoggedIn ? (
-          <div className="cards-container-small" style={{ display: 'none' }}>
-            {/* Hide logout button when logged in */}
-          </div>
-        ) : (
+        {!isLoggedIn && (
           <>
             {isSignup && (
               <div className="user-type-selector-small">
@@ -764,7 +837,9 @@ const HypeModeProfile = () => {
                   boxShadow: selectedSubscription === "user"
                     ? '0 15px 30px rgba(251, 191, 36, 0.2)'
                     : '0 5px 15px rgba(0, 0, 0, 0.1)',
-                  transition: 'all 0.3s ease'
+                  transition: 'all 0.3s ease',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  opacity: isLoading ? 0.7 : 1
                 }}
               >
                 <div 
@@ -810,21 +885,26 @@ const HypeModeProfile = () => {
                         padding: '14px 20px',
                         borderRadius: '25px',
                         fontWeight: '600',
-                        cursor: 'pointer',
+                        cursor: isLoading ? 'not-allowed' : 'pointer',
                         transition: 'all 0.3s ease',
                         boxShadow: '0 4px 15px rgba(251, 191, 36, 0.3)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '10px'
+                        gap: '10px',
+                        opacity: isLoading ? 0.7 : 1
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(251, 191, 36, 0.4)';
+                        if (!isLoading) {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = '0 6px 20px rgba(251, 191, 36, 0.4)';
+                        }
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 4px 15px rgba(251, 191, 36, 0.3)';
+                        if (!isLoading) {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 4px 15px rgba(251, 191, 36, 0.3)';
+                        }
                       }}
                     >
                       <span className="google-icon-small">G</span>
@@ -848,7 +928,8 @@ const HypeModeProfile = () => {
                             border: '2px solid #fbbf24',
                             borderRadius: '12px',
                             padding: '12px 15px',
-                            fontSize: '14px'
+                            fontSize: '14px',
+                            opacity: isLoading ? 0.7 : 1
                           }}
                         />
                       )}
@@ -863,7 +944,8 @@ const HypeModeProfile = () => {
                           border: '2px solid #fbbf24',
                           borderRadius: '12px',
                           padding: '12px 15px',
-                          fontSize: '14px'
+                          fontSize: '14px',
+                          opacity: isLoading ? 0.7 : 1
                         }}
                       />
                       <input
@@ -877,7 +959,8 @@ const HypeModeProfile = () => {
                           border: '2px solid #fbbf24',
                           borderRadius: '12px',
                           padding: '12px 15px',
-                          fontSize: '14px'
+                          fontSize: '14px',
+                          opacity: isLoading ? 0.7 : 1
                         }}
                       />
                       <button 
@@ -891,17 +974,22 @@ const HypeModeProfile = () => {
                           padding: '14px 20px',
                           borderRadius: '25px',
                           fontWeight: '600',
-                          cursor: 'pointer',
+                          cursor: isLoading ? 'not-allowed' : 'pointer',
                           transition: 'all 0.3s ease',
-                          boxShadow: '0 4px 15px rgba(251, 191, 36, 0.3)'
+                          boxShadow: '0 4px 15px rgba(251, 191, 36, 0.3)',
+                          opacity: isLoading ? 0.7 : 1
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                          e.currentTarget.style.boxShadow = '0 6px 20px rgba(251, 191, 36, 0.4)';
+                          if (!isLoading) {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 6px 20px rgba(251, 191, 36, 0.4)';
+                          }
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = '0 4px 15px rgba(251, 191, 36, 0.3)';
+                          if (!isLoading) {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 4px 15px rgba(251, 191, 36, 0.3)';
+                          }
                         }}
                       >
                         {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
@@ -922,7 +1010,9 @@ const HypeModeProfile = () => {
                   boxShadow: selectedSubscription === "studio"
                     ? '0 15px 30px rgba(251, 191, 36, 0.2)'
                     : '0 5px 15px rgba(0, 0, 0, 0.1)',
-                  transition: 'all 0.3s ease'
+                  transition: 'all 0.3s ease',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  opacity: isLoading ? 0.7 : 1
                 }}
               >
                 <div 
@@ -967,21 +1057,26 @@ const HypeModeProfile = () => {
                         padding: '14px 20px',
                         borderRadius: '25px',
                         fontWeight: '600',
-                        cursor: 'pointer',
+                        cursor: isLoading ? 'not-allowed' : 'pointer',
                         transition: 'all 0.3s ease',
                         boxShadow: '0 4px 15px rgba(251, 191, 36, 0.3)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '10px'
+                        gap: '10px',
+                        opacity: isLoading ? 0.7 : 1
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(251, 191, 36, 0.4)';
+                        if (!isLoading) {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = '0 6px 20px rgba(251, 191, 36, 0.4)';
+                        }
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 4px 15px rgba(251, 191, 36, 0.3)';
+                        if (!isLoading) {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 4px 15px rgba(251, 191, 36, 0.3)';
+                        }
                       }}
                     >
                       <span className="google-icon-small">G</span>
@@ -1005,7 +1100,8 @@ const HypeModeProfile = () => {
                             border: '2px solid #fbbf24',
                             borderRadius: '12px',
                             padding: '12px 15px',
-                            fontSize: '14px'
+                            fontSize: '14px',
+                            opacity: isLoading ? 0.7 : 1
                           }}
                         />
                       )}
@@ -1020,7 +1116,8 @@ const HypeModeProfile = () => {
                           border: '2px solid #fbbf24',
                           borderRadius: '12px',
                           padding: '12px 15px',
-                          fontSize: '14px'
+                          fontSize: '14px',
+                          opacity: isLoading ? 0.7 : 1
                         }}
                       />
                       <input
@@ -1034,7 +1131,8 @@ const HypeModeProfile = () => {
                           border: '2px solid #fbbf24',
                           borderRadius: '12px',
                           padding: '12px 15px',
-                          fontSize: '14px'
+                          fontSize: '14px',
+                          opacity: isLoading ? 0.7 : 1
                         }}
                       />
                       <button 
@@ -1048,17 +1146,22 @@ const HypeModeProfile = () => {
                           padding: '14px 20px',
                           borderRadius: '25px',
                           fontWeight: '600',
-                          cursor: 'pointer',
+                          cursor: isLoading ? 'not-allowed' : 'pointer',
                           transition: 'all 0.3s ease',
-                          boxShadow: '0 4px 15px rgba(251, 191, 36, 0.3)'
+                          boxShadow: '0 4px 15px rgba(251, 191, 36, 0.3)',
+                          opacity: isLoading ? 0.7 : 1
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                          e.currentTarget.style.boxShadow = '0 6px 20px rgba(251, 191, 36, 0.4)';
+                          if (!isLoading) {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 6px 20px rgba(251, 191, 36, 0.4)';
+                          }
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = '0 4px 15px rgba(251, 191, 36, 0.3)';
+                          if (!isLoading) {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 4px 15px rgba(251, 191, 36, 0.3)';
+                          }
                         }}
                       >
                         {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
