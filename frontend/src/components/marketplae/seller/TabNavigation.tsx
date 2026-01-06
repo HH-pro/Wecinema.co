@@ -1,4 +1,4 @@
-// Alternative: src/components/marketplae/seller/TabNavigation.tsx - ICONS ONLY MOBILE
+// Alternative: src/components/marketplace/seller/TabNavigation.tsx - ICONS ONLY MOBILE
 import React from 'react';
 
 interface Tab {
@@ -17,8 +17,8 @@ interface TabNavigationProps {
 const TabNavigation: React.FC<TabNavigationProps> = ({ tabs, activeTab, onTabChange }) => {
   return (
     <div className="mb-6 sm:mb-8">
-      {/* Desktop Version (Full Labels) */}
-      <div className="hidden sm:block">
+      {/* Desktop Version (Full Labels) - SHOW ON MEDIUM AND LARGER SCREENS */}
+      <div className="hidden md:block">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-1">
           <nav className="flex space-x-1" aria-label="Tabs">
             {tabs.map((tab) => (
@@ -53,8 +53,8 @@ const TabNavigation: React.FC<TabNavigationProps> = ({ tabs, activeTab, onTabCha
         </div>
       </div>
 
-      {/* Mobile Version (Icons Only) */}
-      <div className="block sm:hidden">
+      {/* Mobile & Tablet Version (Icons Only) - SHOW ON SMALL AND MEDIUM SCREENS */}
+      <div className="block md:hidden">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-1">
           <nav className="flex justify-between" aria-label="Tabs">
             {tabs.map((tab) => (
@@ -82,7 +82,7 @@ const TabNavigation: React.FC<TabNavigationProps> = ({ tabs, activeTab, onTabCha
                         : 'bg-gray-100 text-gray-800 border border-gray-300'
                       }
                     `}>
-                      {tab.badge}
+                      {tab.badge > 9 ? '9+' : tab.badge}
                     </span>
                   )}
                 </div>
