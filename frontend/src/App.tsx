@@ -9,7 +9,7 @@ import 'react-toastify/dist/ReactToastify.css';
 
 // 🆕 Import touch scroll and custom cursor
 import TouchScroll from "./TouchScroll";
-import TouchCursor from "./TouchScroll";
+import TouchCursor from "./Cursor";
 
 export const categories = [
   "Action ",
