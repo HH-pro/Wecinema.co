@@ -1,22 +1,28 @@
 /* HypeModeProfile.css */
-
-/* Remove banner if not needed, or keep with yellow theme */
 .banner-small {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
+  background:  #ffa500;
+  background-size: 400% 400%;
+  animation: gradientShift 3s ease infinite;
   color: white;
   text-align: center;
-  margin-top: 60px;
-  padding: 12px;
-  font-size: 14px;
-  font-weight: 600;
+  margin-top: 20px;
+  padding: 6px;
+  font-size: 12px;
+  font-weight: bold;
   position: relative;
   overflow: hidden;
 }
 
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
 .main-container-small {
   max-width: 900px;
-  margin: 60px auto 0;
-  padding: 20px;
+  margin: 0 auto;
+  padding: 10px;
   min-height: calc(100vh - 100px);
   display: flex;
   flex-direction: column;
@@ -24,22 +30,20 @@
 }
 
 .toggle-button-small {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
+  background: #667eea;
   color: white;
   border: none;
-  padding: 12px 30px;
-  border-radius: 25px;
+  padding: 6px 12px;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 30px;
+  font-size: 11px;
+  margin-bottom: 12px;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
 }
 
 .toggle-button-small:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+  background: #5a6fd8;
+  transform: translateY(-1px);
 }
 
 .toggle-button-small:disabled {
@@ -49,33 +53,30 @@
 
 .user-type-selector-small {
   display: flex;
-  gap: 15px;
-  margin-bottom: 30px;
+  gap: 8px;
+  margin-bottom: 12px;
   justify-content: center;
-  flex-wrap: wrap;
 }
 
 .user-type-button-small {
-  padding: 12px 25px;
-  border: none;
-  border-radius: 25px;
-  background: #fef3c7;
-  color: #92400e;
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: white;
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 10px;
   transition: all 0.3s ease;
 }
 
 .user-type-button-small.active-small {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
+  background: #667eea;
   color: white;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  border-color: #667eea;
 }
 
 .user-type-button-small:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .user-type-button-small:disabled {
@@ -85,129 +86,117 @@
 
 .cards-container-small {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-  gap: 30px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 15px;
   width: 100%;
-  max-width: 800px;
+  max-width: 600px;
   margin: 0 auto;
 }
 
 .subscription-box-small {
   background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 15px;
-  padding: 25px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 15px;
   text-align: center;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   position: relative;
-  min-height: 450px;
+  min-height: 400px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  overflow: hidden;
 }
 
 .subscription-box-small:hover:not(.selected-small) {
-  border-color: #f59e0b;
-  transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.15);
+  border-color: #667eea;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 .subscription-box-small.selected-small {
-  border: 2px solid #f59e0b;
-  background: linear-gradient(135deg, #fffbeb, #ffffff);
-  box-shadow: 0 8px 25px rgba(245, 158, 11, 0.15);
+  border-color: #667eea;
+  background: linear-gradient(135deg, #f5f7ff, #ffffff);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.15);
 }
 
 .premium-badge-small {
   position: absolute;
-  top: 15px;
-  right: 15px;
-  background: linear-gradient(135deg, #f59e0b, #d97706);
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(45deg, #ff6b6b, #ffa500);
   color: white;
-  padding: 6px 15px;
-  border-radius: 20px;
-  font-size: 14px;
-  font-weight: 600;
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
-  z-index: 1;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: bold;
 }
 
 .subscription-title-small {
-  font-size: 22px;
-  font-weight: 700;
-  margin: 10px 0 10px 0;
-  color: #1f2937;
+  font-size: 16px;
+  font-weight: bold;
+  margin: 8px 0 5px 0;
+  color: #2d3748;
 }
 
 .subscription-price-small {
-  font-size: 28px;
-  font-weight: 800;
-  color: #b45309;
-  margin-bottom: 15px;
+  font-size: 18px;
+  font-weight: bold;
+  color: #667eea;
+  margin-bottom: 5px;
 }
 
 .subscription-description-small {
-  font-size: 15px;
-  color: #6b7280;
-  margin-bottom: 20px;
-  line-height: 1.5;
+  font-size: 11px;
+  color: #718096;
+  margin-bottom: 12px;
+  line-height: 1.3;
 }
 
 .features-list-small {
   list-style: none;
   padding: 0;
-  margin: 15px 0;
+  margin: 10px 0;
   text-align: left;
   flex-grow: 1;
 }
 
 .features-list-small li {
-  padding: 8px 0;
-  font-size: 14px;
-  color: #4b5563;
+  padding: 3px 0;
+  font-size: 11px;
+  color: #4a5568;
   position: relative;
-  padding-left: 25px;
-  border-bottom: 1px solid #f3f4f6;
-}
-
-.features-list-small li:last-child {
-  border-bottom: none;
+  padding-left: 15px;
 }
 
 .features-list-small li:before {
   content: "✓";
-  color: #f59e0b;
+  color: #48bb78;
   font-weight: bold;
   position: absolute;
   left: 0;
-  font-size: 16px;
 }
 
 .auth-section-small {
   margin-top: auto;
-  padding-top: 20px;
 }
 
 .subscription-button-small {
   width: 100%;
-  padding: 14px 20px;
+  padding: 8px;
   border: none;
-  border-radius: 25px;
-  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border-radius: 6px;
+  background: #667eea;
   color: white;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 11px;
   cursor: pointer;
   transition: all 0.3s ease;
-  margin-bottom: 10px;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  margin-bottom: 6px;
 }
 
 .subscription-button-small:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+  background: #5a6fd8;
+  transform: translateY(-1px);
 }
 
 .subscription-button-small:disabled {
@@ -216,87 +205,75 @@
 }
 
 .google-auth-button-small {
+  background: #4285f4;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 6px;
 }
 
 .google-auth-button-small:hover:not(:disabled) {
-  background: linear-gradient(135deg, #d97706, #b45309);
+  background: #357ae8;
 }
 
 .google-icon-small {
-  background: white;
-  color: #f59e0b;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   font-weight: bold;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .auth-divider-small {
   display: flex;
   align-items: center;
-  margin: 15px 0;
-  color: #9ca3af;
-  font-size: 14px;
-  position: relative;
+  margin: 8px 0;
+  color: #a0aec0;
+  font-size: 10px;
 }
 
 .auth-divider-small:before,
 .auth-divider-small:after {
   content: "";
   flex: 1;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .auth-divider-small:before {
-  margin-right: 15px;
+  margin-right: 8px;
 }
 
 .auth-divider-small:after {
-  margin-left: 15px;
+  margin-left: 8px;
 }
 
 .email-form-small {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 6px;
 }
 
 .form-input-small {
-  padding: 12px 15px;
-  border: 1px solid #f59e0b;
-  border-radius: 10px;
-  font-size: 14px;
-  transition: all 0.3s ease;
-  box-sizing: border-box;
-  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  font-size: 11px;
+  transition: border-color 0.3s ease;
 }
 
 .form-input-small:focus {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
-  border-color: #d97706;
+  border-color: #667eea;
 }
 
 .form-input-small:disabled {
-  background-color: #f9fafb;
+  background-color: #f7fafc;
   cursor: not-allowed;
-  opacity: 0.7;
 }
 
 .email-submit-button-small {
-  margin-top: 10px;
+  background: #48bb78;
 }
 
 .email-submit-button-small:hover:not(:disabled) {
-  background: linear-gradient(135deg, #d97706, #b45309);
+  background: #38a169;
 }
 
 .overlay {
@@ -307,7 +284,6 @@
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
   z-index: 1000;
-  backdrop-filter: blur(3px);
 }
 
 .popup-small {
@@ -316,156 +292,52 @@
   left: 50%;
   transform: translate(-50%, -50%);
   background: white;
-  padding: 25px;
-  border-radius: 15px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
   z-index: 1001;
   text-align: center;
-  min-width: 300px;
-  max-width: 400px;
-  border: 2px solid #f59e0b;
+  min-width: 250px;
 }
 
 .popup-text-small {
-  font-size: 16px;
-  margin-bottom: 20px;
-  color: #1f2937;
-  line-height: 1.5;
-}
-
-.popup-button-small {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-  color: white;
-  border: none;
-  padding: 12px 30px;
-  border-radius: 25px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
-}
-
-.popup-button-small:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
-}
-
-/* Loading spinner */
-.loading-spinner {
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #f59e0b;
-  border-radius: 50%;
-  width: 50px;
-  height: 50px;
-  animation: spin 1s linear infinite;
-  margin: 20px auto;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  font-size: 12px;
+  margin-bottom: 12px;
+  color: #2d3748;
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  .main-container-small {
-    margin-top: 50px;
-    padding: 15px;
-  }
-  
   .cards-container-small {
     grid-template-columns: 1fr;
-    gap: 20px;
-    max-width: 500px;
+    gap: 12px;
+  }
+  
+  .main-container-small {
+    padding: 8px;
   }
   
   .subscription-box-small {
-    min-height: 420px;
-    padding: 20px;
-  }
-  
-  .user-type-selector-small {
-    gap: 10px;
-  }
-  
-  .user-type-button-small {
-    padding: 10px 20px;
-    font-size: 13px;
-  }
-  
-  .toggle-button-small {
-    padding: 10px 25px;
-    font-size: 13px;
+    min-height: 380px;
+    padding: 12px;
   }
 }
 
 @media (max-width: 480px) {
-  .main-container-small {
-    margin-top: 40px;
-    padding: 10px;
-  }
-  
   .cards-container-small {
-    gap: 15px;
+    gap: 10px;
   }
   
   .subscription-box-small {
-    min-height: 400px;
-    padding: 15px;
+    min-height: 360px;
+    padding: 10px;
   }
   
   .subscription-title-small {
-    font-size: 20px;
-  }
-  
-  .subscription-price-small {
-    font-size: 24px;
-  }
-  
-  .subscription-description-small {
     font-size: 14px;
   }
   
-  .features-list-small li {
-    font-size: 13px;
-    padding: 6px 0;
+  .subscription-price-small {
+    font-size: 16px;
   }
-  
-  .form-input-small {
-    padding: 10px 12px;
-    font-size: 13px;
-  }
-  
-  .subscription-button-small {
-    padding: 12px 15px;
-    font-size: 13px;
-  }
-  
-  .popup-small {
-    min-width: 280px;
-    padding: 20px;
-    margin: 0 10px;
-  }
-}
-
-/* Yellow theme utility classes */
-.yellow-gradient {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
-}
-
-.yellow-bg-light {
-  background-color: #fef3c7;
-}
-
-.yellow-text {
-  color: #b45309;
-}
-
-.yellow-border {
-  border-color: #f59e0b;
-}
-
-.yellow-shadow {
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
 }
