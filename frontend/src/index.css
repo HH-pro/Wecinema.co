@@ -14,6 +14,7 @@
   font-family: 'Poppins', sans-serif !important;
 }
 html,
+html,
 body {
   height: 100%;
 }
@@ -23,15 +24,19 @@ body {
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
 }
+
+/* Default cursor hide */
 * {
   cursor: none !important;
 }
 
-/* Touch dot */
+/* =========================
+   TOUCH DOT (Small & Grey)
+   ========================= */
 .touch-dot {
-  width: 10px;
-  height: 10px;
-  background: black;
+  width: 6px;
+  height: 6px;
+  background: #6b7280; /* Tailwind Gray-500 */
   border-radius: 50%;
   position: fixed;
   pointer-events: none;
@@ -39,15 +44,20 @@ body {
   transform: translate(-50%, -50%);
 }
 
-/* Touch ring */
+/* =========================
+   TOUCH RING (Soft & Clean)
+   ========================= */
 .touch-ring {
-  width: 40px;
-  height: 40px;
-  border: 2px solid black;
+  width: 28px;
+  height: 28px;
+  border: 1.5px solid rgba(107, 114, 128, 0.6);
   border-radius: 50%;
   position: fixed;
   pointer-events: none;
   z-index: 9999;
   transform: translate(-50%, -50%);
-  transition: 0.12s ease-out;
+  transition: transform 0.15s ease-out,
+              width 0.15s ease-out,
+              height 0.15s ease-out,
+              border-color 0.15s ease-out;
 }
