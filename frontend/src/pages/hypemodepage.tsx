@@ -6,6 +6,9 @@ import { getAuth, signInWithPopup, signOut, createUserWithEmailAndPassword, sign
 import { googleProvider } from "../firebase/config";
 import { motion } from "framer-motion";
 import Confetti from "react-confetti";
+import "../css/HypeModeProfile.css";
+
+// Import payment component dependencies
 import styled from 'styled-components';
 import { decodeToken } from "../utilities/helperfFunction";
 import { getRequest } from "../api";
@@ -13,9 +16,8 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import PayPalButtonWrapper from './PayPalButtonWrapper';
 import { API_BASE_URL } from "../api";
-import "../css/HypeModeProfile.css";
 
-// Styled Components for Payment
+// Payment Component Styled Components
 const Container = styled.div`
   display: flex;
   justify-content: center;
@@ -24,7 +26,7 @@ const Container = styled.div`
   color: #333;
 `;
 
-const SubscriptionBox = styled.div`
+const PaymentSubscriptionBox = styled.div`
   padding: 40px;
   border: 2px dashed #000;
   text-align: center;
@@ -46,7 +48,7 @@ const Description = styled.p`
   margin-bottom: 30px;
 `;
 
-const Popup = styled.div`
+const PaymentPopup = styled.div`
   position: fixed;
   top: 50%; 
   left: 50%;
@@ -61,7 +63,7 @@ const Popup = styled.div`
   text-align: center;
 `;
 
-const Overlay = styled.div`
+const PaymentOverlay = styled.div`
   position: fixed;
   top: 0;
   left: 0;
@@ -71,7 +73,7 @@ const Overlay = styled.div`
   z-index: 999;
 `;
 
-const Button = styled.button`
+const PaymentButton = styled.button`
   background: #28a745;
   color: #fff;
   border: none;
@@ -236,12 +238,12 @@ const PaymentComponent: React.FC<{
 
   const TransactionPopup: React.FC<TransactionPopupProps> = ({ message, onClose, isError }) => (
     <>
-      <Overlay onClick={onClose} />
-      <Popup>
+      <PaymentOverlay onClick={onClose} />
+      <PaymentPopup>
         <h3>{isError ? 'Error' : 'Success'}!</h3>
         <p>{message}</p>
-        <Button onClick={onClose}>Close</Button>
-      </Popup>
+        <PaymentButton onClick={onClose}>Close</PaymentButton>
+      </PaymentPopup>
     </>
   );
 
@@ -274,7 +276,7 @@ const PaymentComponent: React.FC<{
 
         {!userHasPaid ? (
           <>
-            <SubscriptionBox>
+            <PaymentSubscriptionBox>
               <div>
                 <Title>Proceed to Payment</Title>
                 <Description>Your subscription type: {subscriptionType}</Description>
@@ -288,7 +290,7 @@ const PaymentComponent: React.FC<{
                   onError={handlePaymentError} 
                 />
               </div>
-            </SubscriptionBox>
+            </PaymentSubscriptionBox>
             {showPopup && (
               <TransactionPopup 
                 message={popupMessage} 
@@ -298,10 +300,10 @@ const PaymentComponent: React.FC<{
             )}
           </>
         ) : (
-          <SubscriptionBox>
+          <PaymentSubscriptionBox>
             <Title>Go back to Home</Title>
             <Description>Congratulations, you successfully subscribed to hypemode.</Description>
-          </SubscriptionBox>
+          </PaymentSubscriptionBox>
         )}
       </Container>
     </Layout>
@@ -323,7 +325,42 @@ const HypeModeProfile = () => {
   const [selectedSubscription, setSelectedSubscription] = useState<"user" | "studio" | null>(null);
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer");
   const [isLoading, setIsLoading] = useState(false);
-  const [showPayment, setShowPayment] = useState(false);
+  const [userHasPaid, setUserHasPaid] = useState(false);
+  const [showPaymentComponent, setShowPaymentComponent] = useState(false);
+
+  // Check if user has paid on component mount
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      const tokenData = decodeToken(token);
+      const userId = tokenData?.userId || tokenData?.id;
+      
+      if (userId) {
+        checkPaymentStatus(userId);
+      }
+    }
+  }, []);
+
+  const checkPaymentStatus = async (userId: string) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
+      const user = response.data;
+      
+      if (user.hasPaid) {
+        // User has paid, redirect to home
+        setUserHasPaid(true);
+        navigate('/');
+      } else {
+        // User hasn't paid, show payment component
+        setUserHasPaid(false);
+        setUserId(userId);
+        setIsLoggedIn(true);
+        setShowPaymentComponent(true);
+      }
+    } catch (error) {
+      console.error('Error checking payment status:', error);
+    }
+  };
 
   // Register user with backend
   const registerUser = async (username: string, email: string, avatar: string, userType: string) => {
@@ -346,7 +383,7 @@ const HypeModeProfile = () => {
         localStorage.setItem('token', token);
         setIsLoggedIn(true);
         setUserId(userId);
-        return true;
+        return { success: true, userId };
       }
     } catch (error: any) {
       if (error.response && error.response.data && error.response.data.error === 'Email already exists.') {
@@ -355,7 +392,7 @@ const HypeModeProfile = () => {
         setPopupMessage('Registration failed. Please try again.');
       }
       setShowPopup(true);
-      return false;
+      return { success: false };
     }
   };
 
@@ -372,7 +409,7 @@ const HypeModeProfile = () => {
         setUserId(userId);
         setPopupMessage('Login successful!');
         setShowPopup(true);
-        return true;
+        return { success: true, userId };
       }
     } catch (error: any) {
       if (error.response) {
@@ -381,7 +418,7 @@ const HypeModeProfile = () => {
         setPopupMessage('Login failed.');
       }
       setShowPopup(true);
-      return false;
+      return { success: false };
     }
   };
 
@@ -394,14 +431,16 @@ const HypeModeProfile = () => {
 
     try {
       if (isSignup) {
-        const success = await registerUser(username, email, avatar, userType);
-        if (success) {
-          navigateToPayment();
+        const result = await registerUser(username, email, avatar, userType);
+        if (result.success && result.userId) {
+          // Check payment status after successful registration
+          await checkPaymentStatus(result.userId);
         }
       } else {
-        const success = await loginUser(email);
-        if (success) {
-          navigateToPayment();
+        const result = await loginUser(email);
+        if (result.success && result.userId) {
+          // Check payment status after successful login
+          await checkPaymentStatus(result.userId);
         }
       }
     } catch (error) {
@@ -410,13 +449,6 @@ const HypeModeProfile = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const navigateToPayment = () => {
-    setTimeout(() => {
-      setShowPopup(false);
-      setShowPayment(true);
-    }, 2000);
   };
 
   // Google Signin
@@ -523,6 +555,7 @@ const HypeModeProfile = () => {
       await signOut(auth);
       localStorage.removeItem('token');
       setIsLoggedIn(false);
+      setShowPaymentComponent(false);
       setPopupMessage('Logout successful.');
       setShowPopup(true);
     } catch (error) {
@@ -561,8 +594,13 @@ const HypeModeProfile = () => {
     setTimeout(() => setShowFireworks(false), 1000);
   }, []);
 
-  // If payment component should be shown
-  if (showPayment && selectedSubscription && userId) {
+  // If user has paid, redirect to home (handled in useEffect)
+  if (userHasPaid) {
+    return null; // Will redirect to home
+  }
+
+  // If user is logged in but hasn't paid, show payment component
+  if (showPaymentComponent && selectedSubscription && userId) {
     return (
       <PaymentComponent 
         subscriptionType={selectedSubscription} 
@@ -601,7 +639,10 @@ const HypeModeProfile = () => {
 
         {isLoggedIn ? (
           <div className="cards-container-small">
-            
+            {/* Show logout button if logged in but not showing payment component */}
+            <button className="subscription-button-small" onClick={handleGoogleLogout}>
+              Logout
+            </button>
           </div>
         ) : (
           <>
