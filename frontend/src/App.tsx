@@ -4,9 +4,12 @@ import { useEffect } from "react";
 import * as Sentry from "@sentry/react";
 import AICustomerSupport from "./components/AICustomerSupport";
 import { MarketplaceProvider } from "./context/MarketplaceContext";
-import { AuthProvider } from "./context/AuthContext"; // Import AuthProvider
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+
+// // 🆕 Import touch scroll and custom cursor
+// import TouchScroll from "./TouchScroll";
+// import TouchCursor from "../src/Cursor ";
 
 export const categories = [
   "Action ",
@@ -26,7 +29,7 @@ export const themes = [
   "Love",
   "Redemption",
   "Family",
-  "Oppression",
+  "Opperession",
   "Survival",
   "Revenge",
   "Justice",
@@ -55,27 +58,29 @@ export default function App() {
 
   return (
     <div>
-      {/* ✅ IMPORTANT: Wrap everything with AuthProvider FIRST */}
-      <AuthProvider>
-        {/* Then wrap with MarketplaceProvider */}
-        <MarketplaceProvider>
-          <AICustomerSupport />
-          <Router />
+      {/* 🆕 WRAP EVERYTHING WITH MARKETPLACE PROVIDER */}
+      <MarketplaceProvider>
+        {/* 🆕 Touch scroll and custom cursor */}
+        {/* <TouchScroll />
+        <TouchCursor /> */}
 
-          <ToastContainer
-            position="top-right"
-            autoClose={5000}
-            hideProgressBar={false}
-            newestOnTop={false}
-            closeOnClick
-            rtl={false}
-            pauseOnFocusLoss
-            draggable
-            pauseOnHover
-            theme="light"
-          />
-        </MarketplaceProvider>
-      </AuthProvider>
+        <AICustomerSupport />
+        <Router />
+
+        {/* 🆕 Toast Container for notifications */}
+        <ToastContainer
+          position="top-right"
+          autoClose={5000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
+        />
+      </MarketplaceProvider>
     </div>
   );
 }
