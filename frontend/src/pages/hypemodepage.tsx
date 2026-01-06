@@ -206,48 +206,101 @@ const HypeModeProfile = () => {
   };
 
   // Login user with backend
-  const loginUser = async (email: string) => {
-    addDebugLog(`Attempting to login user: ${email}`);
+const loginUser = async (email: string) => {
+  addDebugLog(`Attempting to login user: ${email}`);
+  
+  try {
+    const res = await axios.post(`${API_BASE_URL}/user/signin`, { email });
     
-    try {
-      const res = await axios.post(`${API_BASE_URL}/user/signin`, { email });
-      
-      addDebugLog(`Backend login response received: ${res.status}`);
-      
-      const token = res.data.token;
-      const userId = res.data.id;
+    addDebugLog(`Backend login response received: ${res.status}`);
+    addDebugLog(`Response data: ${JSON.stringify(res.data)}`);
+    
+    const token = res.data.token;
+    const userId = res.data.id || res.data.userId || res.data._id;
+    const userData = res.data.user || res.data;
 
-      if (token && userId) {
-        addDebugLog(`Login successful! Token: ${token.substring(0, 20)}..., UserID: ${userId}`);
-        
-        // Get user data
-        const userResponse = await axios.get(`${API_BASE_URL}/user/${userId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        
-        addDebugLog(`User data fetched: ${userResponse.data?.username || 'No username'}`);
-        
-        if (userResponse.data) {
-          auth.login(userResponse.data, token);
-          return { success: true, userId, hasPaid: userResponse.data.hasPaid || false };
+    if (token && userId) {
+      addDebugLog(`Login successful! Token: ${token.substring(0, 20)}..., UserID: ${userId}`);
+      
+      // Check if we need to fetch user data separately
+      if (!userData || !userData.username) {
+        addDebugLog('Fetching user data separately...');
+        try {
+          const userResponse = await axios.get(`${API_BASE_URL}/user/${userId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          addDebugLog(`User data fetched: ${userResponse.data?.username || 'No username'}`);
+          
+          if (userResponse.data) {
+            auth.login(userResponse.data, token);
+            return { success: true, userId, hasPaid: userResponse.data.hasPaid || false };
+          }
+        } catch (fetchError: any) {
+          addDebugLog(`Error fetching user data: ${fetchError.message}`);
         }
       }
       
-      addDebugLog('Login failed: No token or user ID in response');
-      return { success: false };
+      // Use the data from initial response
+      const loginData = {
+        id: userId,
+        username: userData?.username || email.split('@')[0],
+        email: email,
+        userType: userData?.userType || 'buyer',
+        hasPaid: userData?.hasPaid || false,
+        avatar: userData?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(email.split('@')[0])}&background=random`
+      };
       
-    } catch (error: any) {
-      addDebugLog(`Login error: ${error.message}`);
+      auth.login(loginData, token);
+      return { success: true, userId, hasPaid: loginData.hasPaid };
+    } else {
+      addDebugLog(`Login failed - Response structure:`);
+      addDebugLog(`- Token exists: ${!!token}`);
+      addDebugLog(`- User ID exists: ${!!userId}`);
+      addDebugLog(`- Full response: ${JSON.stringify(res.data, null, 2)}`);
       
-      if (error.response?.status === 0) {
-        setPopupMessage('Cannot connect to server. Please check if backend is running.');
-      } else {
-        setPopupMessage(error.response?.data?.message || 'Login failed.');
+      // Try alternative response formats
+      if (res.data.data) {
+        addDebugLog('Checking nested data property...');
+        const nestedToken = res.data.data.token;
+        const nestedUserId = res.data.data.id || res.data.data.userId;
+        
+        if (nestedToken && nestedUserId) {
+          addDebugLog(`Found token and ID in nested data property`);
+          const loginData = {
+            id: nestedUserId,
+            username: res.data.data.username || email.split('@')[0],
+            email: email,
+            userType: res.data.data.userType || 'buyer',
+            hasPaid: res.data.data.hasPaid || false,
+            avatar: res.data.data.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(email.split('@')[0])}&background=random`
+          };
+          
+          auth.login(loginData, nestedToken);
+          return { success: true, userId: nestedUserId, hasPaid: loginData.hasPaid };
+        }
       }
-      setShowPopup(true);
+      
       return { success: false };
     }
-  };
+    
+  } catch (error: any) {
+    addDebugLog(`Login error: ${error.message}`);
+    addDebugLog(`Error response: ${JSON.stringify(error.response?.data, null, 2)}`);
+    
+    if (error.response?.status === 0) {
+      setPopupMessage('Cannot connect to server. Please check if backend is running.');
+    } else if (error.response?.status === 404) {
+      setPopupMessage('User not found. Please sign up first.');
+    } else if (error.response?.data?.message) {
+      setPopupMessage(error.response.data.message);
+    } else {
+      setPopupMessage('Login failed. Please try again.');
+    }
+    setShowPopup(true);
+    return { success: false };
+  }
+};
 
   // Check payment status
   const checkPaymentStatus = async (userId: string) => {
