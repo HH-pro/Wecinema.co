@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from 'axios';
 import { Layout } from "../components";
 import { useNavigate } from 'react-router-dom';
@@ -12,31 +12,149 @@ import PaymentSuccessPopup from '../components/PaymentComponent/SuccessPopup';
 import { API_BASE_URL } from "../api";
 import "../css/HypeModeProfile.css";
 
+// Main HypeModeProfile Component
 const HypeModeProfile = () => {
   const navigate = useNavigate();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [popupMessage, setPopupMessage] = useState('');
   const [showPopup, setShowPopup] = useState(false);
   const [isSignup, setIsSignup] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
+  const [userId, setUserId] = useState('');
   const [selectedSubscription, setSelectedSubscription] = useState<"user" | "studio" | null>(null);
   const [userType, setUserType] = useState<"buyer" | "seller">("buyer");
   const [isLoading, setIsLoading] = useState(false);
   const [showPaymentComponent, setShowPaymentComponent] = useState(false);
+  const [loginSuccess, setLoginSuccess] = useState(false);
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
-  const [userId, setUserId] = useState('');
+  const [countdown, setCountdown] = useState(3);
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+  
+  const redirectAttempted = useRef(false);
+  const authCheckedRef = useRef(false);
 
-  // SIMPLE: Check on load if already logged in
+  // Check if user is already logged in on initial load
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      // Already logged in, go to home immediately
-      window.location.href = '/';
-    }
-  }, []);
+    const checkInitialAuth = async () => {
+      if (authCheckedRef.current) return;
+      authCheckedRef.current = true;
+      
+      // Check if we just logged in and need to redirect
+      const justLoggedIn = localStorage.getItem('hypeModeJustLoggedIn');
+      if (justLoggedIn === 'true') {
+        console.log('Detected recent login, redirecting to home...');
+        localStorage.removeItem('hypeModeJustLoggedIn');
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 100);
+        return;
+      }
+      
+      const token = localStorage.getItem("token");
+      if (!token) {
+        return;
+      }
 
-  // SIMPLE: Register user
+      try {
+        const tokenData = decodeToken(token);
+        const userId = tokenData?.userId || tokenData?.id;
+        
+        if (!userId) {
+          localStorage.removeItem("token");
+          return;
+        }
+
+        // Check user payment status
+        const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
+        const user = response.data;
+        
+        if (user.hasPaid) {
+          // User has paid, redirect to home
+          console.log('User already paid, redirecting...');
+          window.location.href = '/';
+        } else {
+          // User hasn't paid, show payment flow
+          setUserId(userId);
+          setIsLoggedIn(true);
+          setShowPaymentComponent(true);
+        }
+      } catch (error) {
+        console.error('Error checking initial auth:', error);
+        localStorage.removeItem("token");
+      }
+    };
+
+    checkInitialAuth();
+  }, [navigate]);
+
+  // Handle redirect after login success
+  useEffect(() => {
+    if (loginSuccess && !redirectAttempted.current) {
+      redirectAttempted.current = true;
+      
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            // Set localStorage marker and redirect
+            localStorage.setItem('hypeModeJustLoggedIn', 'true');
+            window.location.href = '/';
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      
+      return () => clearInterval(timer);
+    }
+  }, [loginSuccess, navigate]);
+
+  // NEW: Check if we should redirect immediately
+  useEffect(() => {
+    const checkRedirect = () => {
+      const token = localStorage.getItem("token");
+      if (token && !shouldRedirect) {
+        // If user has token but we're still on login page, redirect
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 500);
+      }
+    };
+
+    checkRedirect();
+  }, [shouldRedirect]);
+
+  const checkPaymentStatus = async (userId: string) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
+      const user = response.data;
+      
+      if (user.hasPaid) {
+        // User has paid - set success state
+        setUserId(userId);
+        setIsLoggedIn(true);
+        setLoginSuccess(true);
+        setShouldRedirect(true);
+        
+        // Store marker for immediate redirect
+        localStorage.setItem('hypeModeJustLoggedIn', 'true');
+      } else {
+        // User hasn't paid, show payment component
+        setUserId(userId);
+        setIsLoggedIn(true);
+        setShowPaymentComponent(true);
+      }
+    } catch (error) {
+      console.error('Error checking payment status:', error);
+      setPopupMessage('Error checking payment status. Please try again.');
+      setShowPopup(true);
+      setIsLoading(false);
+    }
+  };
+
+  // Register user with backend
   const registerUser = async (username: string, email: string, avatar: string, userType: string) => {
     try {
       const res = await axios.post(`${API_BASE_URL}/user/signup`, {
@@ -52,6 +170,9 @@ const HypeModeProfile = () => {
 
       if (token) {
         localStorage.setItem('token', token);
+        localStorage.setItem('hypeModeJustLoggedIn', 'true'); // Add marker
+        setIsLoggedIn(true);
+        setUserId(userId);
         return { success: true, userId };
       }
       return { success: false };
@@ -66,7 +187,7 @@ const HypeModeProfile = () => {
     }
   };
 
-  // SIMPLE: Login user
+  // Login user with backend
   const loginUser = async (email: string) => {
     try {
       const res = await axios.post(`${API_BASE_URL}/user/signin`, { email });
@@ -75,6 +196,9 @@ const HypeModeProfile = () => {
 
       if (backendToken) {
         localStorage.setItem('token', backendToken);
+        localStorage.setItem('hypeModeJustLoggedIn', 'true'); // Add marker
+        setIsLoggedIn(true);
+        setUserId(userId);
         return { success: true, userId };
       }
       return { success: false };
@@ -85,56 +209,38 @@ const HypeModeProfile = () => {
     }
   };
 
-  // SIMPLE: Check payment status and redirect
-  const checkPaymentAndRedirect = async (userId: string) => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/user/${userId}`);
-      const user = response.data;
-      
-      if (user.hasPaid) {
-        // User has paid - REDIRECT IMMEDIATELY
-        sessionStorage.setItem('redirectAfterLogin', 'true');
-        window.location.href = '/';
-      } else {
-        // User hasn't paid, show payment
-        setUserId(userId);
-        setShowPaymentComponent(true);
-      }
-    } catch (error) {
-      console.error('Error checking payment:', error);
-      setPopupMessage('Error checking payment status.');
-      setShowPopup(true);
-    }
-  };
+  // Handle successful authentication - SIMPLIFIED
+  const onLoginSuccess = async (user: any, isEmailAuth: boolean = false) => {
+    const profile = user.providerData[0];
+    const email = profile.email;
+    const username = profile.displayName || email.split('@')[0];
+    const avatar = profile.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`;
 
-  // SIMPLE: Handle login success
-  const handleLoginSuccess = async (email: string, displayName?: string, photoURL?: string, isGoogle = false) => {
     try {
       let result;
-      
       if (isSignup) {
-        const avatar = photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName || email.split('@')[0])}&background=random`;
-        result = await registerUser(displayName || email.split('@')[0], email, avatar, userType);
+        result = await registerUser(username, email, avatar, userType);
       } else {
         result = await loginUser(email);
       }
       
       if (result.success && result.userId) {
-        await checkPaymentAndRedirect(result.userId);
+        // Check payment status after successful registration/login
+        await checkPaymentStatus(result.userId);
       } else {
         setIsLoading(false);
       }
     } catch (error) {
-      setPopupMessage('Authentication failed.');
+      setPopupMessage('Authentication failed. Please try again.');
       setShowPopup(true);
       setIsLoading(false);
     }
   };
 
-  // SIMPLE: Google Login
+  // Google Signin
   const handleGoogleLogin = async () => {
     if (!selectedSubscription) {
-      setPopupMessage("Please select a subscription plan.");
+      setPopupMessage("Please select a subscription plan first.");
       setShowPopup(true);
       return;
     }
@@ -144,77 +250,105 @@ const HypeModeProfile = () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
-      await handleLoginSuccess(user.email!, user.displayName, user.photoURL, true);
+      await onLoginSuccess(user);
     } catch (error: any) {
       setIsLoading(false);
-      setPopupMessage('Google login failed.');
+      setPopupMessage('Google login failed. Please try again.');
       setShowPopup(true);
     }
   };
 
-  // SIMPLE: Email Signup/Login
-  const handleEmailAuth = async () => {
+  // Email Signup
+  const handleEmailSignup = async () => {
     if (!selectedSubscription) {
-      setPopupMessage("Please select a subscription plan.");
+      setPopupMessage("Please select a subscription plan first.");
       setShowPopup(true);
       return;
     }
 
-    if (isSignup && !username) {
-      setPopupMessage("Please enter username.");
-      setShowPopup(true);
-      return;
-    }
-
-    if (!email || !password) {
-      setPopupMessage("Please enter email and password.");
+    if (!email || !password || !username) {
+      setPopupMessage("Please enter username, email and password.");
       setShowPopup(true);
       return;
     }
 
     if (password.length < 6) {
-      setPopupMessage("Password should be at least 6 characters.");
+      setPopupMessage("Password should be at least 6 characters long.");
       setShowPopup(true);
       return;
     }
 
     setIsLoading(true);
     const auth = getAuth();
-    
     try {
-      if (isSignup) {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-        await handleLoginSuccess(user.email!, username, user.photoURL);
-      } else {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-        await handleLoginSuccess(user.email!);
-      }
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      await onLoginSuccess(user, true);
     } catch (error: any) {
       setIsLoading(false);
-      
-      let message = 'Authentication failed.';
       if (error.code === 'auth/email-already-in-use') {
-        message = 'Email already in use. Please login.';
+        setPopupMessage('Email already in use. Please try logging in.');
       } else if (error.code === 'auth/weak-password') {
-        message = 'Password should be at least 6 characters.';
-      } else if (error.code === 'auth/user-not-found') {
-        message = 'No user found with this email. Please sign up.';
-      } else if (error.code === 'auth/wrong-password') {
-        message = 'Incorrect password.';
+        setPopupMessage('Password should be at least 6 characters.');
       } else if (error.code === 'auth/invalid-email') {
-        message = 'Invalid email address.';
+        setPopupMessage('Invalid email address.');
+      } else {
+        setPopupMessage('Email signup failed. Please try again.');
       }
-      
-      setPopupMessage(message);
       setShowPopup(true);
+    }
+  };
+
+  // Email Login
+  const handleEmailLogin = async () => {
+    if (!selectedSubscription) {
+      setPopupMessage("Please select a subscription plan first.");
+      setShowPopup(true);
+      return;
+    }
+
+    if (!email || !password) {
+      setPopupMessage("Please enter both email and password.");
+      setShowPopup(true);
+      return;
+    }
+
+    setIsLoading(true);
+    const auth = getAuth();
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      await onLoginSuccess(user, true);
+    } catch (error: any) {
+      setIsLoading(false);
+      if (error.code === 'auth/user-not-found') {
+        setPopupMessage('No user found with this email. Please sign up.');
+      } else if (error.code === 'auth/wrong-password') {
+        setPopupMessage('Incorrect password. Please try again.');
+      } else if (error.code === 'auth/invalid-email') {
+        setPopupMessage('Invalid email address.');
+      } else {
+        setPopupMessage('Email login failed. Please try again.');
+      }
+      setShowPopup(true);
+    }
+  };
+
+  const handleEmailSubmit = () => {
+    if (isSignup) {
+      handleEmailSignup();
+    } else {
+      handleEmailLogin();
     }
   };
 
   const closePopup = () => {
     setShowPopup(false);
     setIsLoading(false);
+  };
+
+  const handleSubscriptionClick = (subscriptionType: "user" | "studio") => {
+    setSelectedSubscription(subscriptionType);
   };
 
   const toggleSignupSignin = () => {
@@ -229,22 +363,19 @@ const HypeModeProfile = () => {
     setShowPaymentSuccess(true);
     setShowPaymentComponent(false);
     
-    // SIMPLE: Redirect after payment
+    // Auto redirect after payment success
     setTimeout(() => {
-      sessionStorage.setItem('redirectAfterLogin', 'true');
+      localStorage.setItem('hypeModeJustLoggedIn', 'true');
       window.location.href = '/';
-    }, 2000);
+    }, 3000);
   };
 
-  const handleSkipPayment = () => {
-    toast.info('You can complete payment later');
-    setTimeout(() => {
-      sessionStorage.setItem('redirectAfterLogin', 'true');
-      window.location.href = '/';
-    }, 1000);
+  const handleForceRedirect = () => {
+    localStorage.setItem('hypeModeJustLoggedIn', 'true');
+    window.location.href = '/';
   };
 
-  // Show payment success
+  // Show payment success popup
   if (showPaymentSuccess && selectedSubscription) {
     return (
       <PaymentSuccessPopup
@@ -254,14 +385,36 @@ const HypeModeProfile = () => {
         amount={selectedSubscription === 'user' ? 5 : 10}
         onClose={() => {
           setShowPaymentSuccess(false);
-          sessionStorage.setItem('redirectAfterLogin', 'true');
+          localStorage.setItem('hypeModeJustLoggedIn', 'true');
           window.location.href = '/';
         }}
       />
     );
   }
 
-  // Show payment component
+  // Show success popup when login is successful
+  if (loginSuccess || shouldRedirect) {
+    return (
+      <>
+        <div className="overlay" />
+        <div className="success-popup">
+          <div className="success-icon">✅</div>
+          <h2 className="success-title">Login Successful!</h2>
+          <p className="success-message">
+            You're being redirected to the home page.
+          </p>
+          <div className="countdown-text">
+            Redirecting in {countdown} second{countdown !== 1 ? 's' : ''}...
+          </div>
+          <button className="close-button" onClick={handleForceRedirect}>
+            Go Now
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  // If user is logged in but hasn't paid, show payment component
   if (showPaymentComponent && selectedSubscription && userId) {
     return (
       <Layout expand={false} hasHeader={true}>
@@ -269,12 +422,12 @@ const HypeModeProfile = () => {
           <div className="payment-subscription-box">
             <div>
               <h2 className="payment-title">Complete Your Subscription</h2>
-              <p className="payment-description">Plan: {selectedSubscription === "user" ? "Basic" : "Pro"}</p>
+              <p className="payment-description">Subscription Plan: {selectedSubscription === "user" ? "Basic Plan" : "Pro Plan"}</p>
               <p className="payment-description">User Type: {userType === "buyer" ? "👤 Buyer" : "🏪 Seller"}</p>
               <p className="payment-amount">
-                Total: ${selectedSubscription === 'user' ? 5 : 10}
+                Total Amount: ${selectedSubscription === 'user' ? 5 : 10}
               </p>
-              <p className="payment-description">Secure PayPal payment</p>
+              <p className="payment-description">Secure payment powered by PayPal</p>
               <PayPalButtonWrapper 
                 amount={selectedSubscription === 'user' ? 5 : 10} 
                 userId={userId}
@@ -288,7 +441,13 @@ const HypeModeProfile = () => {
               />
               <button 
                 className="payment-skip-button"
-                onClick={handleSkipPayment}
+                onClick={() => {
+                  toast.info('You can complete payment later');
+                  setTimeout(() => {
+                    localStorage.setItem('hypeModeJustLoggedIn', 'true');
+                    window.location.href = '/';
+                  }, 1000);
+                }}
               >
                 Skip for Now
               </button>
@@ -299,7 +458,7 @@ const HypeModeProfile = () => {
     );
   }
 
-  // Main render
+  // Render the main component
   return (
     <Layout expand={false} hasHeader={true}>
       <div className="main-container-small">
@@ -311,169 +470,173 @@ const HypeModeProfile = () => {
           {isLoading ? "Processing..." : (isSignup ? "Already have an account? Sign in" : "Don't have an account? Sign up")}
         </button>
 
-        {isSignup && (
-          <div className="user-type-selector-small">
-            <button 
-              className={`user-type-button-small ${userType === "buyer" ? "active-small" : ""}`}
-              onClick={() => setUserType("buyer")}
-              disabled={isLoading}
-            >
-              👤 Buyer
-            </button>
-            <button 
-              className={`user-type-button-small ${userType === "seller" ? "active-small" : ""}`}
-              onClick={() => setUserType("seller")}
-              disabled={isLoading}
-            >
-              🏪 Seller
-            </button>
-          </div>
+        {!isLoggedIn && (
+          <>
+            {isSignup && (
+              <div className="user-type-selector-small">
+                <button 
+                  className={`user-type-button-small ${userType === "buyer" ? "active-small" : ""}`}
+                  onClick={() => setUserType("buyer")}
+                  disabled={isLoading}
+                >
+                  👤 Buyer
+                </button>
+                <button 
+                  className={`user-type-button-small ${userType === "seller" ? "active-small" : ""}`}
+                  onClick={() => setUserType("seller")}
+                  disabled={isLoading}
+                >
+                  🏪 Seller
+                </button>
+              </div>
+            )}
+
+            <div className="cards-container-small">
+              {/* Basic Plan */}
+              <div
+                className={`subscription-box-small ${selectedSubscription === "user" ? "selected-small" : ""}`}
+                onClick={() => !isLoading && handleSubscriptionClick("user")}
+              >
+                <div className="premium-badge-small">Popular</div>
+                <h3 className="subscription-title-small">Basic Plan</h3>
+                <div className="subscription-price-small">$5/month</div>
+                <p className="subscription-description-small">Perfect for individual users</p>
+                
+                <ul className="features-list-small">
+                  <li>Buy Films & Scripts</li>
+                  <li>Sell Your Content</li>
+                  <li>Basic Support</li>
+                  <li>Access to Community</li>
+                  <li>5GB Storage</li>
+                </ul>
+
+                {selectedSubscription === "user" && (
+                  <div className="auth-section-small">
+                    <button 
+                      className="subscription-button-small google-auth-button-small" 
+                      onClick={handleGoogleLogin} 
+                      disabled={isLoading}
+                    >
+                      <span className="google-icon-small">G</span>
+                      {isLoading ? "Processing..." : (isSignup ? "Google Sign up" : "Google Sign in")}
+                    </button>
+
+                    <div className="auth-divider-small">
+                      <span>or</span>
+                    </div>
+
+                    <div className="email-form-small">
+                      {isSignup && (
+                        <input
+                          type="text"
+                          className="form-input-small"
+                          placeholder="Username"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          disabled={isLoading}
+                        />
+                      )}
+                      <input
+                        type="email"
+                        className="form-input-small"
+                        placeholder="Email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        disabled={isLoading}
+                      />
+                      <input
+                        type="password"
+                        className="form-input-small"
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disabled={isLoading}
+                      />
+                      <button 
+                        className="subscription-button-small email-submit-button-small" 
+                        onClick={handleEmailSubmit} 
+                        disabled={isLoading}
+                      >
+                        {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Pro Plan */}
+              <div
+                className={`subscription-box-small ${selectedSubscription === "studio" ? "selected-small" : ""}`}
+                onClick={() => !isLoading && handleSubscriptionClick("studio")}
+              >
+                <div className="premium-badge-small">Pro</div>
+                <h3 className="subscription-title-small">Pro Plan</h3>
+                <div className="subscription-price-small">$10/month</div>
+                <p className="subscription-description-small">Advanced features for professionals</p>
+                
+                <ul className="features-list-small">
+                  <li>All Basic Features</li>
+                  <li>Early Feature Access</li>
+                  <li>Priority Support</li>
+                  <li>Team Collaboration</li>
+                </ul>
+
+                {selectedSubscription === "studio" && (
+                  <div className="auth-section-small">
+                    <button 
+                      className="subscription-button-small google-auth-button-small" 
+                      onClick={handleGoogleLogin} 
+                      disabled={isLoading}
+                    >
+                      <span className="google-icon-small">G</span>
+                      {isLoading ? "Processing..." : (isSignup ? "Google Sign up" : "Google Sign in")}
+                    </button>
+
+                    <div className="auth-divider-small">
+                      <span>or</span>
+                    </div>
+
+                    <div className="email-form-small">
+                      {isSignup && (
+                        <input
+                          type="text"
+                          className="form-input-small"
+                          placeholder="Username"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          disabled={isLoading}
+                        />
+                      )}
+                      <input
+                        type="email"
+                        className="form-input-small"
+                        placeholder="Email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        disabled={isLoading}
+                      />
+                      <input
+                        type="password"
+                        className="form-input-small"
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disabled={isLoading}
+                      />
+                      <button 
+                        className="subscription-button-small email-submit-button-small" 
+                        onClick={handleEmailSubmit} 
+                        disabled={isLoading}
+                      >
+                        {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
         )}
-
-        <div className="cards-container-small">
-          {/* Basic Plan */}
-          <div
-            className={`subscription-box-small ${selectedSubscription === "user" ? "selected-small" : ""}`}
-            onClick={() => !isLoading && setSelectedSubscription("user")}
-          >
-            <div className="premium-badge-small">Popular</div>
-            <h3 className="subscription-title-small">Basic Plan</h3>
-            <div className="subscription-price-small">$5/month</div>
-            <p className="subscription-description-small">Perfect for individual users</p>
-            
-            <ul className="features-list-small">
-              <li>Buy Films & Scripts</li>
-              <li>Sell Your Content</li>
-              <li>Basic Support</li>
-              <li>Access to Community</li>
-              <li>5GB Storage</li>
-            </ul>
-
-            {selectedSubscription === "user" && (
-              <div className="auth-section-small">
-                <button 
-                  className="subscription-button-small google-auth-button-small" 
-                  onClick={handleGoogleLogin} 
-                  disabled={isLoading}
-                >
-                  <span className="google-icon-small">G</span>
-                  {isLoading ? "Processing..." : (isSignup ? "Google Sign up" : "Google Sign in")}
-                </button>
-
-                <div className="auth-divider-small">
-                  <span>or</span>
-                </div>
-
-                <div className="email-form-small">
-                  {isSignup && (
-                    <input
-                      type="text"
-                      className="form-input-small"
-                      placeholder="Username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      disabled={isLoading}
-                    />
-                  )}
-                  <input
-                    type="email"
-                    className="form-input-small"
-                    placeholder="Email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={isLoading}
-                  />
-                  <input
-                    type="password"
-                    className="form-input-small"
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={isLoading}
-                  />
-                  <button 
-                    className="subscription-button-small email-submit-button-small" 
-                    onClick={handleEmailAuth} 
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Pro Plan */}
-          <div
-            className={`subscription-box-small ${selectedSubscription === "studio" ? "selected-small" : ""}`}
-            onClick={() => !isLoading && setSelectedSubscription("studio")}
-          >
-            <div className="premium-badge-small">Pro</div>
-            <h3 className="subscription-title-small">Pro Plan</h3>
-            <div className="subscription-price-small">$10/month</div>
-            <p className="subscription-description-small">Advanced features</p>
-            
-            <ul className="features-list-small">
-              <li>All Basic Features</li>
-              <li>Early Feature Access</li>
-              <li>Priority Support</li>
-              <li>Team Collaboration</li>
-            </ul>
-
-            {selectedSubscription === "studio" && (
-              <div className="auth-section-small">
-                <button 
-                  className="subscription-button-small google-auth-button-small" 
-                  onClick={handleGoogleLogin} 
-                  disabled={isLoading}
-                >
-                  <span className="google-icon-small">G</span>
-                  {isLoading ? "Processing..." : (isSignup ? "Google Sign up" : "Google Sign in")}
-                </button>
-
-                <div className="auth-divider-small">
-                  <span>or</span>
-                </div>
-
-                <div className="email-form-small">
-                  {isSignup && (
-                    <input
-                      type="text"
-                      className="form-input-small"
-                      placeholder="Username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      disabled={isLoading}
-                    />
-                  )}
-                  <input
-                    type="email"
-                    className="form-input-small"
-                    placeholder="Email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={isLoading}
-                  />
-                  <input
-                    type="password"
-                    className="form-input-small"
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={isLoading}
-                  />
-                  <button 
-                    className="subscription-button-small email-submit-button-small" 
-                    onClick={handleEmailAuth} 
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Processing..." : (isSignup ? "Create Account" : "Sign In")}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
       </div>
 
       {showPopup && (
