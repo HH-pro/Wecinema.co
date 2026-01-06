@@ -357,14 +357,15 @@ const HypeModeProfile = () => {
         setCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(timer);
-            window.location.reload();
 
             navigate('/');
+            window.location.reload();
+
             return 0;
           }
           return prev - 1;
         });
-      }, 1000);
+      }, 10);
       
       return () => clearInterval(timer);
     }
