@@ -1173,7 +1173,7 @@ const Popup: React.FC<IPopupProps> = React.memo(
 		if (type === "register") {
 			return (
 				<>
-					<div className={`fixed inset-0 z-50 flex justify-center items-center ${isShow && show ? "visible" : "invisible"} ${className}`}>
+					<div className={`fixed inset-0 mt-50 z-50 flex justify-center items-center ${isShow && show ? "visible" : "invisible"} ${className}`}>
 						<div className="fixed inset-0 bg-gradient-to-br from-white via-yellow-50 to-yellow-200 opacity-80 backdrop-blur-sm" />
 						
 						<motion.div
