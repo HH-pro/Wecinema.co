@@ -7,7 +7,7 @@ import { decodeToken } from "../utilities/helperfFunction";
 import { getRequest } from "../api";
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import PayPalButtonWrapper from './PayPalButtonWrapper';
+import PayPalButtonWrapper from '../components/PaymentComponent/PayPalButtonWrapper';
 
 import { API_BASE_URL } from "../api";
 
