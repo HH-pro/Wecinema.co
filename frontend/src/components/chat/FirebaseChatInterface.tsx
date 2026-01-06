@@ -1,7 +1,7 @@
 // src/components/chat/FirebaseChatInterface.tsx
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useFirebaseChat, Message as FirebaseMessage } from '../../hooks/useFirebaseChat';
-import { useAuthContext } from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import { firestore } from '../../firebase/config';
 import { 
@@ -74,7 +74,7 @@ const FirebaseChatInterface: React.FC<FirebaseChatInterfaceProps> = ({
   const { messages, loading, error, sendMessage, markAllAsRead, sendTypingStatus } = useFirebaseChat(chatId);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const { user: authUser } =  useAuthContext();
+  const { user: authUser } = useAuth();
 
   // Check if chat exists in Firebase
   const checkChatExists = useCallback(async () => {
