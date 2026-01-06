@@ -33,7 +33,6 @@ nav {
   cursor: none !important;
 }
 .touch-circle {
-  z-index: 999999;
 }
 
 /* =========================
@@ -48,5 +47,7 @@ nav {
   pointer-events: none;
   will-change: transform, opacity;
   transition: opacity 0.2s ease;
+  z-index: 999999;
+
   opacity: 0;
 }
