@@ -132,7 +132,7 @@ const WeCinemaLoading = () => {
           {/* Copyright/Footer */}
           <div className="absolute bottom-8 text-center">
             <p className="text-gray-400 text-sm">
-              © 2024 WeCinema. All rights reserved.
+              © 2026 WeCinema. All rights reserved.
             </p>
           </div>
         </div>
