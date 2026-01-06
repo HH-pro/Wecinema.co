@@ -1,9 +1,11 @@
-import React, { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { AnimatePresence } from 'framer-motion';
+import Confetti from 'react-confetti';
+import { motion, AnimatePresence } from 'framer-motion';
 
-const Overlay = styled.div`
+// Styled Components
+const SuccessOverlay = styled.div`
   position: fixed;
   top: 0;
   left: 0;
@@ -14,7 +16,7 @@ const Overlay = styled.div`
   backdrop-filter: blur(10px);
 `;
 
-const ProfessionalSuccessPopup = styled.div`
+const SuccessContainer = styled.div`
   position: fixed;
   top: 50%;
   left: 50%;
@@ -44,8 +46,8 @@ const ProfessionalSuccessPopup = styled.div`
     right: 0;
     bottom: 0;
     background: linear-gradient(135deg, 
-      rgba(251, 191, 36, 0.3), 
-      rgba(180, 83, 9, 0.3)
+      rgba(34, 197, 94, 0.3), 
+      rgba(21, 128, 61, 0.3)
     );
     z-index: -1;
     border-radius: 30px;
@@ -76,7 +78,7 @@ const SuccessTitle = styled.h2`
   font-weight: 800;
   text-shadow: 0 4px 8px rgba(0,0,0,0.3);
   letter-spacing: 0.5px;
-  background: linear-gradient(135deg, #fbbf24, #b45309);
+  background: linear-gradient(135deg, #22c55e, #15803d);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -84,16 +86,37 @@ const SuccessTitle = styled.h2`
 
 const SuccessMessage = styled.p`
   font-size: 18px;
-  margin-bottom: 30px;
+  margin-bottom: 25px;
   line-height: 1.6;
   text-shadow: 0 2px 4px rgba(0,0,0,0.2);
   opacity: 0.95;
 `;
 
+const FeatureList = styled.ul`
+  text-align: left;
+  margin: 25px 0;
+  padding: 0 20px;
+  
+  li {
+    margin: 12px 0;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    
+    &::before {
+      content: '✓';
+      color: #22c55e;
+      font-weight: bold;
+      margin-right: 10px;
+      font-size: 18px;
+    }
+  }
+`;
+
 const CountdownText = styled.div`
   font-size: 16px;
   opacity: 0.9;
-  margin: 25px 0;
+  margin: 20px 0;
   font-weight: 600;
   background: rgba(255, 255, 255, 0.15);
   padding: 12px 20px;
@@ -102,8 +125,8 @@ const CountdownText = styled.div`
   backdrop-filter: blur(10px);
 `;
 
-const CloseButton = styled.button`
-  background: linear-gradient(135deg, #fbbf24, #b45309);
+const ActionButton = styled.button`
+  background: linear-gradient(135deg, #22c55e, #15803d);
   color: white;
   border: none;
   padding: 16px 40px;
@@ -112,10 +135,11 @@ const CloseButton = styled.button`
   font-weight: 700;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 10px 25px rgba(251, 191, 36, 0.4);
+  box-shadow: 0 10px 25px rgba(34, 197, 94, 0.4);
   letter-spacing: 0.5px;
   position: relative;
   overflow: hidden;
+  margin-top: 10px;
   
   &::before {
     content: '';
@@ -130,7 +154,7 @@ const CloseButton = styled.button`
   
   &:hover {
     transform: translateY(-3px);
-    box-shadow: 0 15px 30px rgba(251, 191, 36, 0.6);
+    box-shadow: 0 15px 30px rgba(34, 197, 94, 0.6);
     
     &::before {
       left: 100%;
@@ -139,38 +163,150 @@ const CloseButton = styled.button`
   
   &:active {
     transform: translateY(-1px);
-    box-shadow: 0 8px 20px rgba(251, 191, 36, 0.5);
+    box-shadow: 0 8px 20px rgba(34, 197, 94, 0.5);
   }
 `;
 
-interface SuccessPopupProps {
-  countdown: number;
-  onRedirectNow: () => void;
+// Props interface
+interface PaymentSuccessPopupProps {
+  isVisible: boolean;
+  subscriptionType: 'user' | 'studio';
+  userType: 'buyer' | 'seller';
+  amount: number;
+  onClose?: () => void;
 }
 
-const SuccessPopup: React.FC<SuccessPopupProps> = ({ countdown, onRedirectNow }) => {
+const PaymentSuccessPopup: React.FC<PaymentSuccessPopupProps> = ({
+  isVisible,
+  subscriptionType,
+  userType,
+  amount,
+  onClose
+}) => {
   const navigate = useNavigate();
+  const [countdown, setCountdown] = useState(5);
+  const [showConfetti, setShowConfetti] = useState(true);
+
+  useEffect(() => {
+    if (isVisible) {
+      // Start countdown for automatic redirect
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            handleRedirect();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      // Stop confetti after 5 seconds
+      const confettiTimer = setTimeout(() => {
+        setShowConfetti(false);
+      }, 5000);
+
+      return () => {
+        clearInterval(timer);
+        clearTimeout(confettiTimer);
+      };
+    }
+  }, [isVisible]);
+
+  const handleRedirect = () => {
+    if (onClose) {
+      onClose();
+    }
+    navigate('/'); // Redirect to home page
+  };
+
+  const handleContinue = () => {
+    handleRedirect();
+  };
+
+  if (!isVisible) return null;
+
+  const features = subscriptionType === 'user' 
+    ? [
+        'Access to all basic features',
+        'Buy and sell films & scripts',
+        '5GB storage space',
+        'Community access',
+        'Basic customer support'
+      ]
+    : [
+        'All basic plan features',
+        'Priority customer support',
+        'Early access to new features',
+        'Team collaboration tools',
+        'Advanced analytics dashboard'
+      ];
 
   return (
     <AnimatePresence>
-      <>
-        <Overlay />
-        <ProfessionalSuccessPopup>
-          <SuccessIcon>🎉</SuccessIcon>
-          <SuccessTitle>Welcome Back!</SuccessTitle>
-          <SuccessMessage>
-            Login successful! You're being redirected to your dashboard.
-          </SuccessMessage>
-          <CountdownText>
-            Redirecting in {countdown} second{countdown !== 1 ? 's' : ''}...
-          </CountdownText>
-          <CloseButton onClick={onRedirectNow}>
-            Go Now
-          </CloseButton>
-        </ProfessionalSuccessPopup>
-      </>
+      {isVisible && (
+        <>
+          <SuccessOverlay />
+          <SuccessContainer
+            as={motion.div}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.2 }}
+            transition={{ duration: 0.5 }}
+          >
+            {showConfetti && (
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+                <Confetti 
+                  width={400}
+                  height={600}
+                  numberOfPieces={150}
+                  recycle={false}
+                  gravity={0.1}
+                />
+              </div>
+            )}
+            
+            <SuccessIcon>🎉</SuccessIcon>
+            <SuccessTitle>Payment Successful!</SuccessTitle>
+            
+            <SuccessMessage>
+              Your {subscriptionType === 'user' ? 'Basic' : 'Pro'} Plan subscription has been activated.
+            </SuccessMessage>
+            
+            <div style={{ margin: '20px 0' }}>
+              <p style={{ fontSize: '20px', marginBottom: '5px' }}>
+                <strong>Amount:</strong> ${amount}
+              </p>
+              <p style={{ fontSize: '16px', opacity: 0.9 }}>
+                <strong>User Type:</strong> {userType === 'buyer' ? 'Buyer 👤' : 'Seller 🏪'}
+              </p>
+            </div>
+            
+            <div style={{ textAlign: 'left', margin: '20px 0' }}>
+              <h4 style={{ marginBottom: '10px', color: '#22c55e' }}>Features Activated:</h4>
+              <FeatureList>
+                {features.map((feature, index) => (
+                  <li key={index}>{feature}</li>
+                ))}
+              </FeatureList>
+            </div>
+            
+            <CountdownText>
+              Redirecting to dashboard in {countdown} second{countdown !== 1 ? 's' : ''}...
+            </CountdownText>
+            
+            <ActionButton onClick={handleContinue}>
+              Continue to Dashboard
+            </ActionButton>
+            
+            <p style={{ marginTop: '20px', fontSize: '14px', opacity: 0.8 }}>
+              Need help? Contact support@hypemode.com
+            </p>
+          </SuccessContainer>
+        </>
+      )}
     </AnimatePresence>
   );
 };
 
-export default SuccessPopup;
+export default PaymentSuccessPopup;
