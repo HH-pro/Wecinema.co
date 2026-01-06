@@ -19,7 +19,7 @@ import { IoSunnyOutline } from "react-icons/io5";
 import { CgProfile } from "react-icons/cg";
 import { Link } from "react-router-dom";
 import { TbVideoPlus } from "react-icons/tb";
-import { FaUser, FaSignOutAlt, FaUserTie, FaShoppingCart, FaInfoCircle } from "react-icons/fa";
+import { FaUser, FaSignOutAlt, FaUserTie, FaShoppingCart, FaInfoCircle, FaCheckCircle, FaCrown } from "react-icons/fa";
 import { RiCustomerService2Line } from "react-icons/ri";
 import { MdOutlinePrivacyTip } from "react-icons/md";
 import { toast } from "react-toastify";
@@ -29,7 +29,6 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 import { API_BASE_URL } from "../../api";
-
 
 interface SidebarProps {
   expand: boolean;
@@ -43,6 +42,83 @@ interface SidebarProps {
   toggleSignoutModal?: any;
   setLightMode: any;
 }
+
+// Hypemode Subscription Modal Component
+const HypemodeSubscriptionModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  darkMode: boolean;
+}> = ({ isOpen, onClose, darkMode }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div 
+        className={`subscription-modal ${darkMode ? 'dark-mode' : 'light-mode'}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-header">
+          <div className="modal-icon">
+            <FaCrown className="crown-icon" />
+          </div>
+          <h2 className="modal-title">Already Subscribed!</h2>
+          <button className="modal-close-btn" onClick={onClose}>×</button>
+        </div>
+        
+        <div className="modal-body">
+          <div className="success-animation">
+            <FaCheckCircle className="success-icon" />
+          </div>
+          
+          <div className="subscription-details">
+            <h3>You're All Set! 🎉</h3>
+            <p className="modal-description">
+              You already have an active <strong>HypeMode Premium</strong> subscription.
+              Enjoy uninterrupted access to all premium features!
+            </p>
+            
+            <div className="benefits-list">
+              <div className="benefit-item">
+                <span className="benefit-icon">✓</span>
+                <span className="benefit-text">Unlimited Video Processing</span>
+              </div>
+              <div className="benefit-item">
+                <span className="benefit-icon">✓</span>
+                <span className="benefit-text">Priority Support</span>
+              </div>
+              <div className="benefit-item">
+                <span className="benefit-icon">✓</span>
+                <span className="benefit-text">Advanced AI Features</span>
+              </div>
+              <div className="benefit-item">
+                <span className="benefit-icon">✓</span>
+                <span className="benefit-text">No Watermarks</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="modal-footer">
+          <button 
+            className="modal-primary-btn"
+            onClick={() => {
+              onClose();
+              window.location.href = "/hypemode";
+            }}
+          >
+            Go to HypeMode
+          </button>
+          <button 
+            className="modal-secondary-btn"
+            onClick={onClose}
+          >
+            Continue Browsing
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const Sidebar: React.FC<SidebarProps> = ({
   expand,
@@ -61,6 +137,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [hasPaid, setHasPaid] = useState(false);
   const [userType, setUserType] = useState<'buyer' | 'seller'>('buyer');
   const [userData, setUserData] = useState<any>(null);
+  const [showHypemodeModal, setShowHypemodeModal] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -72,7 +149,6 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const fetchPaymentStatus = async (userId: any) => {
     try {
-      // ✅ Use API_BASE_URL here
       const response = await axios.get(
         `${API_BASE_URL}/user/payment-status/${userId}`
       );
@@ -84,7 +160,6 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const fetchUserData = async (userId: any) => {
     try {
-      // ✅ Use API_BASE_URL here
       const response = await axios.get(
         `${API_BASE_URL}/user/${userId}`
       );
@@ -100,7 +175,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   const handleHypemodeClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (hasPaid) {
       event.preventDefault();
-      toast.info("You are already subscribed to Hypemode!");
+      // Show professional popup instead of toast
+      setShowHypemodeModal(true);
     } else if (!hasPaid) {
       navigate("/hypemode");
     }
@@ -110,7 +186,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     return window.location.pathname === path ? "text-active" : "";
   };
 
-  // Function to change user type
   const changeUserType = async (newType: 'buyer' | 'seller') => {
     if (!tokenData) {
       toast.error("Please login first");
@@ -118,7 +193,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
 
     try {
-      // ✅ Use API_BASE_URL here
       const response = await axios.put(
         `${API_BASE_URL}/user/change-type/${tokenData.userId}`,
         { userType: newType },
@@ -142,7 +216,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  // Render marketplace section based on user type
   const renderMarketplaceSection = () => {
     if (!tokenData) return null;
 
@@ -160,7 +233,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
         
         <ul className="sidebar-section">
-          {/* Common Links for Both */}
           <Link
             to="/marketplace"
             className={`sidebar-item ${getActiveClass("/marketplace")} ${
@@ -181,7 +253,6 @@ const Sidebar: React.FC<SidebarProps> = ({
             <span className="sidebar-text">Messages</span>
           </Link>
 
-          {/* Buyer Specific Links */}
           {userType === 'buyer' && (
             <>
               <Link
@@ -205,7 +276,6 @@ const Sidebar: React.FC<SidebarProps> = ({
             </>
           )}
 
-          {/* Seller Specific Links */}
           {userType === 'seller' && (
             <>
               <Link
@@ -231,7 +301,6 @@ const Sidebar: React.FC<SidebarProps> = ({
           )}
         </ul>
 
-        {/* User Type Badge */}
         {expand && (
           <div className="user-type-badge">
             <span className={`badge ${userType}`}>
@@ -254,215 +323,230 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <section
-      className={`sidebar-container ${expand ? "expanded" : "collapsed"} ${
-        darkMode ? "dark" : "light"
-      }`}
-    >
-      {/* -------- MAIN NAV -------- */}
-      <nav className="sidebar-nav">
-        <ul className="sidebar-section">
-          <Link
-            to="/"
-            className={`sidebar-item ${getActiveClass("/")} ${
-              expand ? "" : "collapsed"
-            }`}
-          >
-            <IoMdHome className="sidebar-icon" />
-            <span className="sidebar-text">Home</span>
-          </Link>
-          <Link
-            to="/hypemode"
-            onClick={handleHypemodeClick}
-            className={`sidebar-item ${getActiveClass("/hypemode")} ${
-              expand ? "" : "collapsed"
-            }`}
-          >
-            <RiMovie2Line className="sidebar-icon" />
-            <span className="sidebar-text">Hype mode</span>
-          </Link>
-          <Link
-            to="/videoeditor"
-            className={`sidebar-item ${getActiveClass("/videoeditor")} ${
-              expand ? "" : "collapsed"
-            }`}
-          >
-            <TbVideoPlus className="sidebar-icon" />
-            <span className="sidebar-text">Video Editor</span>
-          </Link>
-
-          <Link
-            to={tokenData ? `/user/${tokenData.userId}` : "#"}
-            onClick={(event) => {
-              if (!tokenData) {
-                toast.error("Please login!!");
-                event.preventDefault();
-              }
-            }}
-            className={`sidebar-item ${getActiveClass(
-              `/user/${tokenData?.userId}`
-            )} ${expand ? "" : "collapsed"}`}
-          >
-            <CgProfile className="sidebar-icon" />
-            <span className="sidebar-text">Profile</span>
-          </Link>
-
-          <Link
-            to="/history"
-            className={`sidebar-item ${getActiveClass("/history")} ${
-              expand ? "" : "collapsed"
-            }`}
-          >
-            <RiHistoryLine className="sidebar-icon" />
-            <span className="sidebar-text">History</span>
-          </Link>
-
-          <Link
-            to="/likedvideos"
-            className={`sidebar-item ${getActiveClass("/likedvideos")} ${
-              expand ? "" : "collapsed"
-            }`}
-          >
-            <RiHeartLine className="sidebar-icon" />
-            <span className="sidebar-text">Liked Videos</span>
-          </Link>
-
-          <Link
-            to="/chatbot"
-            className={`sidebar-item ${getActiveClass("/chatbot")} ${
-              expand ? "" : "collapsed"
-            }`}
-          >
-            <MdChatBubbleOutline className="sidebar-icon" />
-            <span className="sidebar-text">ChatBot</span>
-          </Link>
-        </ul>
-      </nav>
-
-      {/* -------- MARKETPLACE -------- */}
-      {renderMarketplaceSection()}
-
-      {/* -------- SETTINGS / ACCOUNT -------- */}
-      <nav className="sidebar-section-container">
-        <h2 className={`sidebar-section-title ${expand ? "" : "collapsed"}`}>
-          Settings
-        </h2>
-        <ul className="sidebar-section">
-          <div
-            className={`sidebar-item ${darkMode ? "text-active" : ""} ${
-              expand ? "" : "collapsed"
-            }`}
-            onClick={setDarkMode}
-          >
-            <FaMoon className="sidebar-icon" />
-            <span className="sidebar-text">Dark mode</span>
-          </div>
-          <div
-            className={`sidebar-item ${!darkMode ? "text-active" : ""} ${
-              expand ? "" : "collapsed"
-            }`}
-            onClick={setLightMode}
-          >
-            <IoSunnyOutline className="sidebar-icon" />
-            <span className="sidebar-text">Light mode</span>
-          </div>
-
-          {isLoggedIn ? (
-            <>
-              <Link
-                to="/"
-                className={`sidebar-item ${getActiveClass("/user")} ${
-                  expand ? "" : "collapsed"
-                }`}
-              >
-                <FaUser className="sidebar-icon" />
-                <span className="sidebar-text">{isLoggedIn.username}</span>
-              </Link>
-              <div
-                className={`sidebar-item ${getActiveClass("/signout")} ${
-                  expand ? "" : "collapsed"
-                }`}
-                onClick={toggleSignoutModal}
-              >
-                <FaSignOutAlt className="sidebar-icon" />
-                <span className="sidebar-text">Sign out</span>
+    <>
+      <section
+        className={`sidebar-container ${expand ? "expanded" : "collapsed"} ${
+          darkMode ? "dark" : "light"
+        }`}
+      >
+        {/* -------- MAIN NAV -------- */}
+        <nav className="sidebar-nav">
+          <ul className="sidebar-section">
+            <Link
+              to="/"
+              className={`sidebar-item ${getActiveClass("/")} ${
+                expand ? "" : "collapsed"
+              }`}
+            >
+              <IoMdHome className="sidebar-icon" />
+              <span className="sidebar-text">Home</span>
+            </Link>
+            
+            {/* Hypemode Link with Subscription Check */}
+            <Link
+              to="/hypemode"
+              onClick={handleHypemodeClick}
+              className={`sidebar-item ${getActiveClass("/hypemode")} ${
+                expand ? "" : "collapsed"
+              } ${hasPaid ? 'subscribed-item' : ''}`}
+            >
+              <div className="sidebar-icon-container">
+                <RiMovie2Line className="sidebar-icon" />
+                {hasPaid && <FaCrown className="subscription-badge" />}
               </div>
-            </>
-          ) : (
-            <>
-              <div
-                className={`sidebar-item ${getActiveClass("/signin")} ${
-                  expand ? "" : "collapsed"
-                }`}
-                onClick={toggleSigninModal}
-              >
-                <LiaSignInAltSolid className="sidebar-icon" />
-                <span className="sidebar-text">Sign in</span>
-              </div>
-              <div
-                className={`sidebar-item ${getActiveClass("/signup")} ${
-                  expand ? "" : "collapsed"
-                }`}
-                onClick={toggleSignupModal}
-              >
-                <HiUserAdd className="sidebar-icon" />
-                <span className="sidebar-text">Sign up</span>
-              </div>
-            </>
-          )}
-
-          <Link
-            to="/customersupport"
-            className={`sidebar-item ${getActiveClass("/customersupport")} ${
-              expand ? "" : "collapsed"
+              <span className="sidebar-text">Hype mode</span>
+            </Link>
+            
+            <Link
+              to="/videoeditor"
+              className={`sidebar-item ${getActiveClass("/videoeditor")} ${
+                expand ? "" : "collapsed"
             }`}
-          >
-            <RiCustomerService2Line className="sidebar-icon" />
-            <span className="sidebar-text">Support</span>
-          </Link>
+            >
+              <TbVideoPlus className="sidebar-icon" />
+              <span className="sidebar-text">Video Editor</span>
+            </Link>
 
-          <Link
-            to="/privacy-policy"
-            className={`sidebar-item ${getActiveClass("/privacy-policy")} ${
-              expand ? "" : "collapsed"
-            }`}
-          >
-            <MdOutlinePrivacyTip className="sidebar-icon" />
-            <span className="sidebar-text">Privacy</span>
-          </Link>
+            <Link
+              to={tokenData ? `/user/${tokenData.userId}` : "#"}
+              onClick={(event) => {
+                if (!tokenData) {
+                  toast.error("Please login!!");
+                  event.preventDefault();
+                }
+              }}
+              className={`sidebar-item ${getActiveClass(
+                `/user/${tokenData?.userId}`
+              )} ${expand ? "" : "collapsed"}`}
+            >
+              <CgProfile className="sidebar-icon" />
+              <span className="sidebar-text">Profile</span>
+            </Link>
 
-          <Link
-            to="/about"
-            className={`sidebar-item ${getActiveClass("/about")} ${
-              expand ? "" : "collapsed"
-            }`}
-          >
-            <FaInfoCircle className="sidebar-icon" />
-            <span className="sidebar-text">About</span>
-          </Link>
+            <Link
+              to="/history"
+              className={`sidebar-item ${getActiveClass("/history")} ${
+                expand ? "" : "collapsed"
+              }`}
+            >
+              <RiHistoryLine className="sidebar-icon" />
+              <span className="sidebar-text">History</span>
+            </Link>
 
-          <Link
-            to="/report"
-            className={`sidebar-item ${getActiveClass("/report")} ${
-              expand ? "" : "collapsed"
-            }`}
-          >
-            <RiFlagLine className="sidebar-icon" />
-            <span className="sidebar-text">Report</span>
-          </Link>
+            <Link
+              to="/likedvideos"
+              className={`sidebar-item ${getActiveClass("/likedvideos")} ${
+                expand ? "" : "collapsed"
+              }`}
+            >
+              <RiHeartLine className="sidebar-icon" />
+              <span className="sidebar-text">Liked Videos</span>
+            </Link>
 
-          <Link
-            to="/terms-and-conditions"
-            className={`sidebar-item ${getActiveClass(
-              "/terms-and-conditions"
-            )} ${expand ? "" : "collapsed"}`}
-          >
-            <MdOutlineDescription className="sidebar-icon" />
-            <span className="sidebar-text">Terms</span>
-          </Link>
-        </ul>
-      </nav>
-    </section>
+            <Link
+              to="/chatbot"
+              className={`sidebar-item ${getActiveClass("/chatbot")} ${
+                expand ? "" : "collapsed"
+              }`}
+            >
+              <MdChatBubbleOutline className="sidebar-icon" />
+              <span className="sidebar-text">ChatBot</span>
+            </Link>
+          </ul>
+        </nav>
+
+        {/* -------- MARKETPLACE -------- */}
+        {renderMarketplaceSection()}
+
+        {/* -------- SETTINGS / ACCOUNT -------- */}
+        <nav className="sidebar-section-container">
+          <h2 className={`sidebar-section-title ${expand ? "" : "collapsed"}`}>
+            Settings
+          </h2>
+          <ul className="sidebar-section">
+            <div
+              className={`sidebar-item ${darkMode ? "text-active" : ""} ${
+                expand ? "" : "collapsed"
+              }`}
+              onClick={setDarkMode}
+            >
+              <FaMoon className="sidebar-icon" />
+              <span className="sidebar-text">Dark mode</span>
+            </div>
+            <div
+              className={`sidebar-item ${!darkMode ? "text-active" : ""} ${
+                expand ? "" : "collapsed"
+              }`}
+              onClick={setLightMode}
+            >
+              <IoSunnyOutline className="sidebar-icon" />
+              <span className="sidebar-text">Light mode</span>
+            </div>
+
+            {isLoggedIn ? (
+              <>
+                <Link
+                  to="/"
+                  className={`sidebar-item ${getActiveClass("/user")} ${
+                    expand ? "" : "collapsed"
+                  }`}
+                >
+                  <FaUser className="sidebar-icon" />
+                  <span className="sidebar-text">{isLoggedIn.username}</span>
+                </Link>
+                <div
+                  className={`sidebar-item ${getActiveClass("/signout")} ${
+                    expand ? "" : "collapsed"
+                  }`}
+                  onClick={toggleSignoutModal}
+                >
+                  <FaSignOutAlt className="sidebar-icon" />
+                  <span className="sidebar-text">Sign out</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div
+                  className={`sidebar-item ${getActiveClass("/signin")} ${
+                    expand ? "" : "collapsed"
+                  }`}
+                  onClick={toggleSigninModal}
+                >
+                  <LiaSignInAltSolid className="sidebar-icon" />
+                  <span className="sidebar-text">Sign in</span>
+                </div>
+                <div
+                  className={`sidebar-item ${getActiveClass("/signup")} ${
+                    expand ? "" : "collapsed"
+                  }`}
+                  onClick={toggleSignupModal}
+                >
+                  <HiUserAdd className="sidebar-icon" />
+                  <span className="sidebar-text">Sign up</span>
+                </div>
+              </>
+            )}
+
+            <Link
+              to="/customersupport"
+              className={`sidebar-item ${getActiveClass("/customersupport")} ${
+                expand ? "" : "collapsed"
+              }`}
+            >
+              <RiCustomerService2Line className="sidebar-icon" />
+              <span className="sidebar-text">Support</span>
+            </Link>
+
+            <Link
+              to="/privacy-policy"
+              className={`sidebar-item ${getActiveClass("/privacy-policy")} ${
+                expand ? "" : "collapsed"
+              }`}
+            >
+              <MdOutlinePrivacyTip className="sidebar-icon" />
+              <span className="sidebar-text">Privacy</span>
+            </Link>
+
+            <Link
+              to="/about"
+              className={`sidebar-item ${getActiveClass("/about")} ${
+                expand ? "" : "collapsed"
+              }`}
+            >
+              <FaInfoCircle className="sidebar-icon" />
+              <span className="sidebar-text">About</span>
+            </Link>
+
+            <Link
+              to="/report"
+              className={`sidebar-item ${getActiveClass("/report")} ${
+                expand ? "" : "collapsed"
+              }`}
+            >
+              <RiFlagLine className="sidebar-icon" />
+              <span className="sidebar-text">Report</span>
+            </Link>
+
+            <Link
+              to="/terms-and-conditions"
+              className={`sidebar-item ${getActiveClass(
+                "/terms-and-conditions"
+              )} ${expand ? "" : "collapsed"}`}
+            >
+              <MdOutlineDescription className="sidebar-icon" />
+              <span className="sidebar-text">Terms</span>
+            </Link>
+          </ul>
+        </nav>
+      </section>
+
+      {/* Hypemode Subscription Modal */}
+      <HypemodeSubscriptionModal
+        isOpen={showHypemodeModal}
+        onClose={() => setShowHypemodeModal(false)}
+        darkMode={darkMode}
+      />
+    </>
   );
 };
 
