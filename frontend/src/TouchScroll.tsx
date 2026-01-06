@@ -1,36 +1,44 @@
 import { useEffect, useRef } from "react";
 
-const TouchCursor = () => {
-  const circle = useRef<HTMLDivElement>(null);
+const TouchScroll = () => {
+  const isDown = useRef(false);
+  const startY = useRef(0);
+  const scrollTop = useRef(0);
 
   useEffect(() => {
-    const move = (e: MouseEvent) => {
-      if (!circle.current) return;
-
-      circle.current.style.left = `${e.clientX}px`;
-      circle.current.style.top = `${e.clientY}px`;
+    const onDown = (e: MouseEvent) => {
+      isDown.current = true;
+      startY.current = e.clientY;
+      scrollTop.current = window.scrollY;
     };
 
-    const down = () => {
-      circle.current?.classList.add("active");
+    const onMove = (e: MouseEvent) => {
+      if (!isDown.current) return;
+      e.preventDefault();
+
+      const y = e.clientY;
+      const walk = startY.current - y; // drag distance
+      window.scrollTo({
+        top: scrollTop.current + walk,
+      });
     };
 
-    const up = () => {
-      circle.current?.classList.remove("active");
+    const onUp = () => {
+      isDown.current = false;
     };
 
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mousedown", down);
-    window.addEventListener("mouseup", up);
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
 
     return () => {
-      window.removeEventListener("mousemove", move);
-      window.removeEventListener("mousedown", down);
-      window.removeEventListener("mouseup", up);
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
     };
   }, []);
 
-  return <div ref={circle} className="touch-circle" />;
+  return null;
 };
 
-export default TouchCursor;
+export default TouchScroll;
