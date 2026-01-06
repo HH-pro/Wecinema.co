@@ -15,34 +15,6 @@
 
   }
   /* Mouse bilkul hide */
-* {
-  cursor: none !important;
-}
-
-/* Touch dot */
-.touch-dot {
-  width: 10px;
-  height: 10px;
-  background: black;
-  border-radius: 50%;
-  position: fixed;
-  pointer-events: none;
-  z-index: 10000;
-  transform: translate(-50%, -50%);
-}
-
-/* Touch ring */
-.touch-ring {
-  width: 40px;
-  height: 40px;
-  border: 2px solid black;
-  border-radius: 50%;
-  position: fixed;
-  pointer-events: none;
-  z-index: 9999;
-  transform: translate(-50%, -50%);
-  transition: 0.12s ease-out;
-}
 
   body {
 	background-color: var(--bg-color);
