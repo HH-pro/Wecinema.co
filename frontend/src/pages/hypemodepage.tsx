@@ -61,10 +61,28 @@ const PopupContent = styled.div`
   background: white;
   padding: 30px;
   border-radius: 20px;
-  max-width: 400px;
+  max-width: 500px;
   width: 90%;
   text-align: center;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+`;
+
+const DebugInfo = styled.div`
+  margin-top: 20px;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #007bff;
+  text-align: left;
+  font-size: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+  
+  pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
 `;
 
 // User interface
@@ -96,14 +114,22 @@ const HypeModeProfile = () => {
   const [showPaymentComponent, setShowPaymentComponent] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [countdown, setCountdown] = useState(3);
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
+
+  // Debug logging function
+  const addDebugLog = (message: string) => {
+    const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+    setDebugInfo(prev => [...prev.slice(-10), `[${timestamp}] ${message}`]);
+    console.log(message);
+  };
 
   // Check if user is already authenticated and paid
   useEffect(() => {
     if (auth.isAuthenticated && auth.hasPaid && !auth.loading) {
-      // User is already logged in and paid, show success
+      addDebugLog('User already authenticated and paid, redirecting...');
       setLoginSuccess(true);
     } else if (auth.isAuthenticated && !auth.hasPaid && auth.userId && !auth.loading) {
-      // User is logged in but hasn't paid
+      addDebugLog('User authenticated but not paid, showing payment...');
       setShowPaymentComponent(true);
     }
   }, [auth.isAuthenticated, auth.hasPaid, auth.userId, auth.loading]);
@@ -111,6 +137,7 @@ const HypeModeProfile = () => {
   // Handle redirect after login success
   useEffect(() => {
     if (loginSuccess) {
+      addDebugLog('Login success, starting countdown...');
       const timer = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
@@ -128,6 +155,8 @@ const HypeModeProfile = () => {
 
   // Register user with backend
   const registerUser = async (username: string, email: string, avatar: string, userType: string) => {
+    addDebugLog(`Attempting to register user: ${email} (${userType})`);
+    
     try {
       const res = await axios.post(`${API_BASE_URL}/user/signup`, {
         username,
@@ -137,28 +166,39 @@ const HypeModeProfile = () => {
         dob: "--------"
       });
 
+      addDebugLog(`Backend registration response received: ${res.status}`);
+      
       const token = res.data.token;
       const userId = res.data.id;
 
-      if (token) {
+      if (token && userId) {
+        addDebugLog(`Registration successful! Token: ${token.substring(0, 20)}..., UserID: ${userId}`);
+        
         // Use AuthContext to login
         const userData: User = {
           id: userId,
           username,
           email,
           userType,
-          hasPaid: false,
+          hasPaid: res.data.hasPaid || false,
           avatar
         };
         
         auth.login(userData, token);
-        return { success: true, userId };
+        return { success: true, userId, hasPaid: res.data.hasPaid || false };
+      } else {
+        addDebugLog('Registration failed: No token or user ID in response');
+        return { success: false };
       }
     } catch (error: any) {
+      addDebugLog(`Registration error: ${error.message}`);
+      
       if (error.response?.data?.error === 'Email already exists.') {
         setPopupMessage('Email already exists. Please sign in.');
+      } else if (error.response?.status === 0) {
+        setPopupMessage('Cannot connect to server. Please check if backend is running.');
       } else {
-        setPopupMessage('Registration failed. Please try again.');
+        setPopupMessage(`Registration failed: ${error.response?.data?.message || 'Please try again.'}`);
       }
       setShowPopup(true);
       return { success: false };
@@ -167,70 +207,107 @@ const HypeModeProfile = () => {
 
   // Login user with backend
   const loginUser = async (email: string) => {
+    addDebugLog(`Attempting to login user: ${email}`);
+    
     try {
       const res = await axios.post(`${API_BASE_URL}/user/signin`, { email });
+      
+      addDebugLog(`Backend login response received: ${res.status}`);
+      
       const token = res.data.token;
       const userId = res.data.id;
 
       if (token && userId) {
+        addDebugLog(`Login successful! Token: ${token.substring(0, 20)}..., UserID: ${userId}`);
+        
         // Get user data
         const userResponse = await axios.get(`${API_BASE_URL}/user/${userId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
+        addDebugLog(`User data fetched: ${userResponse.data?.username || 'No username'}`);
+        
         if (userResponse.data) {
           auth.login(userResponse.data, token);
-          return { success: true, userId };
+          return { success: true, userId, hasPaid: userResponse.data.hasPaid || false };
         }
       }
+      
+      addDebugLog('Login failed: No token or user ID in response');
+      return { success: false };
+      
     } catch (error: any) {
-      setPopupMessage(error.response?.data?.message || 'Login failed.');
+      addDebugLog(`Login error: ${error.message}`);
+      
+      if (error.response?.status === 0) {
+        setPopupMessage('Cannot connect to server. Please check if backend is running.');
+      } else {
+        setPopupMessage(error.response?.data?.message || 'Login failed.');
+      }
       setShowPopup(true);
       return { success: false };
     }
   };
 
-  // Handle successful authentication
-  const onLoginSuccess = async (user: any, isEmailAuth: boolean = false) => {
-    const profile = user.providerData[0];
-    const email = profile.email;
-    const username = profile.displayName || email.split('@')[0];
-    const avatar = profile.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`;
-
-    try {
-      let result;
-      if (isSignup) {
-        result = await registerUser(username, email, avatar, userType);
-      } else {
-        result = await loginUser(email);
-      }
-      
-      if (result.success && result.userId) {
-        // Check if user has paid
-        await checkPaymentStatus(result.userId);
-      }
-    } catch (error) {
-      setPopupMessage('Authentication failed. Please try again.');
-      setShowPopup(true);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // Check payment status
   const checkPaymentStatus = async (userId: string) => {
+    addDebugLog(`Checking payment status for user: ${userId}`);
+    
     try {
       await auth.verifyTokenAndPayment();
       
       if (auth.hasPaid) {
+        addDebugLog('User has paid, showing success screen');
         setLoginSuccess(true);
       } else {
+        addDebugLog('User has not paid, showing payment component');
         setShowPaymentComponent(true);
       }
     } catch (error) {
-      console.error('Error checking payment status:', error);
+      addDebugLog(`Error checking payment status: ${error}`);
       setPopupMessage('Error checking payment status. Please try again.');
       setShowPopup(true);
+    }
+  };
+
+  // Handle successful authentication
+  const onLoginSuccess = async (user: any, isEmailAuth: boolean = false) => {
+    addDebugLog(`Firebase authentication successful: ${user.email}`);
+    addDebugLog(`Firebase UID: ${user.uid}`);
+    
+    try {
+      const profile = user.providerData[0];
+      const email = profile.email;
+      const username = profile.displayName || email.split('@')[0];
+      const avatar = profile.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`;
+
+      addDebugLog(`Profile data: ${username}, ${email}`);
+
+      let result;
+      if (isSignup) {
+        addDebugLog('Processing signup...');
+        result = await registerUser(username, email, avatar, userType);
+      } else {
+        addDebugLog('Processing login...');
+        result = await loginUser(email);
+      }
+      
+      addDebugLog(`Backend result: ${result?.success ? 'Success' : 'Failed'}`);
+      
+      if (result?.success && result.userId) {
+        // Check if user has paid
+        await checkPaymentStatus(result.userId);
+      } else {
+        addDebugLog('Backend authentication failed');
+        setPopupMessage('Authentication failed. Please try again.');
+        setShowPopup(true);
+      }
+    } catch (error: any) {
+      addDebugLog(`Error in onLoginSuccess: ${error.message}`);
+      setPopupMessage(`Authentication failed: ${error.message || 'Please try again.'}`);
+      setShowPopup(true);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -243,14 +320,17 @@ const HypeModeProfile = () => {
     }
 
     setIsLoading(true);
+    addDebugLog('Starting Google login...');
+    
     const firebaseAuth = getAuth();
     try {
       const result = await signInWithPopup(firebaseAuth, googleProvider);
+      addDebugLog('Google login successful via Firebase');
       await onLoginSuccess(result.user);
     } catch (error: any) {
+      addDebugLog(`Google login error: ${error.code} - ${error.message}`);
       setIsLoading(false);
-      setPopupMessage('Google login failed. Please try again.');
-      setShowPopup(true);
+      handleAuthError(error);
     }
   };
 
@@ -275,11 +355,15 @@ const HypeModeProfile = () => {
     }
 
     setIsLoading(true);
+    addDebugLog(`Starting email signup: ${email}`);
+    
     const firebaseAuth = getAuth();
     try {
       const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+      addDebugLog('Firebase email signup successful');
       await onLoginSuccess(userCredential.user, true);
     } catch (error: any) {
+      addDebugLog(`Email signup error: ${error.code} - ${error.message}`);
       setIsLoading(false);
       handleAuthError(error);
     }
@@ -300,11 +384,15 @@ const HypeModeProfile = () => {
     }
 
     setIsLoading(true);
+    addDebugLog(`Starting email login: ${email}`);
+    
     const firebaseAuth = getAuth();
     try {
       const userCredential = await signInWithEmailAndPassword(firebaseAuth, email, password);
+      addDebugLog('Firebase email login successful');
       await onLoginSuccess(userCredential.user, true);
     } catch (error: any) {
+      addDebugLog(`Email login error: ${error.code} - ${error.message}`);
       setIsLoading(false);
       handleAuthError(error);
     }
@@ -325,6 +413,11 @@ const HypeModeProfile = () => {
   };
 
   const handleAuthError = (error: any) => {
+    addDebugLog(`Authentication Error Details:`);
+    addDebugLog(`- Code: ${error.code}`);
+    addDebugLog(`- Message: ${error.message}`);
+    addDebugLog(`- Full Error: ${JSON.stringify(error)}`);
+    
     switch (error.code) {
       case 'auth/email-already-in-use':
         setPopupMessage('Email already in use. Please try logging in.');
@@ -341,8 +434,20 @@ const HypeModeProfile = () => {
       case 'auth/wrong-password':
         setPopupMessage('Incorrect password. Please try again.');
         break;
+      case 'auth/network-request-failed':
+        setPopupMessage('Network error. Please check your internet connection.');
+        break;
+      case 'auth/too-many-requests':
+        setPopupMessage('Too many attempts. Please try again later.');
+        break;
+      case 'auth/user-disabled':
+        setPopupMessage('This account has been disabled.');
+        break;
+      case 'auth/operation-not-allowed':
+        setPopupMessage('Email/password accounts are not enabled. Please contact support.');
+        break;
       default:
-        setPopupMessage('Authentication failed. Please try again.');
+        setPopupMessage(`Authentication failed: ${error.message || 'Please try again.'}`);
     }
     setShowPopup(true);
   };
@@ -354,6 +459,7 @@ const HypeModeProfile = () => {
 
   const handleSubscriptionClick = (subscriptionType: "user" | "studio") => {
     setSelectedSubscription(subscriptionType);
+    addDebugLog(`Selected subscription: ${subscriptionType}`);
   };
 
   const toggleSignupSignin = () => {
@@ -362,6 +468,20 @@ const HypeModeProfile = () => {
     setPassword('');
     setUsername('');
     setSelectedSubscription(null);
+    addDebugLog(`Toggled to ${!isSignup ? 'Sign Up' : 'Sign In'} mode`);
+  };
+
+  // Test backend connection
+  const testBackendConnection = async () => {
+    addDebugLog('Testing backend connection...');
+    try {
+      const response = await axios.get(`${API_BASE_URL}/health`);
+      addDebugLog(`Backend health check: ${response.status} - ${response.data?.message || 'OK'}`);
+      toast.success('Backend is connected!');
+    } catch (error) {
+      addDebugLog(`Backend connection failed: ${error}`);
+      toast.error('Cannot connect to backend server');
+    }
   };
 
   // Fireworks effect
@@ -369,6 +489,11 @@ const HypeModeProfile = () => {
     setShowFireworks(true);
     const timer = setTimeout(() => setShowFireworks(false), 3000);
     return () => clearTimeout(timer);
+  }, []);
+
+  // Test backend on component mount
+  useEffect(() => {
+    testBackendConnection();
   }, []);
 
   // If auth is still loading
@@ -453,6 +578,25 @@ const HypeModeProfile = () => {
       )}
 
       <div className="main-container-small">
+        {/* Debug Info Button */}
+        <button 
+          onClick={testBackendConnection}
+          style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            background: '#6b7280',
+            color: 'white',
+            border: 'none',
+            padding: '8px 12px',
+            borderRadius: '5px',
+            fontSize: '12px',
+            cursor: 'pointer'
+          }}
+        >
+          Test Backend
+        </button>
+
         {/* Toggle Button */}
         <button 
           className="toggle-button-small"
@@ -567,29 +711,58 @@ const HypeModeProfile = () => {
         )}
       </div>
 
-      {/* Popup */}
+      {/* Popup with Debug Info */}
       {showPopup && (
         <PopupOverlay onClick={closePopup}>
           <PopupContent onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ color: '#b45309', marginBottom: '15px' }}>Authentication Error</h3>
             <p style={{ marginBottom: '20px', fontSize: '16px', color: '#4b5563' }}>
               {popupMessage}
             </p>
-            <button 
-              onClick={closePopup}
-              style={{
-                background: 'linear-gradient(135deg, #fbbf24, #b45309)',
-                color: 'white',
-                border: 'none',
-                padding: '12px 30px',
-                borderRadius: '25px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                boxShadow: '0 4px 15px rgba(251, 191, 36, 0.3)'
-              }}
-            >
-              Close
-            </button>
+            
+            {/* Debug Info */}
+            {debugInfo.length > 0 && (
+              <DebugInfo>
+                <strong>Debug Info:</strong>
+                <pre>{debugInfo.join('\n')}</pre>
+              </DebugInfo>
+            )}
+            
+            <div style={{ marginTop: '20px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button 
+                onClick={closePopup}
+                style={{
+                  background: 'linear-gradient(135deg, #fbbf24, #b45309)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '10px 20px',
+                  borderRadius: '25px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 4px 15px rgba(251, 191, 36, 0.3)'
+                }}
+              >
+                Close
+              </button>
+              <button 
+                onClick={() => {
+                  addDebugLog('User requested retry...');
+                  closePopup();
+                }}
+                style={{
+                  background: '#4b5563',
+                  color: 'white',
+                  border: 'none',
+                  padding: '10px 20px',
+                  borderRadius: '25px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Retry
+              </button>
+            </div>
           </PopupContent>
         </PopupOverlay>
       )}
