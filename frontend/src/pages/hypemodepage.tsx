@@ -4,11 +4,8 @@ import { Layout } from "../components";
 import { useNavigate } from 'react-router-dom';
 import { getAuth, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { googleProvider } from "../firebase/config";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Confetti from "react-confetti";
-import "../css/HypeModeProfile.css";
-
-// Import payment component dependencies
 import styled from 'styled-components';
 import { decodeToken } from "../utilities/helperfFunction";
 import { getRequest } from "../api";
@@ -16,76 +13,187 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import PayPalButtonWrapper from './PayPalButtonWrapper';
 import { API_BASE_URL } from "../api";
+import "../css/HypeModeProfile.css";
+
+// Professional Success Popup Component
+const ProfessionalSuccessPopup = styled.div`
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 40px 30px;
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  z-index: 10000;
+  text-align: center;
+  color: white;
+  min-width: 350px;
+  max-width: 400px;
+  animation: float 3s ease-in-out infinite;
+  
+  @keyframes float {
+    0%, 100% { transform: translate(-50%, -50%) translateY(0px); }
+    50% { transform: translate(-50%, -50%) translateY(-10px); }
+  }
+`;
+
+const SuccessIcon = styled.div`
+  font-size: 60px;
+  margin-bottom: 20px;
+  animation: pulse 1.5s infinite;
+  
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+  }
+`;
+
+const SuccessTitle = styled.h2`
+  font-size: 28px;
+  margin-bottom: 15px;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+`;
+
+const SuccessMessage = styled.p`
+  font-size: 16px;
+  margin-bottom: 25px;
+  opacity: 0.9;
+  line-height: 1.6;
+`;
+
+const CountdownText = styled.div`
+  font-size: 14px;
+  opacity: 0.8;
+  margin-top: 15px;
+  font-weight: 500;
+`;
+
+const Overlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 9999;
+  backdrop-filter: blur(5px);
+`;
+
+const CloseButton = styled.button`
+  background: white;
+  color: #667eea;
+  border: none;
+  padding: 12px 30px;
+  border-radius: 50px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+`;
 
 // Payment Component Styled Components
 const Container = styled.div`
   display: flex;
   justify-content: center;
-  padding: 100px 20px;
-  background: linear-gradient(to right, #ffffa1 0%, #ffc800 100%);
-  color: #333;
+  align-items: center;
+  min-height: 100vh;
+  padding: 40px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 `;
 
 const PaymentSubscriptionBox = styled.div`
   padding: 40px;
-  border: 2px dashed #000;
+  background: white;
+  border-radius: 20px;
   text-align: center;
   width: 100%;
   max-width: 500px;
-  background-color: #fff;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  border-radius: 10px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  position: relative;
+  overflow: hidden;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 5px;
+    background: linear-gradient(to right, #667eea, #764ba2);
+  }
 `;
 
 const Title = styled.h2`
   margin-bottom: 20px;
-  font-size: 24px;
-  font-weight: bold;
+  font-size: 28px;
+  font-weight: 700;
+  color: #333;
+  position: relative;
+  
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 3px;
+    background: linear-gradient(to right, #667eea, #764ba2);
+    border-radius: 2px;
+  }
 `;
 
 const Description = styled.p`
-  font-size: 18px;
-  margin-bottom: 30px;
-`;
-
-const PaymentPopup = styled.div`
-  position: fixed;
-  top: 50%; 
-  left: 50%;
-  transform: translate(-50%, -50%);
-  padding: 30px;
-  background: #fff;
-  border: 2px solid #000;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  z-index: 1000;
-  border-radius: 10px;
-  max-width: 400px;
-  text-align: center;
-`;
-
-const PaymentOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 999;
+  font-size: 16px;
+  margin-bottom: 10px;
+  color: #666;
+  line-height: 1.6;
+  
+  &:last-of-type {
+    margin-bottom: 30px;
+  }
 `;
 
 const PaymentButton = styled.button`
-  background: #28a745;
-  color: #fff;
+  background: linear-gradient(to right, #667eea, #764ba2);
+  color: white;
   border: none;
-  padding: 10px 20px;
-  cursor: pointer;
+  padding: 15px 30px;
+  border-radius: 50px;
   font-size: 16px;
-  border-radius: 5px;
-  transition: background 0.3s;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
   margin-top: 20px;
-
-  &:hover {
-    background: #218838;
+  width: 100%;
+  max-width: 300px;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  }
+  
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+  
+  &:active:not(:disabled) {
+    transform: translateY(0);
   }
 `;
 
@@ -236,17 +344,6 @@ const PaymentComponent: React.FC<{
     setTimeout(() => setShowPopup(false), 3000);
   };
 
-  const TransactionPopup: React.FC<TransactionPopupProps> = ({ message, onClose, isError }) => (
-    <>
-      <PaymentOverlay onClick={onClose} />
-      <PaymentPopup>
-        <h3>{isError ? 'Error' : 'Success'}!</h3>
-        <p>{message}</p>
-        <PaymentButton onClick={onClose}>Close</PaymentButton>
-      </PaymentPopup>
-    </>
-  );
-
   return (
     <Layout expand={false} hasHeader={true}>
       <Container>
@@ -278,11 +375,13 @@ const PaymentComponent: React.FC<{
           <>
             <PaymentSubscriptionBox>
               <div>
-                <Title>Proceed to Payment</Title>
-                <Description>Your subscription type: {subscriptionType}</Description>
-                <Description>User type: {userType}</Description>
-                <Description>Amount: ${amount}</Description>
-                <Description>Pay with PayPal or Debit Card</Description>
+                <Title>Complete Your Subscription</Title>
+                <Description>Subscription Plan: {subscriptionType === "user" ? "Basic Plan" : "Pro Plan"}</Description>
+                <Description>User Type: {userType === "buyer" ? "👤 Buyer" : "🏪 Seller"}</Description>
+                <Description style={{ fontSize: '24px', fontWeight: 'bold', color: '#333', margin: '20px 0' }}>
+                  Total Amount: ${amount}
+                </Description>
+                <Description>Secure payment powered by PayPal</Description>
                 <PayPalButtonWrapper 
                   amount={amount} 
                   userId={userId} 
@@ -291,18 +390,15 @@ const PaymentComponent: React.FC<{
                 />
               </div>
             </PaymentSubscriptionBox>
-            {showPopup && (
-              <TransactionPopup 
-                message={popupMessage} 
-                onClose={() => setShowPopup(false)} 
-                isError={isError} 
-              />
-            )}
           </>
         ) : (
           <PaymentSubscriptionBox>
-            <Title>Go back to Home</Title>
-            <Description>Congratulations, you successfully subscribed to hypemode.</Description>
+            <Title>Subscription Active</Title>
+            <Description>Your {subscriptionType === "user" ? "Basic" : "Pro"} subscription is now active!</Description>
+            <Description>You can now access all premium features.</Description>
+            <PaymentButton onClick={() => navigate('/')}>
+              Go to Dashboard
+            </PaymentButton>
           </PaymentSubscriptionBox>
         )}
       </Container>
@@ -327,6 +423,7 @@ const HypeModeProfile = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPaymentComponent, setShowPaymentComponent] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
+  const [countdown, setCountdown] = useState(3);
 
   // Check if user has paid on component mount
   useEffect(() => {
@@ -344,11 +441,18 @@ const HypeModeProfile = () => {
   // Handle redirect after login success
   useEffect(() => {
     if (loginSuccess) {
-      const timer = setTimeout(() => {
-        navigate('/');
-      }, 3000); // 3 seconds delay
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            navigate('/');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
       
-      return () => clearTimeout(timer);
+      return () => clearInterval(timer);
     }
   }, [loginSuccess, navigate]);
 
@@ -362,8 +466,6 @@ const HypeModeProfile = () => {
         setUserId(userId);
         setIsLoggedIn(true);
         setLoginSuccess(true);
-        setPopupMessage('Login successful! Redirecting to home...');
-        setShowPopup(true);
       } else {
         // User hasn't paid, show payment component
         setUserId(userId);
@@ -462,7 +564,7 @@ const HypeModeProfile = () => {
   // Google Signin
   const handleGoogleLogin = async () => {
     if (!selectedSubscription) {
-      setPopupMessage("Please select a subscription first.");
+      setPopupMessage("Please select a subscription plan first.");
       setShowPopup(true);
       return;
     }
@@ -483,7 +585,7 @@ const HypeModeProfile = () => {
   // Email Signup
   const handleEmailSignup = async () => {
     if (!selectedSubscription) {
-      setPopupMessage("Please select a subscription first.");
+      setPopupMessage("Please select a subscription plan first.");
       setShowPopup(true);
       return;
     }
@@ -524,7 +626,7 @@ const HypeModeProfile = () => {
   // Email Login
   const handleEmailLogin = async () => {
     if (!selectedSubscription) {
-      setPopupMessage("Please select a subscription first.");
+      setPopupMessage("Please select a subscription plan first.");
       setShowPopup(true);
       return;
     }
@@ -603,22 +705,31 @@ const HypeModeProfile = () => {
     setTimeout(() => setShowFireworks(false), 1000);
   }, []);
 
-  // If login is successful and user has paid, show success popup (will auto redirect)
+  // Show professional success popup when login is successful
   if (loginSuccess) {
     return (
-      <Layout expand={false} hasHeader={true}>
-        <div className="main-container-small">
-          {showPopup && (
+      <>
+        <AnimatePresence>
+          {loginSuccess && (
             <>
-              <div className="overlay" onClick={closePopup} />
-              <div className="popup-small">
-                <p className="popup-text-small">{popupMessage}</p>
-                <button className="subscription-button-small" onClick={closePopup}>Close</button>
-              </div>
+              <Overlay />
+              <ProfessionalSuccessPopup>
+                <SuccessIcon>🎉</SuccessIcon>
+                <SuccessTitle>Welcome Back!</SuccessTitle>
+                <SuccessMessage>
+                  Login successful! You're being redirected to your dashboard.
+                </SuccessMessage>
+                <CountdownText>
+                  Redirecting in {countdown} second{countdown !== 1 ? 's' : ''}...
+                </CountdownText>
+                <CloseButton onClick={() => navigate('/')}>
+                  Go Now
+                </CloseButton>
+              </ProfessionalSuccessPopup>
             </>
           )}
-        </div>
-      </Layout>
+        </AnimatePresence>
+      </>
     );
   }
 
