@@ -24,6 +24,9 @@ body {
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
 }
+nav {
+  pointer-events: auto;
+}
 
 /* Mouse hide */
 * {
