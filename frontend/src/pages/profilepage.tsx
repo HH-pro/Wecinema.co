@@ -100,7 +100,7 @@ const changeUserTypeDirect = async (userId: string, userType: string) => {
                 // ✅ Clear invalid token
                 localStorage.removeItem("token");
                 // ✅ Redirect to login
-                setTimeout(() => nav("/login"), 2000);
+                setTimeout(() => nav("/"), 2000);
             } else if (error.response.status === 403) {
                 errorMessage = "Forbidden: You don't have permission to perform this action.";
             } else if (error.response.status === 404) {
