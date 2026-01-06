@@ -323,47 +323,54 @@ const loginUser = async (email: string) => {
     }
   };
 
-  // Handle successful authentication
   const onLoginSuccess = async (user: any, isEmailAuth: boolean = false) => {
-    addDebugLog(`Firebase authentication successful: ${user.email}`);
-    addDebugLog(`Firebase UID: ${user.uid}`);
-    
-    try {
-      const profile = user.providerData[0];
-      const email = profile.email;
-      const username = profile.displayName || email.split('@')[0];
-      const avatar = profile.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`;
+  addDebugLog(`Firebase authentication successful: ${user.email}`);
+  addDebugLog(`Firebase UID: ${user.uid}`);
+  addDebugLog(`Firebase Provider: ${user.providerId}`);
+  
+  try {
+    const profile = user.providerData[0];
+    const email = profile?.email || user.email;
+    const username = profile?.displayName || email?.split('@')[0] || 'User';
+    const avatar = profile?.photoURL || user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`;
 
-      addDebugLog(`Profile data: ${username}, ${email}`);
+    addDebugLog(`Profile data - Email: ${email}, Username: ${username}`);
 
-      let result;
-      if (isSignup) {
-        addDebugLog('Processing signup...');
-        result = await registerUser(username, email, avatar, userType);
-      } else {
-        addDebugLog('Processing login...');
-        result = await loginUser(email);
-      }
-      
-      addDebugLog(`Backend result: ${result?.success ? 'Success' : 'Failed'}`);
-      
-      if (result?.success && result.userId) {
-        // Check if user has paid
-        await checkPaymentStatus(result.userId);
-      } else {
-        addDebugLog('Backend authentication failed');
-        setPopupMessage('Authentication failed. Please try again.');
-        setShowPopup(true);
-      }
-    } catch (error: any) {
-      addDebugLog(`Error in onLoginSuccess: ${error.message}`);
-      setPopupMessage(`Authentication failed: ${error.message || 'Please try again.'}`);
-      setShowPopup(true);
-    } finally {
-      setIsLoading(false);
+    let result;
+    if (isSignup) {
+      addDebugLog('Processing signup...');
+      result = await registerUser(username, email, avatar, userType);
+    } else {
+      addDebugLog('Processing login...');
+      result = await loginUser(email);
     }
-  };
-
+    
+    addDebugLog(`Backend result: ${JSON.stringify(result, null, 2)}`);
+    
+    if (result?.success && result.userId) {
+      addDebugLog('Authentication successful, checking payment status...');
+      // Check if user has paid
+      await checkPaymentStatus(result.userId);
+    } else {
+      addDebugLog('Backend authentication failed');
+      
+      // Show more detailed error
+      if (result?.error) {
+        setPopupMessage(result.error);
+      } else {
+        setPopupMessage('Authentication failed. Please try again or contact support.');
+      }
+      setShowPopup(true);
+    }
+  } catch (error: any) {
+    addDebugLog(`Error in onLoginSuccess: ${error.message}`);
+    addDebugLog(`Error stack: ${error.stack}`);
+    setPopupMessage(`Authentication error: ${error.message || 'Please try again.'}`);
+    setShowPopup(true);
+  } finally {
+    setIsLoading(false);
+  }
+};
   // Google Signin
   const handleGoogleLogin = async () => {
     if (!selectedSubscription) {
