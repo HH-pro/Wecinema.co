@@ -8,6 +8,9 @@ import { motion } from "framer-motion";
 import Confetti from "react-confetti";
 import "../css/HypeModeProfile.css";
 
+import { API_BASE_URL } from "../api";
+
+
 const HypeModeProfile = () => {
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -26,7 +29,8 @@ const HypeModeProfile = () => {
   // Register user with backend
   const registerUser = async (username: string, email: string, avatar: string, userType: string) => {
     try {
-      const res = await axios.post('https://wecinema-co.onrender.com/user/signup', {
+      // ✅ Use API_BASE_URL here
+      const res = await axios.post(`${API_BASE_URL}/user/signup`, {
         username,
         email,
         avatar,
@@ -60,7 +64,8 @@ const HypeModeProfile = () => {
   // Login user with backend
   const loginUser = async (email: string) => {
     try {
-      const res = await axios.post('https://wecinema-co.onrender.com/user/signin', { email });
+      // ✅ Use API_BASE_URL here
+      const res = await axios.post(`${API_BASE_URL}/user/signin`, { email });
       const backendToken = res.data.token;
       const userId = res.data.id;
 
@@ -293,7 +298,7 @@ const HypeModeProfile = () => {
 
         {isLoggedIn ? (
           <div className="cards-container-small">
-            
+            {/* Logged in content here */}
           </div>
         ) : (
           <>
