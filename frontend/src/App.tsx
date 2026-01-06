@@ -136,7 +136,7 @@ export default function App() {
           animation: 'spin 1s linear infinite',
           marginBottom: '20px'
         }}></div>
-        <p style={{ color: '#4b5563', fontSize: '16px' }}>Loading HypeMode...</p>
+        <p style={{ color: '#4b5563', fontSize: '16px' }}>Loading Wecinema...</p>
         <style>{`
           @keyframes spin {
             0% { transform: rotate(0deg); }
