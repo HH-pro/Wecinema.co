@@ -110,7 +110,58 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+/* App.css - Add these styles */
 
+/* Custom Cursor Styles */
+.custom-cursor {
+  transition: transform 0.1s ease, opacity 0.3s ease;
+}
+
+/* Ensure cursor works on all elements */
+* {
+  cursor: none !important;
+}
+
+/* Special handling for text selection */
+input, textarea, [contenteditable] {
+  cursor: text !important;
+}
+
+/* Make sure toast notifications are above cursor */
+.Toastify__toast-container {
+  z-index: 1000000 !important;
+}
+
+/* Ensure tawk.to widget doesn't interfere */
+.tawk-button {
+  cursor: pointer !important;
+}
+
+/* Responsive cursor - hide on mobile */
+@media (max-width: 768px) {
+  .custom-cursor,
+  [class*="cursor-trail"] {
+    display: none !important;
+  }
+  
+  * {
+    cursor: auto !important;
+  }
+}
+
+/* Fix for AI Customer Support component */
+.AICustomerSupport {
+  position: relative;
+  z-index: 1000;
+}
+
+/* Ensure marketplace components work with cursor */
+.marketplace-item:hover,
+.product-card:hover,
+[role="button"]:hover {
+  transform: translateY(-2px);
+  transition: transform 0.2s ease;
+}
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
