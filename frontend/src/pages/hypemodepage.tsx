@@ -2,16 +2,16 @@ import { useState, useEffect, useRef } from "react";
 import axios from 'axios';
 import { Layout } from "../components";
 import { useNavigate } from 'react-router-dom';
-import { getAuth, signInWithPopup, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import { getAuth, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { googleProvider } from "../firebase/config";
 import { motion, AnimatePresence } from "framer-motion";
 import Confetti from "react-confetti";
 import styled from 'styled-components';
 import { decodeToken } from "../utilities/helperfFunction";
-import { getRequest } from "../api";
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import PayPalButtonWrapper from '../components/PaymentComponent/PayPalButtonWrapper';
+import PaymentSuccessPopup from '../components/PaymentSuccessPopup';
 import { API_BASE_URL } from "../api";
 import "../css/HypeModeProfile.css";
 
@@ -270,6 +270,87 @@ const PaymentButton = styled.button`
   }
 `;
 
+// Auto Redirect Component
+const AutoRedirect = () => {
+  const navigate = useNavigate();
+  const [countdown, setCountdown] = useState(3);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          // Force page refresh before redirect
+          window.location.href = '/';
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [navigate]);
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      background: 'rgba(0, 0, 0, 0.9)',
+      zIndex: 10000
+    }}>
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.1)',
+        backdropFilter: 'blur(20px)',
+        padding: '40px',
+        borderRadius: '20px',
+        textAlign: 'center',
+        color: 'white',
+        minWidth: '300px'
+      }}>
+        <div style={{ fontSize: '60px', marginBottom: '20px' }}>🎉</div>
+        <h2 style={{ marginBottom: '15px' }}>Login Successful!</h2>
+        <p style={{ marginBottom: '25px', fontSize: '16px' }}>
+          You're being redirected to the home page...
+        </p>
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.15)',
+          padding: '10px 20px',
+          borderRadius: '15px',
+          display: 'inline-block',
+          fontSize: '18px',
+          fontWeight: 'bold'
+        }}>
+          Refreshing in {countdown} second{countdown !== 1 ? 's' : ''}
+        </div>
+        <button
+          onClick={() => {
+            window.location.href = '/';
+          }}
+          style={{
+            marginTop: '20px',
+            background: 'linear-gradient(135deg, #22c55e, #15803d)',
+            color: 'white',
+            border: 'none',
+            padding: '12px 30px',
+            borderRadius: '25px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease'
+          }}
+        >
+          Go Now
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // Main HypeModeProfile Component
 const HypeModeProfile = () => {
   const navigate = useNavigate();
@@ -287,6 +368,8 @@ const HypeModeProfile = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPaymentComponent, setShowPaymentComponent] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
+  const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
+  const [shouldAutoRedirect, setShouldAutoRedirect] = useState(false);
   const [countdown, setCountdown] = useState(3);
   const [hasCheckedInitialAuth, setHasCheckedInitialAuth] = useState(false);
   const [authCheckComplete, setAuthCheckComplete] = useState(false);
@@ -294,10 +377,9 @@ const HypeModeProfile = () => {
   // Use refs to prevent multiple redirects
   const redirectAttempted = useRef(false);
 
-  // Simplified initial auth check - only run once on mount
+  // Check if user is already logged in and paid on initial load
   useEffect(() => {
-    const checkInitialAuth = async () => {
-      // Prevent multiple checks
+    const checkAuthAndRedirect = async () => {
       if (redirectAttempted.current) return;
       
       const token = localStorage.getItem("token");
@@ -313,7 +395,6 @@ const HypeModeProfile = () => {
         
         if (!userId) {
           localStorage.removeItem("token");
-          localStorage.removeItem("shouldRedirect");
           setHasCheckedInitialAuth(true);
           setAuthCheckComplete(true);
           return;
@@ -324,10 +405,9 @@ const HypeModeProfile = () => {
         const user = response.data;
         
         if (user.hasPaid) {
-          // User has paid, redirect immediately
+          // User has paid, set auto redirect
           redirectAttempted.current = true;
-
-          navigate('/');
+          setShouldAutoRedirect(true);
           return;
         } else {
           // User hasn't paid, show payment flow
@@ -337,17 +417,26 @@ const HypeModeProfile = () => {
         }
       } catch (error) {
         console.error('Error checking initial auth:', error);
-        // Clear invalid token
         localStorage.removeItem("token");
-        localStorage.removeItem("shouldRedirect");
       } finally {
         setHasCheckedInitialAuth(true);
         setAuthCheckComplete(true);
       }
     };
 
-    checkInitialAuth();
-  }, [navigate]);
+    checkAuthAndRedirect();
+  }, []);
+
+  // Handle auto redirect when user is already logged in and paid
+  useEffect(() => {
+    if (shouldAutoRedirect) {
+      const timer = setTimeout(() => {
+        window.location.href = '/';
+      }, 2000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [shouldAutoRedirect]);
 
   // Handle redirect after login success
   useEffect(() => {
@@ -357,19 +446,17 @@ const HypeModeProfile = () => {
         setCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(timer);
-
-            navigate('/');
-
+            // Force page refresh before redirect
+            window.location.href = '/';
             return 0;
           }
           return prev - 1;
         });
-      }, 10);
-            window.location.reload();
+      }, 1000);
       
       return () => clearInterval(timer);
     }
-  }, [loginSuccess, navigate]);
+  }, [loginSuccess]);
 
   const checkPaymentStatus = async (userId: string) => {
     try {
@@ -377,7 +464,7 @@ const HypeModeProfile = () => {
       const user = response.data;
       
       if (user.hasPaid) {
-        // User has paid, set login success
+        // User has paid, set login success which will trigger auto redirect
         setUserId(userId);
         setIsLoggedIn(true);
         setLoginSuccess(true);
@@ -415,7 +502,7 @@ const HypeModeProfile = () => {
         return { success: true, userId };
       }
     } catch (error: any) {
-      if (error.response && error.response.data && error.response.data.error === 'Email already exists.') {
+      if (error.response?.data?.error === 'Email already exists.') {
         setPopupMessage('Email already exists. Please sign in.');
       } else {
         setPopupMessage('Registration failed. Please try again.');
@@ -439,11 +526,7 @@ const HypeModeProfile = () => {
         return { success: true, userId };
       }
     } catch (error: any) {
-      if (error.response) {
-        setPopupMessage(error.response.data.message || 'Login failed.');
-      } else {
-        setPopupMessage('Login failed.');
-      }
+      setPopupMessage(error.response?.data?.message || 'Login failed.');
       setShowPopup(true);
       return { success: false };
     }
@@ -598,6 +681,16 @@ const HypeModeProfile = () => {
     setSelectedSubscription(null);
   };
 
+  const handlePaymentSuccess = () => {
+    setShowPaymentSuccess(true);
+    setShowPaymentComponent(false);
+    
+    // Auto redirect after payment success
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 3000);
+  };
+
   // Fireworks effect on mount
   useEffect(() => {
     setShowFireworks(true);
@@ -633,6 +726,27 @@ const HypeModeProfile = () => {
     );
   }
 
+  // Show auto redirect component if user is already logged in and paid
+  if (shouldAutoRedirect) {
+    return <AutoRedirect />;
+  }
+
+  // Show payment success popup
+  if (showPaymentSuccess && selectedSubscription) {
+    return (
+      <PaymentSuccessPopup
+        isVisible={showPaymentSuccess}
+        subscriptionType={selectedSubscription}
+        userType={userType}
+        amount={selectedSubscription === 'user' ? 5 : 10}
+        onClose={() => {
+          setShowPaymentSuccess(false);
+          window.location.href = '/';
+        }}
+      />
+    );
+  }
+
   // Show professional success popup when login is successful
   if (loginSuccess) {
     return (
@@ -643,15 +757,15 @@ const HypeModeProfile = () => {
               <Overlay />
               <ProfessionalSuccessPopup>
                 <SuccessIcon>🎉</SuccessIcon>
-                <SuccessTitle>Welcome Back!</SuccessTitle>
+                <SuccessTitle>Login Successful!</SuccessTitle>
                 <SuccessMessage>
-                  Login successful! You're being redirected to your dashboard.
+                  You're being redirected to the home page. The page will refresh automatically.
                 </SuccessMessage>
                 <CountdownText>
-                  Redirecting in {countdown} second{countdown !== 1 ? 's' : ''}...
+                  Refreshing page in {countdown} second{countdown !== 1 ? 's' : ''}...
                 </CountdownText>
-                <CloseButton onClick={() => navigate('/')}>
-                  Go Now
+                <CloseButton onClick={() => window.location.href = '/'}>
+                  Go Now (Refresh)
                 </CloseButton>
               </ProfessionalSuccessPopup>
             </>
@@ -677,11 +791,10 @@ const HypeModeProfile = () => {
               <Description>Secure payment powered by PayPal</Description>
               <PayPalButtonWrapper 
                 amount={selectedSubscription === 'user' ? 5 : 10} 
-                userId={userId} 
-                onSuccess={() => {
-                  toast.success('Payment successful! Redirecting to home...');
-                  setTimeout(() => navigate('/'), 1500);
-                }}
+                userId={userId}
+                subscriptionType={selectedSubscription}
+                userType={userType}
+                onSuccess={handlePaymentSuccess}
                 onError={(msg) => {
                   setPopupMessage(msg);
                   setShowPopup(true);
@@ -690,7 +803,7 @@ const HypeModeProfile = () => {
               <PaymentButton 
                 onClick={() => {
                   toast.info('You can complete payment later');
-                  setTimeout(() => navigate('/'), 1000);
+                  setTimeout(() => window.location.href = '/', 1000);
                 }}
                 style={{ marginTop: '15px', background: 'linear-gradient(135deg, #6b7280, #4b5563)' }}
               >
@@ -1154,7 +1267,7 @@ const HypeModeProfile = () => {
         )}
       </div>
 
-      {showPopup && !loginSuccess && (
+      {showPopup && !loginSuccess && !showPaymentSuccess && (
         <>
           <div className="overlay" onClick={closePopup} />
           <div className="popup-small">
