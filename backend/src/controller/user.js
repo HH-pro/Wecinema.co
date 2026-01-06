@@ -1109,124 +1109,57 @@ router.get('/payment-status/:userId', async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+
 router.post('/save-transaction', async (req, res) => {
-  const { userId, username, email, orderId, payerId, amount, currency, subscriptionType } = req.body;
-
-  console.log('Received transaction data:', req.body);
-
-  // ✅ Input validation
-  if (!userId || !username || !email || !orderId || !payerId || !amount || !currency || !subscriptionType) {
-    console.error('Missing required fields:', req.body);
-    return res.status(400).send({ 
-      message: 'Missing required fields',
-      required: ['userId', 'username', 'email', 'orderId', 'payerId', 'amount', 'currency', 'subscriptionType'],
-      received: req.body
-    });
-  }
-
-  try {
-    // ✅ Check if Transaction model exists
-    if (!Transaction) {
-      console.error('Transaction model is not defined');
-      return res.status(500).send({ message: 'Server configuration error: Transaction model not found' });
-    }
-
-    // ✅ Create and save transaction
-    const newTransaction = new Transaction({
-      userId,
-      username,
-      email,
-      orderId,
-      payerId,
-      amount,
-      currency,
-      subscriptionType, // ✅ Add subscriptionType to transaction
-      transactionDate: new Date()
-    });
-
-    console.log('Saving transaction:', newTransaction);
-    await newTransaction.save();
-    console.log('Transaction saved successfully');
-
-    // ✅ Find user and update payment status
-    console.log('Looking for user with ID:', userId);
-    const user = await User.findOne({ _id: userId });
+	const { userId, username, email, orderId, payerId, amount, currency,subscriptionType } = req.body;
+  
+	try {
+	  const newTransaction = new Transaction({
+		userId,
+		username,
+		email,
+		orderId,
+		payerId,
+		amount,
+		currency
+	  });
+  
+	  await newTransaction.save();
+	// Find user and log before updating
+	const user = await User.findOne({ _id: userId });
 
     if (!user) {
-      console.error('User not found with ID:', userId);
-      return res.status(404).send({ 
-        message: 'User not found',
-        userId: userId
-      });
+      return res.status(404).send({ message: 'User not found' });
     }
 
-    console.log('User found before update:', {
-      id: user._id,
-      username: user.username,
-      hasPaid: user.hasPaid,
-      subscriptionType: user.subscriptionType
-    });
+    // Log user data before attempting update
+    console.log('Before update:', user);
 
-    // ✅ Update user payment status
-    user.hasPaid = true;
-    user.lastPayment = new Date();
-    user.subscriptionType = subscriptionType;
-    
-    console.log('Updating user with:', {
-      hasPaid: true,
-      lastPayment: new Date(),
-      subscriptionType: subscriptionType
-    });
+    // Now attempt the update with findOneAndUpdate
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: userId }, 
+      {
+        $set: {
+          hasPaid: true,
+          lastPayment: new Date() ,
+		  subscriptionType: subscriptionType // Ensure the current date is used here
 
-    await user.save();
+        }
+      },
+      { new: true }  // Ensure that the updated document is returned
+    );
 
-    // ✅ Verify update
-    const updatedUser = await User.findOne({ _id: userId });
-    console.log('User after update:', {
-      id: updatedUser._id,
-      username: updatedUser.username,
-      hasPaid: updatedUser.hasPaid,
-      lastPayment: updatedUser.lastPayment,
-      subscriptionType: updatedUser.subscriptionType
-    });
-
-    // ✅ Send success response
-    res.status(201).send({ 
-      message: 'Transaction saved and user payment status updated successfully!',
-      transactionId: newTransaction._id,
-      user: {
-        userId: updatedUser._id,
-        username: updatedUser.username,
-        hasPaid: updatedUser.hasPaid,
-        subscriptionType: updatedUser.subscriptionType
-      }
-    });
-
-  } catch (error) {
-    console.error('Error saving transaction:', error);
-    
-    // ✅ More detailed error logging
-    if (error.name === 'ValidationError') {
-      console.error('Validation error details:', error.errors);
-      return res.status(400).send({ 
-        message: 'Validation error', 
-        errors: error.errors 
-      });
-    }
-    
-    if (error.name === 'CastError') {
-      console.error('Cast error - invalid ID format:', error.message);
-      return res.status(400).send({ 
-        message: 'Invalid user ID format' 
-      });
-    }
-    
-    res.status(500).send({ 
-      message: 'Failed to save transaction and update user payment status.',
-      error: error.message 
-    });
-  }
-});
+    // Log the updated user document
+    console.log('Updated user:', updatedUser);
+  
+	  res.status(201).send({ message: 'Transaction saved and user payment status updated successfully!' });
+	} catch (error) {
+	  console.error('Error saving transaction:', error);
+	  res.status(500).send({ message: 'Failed to save transaction and update user payment status.' });
+	}
+  });
+  
 // Get all transactions (admin)
 router.get("/transactions", authenticateMiddleware, isAdmin, async (req, res) => {
   try {
