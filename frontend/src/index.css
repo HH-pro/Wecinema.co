@@ -24,27 +24,3 @@ body {
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
 }
-/* nav {
-  pointer-events: auto;
-}
-
-/* Mouse hide */
-* {
-  cursor: none !important;
-}
-
-/* =========================
-   SINGLE TOUCH CIRCLE
-/* Single touch circle – smooth & professional */
-.touch-circle {
-  width: 15px;
-  height: 15px;
-  background: #4c4e53;
-  border-radius: 50%;
-  position: fixed;
-  pointer-events: none;
-  will-change: transform, opacity;
-  transition: opacity 0.15s ease;
-  z-index: 999999;
-  opacity: 0; /* start hidden */
-} */
