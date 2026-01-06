@@ -13,7 +13,7 @@ import styled from 'styled-components';
 import { decodeToken } from "../utilities/helperfFunction";
 
 // ✅ API Base URL
-import { API_BASE_URL } from "../api";
+const API_BASE_URL = "https://wecinema.co/api"; // Production
 
 // ✅ Payment Component Styles
 const PaymentContainer = styled.div`
