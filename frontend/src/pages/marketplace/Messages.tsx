@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import ChatList, { Chat } from '../../components/chat/ChatList';
 import FirebaseChatInterface from '../../components/chat/FirebaseChatInterface';
 import MarketplaceLayout from '../../components/Layout';
-import { useAuthContext } from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 
 // Types
@@ -27,7 +27,7 @@ interface Order {
 const Messages: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user: authUser } = useAuthContext();
+  const { user: authUser } = useAuth();
   
   const [chats, setChats] = useState<Chat[]>([]);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
