@@ -314,7 +314,7 @@ const Layout: React.FC<LayoutProps> = ({
     .fixed-modal-container {
       width: 100%;
       max-width: 500px;
-      max-height: 90vh;
+      max-height: 70vh;
       overflow: hidden;
       border-radius: 16px;
       box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
