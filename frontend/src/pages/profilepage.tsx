@@ -42,7 +42,7 @@ const GenrePage: React.FC = () => {
             const token = localStorage.getItem("token");
             
             const response = await axios.put(
-                `http://localhost:3000/user/change-type/${userId}`,
+                `https://wecinema-co.onrender.com/user/change-type/${userId}`,
                 { userType },
                 {
                     headers: {
