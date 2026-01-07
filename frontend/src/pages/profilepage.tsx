@@ -189,49 +189,36 @@ const GenrePage: React.FC = () => {
         }
     };
 
-   const toggleMarketplaceMode = async () => {
-    if (!id) {
-        toast.error("User not found");
-        return;
-    }
-
-    if (!isCurrentUser) {
-        toast.error("You can only change your own mode");
-        return;
-    }
-
-    const newMode = marketplaceMode === 'buyer' ? 'seller' : 'buyer';
-    
-    // Show loading toast
-    const toastId = toast.loading(`Switching to ${newMode} mode...`);
-    
-    try {
-        const result = await changeUserTypeDirect(id, newMode);
-        
-        if (result) {
-            // Update local state immediately for smooth UX
-            setMarketplaceMode(newMode);
-            setUser(prev => ({ ...prev, userType: newMode }));
-            localStorage.setItem('marketplaceMode', newMode);
-            
-            toast.update(toastId, {
-                render: `✅ Successfully switched to ${newMode} mode`,
-                type: "success",
-                isLoading: false,
-                autoClose: 3000,
-            });
+    const toggleMarketplaceMode = async () => {
+        if (!id) {
+            toast.error("User not found");
+            return;
         }
-    } catch (error: any) {
-        console.error("Error changing user type:", error);
+
+        if (!isCurrentUser) {
+            toast.error("You can only change your own mode");
+            return;
+        }
+
+        const newMode = marketplaceMode === 'buyer' ? 'seller' : 'buyer';
         
-        toast.update(toastId, {
-            render: `❌ ${error.message}`,
-            type: "error",
-            isLoading: false,
-            autoClose: 4000,
-        });
-    }
-};
+        try {
+            const result = await changeUserTypeDirect(id, newMode);
+            
+            if (result) {
+                // Update local state immediately for smooth UX
+                setMarketplaceMode(newMode);
+                setUser(prev => ({ ...prev, userType: newMode }));
+                localStorage.setItem('marketplaceMode', newMode);
+                
+                toast.success(`✅ Switched to ${newMode} mode`);
+            }
+        } catch (error: any) {
+            console.error("Error changing user type:", error);
+            toast.error(`❌ ${error.message}`);
+        }
+    };
+
     const handleRefresh = () => {
         setRefreshing(true);
         fetchUserData();
