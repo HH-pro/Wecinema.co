@@ -62,6 +62,8 @@ const allowedOrigins = [
   "http://wecinema.co",
   "http://www.wecinema.co",
   "https://www.wecinema.co",
+  "https://wecinema-co.onrender.com",
+  
 ];
 
 const corsOptions = {
