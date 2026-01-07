@@ -178,7 +178,7 @@ const BuyerStatsPage: React.FC = () => {
   };
 
   const formatCurrency = (amount: number) => {
-    return marketplaceApi.utils.formatCurrencyshow(amount);
+    return marketplaceApi.utils.formatCurrency(amount);
   };
 
   const formatPercentage = (value: number) => {
