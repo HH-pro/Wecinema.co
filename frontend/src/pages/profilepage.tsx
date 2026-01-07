@@ -34,24 +34,21 @@ const GenrePage: React.FC = () => {
     const [isCurrentUser, setIsCurrentUser] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [contentLoading, setContentLoading] = useState(false);
-
     // Direct API call for changing user type
     const changeUserTypeDirect = async (userId: string, userType: string) => {
         try {
             setChangingMode(true);
             const token = localStorage.getItem("token");
             
-            const response = await axios.put(
-                `https://wecinema-co.onrender.com/user/change-type/${userId}`,
-                { userType },
-                {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    timeout: 10000
-                }
-            );
+           const response = await axios.put(
+  `https://wecinema-co.onrender.com/user/change-type/${userId}`,
+  { userType },
+  {
+    headers: {
+      Authorization: token ? `Bearer ${token}` : "",
+    },
+  }
+);
 
             return response.data;
         } catch (error: any) {
