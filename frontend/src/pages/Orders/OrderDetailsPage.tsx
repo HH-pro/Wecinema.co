@@ -83,10 +83,17 @@ const OrderDetailsPage: React.FC = () => {
     navigate(`?tab=${tab}`, { replace: true });
   };
 
-  const formatCurrency = (amount: number) => {
-    return marketplaceApi.utils.formatCurrencyshow(amount || 0);
-  };
+ const formatCurrency = (
+  amount: number,
+  currency: string = 'USD'
+): string => {
+  const valueInDollars = (amount || 0) / 100;
 
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+  }).format(valueInDollars);
+};
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
     try {
