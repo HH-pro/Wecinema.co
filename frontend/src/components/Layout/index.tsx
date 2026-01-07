@@ -195,7 +195,7 @@ const Layout: React.FC<LayoutProps> = ({
   const fetchPaymentStatus = async (userId: string) => {
     try {
       const response = await axios.get(
-         `${API_BASE_URL}user/payment-status/${userId}`
+         `${API_BASE_URL}/user/payment-status/${userId}`
       );
       setHasPaid(response.data.hasPaid);
     } catch (error) {
