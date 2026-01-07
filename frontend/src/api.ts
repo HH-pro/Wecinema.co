@@ -83,7 +83,7 @@ export interface UserTypeErrorResponse {
 // ========================
 
 // Environment-based configuration
-const getBaseURL = () => "https://wecinema-co.onrender.com";
+const getBaseURL = () => "http://localhost:3000"; // Development
 
 // Create an axios instance with default configurations
 const api = axios.create({
