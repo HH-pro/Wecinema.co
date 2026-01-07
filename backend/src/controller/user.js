@@ -1109,85 +1109,32 @@ router.get('/payment-status/:userId', async (req, res) => {
   }
 });
 
+
+// Change user type (buyer/seller)
 router.put("/change-type/:id", authenticateMiddleware, async (req, res) => {
     try {
-        console.log('🔧 [DEV DEBUG] Change type request received');
-        console.log('Request params:', req.params);
-        console.log('Request body:', req.body);
-        console.log('Authenticated user:', req.user);
-        
         const { id } = req.params;
         const { userType } = req.body;
 
-        // Log MongoDB connection
-        console.log('MongoDB readyState:', mongoose.connection.readyState);
-        
         // Validate userType
         if (!userType || !['buyer', 'seller'].includes(userType)) {
-            console.log('❌ Invalid user type:', userType);
-            return res.status(400).json({ 
-                error: "Invalid user type. Must be 'buyer' or 'seller'",
-                received: userType 
-            });
+            return res.status(400).json({ error: "Invalid user type. Must be 'buyer' or 'seller'" });
         }
 
-        // Find the user - with detailed logging
-        console.log(`🔍 Looking for user with ID: ${id}`);
-        console.log('ID type:', typeof id, 'Length:', id.length);
-        
+        // Find the user by ID
         const user = await User.findById(id);
-        
         if (!user) {
-            console.log('❌ User not found in database');
-            
-            // Try alternative: find by email or username
-            const anyUser = await User.findOne();
-            console.log('Any user exists?', !!anyUser);
-            console.log('First user ID:', anyUser?._id);
-            
-            return res.status(404).json({ 
-                error: "User not found",
-                searchedId: id,
-                suggestion: "Check if user ID is correct"
-            });
-        }
-        
-        console.log('✅ User found:', {
-            id: user._id,
-            username: user.username,
-            currentUserType: user.userType,
-            hasUserTypeField: 'userType' in user
-        });
-
-        // Check if already has this type
-        if (user.userType === userType) {
-            return res.status(400).json({ 
-                error: `User is already a ${userType}`,
-                currentType: user.userType 
-            });
+            return res.status(404).json({ error: "User not found" });
         }
 
         // Update user type
-        const oldType = user.userType;
         user.userType = userType;
 
-        // Save with validation
-        console.log('💾 Attempting to save user...');
-        try {
-            await user.save();
-            console.log('✅ User saved successfully');
-        } catch (saveError) {
-            console.error('❌ Save error:', saveError);
-            console.error('Validation errors:', saveError.errors);
-            throw saveError;
-        }
+        // Save the updated user
+        await user.save();
 
         res.status(200).json({ 
             message: "User type updated successfully", 
-            changes: {
-                from: oldType,
-                to: userType
-            },
             user: {
                 id: user._id,
                 username: user.username,
@@ -1195,44 +1142,9 @@ router.put("/change-type/:id", authenticateMiddleware, async (req, res) => {
                 userType: user.userType
             }
         });
-        
     } catch (error) {
-        console.error("❌ Error updating user type:", error);
-        console.error("Error name:", error.name);
-        console.error("Error code:", error.code);
-        console.error("Error message:", error.message);
-        console.error("Full error:", error);
-        
-        // Specific error handling
-        if (error.name === 'CastError') {
-            return res.status(400).json({ 
-                error: "Invalid user ID format",
-                details: "ID should be a 24-character hex string"
-            });
-        }
-        
-        if (error.name === 'ValidationError') {
-            const errors = Object.values(error.errors).map(err => err.message);
-            return res.status(400).json({ 
-                error: "Validation failed",
-                details: errors 
-            });
-        }
-        
-        if (error.name === 'MongoError' && error.code === 11000) {
-            return res.status(400).json({ 
-                error: "Duplicate key error" 
-            });
-        }
-        
-        res.status(500).json({ 
-            error: "Internal Server Error",
-            // Show details only in development
-            ...(process.env.NODE_ENV === 'development' && { 
-                message: error.message,
-                stack: error.stack 
-            })
-        });
+        console.error("Error updating user type:", error);
+        res.status(500).json({ error: "Internal Server Error" });
     }
 });
 router.post('/save-transaction', async (req, res) => {
