@@ -48,8 +48,8 @@ export interface RequestOptions {
 // ========================
 // CONFIGURATION & INTERCEPTORS
 // ========================
-// export const API_BASE_URL = "https://wecinema-co.onrender.com"; // Production
-export const API_BASE_URL = "http://localhost:3000"; // Local
+export const API_BASE_URL = "https://wecinema-co.onrender.com"; // Production
+// export const API_BASE_URL = "http://localhost:3000"; // Local
 // Environment-based configuration
 const getBaseURL = () => "https://wecinema-co.onrender.com";
  
