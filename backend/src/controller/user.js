@@ -647,7 +647,6 @@ router.post("/contact", async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
-
 // User registration with email verification
 router.post("/register", async (req, res) => {
   try {
