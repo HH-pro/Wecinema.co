@@ -11,9 +11,7 @@ import cover from '.././assets/public/cover.jpg';
 import avatar from '.././assets/public/avatar.jpg';
 import '../App.css';
 import { FaEllipsisV } from "react-icons/fa";
-
 import { API_BASE_URL } from "../api";
-
 
 const token = localStorage.getItem("token") || null;
 
@@ -37,32 +35,110 @@ const GenrePage: React.FC = () => {
     const [isCurrentUser, setIsCurrentUser] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [contentLoading, setContentLoading] = useState(false);
+    const [isFollowing, setIsFollowing] = useState(false);
+    const [followingLoading, setFollowingLoading] = useState(false);
+
+    // Create axios instance with interceptors
+    const api = axios.create({
+        baseURL: API_BASE_URL,
+        timeout: 10000,
+    });
+
+    // Add request interceptor to attach token
+    api.interceptors.request.use(
+        (config) => {
+            const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+            if (token) {
+                config.headers.Authorization = `Bearer ${token}`;
+            }
+            return config;
+        },
+        (error) => {
+            return Promise.reject(error);
+        }
+    );
+
+    // Add response interceptor to handle errors
+    api.interceptors.response.use(
+        (response) => response,
+        (error) => {
+            if (error.response?.status === 401) {
+                // Clear tokens and redirect to login
+                localStorage.removeItem("token");
+                sessionStorage.removeItem("token");
+                toast.error("Session expired. Please log in again.");
+                window.location.href = '/login';
+            }
+            return Promise.reject(error);
+        }
+    );
 
     // Direct API call for changing user type
     const changeUserTypeDirect = async (userId: string, userType: string) => {
         try {
             setChangingMode(true);
-            const token = localStorage.getItem("token");
             
-            // ✅ Use API_BASE_URL here
-            const response = await axios.put(
-                `${API_BASE_URL}/user/change-type/${userId}`,
+            const response = await api.put(
+                `/user/change-type/${userId}`,
                 { userType },
                 {
                     headers: {
-                        'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
-                    },
-                    timeout: 10000
+                    }
                 }
             );
 
             return response.data;
         } catch (error: any) {
             console.error("Error changing user type:", error);
+            if (error.response?.status === 401) {
+                throw new Error("Authentication failed. Please log in again.");
+            }
             throw new Error(error.response?.data?.error || "Failed to change user type");
         } finally {
             setChangingMode(false);
+        }
+    };
+
+    // Follow/Unfollow user
+    const handleFollowToggle = async () => {
+        if (!token) {
+            toast.error("Please login to follow users");
+            return;
+        }
+
+        if (!id) return;
+
+        try {
+            setFollowingLoading(true);
+            
+            if (isFollowing) {
+                // Unfollow logic
+                await api.delete(`/user/unfollow/${id}`);
+                setIsFollowing(false);
+                setUser((prev: any) => ({
+                    ...prev,
+                    followers: prev.followers?.filter((followerId: string) => followerId !== decodeToken(token)?.userId) || []
+                }));
+                toast.success(`Unfollowed ${user.username}`);
+            } else {
+                // Follow logic
+                await api.post(`/user/follow/${id}`);
+                setIsFollowing(true);
+                const tokenData = decodeToken(token);
+                if (tokenData?.userId) {
+                    setUser((prev: any) => ({
+                        ...prev,
+                        followers: [...(prev.followers || []), tokenData.userId]
+                    }));
+                }
+                toast.success(`Following ${user.username}`);
+            }
+        } catch (error: any) {
+            console.error("Error following/unfollowing user:", error);
+            toast.error(error.response?.data?.error || "Failed to update follow status");
+        } finally {
+            setFollowingLoading(false);
         }
     };
 
@@ -82,7 +158,7 @@ const GenrePage: React.FC = () => {
             setContentLoading(true);
             
             // Fetch user data
-            const result: any = await getRequest("/user/" + id, setLoading);
+            const result: any = await getRequest(`/user/${id}`, setLoading);
             if (!result) {
                 throw new Error("User not found");
             }
@@ -106,24 +182,10 @@ const GenrePage: React.FC = () => {
             const tokenData = decodeToken(token);
             if (tokenData && tokenData.userId === id) {
                 setIsCurrentUser(true);
-            }
-
-            // ✅ Use API_BASE_URL here for payment status
-            try {
-                const paymentResponse = await axios.get(`${API_BASE_URL}/user/payment-status/${id}`);
-                setUserHasPaid(paymentResponse.data.hasPaid);
-            } catch (error) {
-                console.error("Error fetching payment status:", error);
-                setUserHasPaid(false);
-            }
-
-            // ✅ Use API_BASE_URL here for current user payment status
-            if (tokenData) {
-                try {
-                    const currentUserResponse = await axios.get(`${API_BASE_URL}/user/payment-status/${tokenData.userId}`);
-                    setCurrentUserHasPaid(currentUserResponse.data.hasPaid);
-                } catch (error) {
-                    console.error("Error fetching current user payment status:", error);
+            } else {
+                // Check if current user is following this user
+                if (tokenData?.userId && result.followers?.includes(tokenData.userId)) {
+                    setIsFollowing(true);
                 }
             }
 
@@ -143,7 +205,7 @@ const GenrePage: React.FC = () => {
     const fetchUserContent = async () => {
         try {
             // Fetch scripts
-            const scriptsResult: any = await getRequest(`video/authors/${id}/scripts`, setContentLoading);
+            const scriptsResult: any = await getRequest(`/video/authors/${id}/scripts`, setContentLoading);
             if (scriptsResult) {
                 setScripts(scriptsResult.map((res: any) => res.script));
                 setData(scriptsResult);
@@ -151,8 +213,8 @@ const GenrePage: React.FC = () => {
                 setScripts([]);
             }
 
-            // Fetch videos
-            const videosResult: any = await getRequest(`video/authors/${id}/videos`, setContentLoading);
+            // Fetch videos - using the new route we need to create
+            const videosResult: any = await getRequest(`/video/authors/${id}/videos`, setContentLoading);
             if (videosResult) {
                 setVideos(videosResult);
             } else {
@@ -177,6 +239,7 @@ const GenrePage: React.FC = () => {
         }
 
         const newMode = marketplaceMode === 'buyer' ? 'seller' : 'buyer';
+        const toastId = toast.loading(`Switching to ${newMode} mode...`);
         
         try {
             const result = await changeUserTypeDirect(id, newMode);
@@ -184,14 +247,24 @@ const GenrePage: React.FC = () => {
             if (result) {
                 // Update local state immediately for smooth UX
                 setMarketplaceMode(newMode);
-                setUser(prev => ({ ...prev, userType: newMode }));
+                setUser((prev: any) => ({ ...prev, userType: newMode }));
                 localStorage.setItem('marketplaceMode', newMode);
                 
-                toast.success(`✅ Switched to ${newMode} mode`);
+                toast.update(toastId, {
+                    render: `✅ Successfully switched to ${newMode} mode`,
+                    type: "success",
+                    isLoading: false,
+                    autoClose: 3000,
+                });
             }
         } catch (error: any) {
             console.error("Error changing user type:", error);
-            toast.error(`❌ ${error.message}`);
+            toast.update(toastId, {
+                render: `❌ ${error.message}`,
+                type: "error",
+                isLoading: false,
+                autoClose: 5000,
+            });
         }
     };
 
@@ -206,11 +279,11 @@ const GenrePage: React.FC = () => {
         }
 
         try {
-            const result: any = await deleteRequest(`video/scripts/${scriptId}`, setContentLoading);
+            const result: any = await deleteRequest(`/video/scripts/${scriptId}`, setContentLoading);
             if (result) {
                 toast.success("🗑️ Script deleted successfully");
-                setScripts(prevScripts => prevScripts.filter((script, index) => data[index]?._id !== scriptId));
-                setData(prevData => prevData.filter((item: any) => item._id !== scriptId));
+                setScripts((prevScripts: any[]) => prevScripts.filter((_, index) => data[index]?._id !== scriptId));
+                setData((prevData: any[]) => prevData.filter((item: any) => item._id !== scriptId));
             }
         } catch (error) {
             console.error("Error deleting script:", error);
@@ -229,14 +302,25 @@ const GenrePage: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        const toastId = toast.loading("Updating profile...");
         try {
             const result = await putRequest("/user/edit/" + id, formData, setContentLoading);
             setUser(result.user);
             setEditMode(false);
-            toast.success("✅ Profile updated successfully!");
+            toast.update(toastId, {
+                render: "✅ Profile updated successfully!",
+                type: "success",
+                isLoading: false,
+                autoClose: 3000,
+            });
         } catch (error) {
             console.error("Error updating profile:", error);
-            toast.error("❌ Failed to update profile");
+            toast.update(toastId, {
+                render: "❌ Failed to update profile",
+                type: "error",
+                isLoading: false,
+                autoClose: 5000,
+            });
         }
     };
 
@@ -255,26 +339,6 @@ const GenrePage: React.FC = () => {
 
     const handleScriptMouseLeave = () => {
         setShowMoreIndex(null);
-    };
-
-    const handleFollow = async () => {
-        if (!token) {
-            toast.error("Please login to follow users");
-            return;
-        }
-
-        try {
-            // ✅ Use API_BASE_URL here for follow functionality
-            // Example:
-            // await axios.post(`${API_BASE_URL}/user/follow/${id}`, {}, {
-            //     headers: { Authorization: `Bearer ${token}` }
-            // });
-            
-            toast.info("👥 Follow functionality coming soon!");
-        } catch (error) {
-            console.error("Error following user:", error);
-            toast.error("❌ Failed to follow user");
-        }
     };
 
     const renderAllowedGenres = () => {
@@ -629,11 +693,22 @@ const GenrePage: React.FC = () => {
                         <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
                             {!isCurrentUser && (
                                 <button
-                                    onClick={handleFollow}
-                                    className="flex items-center justify-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 font-semibold w-full sm:w-auto"
+                                    onClick={handleFollowToggle}
+                                    disabled={followingLoading}
+                                    className={`flex items-center justify-center space-x-2 px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 font-semibold w-full sm:w-auto ${
+                                        isFollowing
+                                            ? 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                                            : 'bg-blue-500 hover:bg-blue-600 text-white'
+                                    } ${followingLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
-                                    <FaHeart className="text-sm" />
-                                    <span>Follow</span>
+                                    {followingLoading ? (
+                                        <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                                    ) : (
+                                        <>
+                                            <FaHeart className={`text-sm ${isFollowing ? 'text-gray-600' : ''}`} />
+                                            <span>{isFollowing ? 'Following' : 'Follow'}</span>
+                                        </>
+                                    )}
                                 </button>
                             )}
                             
