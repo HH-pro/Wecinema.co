@@ -39,32 +39,56 @@ const GenrePage: React.FC = () => {
     const [contentLoading, setContentLoading] = useState(false);
 
     // Direct API call for changing user type
-    const changeUserTypeDirect = async (userId: string, userType: string) => {
-        try {
-            setChangingMode(true);
-            const token = localStorage.getItem("token");
-            
-            // ✅ Use API_BASE_URL here
-            const response = await axios.put(
-                `${API_BASE_URL}/user/change-type/${userId}`,
-                { userType },
-                {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    timeout: 10000
-                }
-            );
-
-            return response.data;
-        } catch (error: any) {
-            console.error("Error changing user type:", error);
-            throw new Error(error.response?.data?.error || "Failed to change user type");
-        } finally {
-            setChangingMode(false);
+  const changeUserTypeDirect = async (userId: string, userType: string) => {
+    try {
+        setChangingMode(true);
+        const token = localStorage.getItem("token");
+        
+        if (!token) {
+            throw new Error("No authentication token found");
         }
-    };
+
+        // Add a timeout check and retry logic
+        const config = {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            timeout: 15000 // Increase timeout to 15 seconds
+        };
+
+        const response = await axios.put(
+            `${API_BASE_URL}/user/change-type/${userId}`,
+            { userType },
+            config
+        );
+
+        if (response.data && response.data.success !== false) {
+            return response.data;
+        } else {
+            throw new Error(response.data?.error || "Failed to change user type");
+        }
+    } catch (error: any) {
+        console.error("Error changing user type:", error);
+        
+        // Provide more specific error messages
+        if (error.code === 'ECONNABORTED') {
+            throw new Error("Request timed out. Please check your internet connection and try again.");
+        } else if (error.response?.status === 401) {
+            throw new Error("Session expired. Please log in again.");
+        } else if (error.response?.status === 403) {
+            throw new Error("You don't have permission to change user type.");
+        } else if (error.response?.data?.error) {
+            throw new Error(error.response.data.error);
+        } else if (error.message) {
+            throw new Error(error.message);
+        } else {
+            throw new Error("Failed to change user type. Please try again.");
+        }
+    } finally {
+        setChangingMode(false);
+    }
+};
 
     useEffect(() => {
         if (!id) {
@@ -165,36 +189,49 @@ const GenrePage: React.FC = () => {
         }
     };
 
-    const toggleMarketplaceMode = async () => {
-        if (!id) {
-            toast.error("User not found");
-            return;
-        }
+   const toggleMarketplaceMode = async () => {
+    if (!id) {
+        toast.error("User not found");
+        return;
+    }
 
-        if (!isCurrentUser) {
-            toast.error("You can only change your own mode");
-            return;
-        }
+    if (!isCurrentUser) {
+        toast.error("You can only change your own mode");
+        return;
+    }
 
-        const newMode = marketplaceMode === 'buyer' ? 'seller' : 'buyer';
+    const newMode = marketplaceMode === 'buyer' ? 'seller' : 'buyer';
+    
+    // Show loading toast
+    const toastId = toast.loading(`Switching to ${newMode} mode...`);
+    
+    try {
+        const result = await changeUserTypeDirect(id, newMode);
         
-        try {
-            const result = await changeUserTypeDirect(id, newMode);
+        if (result) {
+            // Update local state immediately for smooth UX
+            setMarketplaceMode(newMode);
+            setUser(prev => ({ ...prev, userType: newMode }));
+            localStorage.setItem('marketplaceMode', newMode);
             
-            if (result) {
-                // Update local state immediately for smooth UX
-                setMarketplaceMode(newMode);
-                setUser(prev => ({ ...prev, userType: newMode }));
-                localStorage.setItem('marketplaceMode', newMode);
-                
-                toast.success(`✅ Switched to ${newMode} mode`);
-            }
-        } catch (error: any) {
-            console.error("Error changing user type:", error);
-            toast.error(`❌ ${error.message}`);
+            toast.update(toastId, {
+                render: `✅ Successfully switched to ${newMode} mode`,
+                type: "success",
+                isLoading: false,
+                autoClose: 3000,
+            });
         }
-    };
-
+    } catch (error: any) {
+        console.error("Error changing user type:", error);
+        
+        toast.update(toastId, {
+            render: `❌ ${error.message}`,
+            type: "error",
+            isLoading: false,
+            autoClose: 4000,
+        });
+    }
+};
     const handleRefresh = () => {
         setRefreshing(true);
         fetchUserData();
