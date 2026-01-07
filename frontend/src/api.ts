@@ -461,7 +461,7 @@ export const uploadRequest = async <T = any>(
 // AUTH UTILITIES
 // ========================
 
-export const clearAuthAndRedirect = (redirectTo: string = "/login") => {
+export const clearAuthAndRedirect = (redirectTo: string = "/") => {
   localStorage.removeItem("token");
   localStorage.removeItem("refreshToken");
   localStorage.removeItem("loggedIn");
