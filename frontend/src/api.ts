@@ -46,44 +46,13 @@ export interface RequestOptions {
 }
 
 // ========================
-// USER TYPE SPECIFIC TYPES
-// ========================
-
-export type UserType = 'buyer' | 'seller';
-
-export interface ChangeUserTypeRequest {
-  userType: UserType;
-}
-
-export interface ChangeUserTypeResponse {
-  message: string;
-  changes: {
-    from: string;
-    to: string;
-  };
-  user: {
-    id: string;
-    username: string;
-    email: string;
-    userType: UserType;
-  };
-}
-
-export interface UserTypeErrorResponse {
-  error: string;
-  details?: string;
-  received?: string;
-  searchedId?: string;
-  suggestion?: string;
-  currentType?: string;
-}
-
-// ========================
 // CONFIGURATION & INTERCEPTORS
 // ========================
-
+export const API_BASE_URL = "http://localhost:3000"; // Production
+// export const API_BASE_URL = "http://localhost:5000/api"; // Local
 // Environment-based configuration
-const getBaseURL = () => "http://localhost:3000"; // Development
+const getBaseURL = () => "https://wecinema-co.onrender.com";
+ 
 
 // Create an axios instance with default configurations
 const api = axios.create({
@@ -508,7 +477,6 @@ export const clearAuthAndRedirect = (redirectTo: string = "/login") => {
     window.location.href = redirectTo;
   }
 };
-
 export const getCurrentUserFromToken = (): any | null => {
   const token = localStorage.getItem("token");
   if (!token) return null;
@@ -561,229 +529,6 @@ export const hasPermission = (requiredRole: string | string[]): boolean => {
   const userRole = getUserRole();
   const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
   return roles.includes(userRole);
-};
-
-// ========================
-// USER TYPE MANAGEMENT FUNCTIONS
-// ========================
-
-/**
- * Change user type (buyer/seller)
- * @param userId - The ID of the user to update
- * @param userType - New user type ('buyer' or 'seller')
- * @param setLoading - Optional loading state setter
- */
-export const changeUserType = async (
-  userId: string,
-  userType: UserType,
-  setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-): Promise<ChangeUserTypeResponse> => {
-  try {
-    console.log(`🔄 API: Changing user type for ${userId} to ${userType}`);
-    
-    const response = await putRequest<ChangeUserTypeResponse>(
-      `/user/change-type/${userId}`,
-      { userType },
-      setLoading,
-      {
-        message: 'User type updated successfully!',
-        showToast: true,
-        retryCount: 2
-      }
-    );
-    
-    console.log('✅ User type changed successfully:', response);
-    return response;
-    
-  } catch (error: any) {
-    console.error('❌ API Error changing user type:', {
-      message: error.message,
-      status: error.status,
-      details: error.details
-    });
-    
-    // Handle specific user type errors
-    if (error.status === 400 || error.status === 404) {
-      const userTypeError: UserTypeErrorResponse = {
-        error: error.message,
-        details: error.details,
-        ...error
-      };
-      throw userTypeError;
-    }
-    
-    throw error;
-  }
-};
-
-/**
- * Change authenticated user's own type (secure version)
- * @param userType - New user type ('buyer' or 'seller')
- * @param setLoading - Optional loading state setter
- */
-export const changeMyUserType = async (
-  userType: UserType,
-  setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-): Promise<ChangeUserTypeResponse> => {
-  try {
-    console.log(`🔄 API: Changing my user type to ${userType}`);
-    
-    const response = await putRequest<ChangeUserTypeResponse>(
-      `/users/my-type`,
-      { userType },
-      setLoading,
-      {
-        message: 'Your user type has been updated!',
-        showToast: true
-      }
-    );
-    
-    console.log('✅ User type changed successfully:', response);
-    return response;
-    
-  } catch (error: any) {
-    console.error('❌ API Error changing user type:', error);
-    throw error;
-  }
-};
-
-/**
- * Get user type information
- * @param userId - User ID to check
- * @param setLoading - Optional loading state setter
- */
-export const getUserTypeInfo = async (
-  userId: string,
-  setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-): Promise<{
-  id: string;
-  username: string;
-  email: string;
-  userType: UserType;
-}> => {
-  try {
-    const response = await getRequest(
-      `/users/user-type/${userId}`,
-      setLoading,
-      {
-        showToast: false,
-        retryCount: 1
-      }
-    );
-    
-    return response as any;
-  } catch (error) {
-    console.error('Error getting user type info:', error);
-    throw error;
-  }
-};
-
-/**
- * Check user schema (diagnostic endpoint)
- * @param userId - User ID to check
- * @param setLoading - Optional loading state setter
- */
-export const checkUserSchema = async (
-  userId: string,
-  setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-): Promise<{
-  hasUserType: boolean;
-  userTypeValue: string;
-  allFields: string[];
-}> => {
-  try {
-    const response = await getRequest(
-      `/users/check-schema/${userId}`,
-      setLoading,
-      {
-        showToast: false
-      }
-    );
-    
-    return response as any;
-  } catch (error) {
-    console.error('Error checking user schema:', error);
-    throw error;
-  }
-};
-
-/**
- * Test user type endpoint (diagnostic)
- * @param userId - User ID to test
- * @param setLoading - Optional loading state setter
- */
-export const testUserTypeEndpoint = async (
-  userId: string,
-  setLoading?: React.Dispatch<React.SetStateAction<boolean>>
-): Promise<{
-  userExists: boolean;
-  userId: string;
-  currentUserType: string;
-  userTypeExistsInDocument: boolean;
-  schemaHasUserType: boolean;
-  userDocument: {
-    id: string;
-    username: string;
-    userType: string;
-    email: string;
-  };
-}> => {
-  try {
-    const response = await getRequest(
-      `/users/test-user-type/${userId}`,
-      setLoading,
-      {
-        showToast: false
-      }
-    );
-    
-    return response as any;
-  } catch (error) {
-    console.error('Error testing user type endpoint:', error);
-    throw error;
-  }
-};
-
-// ========================
-// REACT HOOK FOR USER TYPE
-// ========================
-
-import { useState, useCallback } from 'react';
-
-export const useChangeUserType = () => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<UserTypeErrorResponse | null>(null);
-  const [data, setData] = useState<ChangeUserTypeResponse | null>(null);
-
-  const changeType = useCallback(async (userId: string, userType: UserType) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const result = await changeUserType(userId, userType, setLoading);
-      setData(result);
-      return result;
-    } catch (err: any) {
-      setError(err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const reset = useCallback(() => {
-    setData(null);
-    setError(null);
-    setLoading(false);
-  }, []);
-
-  return {
-    changeType,
-    loading,
-    error,
-    data,
-    reset
-  };
 };
 
 // ========================
@@ -1012,15 +757,6 @@ export const setStorageItem = (key: string, value: any): void => {
     console.error(`Error setting item ${key} in localStorage:`, error);
   }
 };
-
-export const removeStorageItem = (key: string): void => {
-  try {
-    localStorage.removeItem(key);
-  } catch (error) {
-    console.error(`Error removing item ${key} from localStorage:`, error);
-  }
-};
-
 // ========================
 // AUTH FUNCTIONS
 // ========================
@@ -1087,7 +823,13 @@ export const updatePaymentStatus = async (
     showToast: true
   });
 };
-
+export const removeStorageItem = (key: string): void => {
+  try {
+    localStorage.removeItem(key);
+  } catch (error) {
+    console.error(`Error removing item ${key} from localStorage:`, error);
+  }
+};
 // ========================
 // AUTO REDIRECT LOGIC FOR HYPE MODE
 // ========================
@@ -1165,6 +907,9 @@ export const checkAuthAndRedirect = async (): Promise<boolean> => {
     return false;
   }
 };
+/**
+ * Complete login flow - for use in HypeModeProfile
+ * Handles both signin and signup with automatic redirect
 
 /**
  * Complete login flow - for use in HypeModeProfile
@@ -1301,7 +1046,6 @@ export const completeLoginFlow = async (
     };
   }
 };
-
 /**
  * Quick check - returns true if user should be redirected to home
  * Useful for useEffect hooks
@@ -1327,7 +1071,6 @@ export const shouldRedirectToHome = async (): Promise<boolean> => {
     return false;
   }
 };
-export const API_BASE_URL = "https://wecinema-co.onrender.com"; // Production
 
 // ========================
 // EXPORT DEFAULT
