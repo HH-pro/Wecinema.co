@@ -1031,13 +1031,13 @@ const Popup: React.FC<IPopupProps> = React.memo(
 							)}
 
 							{type === "login" && (
-								<motion.div
-									initial={{ opacity: 0, scale: 0.95, y: 20 }}
-									animate={{ opacity: 1, scale: 1, y: 0 }}
-									exit={{ opacity: 0, scale: 0.95, y: 20 }}
-									transition={{ type: "spring", damping: 25, stiffness: 300 }}
-									className="relative z-50 w-full max-w-md bg-gradient-to-b from-white to-yellow-50 border-2 border-yellow-300 backdrop-blur-xl rounded-2xl shadow-2xl p-4 md:p-6 lg:p-8"
-								>
+  <motion.div
+    initial={{ opacity: 0, scale: 0.95, y: 20 }}
+    animate={{ opacity: 1, scale: 1, y: 0 }}
+    exit={{ opacity: 0, scale: 0.95, y: 20 }}
+    transition={{ type: "spring", damping: 25, stiffness: 300 }}
+    className="relative z-50 w-full max-w-md bg-gradient-to-b from-white to-yellow-50 border-2 border-yellow-300 backdrop-blur-xl rounded-2xl shadow-2xl p-4 md:p-6 lg:p-8 my-8 mx-4" // my-8 और mx-4 added
+  >
 									{/* Decorative header */}
 									<div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-400" />
 									
