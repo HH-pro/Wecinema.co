@@ -360,12 +360,12 @@ const OrderDetailsPage: React.FC = () => {
             >
               Summary
             </button>
-            <button
+            {/* <button
               className={`tab ${activeTab === 'payment' ? 'active' : ''}`}
               onClick={() => handleTabChange('payment')}
             >
               Payment
-            </button>
+            </button> */}
             {order.deliveryFiles && order.deliveryFiles.length > 0 && (
               <button
                 className={`tab ${activeTab === 'files' ? 'active' : ''}`}
