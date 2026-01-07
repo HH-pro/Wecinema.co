@@ -1,7 +1,7 @@
 /* BuyerStatsPage.css */
 .buyer-stats-page {
   max-width: 1200px;
-  margin: 0 auto;
+  margin-top: 20px;
   padding: 20px;
   background: #f8f9fa;
   min-height: 100vh;
