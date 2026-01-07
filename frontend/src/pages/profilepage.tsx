@@ -2,11 +2,20 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Delete, Layout, Render } from "../components";
-import { deleteRequest, getRequest, putRequest } from "../api";
+import { 
+    changeUserType, 
+    getRequest, 
+    putRequest, 
+    deleteRequest,
+    getUserTypeInfo,
+    checkUserSchema,
+    UserType,
+    ChangeUserTypeResponse,
+    UserTypeErrorResponse
+} from "../api";
 import { decodeToken } from "../utilities/helperfFunction";
 import '../components/header/drowpdown.css';
 import { FaEdit, FaStore, FaShoppingCart, FaUserTie, FaUser, FaSync, FaHeart, FaUsers, FaVideo, FaFileAlt } from 'react-icons/fa';
-import axios from 'axios';
 import cover from '.././assets/public/cover.jpg';
 import avatar from '.././assets/public/avatar.jpg';
 import '../App.css';
@@ -25,7 +34,7 @@ const GenrePage: React.FC = () => {
     const [currentUserHasPaid, setCurrentUserHasPaid] = useState(false);
     const [data, setData] = useState<any>([]);
     const [showMoreIndex, setShowMoreIndex] = useState<number | null>(null);
-    const [marketplaceMode, setMarketplaceMode] = useState<'buyer' | 'seller'>('buyer');
+    const [marketplaceMode, setMarketplaceMode] = useState<UserType>('buyer');
     const [changingMode, setChangingMode] = useState(false);
     const [activeTab, setActiveTab] = useState('scripts');
     const nav = useNavigate();
@@ -35,30 +44,24 @@ const GenrePage: React.FC = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [contentLoading, setContentLoading] = useState(false);
 
-    // Direct API call for changing user type
-    const changeUserTypeDirect = async (userId: string, userType: string) => {
+    // Function to change user type using api.ts
+    const changeUserTypeDirect = async (userId: string, userType: UserType) => {
         try {
             setChangingMode(true);
-            const token = localStorage.getItem("token");
             
-            const response = await axios.put(
-                `http://localhost:3000/user/change-type/${userId}`,
-                { userType },
-                {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    timeout: 10000
-                }
+            const result: ChangeUserTypeResponse = await changeUserType(
+                userId, 
+                userType, 
+                setChangingMode
             );
-
-            return response.data;
+            
+            return result;
         } catch (error: any) {
             console.error("Error changing user type:", error);
-            throw new Error(error.response?.data?.error || "Failed to change user type");
-        } finally {
-            setChangingMode(false);
+            
+            // Handle specific error types
+            const typedError = error as UserTypeErrorResponse;
+            throw new Error(typedError.error || typedError.details || "Failed to change user type");
         }
     };
 
@@ -87,8 +90,9 @@ const GenrePage: React.FC = () => {
             
             // Set marketplace mode from user data
             if (result.userType) {
-                setMarketplaceMode(result.userType);
-                localStorage.setItem('marketplaceMode', result.userType);
+                const userType = result.userType as UserType;
+                setMarketplaceMode(userType);
+                localStorage.setItem('marketplaceMode', userType);
             }
             
             // Set form data
@@ -104,22 +108,13 @@ const GenrePage: React.FC = () => {
                 setIsCurrentUser(true);
             }
 
-            // Fetch payment status for profile user
-            try {
-                const paymentResponse = await axios.get(`https://wecinema.co/api/user/payment-status/${id}`);
-                setUserHasPaid(paymentResponse.data.hasPaid);
-            } catch (error) {
-                console.error("Error fetching payment status:", error);
-                setUserHasPaid(false);
-            }
-
-            // Fetch payment status for current logged-in user
-            if (tokenData) {
+            // Optional: Check user schema (for debugging)
+            if (process.env.NODE_ENV === 'development') {
                 try {
-                    const currentUserResponse = await axios.get(`https://wecinema.co/api/user/payment-status/${tokenData.userId}`);
-                    setCurrentUserHasPaid(currentUserResponse.data.hasPaid);
+                    const schemaInfo = await checkUserSchema(id, setLoading);
+                    console.log("User schema info:", schemaInfo);
                 } catch (error) {
-                    console.error("Error fetching current user payment status:", error);
+                    console.log("Schema check skipped or failed:", error);
                 }
             }
 
@@ -172,7 +167,7 @@ const GenrePage: React.FC = () => {
             return;
         }
 
-        const newMode = marketplaceMode === 'buyer' ? 'seller' : 'buyer';
+        const newMode: UserType = marketplaceMode === 'buyer' ? 'seller' : 'buyer';
         
         try {
             const result = await changeUserTypeDirect(id, newMode);
@@ -183,11 +178,29 @@ const GenrePage: React.FC = () => {
                 setUser(prev => ({ ...prev, userType: newMode }));
                 localStorage.setItem('marketplaceMode', newMode);
                 
-              
+                // Show success message
+                toast.success(`🎉 Successfully switched to ${newMode} mode!`, {
+                    autoClose: 3000,
+                    position: "top-right"
+                });
+                
+                // Optional: Show user info in success message
+                console.log("User type changed successfully:", {
+                    from: result.changes.from,
+                    to: result.changes.to,
+                    user: result.user
+                });
             }
         } catch (error: any) {
             console.error("Error changing user type:", error);
-            toast.error(`❌ ${error.message}`);
+            toast.error(`❌ ${error.message}`, {
+                autoClose: 5000,
+                position: "top-right"
+            });
+            
+            // Optionally revert the UI state on error
+            const currentType = marketplaceMode;
+            setMarketplaceMode(currentType);
         }
     };
 
