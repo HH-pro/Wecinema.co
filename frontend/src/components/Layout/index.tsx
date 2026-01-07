@@ -272,7 +272,7 @@ const Layout: React.FC<LayoutProps> = ({
 
   // Add CSS styles inline or you can add them in your main CSS file
   const modalStyles = `
-    .modal-overlay {
+     .modal-overlay {
       position: fixed;
       top: 0;
       left: 0;
@@ -284,17 +284,21 @@ const Layout: React.FC<LayoutProps> = ({
       align-items: center;
       z-index: 9999;
       backdrop-filter: blur(4px);
+      overflow-y: auto; /* Allow scrolling for small screens */
     }
 
     .subscription-modal {
       width: 90%;
       max-width: 380px;
+      max-height: 90vh; /* Limit height for mobile */
       border-radius: 16px;
       padding: 20px;
       box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
       animation: modalSlideIn 0.3s ease-out;
       position: relative;
+      margin: auto; /* Center modal */
     }
+
 
     .subscription-modal.dark-mode {
       background: linear-gradient(145deg, #2d3748, #1a202c);
