@@ -88,13 +88,29 @@ const OrderDetailsPage: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    if (!dateString) return 'N/A';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid date';
+    }
+  };
+
+  const formatStatus = (status: string | undefined | null): string => {
+    if (!status || status.trim() === '') return 'N/A';
+    // Replace underscores and hyphens with spaces, and capitalize each word
+    return status
+      .replace(/[_-]/g, ' ')
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
   };
 
   const renderTabContent = () => {
@@ -131,10 +147,11 @@ const OrderDetailsPage: React.FC = () => {
               <div className="files-list">
                 {order.deliveryFiles.map((file: string, index: number) => (
                   <div key={index} className="file-item">
-                    <span className="file-name">{file}</span>
+                    <span className="file-name">{file || `File ${index + 1}`}</span>
                     <button 
                       className="download-btn"
                       onClick={() => window.open(`/marketplace/orders/upload/delivery/${file}`, '_blank')}
+                      disabled={!file}
                     >
                       Download
                     </button>
@@ -156,7 +173,7 @@ const OrderDetailsPage: React.FC = () => {
                 <h4>Order Information</h4>
                 <div className="detail-item">
                   <strong>Order ID:</strong>
-                  <span>{order._id}</span>
+                  <span>{order._id || 'N/A'}</span>
                 </div>
                 <div className="detail-item">
                   <strong>Order Number:</strong>
@@ -164,14 +181,14 @@ const OrderDetailsPage: React.FC = () => {
                 </div>
                 <div className="detail-item">
                   <strong>Status:</strong>
-                  <span className={`status-badge status-${order.status}`}>
-                    {order.status.replace('_', ' ')}
+                  <span className={`status-badge status-${order.status || 'unknown'}`}>
+                    {formatStatus(order.status)}
                   </span>
                 </div>
                 <div className="detail-item">
                   <strong>Payment Status:</strong>
-                  <span className={`status-badge status-${order.paymentStatus}`}>
-                    {order.paymentStatus.replace('_', ' ')}
+                  <span className={`status-badge status-${order.paymentStatus || 'unknown'}`}>
+                    {formatStatus(order.paymentStatus)}
                   </span>
                 </div>
                 <div className="detail-item">
@@ -180,13 +197,13 @@ const OrderDetailsPage: React.FC = () => {
                 </div>
                 <div className="detail-item">
                   <strong>Amount:</strong>
-                  <span>{formatCurrency(order.amount)}</span>
+                  <span>{formatCurrency(order.amount || 0)}</span>
                 </div>
                 <div className="detail-item">
                   <strong>Created:</strong>
                   <span>{formatDate(order.createdAt)}</span>
                 </div>
-                {order.updatedAt !== order.createdAt && (
+                {order.updatedAt && order.updatedAt !== order.createdAt && (
                   <div className="detail-item">
                     <strong>Last Updated:</strong>
                     <span>{formatDate(order.updatedAt)}</span>
@@ -196,11 +213,11 @@ const OrderDetailsPage: React.FC = () => {
               
               <div className="detail-section">
                 <h4>Listing Details</h4>
-                {typeof order.listingId === 'object' && order.listingId ? (
+                {order.listingId && typeof order.listingId === 'object' ? (
                   <>
                     <div className="detail-item">
                       <strong>Title:</strong>
-                      <span>{order.listingId.title}</span>
+                      <span>{order.listingId.title || 'N/A'}</span>
                     </div>
                     <div className="detail-item">
                       <strong>Category:</strong>
@@ -218,11 +235,11 @@ const OrderDetailsPage: React.FC = () => {
               
               <div className="detail-section">
                 <h4>Seller Information</h4>
-                {typeof order.sellerId === 'object' && order.sellerId ? (
+                {order.sellerId && typeof order.sellerId === 'object' ? (
                   <>
                     <div className="detail-item">
                       <strong>Username:</strong>
-                      <span>{order.sellerId.username}</span>
+                      <span>{order.sellerId.username || 'N/A'}</span>
                     </div>
                     <div className="detail-item">
                       <strong>Name:</strong>
@@ -313,7 +330,7 @@ const OrderDetailsPage: React.FC = () => {
             <FaArrowLeft /> Back to Dashboard
           </button>
           <h1>Order Details</h1>
-          <div className="order-number">#{order.orderNumber || order._id.slice(-8)}</div>
+          <div className="order-number">#{order.orderNumber || (order._id ? order._id.slice(-8) : 'N/A')}</div>
         </div>
 
         <div className="tabs-container">
@@ -342,12 +359,14 @@ const OrderDetailsPage: React.FC = () => {
             >
               Payment
             </button>
-            <button
-              className={`tab ${activeTab === 'files' ? 'active' : ''}`}
-              onClick={() => handleTabChange('files')}
-            >
-              Files
-            </button>
+            {order.deliveryFiles && order.deliveryFiles.length > 0 && (
+              <button
+                className={`tab ${activeTab === 'files' ? 'active' : ''}`}
+                onClick={() => handleTabChange('files')}
+              >
+                Files
+              </button>
+            )}
           </div>
 
           <div className="tab-content">
