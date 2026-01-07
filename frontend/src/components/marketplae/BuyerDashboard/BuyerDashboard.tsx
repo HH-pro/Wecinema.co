@@ -225,15 +225,7 @@ const BuyerDashboard: React.FC = () => {
       color: '#EC4899',
       bgColor: '#FDF2F8'
     },
-    {
-      icon: <FaTrophy />,
-      label: 'Rewards',
-      description: 'Earn points and badges',
-      action: () => navigate('/rewards'),
-      type: 'premium' as const,
-      color: '#F59E0B',
-      bgColor: '#FFFBEB'
-    }
+    
   ];
 
   // Category icons mapping with light theme colors
