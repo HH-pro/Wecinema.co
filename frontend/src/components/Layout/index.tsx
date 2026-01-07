@@ -27,6 +27,7 @@ import { IoSunnyOutline } from "react-icons/io5";
 import { Link, useLocation } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
+import ReactDOM from "react-dom";
 
 export const theme = [
   "Love",
@@ -63,10 +64,10 @@ const HypemodeSubscriptionModal: React.FC<{
 }> = ({ isOpen, onClose, darkMode }) => {
   if (!isOpen) return null;
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
+  return ReactDOM.createPortal(
+    <div className="modal-overlay fixed inset-0 z-[10050] flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm" onClick={onClose}>
       <div 
-        className={`subscription-modal ${darkMode ? 'dark-mode' : 'light-mode'}`}
+        className={`subscription-modal ${darkMode ? 'dark-mode' : 'light-mode'} w-11/12 max-w-md mx-4`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">
@@ -128,7 +129,33 @@ const HypemodeSubscriptionModal: React.FC<{
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
+  );
+};
+
+// Portal Modal Component for Login/Register/Logout
+const PortalModal: React.FC<{ 
+  show: boolean; 
+  type: string; 
+  authorized: boolean; 
+  onClose: () => void;
+}> = ({ show, type, authorized, onClose }) => {
+  if (!show) return null;
+
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm" onClick={onClose}></div>
+      <div className="relative z-[10001] w-full max-w-md mx-4">
+        <Modal 
+          type={type} 
+          authorized={authorized} 
+          show={show}
+          onClose={onClose}
+        />
+      </div>
+    </div>,
+    document.body
   );
 };
 
@@ -148,9 +175,8 @@ const Layout: React.FC<LayoutProps> = ({
   const isDarkMode = localStorage.getItem("isDarkMode") ?? false;
   const [darkMode, setDarkMode] = useState<boolean>(!!isDarkMode);
   const [expanded, setExpanded] = useState<boolean>(false);
-  const [modalShow, setModalShow] = useState(false);
   const [type, setType] = useState("");
-  const [show, setShow] = useState<boolean>(false);
+  const [showModal, setShowModal] = useState(false);
   const [showHypemodeModal, setShowHypemodeModal] = useState(false);
   const [viewPageSidebarVisible, setViewPageSidebarVisible] =
     useState<boolean>(!hideSidebar);
@@ -244,145 +270,145 @@ const Layout: React.FC<LayoutProps> = ({
 
   const handleType = (str: string) => {
     setType(str);
-    setModalShow(!modalShow);
+    setShowModal(true);
   };
 
   const handleHypemodeClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (hasPaid) {
       event.preventDefault();
-      // Show professional popup instead of toast
       setShowHypemodeModal(true);
-    } else if (!hasPaid) {
-      // Navigate will be handled by Link
     }
   };
-
-  useEffect(() => {
-    setShow(!!type);
-  }, [type, modalShow]);
 
   const isTabletOrMobile = screenWidth <= 1120;
   const isMobile = screenWidth <= 420;
   const isSidebarVisible = hideSidebar ? viewPageSidebarVisible : true;
 
-  // Get active class for sidebar items
   const getActiveClass = (path: string) => {
     return location.pathname === path ? "bg-yellow-50 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-400" : "";
   };
 
-  // Add CSS styles inline or you can add them in your main CSS file
+  // Modal Styles
   const modalStyles = `
-     .modal-overlay {
+    .modal-overlay {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      background-color: rgba(0, 0, 0, 0.5);
       display: flex;
       justify-content: center;
       align-items: center;
-      z-index: 9999;
       backdrop-filter: blur(4px);
-      overflow-y: auto; /* Allow scrolling for small screens */
+      z-index: 10000;
     }
 
     .subscription-modal {
-      width: 90%;
-      max-width: 380px;
-      max-height: 90vh; /* Limit height for mobile */
-      border-radius: 16px;
-      padding: 20px;
-      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
+      width: 95%;
+      max-width: 400px;
+      border-radius: 20px;
+      padding: 25px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
       animation: modalSlideIn 0.3s ease-out;
       position: relative;
-      margin: auto; /* Center modal */
+      overflow: hidden;
     }
 
+    @media (max-width: 640px) {
+      .subscription-modal {
+        margin: 20px;
+        width: calc(100% - 40px);
+      }
+    }
 
     .subscription-modal.dark-mode {
-      background: linear-gradient(145deg, #2d3748, #1a202c);
-      color: white;
-      border: 1px solid #4a5568;
+      background: linear-gradient(145deg, #1e293b, #0f172a);
+      color: #f1f5f9;
+      border: 1px solid #475569;
     }
 
     .subscription-modal.light-mode {
       background: white;
-      color: #2d3748;
+      color: #334155;
       border: 1px solid #e2e8f0;
     }
 
     @keyframes modalSlideIn {
       from {
         opacity: 0;
-        transform: translateY(-15px);
+        transform: translateY(-20px) scale(0.95);
       }
       to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
       }
     }
 
     .modal-header {
       display: flex;
       align-items: center;
-      margin-bottom: 15px;
+      margin-bottom: 25px;
       position: relative;
     }
 
     .modal-icon {
-      width: 45px;
-      height: 45px;
+      width: 50px;
+      height: 50px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-right: 12px;
+      margin-right: 15px;
+      flex-shrink: 0;
     }
 
     .subscription-modal.dark-mode .modal-icon {
-      background: linear-gradient(135deg, #eab308, #fbbf24);
+      background: linear-gradient(135deg, #f59e0b, #d97706);
     }
 
     .subscription-modal.light-mode .modal-icon {
-      background: linear-gradient(135deg, #eab308, #f59e0b);
+      background: linear-gradient(135deg, #fbbf24, #f59e0b);
     }
 
     .crown-icon {
-      font-size: 20px;
+      font-size: 22px;
       color: #1f2937;
     }
 
     .modal-title {
-      font-size: 20px;
-      font-weight: bold;
+      font-size: 22px;
+      font-weight: 700;
       flex: 1;
+      margin: 0;
     }
 
     .modal-close-btn {
       position: absolute;
-      top: -8px;
-      right: -8px;
-      width: 30px;
-      height: 30px;
+      top: -15px;
+      right: -15px;
+      width: 36px;
+      height: 36px;
       border-radius: 50%;
       border: none;
-      font-size: 20px;
+      font-size: 24px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       transition: all 0.2s;
+      z-index: 10;
     }
 
     .subscription-modal.dark-mode .modal-close-btn {
-      background: #4a5568;
+      background: #475569;
       color: #fbbf24;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
 
     .subscription-modal.light-mode .modal-close-btn {
       background: #fef3c7;
       color: #92400e;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     }
 
     .modal-close-btn:hover {
@@ -391,111 +417,149 @@ const Layout: React.FC<LayoutProps> = ({
 
     .modal-body {
       text-align: center;
-      margin-bottom: 20px;
+      margin-bottom: 25px;
     }
 
     .success-animation {
-      margin-bottom: 15px;
+      margin-bottom: 20px;
     }
 
     .success-icon {
-      font-size: 52px;
-      color: #22c55e;
+      font-size: 60px;
+      color: #10b981;
       animation: pulse 2s infinite;
     }
 
     @keyframes pulse {
-      0% {
+      0%, 100% {
         transform: scale(1);
       }
       50% {
         transform: scale(1.05);
       }
-      100% {
-        transform: scale(1);
-      }
     }
 
     .subscription-details h3 {
-      font-size: 18px;
-      margin-bottom: 12px;
-      color: #fbbf24;
+      font-size: 20px;
+      margin-bottom: 15px;
+      color: #f59e0b;
+      font-weight: 600;
     }
 
     .modal-description {
-      font-size: 14px;
-      line-height: 1.5;
-      margin-bottom: 20px;
+      font-size: 15px;
+      line-height: 1.6;
+      margin-bottom: 25px;
       opacity: 0.9;
+      padding: 0 10px;
     }
 
     .benefits-list {
       text-align: left;
-      margin-top: 15px;
+      margin-top: 20px;
+      max-height: 200px;
+      overflow-y: auto;
+      padding-right: 10px;
+    }
+
+    .benefits-list::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .benefits-list::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+    }
+
+    .benefits-list::-webkit-scrollbar-thumb {
+      background: #f59e0b;
+      border-radius: 10px;
+    }
+
+    .subscription-modal.light-mode .benefits-list::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.05);
     }
 
     .benefit-item {
       display: flex;
       align-items: center;
-      padding: 8px 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 12px 0;
+      border-bottom: 1px solid;
+    }
+
+    .subscription-modal.dark-mode .benefit-item {
+      border-bottom-color: rgba(255, 255, 255, 0.1);
     }
 
     .subscription-modal.light-mode .benefit-item {
       border-bottom-color: rgba(0, 0, 0, 0.08);
     }
 
+    .benefit-item:last-child {
+      border-bottom: none;
+    }
+
     .benefit-icon {
-      color: #fbbf24;
+      color: #f59e0b;
       font-weight: bold;
-      margin-right: 10px;
-      font-size: 16px;
+      margin-right: 12px;
+      font-size: 18px;
+      flex-shrink: 0;
     }
 
     .benefit-text {
-      font-size: 14px;
+      font-size: 15px;
+      font-weight: 500;
     }
 
     .modal-footer {
       display: flex;
-      gap: 12px;
-      justify-content: center;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 480px) {
+      .modal-footer {
+        flex-direction: column;
+      }
     }
 
     .modal-primary-btn {
-      padding: 12px 24px;
-      border-radius: 8px;
+      padding: 14px 28px;
+      border-radius: 12px;
       border: none;
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.3s;
-      background: linear-gradient(135deg, #eab308, #f59e0b);
-      color: #1f2937;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: white;
       flex: 1;
+      min-width: 140px;
     }
 
     .modal-primary-btn:hover {
       transform: translateY(-2px);
-      box-shadow: 0 8px 16px rgba(234, 179, 8, 0.3);
-      background: linear-gradient(135deg, #f59e0b, #eab308);
+      box-shadow: 0 10px 25px rgba(245, 158, 11, 0.4);
+      background: linear-gradient(135deg, #d97706, #b45309);
     }
 
     .modal-secondary-btn {
-      padding: 12px 24px;
-      border-radius: 8px;
+      padding: 14px 28px;
+      border-radius: 12px;
       border: 2px solid;
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.3s;
       background: transparent;
       flex: 1;
+      min-width: 140px;
     }
 
     .subscription-modal.dark-mode .modal-secondary-btn {
-      border-color: #fbbf24;
-      color: #fbbf24;
+      border-color: #f59e0b;
+      color: #f59e0b;
     }
 
     .subscription-modal.light-mode .modal-secondary-btn {
@@ -505,14 +569,57 @@ const Layout: React.FC<LayoutProps> = ({
 
     .modal-secondary-btn:hover {
       transform: translateY(-2px);
-      background: rgba(251, 191, 36, 0.1);
+      background: rgba(245, 158, 11, 0.1);
+    }
+
+    /* Fix for login/register modal */
+    .fixed.inset-0.z-\\[10000\\] {
+      z-index: 10000 !important;
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      overflow: auto !important;
+    }
+
+    .relative.z-\\[10001\\] {
+      z-index: 10001 !important;
+      position: relative !important;
+      margin: auto !important;
+      max-height: calc(100vh - 40px) !important;
+      overflow-y: auto !important;
+    }
+
+    @media (max-height: 700px) {
+      .relative.z-\\[10001\\] {
+        max-height: calc(100vh - 20px) !important;
+      }
     }
   `;
 
   return (
     <>
       <style>{modalStyles}</style>
-      <div className="text-lg md:text-sm sm:text-xs">
+      <div className="text-lg md:text-sm sm:text-xs relative min-h-screen">
+        {/* Login/Register/Logout Modal */}
+        <PortalModal 
+          show={showModal} 
+          type={type} 
+          authorized={!!token}
+          onClose={() => setShowModal(false)}
+        />
+
+        {/* Hypemode Subscription Modal */}
+        <HypemodeSubscriptionModal
+          isOpen={showHypemodeModal}
+          onClose={() => setShowHypemodeModal(false)}
+          darkMode={darkMode}
+        />
+
         <ToastContainer />
         {hasHeader && (
           <Header
@@ -626,7 +733,6 @@ const Layout: React.FC<LayoutProps> = ({
                     <>
                       <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider flex justify-between items-center">
                         <span>Marketplace</span>
-                       
                       </div>
 
                       <Link
@@ -826,7 +932,6 @@ const Layout: React.FC<LayoutProps> = ({
                 : "0px",
             }}
           >
-            <Modal type={type} authorized={!!token} show={modalShow} />
             <div className="flex-grow">{children}</div>
 
             {/* Footer */}
@@ -850,13 +955,6 @@ const Layout: React.FC<LayoutProps> = ({
           </main>
         </div>
       </div>
-
-      {/* Hypemode Subscription Modal */}
-      <HypemodeSubscriptionModal
-        isOpen={showHypemodeModal}
-        onClose={() => setShowHypemodeModal(false)}
-        darkMode={darkMode}
-      />
     </>
   );
 };
