@@ -582,7 +582,7 @@ export const changeUserType = async (
     console.log(`🔄 API: Changing user type for ${userId} to ${userType}`);
     
     const response = await putRequest<ChangeUserTypeResponse>(
-      `/users/change-type/${userId}`,
+      `/user/change-type/${userId}`,
       { userType },
       setLoading,
       {
