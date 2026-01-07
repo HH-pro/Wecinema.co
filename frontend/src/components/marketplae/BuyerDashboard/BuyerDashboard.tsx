@@ -215,15 +215,7 @@ const BuyerDashboard: React.FC = () => {
       color: '#8B5CF6',
       bgColor: '#F5F3FF'
     },
-    {
-      icon: <FaSpinner />,
-      label: 'Invoices',
-      description: 'Download order invoices',
-      action: () => navigate('/marketplace/orders/invoices'),
-      type: 'secondary' as const,
-      color: '#06B6D4',
-      bgColor: '#ECFEFF'
-    },
+   
     {
       icon: <FaHeadset />,
       label: 'Support',
