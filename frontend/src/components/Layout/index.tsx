@@ -55,7 +55,7 @@ interface LayoutProps {
   hideSidebar?: boolean;
 }
 
-// Enhanced Auth Modal Component
+// Simple and Clean Auth Modal Component
 const AuthModal: React.FC<{
   type: 'login' | 'register';
   isOpen: boolean;
@@ -72,8 +72,6 @@ const AuthModal: React.FC<{
     confirmPassword: type === 'register' ? "" : undefined,
   });
 
-  const [loading, setLoading] = useState(false);
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -84,132 +82,113 @@ const AuthModal: React.FC<{
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    
-    // Here you would implement actual auth logic
-    // For now, just simulate loading and close
-    setTimeout(() => {
-      setLoading(false);
-      onClose();
-      toast.success(type === 'login' ? 'Logged in successfully!' : 'Registered successfully!');
-    }, 1500);
+    // Auth logic here
+    onClose();
+    toast.success(type === 'login' ? 'Logged in successfully!' : 'Registered successfully!');
   };
 
   return (
-    <div className="auth-modal-overlay" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
       <div 
-        className={`auth-modal ${darkMode ? 'dark-mode' : 'light-mode'}`}
+        className={`relative w-full max-w-md rounded-lg shadow-xl ${darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="modal-header">
-          <h2 className="modal-title">
-            {type === 'login' ? 'Welcome Back!' : 'Create Account'}
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b">
+          <h2 className="text-xl font-semibold">
+            {type === 'login' ? 'Sign In' : 'Sign Up'}
           </h2>
-          <button className="modal-close-btn" onClick={onClose}>×</button>
+          <button 
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-        
-        <div className="modal-body">
-          <form onSubmit={handleSubmit} className="auth-form">
+
+        {/* Body */}
+        <div className="p-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {type === 'register' && (
-              <div className="form-group">
-                <label htmlFor="username" className="form-label">
-                  Username
-                </label>
+              <div>
+                <label className="block text-sm font-medium mb-1">Username</label>
                 <input
                   type="text"
-                  id="username"
                   name="username"
                   value={formData.username || ''}
                   onChange={handleInputChange}
-                  className="form-input"
-                  placeholder="Enter your username"
+                  className={`w-full px-3 py-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
+                  placeholder="Enter username"
                   required
-                  disabled={loading}
                 />
               </div>
             )}
             
-            <div className="form-group">
-              <label htmlFor="email" className="form-label">
-                Email
-              </label>
+            <div>
+              <label className="block text-sm font-medium mb-1">Email</label>
               <input
                 type="email"
-                id="email"
                 name="email"
                 value={formData.email}
                 onChange={handleInputChange}
-                className="form-input"
-                placeholder="Enter your email"
+                className={`w-full px-3 py-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
+                placeholder="Enter email"
                 required
-                disabled={loading}
               />
             </div>
             
-            <div className="form-group">
-              <label htmlFor="password" className="form-label">
-                Password
-              </label>
+            <div>
+              <label className="block text-sm font-medium mb-1">Password</label>
               <input
                 type="password"
-                id="password"
                 name="password"
                 value={formData.password}
                 onChange={handleInputChange}
-                className="form-input"
-                placeholder="Enter your password"
+                className={`w-full px-3 py-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
+                placeholder="Enter password"
                 required
-                disabled={loading}
               />
             </div>
             
             {type === 'register' && (
-              <div className="form-group">
-                <label htmlFor="confirmPassword" className="form-label">
-                  Confirm Password
-                </label>
+              <div>
+                <label className="block text-sm font-medium mb-1">Confirm Password</label>
                 <input
                   type="password"
-                  id="confirmPassword"
                   name="confirmPassword"
                   value={formData.confirmPassword || ''}
                   onChange={handleInputChange}
-                  className="form-input"
-                  placeholder="Confirm your password"
+                  className={`w-full px-3 py-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
+                  placeholder="Confirm password"
                   required
-                  disabled={loading}
                 />
               </div>
             )}
             
             <button
               type="submit"
-              className="submit-btn"
-              disabled={loading}
+              className="w-full py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded"
             >
-              {loading ? (
-                <span className="loading-spinner"></span>
-              ) : (
-                type === 'login' ? 'Sign In' : 'Sign Up'
-              )}
+              {type === 'login' ? 'Sign In' : 'Sign Up'}
             </button>
           </form>
-          
-          <div className="auth-footer">
-            <p className="auth-switch-text">
+
+          <div className="mt-6 text-center">
+            <p className="text-sm">
               {type === 'login' ? "Don't have an account?" : "Already have an account?"}
               <button
                 type="button"
-                className="auth-switch-btn"
                 onClick={onSwitchType}
-                disabled={loading}
+                className="ml-2 text-yellow-500 hover:text-yellow-600 font-medium"
               >
                 {type === 'login' ? 'Sign Up' : 'Sign In'}
               </button>
             </p>
             
             {type === 'login' && (
-              <button type="button" className="forgot-password-btn">
+              <button type="button" className="mt-2 text-sm text-blue-500 hover:text-blue-600">
                 Forgot Password?
               </button>
             )}
@@ -220,7 +199,7 @@ const AuthModal: React.FC<{
   );
 };
 
-// Hypemode Subscription Modal Component
+// Simple Hypemode Subscription Modal
 const HypemodeSubscriptionModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
@@ -229,68 +208,73 @@ const HypemodeSubscriptionModal: React.FC<{
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
       <div 
-        className={`subscription-modal ${darkMode ? 'dark-mode' : 'light-mode'}`}
+        className={`relative w-full max-w-sm rounded-lg shadow-xl ${darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="modal-header">
-          <div className="modal-icon">
-            <FaCrown className="crown-icon" />
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-yellow-500 rounded-full flex items-center justify-center mr-3">
+                <FaCrown className="text-white" />
+              </div>
+              <h2 className="text-xl font-bold">Already Subscribed!</h2>
+            </div>
+            <button 
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
-          <h2 className="modal-title">Already Subscribed!</h2>
-          <button className="modal-close-btn" onClick={onClose}>×</button>
-        </div>
-        
-        <div className="modal-body">
-          <div className="success-animation">
-            <FaCheckCircle className="success-icon" />
-          </div>
-          
-          <div className="subscription-details">
-            <h3>You're All Set! 🎉</h3>
-            <p className="modal-description">
+
+          <div className="text-center mb-6">
+            <FaCheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">You're All Set! 🎉</h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-4">
               You already have an active <strong>HypeMode Premium</strong> subscription.
-              Enjoy uninterrupted access to all premium features!
             </p>
-            
-            <div className="benefits-list">
-              <div className="benefit-item">
-                <span className="benefit-icon">✓</span>
-                <span className="benefit-text">Unlimited Video Processing</span>
-              </div>
-              <div className="benefit-item">
-                <span className="benefit-icon">✓</span>
-                <span className="benefit-text">Priority Support</span>
-              </div>
-              <div className="benefit-item">
-                <span className="benefit-icon">✓</span>
-                <span className="benefit-text">Advanced AI Features</span>
-              </div>
-              <div className="benefit-item">
-                <span className="benefit-icon">✓</span>
-                <span className="benefit-text">No Watermarks</span>
-              </div>
+          </div>
+
+          <div className="space-y-3 mb-6">
+            <div className="flex items-center">
+              <span className="text-green-500 mr-2">✓</span>
+              <span>Unlimited Video Processing</span>
+            </div>
+            <div className="flex items-center">
+              <span className="text-green-500 mr-2">✓</span>
+              <span>Priority Support</span>
+            </div>
+            <div className="flex items-center">
+              <span className="text-green-500 mr-2">✓</span>
+              <span>Advanced AI Features</span>
+            </div>
+            <div className="flex items-center">
+              <span className="text-green-500 mr-2">✓</span>
+              <span>No Watermarks</span>
             </div>
           </div>
-        </div>
-        
-        <div className="modal-footer">
-          <button 
-            className="modal-primary-btn"
-            onClick={() => {
-              onClose();
-              window.location.href = "/hypemode";
-            }}
-          >
-            Go to HypeMode
-          </button>
-          <button 
-            className="modal-secondary-btn"
-            onClick={onClose}
-          >
-            Continue Browsing
-          </button>
+
+          <div className="space-y-3">
+            <button 
+              onClick={() => {
+                onClose();
+                window.location.href = "/hypemode";
+              }}
+              className="w-full py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded"
+            >
+              Go to HypeMode
+            </button>
+            <button 
+              onClick={onClose}
+              className={`w-full py-2 px-4 border rounded ${darkMode ? 'border-yellow-500 text-yellow-500 hover:bg-yellow-900' : 'border-yellow-500 text-yellow-600 hover:bg-yellow-50'}`}
+            >
+              Continue Browsing
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -439,550 +423,8 @@ const Layout: React.FC<LayoutProps> = ({
     return location.pathname === path ? "bg-yellow-50 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-400" : "";
   };
 
-  // Add CSS styles inline
-  const modalStyles = `
-    /* Base overlay styles */
-    .modal-overlay, .auth-modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: rgba(0, 0, 0, 0.7);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 9999;
-      backdrop-filter: blur(6px);
-      padding: 20px;
-      overflow-y: auto;
-    }
-
-    /* Auth Modal Styles */
-    .auth-modal {
-      width: 100%;
-      max-width: 420px;
-      max-height: 90vh;
-      border-radius: 20px;
-      padding: 28px;
-      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
-      animation: modalSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-      position: relative;
-      overflow-y: auto;
-    }
-
-    .auth-modal.dark-mode {
-      background: linear-gradient(145deg, #1e293b, #0f172a);
-      color: #f8fafc;
-      border: 1px solid #334155;
-    }
-
-    .auth-modal.light-mode {
-      background: linear-gradient(145deg, #ffffff, #f1f5f9);
-      color: #1e293b;
-      border: 1px solid #e2e8f0;
-    }
-
-    .auth-modal .modal-header {
-      text-align: center;
-      margin-bottom: 28px;
-      position: relative;
-      padding-bottom: 16px;
-    }
-
-    .auth-modal .modal-header::after {
-      content: '';
-      position: absolute;
-      bottom: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 60px;
-      height: 3px;
-      background: linear-gradient(90deg, #f59e0b, #eab308);
-      border-radius: 2px;
-    }
-
-    .auth-modal .modal-title {
-      font-size: 28px;
-      font-weight: 700;
-      margin: 0;
-      background: linear-gradient(135deg, #f59e0b, #eab308);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .auth-modal .modal-close-btn {
-      position: absolute;
-      top: -8px;
-      right: -8px;
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      border: none;
-      font-size: 22px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.3s ease;
-    }
-
-    .auth-modal.dark-mode .modal-close-btn {
-      background: #334155;
-      color: #fbbf24;
-    }
-
-    .auth-modal.light-mode .modal-close-btn {
-      background: #fef3c7;
-      color: #92400e;
-    }
-
-    .auth-modal .modal-close-btn:hover {
-      transform: scale(1.1) rotate(90deg);
-    }
-
-    .auth-form {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .form-label {
-      font-size: 14px;
-      font-weight: 600;
-      color: inherit;
-      opacity: 0.9;
-    }
-
-    .form-input {
-      padding: 14px 16px;
-      border-radius: 12px;
-      border: 2px solid;
-      font-size: 15px;
-      transition: all 0.3s ease;
-      outline: none;
-    }
-
-    .auth-modal.dark-mode .form-input {
-      background: #1e293b;
-      border-color: #475569;
-      color: #f8fafc;
-    }
-
-    .auth-modal.light-mode .form-input {
-      background: white;
-      border-color: #cbd5e1;
-      color: #1e293b;
-    }
-
-    .form-input:focus {
-      border-color: #f59e0b;
-      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
-    }
-
-    .form-input:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .submit-btn {
-      padding: 16px;
-      border-radius: 12px;
-      border: none;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      background: linear-gradient(135deg, #f59e0b, #eab308);
-      color: #1e293b;
-      margin-top: 8px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .submit-btn:hover:not(:disabled) {
-      transform: translateY(-2px);
-      box-shadow: 0 12px 24px rgba(245, 158, 11, 0.3);
-    }
-
-    .submit-btn:disabled {
-      opacity: 0.7;
-      cursor: not-allowed;
-    }
-
-    .loading-spinner {
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 3px solid rgba(255, 255, 255, 0.3);
-      border-radius: 50%;
-      border-top-color: #1e293b;
-      animation: spin 1s ease-in-out infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    .auth-footer {
-      text-align: center;
-      margin-top: 28px;
-      padding-top: 20px;
-      border-top: 1px solid;
-    }
-
-    .auth-modal.dark-mode .auth-footer {
-      border-top-color: #334155;
-    }
-
-    .auth-modal.light-mode .auth-footer {
-      border-top-color: #e2e8f0;
-    }
-
-    .auth-switch-text {
-      font-size: 14px;
-      margin-bottom: 16px;
-      opacity: 0.9;
-    }
-
-    .auth-switch-btn {
-      background: none;
-      border: none;
-      color: #f59e0b;
-      font-weight: 600;
-      cursor: pointer;
-      margin-left: 8px;
-      padding: 4px 8px;
-      border-radius: 6px;
-      transition: all 0.2s ease;
-    }
-
-    .auth-switch-btn:hover:not(:disabled) {
-      background: rgba(245, 158, 11, 0.1);
-    }
-
-    .auth-switch-btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .forgot-password-btn {
-      background: none;
-      border: none;
-      color: #60a5fa;
-      font-size: 13px;
-      cursor: pointer;
-      padding: 8px;
-      border-radius: 6px;
-      transition: all 0.2s ease;
-    }
-
-    .forgot-password-btn:hover {
-      background: rgba(96, 165, 250, 0.1);
-    }
-
-    /* Subscription Modal Styles */
-    .subscription-modal {
-      width: 90%;
-      max-width: 380px;
-      border-radius: 20px;
-      padding: 24px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-      animation: modalSlideIn 0.3s ease-out;
-      position: relative;
-    }
-
-    .subscription-modal.dark-mode {
-      background: linear-gradient(145deg, #2d3748, #1a202c);
-      color: white;
-      border: 1px solid #4a5568;
-    }
-
-    .subscription-modal.light-mode {
-      background: white;
-      color: #2d3748;
-      border: 1px solid #e2e8f0;
-    }
-
-    @keyframes modalSlideIn {
-      from {
-        opacity: 0;
-        transform: translateY(-20px) scale(0.95);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-      }
-    }
-
-    .subscription-modal .modal-header {
-      display: flex;
-      align-items: center;
-      margin-bottom: 20px;
-      position: relative;
-    }
-
-    .modal-icon {
-      width: 50px;
-      height: 50px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-right: 14px;
-      flex-shrink: 0;
-    }
-
-    .subscription-modal.dark-mode .modal-icon {
-      background: linear-gradient(135deg, #eab308, #fbbf24);
-    }
-
-    .subscription-modal.light-mode .modal-icon {
-      background: linear-gradient(135deg, #eab308, #f59e0b);
-    }
-
-    .crown-icon {
-      font-size: 22px;
-      color: #1f2937;
-    }
-
-    .subscription-modal .modal-title {
-      font-size: 22px;
-      font-weight: bold;
-      flex: 1;
-      margin: 0;
-    }
-
-    .subscription-modal .modal-close-btn {
-      position: absolute;
-      top: -8px;
-      right: -8px;
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      border: none;
-      font-size: 22px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.3s;
-    }
-
-    .subscription-modal.dark-mode .modal-close-btn {
-      background: #4a5568;
-      color: #fbbf24;
-    }
-
-    .subscription-modal.light-mode .modal-close-btn {
-      background: #fef3c7;
-      color: #92400e;
-    }
-
-    .subscription-modal .modal-close-btn:hover {
-      transform: scale(1.1) rotate(90deg);
-    }
-
-    .subscription-modal .modal-body {
-      text-align: center;
-      margin-bottom: 24px;
-    }
-
-    .success-animation {
-      margin-bottom: 20px;
-    }
-
-    .success-icon {
-      font-size: 60px;
-      color: #22c55e;
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0% {
-        transform: scale(1);
-      }
-      50% {
-        transform: scale(1.1);
-      }
-      100% {
-        transform: scale(1);
-      }
-    }
-
-    .subscription-details h3 {
-      font-size: 20px;
-      margin-bottom: 14px;
-      color: #fbbf24;
-    }
-
-    .modal-description {
-      font-size: 15px;
-      line-height: 1.6;
-      margin-bottom: 24px;
-      opacity: 0.9;
-    }
-
-    .benefits-list {
-      text-align: left;
-      margin-top: 20px;
-    }
-
-    .benefit-item {
-      display: flex;
-      align-items: center;
-      padding: 10px 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .subscription-modal.light-mode .benefit-item {
-      border-bottom-color: rgba(0, 0, 0, 0.1);
-    }
-
-    .benefit-icon {
-      color: #fbbf24;
-      font-weight: bold;
-      margin-right: 12px;
-      font-size: 18px;
-    }
-
-    .benefit-text {
-      font-size: 15px;
-    }
-
-    .modal-footer {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .modal-primary-btn {
-      padding: 16px;
-      border-radius: 12px;
-      border: none;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s;
-      background: linear-gradient(135deg, #eab308, #f59e0b);
-      color: #1f2937;
-      width: 100%;
-    }
-
-    .modal-primary-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 12px 24px rgba(234, 179, 8, 0.3);
-    }
-
-    .modal-secondary-btn {
-      padding: 16px;
-      border-radius: 12px;
-      border: 2px solid;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s;
-      background: transparent;
-      width: 100%;
-    }
-
-    .subscription-modal.dark-mode .modal-secondary-btn {
-      border-color: #fbbf24;
-      color: #fbbf24;
-    }
-
-    .subscription-modal.light-mode .modal-secondary-btn {
-      border-color: #f59e0b;
-      color: #92400e;
-    }
-
-    .modal-secondary-btn:hover {
-      transform: translateY(-2px);
-      background: rgba(251, 191, 36, 0.1);
-    }
-
-    /* Responsive adjustments */
-    @media (max-width: 768px) {
-      .auth-modal, .subscription-modal {
-        width: 95%;
-        padding: 24px;
-        max-height: 85vh;
-      }
-      
-      .auth-modal .modal-title {
-        font-size: 24px;
-      }
-      
-      .subscription-modal .modal-title {
-        font-size: 20px;
-      }
-      
-      .form-input {
-        padding: 12px 14px;
-      }
-      
-      .submit-btn, .modal-primary-btn, .modal-secondary-btn {
-        padding: 14px;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .auth-modal, .subscription-modal {
-        padding: 20px;
-        border-radius: 16px;
-      }
-      
-      .auth-modal .modal-title {
-        font-size: 22px;
-      }
-      
-      .subscription-modal {
-        max-width: 95%;
-      }
-      
-      .modal-footer {
-        flex-direction: column;
-      }
-      
-      .form-input {
-        font-size: 14px;
-      }
-    }
-
-    /* Scrollbar styling */
-    .auth-modal::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    .auth-modal.dark-mode::-webkit-scrollbar-track {
-      background: #1e293b;
-    }
-
-    .auth-modal.light-mode::-webkit-scrollbar-track {
-      background: #f1f5f9;
-    }
-
-    .auth-modal.dark-mode::-webkit-scrollbar-thumb {
-      background: #475569;
-      border-radius: 3px;
-    }
-
-    .auth-modal.light-mode::-webkit-scrollbar-thumb {
-      background: #cbd5e1;
-      border-radius: 3px;
-    }
-  `;
-
   return (
     <>
-      <style>{modalStyles}</style>
       <div className="text-lg md:text-sm sm:text-xs">
         <ToastContainer />
         {hasHeader && (
@@ -1284,8 +726,8 @@ const Layout: React.FC<LayoutProps> = ({
 
           <main
             className={`flex flex-col min-h-screen ${hasHeader ? 'mt-12' : 'mt-0'} ${
-              darkMode ? "body-dark text-dark" : "body-light text-light"
-            } bg-gray-200 w-full transition-all duration-300`}
+              darkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-900"
+            } w-full transition-all duration-300`}
             style={{
               marginLeft: !isSidebarVisible
                 ? "0px"
@@ -1303,8 +745,8 @@ const Layout: React.FC<LayoutProps> = ({
             <footer
               className={`w-full text-center py-4 ${
                 darkMode
-                  ? "bg-gray-900 text-gray-300"
-                  : "bg-gray-100 text-gray-700"
+                  ? "bg-gray-800 text-gray-300"
+                  : "bg-gray-200 text-gray-700"
               }`}
             >
               © {new Date().getFullYear()} All rights reserved by{" "}
