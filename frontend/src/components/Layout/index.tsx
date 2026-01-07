@@ -55,6 +55,171 @@ interface LayoutProps {
   hideSidebar?: boolean;
 }
 
+// Enhanced Auth Modal Component
+const AuthModal: React.FC<{
+  type: 'login' | 'register';
+  isOpen: boolean;
+  onClose: () => void;
+  darkMode: boolean;
+  onSwitchType: () => void;
+}> = ({ type, isOpen, onClose, darkMode, onSwitchType }) => {
+  if (!isOpen) return null;
+
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+    username: type === 'register' ? "" : undefined,
+    confirmPassword: type === 'register' ? "" : undefined,
+  });
+
+  const [loading, setLoading] = useState(false);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    // Here you would implement actual auth logic
+    // For now, just simulate loading and close
+    setTimeout(() => {
+      setLoading(false);
+      onClose();
+      toast.success(type === 'login' ? 'Logged in successfully!' : 'Registered successfully!');
+    }, 1500);
+  };
+
+  return (
+    <div className="auth-modal-overlay" onClick={onClose}>
+      <div 
+        className={`auth-modal ${darkMode ? 'dark-mode' : 'light-mode'}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-header">
+          <h2 className="modal-title">
+            {type === 'login' ? 'Welcome Back!' : 'Create Account'}
+          </h2>
+          <button className="modal-close-btn" onClick={onClose}>×</button>
+        </div>
+        
+        <div className="modal-body">
+          <form onSubmit={handleSubmit} className="auth-form">
+            {type === 'register' && (
+              <div className="form-group">
+                <label htmlFor="username" className="form-label">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  id="username"
+                  name="username"
+                  value={formData.username || ''}
+                  onChange={handleInputChange}
+                  className="form-input"
+                  placeholder="Enter your username"
+                  required
+                  disabled={loading}
+                />
+              </div>
+            )}
+            
+            <div className="form-group">
+              <label htmlFor="email" className="form-label">
+                Email
+              </label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                className="form-input"
+                placeholder="Enter your email"
+                required
+                disabled={loading}
+              />
+            </div>
+            
+            <div className="form-group">
+              <label htmlFor="password" className="form-label">
+                Password
+              </label>
+              <input
+                type="password"
+                id="password"
+                name="password"
+                value={formData.password}
+                onChange={handleInputChange}
+                className="form-input"
+                placeholder="Enter your password"
+                required
+                disabled={loading}
+              />
+            </div>
+            
+            {type === 'register' && (
+              <div className="form-group">
+                <label htmlFor="confirmPassword" className="form-label">
+                  Confirm Password
+                </label>
+                <input
+                  type="password"
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  value={formData.confirmPassword || ''}
+                  onChange={handleInputChange}
+                  className="form-input"
+                  placeholder="Confirm your password"
+                  required
+                  disabled={loading}
+                />
+              </div>
+            )}
+            
+            <button
+              type="submit"
+              className="submit-btn"
+              disabled={loading}
+            >
+              {loading ? (
+                <span className="loading-spinner"></span>
+              ) : (
+                type === 'login' ? 'Sign In' : 'Sign Up'
+              )}
+            </button>
+          </form>
+          
+          <div className="auth-footer">
+            <p className="auth-switch-text">
+              {type === 'login' ? "Don't have an account?" : "Already have an account?"}
+              <button
+                type="button"
+                className="auth-switch-btn"
+                onClick={onSwitchType}
+                disabled={loading}
+              >
+                {type === 'login' ? 'Sign Up' : 'Sign In'}
+              </button>
+            </p>
+            
+            {type === 'login' && (
+              <button type="button" className="forgot-password-btn">
+                Forgot Password?
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Hypemode Subscription Modal Component
 const HypemodeSubscriptionModal: React.FC<{
   isOpen: boolean;
@@ -154,6 +319,8 @@ const Layout: React.FC<LayoutProps> = ({
   const [showHypemodeModal, setShowHypemodeModal] = useState(false);
   const [viewPageSidebarVisible, setViewPageSidebarVisible] =
     useState<boolean>(!hideSidebar);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalType, setAuthModalType] = useState<'login' | 'register'>('login');
 
   const location = useLocation();
 
@@ -247,13 +414,15 @@ const Layout: React.FC<LayoutProps> = ({
     setModalShow(!modalShow);
   };
 
+  const handleAuthModal = (authType: 'login' | 'register') => {
+    setAuthModalType(authType);
+    setAuthModalOpen(true);
+  };
+
   const handleHypemodeClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (hasPaid) {
       event.preventDefault();
-      // Show professional popup instead of toast
       setShowHypemodeModal(true);
-    } else if (!hasPaid) {
-      // Navigate will be handled by Link
     }
   };
 
@@ -270,28 +439,262 @@ const Layout: React.FC<LayoutProps> = ({
     return location.pathname === path ? "bg-yellow-50 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-400" : "";
   };
 
-  // Add CSS styles inline or you can add them in your main CSS file
+  // Add CSS styles inline
   const modalStyles = `
-    .modal-overlay {
+    /* Base overlay styles */
+    .modal-overlay, .auth-modal-overlay {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      background-color: rgba(0, 0, 0, 0.5);
+      background-color: rgba(0, 0, 0, 0.7);
       display: flex;
       justify-content: center;
       align-items: center;
       z-index: 9999;
-      backdrop-filter: blur(4px);
+      backdrop-filter: blur(6px);
+      padding: 20px;
+      overflow-y: auto;
     }
 
+    /* Auth Modal Styles */
+    .auth-modal {
+      width: 100%;
+      max-width: 420px;
+      max-height: 90vh;
+      border-radius: 20px;
+      padding: 28px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35);
+      animation: modalSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      overflow-y: auto;
+    }
+
+    .auth-modal.dark-mode {
+      background: linear-gradient(145deg, #1e293b, #0f172a);
+      color: #f8fafc;
+      border: 1px solid #334155;
+    }
+
+    .auth-modal.light-mode {
+      background: linear-gradient(145deg, #ffffff, #f1f5f9);
+      color: #1e293b;
+      border: 1px solid #e2e8f0;
+    }
+
+    .auth-modal .modal-header {
+      text-align: center;
+      margin-bottom: 28px;
+      position: relative;
+      padding-bottom: 16px;
+    }
+
+    .auth-modal .modal-header::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60px;
+      height: 3px;
+      background: linear-gradient(90deg, #f59e0b, #eab308);
+      border-radius: 2px;
+    }
+
+    .auth-modal .modal-title {
+      font-size: 28px;
+      font-weight: 700;
+      margin: 0;
+      background: linear-gradient(135deg, #f59e0b, #eab308);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .auth-modal .modal-close-btn {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+    }
+
+    .auth-modal.dark-mode .modal-close-btn {
+      background: #334155;
+      color: #fbbf24;
+    }
+
+    .auth-modal.light-mode .modal-close-btn {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .auth-modal .modal-close-btn:hover {
+      transform: scale(1.1) rotate(90deg);
+    }
+
+    .auth-form {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .form-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: inherit;
+      opacity: 0.9;
+    }
+
+    .form-input {
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 2px solid;
+      font-size: 15px;
+      transition: all 0.3s ease;
+      outline: none;
+    }
+
+    .auth-modal.dark-mode .form-input {
+      background: #1e293b;
+      border-color: #475569;
+      color: #f8fafc;
+    }
+
+    .auth-modal.light-mode .form-input {
+      background: white;
+      border-color: #cbd5e1;
+      color: #1e293b;
+    }
+
+    .form-input:focus {
+      border-color: #f59e0b;
+      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+    }
+
+    .form-input:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .submit-btn {
+      padding: 16px;
+      border-radius: 12px;
+      border: none;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: linear-gradient(135deg, #f59e0b, #eab308);
+      color: #1e293b;
+      margin-top: 8px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .submit-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px rgba(245, 158, 11, 0.3);
+    }
+
+    .submit-btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #1e293b;
+      animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .auth-footer {
+      text-align: center;
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 1px solid;
+    }
+
+    .auth-modal.dark-mode .auth-footer {
+      border-top-color: #334155;
+    }
+
+    .auth-modal.light-mode .auth-footer {
+      border-top-color: #e2e8f0;
+    }
+
+    .auth-switch-text {
+      font-size: 14px;
+      margin-bottom: 16px;
+      opacity: 0.9;
+    }
+
+    .auth-switch-btn {
+      background: none;
+      border: none;
+      color: #f59e0b;
+      font-weight: 600;
+      cursor: pointer;
+      margin-left: 8px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .auth-switch-btn:hover:not(:disabled) {
+      background: rgba(245, 158, 11, 0.1);
+    }
+
+    .auth-switch-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .forgot-password-btn {
+      background: none;
+      border: none;
+      color: #60a5fa;
+      font-size: 13px;
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .forgot-password-btn:hover {
+      background: rgba(96, 165, 250, 0.1);
+    }
+
+    /* Subscription Modal Styles */
     .subscription-modal {
       width: 90%;
       max-width: 380px;
-      border-radius: 16px;
-      padding: 20px;
-      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
       animation: modalSlideIn 0.3s ease-out;
       position: relative;
     }
@@ -311,29 +714,30 @@ const Layout: React.FC<LayoutProps> = ({
     @keyframes modalSlideIn {
       from {
         opacity: 0;
-        transform: translateY(-15px);
+        transform: translateY(-20px) scale(0.95);
       }
       to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
       }
     }
 
-    .modal-header {
+    .subscription-modal .modal-header {
       display: flex;
       align-items: center;
-      margin-bottom: 15px;
+      margin-bottom: 20px;
       position: relative;
     }
 
     .modal-icon {
-      width: 45px;
-      height: 45px;
+      width: 50px;
+      height: 50px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-right: 12px;
+      margin-right: 14px;
+      flex-shrink: 0;
     }
 
     .subscription-modal.dark-mode .modal-icon {
@@ -345,30 +749,31 @@ const Layout: React.FC<LayoutProps> = ({
     }
 
     .crown-icon {
-      font-size: 20px;
+      font-size: 22px;
       color: #1f2937;
     }
 
-    .modal-title {
-      font-size: 20px;
+    .subscription-modal .modal-title {
+      font-size: 22px;
       font-weight: bold;
       flex: 1;
+      margin: 0;
     }
 
-    .modal-close-btn {
+    .subscription-modal .modal-close-btn {
       position: absolute;
       top: -8px;
       right: -8px;
-      width: 30px;
-      height: 30px;
+      width: 32px;
+      height: 32px;
       border-radius: 50%;
       border: none;
-      font-size: 20px;
+      font-size: 22px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.2s;
+      transition: all 0.3s;
     }
 
     .subscription-modal.dark-mode .modal-close-btn {
@@ -381,21 +786,21 @@ const Layout: React.FC<LayoutProps> = ({
       color: #92400e;
     }
 
-    .modal-close-btn:hover {
-      transform: scale(1.1);
+    .subscription-modal .modal-close-btn:hover {
+      transform: scale(1.1) rotate(90deg);
     }
 
-    .modal-body {
+    .subscription-modal .modal-body {
       text-align: center;
-      margin-bottom: 20px;
+      margin-bottom: 24px;
     }
 
     .success-animation {
-      margin-bottom: 15px;
+      margin-bottom: 20px;
     }
 
     .success-icon {
-      font-size: 52px;
+      font-size: 60px;
       color: #22c55e;
       animation: pulse 2s infinite;
     }
@@ -405,7 +810,7 @@ const Layout: React.FC<LayoutProps> = ({
         transform: scale(1);
       }
       50% {
-        transform: scale(1.05);
+        transform: scale(1.1);
       }
       100% {
         transform: scale(1);
@@ -413,80 +818,79 @@ const Layout: React.FC<LayoutProps> = ({
     }
 
     .subscription-details h3 {
-      font-size: 18px;
-      margin-bottom: 12px;
+      font-size: 20px;
+      margin-bottom: 14px;
       color: #fbbf24;
     }
 
     .modal-description {
-      font-size: 14px;
-      line-height: 1.5;
-      margin-bottom: 20px;
+      font-size: 15px;
+      line-height: 1.6;
+      margin-bottom: 24px;
       opacity: 0.9;
     }
 
     .benefits-list {
       text-align: left;
-      margin-top: 15px;
+      margin-top: 20px;
     }
 
     .benefit-item {
       display: flex;
       align-items: center;
-      padding: 8px 0;
+      padding: 10px 0;
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
 
     .subscription-modal.light-mode .benefit-item {
-      border-bottom-color: rgba(0, 0, 0, 0.08);
+      border-bottom-color: rgba(0, 0, 0, 0.1);
     }
 
     .benefit-icon {
       color: #fbbf24;
       font-weight: bold;
-      margin-right: 10px;
-      font-size: 16px;
+      margin-right: 12px;
+      font-size: 18px;
     }
 
     .benefit-text {
-      font-size: 14px;
+      font-size: 15px;
     }
 
     .modal-footer {
       display: flex;
+      flex-direction: column;
       gap: 12px;
-      justify-content: center;
     }
 
     .modal-primary-btn {
-      padding: 12px 24px;
-      border-radius: 8px;
+      padding: 16px;
+      border-radius: 12px;
       border: none;
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.3s;
       background: linear-gradient(135deg, #eab308, #f59e0b);
       color: #1f2937;
-      flex: 1;
+      width: 100%;
     }
 
     .modal-primary-btn:hover {
       transform: translateY(-2px);
-      box-shadow: 0 8px 16px rgba(234, 179, 8, 0.3);
-      background: linear-gradient(135deg, #f59e0b, #eab308);
+      box-shadow: 0 12px 24px rgba(234, 179, 8, 0.3);
     }
 
     .modal-secondary-btn {
-      padding: 12px 24px;
-      border-radius: 8px;
+      padding: 16px;
+      border-radius: 12px;
       border: 2px solid;
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.3s;
       background: transparent;
-      flex: 1;
+      width: 100%;
     }
 
     .subscription-modal.dark-mode .modal-secondary-btn {
@@ -502,6 +906,77 @@ const Layout: React.FC<LayoutProps> = ({
     .modal-secondary-btn:hover {
       transform: translateY(-2px);
       background: rgba(251, 191, 36, 0.1);
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .auth-modal, .subscription-modal {
+        width: 95%;
+        padding: 24px;
+        max-height: 85vh;
+      }
+      
+      .auth-modal .modal-title {
+        font-size: 24px;
+      }
+      
+      .subscription-modal .modal-title {
+        font-size: 20px;
+      }
+      
+      .form-input {
+        padding: 12px 14px;
+      }
+      
+      .submit-btn, .modal-primary-btn, .modal-secondary-btn {
+        padding: 14px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .auth-modal, .subscription-modal {
+        padding: 20px;
+        border-radius: 16px;
+      }
+      
+      .auth-modal .modal-title {
+        font-size: 22px;
+      }
+      
+      .subscription-modal {
+        max-width: 95%;
+      }
+      
+      .modal-footer {
+        flex-direction: column;
+      }
+      
+      .form-input {
+        font-size: 14px;
+      }
+    }
+
+    /* Scrollbar styling */
+    .auth-modal::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .auth-modal.dark-mode::-webkit-scrollbar-track {
+      background: #1e293b;
+    }
+
+    .auth-modal.light-mode::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+
+    .auth-modal.dark-mode::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 3px;
+    }
+
+    .auth-modal.light-mode::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
     }
   `;
 
@@ -622,7 +1097,6 @@ const Layout: React.FC<LayoutProps> = ({
                     <>
                       <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider flex justify-between items-center">
                         <span>Marketplace</span>
-                       
                       </div>
 
                       <Link
@@ -757,14 +1231,14 @@ const Layout: React.FC<LayoutProps> = ({
                 {!decodedToken ? (
                   <>
                     <div
-                      onClick={() => handleType("login")}
+                      onClick={() => handleAuthModal("login")}
                       className="flex items-center gap-3 py-2 cursor-pointer hover:text-yellow-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
                     >
                       <LiaSignInAltSolid size="20" />
                       <span>Sign In</span>
                     </div>
                     <div
-                      onClick={() => handleType("register")}
+                      onClick={() => handleAuthModal("register")}
                       className="flex items-center gap-3 py-2 cursor-pointer hover:text-yellow-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
                     >
                       <HiUserAdd size="20" />
@@ -798,8 +1272,8 @@ const Layout: React.FC<LayoutProps> = ({
               expand={expanded}
               setLightMode={setLightMode}
               setDarkMode={setDarkiMode}
-              toggleSigninModal={() => handleType("login")}
-              toggleSignupModal={() => handleType("register")}
+              toggleSigninModal={() => handleAuthModal("login")}
+              toggleSignupModal={() => handleAuthModal("register")}
               toggleSignoutModal={() => handleType("logout")}
               darkMode={darkMode}
               toggleUploadModal={() => handleType("video")}
@@ -846,6 +1320,15 @@ const Layout: React.FC<LayoutProps> = ({
           </main>
         </div>
       </div>
+
+      {/* Auth Modal */}
+      <AuthModal
+        type={authModalType}
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        darkMode={darkMode}
+        onSwitchType={() => setAuthModalType(authModalType === 'login' ? 'register' : 'login')}
+      />
 
       {/* Hypemode Subscription Modal */}
       <HypemodeSubscriptionModal
