@@ -56,7 +56,7 @@ interface LayoutProps {
   hideSidebar?: boolean;
 }
 
-// Enhanced Modal Component that doesn't go off screen
+// Enhanced Modal Component with proper width
 const FixedModal: React.FC<{
   type: string;
   authorized: boolean;
@@ -67,13 +67,15 @@ const FixedModal: React.FC<{
 
   return ReactDOM.createPortal(
     <div className="fixed-modal-overlay" onClick={onClose}>
-      <div className="fixed-modal-container" onClick={(e) => e.stopPropagation()}>
-        <Modal 
-          type={type} 
-          authorized={authorized} 
-          show={show} 
-          onClose={onClose}
-        />
+      <div className="fixed-modal-wrapper">
+        <div className="fixed-modal-container" onClick={(e) => e.stopPropagation()}>
+          <Modal 
+            type={type} 
+            authorized={authorized} 
+            show={show} 
+            onClose={onClose}
+          />
+        </div>
       </div>
     </div>,
     document.body
@@ -90,67 +92,69 @@ const HypemodeSubscriptionModal: React.FC<{
 
   return ReactDOM.createPortal(
     <div className="subscription-modal-overlay" onClick={onClose}>
-      <div 
-        className={`subscription-modal ${darkMode ? 'dark-mode' : 'light-mode'}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="modal-header">
-          <div className="modal-icon">
-            <FaCrown className="crown-icon" />
-          </div>
-          <h2 className="modal-title">Already Subscribed!</h2>
-          <button className="modal-close-btn" onClick={onClose}>×</button>
-        </div>
-        
-        <div className="modal-body">
-          <div className="success-animation">
-            <FaCheckCircle className="success-icon" />
+      <div className="subscription-modal-wrapper">
+        <div 
+          className={`subscription-modal ${darkMode ? 'dark-mode' : 'light-mode'}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="modal-header">
+            <div className="modal-icon">
+              <FaCrown className="crown-icon" />
+            </div>
+            <h2 className="modal-title">Already Subscribed!</h2>
+            <button className="modal-close-btn" onClick={onClose}>×</button>
           </div>
           
-          <div className="subscription-details">
-            <h3>You're All Set! 🎉</h3>
-            <p className="modal-description">
-              You already have an active <strong>HypeMode Premium</strong> subscription.
-              Enjoy uninterrupted access to all premium features!
-            </p>
+          <div className="modal-body">
+            <div className="success-animation">
+              <FaCheckCircle className="success-icon" />
+            </div>
             
-            <div className="benefits-list">
-              <div className="benefit-item">
-                <span className="benefit-icon">✓</span>
-                <span className="benefit-text">Unlimited Video Processing</span>
-              </div>
-              <div className="benefit-item">
-                <span className="benefit-icon">✓</span>
-                <span className="benefit-text">Priority Support</span>
-              </div>
-              <div className="benefit-item">
-                <span className="benefit-icon">✓</span>
-                <span className="benefit-text">Advanced AI Features</span>
-              </div>
-              <div className="benefit-item">
-                <span className="benefit-icon">✓</span>
-                <span className="benefit-text">No Watermarks</span>
+            <div className="subscription-details">
+              <h3>You're All Set! 🎉</h3>
+              <p className="modal-description">
+                You already have an active <strong>HypeMode Premium</strong> subscription.
+                Enjoy uninterrupted access to all premium features!
+              </p>
+              
+              <div className="benefits-list">
+                <div className="benefit-item">
+                  <span className="benefit-icon">✓</span>
+                  <span className="benefit-text">Unlimited Video Processing</span>
+                </div>
+                <div className="benefit-item">
+                  <span className="benefit-icon">✓</span>
+                  <span className="benefit-text">Priority Support</span>
+                </div>
+                <div className="benefit-item">
+                  <span className="benefit-icon">✓</span>
+                  <span className="benefit-text">Advanced AI Features</span>
+                </div>
+                <div className="benefit-item">
+                  <span className="benefit-icon">✓</span>
+                  <span className="benefit-text">No Watermarks</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-        
-        <div className="modal-footer">
-          <button 
-            className="modal-primary-btn"
-            onClick={() => {
-              onClose();
-              window.location.href = "/hypemode";
-            }}
-          >
-            Go to HypeMode
-          </button>
-          <button 
-            className="modal-secondary-btn"
-            onClick={onClose}
-          >
-            Continue Browsing
-          </button>
+          
+          <div className="modal-footer">
+            <button 
+              className="modal-primary-btn"
+              onClick={() => {
+                onClose();
+                window.location.href = "/hypemode";
+              }}
+            >
+              Go to HypeMode
+            </button>
+            <button 
+              className="modal-secondary-btn"
+              onClick={onClose}
+            >
+              Continue Browsing
+            </button>
+          </div>
         </div>
       </div>
     </div>,
@@ -292,7 +296,7 @@ const Layout: React.FC<LayoutProps> = ({
     return location.pathname === path ? "bg-yellow-50 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-400" : "";
   };
 
-  // Comprehensive Modal Styles
+  // Comprehensive Modal Styles with Increased Width
   const modalStyles = `
     /* Fixed Modal Overlay - for Login/Register/Logout */
     .fixed-modal-overlay {
@@ -311,10 +315,17 @@ const Layout: React.FC<LayoutProps> = ({
       backdrop-filter: blur(5px);
     }
 
+    .fixed-modal-wrapper {
+      width: 100%;
+      max-width: 520px; /* Increased from 500px */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
     .fixed-modal-container {
       width: 100%;
-      max-width: 500px;
-      max-height: 70vh;
+      max-height: 90vh;
       overflow: hidden;
       border-radius: 16px;
       box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
@@ -338,11 +349,41 @@ const Layout: React.FC<LayoutProps> = ({
       }
     }
 
+    /* Register/Login Modal Specific Width */
+    .fixed-modal-container .modal-dialog {
+      max-width: 100% !important;
+      width: 100% !important;
+      margin: 0 !important;
+    }
+
+    .fixed-modal-container .modal-content {
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+
     /* Modal Content Styling */
     .modal-content-wrapper {
       max-height: 90vh;
       overflow-y: auto;
-      padding: 30px;
+      padding: 40px; /* Increased padding */
+    }
+
+    /* Form Container Specific */
+    .modal-content-wrapper form {
+      width: 100% !important;
+      max-width: 100% !important;
+      padding: 0 !important;
+    }
+
+    .modal-content-wrapper .form-group {
+      width: 100% !important;
+    }
+
+    .modal-content-wrapper input,
+    .modal-content-wrapper select,
+    .modal-content-wrapper textarea {
+      width: 100% !important;
+      box-sizing: border-box !important;
     }
 
     /* Scrollbar Styling for Modal */
@@ -414,10 +455,36 @@ const Layout: React.FC<LayoutProps> = ({
       padding-right: 5px;
     }
 
-    /* Responsive Styles */
+    /* Responsive Styles for Larger Screens */
+    @media (min-width: 768px) {
+      .fixed-modal-wrapper {
+        max-width: 550px; /* Even larger for tablets */
+      }
+      
+      .modal-content-wrapper {
+        padding: 45px; /* More padding for larger screens */
+      }
+    }
+
+    @media (min-width: 1024px) {
+      .fixed-modal-wrapper {
+        max-width: 600px; /* Largest for desktop */
+      }
+      
+      .modal-content-wrapper {
+        padding: 50px;
+      }
+    }
+
+    /* Mobile Responsive Styles */
     @media (max-width: 640px) {
       .fixed-modal-overlay {
         padding: 10px;
+      }
+      
+      .fixed-modal-wrapper {
+        max-width: 100%;
+        width: 100%;
       }
       
       .fixed-modal-container {
@@ -427,7 +494,7 @@ const Layout: React.FC<LayoutProps> = ({
       }
       
       .modal-content-wrapper {
-        padding: 20px;
+        padding: 30px; /* Adjusted for mobile */
         max-height: 95vh;
       }
       
@@ -464,57 +531,68 @@ const Layout: React.FC<LayoutProps> = ({
       }
     }
 
-    /* Input Fields Styling */
+    /* Input Fields Styling - Wider */
     .modal-input-field {
-      width: 100%;
-      padding: 12px 16px;
-      border: 2px solid #e5e7eb;
-      border-radius: 10px;
-      font-size: 16px;
-      transition: all 0.3s;
-      margin-bottom: 20px;
+      width: 100% !important;
+      padding: 14px 18px !important; /* Increased padding */
+      border: 2px solid #e5e7eb !important;
+      border-radius: 10px !important;
+      font-size: 16px !important;
+      transition: all 0.3s !important;
+      margin-bottom: 20px !important;
+      box-sizing: border-box !important;
     }
 
     .modal-input-field:focus {
-      outline: none;
-      border-color: #3b82f6;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      outline: none !important;
+      border-color: #3b82f6 !important;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
     }
 
     .dark .modal-input-field {
-      background: #374151;
-      border-color: #4b5563;
-      color: white;
+      background: #374151 !important;
+      border-color: #4b5563 !important;
+      color: white !important;
     }
 
     .dark .modal-input-field:focus {
-      border-color: #60a5fa;
-      box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+      border-color: #60a5fa !important;
+      box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2) !important;
     }
 
-    /* Modal Buttons */
+    /* Modal Buttons - Wider */
     .modal-submit-btn {
-      width: 100%;
-      padding: 14px;
-      background: linear-gradient(135deg, #3b82f6, #2563eb);
-      color: white;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s;
-      margin-top: 10px;
+      width: 100% !important;
+      padding: 16px !important; /* Increased padding */
+      background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+      color: white !important;
+      border: none !important;
+      border-radius: 10px !important;
+      font-size: 16px !important;
+      font-weight: 600 !important;
+      cursor: pointer !important;
+      transition: all 0.3s !important;
+      margin-top: 10px !important;
+      box-sizing: border-box !important;
     }
 
     .modal-submit-btn:hover {
-      background: linear-gradient(135deg, #2563eb, #1d4ed8);
-      transform: translateY(-2px);
-      box-shadow: 0 10px 20px rgba(37, 99, 235, 0.2);
+      background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+      transform: translateY(-2px) !important;
+      box-shadow: 0 10px 20px rgba(37, 99, 235, 0.2) !important;
     }
 
     .modal-submit-btn:active {
-      transform: translateY(0);
+      transform: translateY(0) !important;
+    }
+
+    /* Label Styling */
+    .modal-label {
+      display: block !important;
+      width: 100% !important;
+      margin-bottom: 8px !important;
+      font-weight: 500 !important;
+      font-size: 15px !important;
     }
 
     /* Subscription Modal Styles */
@@ -533,12 +611,19 @@ const Layout: React.FC<LayoutProps> = ({
       backdrop-filter: blur(5px);
     }
 
+    .subscription-modal-wrapper {
+      width: 100%;
+      max-width: 450px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
     .subscription-modal {
-      width: 95%;
-      max-width: 420px;
+      width: 100%;
       max-height: 90vh;
       border-radius: 20px;
-      padding: 25px;
+      padding: 30px; /* Increased padding */
       box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
       animation: modalSlideIn 0.3s ease-out;
       position: relative;
@@ -801,6 +886,16 @@ const Layout: React.FC<LayoutProps> = ({
     .modal-secondary-btn:hover {
       transform: translateY(-2px);
       background: rgba(245, 158, 11, 0.1);
+    }
+
+    /* Force Modal Content to be Wide */
+    .modal-dialog {
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+
+    .modal-content {
+      width: 100% !important;
     }
   `;
 
