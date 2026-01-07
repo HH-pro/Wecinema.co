@@ -27,7 +27,6 @@ import { IoSunnyOutline } from "react-icons/io5";
 import { Link, useLocation } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
-import ReactDOM from "react-dom";
 
 export const theme = [
   "Love",
@@ -56,32 +55,6 @@ interface LayoutProps {
   hideSidebar?: boolean;
 }
 
-// Compact Modal Component with reduced height
-const FixedModal: React.FC<{
-  type: string;
-  authorized: boolean;
-  show: boolean;
-  onClose: () => void;
-}> = ({ type, authorized, show, onClose }) => {
-  if (!show) return null;
-
-  return ReactDOM.createPortal(
-    <div className="compact-modal-overlay" onClick={onClose}>
-      <div className="compact-modal-wrapper">
-        <div className="compact-modal-container" onClick={(e) => e.stopPropagation()}>
-          <Modal 
-            type={type} 
-            authorized={authorized} 
-            show={show} 
-            onClose={onClose}
-          />
-        </div>
-      </div>
-    </div>,
-    document.body
-  );
-};
-
 // Hypemode Subscription Modal Component
 const HypemodeSubscriptionModal: React.FC<{
   isOpen: boolean;
@@ -90,75 +63,72 @@ const HypemodeSubscriptionModal: React.FC<{
 }> = ({ isOpen, onClose, darkMode }) => {
   if (!isOpen) return null;
 
-  return ReactDOM.createPortal(
-    <div className="subscription-modal-overlay" onClick={onClose}>
-      <div className="subscription-modal-wrapper">
-        <div 
-          className={`subscription-modal ${darkMode ? 'dark-mode' : 'light-mode'}`}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="modal-header">
-            <div className="modal-icon">
-              <FaCrown className="crown-icon" />
-            </div>
-            <h2 className="modal-title">Already Subscribed!</h2>
-            <button className="modal-close-btn" onClick={onClose}>×</button>
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div 
+        className={`subscription-modal ${darkMode ? 'dark-mode' : 'light-mode'}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-header">
+          <div className="modal-icon">
+            <FaCrown className="crown-icon" />
+          </div>
+          <h2 className="modal-title">Already Subscribed!</h2>
+          <button className="modal-close-btn" onClick={onClose}>×</button>
+        </div>
+        
+        <div className="modal-body">
+          <div className="success-animation">
+            <FaCheckCircle className="success-icon" />
           </div>
           
-          <div className="modal-body">
-            <div className="success-animation">
-              <FaCheckCircle className="success-icon" />
-            </div>
+          <div className="subscription-details">
+            <h3>You're All Set! 🎉</h3>
+            <p className="modal-description">
+              You already have an active <strong>HypeMode Premium</strong> subscription.
+              Enjoy uninterrupted access to all premium features!
+            </p>
             
-            <div className="subscription-details">
-              <h3>You're All Set! 🎉</h3>
-              <p className="modal-description">
-                You already have an active <strong>HypeMode Premium</strong> subscription.
-                Enjoy uninterrupted access to all premium features!
-              </p>
-              
-              <div className="benefits-list">
-                <div className="benefit-item">
-                  <span className="benefit-icon">✓</span>
-                  <span className="benefit-text">Unlimited Video Processing</span>
-                </div>
-                <div className="benefit-item">
-                  <span className="benefit-icon">✓</span>
-                  <span className="benefit-text">Priority Support</span>
-                </div>
-                <div className="benefit-item">
-                  <span className="benefit-icon">✓</span>
-                  <span className="benefit-text">Advanced AI Features</span>
-                </div>
-                <div className="benefit-item">
-                  <span className="benefit-icon">✓</span>
-                  <span className="benefit-text">No Watermarks</span>
-                </div>
+            <div className="benefits-list">
+              <div className="benefit-item">
+                <span className="benefit-icon">✓</span>
+                <span className="benefit-text">Unlimited Video Processing</span>
+              </div>
+              <div className="benefit-item">
+                <span className="benefit-icon">✓</span>
+                <span className="benefit-text">Priority Support</span>
+              </div>
+              <div className="benefit-item">
+                <span className="benefit-icon">✓</span>
+                <span className="benefit-text">Advanced AI Features</span>
+              </div>
+              <div className="benefit-item">
+                <span className="benefit-icon">✓</span>
+                <span className="benefit-text">No Watermarks</span>
               </div>
             </div>
           </div>
-          
-          <div className="modal-footer">
-            <button 
-              className="modal-primary-btn"
-              onClick={() => {
-                onClose();
-                window.location.href = "/hypemode";
-              }}
-            >
-              Go to HypeMode
-            </button>
-            <button 
-              className="modal-secondary-btn"
-              onClick={onClose}
-            >
-              Continue Browsing
-            </button>
-          </div>
+        </div>
+        
+        <div className="modal-footer">
+          <button 
+            className="modal-primary-btn"
+            onClick={() => {
+              onClose();
+              window.location.href = "/hypemode";
+            }}
+          >
+            Go to HypeMode
+          </button>
+          <button 
+            className="modal-secondary-btn"
+            onClick={onClose}
+          >
+            Continue Browsing
+          </button>
         </div>
       </div>
-    </div>,
-    document.body
+    </div>
   );
 };
 
@@ -178,8 +148,9 @@ const Layout: React.FC<LayoutProps> = ({
   const isDarkMode = localStorage.getItem("isDarkMode") ?? false;
   const [darkMode, setDarkMode] = useState<boolean>(!!isDarkMode);
   const [expanded, setExpanded] = useState<boolean>(false);
+  const [modalShow, setModalShow] = useState(false);
   const [type, setType] = useState("");
-  const [showModal, setShowModal] = useState(false);
+  const [show, setShow] = useState<boolean>(false);
   const [showHypemodeModal, setShowHypemodeModal] = useState(false);
   const [viewPageSidebarVisible, setViewPageSidebarVisible] =
     useState<boolean>(!hideSidebar);
@@ -273,525 +244,141 @@ const Layout: React.FC<LayoutProps> = ({
 
   const handleType = (str: string) => {
     setType(str);
-    setShowModal(true);
+    setModalShow(!modalShow);
   };
 
   const handleHypemodeClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (hasPaid) {
       event.preventDefault();
+      // Show professional popup instead of toast
       setShowHypemodeModal(true);
+    } else if (!hasPaid) {
+      // Navigate will be handled by Link
     }
   };
 
-  const handleCloseModal = () => {
-    setShowModal(false);
-    setType("");
-  };
+  useEffect(() => {
+    setShow(!!type);
+  }, [type, modalShow]);
 
   const isTabletOrMobile = screenWidth <= 1120;
   const isMobile = screenWidth <= 420;
   const isSidebarVisible = hideSidebar ? viewPageSidebarVisible : true;
 
+  // Get active class for sidebar items
   const getActiveClass = (path: string) => {
     return location.pathname === path ? "bg-yellow-50 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-400" : "";
   };
 
-  // Compact Modal Styles with Reduced Height
+  // Add CSS styles inline or you can add them in your main CSS file
   const modalStyles = `
-    /* Compact Modal Overlay - for Login/Register/Logout */
-    .compact-modal-overlay {
+    .modal-overlay {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       bottom: 0;
-      background-color: rgba(0, 0, 0, 0.7);
+      background-color: rgba(0, 0, 0, 0.5);
       display: flex;
       justify-content: center;
       align-items: center;
-      z-index: 10000;
-      overflow-y: auto;
+      z-index: 9999;
+      backdrop-filter: blur(4px);
+    }
+
+    .subscription-modal {
+      width: 90%;
+      max-width: 380px;
+      border-radius: 16px;
       padding: 20px;
-      backdrop-filter: blur(5px);
-    }
-
-    .compact-modal-wrapper {
-      width: 100%;
-      max-width: 450px; /* Reduced from 520px */
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-
-    .compact-modal-container {
-      width: 100%;
-      max-height: 650px; /* Fixed maximum height */
-      overflow: hidden;
-      border-radius: 12px; /* Smaller border radius */
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
       animation: modalSlideIn 0.3s ease-out;
-      background: white;
+      position: relative;
     }
 
-    /* Dark mode support for modal container */
-    .dark .compact-modal-container {
-      background: #1f2937;
+    .subscription-modal.dark-mode {
+      background: linear-gradient(145deg, #2d3748, #1a202c);
+      color: white;
+      border: 1px solid #4a5568;
+    }
+
+    .subscription-modal.light-mode {
+      background: white;
+      color: #2d3748;
+      border: 1px solid #e2e8f0;
     }
 
     @keyframes modalSlideIn {
       from {
         opacity: 0;
-        transform: translateY(-20px) scale(0.98);
+        transform: translateY(-15px);
       }
       to {
         opacity: 1;
-        transform: translateY(0) scale(1);
+        transform: translateY(0);
       }
-    }
-
-    /* Register/Login Modal Specific */
-    .compact-modal-container .modal-dialog {
-      max-width: 100% !important;
-      width: 100% !important;
-      margin: 0 !important;
-    }
-
-    .compact-modal-container .modal-content {
-      width: 100% !important;
-      max-width: 100% !important;
-    }
-
-    /* Compact Modal Content */
-    .compact-modal-content {
-      max-height: 650px;
-      overflow-y: auto;
-      padding: 25px 30px; /* Reduced padding */
-    }
-
-    /* Compact Form Container */
-    .compact-modal-content form {
-      width: 100% !important;
-      max-width: 100% !important;
-      padding: 0 !important;
-    }
-
-    .compact-modal-content .form-group {
-      width: 100% !important;
-      margin-bottom: 16px !important; /* Reduced margin */
-    }
-
-    /* Compact Input Fields */
-    .compact-input-field {
-      width: 100% !important;
-      padding: 10px 14px !important; /* Reduced padding */
-      border: 1.5px solid #e5e7eb !important; /* Thinner border */
-      border-radius: 8px !important; /* Smaller radius */
-      font-size: 14px !important; /* Smaller font */
-      transition: all 0.2s !important;
-      margin-bottom: 12px !important; /* Reduced margin */
-      box-sizing: border-box !important;
-      height: 44px !important; /* Fixed height */
-    }
-
-    .compact-input-field:focus {
-      outline: none !important;
-      border-color: #3b82f6 !important;
-      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
-    }
-
-    .dark .compact-input-field {
-      background: #374151 !important;
-      border-color: #4b5563 !important;
-      color: white !important;
-    }
-
-    .dark .compact-input-field:focus {
-      border-color: #60a5fa !important;
-      box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2) !important;
-    }
-
-    /* Compact Labels */
-    .compact-label {
-      display: block !important;
-      width: 100% !important;
-      margin-bottom: 6px !important; /* Reduced margin */
-      font-weight: 500 !important;
-      font-size: 13px !important; /* Smaller font */
-      color: #4b5563;
-    }
-
-    .dark .compact-label {
-      color: #d1d5db;
-    }
-
-    /* Compact Buttons */
-    .compact-submit-btn {
-      width: 100% !important;
-      padding: 12px !important; /* Reduced padding */
-      background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
-      color: white !important;
-      border: none !important;
-      border-radius: 8px !important; /* Smaller radius */
-      font-size: 14px !important; /* Smaller font */
-      font-weight: 600 !important;
-      cursor: pointer !important;
-      transition: all 0.2s !important;
-      margin-top: 8px !important; /* Reduced margin */
-      box-sizing: border-box !important;
-      height: 44px !important; /* Fixed height */
-    }
-
-    .compact-submit-btn:hover {
-      background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
-      transform: translateY(-1px) !important;
-      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2) !important;
-    }
-
-    .compact-submit-btn:active {
-      transform: translateY(0) !important;
-    }
-
-    /* Modal Header Compact */
-    .compact-modal-header {
-      padding: 15px 30px 10px !important; /* Reduced padding */
-      border-bottom: 1px solid #e5e7eb !important;
-      margin-bottom: 15px !important; /* Reduced margin */
-    }
-
-    .dark .compact-modal-header {
-      border-bottom-color: #374151 !important;
-    }
-
-    .compact-modal-title {
-      font-size: 18px !important; /* Smaller title */
-      font-weight: 600 !important;
-      margin: 0 !important;
-      text-align: center !important;
-    }
-
-    /* Modal Footer Compact */
-    .compact-modal-footer {
-      padding: 15px 30px 20px !important; /* Reduced padding */
-      border-top: 1px solid #e5e7eb !important;
-      margin-top: 15px !important; /* Reduced margin */
-      text-align: center !important;
-    }
-
-    .dark .compact-modal-footer {
-      border-top-color: #374151 !important;
-    }
-
-    /* Close Button Compact */
-    .compact-close-btn {
-      position: absolute !important;
-      top: 12px !important;
-      right: 12px !important;
-      background: none !important;
-      border: none !important;
-      font-size: 22px !important; /* Smaller */
-      cursor: pointer !important;
-      color: #9ca3af !important;
-      width: 32px !important;
-      height: 32px !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      border-radius: 50% !important;
-      transition: all 0.2s !important;
-      z-index: 100 !important;
-    }
-
-    .compact-close-btn:hover {
-      background: #f3f4f6 !important;
-      color: #374151 !important;
-    }
-
-    .dark .compact-close-btn:hover {
-      background: #374151 !important;
-      color: #f3f4f6 !important;
-    }
-
-    /* Scrollbar Compact */
-    .compact-modal-content::-webkit-scrollbar {
-      width: 6px; /* Thinner */
-    }
-
-    .compact-modal-content::-webkit-scrollbar-track {
-      background: #f1f1f1;
-      border-radius: 8px; /* Smaller radius */
-      margin: 5px 0;
-    }
-
-    .compact-modal-content::-webkit-scrollbar-thumb {
-      background: #c1c1c1;
-      border-radius: 8px; /* Smaller radius */
-    }
-
-    .compact-modal-content::-webkit-scrollbar-thumb:hover {
-      background: #a1a1a1;
-    }
-
-    .dark .compact-modal-content::-webkit-scrollbar-track {
-      background: #374151;
-    }
-
-    .dark .compact-modal-content::-webkit-scrollbar-thumb {
-      background: #6b7280;
-    }
-
-    .dark .compact-modal-content::-webkit-scrollbar-thumb:hover {
-      background: #4b5563;
-    }
-
-    /* Form Row - for better spacing */
-    .form-row-compact {
-      display: flex !important;
-      gap: 12px !important; /* Reduced gap */
-      margin-bottom: 12px !important; /* Reduced margin */
-    }
-
-    .form-row-compact .form-group {
-      flex: 1 !important;
-      margin-bottom: 0 !important;
-    }
-
-    /* Checkbox and Radio Compact */
-    .compact-checkbox {
-      transform: scale(0.9) !important; /* Smaller checkbox */
-      margin-right: 6px !important; /* Reduced margin */
-    }
-
-    /* Link Styling */
-    .compact-link {
-      font-size: 13px !important; /* Smaller font */
-      color: #3b82f6 !important;
-      text-decoration: none !important;
-    }
-
-    .compact-link:hover {
-      text-decoration: underline !important;
-    }
-
-    /* Responsive Styles */
-    @media (max-width: 640px) {
-      .compact-modal-wrapper {
-        max-width: 95% !important;
-      }
-      
-      .compact-modal-container {
-        max-height: 580px !important; /* Even smaller on mobile */
-      }
-      
-      .compact-modal-content {
-        padding: 20px !important; /* Even less padding on mobile */
-        max-height: 580px !important;
-      }
-      
-      .compact-input-field {
-        padding: 9px 12px !important; /* Even smaller padding */
-        height: 42px !important;
-      }
-      
-      .compact-submit-btn {
-        padding: 11px !important;
-        height: 42px !important;
-      }
-    }
-
-    @media (max-height: 700px) {
-      .compact-modal-container {
-        max-height: 500px !important;
-      }
-      
-      .compact-modal-content {
-        max-height: 500px !important;
-      }
-    }
-
-    @media (max-height: 600px) {
-      .compact-modal-container {
-        max-height: 450px !important;
-      }
-      
-      .compact-modal-content {
-        max-height: 450px !important;
-      }
-      
-      .compact-input-field {
-        padding: 8px 12px !important;
-        height: 40px !important;
-      }
-      
-      .compact-submit-btn {
-        padding: 10px !important;
-        height: 40px !important;
-      }
-    }
-
-    /* Compact Select Styling */
-    .compact-select {
-      width: 100% !important;
-      padding: 10px 14px !important;
-      border: 1.5px solid #e5e7eb !important;
-      border-radius: 8px !important;
-      font-size: 14px !important;
-      height: 44px !important;
-      background-color: white !important;
-      cursor: pointer !important;
-    }
-
-    .dark .compact-select {
-      background: #374151 !important;
-      border-color: #4b5563 !important;
-      color: white !important;
-    }
-
-    /* Compact Textarea */
-    .compact-textarea {
-      width: 100% !important;
-      padding: 10px 14px !important;
-      border: 1.5px solid #e5e7eb !important;
-      border-radius: 8px !important;
-      font-size: 14px !important;
-      min-height: 80px !important; /* Reduced height */
-      resize: vertical !important;
-      font-family: inherit !important;
-    }
-
-    .dark .compact-textarea {
-      background: #374151 !important;
-      border-color: #4b5563 !important;
-      color: white !important;
-    }
-
-    /* Error Messages Compact */
-    .compact-error {
-      color: #ef4444 !important;
-      font-size: 12px !important; /* Smaller */
-      margin-top: 4px !important; /* Reduced margin */
-      display: block !important;
-    }
-
-    /* Success Messages Compact */
-    .compact-success {
-      color: #10b981 !important;
-      font-size: 12px !important; /* Smaller */
-      margin-top: 4px !important; /* Reduced margin */
-      display: block !important;
-    }
-
-    /* Subscription Modal Styles (unchanged but included for completeness) */
-    .subscription-modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: rgba(0, 0, 0, 0.7);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 10050;
-      padding: 20px;
-      backdrop-filter: blur(5px);
-    }
-
-    .subscription-modal-wrapper {
-      width: 100%;
-      max-width: 450px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-
-    .subscription-modal {
-      width: 100%;
-      max-height: 90vh;
-      border-radius: 20px;
-      padding: 30px;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-      animation: modalSlideIn 0.3s ease-out;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .subscription-modal.dark-mode {
-      background: linear-gradient(145deg, #1e293b, #0f172a);
-      color: #f1f5f9;
-      border: 1px solid #475569;
-    }
-
-    .subscription-modal.light-mode {
-      background: white;
-      color: #334155;
-      border: 1px solid #e2e8f0;
     }
 
     .modal-header {
       display: flex;
       align-items: center;
-      margin-bottom: 25px;
+      margin-bottom: 15px;
       position: relative;
     }
 
     .modal-icon {
-      width: 50px;
-      height: 50px;
+      width: 45px;
+      height: 45px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-right: 15px;
-      flex-shrink: 0;
+      margin-right: 12px;
     }
 
     .subscription-modal.dark-mode .modal-icon {
-      background: linear-gradient(135deg, #f59e0b, #d97706);
+      background: linear-gradient(135deg, #eab308, #fbbf24);
     }
 
     .subscription-modal.light-mode .modal-icon {
-      background: linear-gradient(135deg, #fbbf24, #f59e0b);
+      background: linear-gradient(135deg, #eab308, #f59e0b);
     }
 
     .crown-icon {
-      font-size: 22px;
+      font-size: 20px;
       color: #1f2937;
     }
 
     .modal-title {
-      font-size: 22px;
-      font-weight: 700;
+      font-size: 20px;
+      font-weight: bold;
       flex: 1;
-      margin: 0;
     }
 
     .modal-close-btn {
       position: absolute;
-      top: -15px;
-      right: -15px;
-      width: 36px;
-      height: 36px;
+      top: -8px;
+      right: -8px;
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
       border: none;
-      font-size: 24px;
+      font-size: 20px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       transition: all 0.2s;
-      z-index: 10;
     }
 
     .subscription-modal.dark-mode .modal-close-btn {
-      background: #475569;
+      background: #4a5568;
       color: #fbbf24;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
 
     .subscription-modal.light-mode .modal-close-btn {
       background: #fef3c7;
       color: #92400e;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     }
 
     .modal-close-btn:hover {
@@ -800,167 +387,111 @@ const Layout: React.FC<LayoutProps> = ({
 
     .modal-body {
       text-align: center;
-      margin-bottom: 25px;
-      max-height: calc(90vh - 200px);
-      overflow-y: auto;
-      padding-right: 10px;
-    }
-
-    .modal-body::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    .modal-body::-webkit-scrollbar-track {
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 10px;
-    }
-
-    .modal-body::-webkit-scrollbar-thumb {
-      background: #f59e0b;
-      border-radius: 10px;
-    }
-
-    .subscription-modal.light-mode .modal-body::-webkit-scrollbar-track {
-      background: rgba(0, 0, 0, 0.05);
-    }
-
-    .success-animation {
       margin-bottom: 20px;
     }
 
+    .success-animation {
+      margin-bottom: 15px;
+    }
+
     .success-icon {
-      font-size: 60px;
-      color: #10b981;
+      font-size: 52px;
+      color: #22c55e;
       animation: pulse 2s infinite;
     }
 
     @keyframes pulse {
-      0%, 100% {
+      0% {
         transform: scale(1);
       }
       50% {
         transform: scale(1.05);
       }
+      100% {
+        transform: scale(1);
+      }
     }
 
     .subscription-details h3 {
-      font-size: 20px;
-      margin-bottom: 15px;
-      color: #f59e0b;
-      font-weight: 600;
+      font-size: 18px;
+      margin-bottom: 12px;
+      color: #fbbf24;
     }
 
     .modal-description {
-      font-size: 15px;
-      line-height: 1.6;
-      margin-bottom: 25px;
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 20px;
       opacity: 0.9;
-      padding: 0 10px;
     }
 
     .benefits-list {
       text-align: left;
-      margin-top: 20px;
-      max-height: 200px;
-      overflow-y: auto;
-      padding-right: 10px;
-    }
-
-    .benefits-list::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    .benefits-list::-webkit-scrollbar-track {
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 10px;
-    }
-
-    .benefits-list::-webkit-scrollbar-thumb {
-      background: #f59e0b;
-      border-radius: 10px;
+      margin-top: 15px;
     }
 
     .benefit-item {
       display: flex;
       align-items: center;
-      padding: 12px 0;
-      border-bottom: 1px solid;
-    }
-
-    .subscription-modal.dark-mode .benefit-item {
-      border-bottom-color: rgba(255, 255, 255, 0.1);
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
 
     .subscription-modal.light-mode .benefit-item {
       border-bottom-color: rgba(0, 0, 0, 0.08);
     }
 
-    .benefit-item:last-child {
-      border-bottom: none;
-    }
-
     .benefit-icon {
-      color: #f59e0b;
+      color: #fbbf24;
       font-weight: bold;
-      margin-right: 12px;
-      font-size: 18px;
-      flex-shrink: 0;
+      margin-right: 10px;
+      font-size: 16px;
     }
 
     .benefit-text {
-      font-size: 15px;
-      font-weight: 500;
+      font-size: 14px;
     }
 
     .modal-footer {
       display: flex;
-      gap: 15px;
-      flex-wrap: wrap;
-      margin-top: 20px;
-    }
-
-    @media (max-width: 480px) {
-      .modal-footer {
-        flex-direction: column;
-      }
+      gap: 12px;
+      justify-content: center;
     }
 
     .modal-primary-btn {
-      padding: 14px 28px;
-      border-radius: 12px;
+      padding: 12px 24px;
+      border-radius: 8px;
       border: none;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.3s;
-      background: linear-gradient(135deg, #f59e0b, #d97706);
-      color: white;
+      background: linear-gradient(135deg, #eab308, #f59e0b);
+      color: #1f2937;
       flex: 1;
-      min-width: 140px;
     }
 
     .modal-primary-btn:hover {
       transform: translateY(-2px);
-      box-shadow: 0 10px 25px rgba(245, 158, 11, 0.4);
-      background: linear-gradient(135deg, #d97706, #b45309);
+      box-shadow: 0 8px 16px rgba(234, 179, 8, 0.3);
+      background: linear-gradient(135deg, #f59e0b, #eab308);
     }
 
     .modal-secondary-btn {
-      padding: 14px 28px;
-      border-radius: 12px;
+      padding: 12px 24px;
+      border-radius: 8px;
       border: 2px solid;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.3s;
       background: transparent;
       flex: 1;
-      min-width: 140px;
     }
 
     .subscription-modal.dark-mode .modal-secondary-btn {
-      border-color: #f59e0b;
-      color: #f59e0b;
+      border-color: #fbbf24;
+      color: #fbbf24;
     }
 
     .subscription-modal.light-mode .modal-secondary-btn {
@@ -970,30 +501,14 @@ const Layout: React.FC<LayoutProps> = ({
 
     .modal-secondary-btn:hover {
       transform: translateY(-2px);
-      background: rgba(245, 158, 11, 0.1);
+      background: rgba(251, 191, 36, 0.1);
     }
   `;
 
   return (
     <>
       <style>{modalStyles}</style>
-      
-      {/* Compact Modal for Login/Register/Logout */}
-      <FixedModal 
-        show={showModal} 
-        type={type} 
-        authorized={!!token}
-        onClose={handleCloseModal}
-      />
-
-      {/* Hypemode Subscription Modal */}
-      <HypemodeSubscriptionModal
-        isOpen={showHypemodeModal}
-        onClose={() => setShowHypemodeModal(false)}
-        darkMode={darkMode}
-      />
-
-      <div className={`text-lg md:text-sm sm:text-xs min-h-screen ${darkMode ? 'dark' : ''}`}>
+      <div className="text-lg md:text-sm sm:text-xs">
         <ToastContainer />
         {hasHeader && (
           <Header
@@ -1011,9 +526,6 @@ const Layout: React.FC<LayoutProps> = ({
           />
         )}
 
-        {/* Rest of your Layout code remains exactly the same */}
-        {/* ... */}
-        
         {/* ✅ Sidebar Overlay for Tablet + Mobile */}
         {expanded && isTabletOrMobile && isSidebarVisible && (
           <div className="fixed top-0 left-0 z-40 h-full w-full bg-black bg-opacity-90 backdrop-blur-md transition-opacity ease-in-out duration-300">
@@ -1110,6 +622,7 @@ const Layout: React.FC<LayoutProps> = ({
                     <>
                       <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider flex justify-between items-center">
                         <span>Marketplace</span>
+                       
                       </div>
 
                       <Link
@@ -1309,6 +822,7 @@ const Layout: React.FC<LayoutProps> = ({
                 : "0px",
             }}
           >
+            <Modal type={type} authorized={!!token} show={modalShow} />
             <div className="flex-grow">{children}</div>
 
             {/* Footer */}
@@ -1332,6 +846,13 @@ const Layout: React.FC<LayoutProps> = ({
           </main>
         </div>
       </div>
+
+      {/* Hypemode Subscription Modal */}
+      <HypemodeSubscriptionModal
+        isOpen={showHypemodeModal}
+        onClose={() => setShowHypemodeModal(false)}
+        darkMode={darkMode}
+      />
     </>
   );
 };
