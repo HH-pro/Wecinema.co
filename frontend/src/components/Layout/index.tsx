@@ -55,7 +55,7 @@ interface LayoutProps {
   hideSidebar?: boolean;
 }
 
-// Fixed Hypemode Subscription Modal Component with proper positioning
+// Hypemode Subscription Modal Component
 const HypemodeSubscriptionModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
@@ -64,221 +64,68 @@ const HypemodeSubscriptionModal: React.FC<{
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm">
+    <div className="modal-overlay" onClick={onClose}>
       <div 
-        className={`relative w-full max-w-sm rounded-lg shadow-xl ${darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'}`}
+        className={`subscription-modal ${darkMode ? 'dark-mode' : 'light-mode'}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-yellow-500 rounded-full flex items-center justify-center mr-3">
-                <FaCrown className="text-white" />
-              </div>
-              <h2 className="text-xl font-bold">Already Subscribed!</h2>
-            </div>
-            <button 
-              onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+        <div className="modal-header">
+          <div className="modal-icon">
+            <FaCrown className="crown-icon" />
           </div>
-
-          {/* Body */}
-          <div className="text-center mb-6">
-            <FaCheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">You're All Set! 🎉</h3>
-            <p className="text-gray-600 dark:text-gray-300 mb-4">
+          <h2 className="modal-title">Already Subscribed!</h2>
+          <button className="modal-close-btn" onClick={onClose}>×</button>
+        </div>
+        
+        <div className="modal-body">
+          <div className="success-animation">
+            <FaCheckCircle className="success-icon" />
+          </div>
+          
+          <div className="subscription-details">
+            <h3>You're All Set! 🎉</h3>
+            <p className="modal-description">
               You already have an active <strong>HypeMode Premium</strong> subscription.
+              Enjoy uninterrupted access to all premium features!
             </p>
-          </div>
-
-          {/* Benefits List */}
-          <div className="space-y-3 mb-6">
-            <div className="flex items-center">
-              <span className="text-green-500 mr-2">✓</span>
-              <span>Unlimited Video Processing</span>
+            
+            <div className="benefits-list">
+              <div className="benefit-item">
+                <span className="benefit-icon">✓</span>
+                <span className="benefit-text">Unlimited Video Processing</span>
+              </div>
+              <div className="benefit-item">
+                <span className="benefit-icon">✓</span>
+                <span className="benefit-text">Priority Support</span>
+              </div>
+              <div className="benefit-item">
+                <span className="benefit-icon">✓</span>
+                <span className="benefit-text">Advanced AI Features</span>
+              </div>
+              <div className="benefit-item">
+                <span className="benefit-icon">✓</span>
+                <span className="benefit-text">No Watermarks</span>
+              </div>
             </div>
-            <div className="flex items-center">
-              <span className="text-green-500 mr-2">✓</span>
-              <span>Priority Support</span>
-            </div>
-            <div className="flex items-center">
-              <span className="text-green-500 mr-2">✓</span>
-              <span>Advanced AI Features</span>
-            </div>
-            <div className="flex items-center">
-              <span className="text-green-500 mr-2">✓</span>
-              <span>No Watermarks</span>
-            </div>
-          </div>
-
-          {/* Footer Buttons */}
-          <div className="space-y-3">
-            <button 
-              onClick={() => {
-                onClose();
-                window.location.href = "/hypemode";
-              }}
-              className="w-full py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded transition-colors"
-            >
-              Go to HypeMode
-            </button>
-            <button 
-              onClick={onClose}
-              className={`w-full py-2 px-4 border rounded transition-colors ${darkMode ? 'border-yellow-500 text-yellow-500 hover:bg-yellow-900' : 'border-yellow-500 text-yellow-600 hover:bg-yellow-50'}`}
-            >
-              Continue Browsing
-            </button>
           </div>
         </div>
-      </div>
-    </div>
-  );
-};
-
-// Simple Login/Register Modal Component
-const AuthModal: React.FC<{
-  type: 'login' | 'register';
-  isOpen: boolean;
-  onClose: () => void;
-  darkMode: boolean;
-  onSwitchType: () => void;
-}> = ({ type, isOpen, onClose, darkMode, onSwitchType }) => {
-  if (!isOpen) return null;
-
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-    username: type === 'register' ? "" : undefined,
-    confirmPassword: type === 'register' ? "" : undefined,
-  });
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // Add your auth logic here
-    onClose();
-    toast.success(type === 'login' ? 'Logged in successfully!' : 'Registered successfully!');
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50 backdrop-blur-sm">
-      <div 
-        className={`relative w-full max-w-md rounded-lg shadow-xl overflow-y-auto max-h-[90vh] ${darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="sticky top-0 flex items-center justify-between p-4 border-b bg-inherit">
-          <h2 className="text-xl font-semibold">
-            {type === 'login' ? 'Sign In' : 'Sign Up'}
-          </h2>
+        
+        <div className="modal-footer">
           <button 
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            className="modal-primary-btn"
+            onClick={() => {
+              onClose();
+              window.location.href = "/hypemode";
+            }}
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            Go to HypeMode
           </button>
-        </div>
-
-        {/* Body */}
-        <div className="p-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {type === 'register' && (
-              <div>
-                <label className="block text-sm font-medium mb-1">Username</label>
-                <input
-                  type="text"
-                  name="username"
-                  value={formData.username || ''}
-                  onChange={handleInputChange}
-                  className={`w-full px-3 py-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
-                  placeholder="Enter username"
-                  required
-                />
-              </div>
-            )}
-            
-            <div>
-              <label className="block text-sm font-medium mb-1">Email</label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                className={`w-full px-3 py-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
-                placeholder="Enter email"
-                required
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium mb-1">Password</label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleInputChange}
-                className={`w-full px-3 py-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
-                placeholder="Enter password"
-                required
-              />
-            </div>
-            
-            {type === 'register' && (
-              <div>
-                <label className="block text-sm font-medium mb-1">Confirm Password</label>
-                <input
-                  type="password"
-                  name="confirmPassword"
-                  value={formData.confirmPassword || ''}
-                  onChange={handleInputChange}
-                  className={`w-full px-3 py-2 rounded border ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
-                  placeholder="Confirm password"
-                  required
-                />
-              </div>
-            )}
-            
-            <button
-              type="submit"
-              className="w-full py-2 px-4 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded transition-colors"
-            >
-              {type === 'login' ? 'Sign In' : 'Sign Up'}
-            </button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <p className="text-sm">
-              {type === 'login' ? "Don't have an account?" : "Already have an account?"}
-              <button
-                type="button"
-                onClick={onSwitchType}
-                className="ml-2 text-yellow-500 hover:text-yellow-600 font-medium"
-              >
-                {type === 'login' ? 'Sign Up' : 'Sign In'}
-              </button>
-            </p>
-            
-            {type === 'login' && (
-              <button type="button" className="mt-2 text-sm text-blue-500 hover:text-blue-600">
-                Forgot Password?
-              </button>
-            )}
-          </div>
+          <button 
+            className="modal-secondary-btn"
+            onClick={onClose}
+          >
+            Continue Browsing
+          </button>
         </div>
       </div>
     </div>
@@ -307,8 +154,6 @@ const Layout: React.FC<LayoutProps> = ({
   const [showHypemodeModal, setShowHypemodeModal] = useState(false);
   const [viewPageSidebarVisible, setViewPageSidebarVisible] =
     useState<boolean>(!hideSidebar);
-  const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [authModalType, setAuthModalType] = useState<'login' | 'register'>('login');
 
   const location = useLocation();
 
@@ -402,15 +247,13 @@ const Layout: React.FC<LayoutProps> = ({
     setModalShow(!modalShow);
   };
 
-  const handleAuthModal = (authType: 'login' | 'register') => {
-    setAuthModalType(authType);
-    setAuthModalOpen(true);
-  };
-
   const handleHypemodeClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (hasPaid) {
       event.preventDefault();
+      // Show professional popup instead of toast
       setShowHypemodeModal(true);
+    } else if (!hasPaid) {
+      // Navigate will be handled by Link
     }
   };
 
@@ -427,8 +270,244 @@ const Layout: React.FC<LayoutProps> = ({
     return location.pathname === path ? "bg-yellow-50 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-400" : "";
   };
 
+  // Add CSS styles inline or you can add them in your main CSS file
+  const modalStyles = `
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      backdrop-filter: blur(4px);
+    }
+
+    .subscription-modal {
+      width: 90%;
+      max-width: 380px;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
+      animation: modalSlideIn 0.3s ease-out;
+      position: relative;
+    }
+
+    .subscription-modal.dark-mode {
+      background: linear-gradient(145deg, #2d3748, #1a202c);
+      color: white;
+      border: 1px solid #4a5568;
+    }
+
+    .subscription-modal.light-mode {
+      background: white;
+      color: #2d3748;
+      border: 1px solid #e2e8f0;
+    }
+
+    @keyframes modalSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-15px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 15px;
+      position: relative;
+    }
+
+    .modal-icon {
+      width: 45px;
+      height: 45px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 12px;
+    }
+
+    .subscription-modal.dark-mode .modal-icon {
+      background: linear-gradient(135deg, #eab308, #fbbf24);
+    }
+
+    .subscription-modal.light-mode .modal-icon {
+      background: linear-gradient(135deg, #eab308, #f59e0b);
+    }
+
+    .crown-icon {
+      font-size: 20px;
+      color: #1f2937;
+    }
+
+    .modal-title {
+      font-size: 20px;
+      font-weight: bold;
+      flex: 1;
+    }
+
+    .modal-close-btn {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .subscription-modal.dark-mode .modal-close-btn {
+      background: #4a5568;
+      color: #fbbf24;
+    }
+
+    .subscription-modal.light-mode .modal-close-btn {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .modal-close-btn:hover {
+      transform: scale(1.1);
+    }
+
+    .modal-body {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .success-animation {
+      margin-bottom: 15px;
+    }
+
+    .success-icon {
+      font-size: 52px;
+      color: #22c55e;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% {
+        transform: scale(1);
+      }
+      50% {
+        transform: scale(1.05);
+      }
+      100% {
+        transform: scale(1);
+      }
+    }
+
+    .subscription-details h3 {
+      font-size: 18px;
+      margin-bottom: 12px;
+      color: #fbbf24;
+    }
+
+    .modal-description {
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 20px;
+      opacity: 0.9;
+    }
+
+    .benefits-list {
+      text-align: left;
+      margin-top: 15px;
+    }
+
+    .benefit-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .subscription-modal.light-mode .benefit-item {
+      border-bottom-color: rgba(0, 0, 0, 0.08);
+    }
+
+    .benefit-icon {
+      color: #fbbf24;
+      font-weight: bold;
+      margin-right: 10px;
+      font-size: 16px;
+    }
+
+    .benefit-text {
+      font-size: 14px;
+    }
+
+    .modal-footer {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .modal-primary-btn {
+      padding: 12px 24px;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      background: linear-gradient(135deg, #eab308, #f59e0b);
+      color: #1f2937;
+      flex: 1;
+    }
+
+    .modal-primary-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(234, 179, 8, 0.3);
+      background: linear-gradient(135deg, #f59e0b, #eab308);
+    }
+
+    .modal-secondary-btn {
+      padding: 12px 24px;
+      border-radius: 8px;
+      border: 2px solid;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      background: transparent;
+      flex: 1;
+    }
+
+    .subscription-modal.dark-mode .modal-secondary-btn {
+      border-color: #fbbf24;
+      color: #fbbf24;
+    }
+
+    .subscription-modal.light-mode .modal-secondary-btn {
+      border-color: #f59e0b;
+      color: #92400e;
+    }
+
+    .modal-secondary-btn:hover {
+      transform: translateY(-2px);
+      background: rgba(251, 191, 36, 0.1);
+    }
+  `;
+
   return (
     <>
+      <style>{modalStyles}</style>
       <div className="text-lg md:text-sm sm:text-xs">
         <ToastContainer />
         {hasHeader && (
@@ -449,194 +528,149 @@ const Layout: React.FC<LayoutProps> = ({
 
         {/* ✅ Sidebar Overlay for Tablet + Mobile */}
         {expanded && isTabletOrMobile && isSidebarVisible && (
-          <div className="fixed inset-0 z-40 bg-black bg-opacity-90 backdrop-blur-md transition-opacity duration-300">
+          <div className="fixed top-0 left-0 z-40 h-full w-full bg-black bg-opacity-90 backdrop-blur-md transition-opacity ease-in-out duration-300">
             <section
-              className={`fixed inset-y-0 left-0 w-4/5 max-w-xs border-r border-gray-200 overflow-y-auto z-50 ${darkMode ? "bg-gray-900 text-white" : "bg-white text-gray-900"}`}
+              className={`fixed inset-0 w-4/5 max-w-xs border-r border-gray-200 overflow-auto z-50 ${
+                darkMode ? "bg-dark text-light" : "bg-light text-dark"
+              }`}
             >
-              {/* Close Button for Mobile */}
-              <button
-                onClick={() => setExpanded(false)}
-                className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-
               {/* Main Nav */}
-              <nav className="pt-16 p-4">
-                <ul className="space-y-1">
+              <nav className="flex items-center justify-between p-2 my-3 pb-6">
+                <ul className="border-b w-full border-gray-200 pb-4">
                   {/* Home */}
-                  <li>
-                    <Link
-                      to="/"
-                      onClick={() => setExpanded(false)}
-                      className={`flex items-center gap-3 px-4 py-3 rounded-lg ${getActiveClass("/")} ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                    >
-                      <IoMdHome size="20" />
-                      <span>Home</span>
-                    </Link>
-                  </li>
+                  <Link
+                    to="/"
+                    className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/")}`}
+                  >
+                    <IoMdHome size="20" />
+                    <span>Home</span>
+                  </Link>
 
                   {/* Hype mode */}
-                  <li>
-                    <Link
-                      to="/hypemode"
-                      onClick={(e) => {
-                        setExpanded(false);
-                        handleHypemodeClick(e);
-                      }}
-                      className={`flex items-center gap-3 px-4 py-3 rounded-lg relative ${getActiveClass("/hypemode")} ${hasPaid ? 'bg-yellow-50 dark:bg-yellow-900' : ''} ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                    >
-                      <div className="relative">
-                        <RiMovie2Line size="20" className={hasPaid ? "text-yellow-500" : ""} />
-                        {hasPaid && (
-                          <FaCrown className="absolute -top-1 -right-1 text-yellow-500 text-xs bg-gray-800 rounded-full p-0.5" />
-                        )}
-                      </div>
-                      <span className={hasPaid ? "text-yellow-600 dark:text-yellow-400" : ""}>Hype mode</span>
+                  <Link
+                    to="/hypemode"
+                    onClick={handleHypemodeClick}
+                    className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded relative ${getActiveClass("/hypemode")} ${hasPaid ? 'bg-yellow-50 dark:bg-yellow-900' : ''}`}
+                  >
+                    <div className="relative">
+                      <RiMovie2Line size="20" className={hasPaid ? "text-yellow-500" : ""} />
                       {hasPaid && (
-                        <span className="ml-auto text-xs px-2 py-1 bg-yellow-100 dark:bg-yellow-800 text-yellow-600 dark:text-yellow-300 rounded-full">
-                          Premium
-                        </span>
+                        <FaCrown className="absolute -top-1 -right-1 text-yellow-500 text-xs bg-gray-800 rounded-full p-0.5" />
                       )}
-                    </Link>
-                  </li>
+                    </div>
+                    <span className={hasPaid ? "text-yellow-600 dark:text-yellow-400" : ""}>Hype mode</span>
+                    {hasPaid && (
+                      <span className="ml-auto text-xs px-2 py-1 bg-yellow-100 dark:bg-yellow-800 text-yellow-600 dark:text-yellow-300 rounded-full">
+                        Premium
+                      </span>
+                    )}
+                  </Link>
 
                   {/* Video Editor */}
-                  <li>
-                    <Link
-                      to="/videoeditor"
-                      onClick={() => setExpanded(false)}
-                      className={`flex items-center gap-3 px-4 py-3 rounded-lg ${getActiveClass("/videoeditor")} ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                    >
-                      <TbVideoPlus size="20" />
-                      <span>Video Editor</span>
-                    </Link>
-                  </li>
+                  <Link
+                    to="/videoeditor"
+                    className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/videoeditor")}`}
+                  >
+                    <TbVideoPlus size="20" />
+                    <span>Video Editor</span>
+                  </Link>
 
                   {/* Profile */}
                   {decodedToken && (
-                    <li>
-                      <Link
-                        to={`/user/${decodedToken?.userId}`}
-                        onClick={() => setExpanded(false)}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-lg ${getActiveClass(`/user/${decodedToken?.userId}`)} ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                      >
-                        <CgProfile size="20" />
-                        <span>Profile</span>
-                      </Link>
-                    </li>
+                    <Link
+                      to={`/user/${decodedToken?.userId}`}
+                      className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass(`/user/${decodedToken?.userId}`)}`}
+                    >
+                      <CgProfile size="20" />
+                      <span>Profile</span>
+                    </Link>
                   )}
 
                   {/* History */}
                   {decodedToken && (
-                    <li>
-                      <Link
-                        to="/history"
-                        onClick={() => setExpanded(false)}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-lg ${getActiveClass("/history")} ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                      >
-                        <RiHistoryLine size="20" />
-                        <span>History</span>
-                      </Link>
-                    </li>
+                    <Link
+                      to="/history"
+                      className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/history")}`}
+                    >
+                      <RiHistoryLine size="20" />
+                      <span>History</span>
+                    </Link>
                   )}
 
                   {/* Liked Videos */}
                   {decodedToken && (
-                    <li>
-                      <Link
-                        to="/likedvideos"
-                        onClick={() => setExpanded(false)}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-lg ${getActiveClass("/likedvideos")} ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                      >
-                        <RiHeartLine size="20" />
-                        <span>Liked Videos</span>
-                      </Link>
-                    </li>
+                    <Link
+                      to="/likedvideos"
+                      className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/likedvideos")}`}
+                    >
+                      <RiHeartLine size="20" />
+                      <span>Liked Videos</span>
+                    </Link>
                   )}
 
                   {/* Chat Bot */}
-                  <li>
-                    <Link
-                      to="/chatbot"
-                      onClick={() => setExpanded(false)}
-                      className={`flex items-center gap-3 px-4 py-3 rounded-lg ${getActiveClass("/chatbot")} ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                    >
-                      <MdChatBubbleOutline size="20" />
-                      <span>Chat Bot</span>
-                    </Link>
-                  </li>
+                  <Link
+                    to="/chatbot"
+                    className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/chatbot")}`}
+                  >
+                    <MdChatBubbleOutline size="20" />
+                    <span>Chat Bot</span>
+                  </Link>
 
                   {/* ✅ Marketplace for logged-in users */}
                   {decodedToken && (
                     <>
-                      <li className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider flex justify-between items-center">
                         <span>Marketplace</span>
-                      </li>
+                       
+                      </div>
 
-                      <li>
-                        <Link
-                          to="/marketplace"
-                          onClick={() => setExpanded(false)}
-                          className={`flex items-center gap-3 px-4 py-3 rounded-lg ${getActiveClass("/marketplace")} ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                        >
-                          <RiStoreLine size="20" />
-                          <span>Browse Listings</span>
-                        </Link>
-                      </li>
+                      <Link
+                        to="/marketplace"
+                        className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace")}`}
+                      >
+                        <RiStoreLine size="20" />
+                        <span>Browse Listings</span>
+                      </Link>
 
-                      <li>
-                        <Link
-                          to="/marketplace/messages"
-                          onClick={() => setExpanded(false)}
-                          className={`flex items-center gap-3 px-4 py-3 rounded-lg ${getActiveClass("/marketplace/messages")} ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                        >
-                          <RiMessageLine size="20" />
-                          <span>Messages</span>
-                        </Link>
-                      </li>
+                      <Link
+                        to="/marketplace/messages"
+                        className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace/messages")}`}
+                      >
+                        <RiMessageLine size="20" />
+                        <span>Messages</span>
+                      </Link>
 
                       {userType === 'seller' && (
-                        <li>
-                          <Link
-                            to="/marketplace/create"
-                            onClick={() => setExpanded(false)}
-                            className={`flex items-center gap-3 px-4 py-3 rounded-lg ${getActiveClass("/marketplace/create")} ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                          >
-                            <RiAddCircleLine size="20" />
-                            <span>Create Listing</span>
-                          </Link>
-                        </li>
+                        <Link
+                          to="/marketplace/create"
+                          className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace/create")}`}
+                        >
+                          <RiAddCircleLine size="20" />
+                          <span>Create Listing</span>
+                        </Link>
                       )}
 
-                      <li>
-                        <Link
-                          to={userType === 'seller' ? "/marketplace/dashboard" : "/marketplace/buyer-dashboard"}
-                          onClick={() => setExpanded(false)}
-                          className={`flex items-center gap-3 px-4 py-3 rounded-lg ${getActiveClass(userType === 'seller' ? "/marketplace/dashboard" : "/marketplace/buyer-dashboard")} ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                        >
-                          <RiListCheck size="20" />
-                          <span>{userType === 'seller' ? 'Seller' : 'Buyer'} Dashboard</span>
-                        </Link>
-                      </li>
+                      <Link
+                        to={userType === 'seller' ? "/marketplace/dashboard" : "/marketplace/buyer-dashboard"}
+                        className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass(userType === 'seller' ? "/marketplace/dashboard" : "/marketplace/buyer-dashboard")}`}
+                      >
+                        <RiListCheck size="20" />
+                        <span>{userType === 'seller' ? 'Seller' : 'Buyer'} Dashboard</span>
+                      </Link>
 
                       {userType === 'buyer' && (
-                        <li>
-                          <Link
-                            to="/marketplace/my-orders"
-                            onClick={() => setExpanded(false)}
-                            className={`flex items-center gap-3 px-4 py-3 rounded-lg ${getActiveClass("/marketplace/my-orders")} ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                          >
-                            <RiShoppingBagLine size="20" />
-                            <span>My Orders</span>
-                          </Link>
-                        </li>
+                        <Link
+                          to="/marketplace/my-orders"
+                          className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace/my-orders")}`}
+                        >
+                          <RiShoppingBagLine size="20" />
+                          <span>My Orders</span>
+                        </Link>
                       )}
 
                       {/* User Type Badge */}
-                      <li className="px-4 py-2">
+                      <div className="px-4 py-2">
                         <span className={`text-xs px-2 py-1 rounded-full ${userType === 'seller' ? 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300' : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-300'}`}>
                           {userType === 'seller' ? (
                             <>
@@ -650,38 +684,35 @@ const Layout: React.FC<LayoutProps> = ({
                             </>
                           )}
                         </span>
-                      </li>
+                      </div>
 
                       <div className="border-t border-gray-200 my-2"></div>
                     </>
                   )}
 
                   {/* Support */}
-                  <li>
-                    <Link
-                      to="/customersupport"
-                      onClick={() => setExpanded(false)}
-                      className={`flex items-center gap-3 px-4 py-3 rounded-lg ${getActiveClass("/customersupport")} ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-                    >
-                      <RiCustomerService2Line size="20" />
-                      <span>Support</span>
-                    </Link>
-                  </li>
+                  <Link
+                    to="/customersupport"
+                    className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/customersupport")}`}
+                  >
+                    <RiCustomerService2Line size="20" />
+                    <span>Support</span>
+                  </Link>
                 </ul>
               </nav>
 
               {/* Settings */}
-              <nav className="px-4 py-2 border-t border-gray-200">
+              <nav className="px-4 py-2 border-b border-gray-200">
                 <h2 className="font-bold mb-2">Settings</h2>
                 <div
-                  className={`flex items-center gap-3 py-2 cursor-pointer rounded px-2 ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} ${darkMode ? "text-yellow-400" : "text-yellow-600"}`}
+                  className={`flex items-center gap-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 ${darkMode ? "text-yellow-600 dark:text-yellow-400" : ""}`}
                   onClick={setDarkiMode}
                 >
                   <FaMoon size="20" />
                   <span className="text-sm">Dark Mode</span>
                 </div>
                 <div
-                  className={`flex items-center gap-3 py-2 cursor-pointer rounded px-2 ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} ${!darkMode ? "text-yellow-400" : "text-yellow-600"}`}
+                  className={`flex items-center gap-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 ${!darkMode ? "text-yellow-600 dark:text-yellow-400" : ""}`}
                   onClick={setLightMode}
                 >
                   <IoSunnyOutline size="20" />
@@ -690,8 +721,7 @@ const Layout: React.FC<LayoutProps> = ({
                 
                 <Link
                   to="/about"
-                  onClick={() => setExpanded(false)}
-                  className={`flex items-center gap-3 py-2 rounded px-2 ${getActiveClass("/about")} ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+                  className={`flex items-center gap-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 ${getActiveClass("/about")}`}
                 >
                   <FaInfoCircle size="20" />
                   <span className="text-sm">About</span>
@@ -699,8 +729,7 @@ const Layout: React.FC<LayoutProps> = ({
                 
                 <Link
                   to="/report"
-                  onClick={() => setExpanded(false)}
-                  className={`flex items-center gap-3 py-2 rounded px-2 ${getActiveClass("/report")} ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+                  className={`flex items-center gap-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 ${getActiveClass("/report")}`}
                 >
                   <RiFlagLine size="20" />
                   <span className="text-sm">Report</span>
@@ -708,8 +737,7 @@ const Layout: React.FC<LayoutProps> = ({
                 
                 <Link
                   to="/privacy-policy"
-                  onClick={() => setExpanded(false)}
-                  className={`flex items-center gap-3 py-2 rounded px-2 ${getActiveClass("/privacy-policy")} ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+                  className={`flex items-center gap-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 ${getActiveClass("/privacy-policy")}`}
                 >
                   <MdOutlinePrivacyTip size="20" />
                   <span className="text-sm">Privacy Policy</span>
@@ -717,8 +745,7 @@ const Layout: React.FC<LayoutProps> = ({
                 
                 <Link
                   to="/terms-and-conditions"
-                  onClick={() => setExpanded(false)}
-                  className={`flex items-center gap-3 py-2 rounded px-2 ${getActiveClass("/terms-and-conditions")} ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+                  className={`flex items-center gap-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2 ${getActiveClass("/terms-and-conditions")}`}
                 >
                   <MdOutlineDescription size="20" />
                   <span className="text-sm">Terms & Conditions</span>
@@ -726,25 +753,19 @@ const Layout: React.FC<LayoutProps> = ({
               </nav>
 
               {/* Auth */}
-              <nav className="px-4 py-3 border-t border-gray-200">
+              <nav className="px-4 py-3">
                 {!decodedToken ? (
                   <>
                     <div
-                      onClick={() => {
-                        setExpanded(false);
-                        handleAuthModal("login");
-                      }}
-                      className="flex items-center gap-3 py-2 cursor-pointer rounded px-2 text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900"
+                      onClick={() => handleType("login")}
+                      className="flex items-center gap-3 py-2 cursor-pointer hover:text-yellow-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
                     >
                       <LiaSignInAltSolid size="20" />
                       <span>Sign In</span>
                     </div>
                     <div
-                      onClick={() => {
-                        setExpanded(false);
-                        handleAuthModal("register");
-                      }}
-                      className="flex items-center gap-3 py-2 cursor-pointer rounded px-2 text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900"
+                      onClick={() => handleType("register")}
+                      className="flex items-center gap-3 py-2 cursor-pointer hover:text-yellow-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
                     >
                       <HiUserAdd size="20" />
                       <span>Sign Up</span>
@@ -757,11 +778,8 @@ const Layout: React.FC<LayoutProps> = ({
                       <span className="text-sm">{userData?.username || decodedToken?.username}</span>
                     </div>
                     <div
-                      onClick={() => {
-                        setExpanded(false);
-                        handleType("logout");
-                      }}
-                      className="flex items-center gap-3 py-2 cursor-pointer rounded px-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900"
+                      onClick={() => handleType("logout")}
+                      className="flex items-center gap-3 py-2 cursor-pointer hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-2"
                     >
                       <FaSignOutAlt size="16" />
                       <span>Log Out</span>
@@ -780,8 +798,8 @@ const Layout: React.FC<LayoutProps> = ({
               expand={expanded}
               setLightMode={setLightMode}
               setDarkMode={setDarkiMode}
-              toggleSigninModal={() => handleAuthModal("login")}
-              toggleSignupModal={() => handleAuthModal("register")}
+              toggleSigninModal={() => handleType("login")}
+              toggleSignupModal={() => handleType("register")}
               toggleSignoutModal={() => handleType("logout")}
               darkMode={darkMode}
               toggleUploadModal={() => handleType("video")}
@@ -791,29 +809,28 @@ const Layout: React.FC<LayoutProps> = ({
           )}
 
           <main
-            className={`flex flex-col min-h-screen ${hasHeader ? 'mt-16' : 'mt-0'} ${
-              darkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-900"
-            } w-full transition-all duration-300`}
+            className={`flex flex-col min-h-screen ${hasHeader ? 'mt-12' : 'mt-0'} ${
+              darkMode ? "body-dark text-dark" : "body-light text-light"
+            } bg-gray-200 w-full transition-all duration-300`}
             style={{
               marginLeft: !isSidebarVisible
                 ? "0px"
                 : !isTabletOrMobile
                 ? expanded
-                  ? "250px"
-                  : "80px"
+                  ? "16.8%"
+                  : "150px"
                 : "0px",
-              transition: "margin-left 0.3s ease",
             }}
           >
             <Modal type={type} authorized={!!token} show={modalShow} />
-            <div className="flex-grow p-4 md:p-6">{children}</div>
+            <div className="flex-grow">{children}</div>
 
             {/* Footer */}
             <footer
-              className={`w-full text-center py-4 mt-auto ${
+              className={`w-full text-center py-4 ${
                 darkMode
-                  ? "bg-gray-800 text-gray-300"
-                  : "bg-gray-200 text-gray-700"
+                  ? "bg-gray-900 text-gray-300"
+                  : "bg-gray-100 text-gray-700"
               }`}
             >
               © {new Date().getFullYear()} All rights reserved by{" "}
@@ -821,7 +838,7 @@ const Layout: React.FC<LayoutProps> = ({
                 href="https://wecinema.co"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-semibold hover:underline text-yellow-500"
+                className="font-semibold hover:underline"
               >
                 wecinema.co
               </a>
@@ -829,15 +846,6 @@ const Layout: React.FC<LayoutProps> = ({
           </main>
         </div>
       </div>
-
-      {/* Auth Modal */}
-      <AuthModal
-        type={authModalType}
-        isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        darkMode={darkMode}
-        onSwitchType={() => setAuthModalType(authModalType === 'login' ? 'register' : 'login')}
-      />
 
       {/* Hypemode Subscription Modal */}
       <HypemodeSubscriptionModal
