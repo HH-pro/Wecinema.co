@@ -420,14 +420,14 @@ const OrderDetailsPage: React.FC = () => {
             </button>
           )}
 
-          {['in_revision', 'delivered'].includes(order.status) && (
+          {/* {['in_revision', 'delivered'].includes(order.status) && (
             <button 
               className="action-btn revision"
               onClick={() => navigate(`/marketplace/orders/${orderId}/revision`)}
             >
               Request Revision
             </button>
-          )}
+          )} */}
 
           {['pending', 'pending_payment'].includes(order.status) && (
             <button 
