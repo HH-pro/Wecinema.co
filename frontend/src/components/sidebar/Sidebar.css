@@ -116,6 +116,7 @@
 .sidebar-container.light .text-active {
   color: #4361ee;
 }
+
 /* Hypemode Modal Styles - Compact Version */
 .modal-overlay {
   position: fixed;
@@ -158,6 +159,7 @@
     opacity: 0;
     transform: translateY(-15px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -172,8 +174,10 @@
 }
 
 .modal-icon {
-  width: 45px; /* Reduced */
-  height: 45px; /* Reduced */
+  width: 45px;
+  /* Reduced */
+  height: 45px;
+  /* Reduced */
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -182,33 +186,42 @@
 }
 
 .subscription-modal.dark-mode .modal-icon {
-  background: linear-gradient(135deg, #eab308, #fbbf24); /* Yellow gradient */
+  background: linear-gradient(135deg, #eab308, #fbbf24);
+  /* Yellow gradient */
 }
 
 .subscription-modal.light-mode .modal-icon {
-  background: linear-gradient(135deg, #eab308, #f59e0b); /* Yellow gradient */
+  background: linear-gradient(135deg, #eab308, #f59e0b);
+  /* Yellow gradient */
 }
 
 .crown-icon {
-  font-size: 20px; /* Reduced */
+  font-size: 20px;
+  /* Reduced */
   color: #1f2937;
 }
 
 .modal-title {
-  font-size: 20px; /* Reduced */
+  font-size: 20px;
+  /* Reduced */
   font-weight: bold;
   flex: 1;
 }
 
 .modal-close-btn {
   position: absolute;
-  top: -8px; /* Reduced */
-  right: -8px; /* Reduced */
-  width: 30px; /* Reduced */
-  height: 30px; /* Reduced */
+  top: -8px;
+  /* Reduced */
+  right: -8px;
+  /* Reduced */
+  width: 30px;
+  /* Reduced */
+  height: 30px;
+  /* Reduced */
   border-radius: 50%;
   border: none;
-  font-size: 20px; /* Reduced */
+  font-size: 20px;
+  /* Reduced */
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -218,12 +231,15 @@
 
 .subscription-modal.dark-mode .modal-close-btn {
   background: #4a5568;
-  color: #fbbf24; /* Yellow text */
+  color: #fbbf24;
+  /* Yellow text */
 }
 
 .subscription-modal.light-mode .modal-close-btn {
-  background: #fef3c7; /* Yellow-100 */
-  color: #92400e; /* Yellow-800 */
+  background: #fef3c7;
+  /* Yellow-100 */
+  color: #92400e;
+  /* Yellow-800 */
 }
 
 .modal-close-btn:hover {
@@ -240,8 +256,10 @@
 }
 
 .success-icon {
-  font-size: 52px; /* Reduced */
-  color: #22c55e; /* Green-500 */
+  font-size: 52px;
+  /* Reduced */
+  color: #22c55e;
+  /* Green-500 */
   animation: pulse 2s infinite;
 }
 
@@ -249,22 +267,27 @@
   0% {
     transform: scale(1);
   }
+
   50% {
     transform: scale(1.05);
   }
+
   100% {
     transform: scale(1);
   }
 }
 
 .subscription-details h3 {
-  font-size: 18px; /* Reduced */
+  font-size: 18px;
+  /* Reduced */
   margin-bottom: 12px;
-  color: #fbbf24; /* Yellow-400 */
+  color: #fbbf24;
+  /* Yellow-400 */
 }
 
 .modal-description {
-  font-size: 14px; /* Reduced */
+  font-size: 14px;
+  /* Reduced */
   line-height: 1.5;
   margin-bottom: 20px;
   opacity: 0.9;
@@ -278,7 +301,8 @@
 .benefit-item {
   display: flex;
   align-items: center;
-  padding: 8px 0; /* Reduced */
+  padding: 8px 0;
+  /* Reduced */
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -287,7 +311,8 @@
 }
 
 .benefit-icon {
-  color: #fbbf24; /* Yellow-400 */
+  color: #fbbf24;
+  /* Yellow-400 */
   font-weight: bold;
   margin-right: 10px;
   font-size: 16px;
@@ -304,29 +329,36 @@
 }
 
 .modal-primary-btn {
-  padding: 12px 24px; /* Reduced */
+  padding: 12px 24px;
+  /* Reduced */
   border-radius: 8px;
   border: none;
-  font-size: 14px; /* Reduced */
+  font-size: 14px;
+  /* Reduced */
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
-  background: linear-gradient(135deg, #eab308, #f59e0b); /* Yellow-500 gradient */
-  color: #1f2937; /* Dark text for contrast */
+  background: linear-gradient(135deg, #eab308, #f59e0b);
+  /* Yellow-500 gradient */
+  color: #1f2937;
+  /* Dark text for contrast */
   flex: 1;
 }
 
 .modal-primary-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(234, 179, 8, 0.3); /* Yellow shadow */
+  box-shadow: 0 8px 16px rgba(234, 179, 8, 0.3);
+  /* Yellow shadow */
   background: linear-gradient(135deg, #f59e0b, #eab308);
 }
 
 .modal-secondary-btn {
-  padding: 12px 24px; /* Reduced */
+  padding: 12px 24px;
+  /* Reduced */
   border-radius: 8px;
   border: 2px solid;
-  font-size: 14px; /* Reduced */
+  font-size: 14px;
+  /* Reduced */
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
@@ -335,18 +367,22 @@
 }
 
 .subscription-modal.dark-mode .modal-secondary-btn {
-  border-color: #fbbf24; /* Yellow-400 */
+  border-color: #fbbf24;
+  /* Yellow-400 */
   color: #fbbf24;
 }
 
 .subscription-modal.light-mode .modal-secondary-btn {
-  border-color: #f59e0b; /* Yellow-500 */
-  color: #92400e; /* Yellow-800 */
+  border-color: #f59e0b;
+  /* Yellow-500 */
+  color: #92400e;
+  /* Yellow-800 */
 }
 
 .modal-secondary-btn:hover {
   transform: translateY(-2px);
-  background: rgba(251, 191, 36, 0.1); /* Yellow background on hover */
+  background: rgba(251, 191, 36, 0.1);
+  /* Yellow background on hover */
 }
 
 /* Subscription badge for sidebar item */
@@ -362,7 +398,8 @@
   top: -5px;
   right: -5px;
   font-size: 10px;
-  color: #fbbf24; /* Yellow-400 */
+  color: #fbbf24;
+  /* Yellow-400 */
   background: #1f2937;
   border-radius: 50%;
   padding: 2px;
@@ -374,7 +411,8 @@
 }
 
 .subscribed-item .sidebar-icon {
-  color: #fbbf24; /* Yellow icon for subscribed users */
+  color: #fbbf24;
+  /* Yellow icon for subscribed users */
 }
 
 .subscribed-item::after {
@@ -402,8 +440,11 @@
   height: 2px;
   background: linear-gradient(90deg, #eab308, #fbbf24, #eab308);
 }
+
 /* Smooth transitions */
-.sidebar-item, .sidebar-icon, .sidebar-text {
+.sidebar-item,
+.sidebar-icon,
+.sidebar-text {
   transition: all 0.2s ease;
 }
 
@@ -412,7 +453,7 @@
   .sidebar-container {
     transform: translateX(-100%);
   }
-  
+
   .sidebar-container.expanded {
     transform: translateX(0);
   }
