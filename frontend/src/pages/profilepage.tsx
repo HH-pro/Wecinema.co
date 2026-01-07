@@ -7,7 +7,6 @@ import {
     getRequest, 
     putRequest, 
     deleteRequest,
-    getUserTypeInfo,
     checkUserSchema,
     UserType,
     ChangeUserTypeResponse,
