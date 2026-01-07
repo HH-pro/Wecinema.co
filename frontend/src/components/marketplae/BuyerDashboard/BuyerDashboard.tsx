@@ -220,7 +220,7 @@ const BuyerDashboard: React.FC = () => {
       icon: <FaHeadset />,
       label: 'Support',
       description: 'Get help from our team',
-      action: () => navigate('/support'),
+      action: () => navigate('/customersupport'),
       type: 'secondary' as const,
       color: '#EC4899',
       bgColor: '#FDF2F8'
