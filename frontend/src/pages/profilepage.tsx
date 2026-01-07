@@ -2,22 +2,18 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Delete, Layout, Render } from "../components";
-import { 
-    changeUserType, 
-    getRequest, 
-    putRequest, 
-    deleteRequest,
-    UserType,
-    ChangeUserTypeResponse,
-    UserTypeErrorResponse
-} from "../api";
+import { deleteRequest, getRequest, putRequest } from "../api";
 import { decodeToken } from "../utilities/helperfFunction";
 import '../components/header/drowpdown.css';
 import { FaEdit, FaStore, FaShoppingCart, FaUserTie, FaUser, FaSync, FaHeart, FaUsers, FaVideo, FaFileAlt } from 'react-icons/fa';
+import axios from 'axios';
 import cover from '.././assets/public/cover.jpg';
 import avatar from '.././assets/public/avatar.jpg';
 import '../App.css';
 import { FaEllipsisV } from "react-icons/fa";
+
+import { API_BASE_URL } from "../api";
+
 
 const token = localStorage.getItem("token") || null;
 
@@ -32,7 +28,7 @@ const GenrePage: React.FC = () => {
     const [currentUserHasPaid, setCurrentUserHasPaid] = useState(false);
     const [data, setData] = useState<any>([]);
     const [showMoreIndex, setShowMoreIndex] = useState<number | null>(null);
-    const [marketplaceMode, setMarketplaceMode] = useState<UserType>('buyer');
+    const [marketplaceMode, setMarketplaceMode] = useState<'buyer' | 'seller'>('buyer');
     const [changingMode, setChangingMode] = useState(false);
     const [activeTab, setActiveTab] = useState('scripts');
     const nav = useNavigate();
@@ -42,24 +38,31 @@ const GenrePage: React.FC = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [contentLoading, setContentLoading] = useState(false);
 
-    // Function to change user type using api.ts
-    const changeUserTypeDirect = async (userId: string, userType: UserType) => {
+    // Direct API call for changing user type
+    const changeUserTypeDirect = async (userId: string, userType: string) => {
         try {
             setChangingMode(true);
+            const token = localStorage.getItem("token");
             
-            const result: ChangeUserTypeResponse = await changeUserType(
-                userId, 
-                userType, 
-                setChangingMode
+            // ✅ Use API_BASE_URL here
+            const response = await axios.put(
+                `${API_BASE_URL}/user/change-type/${userId}`,
+                { userType },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    timeout: 10000
+                }
             );
-            
-            return result;
+
+            return response.data;
         } catch (error: any) {
             console.error("Error changing user type:", error);
-            
-            // Handle specific error types
-            const typedError = error as UserTypeErrorResponse;
-            throw new Error(typedError.error || typedError.details || "Failed to change user type");
+            throw new Error(error.response?.data?.error || "Failed to change user type");
+        } finally {
+            setChangingMode(false);
         }
     };
 
@@ -88,9 +91,8 @@ const GenrePage: React.FC = () => {
             
             // Set marketplace mode from user data
             if (result.userType) {
-                const userType = result.userType as UserType;
-                setMarketplaceMode(userType);
-                localStorage.setItem('marketplaceMode', userType);
+                setMarketplaceMode(result.userType);
+                localStorage.setItem('marketplaceMode', result.userType);
             }
             
             // Set form data
@@ -106,7 +108,24 @@ const GenrePage: React.FC = () => {
                 setIsCurrentUser(true);
             }
 
-           
+            // ✅ Use API_BASE_URL here for payment status
+            try {
+                const paymentResponse = await axios.get(`${API_BASE_URL}/user/payment-status/${id}`);
+                setUserHasPaid(paymentResponse.data.hasPaid);
+            } catch (error) {
+                console.error("Error fetching payment status:", error);
+                setUserHasPaid(false);
+            }
+
+            // ✅ Use API_BASE_URL here for current user payment status
+            if (tokenData) {
+                try {
+                    const currentUserResponse = await axios.get(`${API_BASE_URL}/user/payment-status/${tokenData.userId}`);
+                    setCurrentUserHasPaid(currentUserResponse.data.hasPaid);
+                } catch (error) {
+                    console.error("Error fetching current user payment status:", error);
+                }
+            }
 
             // Fetch user scripts and videos
             await fetchUserContent();
@@ -157,7 +176,7 @@ const GenrePage: React.FC = () => {
             return;
         }
 
-        const newMode: UserType = marketplaceMode === 'buyer' ? 'seller' : 'buyer';
+        const newMode = marketplaceMode === 'buyer' ? 'seller' : 'buyer';
         
         try {
             const result = await changeUserTypeDirect(id, newMode);
@@ -168,29 +187,11 @@ const GenrePage: React.FC = () => {
                 setUser(prev => ({ ...prev, userType: newMode }));
                 localStorage.setItem('marketplaceMode', newMode);
                 
-                // Show success message
-                toast.success(`🎉 Successfully switched to ${newMode} mode!`, {
-                    autoClose: 3000,
-                    position: "top-right"
-                });
-                
-                // Optional: Show user info in success message
-                console.log("User type changed successfully:", {
-                    from: result.changes.from,
-                    to: result.changes.to,
-                    user: result.user
-                });
+                toast.success(`✅ Switched to ${newMode} mode`);
             }
         } catch (error: any) {
             console.error("Error changing user type:", error);
-            toast.error(`❌ ${error.message}`, {
-                autoClose: 5000,
-                position: "top-right"
-            });
-            
-            // Optionally revert the UI state on error
-            const currentType = marketplaceMode;
-            setMarketplaceMode(currentType);
+            toast.error(`❌ ${error.message}`);
         }
     };
 
@@ -263,7 +264,12 @@ const GenrePage: React.FC = () => {
         }
 
         try {
-            // Implement follow functionality here
+            // ✅ Use API_BASE_URL here for follow functionality
+            // Example:
+            // await axios.post(`${API_BASE_URL}/user/follow/${id}`, {}, {
+            //     headers: { Authorization: `Bearer ${token}` }
+            // });
+            
             toast.info("👥 Follow functionality coming soon!");
         } catch (error) {
             console.error("Error following user:", error);
@@ -559,7 +565,7 @@ const GenrePage: React.FC = () => {
 
     if (loading) {
         return (
-            <Layout expand={false} hasHeader={false}>
+            <Layout expand={false} hasHeader={true}>
                 <div className="mt-12 px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-center items-center min-h-[60vh]">
                         <div className="text-center">
@@ -574,7 +580,7 @@ const GenrePage: React.FC = () => {
     }
 
     return (
-        <Layout expand={false} hasHeader={false}>
+        <Layout expand={false} hasHeader={true}>
             <div className="mt-12 px-4 sm:px-6 lg:px-8">
                 {/* Header Section */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
