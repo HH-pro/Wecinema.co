@@ -13,8 +13,6 @@ import '../App.css';
 import { FaEllipsisV } from "react-icons/fa";
 import { API_BASE_URL } from "../api";
 
-const token = localStorage.getItem("token") || null;
-
 const GenrePage: React.FC = () => {
     const { id } = useParams();
     const [loading, setLoading] = useState(true);
@@ -44,10 +42,15 @@ const GenrePage: React.FC = () => {
         timeout: 10000,
     });
 
+    // Get token from localStorage
+    const getAuthToken = () => {
+        return localStorage.getItem("token") || sessionStorage.getItem("token");
+    };
+
     // Add request interceptor to attach token
     api.interceptors.request.use(
         (config) => {
-            const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+            const token = getAuthToken();
             if (token) {
                 config.headers.Authorization = `Bearer ${token}`;
             }
@@ -63,11 +66,14 @@ const GenrePage: React.FC = () => {
         (response) => response,
         (error) => {
             if (error.response?.status === 401) {
-                // Clear tokens and redirect to login
-                localStorage.removeItem("token");
-                sessionStorage.removeItem("token");
-                toast.error("Session expired. Please log in again.");
-                window.location.href = '/';
+                // Only clear tokens if it's not a user type change request
+                const url = error.config?.url || '';
+                if (!url.includes('/user/change-type/')) {
+                    localStorage.removeItem("token");
+                    sessionStorage.removeItem("token");
+                    toast.error("Session expired. Please log in again.");
+                    window.location.href = '/login';
+                }
             }
             return Promise.reject(error);
         }
@@ -78,23 +84,60 @@ const GenrePage: React.FC = () => {
         try {
             setChangingMode(true);
             
-            const response = await api.put(
-                `/user/change-type/${userId}`,
+            const token = getAuthToken();
+            if (!token) {
+                throw new Error("No authentication token found");
+            }
+
+            const response = await axios.put(
+                `${API_BASE_URL}/user/change-type/${userId}`,
                 { userType },
                 {
                     headers: {
+                        'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    timeout: 10000
                 }
             );
 
             return response.data;
         } catch (error: any) {
             console.error("Error changing user type:", error);
+            
+            // Handle specific error cases
             if (error.response?.status === 401) {
-                throw new Error("Authentication failed. Please log in again.");
+                // Check if token is still valid by decoding it
+                const token = getAuthToken();
+                if (token) {
+                    try {
+                        const decoded = decodeToken(token);
+                        if (decoded) {
+                            // Token is valid but request failed, might be server issue
+                            throw new Error("Server error. Please try again.");
+                        }
+                    } catch (e) {
+                        // Token is invalid
+                        throw new Error("Authentication failed. Please log in again.");
+                    }
+                } else {
+                    throw new Error("Please log in to continue");
+                }
             }
-            throw new Error(error.response?.data?.error || "Failed to change user type");
+            
+            if (error.response?.status === 400) {
+                throw new Error(error.response.data.error || "Invalid request");
+            }
+            
+            if (error.response?.data?.error) {
+                throw new Error(error.response.data.error);
+            }
+            
+            if (error.message.includes("timeout")) {
+                throw new Error("Request timeout. Please check your connection.");
+            }
+            
+            throw new Error(error.message || "Failed to change user type");
         } finally {
             setChangingMode(false);
         }
@@ -102,12 +145,14 @@ const GenrePage: React.FC = () => {
 
     // Follow/Unfollow user
     const handleFollowToggle = async () => {
+        if (!id) return;
+
+        const token = getAuthToken();
         if (!token) {
             toast.error("Please login to follow users");
+            nav('/login');
             return;
         }
-
-        if (!id) return;
 
         try {
             setFollowingLoading(true);
@@ -179,6 +224,7 @@ const GenrePage: React.FC = () => {
             });
 
             // Check if current user is viewing their own profile
+            const token = getAuthToken();
             const tokenData = decodeToken(token);
             if (tokenData && tokenData.userId === id) {
                 setIsCurrentUser(true);
@@ -213,7 +259,7 @@ const GenrePage: React.FC = () => {
                 setScripts([]);
             }
 
-            // Fetch videos - using the new route we need to create
+            // Fetch videos
             const videosResult: any = await getRequest(`/video/authors/${id}/videos`, setContentLoading);
             if (videosResult) {
                 setVideos(videosResult);
@@ -239,7 +285,8 @@ const GenrePage: React.FC = () => {
         }
 
         const newMode = marketplaceMode === 'buyer' ? 'seller' : 'buyer';
-        const toastId = toast.loading(`Switching to ${newMode} mode...`);
+        const displayMode = newMode === 'buyer' ? 'Buyer' : 'Seller';
+        const toastId = toast.loading(`Switching to ${displayMode} mode...`);
         
         try {
             const result = await changeUserTypeDirect(id, newMode);
@@ -251,20 +298,43 @@ const GenrePage: React.FC = () => {
                 localStorage.setItem('marketplaceMode', newMode);
                 
                 toast.update(toastId, {
-                    render: `✅ Successfully switched to ${newMode} mode`,
+                    render: `✅ Successfully switched to ${displayMode} mode`,
                     type: "success",
                     isLoading: false,
                     autoClose: 3000,
                 });
+                
+                // Refresh user data to ensure consistency
+                setTimeout(() => {
+                    fetchUserData();
+                }, 1000);
             }
         } catch (error: any) {
             console.error("Error changing user type:", error);
-            toast.update(toastId, {
-                render: `❌ ${error.message}`,
-                type: "error",
-                isLoading: false,
-                autoClose: 5000,
-            });
+            
+            let errorMessage = error.message || "Failed to change user type";
+            
+            // If token is invalid, prompt user to login
+            if (errorMessage.includes("Authentication failed") || errorMessage.includes("Please log in")) {
+                toast.update(toastId, {
+                    render: "Session expired. Please log in again.",
+                    type: "error",
+                    isLoading: false,
+                    autoClose: 5000,
+                    onClose: () => {
+                        localStorage.removeItem("token");
+                        sessionStorage.removeItem("token");
+                        nav('/login');
+                    }
+                });
+            } else {
+                toast.update(toastId, {
+                    render: `❌ ${errorMessage}`,
+                    type: "error",
+                    isLoading: false,
+                    autoClose: 5000,
+                });
+            }
         }
     };
 
