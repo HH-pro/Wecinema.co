@@ -56,7 +56,7 @@ interface LayoutProps {
   hideSidebar?: boolean;
 }
 
-// Enhanced Modal Component with proper width
+// Compact Modal Component with reduced height
 const FixedModal: React.FC<{
   type: string;
   authorized: boolean;
@@ -66,9 +66,9 @@ const FixedModal: React.FC<{
   if (!show) return null;
 
   return ReactDOM.createPortal(
-    <div className="fixed-modal-overlay" onClick={onClose}>
-      <div className="fixed-modal-wrapper">
-        <div className="fixed-modal-container" onClick={(e) => e.stopPropagation()}>
+    <div className="compact-modal-overlay" onClick={onClose}>
+      <div className="compact-modal-wrapper">
+        <div className="compact-modal-container" onClick={(e) => e.stopPropagation()}>
           <Modal 
             type={type} 
             authorized={authorized} 
@@ -296,10 +296,10 @@ const Layout: React.FC<LayoutProps> = ({
     return location.pathname === path ? "bg-yellow-50 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-400" : "";
   };
 
-  // Comprehensive Modal Styles with Increased Width
+  // Compact Modal Styles with Reduced Height
   const modalStyles = `
-    /* Fixed Modal Overlay - for Login/Register/Logout */
-    .fixed-modal-overlay {
+    /* Compact Modal Overlay - for Login/Register/Logout */
+    .compact-modal-overlay {
       position: fixed;
       top: 0;
       left: 0;
@@ -315,33 +315,33 @@ const Layout: React.FC<LayoutProps> = ({
       backdrop-filter: blur(5px);
     }
 
-    .fixed-modal-wrapper {
+    .compact-modal-wrapper {
       width: 100%;
-      max-width: 520px; /* Increased from 500px */
+      max-width: 450px; /* Reduced from 520px */
       display: flex;
       justify-content: center;
       align-items: center;
     }
 
-    .fixed-modal-container {
+    .compact-modal-container {
       width: 100%;
-      max-height: 90vh;
+      max-height: 650px; /* Fixed maximum height */
       overflow: hidden;
-      border-radius: 16px;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      border-radius: 12px; /* Smaller border radius */
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
       animation: modalSlideIn 0.3s ease-out;
       background: white;
     }
 
     /* Dark mode support for modal container */
-    .dark .fixed-modal-container {
+    .dark .compact-modal-container {
       background: #1f2937;
     }
 
     @keyframes modalSlideIn {
       from {
         opacity: 0;
-        transform: translateY(-30px) scale(0.95);
+        transform: translateY(-20px) scale(0.98);
       }
       to {
         opacity: 1;
@@ -349,253 +349,338 @@ const Layout: React.FC<LayoutProps> = ({
       }
     }
 
-    /* Register/Login Modal Specific Width */
-    .fixed-modal-container .modal-dialog {
+    /* Register/Login Modal Specific */
+    .compact-modal-container .modal-dialog {
       max-width: 100% !important;
       width: 100% !important;
       margin: 0 !important;
     }
 
-    .fixed-modal-container .modal-content {
+    .compact-modal-container .modal-content {
       width: 100% !important;
       max-width: 100% !important;
     }
 
-    /* Modal Content Styling */
-    .modal-content-wrapper {
-      max-height: 90vh;
+    /* Compact Modal Content */
+    .compact-modal-content {
+      max-height: 650px;
       overflow-y: auto;
-      padding: 40px; /* Increased padding */
+      padding: 25px 30px; /* Reduced padding */
     }
 
-    /* Form Container Specific */
-    .modal-content-wrapper form {
+    /* Compact Form Container */
+    .compact-modal-content form {
       width: 100% !important;
       max-width: 100% !important;
       padding: 0 !important;
     }
 
-    .modal-content-wrapper .form-group {
+    .compact-modal-content .form-group {
       width: 100% !important;
+      margin-bottom: 16px !important; /* Reduced margin */
     }
 
-    .modal-content-wrapper input,
-    .modal-content-wrapper select,
-    .modal-content-wrapper textarea {
+    /* Compact Input Fields */
+    .compact-input-field {
       width: 100% !important;
+      padding: 10px 14px !important; /* Reduced padding */
+      border: 1.5px solid #e5e7eb !important; /* Thinner border */
+      border-radius: 8px !important; /* Smaller radius */
+      font-size: 14px !important; /* Smaller font */
+      transition: all 0.2s !important;
+      margin-bottom: 12px !important; /* Reduced margin */
       box-sizing: border-box !important;
+      height: 44px !important; /* Fixed height */
     }
 
-    /* Scrollbar Styling for Modal */
-    .modal-content-wrapper::-webkit-scrollbar {
-      width: 8px;
-    }
-
-    .modal-content-wrapper::-webkit-scrollbar-track {
-      background: #f1f1f1;
-      border-radius: 10px;
-      margin: 10px 0;
-    }
-
-    .modal-content-wrapper::-webkit-scrollbar-thumb {
-      background: #c1c1c1;
-      border-radius: 10px;
-    }
-
-    .modal-content-wrapper::-webkit-scrollbar-thumb:hover {
-      background: #a1a1a1;
-    }
-
-    .dark .modal-content-wrapper::-webkit-scrollbar-track {
-      background: #374151;
-    }
-
-    .dark .modal-content-wrapper::-webkit-scrollbar-thumb {
-      background: #6b7280;
-    }
-
-    .dark .modal-content-wrapper::-webkit-scrollbar-thumb:hover {
-      background: #4b5563;
-    }
-
-    /* Close Button */
-    .modal-close-top {
-      position: absolute;
-      top: 15px;
-      right: 15px;
-      background: none;
-      border: none;
-      font-size: 28px;
-      cursor: pointer;
-      color: #6b7280;
-      z-index: 100;
-      width: 40px;
-      height: 40px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      transition: all 0.2s;
-    }
-
-    .modal-close-top:hover {
-      background: #f3f4f6;
-      color: #374151;
-    }
-
-    .dark .modal-close-top:hover {
-      background: #374151;
-      color: #f3f4f6;
-    }
-
-    /* Form Container Styling */
-    .modal-form-container {
-      max-height: calc(90vh - 60px);
-      overflow-y: auto;
-      padding-right: 5px;
-    }
-
-    /* Responsive Styles for Larger Screens */
-    @media (min-width: 768px) {
-      .fixed-modal-wrapper {
-        max-width: 550px; /* Even larger for tablets */
-      }
-      
-      .modal-content-wrapper {
-        padding: 45px; /* More padding for larger screens */
-      }
-    }
-
-    @media (min-width: 1024px) {
-      .fixed-modal-wrapper {
-        max-width: 600px; /* Largest for desktop */
-      }
-      
-      .modal-content-wrapper {
-        padding: 50px;
-      }
-    }
-
-    /* Mobile Responsive Styles */
-    @media (max-width: 640px) {
-      .fixed-modal-overlay {
-        padding: 10px;
-      }
-      
-      .fixed-modal-wrapper {
-        max-width: 100%;
-        width: 100%;
-      }
-      
-      .fixed-modal-container {
-        max-height: 95vh;
-        width: 100%;
-        margin: 0;
-      }
-      
-      .modal-content-wrapper {
-        padding: 30px; /* Adjusted for mobile */
-        max-height: 95vh;
-      }
-      
-      .modal-form-container {
-        max-height: calc(95vh - 60px);
-      }
-    }
-
-    @media (max-height: 700px) {
-      .fixed-modal-container {
-        max-height: 85vh;
-      }
-      
-      .modal-content-wrapper {
-        max-height: 85vh;
-      }
-      
-      .modal-form-container {
-        max-height: calc(85vh - 60px);
-      }
-    }
-
-    @media (max-height: 600px) {
-      .fixed-modal-container {
-        max-height: 80vh;
-      }
-      
-      .modal-content-wrapper {
-        max-height: 80vh;
-      }
-      
-      .modal-form-container {
-        max-height: calc(80vh - 60px);
-      }
-    }
-
-    /* Input Fields Styling - Wider */
-    .modal-input-field {
-      width: 100% !important;
-      padding: 14px 18px !important; /* Increased padding */
-      border: 2px solid #e5e7eb !important;
-      border-radius: 10px !important;
-      font-size: 16px !important;
-      transition: all 0.3s !important;
-      margin-bottom: 20px !important;
-      box-sizing: border-box !important;
-    }
-
-    .modal-input-field:focus {
+    .compact-input-field:focus {
       outline: none !important;
       border-color: #3b82f6 !important;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1) !important;
     }
 
-    .dark .modal-input-field {
+    .dark .compact-input-field {
       background: #374151 !important;
       border-color: #4b5563 !important;
       color: white !important;
     }
 
-    .dark .modal-input-field:focus {
+    .dark .compact-input-field:focus {
       border-color: #60a5fa !important;
-      box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2) !important;
+      box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2) !important;
     }
 
-    /* Modal Buttons - Wider */
-    .modal-submit-btn {
+    /* Compact Labels */
+    .compact-label {
+      display: block !important;
       width: 100% !important;
-      padding: 16px !important; /* Increased padding */
+      margin-bottom: 6px !important; /* Reduced margin */
+      font-weight: 500 !important;
+      font-size: 13px !important; /* Smaller font */
+      color: #4b5563;
+    }
+
+    .dark .compact-label {
+      color: #d1d5db;
+    }
+
+    /* Compact Buttons */
+    .compact-submit-btn {
+      width: 100% !important;
+      padding: 12px !important; /* Reduced padding */
       background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
       color: white !important;
       border: none !important;
-      border-radius: 10px !important;
-      font-size: 16px !important;
+      border-radius: 8px !important; /* Smaller radius */
+      font-size: 14px !important; /* Smaller font */
       font-weight: 600 !important;
       cursor: pointer !important;
-      transition: all 0.3s !important;
-      margin-top: 10px !important;
+      transition: all 0.2s !important;
+      margin-top: 8px !important; /* Reduced margin */
       box-sizing: border-box !important;
+      height: 44px !important; /* Fixed height */
     }
 
-    .modal-submit-btn:hover {
+    .compact-submit-btn:hover {
       background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
-      transform: translateY(-2px) !important;
-      box-shadow: 0 10px 20px rgba(37, 99, 235, 0.2) !important;
+      transform: translateY(-1px) !important;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2) !important;
     }
 
-    .modal-submit-btn:active {
+    .compact-submit-btn:active {
       transform: translateY(0) !important;
     }
 
-    /* Label Styling */
-    .modal-label {
-      display: block !important;
-      width: 100% !important;
-      margin-bottom: 8px !important;
-      font-weight: 500 !important;
-      font-size: 15px !important;
+    /* Modal Header Compact */
+    .compact-modal-header {
+      padding: 15px 30px 10px !important; /* Reduced padding */
+      border-bottom: 1px solid #e5e7eb !important;
+      margin-bottom: 15px !important; /* Reduced margin */
     }
 
-    /* Subscription Modal Styles */
+    .dark .compact-modal-header {
+      border-bottom-color: #374151 !important;
+    }
+
+    .compact-modal-title {
+      font-size: 18px !important; /* Smaller title */
+      font-weight: 600 !important;
+      margin: 0 !important;
+      text-align: center !important;
+    }
+
+    /* Modal Footer Compact */
+    .compact-modal-footer {
+      padding: 15px 30px 20px !important; /* Reduced padding */
+      border-top: 1px solid #e5e7eb !important;
+      margin-top: 15px !important; /* Reduced margin */
+      text-align: center !important;
+    }
+
+    .dark .compact-modal-footer {
+      border-top-color: #374151 !important;
+    }
+
+    /* Close Button Compact */
+    .compact-close-btn {
+      position: absolute !important;
+      top: 12px !important;
+      right: 12px !important;
+      background: none !important;
+      border: none !important;
+      font-size: 22px !important; /* Smaller */
+      cursor: pointer !important;
+      color: #9ca3af !important;
+      width: 32px !important;
+      height: 32px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      border-radius: 50% !important;
+      transition: all 0.2s !important;
+      z-index: 100 !important;
+    }
+
+    .compact-close-btn:hover {
+      background: #f3f4f6 !important;
+      color: #374151 !important;
+    }
+
+    .dark .compact-close-btn:hover {
+      background: #374151 !important;
+      color: #f3f4f6 !important;
+    }
+
+    /* Scrollbar Compact */
+    .compact-modal-content::-webkit-scrollbar {
+      width: 6px; /* Thinner */
+    }
+
+    .compact-modal-content::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 8px; /* Smaller radius */
+      margin: 5px 0;
+    }
+
+    .compact-modal-content::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 8px; /* Smaller radius */
+    }
+
+    .compact-modal-content::-webkit-scrollbar-thumb:hover {
+      background: #a1a1a1;
+    }
+
+    .dark .compact-modal-content::-webkit-scrollbar-track {
+      background: #374151;
+    }
+
+    .dark .compact-modal-content::-webkit-scrollbar-thumb {
+      background: #6b7280;
+    }
+
+    .dark .compact-modal-content::-webkit-scrollbar-thumb:hover {
+      background: #4b5563;
+    }
+
+    /* Form Row - for better spacing */
+    .form-row-compact {
+      display: flex !important;
+      gap: 12px !important; /* Reduced gap */
+      margin-bottom: 12px !important; /* Reduced margin */
+    }
+
+    .form-row-compact .form-group {
+      flex: 1 !important;
+      margin-bottom: 0 !important;
+    }
+
+    /* Checkbox and Radio Compact */
+    .compact-checkbox {
+      transform: scale(0.9) !important; /* Smaller checkbox */
+      margin-right: 6px !important; /* Reduced margin */
+    }
+
+    /* Link Styling */
+    .compact-link {
+      font-size: 13px !important; /* Smaller font */
+      color: #3b82f6 !important;
+      text-decoration: none !important;
+    }
+
+    .compact-link:hover {
+      text-decoration: underline !important;
+    }
+
+    /* Responsive Styles */
+    @media (max-width: 640px) {
+      .compact-modal-wrapper {
+        max-width: 95% !important;
+      }
+      
+      .compact-modal-container {
+        max-height: 580px !important; /* Even smaller on mobile */
+      }
+      
+      .compact-modal-content {
+        padding: 20px !important; /* Even less padding on mobile */
+        max-height: 580px !important;
+      }
+      
+      .compact-input-field {
+        padding: 9px 12px !important; /* Even smaller padding */
+        height: 42px !important;
+      }
+      
+      .compact-submit-btn {
+        padding: 11px !important;
+        height: 42px !important;
+      }
+    }
+
+    @media (max-height: 700px) {
+      .compact-modal-container {
+        max-height: 500px !important;
+      }
+      
+      .compact-modal-content {
+        max-height: 500px !important;
+      }
+    }
+
+    @media (max-height: 600px) {
+      .compact-modal-container {
+        max-height: 450px !important;
+      }
+      
+      .compact-modal-content {
+        max-height: 450px !important;
+      }
+      
+      .compact-input-field {
+        padding: 8px 12px !important;
+        height: 40px !important;
+      }
+      
+      .compact-submit-btn {
+        padding: 10px !important;
+        height: 40px !important;
+      }
+    }
+
+    /* Compact Select Styling */
+    .compact-select {
+      width: 100% !important;
+      padding: 10px 14px !important;
+      border: 1.5px solid #e5e7eb !important;
+      border-radius: 8px !important;
+      font-size: 14px !important;
+      height: 44px !important;
+      background-color: white !important;
+      cursor: pointer !important;
+    }
+
+    .dark .compact-select {
+      background: #374151 !important;
+      border-color: #4b5563 !important;
+      color: white !important;
+    }
+
+    /* Compact Textarea */
+    .compact-textarea {
+      width: 100% !important;
+      padding: 10px 14px !important;
+      border: 1.5px solid #e5e7eb !important;
+      border-radius: 8px !important;
+      font-size: 14px !important;
+      min-height: 80px !important; /* Reduced height */
+      resize: vertical !important;
+      font-family: inherit !important;
+    }
+
+    .dark .compact-textarea {
+      background: #374151 !important;
+      border-color: #4b5563 !important;
+      color: white !important;
+    }
+
+    /* Error Messages Compact */
+    .compact-error {
+      color: #ef4444 !important;
+      font-size: 12px !important; /* Smaller */
+      margin-top: 4px !important; /* Reduced margin */
+      display: block !important;
+    }
+
+    /* Success Messages Compact */
+    .compact-success {
+      color: #10b981 !important;
+      font-size: 12px !important; /* Smaller */
+      margin-top: 4px !important; /* Reduced margin */
+      display: block !important;
+    }
+
+    /* Subscription Modal Styles (unchanged but included for completeness) */
     .subscription-modal-overlay {
       position: fixed;
       top: 0;
@@ -623,7 +708,7 @@ const Layout: React.FC<LayoutProps> = ({
       width: 100%;
       max-height: 90vh;
       border-radius: 20px;
-      padding: 30px; /* Increased padding */
+      padding: 30px;
       box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
       animation: modalSlideIn 0.3s ease-out;
       position: relative;
@@ -887,23 +972,13 @@ const Layout: React.FC<LayoutProps> = ({
       transform: translateY(-2px);
       background: rgba(245, 158, 11, 0.1);
     }
-
-    /* Force Modal Content to be Wide */
-    .modal-dialog {
-      width: 100% !important;
-      max-width: 100% !important;
-    }
-
-    .modal-content {
-      width: 100% !important;
-    }
   `;
 
   return (
     <>
       <style>{modalStyles}</style>
       
-      {/* Main Modal for Login/Register/Logout */}
+      {/* Compact Modal for Login/Register/Logout */}
       <FixedModal 
         show={showModal} 
         type={type} 
@@ -936,6 +1011,9 @@ const Layout: React.FC<LayoutProps> = ({
           />
         )}
 
+        {/* Rest of your Layout code remains exactly the same */}
+        {/* ... */}
+        
         {/* ✅ Sidebar Overlay for Tablet + Mobile */}
         {expanded && isTabletOrMobile && isSidebarVisible && (
           <div className="fixed top-0 left-0 z-40 h-full w-full bg-black bg-opacity-90 backdrop-blur-md transition-opacity ease-in-out duration-300">
