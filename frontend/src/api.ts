@@ -1072,6 +1072,22 @@ export const shouldRedirectToHome = async (): Promise<boolean> => {
   }
 };
 // ========================
+// USER TYPE MANAGEMENT
+// ========================
+
+export const changeUserType = async (
+  userId: string,
+  userType: 'buyer' | 'seller',
+  setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+): Promise<{ success: boolean; message: string; user?: any }> => {
+  return await putRequest(`/user/change-type/${userId}`, {
+    userType
+  }, setLoading, {
+    message: 'User type updated successfully!',
+    showToast: true
+  });
+};
+// ========================
 // EXPORT DEFAULT
 // ========================
 
