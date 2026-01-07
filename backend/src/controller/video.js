@@ -1063,7 +1063,27 @@ router.delete("/scripts/:id", authenticateMiddleware, async (req, res) => {
 		res.status(500).json({ error: "Internal Server Error" });
 	}
 });
-
+// Route to get all videos by a specific author
+router.get("/authors/:authorId/videos", async (req, res) => {
+    try {
+        const authorId = req.params.authorId;
+        
+        // Check if authorId is a valid ObjectId
+        if (!mongoose.Types.ObjectId.isValid(authorId)) {
+            return res.status(400).json({ error: "Invalid author ID" });
+        }
+        
+        const videos = await Videos.find({ 
+            author: authorId, 
+            hidden: false 
+        }).populate("author", "username avatar followers followings");
+        
+        res.status(200).json(videos);
+    } catch (error) {
+        console.error("Error getting videos by author:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
 router.patch("/change-video-status", async (req, res) => {
 	try {
 		// Set all users' isActive status to true
