@@ -7,7 +7,6 @@ import {
     getRequest, 
     putRequest, 
     deleteRequest,
-    checkUserSchema,
     UserType,
     ChangeUserTypeResponse,
     UserTypeErrorResponse
@@ -107,15 +106,7 @@ const GenrePage: React.FC = () => {
                 setIsCurrentUser(true);
             }
 
-            // Optional: Check user schema (for debugging)
-            if (process.env.NODE_ENV === 'development') {
-                try {
-                    const schemaInfo = await checkUserSchema(id, setLoading);
-                    console.log("User schema info:", schemaInfo);
-                } catch (error) {
-                    console.log("Schema check skipped or failed:", error);
-                }
-            }
+           
 
             // Fetch user scripts and videos
             await fetchUserContent();
