@@ -317,7 +317,7 @@ const OrderDetailsPage: React.FC = () => {
   if (error || !order) {
     return (
       <MarketplaceLayout>
-        <div className="order-error mt-20">
+        <div className="order-error top-20">
           <FaExclamationCircle />
           <h3>Order Not Found</h3>
           <p>{error || 'The order you are looking for does not exist'}</p>
