@@ -1171,7 +1171,7 @@ const Popup: React.FC<IPopupProps> = React.memo(
 							)}
 
 							{type === "register" && (
-								<div className="relative z-50 w-full flex justify-center items-start py-8 px-4">
+								<div className="relative pt-20 z-50 w-full flex justify-center items-start py-8 px-4">
 									<motion.div
 										initial={{ opacity: 0, scale: 0.95, y: 20 }}
 										animate={{ opacity: 1, scale: 1, y: 0 }}
