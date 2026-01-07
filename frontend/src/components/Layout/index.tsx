@@ -27,6 +27,7 @@ import { IoSunnyOutline } from "react-icons/io5";
 import { Link, useLocation } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
+import { API_BASE_URL } from "../../api";
 
 export const theme = [
   "Love",
@@ -179,7 +180,7 @@ const Layout: React.FC<LayoutProps> = ({
   const fetchUserData = async (userId: string) => {
     try {
       const response = await axios.get(
-        `http://localhost:3000/user/${userId}`
+        `${API_BASE_URL}/user/${userId}`
       );
       setUserData(response.data);
       if (response.data.userType) {
@@ -194,7 +195,7 @@ const Layout: React.FC<LayoutProps> = ({
   const fetchPaymentStatus = async (userId: string) => {
     try {
       const response = await axios.get(
-        `https://wecinema.co/api/user/payment-status/${userId}`
+         `${API_BASE_URL}user/payment-status/${userId}`
       );
       setHasPaid(response.data.hasPaid);
     } catch (error) {
@@ -210,7 +211,7 @@ const Layout: React.FC<LayoutProps> = ({
 
     try {
       const response = await axios.put(
-        `http://localhost:3000/user/change-type/${decodedToken.userId}`,
+        `${API_BASE_URL}/user/change-type/${decodedToken.userId}`,
         { userType: newType },
         {
           headers: {
