@@ -8,8 +8,7 @@ import '../components/header/drowpdown.css';
 import { 
   FaEdit, FaStore, FaShoppingCart, FaUserTie, FaUser, 
   FaSync, FaHeart, FaUsers, FaVideo, FaFileAlt, 
-  FaCalendar, FaEnvelope, FaStar, FaCheckCircle,
-  FaCrown, FaBriefcase, FaPalette, FaGlobe
+  FaCalendar, FaEnvelope, FaStar, FaCheckCircle, FaEye, FaTrash
 } from 'react-icons/fa';
 import { BsThreeDotsVertical } from 'react-icons/bs';
 import axios from 'axios';
@@ -28,6 +27,7 @@ const UserProfilePage: React.FC = () => {
     const [editMode, setEditMode] = useState(false);
     const [formData, setFormData] = useState({ username: "", dob: "", bio: "" });
     const [userHasPaid, setUserHasPaid] = useState(false);
+    const [currentUserHasPaid, setCurrentUserHasPaid] = useState(false);
     const [data, setData] = useState<any>([]);
     const [showMoreIndex, setShowMoreIndex] = useState<number | null>(null);
     const [marketplaceMode, setMarketplaceMode] = useState<'buyer' | 'seller'>('buyer');
@@ -39,15 +39,9 @@ const UserProfilePage: React.FC = () => {
     const [isCurrentUser, setIsCurrentUser] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [contentLoading, setContentLoading] = useState(false);
-    const [stats, setStats] = useState({
-        followers: 0,
-        following: 0,
-        scripts: 0,
-        videos: 0
-    });
 
-    // Change user type without page refresh
-    const changeUserType = async (userId: string, userType: string) => {
+    // Direct API call for changing user type
+    const changeUserTypeDirect = async (userId: string, userType: string) => {
         try {
             setChangingMode(true);
             const token = localStorage.getItem("token");
@@ -59,18 +53,16 @@ const UserProfilePage: React.FC = () => {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    timeout: 10000
                 }
             );
 
-            // Update local state immediately
-            setMarketplaceMode(userType);
-            setUser(prev => ({ ...prev, userType }));
-            localStorage.setItem('marketplaceMode', userType);
-            
+            toast.success(`Switched to ${userType} mode`);
             return response.data;
         } catch (error: any) {
             console.error("Error changing user type:", error);
+            toast.error(error.response?.data?.error || "Failed to change user type");
             throw error;
         } finally {
             setChangingMode(false);
@@ -79,6 +71,7 @@ const UserProfilePage: React.FC = () => {
 
     useEffect(() => {
         if (!id) {
+            toast.error("User ID not found");
             setLoading(false);
             return;
         }
@@ -94,7 +87,8 @@ const UserProfilePage: React.FC = () => {
             // Fetch user data
             const result: any = await getRequest("/user/" + id, setLoading);
             if (!result) {
-                throw new Error("User not found");
+                toast.error("User not found");
+                return;
             }
             
             setUser(result);
@@ -118,7 +112,6 @@ const UserProfilePage: React.FC = () => {
                 setIsCurrentUser(true);
             }
 
-            // Fetch payment status
             try {
                 const paymentResponse = await axios.get(`${API_BASE_URL}/user/payment-status/${id}`);
                 setUserHasPaid(paymentResponse.data.hasPaid);
@@ -127,11 +120,20 @@ const UserProfilePage: React.FC = () => {
                 setUserHasPaid(false);
             }
 
-            // Fetch user content
+            if (tokenData) {
+                try {
+                    const currentUserResponse = await axios.get(`${API_BASE_URL}/user/payment-status/${tokenData.userId}`);
+                    setCurrentUserHasPaid(currentUserResponse.data.hasPaid);
+                } catch (error) {
+                    console.error("Error fetching current user payment status:", error);
+                }
+            }
+
             await fetchUserContent();
 
         } catch (error) {
             console.error("Error fetching data:", error);
+            toast.error("Failed to load profile data");
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -141,34 +143,20 @@ const UserProfilePage: React.FC = () => {
 
     const fetchUserContent = async () => {
         try {
-            // Fetch scripts
             const scriptsResult: any = await getRequest(`video/authors/${id}/scripts`, setContentLoading);
             if (scriptsResult) {
                 setScripts(scriptsResult.map((res: any) => res.script));
                 setData(scriptsResult);
-                setStats(prev => ({ ...prev, scripts: scriptsResult.length }));
             } else {
                 setScripts([]);
             }
 
-            // Fetch videos
             const videosResult: any = await getRequest(`video/authors/${id}/videos`, setContentLoading);
             if (videosResult) {
                 setVideos(videosResult);
-                setStats(prev => ({ ...prev, videos: videosResult.length }));
             } else {
                 setVideos([]);
             }
-
-            // Update stats
-            if (user.followers && user.followings) {
-                setStats(prev => ({
-                    ...prev,
-                    followers: user.followers.length,
-                    following: user.followings.length
-                }));
-            }
-
         } catch (error) {
             console.error("Error fetching user content:", error);
             setScripts([]);
@@ -177,24 +165,35 @@ const UserProfilePage: React.FC = () => {
     };
 
     const toggleMarketplaceMode = async () => {
-        if (!id || !isCurrentUser) return;
+        if (!id) {
+            toast.error("User not found");
+            return;
+        }
+
+        if (!isCurrentUser) {
+            toast.error("You can only change your own mode");
+            return;
+        }
 
         const newMode = marketplaceMode === 'buyer' ? 'seller' : 'buyer';
         
         try {
-            await changeUserType(id, newMode);
-            // State is already updated in changeUserType function
+            const result = await changeUserTypeDirect(id, newMode);
+            
+            if (result) {
+                setMarketplaceMode(newMode);
+                setUser(prev => ({ ...prev, userType: newMode }));
+                localStorage.setItem('marketplaceMode', newMode);
+            }
         } catch (error: any) {
             console.error("Error changing user type:", error);
-            // Revert state on error
-            setMarketplaceMode(marketplaceMode);
-            setUser(prev => ({ ...prev, userType: marketplaceMode }));
         }
     };
 
     const handleRefresh = () => {
         setRefreshing(true);
         fetchUserData();
+        toast.info("Refreshing profile...");
     };
 
     const deleteScript = async (scriptId: string) => {
@@ -207,10 +206,11 @@ const UserProfilePage: React.FC = () => {
             if (result) {
                 setScripts(prevScripts => prevScripts.filter((script, index) => data[index]?._id !== scriptId));
                 setData(prevData => prevData.filter((item: any) => item._id !== scriptId));
-                setStats(prev => ({ ...prev, scripts: prev.scripts - 1 }));
+                toast.success("Script deleted successfully");
             }
         } catch (error) {
             console.error("Error deleting script:", error);
+            toast.error("Error deleting script");
         }
     };
 
@@ -254,38 +254,62 @@ const UserProfilePage: React.FC = () => {
     };
 
     const handleFollow = async () => {
-        if (!token) return;
+        if (!token) {
+            toast.error("Please login to follow users");
+            return;
+        }
         
         try {
-            // Follow functionality
             toast.success(`Following ${user.username}`);
         } catch (error) {
             console.error("Error following user:", error);
+            toast.error("Failed to follow user");
         }
     };
 
     const renderAllowedGenres = () => {
         if (!user.allowedGenres || user.allowedGenres.length === 0) {
             return (
-                <div className="text-gray-500 text-sm bg-gray-50 px-3 py-2 rounded-lg">
-                    No content ratings specified
+                <div className="text-gray-500 text-sm bg-gray-50 px-3 py-2 rounded-lg text-center">
+                    No ratings specified
                 </div>
             );
         }
 
-        return (
-            <div className="flex flex-wrap gap-2">
-                {user.allowedGenres.map((genre: string) => (
-                    <span 
-                        key={genre} 
-                        className="inline-flex items-center bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg text-sm font-medium"
-                    >
-                        <FaStar className="mr-1.5 text-xs" />
-                        {genre}
-                    </span>
-                ))}
-            </div>
-        );
+        return user.allowedGenres.map((genre: string) => {
+            let bgColor, textColor;
+            switch (genre) {
+                case "G":
+                    bgColor = "bg-emerald-50";
+                    textColor = "text-emerald-700";
+                    break;
+                case "PG":
+                case "PG-13":
+                    bgColor = "bg-blue-50";
+                    textColor = "text-blue-700";
+                    break;
+                case "R":
+                    bgColor = "bg-yellow-50";
+                    textColor = "text-yellow-700";
+                    break;
+                case "X":
+                    bgColor = "bg-red-50";
+                    textColor = "text-red-700";
+                    break;
+                default:
+                    bgColor = "bg-gray-50";
+                    textColor = "text-gray-700";
+            }
+            return (
+                <span 
+                    key={genre} 
+                    className={`inline-flex items-center ${bgColor} ${textColor} px-3 py-1.5 rounded-lg text-sm font-medium shadow-sm`}
+                >
+                    <FaStar className="mr-1.5 text-xs" />
+                    {genre}
+                </span>
+            );
+        });
     };
 
     const renderContent = () => {
@@ -293,7 +317,7 @@ const UserProfilePage: React.FC = () => {
             return (
                 <div className="flex justify-center items-center py-12">
                     <div className="text-center">
-                        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
                         <p className="text-gray-600">Loading content...</p>
                     </div>
                 </div>
@@ -306,37 +330,37 @@ const UserProfilePage: React.FC = () => {
                     <div className="space-y-6">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div>
-                                <h3 className="text-xl font-semibold text-gray-900">Scripts</h3>
-                                <p className="text-gray-500 text-sm">Discover creative scripts</p>
+                                <h3 className="text-xl font-bold text-gray-900">Scripts</h3>
+                                <p className="text-gray-500 text-sm">Creative scripts by {user.username}</p>
                             </div>
                             {scripts.length > 0 && (
-                                <span className="text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                                <span className="text-sm text-yellow-700 bg-yellow-50 px-3 py-1 rounded-full font-medium">
                                     {scripts.length} {scripts.length === 1 ? 'Script' : 'Scripts'}
                                 </span>
                             )}
                         </div>
                         
                         {scripts.length === 0 ? (
-                            <div className="text-center py-16 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                                <div className="text-6xl mb-6">📝</div>
+                            <div className="text-center py-16 bg-yellow-50 rounded-2xl border border-yellow-100">
+                                <div className="text-5xl mb-4">📝</div>
                                 <p className="text-lg font-medium text-gray-800 mb-2">No scripts yet</p>
-                                <p className="text-gray-600 max-w-md mx-auto">This user hasn't created any scripts.</p>
+                                <p className="text-gray-600">This user hasn't created any scripts</p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                                 {scripts?.map((script: any, index: number) => {
                                     const scriptData = data?.[index];
                                     return (
                                         <div
                                             key={scriptData?._id || index}
-                                            className="group relative bg-white rounded-xl border border-gray-200 hover:shadow-lg transition-all duration-300 overflow-hidden"
+                                            className="group relative bg-white rounded-xl border border-gray-200 hover:border-yellow-300 transition-all duration-300 overflow-hidden"
                                             onMouseEnter={() => handleScriptMouseEnter(index)}
                                             onMouseLeave={handleScriptMouseLeave}
                                             onClick={() => nav(`/script/${scriptData?._id}`, { state: JSON.stringify(scriptData) })}
                                         >
-                                            <div className="p-5">
+                                            <div className="p-4">
                                                 <div className="flex justify-between items-start mb-3">
-                                                    <h3 className="font-medium text-gray-900 text-base line-clamp-2 pr-2">
+                                                    <h3 className="font-semibold text-gray-900 text-md line-clamp-2 pr-2">
                                                         {scriptData?.title || "Untitled Script"}
                                                     </h3>
                                                     {isCurrentUser && (
@@ -345,14 +369,14 @@ const UserProfilePage: React.FC = () => {
                                                                 e.stopPropagation();
                                                                 setMenuOpen(menuOpen === index ? null : index);
                                                             }}
-                                                            className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                                            className="p-1 hover:bg-gray-50 rounded transition-colors"
                                                         >
-                                                            <BsThreeDotsVertical className="text-gray-400" />
+                                                            <BsThreeDotsVertical className="text-gray-400 text-sm" />
                                                         </button>
                                                     )}
                                                 </div>
                                                 
-                                                <div className="text-gray-600 text-sm line-clamp-3 mb-4">
+                                                <div className="text-gray-600 text-sm line-clamp-3 mb-3 min-h-[60px]">
                                                     <Render htmlString={script} />
                                                 </div>
                                                 
@@ -360,23 +384,23 @@ const UserProfilePage: React.FC = () => {
                                                     <span className="text-xs text-gray-500">
                                                         {scriptData?.createdAt ? new Date(scriptData.createdAt).toLocaleDateString() : 'Recent'}
                                                     </span>
-                                                    <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                                    <span className="text-xs font-medium text-yellow-700">
                                                         Script
                                                     </span>
                                                 </div>
                                             </div>
 
                                             {showMoreIndex === index && (
-                                                <div className="absolute inset-0 bg-black/80 flex items-center justify-center transition-all duration-300 p-5">
+                                                <div className="absolute inset-0 bg-yellow-500/95 flex items-center justify-center transition-all duration-200 p-4">
                                                     <div className="text-center text-white">
-                                                        <p className="font-medium mb-1">Read Full Script</p>
-                                                        <p className="text-sm opacity-90">Click to explore</p>
+                                                        <FaEye className="text-xl mx-auto mb-2" />
+                                                        <p className="font-medium text-sm">View Script</p>
                                                     </div>
                                                 </div>
                                             )}
 
                                             {menuOpen === index && (
-                                                <div className="absolute right-2 top-12 w-36 bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden z-20">
+                                                <div className="absolute right-2 top-10 w-36 bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden z-20">
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
@@ -385,9 +409,9 @@ const UserProfilePage: React.FC = () => {
                                                                 setMenuOpen(null);
                                                             }
                                                         }}
-                                                        className="w-full text-left px-4 py-2.5 text-red-600 hover:bg-red-50 transition-colors flex items-center text-sm"
+                                                        className="w-full text-left px-3 py-2.5 text-red-600 hover:bg-red-50 transition-colors flex items-center text-sm"
                                                     >
-                                                        <span className="mr-2">🗑️</span>
+                                                        <FaTrash className="mr-2 text-xs" />
                                                         Delete
                                                     </button>
                                                 </div>
@@ -405,63 +429,63 @@ const UserProfilePage: React.FC = () => {
                     <div className="space-y-6">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div>
-                                <h3 className="text-xl font-semibold text-gray-900">Videos</h3>
-                                <p className="text-gray-500 text-sm">Watch visual stories</p>
+                                <h3 className="text-xl font-bold text-gray-900">Videos</h3>
+                                <p className="text-gray-500 text-sm">Visual content by {user.username}</p>
                             </div>
                             {videos.length > 0 && (
-                                <span className="text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                                <span className="text-sm text-yellow-700 bg-yellow-50 px-3 py-1 rounded-full font-medium">
                                     {videos.length} {videos.length === 1 ? 'Video' : 'Videos'}
                                 </span>
                             )}
                         </div>
                         
                         {videos.length === 0 ? (
-                            <div className="text-center py-16 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                                <div className="text-6xl mb-6">🎬</div>
+                            <div className="text-center py-16 bg-yellow-50 rounded-2xl border border-yellow-100">
+                                <div className="text-5xl mb-4">🎬</div>
                                 <p className="text-lg font-medium text-gray-800 mb-2">No videos yet</p>
-                                <p className="text-gray-600 max-w-md mx-auto">This user hasn't uploaded any videos.</p>
+                                <p className="text-gray-600">This user hasn't uploaded any videos</p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                                 {videos?.map((video: any) => (
                                     <div
                                         key={video._id}
-                                        className="group bg-white rounded-xl border border-gray-200 hover:shadow-lg transition-all duration-300 overflow-hidden"
+                                        className="group bg-white rounded-xl border border-gray-200 hover:border-yellow-300 transition-all duration-300 overflow-hidden"
                                         onClick={() => nav(`/video/${video._id}`)}
                                     >
-                                        <div className="relative overflow-hidden">
+                                        <div className="relative overflow-hidden bg-gray-100">
                                             {video.thumbnail ? (
                                                 <img
                                                     src={video.thumbnail}
                                                     alt={video.title}
-                                                    className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300"
+                                                    className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-500"
                                                 />
                                             ) : (
-                                                <div className="w-full h-40 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                                                    <span className="text-gray-400 text-4xl">🎥</span>
+                                                <div className="w-full h-40 bg-gradient-to-br from-yellow-100 to-yellow-200 flex items-center justify-center">
+                                                    <span className="text-4xl">🎥</span>
                                                 </div>
                                             )}
-                                            <div className="absolute top-2 right-2">
-                                                <span className="bg-black/70 text-white px-2 py-1 rounded text-xs">
+                                            <div className="absolute bottom-2 right-2">
+                                                <span className="bg-yellow-500 text-white px-2 py-1 rounded text-xs font-medium">
                                                     Video
                                                 </span>
                                             </div>
                                         </div>
                                         
                                         <div className="p-4">
-                                            <h3 className="font-medium text-gray-900 text-base mb-2 line-clamp-2">
+                                            <h3 className="font-semibold text-gray-900 text-md mb-2 line-clamp-2">
                                                 {video.title || "Untitled Video"}
                                             </h3>
                                             <p className="text-gray-600 text-sm mb-3 line-clamp-2">
                                                 {video.description || "No description available"}
                                             </p>
-                                            <div className="flex items-center justify-between">
+                                            <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                                                 <span className="text-xs text-gray-500">
                                                     {video.duration || 'N/A'}
                                                 </span>
-                                                <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+                                                <span className="text-xs font-medium text-yellow-700">
                                                     Watch →
-                                                </button>
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
@@ -473,95 +497,102 @@ const UserProfilePage: React.FC = () => {
             
             case 'about':
                 return (
-                    <div className="space-y-8">
+                    <div className="space-y-6">
                         <div>
-                            <h3 className="text-xl font-semibold text-gray-900 mb-2">About {user.username}</h3>
-                            <p className="text-gray-600">Get to know more about this creator</p>
+                            <h3 className="text-xl font-bold text-gray-900 mb-1">About {user.username}</h3>
+                            <p className="text-gray-500 text-sm">Profile information</p>
                         </div>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div className="bg-white rounded-xl border border-gray-200 p-5">
-                                <div className="flex items-center space-x-3 mb-5">
-                                    <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
-                                        <FaUser className="text-blue-600 text-lg" />
+                                <div className="flex items-center space-x-3 mb-4">
+                                    <div className="w-12 h-12 bg-yellow-50 rounded-lg flex items-center justify-center">
+                                        <FaUser className="text-yellow-600" />
                                     </div>
                                     <div>
-                                        <h4 className="font-medium text-gray-900">Profile Details</h4>
-                                        <p className="text-gray-500 text-sm">Personal information</p>
+                                        <h4 className="font-semibold text-gray-900">Profile Details</h4>
+                                        <p className="text-gray-500 text-xs">Personal information</p>
                                     </div>
                                 </div>
                                 
-                                <div className="space-y-4">
-                                    <div>
-                                        <p className="text-sm text-gray-500 mb-1">Joined Date</p>
-                                        <p className="font-medium text-gray-900">
-                                            {user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', {
-                                                year: 'numeric',
-                                                month: 'long',
-                                                day: 'numeric'
-                                            }) : 'Unknown'}
-                                        </p>
+                                <div className="space-y-3">
+                                    <div className="flex items-center space-x-2">
+                                        <div className="w-7 h-7 bg-yellow-50 rounded flex items-center justify-center">
+                                            <FaCalendar className="text-yellow-600 text-xs" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-gray-500">Joined Date</p>
+                                            <p className="font-medium text-gray-900 text-sm">
+                                                {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown'}
+                                            </p>
+                                        </div>
                                     </div>
                                     
-                                    <div>
-                                        <p className="text-sm text-gray-500 mb-1">Bio</p>
-                                        <p className="text-gray-700">
-                                            {user.bio || "No bio provided yet."}
-                                        </p>
+                                    <div className="flex items-center space-x-2">
+                                        <div className="w-7 h-7 bg-yellow-50 rounded flex items-center justify-center">
+                                            <FaEnvelope className="text-yellow-600 text-xs" />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-gray-500">Email</p>
+                                            <p className="font-medium text-gray-900 text-sm">{user.email}</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="bg-white rounded-xl border border-gray-200 p-5">
-                                <div className="flex items-center space-x-3 mb-5">
-                                    <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
-                                        <FaBriefcase className="text-blue-600 text-lg" />
+                                <div className="flex items-center space-x-3 mb-4">
+                                    <div className="w-12 h-12 bg-yellow-50 rounded-lg flex items-center justify-center">
+                                        <FaStore className="text-yellow-600" />
                                     </div>
                                     <div>
-                                        <h4 className="font-medium text-gray-900">Marketplace Status</h4>
-                                        <p className="text-gray-500 text-sm">Role & subscription</p>
+                                        <h4 className="font-semibold text-gray-900">Marketplace Status</h4>
+                                        <p className="text-gray-500 text-xs">Role & subscription</p>
                                     </div>
                                 </div>
                                 
-                                <div className="space-y-4">
+                                <div className="space-y-3">
                                     <div>
-                                        <p className="text-sm text-gray-500 mb-2">Current Role</p>
-                                        <div className={`inline-flex items-center px-3 py-1.5 rounded-full font-medium ${
+                                        <p className="text-xs text-gray-500 mb-1">Current Role</p>
+                                        <div className={`inline-flex items-center px-3 py-1.5 rounded-full font-medium text-sm ${
                                             user.userType === 'seller' 
-                                                ? 'bg-green-100 text-green-800' 
-                                                : 'bg-blue-100 text-blue-800'
+                                                ? 'bg-yellow-500 text-white' 
+                                                : 'bg-yellow-50 text-yellow-700'
                                         }`}>
                                             {user.userType === 'seller' ? (
                                                 <>
-                                                    <FaUserTie className="mr-2 text-sm" /> Seller
+                                                    <FaUserTie className="mr-1.5 text-xs" /> Seller
                                                 </>
                                             ) : (
                                                 <>
-                                                    <FaShoppingCart className="mr-2 text-sm" /> Buyer
+                                                    <FaShoppingCart className="mr-1.5 text-xs" /> Buyer
                                                 </>
                                             )}
                                         </div>
                                     </div>
                                     
                                     <div>
-                                        <p className="text-sm text-gray-500 mb-2">Subscription</p>
-                                        <div className={`inline-flex items-center px-3 py-1.5 rounded-full ${
+                                        <p className="text-xs text-gray-500 mb-1">Subscription Status</p>
+                                        <div className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm ${
                                             userHasPaid 
-                                                ? 'bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-800' 
+                                                ? 'bg-emerald-50 text-emerald-700' 
                                                 : 'bg-gray-100 text-gray-600'
                                         }`}>
-                                            {userHasPaid ? (
-                                                <>
-                                                    <FaCrown className="mr-2 text-sm" /> Premium
-                                                </>
-                                            ) : (
-                                                'Basic Account'
-                                            )}
+                                            <span className="font-medium">
+                                                {userHasPaid ? 'Premium Account' : 'Basic Account'}
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
+                        
+                        {user.bio && (
+                            <div className="bg-yellow-50 rounded-xl border border-yellow-100 p-5">
+                                <h4 className="font-semibold text-gray-900 mb-2">Bio</h4>
+                                <p className="text-gray-700 text-sm leading-relaxed">{user.bio}</p>
+                            </div>
+                        )}
                     </div>
                 );
             
@@ -572,12 +603,11 @@ const UserProfilePage: React.FC = () => {
 
     if (loading) {
         return (
-            <Layout expand={false} hasHeader={true}>
-                <div className="min-h-screen flex items-center justify-center bg-white p-4">
-                    <div className="text-center max-w-md w-full">
-                        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-600 mx-auto mb-6"></div>
-                        <p className="text-lg text-gray-800 font-medium mb-2">Loading profile...</p>
-                        <p className="text-gray-600 text-sm">Please wait a moment</p>
+            <Layout>
+                <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+                        <p className="text-gray-700">Loading profile...</p>
                     </div>
                 </div>
             </Layout>
@@ -585,289 +615,270 @@ const UserProfilePage: React.FC = () => {
     }
 
     return (
-        <Layout expand={false} hasHeader={true}>
-            <div className="min-h-screen bg-gray-50">
+        <Layout>
+            <div className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto py-6">
                 {/* Cover Section */}
-                <div className="relative bg-gradient-to-r from-blue-600 to-blue-800 h-40 md:h-48">
-                    <div className="absolute inset-0 bg-black/20"></div>
-                    <div className="relative h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-end pb-6">
-                        <div className="flex items-center space-x-4">
+                <div className="relative w-full h-40 sm:h-48 md:h-56 rounded-xl overflow-hidden mb-6">
+                    <img
+                        className="w-full h-full object-cover"
+                        src={user.coverImage || cover}
+                        alt="Cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
+                    <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between">
+                        <div className="flex items-center space-x-3">
                             <div className="relative">
                                 <img
-                                    className="rounded-xl bg-white h-20 w-20 md:h-24 md:w-24 border-4 border-white shadow-lg"
+                                    className="rounded-lg bg-white h-16 w-16 sm:h-20 sm:w-20 border-2 border-white shadow"
                                     src={user.avatar || avatar}
                                     alt="Avatar"
                                 />
                                 {isCurrentUser && (
-                                    <div className="absolute -bottom-1 -right-1 bg-green-500 text-white p-1 rounded-full border-2 border-white">
+                                    <div className="absolute -bottom-1 -right-1 bg-yellow-500 text-white p-1 rounded-full border border-white">
                                         <FaCheckCircle className="text-xs" />
                                     </div>
                                 )}
                             </div>
-                            <div className="text-white">
-                                <h1 className="text-2xl md:text-3xl font-bold mb-1">
+                            <div>
+                                <h1 className="text-xl sm:text-2xl font-bold text-white mb-0.5">
                                     {user.username}
                                 </h1>
-                                <p className="text-blue-100">{user.email}</p>
+                                <p className="text-gray-200 text-sm">{user.email}</p>
                             </div>
+                        </div>
+                        
+                        <div className="flex space-x-2">
+                            <button
+                                onClick={handleRefresh}
+                                disabled={refreshing}
+                                className="inline-flex items-center justify-center space-x-1.5 bg-white/20 backdrop-blur-sm text-white px-3 py-1.5 rounded-lg hover:bg-white/30 transition-colors disabled:opacity-50 text-sm"
+                            >
+                                <FaSync className={`text-xs ${refreshing ? 'animate-spin' : ''}`} />
+                                <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+                            </button>
+                            
+                            {!isCurrentUser && (
+                                <button
+                                    onClick={handleFollow}
+                                    className="inline-flex items-center justify-center space-x-1.5 bg-yellow-500 text-white px-3 py-1.5 rounded-lg hover:bg-yellow-600 transition-colors font-medium text-sm"
+                                >
+                                    <FaHeart className="text-xs" />
+                                    <span>Follow</span>
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
 
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 md:-mt-12">
-                    {/* Quick Stats */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-                            <div className="flex items-center space-x-3">
-                                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                                    <FaUsers className="text-blue-600" />
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold text-gray-900">{stats.followers}</p>
-                                    <p className="text-sm text-gray-500">Followers</p>
-                                </div>
+                {/* Main Content Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Left Sidebar - Profile Info */}
+                    <div className="lg:col-span-1">
+                        <div className="bg-white rounded-xl border border-gray-200 p-5 sticky top-24">
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-lg font-bold text-gray-900">Profile Info</h2>
+                                {isCurrentUser && !editMode && (
+                                    <button
+                                        onClick={handleEdit}
+                                        className="inline-flex items-center space-x-1.5 bg-yellow-500 text-white px-3 py-1.5 rounded-lg hover:bg-yellow-600 transition-colors font-medium text-sm"
+                                    >
+                                        <FaEdit size="12" />
+                                        <span>Edit</span>
+                                    </button>
+                                )}
                             </div>
-                        </div>
-                        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-                            <div className="flex items-center space-x-3">
-                                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                                    <FaUser className="text-blue-600" />
+
+                            {editMode ? (
+                                <form onSubmit={handleSubmit} className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Username
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="username"
+                                            value={formData.username}
+                                            onChange={handleChange}
+                                            className="w-full p-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-yellow-500 focus:border-yellow-500 transition-all text-sm"
+                                            placeholder="Enter username"
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Date of Birth
+                                        </label>
+                                        <input
+                                            type="date"
+                                            name="dob"
+                                            value={formData.dob}
+                                            onChange={handleChange}
+                                            className="w-full p-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-yellow-500 focus:border-yellow-500 transition-all text-sm"
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Bio
+                                        </label>
+                                        <textarea
+                                            name="bio"
+                                            value={formData.bio}
+                                            onChange={handleChange}
+                                            rows={3}
+                                            className="w-full p-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-yellow-500 focus:border-yellow-500 transition-all resize-none text-sm"
+                                            placeholder="Tell your story..."
+                                        />
+                                    </div>
+
+                                    <div className="flex space-x-3 pt-2">
+                                        <button 
+                                            type="submit" 
+                                            className="flex-1 bg-yellow-500 text-white py-2 px-4 rounded-lg hover:bg-yellow-600 transition-colors font-medium text-sm"
+                                        >
+                                            Save Changes
+                                        </button>
+                                        <button 
+                                            type="button"
+                                            onClick={handleCancelEdit}
+                                            className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors font-medium text-sm"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </form>
+                            ) : (
+                                <div className="space-y-6">
+                                    <div className="space-y-4">
+                                        <div>
+                                            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Contact Info</h3>
+                                            <div className="space-y-3">
+                                                <div className="flex items-center space-x-2">
+                                                    <div className="w-8 h-8 bg-yellow-50 rounded flex items-center justify-center">
+                                                        <FaUser className="text-yellow-600 text-xs" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs text-gray-500">Username</p>
+                                                        <p className="font-medium text-gray-900 text-sm">{user.username}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center space-x-2">
+                                                    <div className="w-8 h-8 bg-yellow-50 rounded flex items-center justify-center">
+                                                        <FaEnvelope className="text-yellow-600 text-xs" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs text-gray-500">Email</p>
+                                                        <p className="font-medium text-gray-900 text-sm">{user.email}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Allowed Ratings</h3>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {renderAllowedGenres()}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* User Mode Toggle */}
+                                    {isCurrentUser && (
+                                        <div className="pt-4 border-t border-gray-100">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <div>
+                                                    <h3 className="font-medium text-gray-900 text-sm">Marketplace Mode</h3>
+                                                    <p className="text-xs text-gray-500">Switch between buyer and seller</p>
+                                                </div>
+                                                <div className="relative">
+                                                    <button 
+                                                        onClick={toggleMarketplaceMode}
+                                                        disabled={changingMode}
+                                                        className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors ${
+                                                            marketplaceMode === 'buyer' 
+                                                                ? 'bg-yellow-100' 
+                                                                : 'bg-yellow-500'
+                                                        } ${changingMode ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                    >
+                                                        <span className={`absolute left-1 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow transition-all duration-200 ${
+                                                            marketplaceMode === 'seller' ? 'translate-x-8' : ''
+                                                        }`}>
+                                                            {changingMode ? (
+                                                                <div className="h-3 w-3 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+                                                            ) : marketplaceMode === 'seller' ? (
+                                                                <FaUserTie className="text-yellow-600 text-xs" />
+                                                            ) : (
+                                                                <FaShoppingCart className="text-yellow-600 text-xs" />
+                                                            )}
+                                                        </span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs">
+                                                <span className={`font-medium ${marketplaceMode === 'buyer' ? 'text-yellow-600' : 'text-gray-500'}`}>
+                                                    <FaShoppingCart className="inline mr-1" /> Buyer
+                                                </span>
+                                                <span className={`font-medium ${marketplaceMode === 'seller' ? 'text-yellow-600' : 'text-gray-500'}`}>
+                                                    <FaUserTie className="inline mr-1" /> Seller
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Stats */}
+                                    <div className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-100">
+                                        <div className="text-center">
+                                            <div className="text-2xl font-bold text-gray-900">{user.followers?.length || 0}</div>
+                                            <div className="text-xs text-gray-500">Followers</div>
+                                        </div>
+                                        <div className="text-center">
+                                            <div className="text-2xl font-bold text-gray-900">{user.followings?.length || 0}</div>
+                                            <div className="text-xs text-gray-500">Following</div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="text-2xl font-bold text-gray-900">{stats.following}</p>
-                                    <p className="text-sm text-gray-500">Following</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-                            <div className="flex items-center space-x-3">
-                                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                                    <FaFileAlt className="text-blue-600" />
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold text-gray-900">{stats.scripts}</p>
-                                    <p className="text-sm text-gray-500">Scripts</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-                            <div className="flex items-center space-x-3">
-                                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                                    <FaVideo className="text-blue-600" />
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold text-gray-900">{stats.videos}</p>
-                                    <p className="text-sm text-gray-500">Videos</p>
-                                </div>
-                            </div>
+                            )}
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        {/* Left Sidebar */}
-                        <div className="lg:col-span-1">
-                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sticky top-6">
-                                <div className="flex items-center justify-between mb-6">
-                                    <h2 className="text-lg font-semibold text-gray-900">Profile Info</h2>
-                                    {isCurrentUser && !editMode && (
-                                        <button
-                                            onClick={handleEdit}
-                                            className="inline-flex items-center space-x-2 text-blue-600 hover:text-blue-700 text-sm font-medium"
-                                        >
-                                            <FaEdit size="14" />
-                                            <span>Edit</span>
-                                        </button>
-                                    )}
-                                </div>
-
-                                {editMode ? (
-                                    <form onSubmit={handleSubmit} className="space-y-5">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Username
-                                            </label>
-                                            <input
-                                                type="text"
-                                                name="username"
-                                                value={formData.username}
-                                                onChange={handleChange}
-                                                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                                placeholder="Enter username"
-                                            />
-                                        </div>
-                                        
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Date of Birth
-                                            </label>
-                                            <input
-                                                type="date"
-                                                name="dob"
-                                                value={formData.dob}
-                                                onChange={handleChange}
-                                                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                            />
-                                        </div>
-                                        
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Bio
-                                            </label>
-                                            <textarea
-                                                name="bio"
-                                                value={formData.bio}
-                                                onChange={handleChange}
-                                                rows={3}
-                                                className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                                                placeholder="Tell your story..."
-                                            />
-                                        </div>
-
-                                        <div className="flex space-x-3">
-                                            <button 
-                                                type="submit" 
-                                                className="flex-1 bg-blue-600 text-white py-2.5 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                                            >
-                                                Save
-                                            </button>
-                                            <button 
-                                                type="button"
-                                                onClick={handleCancelEdit}
-                                                className="flex-1 bg-gray-100 text-gray-700 py-2.5 px-4 rounded-lg hover:bg-gray-200 transition-colors font-medium"
-                                            >
-                                                Cancel
-                                            </button>
-                                        </div>
-                                    </form>
-                                ) : (
-                                    <div className="space-y-6">
-                                        <div className="space-y-4">
-                                            <div className="flex items-center space-x-3">
-                                                <FaCalendar className="text-gray-400" />
-                                                <div>
-                                                    <p className="text-sm text-gray-500">Date of Birth</p>
-                                                    <p className="font-medium text-gray-900">{user.dob || 'Not specified'}</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center space-x-3">
-                                                <FaGlobe className="text-gray-400" />
-                                                <div>
-                                                    <p className="text-sm text-gray-500">Allowed Ratings</p>
-                                                    <div className="mt-1">
-                                                        {renderAllowedGenres()}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* User Mode Toggle */}
-                                        {isCurrentUser && (
-                                            <div className="pt-6 border-t border-gray-200">
-                                                <div className="flex items-center justify-between mb-4">
-                                                    <div>
-                                                        <h3 className="font-medium text-gray-900">Marketplace Mode</h3>
-                                                        <p className="text-sm text-gray-500">Switch between roles</p>
-                                                    </div>
-                                                    <div className="relative">
-                                                        <button 
-                                                            onClick={toggleMarketplaceMode}
-                                                            disabled={changingMode}
-                                                            className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                                                                marketplaceMode === 'buyer' 
-                                                                    ? 'bg-blue-100' 
-                                                                    : 'bg-green-100'
-                                                            } ${changingMode ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                        >
-                                                            <span className={`absolute left-1 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow transition-all ${
-                                                                marketplaceMode === 'seller' ? 'translate-x-6' : ''
-                                                            }`}>
-                                                                {changingMode ? (
-                                                                    <div className="h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                                                                ) : marketplaceMode === 'seller' ? (
-                                                                    <FaUserTie className="text-green-600 text-xs" />
-                                                                ) : (
-                                                                    <FaShoppingCart className="text-blue-600 text-xs" />
-                                                                )}
-                                                            </span>
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center justify-between text-sm">
-                                                    <span className={`font-medium ${marketplaceMode === 'buyer' ? 'text-blue-600' : 'text-gray-500'}`}>
-                                                        Buyer
-                                                    </span>
-                                                    <span className={`font-medium ${marketplaceMode === 'seller' ? 'text-green-600' : 'text-gray-500'}`}>
-                                                        Seller
-                                                    </span>
-                                                </div>
-                                            </div>
+                    {/* Right Content Area */}
+                    <div className="lg:col-span-2">
+                        {/* Tabs Navigation */}
+                        <div className="mb-6">
+                            <div className="flex space-x-1 bg-white rounded-lg border border-gray-200 p-1">
+                                {[
+                                    { key: 'scripts', label: 'Scripts', icon: '📝', count: scripts.length },
+                                    { key: 'videos', label: 'Videos', icon: '🎬', count: videos.length },
+                                    { key: 'about', label: 'About', icon: '👤', count: null }
+                                ].map((tab) => (
+                                    <button
+                                        key={tab.key}
+                                        onClick={() => setActiveTab(tab.key)}
+                                        className={`flex-1 flex items-center justify-center py-2.5 px-2 rounded-md transition-colors text-sm ${
+                                            activeTab === tab.key
+                                                ? 'bg-yellow-500 text-white'
+                                                : 'text-gray-600 hover:text-yellow-600 hover:bg-yellow-50'
+                                        }`}
+                                    >
+                                        <span className="mr-2">{tab.icon}</span>
+                                        <span className="font-medium">{tab.label}</span>
+                                        {tab.count !== null && (
+                                            <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs ${
+                                                activeTab === tab.key
+                                                    ? 'bg-white text-yellow-600'
+                                                    : 'bg-yellow-100 text-yellow-700'
+                                            }`}>
+                                                {tab.count}
+                                            </span>
                                         )}
-
-                                        {/* Action Buttons */}
-                                        <div className="pt-6 border-t border-gray-200 space-y-3">
-                                            <button
-                                                onClick={handleRefresh}
-                                                disabled={refreshing}
-                                                className="w-full flex items-center justify-center space-x-2 bg-gray-100 text-gray-700 py-2.5 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-                                            >
-                                                <FaSync className={`${refreshing ? 'animate-spin' : ''}`} />
-                                                <span className="font-medium">{refreshing ? 'Refreshing...' : 'Refresh Profile'}</span>
-                                            </button>
-                                            
-                                            {!isCurrentUser && (
-                                                <button
-                                                    onClick={handleFollow}
-                                                    className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                                                >
-                                                    <FaHeart />
-                                                    <span>Follow User</span>
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
-                        {/* Right Content Area */}
-                        <div className="lg:col-span-2">
-                            {/* Tabs Navigation */}
-                            <div className="mb-6">
-                                <div className="flex space-x-1 bg-white rounded-lg border border-gray-200 p-1">
-                                    {[
-                                        { key: 'scripts', label: 'Scripts', icon: <FaFileAlt />, count: scripts.length },
-                                        { key: 'videos', label: 'Videos', icon: <FaVideo />, count: videos.length },
-                                        { key: 'about', label: 'About', icon: <FaUser />, count: null }
-                                    ].map((tab) => (
-                                        <button
-                                            key={tab.key}
-                                            onClick={() => setActiveTab(tab.key)}
-                                            className={`flex-1 flex items-center justify-center py-3 px-2 rounded-md transition-colors ${
-                                                activeTab === tab.key
-                                                    ? 'bg-blue-50 text-blue-600'
-                                                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                                            }`}
-                                        >
-                                            <span className="mr-2">{tab.icon}</span>
-                                            <span className="font-medium">{tab.label}</span>
-                                            {tab.count !== null && (
-                                                <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${
-                                                    activeTab === tab.key
-                                                        ? 'bg-blue-100 text-blue-700'
-                                                        : 'bg-gray-100 text-gray-600'
-                                                }`}>
-                                                    {tab.count}
-                                                </span>
-                                            )}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Tab Content */}
-                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                                {renderContent()}
-                            </div>
+                        {/* Tab Content */}
+                        <div className="bg-white rounded-xl border border-gray-200 p-5">
+                            {renderContent()}
                         </div>
                     </div>
                 </div>
