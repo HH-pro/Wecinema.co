@@ -51,7 +51,7 @@ export interface RequestOptions {
 // export const API_BASE_URL = "https://wecinema-co.onrender.com"; // Production
 export const API_BASE_URL = "http://localhost:3000"; // Local
 // Environment-based configuration
-const getBaseURL = () => "https://wecinema-co.onrender.com";
+const getBaseURL = () => "http://localhost:3000";
  
 
 // Create an axios instance with default configurations
