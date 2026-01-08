@@ -57,8 +57,8 @@ const UserProfilePage: React.FC = () => {
                     timeout: 10000
                 }
             );
-
-            toast.success(`Switched to ${userType} mode`);
+            window.location.reload();
+            // toast.success(`Switched to ${userType} mode`);
             return response.data;
         } catch (error: any) {
             console.error("Error changing user type:", error);
@@ -229,7 +229,7 @@ const UserProfilePage: React.FC = () => {
             const result = await putRequest("/user/edit/" + id, formData, setContentLoading);
             setUser(result.user);
             setEditMode(false);
-            toast.success("Profile updated successfully");
+            // toast.success("Profile updated successfully");
         } catch (error) {
             console.error("Error updating profile:", error);
             toast.error("Failed to update profile");
