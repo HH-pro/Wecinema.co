@@ -187,7 +187,6 @@ const GenrePage: React.FC = () => {
                 setUser(prev => ({ ...prev, userType: newMode }));
                 localStorage.setItem('marketplaceMode', newMode);
                 
-                toast.success(`✅ Switched to ${newMode} mode`);
             }
         } catch (error: any) {
             console.error("Error changing user type:", error);
@@ -208,7 +207,6 @@ const GenrePage: React.FC = () => {
         try {
             const result: any = await deleteRequest(`video/scripts/${scriptId}`, setContentLoading);
             if (result) {
-                toast.success("🗑️ Script deleted successfully");
                 setScripts(prevScripts => prevScripts.filter((script, index) => data[index]?._id !== scriptId));
                 setData(prevData => prevData.filter((item: any) => item._id !== scriptId));
             }
@@ -233,7 +231,6 @@ const GenrePage: React.FC = () => {
             const result = await putRequest("/user/edit/" + id, formData, setContentLoading);
             setUser(result.user);
             setEditMode(false);
-            toast.success("✅ Profile updated successfully!");
         } catch (error) {
             console.error("Error updating profile:", error);
             toast.error("❌ Failed to update profile");
