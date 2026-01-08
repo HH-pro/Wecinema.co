@@ -385,8 +385,7 @@ export interface StripeAccountRequirements {
 // ✅ API CONFIGURATION
 // ============================================
 
-export const API_BASE_URL = "https://wecinema.co/api"; // Production
-
+export const API_BASE_URL = "https://wecinema-co.onrender.com"; // Production
 // export const API_BASE_URL = "http://localhost:3000"; // Local
 
 
