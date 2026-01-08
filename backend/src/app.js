@@ -56,7 +56,6 @@ app.use(express.json());
 const allowedOrigins = [
   "http://localhost:3000",
   "https://wecinema-co.vercel.app",
-  "https://wecinema-main.vercel.app",
   "https://wecinema-21d00.firebaseapp.com",
   "https://wecinema.co",
   "http://wecinema.co",
