@@ -287,7 +287,7 @@ const Popup: React.FC<IPopupProps> = React.memo(
 		// Check payment status
 		const checkUserPaymentStatus = async (userId: string) => {
 			try {
-				const response = await axios.get(`https://wecinema.co/api/user/payment-status/${userId}`);
+				const response = await axios.get(`https://wecinema-co.onrender.com/user/payment-status/${userId}`);
 				setHasPaid(response.data.hasPaid);
 			} catch (error) {
 				console.error("Error checking payment status:", error);
@@ -389,7 +389,7 @@ const Popup: React.FC<IPopupProps> = React.memo(
 		const resendVerificationEmail = async () => {
 			try {
 				setIsResending(true);
-				const response = await axios.post("https://wecinema.co/api/user/resend-verification", {
+				const response = await axios.post("https://wecinema-co.onrender.com/user/resend-verification", {
 					email: pendingVerificationEmail,
 				});
 				
