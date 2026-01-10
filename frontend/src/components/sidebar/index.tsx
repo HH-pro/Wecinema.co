@@ -222,7 +222,9 @@ const Sidebar: React.FC<SidebarProps> = ({
     return (
       <nav className="sidebar-section-container">
         <div className="sidebar-section-header">
-         
+          {/* <h2 className={`sidebar-section-title ${expand ? "" : "collapsed"}`}>
+            Marketplace
+          </h2> */}
           {expand && (
             <div className="user-type-switcher">
               {/* User type switch button could be added here if needed */}
@@ -424,9 +426,9 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         {/* -------- SETTINGS / ACCOUNT -------- */}
         <nav className="sidebar-section-container">
-          <h2 className={`sidebar-section-title ${expand ? "" : "collapsed"}`}>
+          {/* <h2 className={`sidebar-section-title ${expand ? "" : "collapsed"}`}>
             Settings
-          </h2>
+          </h2> */}
           <ul className="sidebar-section">
             <div
               className={`sidebar-item ${darkMode ? "text-active" : ""} ${
