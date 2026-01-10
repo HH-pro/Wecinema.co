@@ -661,6 +661,37 @@ router.get("/verify-email", async (req, res) => {
     `);
   }
 });
+// Check if user needs verification
+router.post("/check-verification", async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    const user = await User.findOne({ 
+      email: { $regex: new RegExp(`^${email}$`, 'i') } 
+    });
+    
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.status(200).json({
+      isVerified: user.isVerified,
+      canResend: !user.isVerified,
+      email: user.email,
+      username: user.username,
+      lastSent: user.lastVerificationSent,
+      hasToken: !!user.verificationToken,
+      tokenExpired: user.verificationTokenExpiry && user.verificationTokenExpiry < Date.now()
+    });
+  } catch (error) {
+    console.error("Error checking verification:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 // Resend verification email - IMPROVED VERSION
 router.post("/resend-verification", async (req, res) => {
   try {
