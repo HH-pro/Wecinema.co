@@ -404,21 +404,23 @@ const Layout: React.FC<LayoutProps> = ({
         )}
 
         {/* User Type Badge */}
-        <div className="px-4 py-2">
-          <span className={`text-xs px-2 py-1 rounded-full ${userType === 'seller' ? 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300' : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-300'}`}>
-            {userType === 'seller' ? (
-              <>
-                <FaUserTie className="inline mr-1" size="10" />
-                Seller Mode
-              </>
-            ) : (
-              <>
-                <FaShoppingCart className="inline mr-1" size="10" />
-                Buyer Mode
-              </>
-            )}
-          </span>
-        </div>
+       {userType && (
+  <div className="px-4 py-2">
+    <span className={`text-xs px-2 py-1 rounded-full ${userType === 'seller' ? 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300' : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-300'}`}>
+      {userType === 'seller' ? (
+        <>
+          <FaUserTie className="inline mr-1" size="10" />
+          Seller Mode
+        </>
+      ) : userType === 'buyer' ? (
+        <>
+          <FaShoppingCart className="inline mr-1" size="10" />
+          Buyer Mode
+        </>
+      ) : null}
+    </span>
+  </div>
+)}
 
         <div className="border-t border-gray-200 my-2"></div>
       </>
