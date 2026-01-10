@@ -851,7 +851,7 @@
     background: #ffffff !important;
   }
   .dropdown-menu--upload {
-  min-width: 200px;
+  min-width: 100px;
 }
 
 .dropdown-menu--genre {
@@ -860,7 +860,7 @@
 }
 
 .dropdown-menu--rating {
-  min-width: 80px;
+  min-width: 50px;
   margin-left: -90px;
 }
 
