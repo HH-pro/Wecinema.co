@@ -845,6 +845,7 @@
   .dropdown-menu__header {
     background: #f9fafb !important;
     border-bottom: 1px solid #e5e7eb;
+    width: 20px;
   }
   
   .dropdown-menu__list {
