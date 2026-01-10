@@ -1108,7 +1108,9 @@
     min-height: 24px; /* Larger touch target */
   }
   
-  .dropdown-menu--genre .dropdown-menu__item {
+  .dropdown-menu--genre {
+    max-width: 40px;
+  }.dropdown-menu__item {
     min-height: 48px;
     min-width: 20px;
   }
