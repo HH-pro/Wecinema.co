@@ -648,7 +648,7 @@ router.post("/contact", async (req, res) => {
   }
 });
 // User registration with email verification
-router.post("/register", async (req, res) => {
+router.post("/register", authenticateMiddleware, async (req, res) => {
   try {
     const { username, email, password, avatar, dob } = req.body;
     
@@ -705,7 +705,7 @@ router.post("/register", async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
-router.post("/login", async (req, res) => {
+router.post("/login", authenticateMiddleware, async (req, res) => {
   try {
     const { email, password } = req.body;
 
