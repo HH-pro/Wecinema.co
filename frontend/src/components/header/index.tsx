@@ -1,14 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MdMenu, MdMic, MdMicOff, MdExpandMore, MdUpload } from "react-icons/md";
 import logo from "../../assets/wecinema.png";
-import { FaVideo, FaFileAlt, FaShoppingCart, FaStore, FaUserTie } from "react-icons/fa";
+import { FaVideo, FaFileAlt } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { categories, ratings } from "../../App";
 import { Search, X } from "lucide-react";
 import './Header.css';
-import { decodeToken } from "../../utilities/helperfFunction";
-import axios from "axios";
-import { API_BASE_URL } from "../../api";
 
 interface HeaderProps {
     darkMode: boolean;
@@ -33,44 +30,14 @@ const Header: React.FC<HeaderProps> = ({
     const [isSearchExpanded, setIsSearchExpanded] = useState(false);
     const [isGenreMenuOpen, setIsGenreMenuOpen] = useState(false);
     const [isRatingMenuOpen, setIsRatingMenuOpen] = useState(false);
-    const [isMarketplaceMenuOpen, setIsMarketplaceMenuOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [isListening, setIsListening] = useState(false);
     const [isUploadMenuOpen, setIsUploadMenuOpen] = useState(false);
-    const [userType, setUserType] = useState<string>('');
-    const [userData, setUserData] = useState<any>(null);
-    
-    const token = localStorage.getItem("token") || null;
-    const tokenData = decodeToken(token);
     
     const genreMenuRef = useRef<HTMLDivElement>(null);
     const ratingMenuRef = useRef<HTMLDivElement>(null);
     const uploadMenuRef = useRef<HTMLDivElement>(null);
-    const marketplaceMenuRef = useRef<HTMLDivElement>(null);
     const mobileSearchRef = useRef<HTMLDivElement>(null);
-
-    // Fetch user data
-    useEffect(() => {
-        if (tokenData) {
-            fetchUserData(tokenData.userId);
-        }
-    }, [tokenData]);
-
-    const fetchUserData = async (userId: any) => {
-        try {
-            const response = await axios.get(
-                `${API_BASE_URL}/user/${userId}`
-            );
-            setUserData(response.data);
-            if (response.data.userType) {
-                setUserType(response.data.userType);
-            } else {
-                setUserType('');
-            }
-        } catch (error) {
-            console.error("User data fetch error:", error);
-        }
-    };
 
     // Close dropdowns when clicking outside
     useEffect(() => {
@@ -87,10 +54,6 @@ const Header: React.FC<HeaderProps> = ({
             
             if (uploadMenuRef.current && !uploadMenuRef.current.contains(target)) {
                 setIsUploadMenuOpen(false);
-            }
-            
-            if (marketplaceMenuRef.current && !marketplaceMenuRef.current.contains(target)) {
-                setIsMarketplaceMenuOpen(false);
             }
             
             if (mobileSearchRef.current && isSearchExpanded && 
@@ -113,7 +76,6 @@ const Header: React.FC<HeaderProps> = ({
         setIsGenreMenuOpen(false);
         setIsRatingMenuOpen(false);
         setIsUploadMenuOpen(false);
-        setIsMarketplaceMenuOpen(false);
     };
     
     const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -182,162 +144,18 @@ const Header: React.FC<HeaderProps> = ({
         setIsUploadMenuOpen(!isUploadMenuOpen);
         setIsGenreMenuOpen(false);
         setIsRatingMenuOpen(false);
-        setIsMarketplaceMenuOpen(false);
     };
 
     const toggleGenreMenu = () => {
         setIsGenreMenuOpen(!isGenreMenuOpen);
         setIsRatingMenuOpen(false);
         setIsUploadMenuOpen(false);
-        setIsMarketplaceMenuOpen(false);
     };
 
     const toggleRatingMenu = () => {
         setIsRatingMenuOpen(!isRatingMenuOpen);
         setIsGenreMenuOpen(false);
         setIsUploadMenuOpen(false);
-        setIsMarketplaceMenuOpen(false);
-    };
-
-    const toggleMarketplaceMenu = () => {
-        setIsMarketplaceMenuOpen(!isMarketplaceMenuOpen);
-        setIsGenreMenuOpen(false);
-        setIsRatingMenuOpen(false);
-        setIsUploadMenuOpen(false);
-    };
-
-    const handleMarketplaceNavigation = (path: string) => {
-        if (!tokenData) {
-            alert("Please login to access marketplace");
-            navigate("/login");
-            return;
-        }
-
-        // Check if user has marketplace role
-        if (!userType || userType === '') {
-            alert("Please setup your marketplace profile first");
-            navigate("/user/profile");
-            return;
-        }
-
-        navigate(path);
-        setIsMarketplaceMenuOpen(false);
-    };
-
-    const handleMarketplaceSetup = () => {
-        if (!tokenData) {
-            alert("Please login first");
-            navigate("/login");
-            return;
-        }
-
-        navigate("/user/profile");
-        setIsMarketplaceMenuOpen(false);
-    };
-
-    // Render marketplace menu items based on user type
-    const renderMarketplaceMenu = () => {
-        // For non-logged in users
-        if (!tokenData) {
-            return (
-                <button
-                    className="dropdown-menu__item"
-                    onClick={() => {
-                        setIsMarketplaceMenuOpen(false);
-                        navigate("/login");
-                    }}
-                    aria-label="Login to access marketplace"
-                >
-                    <FaStore className="dropdown-menu__icon" />
-                    <span>Login for Marketplace</span>
-                </button>
-            );
-        }
-
-        // For normal users (no marketplace role)
-        if (!userType || userType === '') {
-            return (
-                <>
-                    <button
-                        className="dropdown-menu__item"
-                        onClick={handleMarketplaceSetup}
-                        aria-label="Setup marketplace profile"
-                    >
-                        <FaStore className="dropdown-menu__icon" />
-                        <span>Setup Marketplace</span>
-                    </button>
-                    <div className="dropdown-menu__empty" style={{ padding: '10px 15px', fontSize: '12px' }}>
-                        Complete your profile to start buying or selling
-                    </div>
-                </>
-            );
-        }
-
-        // For buyer users
-        if (userType === 'buyer') {
-            return (
-                <>
-                    <button
-                        className="dropdown-menu__item"
-                        onClick={() => handleMarketplaceNavigation("/marketplace")}
-                        aria-label="Browse listings"
-                    >
-                        <FaShoppingCart className="dropdown-menu__icon" />
-                        <span>Browse Listings</span>
-                    </button>
-                    <button
-                        className="dropdown-menu__item"
-                        onClick={() => handleMarketplaceNavigation("/marketplace/my-orders")}
-                        aria-label="My orders"
-                    >
-                        <FaShoppingCart className="dropdown-menu__icon" />
-                        <span>My Orders</span>
-                    </button>
-                    <button
-                        className="dropdown-menu__item"
-                        onClick={() => handleMarketplaceNavigation("/marketplace/messages")}
-                        aria-label="Messages"
-                    >
-                        <span className="dropdown-menu__icon">💬</span>
-                        <span>Messages</span>
-                    </button>
-                </>
-            );
-        }
-
-        // For seller users
-        if (userType === 'seller') {
-            return (
-                <>
-                    <button
-                        className="dropdown-menu__item"
-                        onClick={() => handleMarketplaceNavigation("/marketplace/create")}
-                        aria-label="Create listing"
-                    >
-                        <FaUserTie className="dropdown-menu__icon" />
-                        <span>Create Listing</span>
-                    </button>
-                    <button
-                        className="dropdown-menu__item"
-                        onClick={() => handleMarketplaceNavigation("/marketplace")}
-                        aria-label="My listings"
-                    >
-                        <FaStore className="dropdown-menu__icon" />
-                        <span>My Listings</span>
-                    </button>
-                    <button
-                        className="dropdown-menu__item"
-                        onClick={() => handleMarketplaceNavigation("/marketplace/messages")}
-                        aria-label="Messages"
-                    >
-                        <span className="dropdown-menu__icon">💬</span>
-                        <span>Messages</span>
-                    </button>
-                </>
-            );
-        }
-
-        return null;
     };
 
     return (
@@ -408,44 +226,6 @@ const Header: React.FC<HeaderProps> = ({
 
                 {/* Right Section - Action Controls */}
                 <div className="header__right">
-                    {/* Marketplace Menu - Show for all users */}
-                    <div className="header__dropdown" ref={marketplaceMenuRef}>
-                        <button
-                            className="header__action-btn"
-                            onClick={toggleMarketplaceMenu}
-                            aria-expanded={isMarketplaceMenuOpen}
-                            aria-haspopup="true"
-                            aria-label="Marketplace"
-                        >
-                            <FaStore size={16} />
-                            {!isMobile && <span>Marketplace</span>}
-                            <MdExpandMore 
-                                size={16} 
-                                className={`header__dropdown-arrow ${isMarketplaceMenuOpen ? 'header__dropdown-arrow--open' : ''}`} 
-                            />
-                        </button>
-                        
-                        {isMarketplaceMenuOpen && (
-                            <div className="dropdown-menu dropdown-menu--marketplace dropdown-menu--left">
-                                <div className="dropdown-menu__header">
-                                    <h3 className="dropdown-menu__title">
-                                        {!tokenData ? 'Marketplace' : 
-                                         !userType ? 'Setup Required' :
-                                         userType === 'buyer' ? 'Buyer Mode' : 'Seller Mode'}
-                                    </h3>
-                                    {tokenData && userType && (
-                                        <span className="dropdown-menu__count">
-                                            {userType === 'buyer' ? '🛒' : '🏪'}
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="dropdown-menu__list">
-                                    {renderMarketplaceMenu()}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
                     {/* Upload Menu */}
                     <div className="header__dropdown" ref={uploadMenuRef}>
                         <button
