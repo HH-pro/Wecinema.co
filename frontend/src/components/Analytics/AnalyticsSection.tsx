@@ -25,13 +25,13 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Check localStorage for user preference
-  useEffect(() => {
-    const userPreference = localStorage.getItem('analyticsGraphsVisible');
-    if (userPreference !== null) {
-      setShowGraphs(userPreference === 'true');
-    }
-  }, []);
+  // // Check localStorage for user preference
+  // useEffect(() => {
+  //   const userPreference = localStorage.getItem('analyticsGraphsVisible');
+  //   if (userPreference !== null) {
+  //     setShowGraphs(userPreference === 'true');
+  //   }
+  // }, []);
 
   const handleToggle = () => {
     setIsAnimating(true);
