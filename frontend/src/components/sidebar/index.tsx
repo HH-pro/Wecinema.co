@@ -306,23 +306,24 @@ const Sidebar: React.FC<SidebarProps> = ({
           )}
         </ul>
 
-        {expand && (
-          <div className="user-type-badge">
-            <span className={`badge ${userType}`}>
-              {userType === 'seller' ? (
-                <>
-                  <FaUserTie className="badge-icon" />
-                  Seller Mode
-                </>
-              ) : (
-                <>
-                  <FaShoppingCart className="badge-icon" />
-                  Buyer Mode
-                </>
-              )}
-            </span>
-          </div>
-        )}
+        {/* CONDITIONAL BADGE - Only shows for buyer/seller users */}
+      {expand && userType && (
+        <div className="user-type-badge">
+          <span className={`badge ${userType}`}>
+            {userType === 'seller' ? (
+              <>
+                <FaUserTie className="badge-icon" />
+                Seller Mode
+              </>
+            ) : userType === 'buyer' ? (
+              <>
+                <FaShoppingCart className="badge-icon" />
+                Buyer Mode
+              </>
+            ) : null}
+          </span>
+        </div>
+      )}
       </nav>
     );
   };
