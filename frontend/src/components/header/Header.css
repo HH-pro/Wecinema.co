@@ -1083,7 +1083,7 @@
 /* Extra small height devices */
 @media (max-height: 600px) {
   .dropdown-menu {
-    max-height: 60vh !important;
+    max-height: 30vh !important;
   }
   
   .dropdown-menu__list {
