@@ -294,147 +294,97 @@ const Popup: React.FC<IPopupProps> = React.memo(
 			}
 		};
 
-	const handleLoginSubmit = async (e: React.FormEvent) => {
-	e.preventDefault();
-	setFormErrors({});
-	setLoading(true);
+		const handleLoginSubmit = async (e: React.FormEvent) => {
+			e.preventDefault();
+			setFormErrors({});
+			setLoading(true);
 
-	try {
-		const payload = { 
-			email: email.trim().toLowerCase(), 
-			password: password.trim() 
-		};
+			try {
+				const payload = { 
+					email: email.trim().toLowerCase(), 
+					password: password.trim() 
+				};
 
-		console.log("🔵 Direct login request to:", "https://wecinema-co.onrender.com/user/login");
-		console.log("🔵 Payload:", payload);
+				console.log("Sending login request with payload:", payload);
 
-		// Direct axios request (bypass postRequest)
-		const response = await axios.post(
-			'https://wecinema-co.onrender.com/user/login',
-			payload,
-			{
-				headers: {
-					'Content-Type': 'application/json',
-					// NO Authorization header!
-				},
-				timeout: 30000
-			}
-		);
-		
-		console.log("🟢 Login response:", response.data);
+				const result: any = await postRequest("user/login", payload, setLoading);
 
-		const result = response.data;
+				console.log("Login response:", result);
 
-		// Success handling
-		if (result.token && result.user) {
-			console.log("✅ Login successful");
-			
-			// Store authentication
-			localStorage.setItem("token", result.token);
-			localStorage.setItem("loggedIn", "true");
-			localStorage.setItem("user", JSON.stringify(result.user));
-			
-			// Update context/state
-			setToken(result.token);
-			setShow(false);
-
-			toast.success("Login successful! 🎉", {
-				duration: 3000,
-				position: "top-center",
-				icon: '🎬'
-			});
-
-			// Reload after success
-			setTimeout(() => {
-				window.location.reload();
-			}, 1500);
-			return;
-		}
-
-		// Handle API errors
-		if (result.error) {
-			console.log("🔴 API error:", result.error);
-			
-			if (result.error.includes("verify") || result.error.includes("not verified")) {
-				setPendingVerificationEmail(email);
-				setPendingVerificationUsername(result.user?.username || email.split('@')[0]);
-				setVerificationModal(true);
-				
-				toast.error("Please verify your email before logging in", {
-					duration: 4000,
-					position: "top-center",
-					icon: '📧'
-				});
-				return;
-			}
-			
-			toast.error(result.error, {
-				duration: 4000,
-				position: "top-center"
-			});
-			return;
-		}
-
-		// Unexpected response
-		console.error("⚠️ Unexpected response:", result);
-		toast.error("Unexpected response from server", {
-			duration: 4000,
-			position: "top-center"
-		});
-		
-	} catch (error: any) {
-		setLoading(false);
-		
-		console.error("🔴 Login error details:", {
-			status: error.response?.status,
-			data: error.response?.data,
-			message: error.message
-		});
-
-		// Simplified error handling
-		if (error.response) {
-			const { status, data } = error.response;
-			
-			if (status === 401) {
-				if (data?.isVerified === false || data?.error?.includes("verify")) {
+				if (result.error && result.error.includes("verify your email")) {
 					setPendingVerificationEmail(email);
+					setPendingVerificationUsername(result.user?.username || email.split('@')[0]);
 					setVerificationModal(true);
-					toast.error("Please verify your email", {
+					
+					toast.error("Please verify your email before logging in", {
 						duration: 4000,
 						position: "top-center",
 						icon: '📧'
 					});
+					return;
+				}
+
+				if (result.token && result.user) {
+					console.log("Login successful, storing token");
+					
+					setShow(false);
+					setToken(result.token);
+					
+					localStorage.setItem("token", result.token);
+					localStorage.setItem("loggedIn", "true");
+					localStorage.setItem("user", JSON.stringify(result.user));
+
+					toast.success("Login successful! 🎉", {
+						duration: 3000,
+						position: "top-center",
+						icon: '🎬'
+					});
+
+					setTimeout(() => {
+						window.location.reload();
+					}, 1000);
+				}
+			} catch (error: any) {
+				setLoading(false);
+				
+				console.error("Login error details:", {
+					status: error.response?.status,
+					data: error.response?.data,
+					message: error.message
+				});
+
+				const errorMessage = error?.response?.data?.error || 
+									error?.response?.data?.message || 
+									"Login failed. Please try again.";
+				
+				if (error?.response?.status === 401) {
+					if (error.response?.data?.isVerified === false) {
+						// Email not verified
+						setPendingVerificationEmail(email);
+						setVerificationModal(true);
+						
+						toast.error("Please verify your email before logging in", {
+							duration: 4000,
+							position: "top-center",
+							icon: '📧'
+						});
+					} else {
+						// Invalid credentials
+						toast.error("Invalid email or password", {
+							duration: 4000,
+							position: "top-center",
+							icon: '🔒'
+						});
+					}
 				} else {
-					toast.error("Invalid email or password", {
+					toast.error(errorMessage, {
 						duration: 4000,
 						position: "top-center",
-						icon: '🔒'
 					});
 				}
-			} else if (status === 400) {
-				toast.error(data?.error || data?.message || "Invalid request", {
-					duration: 4000,
-					position: "top-center"
-				});
-			} else {
-				toast.error(data?.error || data?.message || "Login failed", {
-					duration: 4000,
-					position: "top-center"
-				});
 			}
-		} else if (error.message?.includes("timeout")) {
-			toast.error("Request timed out", {
-				duration: 4000,
-				position: "top-center"
-			});
-		} else {
-			toast.error("Network error. Check connection.", {
-				duration: 4000,
-				position: "top-center"
-			});
-		}
-	}
-};
+		};
+
 		// Resend verification email
 		const resendVerificationEmail = async () => {
 			try {
