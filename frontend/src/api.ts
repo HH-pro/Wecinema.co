@@ -318,36 +318,20 @@ const handleError = (
 // ========================
 // CRUD OPERATIONS WITH ENHANCED OPTIONS
 // ========================
+
 export const postRequest = async <T = any>(
   url: string,
   data: any,
   setLoading?: React.Dispatch<React.SetStateAction<boolean>>,
-  options?: RequestOptions & { message?: string; skipAuth?: boolean } // Add skipAuth option
+  options?: RequestOptions & { message?: string }
 ): Promise<T> => {
   setLoading?.(true);
   
-  const requestFn = () => {
-    // Login/register requests کے لیے الگ headers بنائیں
-    const config: AxiosRequestConfig = {
-      timeout: options?.timeout,
-      headers: options?.headers,
-      params: options?.params
-    };
-    
-    // اگر skipAuth ہے یا یہ login/register request ہے تو Authorization header نہیں ڈالیں
-    if (options?.skipAuth || 
-        url.includes('/login') || 
-        url.includes('/register') ||
-        url.includes('/forgot-password') ||
-        url.includes('/reset-password') ||
-        url.includes('/verify-email')) {
-      // Custom axios instance استعمال کریں جو token نہیں بھیجتی
-      return apiWithoutAuth.post<ApiResponse<T>>(url, data, config);
-    }
-    
-    // باقی تمام requests کے لیے normal api instance استعمال کریں
-    return api.post<ApiResponse<T>>(url, data, config);
-  };
+  const requestFn = () => api.post<ApiResponse<T>>(url, data, {
+    timeout: options?.timeout,
+    headers: options?.headers,
+    params: options?.params
+  });
 
   try {
     const response = await retryRequest(requestFn, options?.retryCount);
@@ -356,6 +340,7 @@ export const postRequest = async <T = any>(
     return handleError(error as AxiosError<ApiResponse>, "POST", setLoading);
   }
 };
+
 export const getRequest = async <T = any>(
   url: string,
   setLoading?: React.Dispatch<React.SetStateAction<boolean>>,
