@@ -726,6 +726,7 @@
 .yellow-close-text {
   font-weight: 600;
   white-space: nowrap;
+  color: white;
 }
 
 .yellow-close-icon {
