@@ -307,68 +307,108 @@ const Popup: React.FC<IPopupProps> = React.memo(
 
 		console.log("🔵 Login request payload:", payload);
 		
-		// Debug: Check if postRequest function is working
-		console.log("🔵 Calling postRequest function...");
-		
-		const result: any = await postRequest("user/login", payload, setLoading);
+		// postRequest کو skipAuth option کے ساتھ call کریں
+		const result: any = await postRequest("user/login", payload, setLoading, {
+			skipAuth: true, // یہ ضروری ہے تاکہ Authorization header نہ بھیجا جائے
+			timeout: 30000,
+			message: "Logging in..."
+		});
 		
 		console.log("🟢 Login response received:", result);
 
-		// Handle response
-		if (result.error) {
-			console.log("🔴 API returned error:", result.error);
-			
-			if (result.error.includes("verify your email") || result.error.includes("not verified")) {
-				setPendingVerificationEmail(email);
-				setPendingVerificationUsername(result.user?.username || email.split('@')[0]);
-				setVerificationModal(true);
+		// Handle response - چیک کریں کہ response کی structure صحیح ہے
+		if (result && typeof result === 'object') {
+			// Check for error in response data
+			if (result.error || result.success === false) {
+				const errorMessage = result.error || result.message || "Login failed";
+				console.log("🔴 API returned error:", errorMessage);
 				
-				toast.error("Please verify your email before logging in", {
+				if (errorMessage.includes("verify your email") || 
+					errorMessage.includes("not verified") ||
+					errorMessage.includes("verification")) {
+					
+					setPendingVerificationEmail(email);
+					setPendingVerificationUsername(result.user?.username || email.split('@')[0]);
+					setVerificationModal(true);
+					
+					toast.error("Please verify your email before logging in", {
+						duration: 4000,
+						position: "top-center",
+						icon: '📧'
+					});
+					return;
+				}
+				
+				// Direct error from API
+				toast.error(errorMessage, {
 					duration: 4000,
-					position: "top-center",
-					icon: '📧'
+					position: "top-center"
 				});
 				return;
 			}
+
+			// Check for success response
+			if (result.token && result.user) {
+				console.log("✅ Login successful");
+				
+				// Store authentication
+				localStorage.setItem("token", result.token);
+				localStorage.setItem("loggedIn", "true");
+				localStorage.setItem("user", JSON.stringify(result.user));
+				
+				// Update context/state
+				setToken(result.token);
+				setShow(false);
+
+				toast.success("Login successful! 🎉", {
+					duration: 3000,
+					position: "top-center",
+					icon: '🎬'
+				});
+
+				// Reload after success
+				setTimeout(() => {
+					window.location.reload();
+				}, 1500);
+				return;
+			}
 			
-			// Direct error from API
-			toast.error(result.error, {
-				duration: 4000,
-				position: "top-center"
-			});
-			return;
+			// Check if response has nested data property
+			if (result.data) {
+				const data = result.data;
+				if (data.token && data.user) {
+					console.log("✅ Login successful (nested data)");
+					
+					// Store authentication
+					localStorage.setItem("token", data.token);
+					localStorage.setItem("loggedIn", "true");
+					localStorage.setItem("user", JSON.stringify(data.user));
+					
+					// Update context/state
+					setToken(data.token);
+					setShow(false);
+
+					toast.success("Login successful! 🎉", {
+						duration: 3000,
+						position: "top-center",
+						icon: '🎬'
+					});
+
+					setTimeout(() => {
+						window.location.reload();
+					}, 1500);
+					return;
+				}
+			}
 		}
 
-		if (result.token && result.user) {
-			console.log("✅ Login successful");
-			
-			// Store authentication
-			localStorage.setItem("token", result.token);
-			localStorage.setItem("loggedIn", "true");
-			localStorage.setItem("user", JSON.stringify(result.user));
-			
-			// Update context/state
-			setToken(result.token);
-			setShow(false);
-
-			toast.success("Login successful! 🎉", {
-				duration: 3000,
-				position: "top-center",
-				icon: '🎬'
-			});
-
-			// Reload after success
-			setTimeout(() => {
-				window.location.reload();
-			}, 1500);
-		} else {
-			// Unexpected response format
-			console.error("⚠️ Unexpected response format:", result);
-			toast.error("Unexpected response from server", {
-				duration: 4000,
-				position: "top-center"
-			});
-		}
+		// If we reach here, response format is unexpected
+		console.error("⚠️ Unexpected response format:", result);
+		toast.error("Unexpected response from server. Please try again.", {
+			duration: 4000,
+			position: "top-center"
+		});
+		
 	} catch (error: any) {
 		setLoading(false);
 		
@@ -390,7 +430,9 @@ const Popup: React.FC<IPopupProps> = React.memo(
 			console.log(`🔴 Server responded with ${status}:`, data);
 			
 			if (status === 401) {
-				if (data?.isVerified === false) {
+				if (data?.isVerified === false || 
+					data?.error?.includes("verify") || 
+					data?.message?.includes("verify")) {
 					// Email not verified
 					setPendingVerificationEmail(email);
 					setVerificationModal(true);
@@ -400,16 +442,47 @@ const Popup: React.FC<IPopupProps> = React.memo(
 						position: "top-center",
 						icon: '📧'
 					});
-				} else if (data?.message?.includes("Invalid credentials")) {
+				} else if (data?.message?.includes("Invalid credentials") ||
+						   data?.error?.includes("Invalid credentials") ||
+						   data?.message?.includes("incorrect") ||
+						   data?.error?.includes("incorrect")) {
 					// Invalid email/password
 					toast.error("Invalid email or password", {
 						duration: 4000,
 						position: "top-center",
 						icon: '🔒'
 					});
+				} else if (data?.message === "No token provided") {
+					// This happens when token is being sent with login request
+					toast.error("Authentication error. Please try again.", {
+						duration: 4000,
+						position: "top-center",
+						icon: '🔐'
+					});
+					console.error("🔴 Token is being sent with login request. Check postRequest function.");
 				} else {
 					// Generic 401
-					toast.error(data?.message || "Unauthorized access", {
+					toast.error(data?.message || data?.error || "Unauthorized access", {
+						duration: 4000,
+						position: "top-center"
+					});
+				}
+			} else if (status === 400) {
+				// Bad request - validation errors
+				if (data?.errors) {
+					// Handle validation errors
+					const validationErrors: Record<string, string> = {};
+					Object.keys(data.errors).forEach(key => {
+						validationErrors[key] = data.errors[key][0];
+					});
+					setFormErrors(validationErrors);
+					
+					toast.error("Please fix the errors in the form", {
+						duration: 4000,
+						position: "top-center"
+					});
+				} else {
+					toast.error(data?.message || data?.error || "Invalid request", {
 						duration: 4000,
 						position: "top-center"
 					});
@@ -417,6 +490,12 @@ const Popup: React.FC<IPopupProps> = React.memo(
 			} else if (status === 429) {
 				// Too many requests
 				toast.error("Too many login attempts. Please try again later.", {
+					duration: 4000,
+					position: "top-center"
+				});
+			} else if (status === 404) {
+				// Endpoint not found
+				toast.error("Login service is currently unavailable", {
 					duration: 4000,
 					position: "top-center"
 				});
@@ -428,7 +507,7 @@ const Popup: React.FC<IPopupProps> = React.memo(
 				});
 			} else {
 				// Other errors
-				toast.error(data?.message || "Login failed", {
+				toast.error(data?.message || data?.error || `Login failed (${status})`, {
 					duration: 4000,
 					position: "top-center"
 				});
@@ -436,7 +515,21 @@ const Popup: React.FC<IPopupProps> = React.memo(
 		} else if (error.request) {
 			// Request was made but no response
 			console.error("🔴 No response received:", error.request);
-			toast.error("No response from server. Check your connection.", {
+			toast.error("No response from server. Check your internet connection.", {
+				duration: 4000,
+				position: "top-center"
+			});
+		} else if (error.message?.includes("timeout")) {
+			// Request timeout
+			console.error("🔴 Request timeout:", error.message);
+			toast.error("Request timed out. Please try again.", {
+				duration: 4000,
+				position: "top-center"
+			});
+		} else if (error.message?.includes("Network Error")) {
+			// Network error
+			console.error("🔴 Network error:", error.message);
+			toast.error("Network error. Please check your connection.", {
 				duration: 4000,
 				position: "top-center"
 			});
@@ -448,6 +541,9 @@ const Popup: React.FC<IPopupProps> = React.memo(
 				position: "top-center"
 			});
 		}
+	} finally {
+		// Ensure loading is always false
+		setLoading(false);
 	}
 };
 		// Resend verification email
