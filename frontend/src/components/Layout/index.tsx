@@ -350,7 +350,7 @@ const Layout: React.FC<LayoutProps> = ({
   </span>
 </div>
         {/* Common items for both buyer and seller */}
-          {userType === 'seller'|| 'buyer' || (
+          {userType === 'buyer' && (
           <>
         <Link
           to="/marketplace"
