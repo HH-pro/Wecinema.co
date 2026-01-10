@@ -655,7 +655,7 @@ router.get("/verify-email", async (req, res) => {
       <body>
         <h1>❌ Error Verifying Email</h1>
         <p class="error">An error occurred while verifying your email. Please try again later.</p>
-        <p><a href="/" style="color: #f59e0b;">Return to Homepage</a></p>
+        <p><a href="/user/resend-verification" style="color: #f59e0b;">Return to Homepage</a></p>
       </body>
       </html>
     `);
