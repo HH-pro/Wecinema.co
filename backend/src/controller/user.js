@@ -330,8 +330,7 @@ router.put("/admin/remove/:userId", async (req, res) => {
     });
   }
 });
-
-// Email verification endpoint
+// Email verification endpoint - IMPROVED VERSION
 router.get("/verify-email", async (req, res) => {
   try {
     const { token } = req.query;
@@ -345,41 +344,27 @@ router.get("/verify-email", async (req, res) => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Invalid Verification Link - Wecinema</title>
           <style>
-            body {
-              font-family: Arial, sans-serif;
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-              min-height: 100vh;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              padding: 20px;
+            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+            .container { max-width: 600px; margin: 0 auto; }
+            h1 { color: #f59e0b; }
+            .error { color: #e74c3c; margin: 20px 0; }
+            .btn { 
+              background: #f59e0b; 
+              color: white; 
+              padding: 12px 30px; 
+              text-decoration: none; 
+              border-radius: 5px; 
+              display: inline-block; 
+              margin: 10px; 
+              font-weight: bold; 
             }
-            .container {
-              background: white;
-              border-radius: 15px;
-              padding: 40px;
-              max-width: 500px;
-              text-align: center;
-              box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            }
-            h1 {
-              color: #f59e0b;
-              margin-bottom: 20px;
-            }
-            .error {
-              color: #e74c3c;
-              font-size: 18px;
-              margin: 20px 0;
-            }
-            .btn {
-              background: #f59e0b;
-              color: white;
-              padding: 12px 30px;
-              text-decoration: none;
-              border-radius: 5px;
-              display: inline-block;
-              margin-top: 20px;
-              font-weight: bold;
+            .btn-secondary { background: #3498db; }
+            .info { 
+              background: #f8f9fa; 
+              padding: 15px; 
+              border-radius: 5px; 
+              margin: 20px 0; 
+              text-align: left;
             }
           </style>
         </head>
@@ -387,9 +372,59 @@ router.get("/verify-email", async (req, res) => {
           <div class="container">
             <h1>⚠️ Invalid Verification Link</h1>
             <p class="error">The verification link is invalid or has expired.</p>
-            <p>Please check your email for the correct verification link or request a new one.</p>
-            <a href="/" class="btn">Go to Homepage</a>
+            <div class="info">
+              <p><strong>Possible reasons:</strong></p>
+              <ul>
+                <li>Link has expired (valid for 24 hours only)</li>
+                <li>Link has already been used</li>
+                <li>Invalid or tampered link</li>
+              </ul>
+            </div>
+            <div>
+              <a href="/login" class="btn">Go to Login</a>
+              <button onclick="showResendForm()" class="btn btn-secondary">Resend Verification Email</button>
+            </div>
+            <div id="resendForm" style="display: none; margin-top: 30px;">
+              <h3>Resend Verification Email</h3>
+              <form id="resendFormEl" style="max-width: 400px; margin: 0 auto;">
+                <input type="email" id="resendEmail" placeholder="Enter your email" required 
+                       style="width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px;">
+                <button type="submit" style="background: #f59e0b; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
+                  Resend Email
+                </button>
+              </form>
+              <div id="resendResult" style="margin-top: 10px;"></div>
+            </div>
           </div>
+          <script>
+            function showResendForm() {
+              document.getElementById('resendForm').style.display = 'block';
+            }
+            
+            document.getElementById('resendFormEl').addEventListener('submit', async (e) => {
+              e.preventDefault();
+              const email = document.getElementById('resendEmail').value;
+              const resultDiv = document.getElementById('resendResult');
+              
+              try {
+                const response = await fetch('/user/resend-verification', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email: email })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                  resultDiv.innerHTML = '<p style="color: green;">✓ Verification email sent successfully! Check your inbox.</p>';
+                } else {
+                  resultDiv.innerHTML = '<p style="color: red;">✗ ' + data.error + '</p>';
+                }
+              } catch (error) {
+                resultDiv.innerHTML = '<p style="color: red;">✗ Failed to resend email. Please try again.</p>';
+              }
+            });
+          </script>
         </body>
         </html>
       `);
@@ -401,62 +436,125 @@ router.get("/verify-email", async (req, res) => {
     });
 
     if (!user) {
+      // Check if token exists but expired
+      const expiredUser = await User.findOne({ verificationToken: token });
+      
+      if (expiredUser) {
+        return res.status(400).send(`
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Link Expired - Wecinema</title>
+            <style>
+              body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+              .container { max-width: 600px; margin: 0 auto; }
+              h1 { color: #f59e0b; }
+              .error { color: #e74c3c; margin: 20px 0; }
+              .btn { 
+                background: #f59e0b; 
+                color: white; 
+                padding: 12px 30px; 
+                text-decoration: none; 
+                border-radius: 5px; 
+                display: inline-block; 
+                margin: 10px; 
+                font-weight: bold; 
+              }
+              .btn-secondary { background: #3498db; }
+              .info { 
+                background: #f8f9fa; 
+                padding: 15px; 
+                border-radius: 5px; 
+                margin: 20px 0; 
+              }
+              #resendForm { 
+                display: block; 
+                margin-top: 30px; 
+                padding: 20px; 
+                background: #f8f9fa; 
+                border-radius: 10px; 
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>⏰ Verification Link Expired</h1>
+              <p class="error">This verification link has expired.</p>
+              <div class="info">
+                <p><strong>Verification links are valid for 24 hours only.</strong></p>
+                <p>We can send you a new verification email to <strong>${expiredUser.email}</strong></p>
+              </div>
+              
+              <div id="resendForm">
+                <h3>Get New Verification Link</h3>
+                <button onclick="resendEmail('${expiredUser.email}')" class="btn btn-secondary">
+                  Resend Verification Email
+                </button>
+                <div id="resendResult" style="margin-top: 10px;"></div>
+              </div>
+              
+              <div style="margin-top: 30px;">
+                <a href="/login" class="btn">Go to Login</a>
+              </div>
+            </div>
+            <script>
+              async function resendEmail(email) {
+                const resultDiv = document.getElementById('resendResult');
+                const button = event.target;
+                const originalText = button.textContent;
+                
+                button.disabled = true;
+                button.textContent = 'Sending...';
+                
+                try {
+                  const response = await fetch('/user/resend-verification', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email })
+                  });
+                  
+                  const data = await response.json();
+                  
+                  if (response.ok) {
+                    resultDiv.innerHTML = '<p style="color: green;">✓ New verification email sent! Check your inbox.</p>';
+                    button.style.display = 'none';
+                  } else {
+                    resultDiv.innerHTML = '<p style="color: red;">✗ ' + data.error + '</p>';
+                    button.disabled = false;
+                    button.textContent = originalText;
+                  }
+                } catch (error) {
+                  resultDiv.innerHTML = '<p style="color: red;">✗ Failed to resend email. Please try again.</p>';
+                  button.disabled = false;
+                  button.textContent = originalText;
+                }
+              }
+            </script>
+          </body>
+          </html>
+        `);
+      }
+      
+      // Token doesn't exist at all
       return res.status(400).send(`
         <!DOCTYPE html>
         <html lang="en">
         <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Expired Verification Link - Wecinema</title>
+          <title>Invalid Link - Wecinema</title>
           <style>
-            body {
-              font-family: Arial, sans-serif;
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-              min-height: 100vh;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              padding: 20px;
-            }
-            .container {
-              background: white;
-              border-radius: 15px;
-              padding: 40px;
-              max-width: 500px;
-              text-align: center;
-              box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            }
-            h1 {
-              color: #f59e0b;
-              margin-bottom: 20px;
-            }
-            .error {
-              color: #e74c3c;
-              font-size: 18px;
-              margin: 20px 0;
-            }
-            .btn {
-              background: #f59e0b;
-              color: white;
-              padding: 12px 30px;
-              text-decoration: none;
-              border-radius: 5px;
-              display: inline-block;
-              margin: 10px;
-              font-weight: bold;
-            }
+            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+            h1 { color: #f59e0b; }
+            .error { color: #e74c3c; margin: 20px 0; }
           </style>
         </head>
         <body>
-          <div class="container">
-            <h1>⏰ Link Expired</h1>
-            <p class="error">This verification link has expired.</p>
-            <p>Verification links are valid for 24 hours only.</p>
-            <div>
-              <a href="/" class="btn">Go to Login</a>
-              <a href="/resend-verification" class="btn" style="background: #3498db;">Resend Email</a>
-            </div>
-          </div>
+          <h1>❌ Invalid Verification Link</h1>
+          <p class="error">This verification link is invalid or has already been used.</p>
+          <p><a href="/login" style="color: #f59e0b;">Go to Login</a></p>
         </body>
         </html>
       `);
@@ -466,8 +564,10 @@ router.get("/verify-email", async (req, res) => {
     user.isVerified = true;
     user.verificationToken = undefined;
     user.verificationTokenExpiry = undefined;
+    user.verifiedAt = new Date();
     await user.save();
 
+    // Success response
     res.send(`
       <!DOCTYPE html>
       <html lang="en">
@@ -535,40 +635,33 @@ router.get("/verify-email", async (req, res) => {
           <p style="color: #777; margin: 20px 0;">
             You can now log in to your account and start enjoying Wecinema's amazing movie collection.
           </p>
-          <a href="/" class="btn">Go to Login</a>
+          <a href="/login" class="btn">Go to Login</a>
         </div>
       </body>
       </html>
     `);
   } catch (err) {
-    console.error(err);
+    console.error("Verification error:", err);
     res.status(500).send(`
       <!DOCTYPE html>
       <html>
       <head>
         <title>Error - Wecinema</title>
         <style>
-          body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding: 50px;
-          }
-          .error {
-            color: red;
-            font-size: 20px;
-          }
+          body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+          .error { color: red; font-size: 20px; }
         </style>
       </head>
       <body>
         <h1>❌ Error Verifying Email</h1>
         <p class="error">An error occurred while verifying your email. Please try again later.</p>
+        <p><a href="/" style="color: #f59e0b;">Return to Homepage</a></p>
       </body>
       </html>
     `);
   }
 });
-
-// Resend verification email
+// Resend verification email - IMPROVED VERSION
 router.post("/resend-verification", async (req, res) => {
   try {
     const { email } = req.body;
@@ -577,33 +670,56 @@ router.post("/resend-verification", async (req, res) => {
       return res.status(400).json({ error: "Email is required" });
     }
 
-    const user = await User.findOne({ email });
+    // Case-insensitive email search
+    const user = await User.findOne({ 
+      email: { $regex: new RegExp(`^${email}$`, 'i') } 
+    });
     
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ 
+        error: "User not found. Please check the email address." 
+      });
     }
 
     if (user.isVerified) {
-      return res.status(400).json({ error: "Email is already verified" });
+      return res.status(400).json({ 
+        error: "Email is already verified. You can proceed to login." 
+      });
+    }
+
+    // Check if last verification was sent recently (prevent spam)
+    const now = Date.now();
+    if (user.lastVerificationSent && 
+        (now - user.lastVerificationSent.getTime()) < 5 * 60 * 1000) {
+      return res.status(429).json({ 
+        error: "Please wait 5 minutes before requesting another verification email." 
+      });
     }
 
     // Generate new verification token
     const verificationToken = crypto.randomBytes(32).toString('hex');
+    
+    // Update user with new token and expiry
     user.verificationToken = verificationToken;
-    user.verificationTokenExpiry = Date.now() + 24 * 60 * 60 * 1000;
+    user.verificationTokenExpiry = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+    user.lastVerificationSent = new Date();
     await user.save();
 
     // Send new verification email
     await sendVerificationEmail(email, user.username, verificationToken);
 
+    console.log(`Resent verification email to ${email}`);
+    
     res.status(200).json({ 
+      success: true,
       message: "Verification email sent successfully",
-      email: user.email
+      email: user.email,
+      resendTime: new Date().toISOString()
     });
   } catch (error) {
     console.error("Error resending verification email:", error);
     res.status(500).json({ 
-      error: "Internal Server Error",
+      error: "Failed to send verification email",
       details: error.message 
     });
   }
