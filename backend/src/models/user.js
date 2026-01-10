@@ -73,7 +73,7 @@ const userSchema = new Schema({
     // 🆕 NEW: UserType field for HypeMode Signup
     userType: {
         type: String,
-        enum: ['buyer', 'seller'],
+        enum: ['buyer', 'seller', 'normalUser'],
         default: 'normalUser'
     },
     
