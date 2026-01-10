@@ -1007,12 +1007,12 @@
   
   .dropdown-menu--genre {
     min-width: 200px;
-    max-width: 30px;
+    max-width: 300px;
   }
   
   .dropdown-menu--rating {
     min-width: 120px;
-    max-width: 160px;
+    max-width: 10px;
   }
   
   .dropdown-menu--upload {
