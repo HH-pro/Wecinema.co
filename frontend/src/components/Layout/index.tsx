@@ -314,7 +314,7 @@ const Layout: React.FC<LayoutProps> = ({
   const renderMarketplaceSection = () => {
     if (!decodedToken) return null;
 
-    // Normal users (no userType set) - Show setup prompt
+    // Normal users (no userType set) - Show setup prompt ONLY
     if (!userType || userType === '') {
       return (
         <>
@@ -325,11 +325,13 @@ const Layout: React.FC<LayoutProps> = ({
             darkMode={darkMode} 
             onClick={handleMarketplaceSetup}
           />
+          {/* NO OTHER MARKETPLACE ITEMS FOR NORMAL USERS */}
+          <div className="border-t border-gray-200 my-2"></div>
         </>
       );
     }
 
-    // Buyer/Seller users - Show full marketplace options
+    // ONLY for Buyer/Seller users - Show full marketplace options
     return (
       <>
         <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider flex justify-between items-center">
@@ -339,6 +341,7 @@ const Layout: React.FC<LayoutProps> = ({
           </span>
         </div>
 
+        {/* Common items for both buyer and seller */}
         <Link
           to="/marketplace"
           className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace")}`}
@@ -355,32 +358,46 @@ const Layout: React.FC<LayoutProps> = ({
           <span>Messages</span>
         </Link>
 
+        {/* Seller-only items */}
         {userType === 'seller' && (
-          <Link
-            to="/marketplace/create"
-            className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace/create")}`}
-          >
-            <RiAddCircleLine size="20" />
-            <span>Create Listing</span>
-          </Link>
+          <>
+            <Link
+              to="/marketplace/create"
+              className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace/create")}`}
+            >
+              <RiAddCircleLine size="20" />
+              <span>Create Listing</span>
+            </Link>
+
+            <Link
+              to="/marketplace/seller-dashboard"
+              className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace/seller-dashboard")}`}
+            >
+              <RiListCheck size="20" />
+              <span>Seller Dashboard</span>
+            </Link>
+          </>
         )}
 
-        <Link
-          to={userType === 'seller' ? "/marketplace/dashboard" : "/marketplace/buyer-dashboard"}
-          className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass(userType === 'seller' ? "/marketplace/dashboard" : "/marketplace/buyer-dashboard")}`}
-        >
-          <RiListCheck size="20" />
-          <span>{userType === 'seller' ? 'Seller' : 'Buyer'} Dashboard</span>
-        </Link>
-
+        {/* Buyer-only items */}
         {userType === 'buyer' && (
-          <Link
-            to="/marketplace/my-orders"
-            className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace/my-orders")}`}
-          >
-            <RiShoppingBagLine size="20" />
-            <span>My Orders</span>
-          </Link>
+          <>
+            <Link
+              to="/marketplace/buyer-dashboard"
+              className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace/buyer-dashboard")}`}
+            >
+              <RiListCheck size="20" />
+              <span>Buyer Dashboard</span>
+            </Link>
+
+            <Link
+              to="/marketplace/my-orders"
+              className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace/my-orders")}`}
+            >
+              <RiShoppingBagLine size="20" />
+              <span>My Orders</span>
+            </Link>
+          </>
         )}
 
         {/* User Type Badge */}
