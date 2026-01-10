@@ -74,7 +74,7 @@ const userSchema = new Schema({
     userType: {
         type: String,
         enum: ['buyer', 'seller'],
-        default: 'normal user'
+        default: 'normalUser'
     },
     
     // 🆕 NEW: Authentication provider tracking
