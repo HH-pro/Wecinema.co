@@ -231,8 +231,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
         </div>
-        
         <ul className="sidebar-section">
+          {userType === 'buyer' && (
+            <>
+          
           <Link
             to="/marketplace"
             className={`sidebar-item ${getActiveClass("/marketplace")} ${
@@ -252,6 +254,9 @@ const Sidebar: React.FC<SidebarProps> = ({
             <RiMessageLine className="sidebar-icon" />
             <span className="sidebar-text">Messages</span>
           </Link>
+            </>
+
+          )}
 
           {userType === 'buyer' && (
             <>
