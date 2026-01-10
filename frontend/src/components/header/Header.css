@@ -1100,7 +1100,7 @@
 /* Touch device optimizations */
 @media (hover: none) and (pointer: coarse) {
   .dropdown-menu__item {
-    padding: 14px 12px; /* Larger touch target */
+    padding: 1px 1px; /* Larger touch target */
     margin-bottom: 2px;
   }
   
