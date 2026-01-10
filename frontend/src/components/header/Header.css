@@ -1091,7 +1091,7 @@
   }
   
   .dropdown-menu--genre .dropdown-menu__item {
-    padding: 8px 10px;
+    padding: 2px 1px;
     min-height: 40px;
     font-size: 12px;
   }
