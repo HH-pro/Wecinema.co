@@ -1109,6 +1109,6 @@
   }
   
   .dropdown-menu--genre .dropdown-menu__item {
-    min-height: 48px;
+    min-height: 4px;
   }
 }
