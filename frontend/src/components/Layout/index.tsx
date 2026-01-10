@@ -342,6 +342,8 @@ const Layout: React.FC<LayoutProps> = ({
         </div>
 
         {/* Common items for both buyer and seller */}
+          {userType === 'seller' && 'buyer' (
+          <>
         <Link
           to="/marketplace"
           className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace")}`}
@@ -357,7 +359,8 @@ const Layout: React.FC<LayoutProps> = ({
           <RiMessageLine size="20" />
           <span>Messages</span>
         </Link>
-
+     </>
+        )}
         {/* Seller-only items */}
         {userType === 'seller' && (
           <>
