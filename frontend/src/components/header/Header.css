@@ -1066,7 +1066,7 @@
 /* Tablet Styles (600px - 768px) */
 @media (min-width: 600px) and (max-width: 768px) {
   .dropdown-menu--genre .dropdown-menu__list {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
   }
   
   .dropdown-menu--rating {
