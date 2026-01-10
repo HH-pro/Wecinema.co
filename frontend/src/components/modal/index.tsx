@@ -294,26 +294,105 @@ const Popup: React.FC<IPopupProps> = React.memo(
 			}
 		};
 
-		const handleLoginSubmit = async (e: React.FormEvent) => {
-			e.preventDefault();
-			setFormErrors({});
-			setLoading(true);
+	const handleLoginSubmit = async (e: React.FormEvent) => {
+	e.preventDefault();
+	setFormErrors({});
+	setLoading(true);
 
-			try {
-				const payload = { 
-					email: email.trim().toLowerCase(), 
-					password: password.trim() 
-				};
+	try {
+		const payload = { 
+			email: email.trim().toLowerCase(), 
+			password: password.trim() 
+		};
 
-				console.log("Sending login request with payload:", payload);
+		console.log("🔵 Login request payload:", payload);
+		
+		// Debug: Check if postRequest function is working
+		console.log("🔵 Calling postRequest function...");
+		
+		const result: any = await postRequest("user/login", payload, setLoading);
+		
+		console.log("🟢 Login response received:", result);
 
-				const result: any = await postRequest("user/login", payload, setLoading);
+		// Handle response
+		if (result.error) {
+			console.log("🔴 API returned error:", result.error);
+			
+			if (result.error.includes("verify your email") || result.error.includes("not verified")) {
+				setPendingVerificationEmail(email);
+				setPendingVerificationUsername(result.user?.username || email.split('@')[0]);
+				setVerificationModal(true);
+				
+				toast.error("Please verify your email before logging in", {
+					duration: 4000,
+					position: "top-center",
+					icon: '📧'
+				});
+				return;
+			}
+			
+			// Direct error from API
+			toast.error(result.error, {
+				duration: 4000,
+				position: "top-center"
+			});
+			return;
+		}
 
-				console.log("Login response:", result);
+		if (result.token && result.user) {
+			console.log("✅ Login successful");
+			
+			// Store authentication
+			localStorage.setItem("token", result.token);
+			localStorage.setItem("loggedIn", "true");
+			localStorage.setItem("user", JSON.stringify(result.user));
+			
+			// Update context/state
+			setToken(result.token);
+			setShow(false);
 
-				if (result.error && result.error.includes("verify your email")) {
+			toast.success("Login successful! 🎉", {
+				duration: 3000,
+				position: "top-center",
+				icon: '🎬'
+			});
+
+			// Reload after success
+			setTimeout(() => {
+				window.location.reload();
+			}, 1500);
+		} else {
+			// Unexpected response format
+			console.error("⚠️ Unexpected response format:", result);
+			toast.error("Unexpected response from server", {
+				duration: 4000,
+				position: "top-center"
+			});
+		}
+	} catch (error: any) {
+		setLoading(false);
+		
+		console.error("🔴 Login catch error:", {
+			name: error.name,
+			message: error.message,
+			code: error.code,
+			response: error.response,
+			request: error.request,
+			config: error.config,
+			isAxiosError: error.isAxiosError
+		});
+
+		// Handle specific error cases
+		if (error.response) {
+			// Server responded with error status
+			const { status, data } = error.response;
+			
+			console.log(`🔴 Server responded with ${status}:`, data);
+			
+			if (status === 401) {
+				if (data?.isVerified === false) {
+					// Email not verified
 					setPendingVerificationEmail(email);
-					setPendingVerificationUsername(result.user?.username || email.split('@')[0]);
 					setVerificationModal(true);
 					
 					toast.error("Please verify your email before logging in", {
@@ -321,70 +400,56 @@ const Popup: React.FC<IPopupProps> = React.memo(
 						position: "top-center",
 						icon: '📧'
 					});
-					return;
-				}
-
-				if (result.token && result.user) {
-					console.log("Login successful, storing token");
-					
-					setShow(false);
-					setToken(result.token);
-					
-					localStorage.setItem("token", result.token);
-					localStorage.setItem("loggedIn", "true");
-					localStorage.setItem("user", JSON.stringify(result.user));
-
-					toast.success("Login successful! 🎉", {
-						duration: 3000,
-						position: "top-center",
-						icon: '🎬'
-					});
-
-					setTimeout(() => {
-						window.location.reload();
-					}, 1000);
-				}
-			} catch (error: any) {
-				setLoading(false);
-				
-				console.error("Login error details:", {
-					status: error.response?.status,
-					data: error.response?.data,
-					message: error.message
-				});
-
-				const errorMessage = error?.response?.data?.error || 
-									error?.response?.data?.message || 
-									"Login failed. Please try again.";
-				
-				if (error?.response?.status === 401) {
-					if (error.response?.data?.isVerified === false) {
-						// Email not verified
-						setPendingVerificationEmail(email);
-						setVerificationModal(true);
-						
-						toast.error("Please verify your email before logging in", {
-							duration: 4000,
-							position: "top-center",
-							icon: '📧'
-						});
-					} else {
-						// Invalid credentials
-						toast.error("Invalid email or password", {
-							duration: 4000,
-							position: "top-center",
-							icon: '🔒'
-						});
-					}
-				} else {
-					toast.error(errorMessage, {
+				} else if (data?.message?.includes("Invalid credentials")) {
+					// Invalid email/password
+					toast.error("Invalid email or password", {
 						duration: 4000,
 						position: "top-center",
+						icon: '🔒'
+					});
+				} else {
+					// Generic 401
+					toast.error(data?.message || "Unauthorized access", {
+						duration: 4000,
+						position: "top-center"
 					});
 				}
+			} else if (status === 429) {
+				// Too many requests
+				toast.error("Too many login attempts. Please try again later.", {
+					duration: 4000,
+					position: "top-center"
+				});
+			} else if (status >= 500) {
+				// Server error
+				toast.error("Server error. Please try again later.", {
+					duration: 4000,
+					position: "top-center"
+				});
+			} else {
+				// Other errors
+				toast.error(data?.message || "Login failed", {
+					duration: 4000,
+					position: "top-center"
+				});
 			}
-		};
-
+		} else if (error.request) {
+			// Request was made but no response
+			console.error("🔴 No response received:", error.request);
+			toast.error("No response from server. Check your connection.", {
+				duration: 4000,
+				position: "top-center"
+			});
+		} else {
+			// Other errors
+			console.error("🔴 Request setup error:", error.message);
+			toast.error("Login failed: " + error.message, {
+				duration: 4000,
+				position: "top-center"
+			});
+		}
+	}
+};
 		// Resend verification email
 		const resendVerificationEmail = async () => {
 			try {
