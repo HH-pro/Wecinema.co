@@ -120,96 +120,6 @@ const HypemodeSubscriptionModal: React.FC<{
   );
 };
 
-// Marketplace Setup Modal
-const MarketplaceSetupModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  darkMode: boolean;
-  onSelectUserType: (type: 'buyer' | 'seller') => void;
-}> = ({ isOpen, onClose, darkMode, onSelectUserType }) => {
-  if (!isOpen) return null;
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div 
-        className={`marketplace-setup-modal ${darkMode ? 'dark-mode' : 'light-mode'}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="modal-header">
-          <div className="modal-icon">
-            <RiStoreLine className="store-icon" />
-          </div>
-          <h2 className="modal-title">Setup Marketplace Profile</h2>
-          <button className="modal-close-btn" onClick={onClose}>×</button>
-        </div>
-        
-        <div className="modal-body">
-          <p className="modal-description">
-            Choose how you want to use the marketplace. You can change this later.
-          </p>
-          
-          <div className="user-type-options">
-            <div 
-              className="user-type-option buyer-option"
-              onClick={() => onSelectUserType('buyer')}
-            >
-              <div className="option-icon">
-                <FaShoppingCart />
-              </div>
-              <div className="option-content">
-                <h3>Buyer</h3>
-                <p>Browse and purchase items from sellers</p>
-                <ul className="option-features">
-                  <li>Browse listings</li>
-                  <li>Message sellers</li>
-                  <li>Track orders</li>
-                  <li>Leave reviews</li>
-                </ul>
-              </div>
-              <button className="option-select-btn">Select Buyer</button>
-            </div>
-            
-            <div 
-              className="user-type-option seller-option"
-              onClick={() => onSelectUserType('seller')}
-            >
-              <div className="option-icon">
-                <FaUserTie />
-              </div>
-              <div className="option-content">
-                <h3>Seller</h3>
-                <p>Sell your products and manage your shop</p>
-                <ul className="option-features">
-                  <li>Create listings</li>
-                  <li>Manage inventory</li>
-                  <li>Process orders</li>
-                  <li>Track sales</li>
-                </ul>
-              </div>
-              <button className="option-select-btn">Select Seller</button>
-            </div>
-          </div>
-          
-          <div className="marketplace-info">
-            <p className="info-text">
-              <strong>Note:</strong> You can switch between buyer and seller mode anytime from your profile settings.
-            </p>
-          </div>
-        </div>
-        
-        <div className="modal-footer">
-          <button 
-            className="modal-secondary-btn"
-            onClick={onClose}
-          >
-            Maybe Later
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const Sidebar: React.FC<SidebarProps> = ({
   expand,
   toggleSigninModal,
@@ -225,10 +135,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   const token = localStorage.getItem("token") || null;
   const tokenData = decodeToken(token);
   const [hasPaid, setHasPaid] = useState(false);
-  const [userType, setUserType] = useState<string>(''); // Can be 'buyer', 'seller', or empty for normal user
+  const [userType, setUserType] = useState<'buyer' | 'seller'>('buyer');
   const [userData, setUserData] = useState<any>(null);
   const [showHypemodeModal, setShowHypemodeModal] = useState(false);
-  const [showMarketplaceSetupModal, setShowMarketplaceSetupModal] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -257,8 +166,6 @@ const Sidebar: React.FC<SidebarProps> = ({
       setUserData(response.data);
       if (response.data.userType) {
         setUserType(response.data.userType);
-      } else {
-        setUserType(''); // Normal user, no marketplace role
       }
     } catch (error) {
       console.error("User data fetch error:", error);
@@ -268,29 +175,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   const handleHypemodeClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (hasPaid) {
       event.preventDefault();
+      // Show professional popup instead of toast
       setShowHypemodeModal(true);
     } else if (!hasPaid) {
       navigate("/hypemode");
-    }
-  };
-
-  const handleMarketplaceClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!tokenData) {
-      toast.error("Please login first");
-      event.preventDefault();
-      return;
-    }
-
-    // If user hasn't set up marketplace profile
-    if (!userType) {
-      event.preventDefault();
-      setShowMarketplaceSetupModal(true);
-    }
-    // If user is a normal user (no marketplace role)
-    else if (userType === '' || !userType) {
-      event.preventDefault();
-      toast.info("Please setup your marketplace profile first");
-      setShowMarketplaceSetupModal(true);
     }
   };
 
@@ -298,7 +186,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     return window.location.pathname === path ? "text-active" : "";
   };
 
-  const handleSelectUserType = async (newType: 'buyer' | 'seller') => {
+  const changeUserType = async (newType: 'buyer' | 'seller') => {
     if (!tokenData) {
       toast.error("Please login first");
       return;
@@ -320,55 +208,17 @@ const Sidebar: React.FC<SidebarProps> = ({
         setUserType(newType);
         setUserData((prev: any) => ({ ...prev, userType: newType }));
         localStorage.setItem('marketplaceMode', newType);
-        toast.success(`Welcome to ${newType === 'seller' ? 'Seller' : 'Buyer'} mode!`);
-        setShowMarketplaceSetupModal(false);
-        
-        // Navigate to marketplace after setup
-        navigate("/marketplace");
+        toast.success(`Switched to ${newType} mode successfully!`);
       }
     } catch (error: any) {
       console.error("Error changing user type:", error);
-      toast.error(error.response?.data?.error || "Failed to setup marketplace profile");
+      toast.error(error.response?.data?.error || "Failed to switch mode");
     }
   };
 
   const renderMarketplaceSection = () => {
-    // Don't show marketplace section for non-logged in users
     if (!tokenData) return null;
 
-    // Don't show marketplace section for normal users (users without buyer/seller role)
-    if (!userType || userType === '') {
-      return (
-        <nav className="sidebar-section-container">
-          <div className="sidebar-section-header">
-            <h2 className={`sidebar-section-title ${expand ? "" : "collapsed"}`}>
-              Marketplace
-            </h2>
-          </div>
-          
-          <ul className="sidebar-section">
-            <div 
-              className={`sidebar-item ${expand ? "" : "collapsed"} marketplace-setup-item`}
-              onClick={() => setShowMarketplaceSetupModal(true)}
-            >
-              <RiStoreLine className="sidebar-icon" />
-              <span className="sidebar-text">Setup Marketplace</span>
-              <span className="setup-badge">New</span>
-            </div>
-          </ul>
-
-          {expand && (
-            <div className="marketplace-info-text">
-              <p className="info-text">
-                Setup your marketplace profile to start buying or selling.
-              </p>
-            </div>
-          )}
-        </nav>
-      );
-    }
-
-    // Show full marketplace section for buyer/seller users
     return (
       <nav className="sidebar-section-container">
         <div className="sidebar-section-header">
@@ -377,20 +227,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           </h2>
           {expand && (
             <div className="user-type-switcher">
-              <button 
-                className={`switch-btn ${userType === 'buyer' ? 'active' : ''}`}
-                onClick={() => handleSelectUserType('buyer')}
-                disabled={userType === 'buyer'}
-              >
-                Buyer
-              </button>
-              <button 
-                className={`switch-btn ${userType === 'seller' ? 'active' : ''}`}
-                onClick={() => handleSelectUserType('seller')}
-                disabled={userType === 'seller'}
-              >
-                Seller
-              </button>
+              {/* User type switch button could be added here if needed */}
             </div>
           )}
         </div>
@@ -421,7 +258,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               <Link
                 to="/marketplace/buyer-dashboard"
                 className={`sidebar-item ${getActiveClass(
-                  "/marketplace/buyer-dashboard"
+                  "/marketplace/dashboard"
                 )} ${expand ? "" : "collapsed"}`}
               >
                 <RiListCheck className="sidebar-icon" />
@@ -452,9 +289,9 @@ const Sidebar: React.FC<SidebarProps> = ({
               </Link>
 
               <Link
-                to="/marketplace/seller-dashboard"
+                to="/marketplace/dashboard"
                 className={`sidebar-item ${getActiveClass(
-                  "/marketplace/seller-dashboard"
+                  "/marketplace/dashboard"
                 )} ${expand ? "" : "collapsed"}`}
               >
                 <RiListCheck className="sidebar-icon" />
@@ -708,14 +545,6 @@ const Sidebar: React.FC<SidebarProps> = ({
         isOpen={showHypemodeModal}
         onClose={() => setShowHypemodeModal(false)}
         darkMode={darkMode}
-      />
-
-      {/* Marketplace Setup Modal */}
-      <MarketplaceSetupModal
-        isOpen={showMarketplaceSetupModal}
-        onClose={() => setShowMarketplaceSetupModal(false)}
-        darkMode={darkMode}
-        onSelectUserType={handleSelectUserType}
       />
     </>
   );
