@@ -335,12 +335,13 @@ const Layout: React.FC<LayoutProps> = ({
     return (
       <>
         <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider flex justify-between items-center">
-          <span>Marketplace</span>
-          <span className={`text-xs px-2 py-1 rounded-full ${userType === 'seller' ? 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300' : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-300'}`}>
-            {userType === 'seller' ? 'Seller' : 'Buyer'}
-          </span>
-        </div>
-
+  <span>Marketplace</span>
+  {userType && (
+    <span className={`text-xs px-2 py-1 rounded-full ${userType === 'seller' ? 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300' : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-300'}`}>
+      {userType === 'seller' ? 'Seller' : userType === 'buyer' ? 'Buyer' : ''}
+    </span>
+  )}
+</div>
         {/* Common items for both buyer and seller */}
           {userType === 'seller' && 'buyer' && (
           <>
