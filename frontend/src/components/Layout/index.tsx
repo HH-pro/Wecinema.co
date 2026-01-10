@@ -349,26 +349,26 @@ const Layout: React.FC<LayoutProps> = ({
     ) : null}
   </span>
 </div>
-        {/* Common items for both buyer and seller */}
-          {userType === 'seller' && (
-          <>
-        <Link
-          to="/marketplace"
-          className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace")}`}
-        >
-          <RiStoreLine size="20" />
-          <span>Browse Listings</span>
-        </Link>
+       {/* Common items for both buyer and seller - Show for ALL marketplace users */}
+{(userType === 'seller' || userType === 'buyer') && (
+  <>
+    <Link
+      to="/marketplace"
+      className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace")}`}
+    >
+      <RiStoreLine size="20" />
+      <span>Browse Listings</span>
+    </Link>
 
-        <Link
-          to="/marketplace/messages"
-          className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace/messages")}`}
-        >
-          <RiMessageLine size="20" />
-          <span>Messages</span>
-        </Link>
-     </>
-        )}
+    <Link
+      to="/marketplace/messages"
+      className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace/messages")}`}
+    >
+      <RiMessageLine size="20" />
+      <span>Messages</span>
+    </Link>
+  </>
+)}
         {/* Seller-only items */}
         {userType === 'seller' && (
           <>
