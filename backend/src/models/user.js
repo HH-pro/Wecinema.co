@@ -82,8 +82,11 @@ const userSchema = new Schema({
         type: String,
         enum: ['email', 'google'],
         default: 'email'
-    }
-
+    },
+ verificationToken: String,
+  verificationTokenExpiry: Date,
+  lastVerificationSent: Date, // Add this field
+  verifiedAt: Date,
 });
 
 // Utility method: calculate age
