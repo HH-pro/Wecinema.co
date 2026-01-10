@@ -24,7 +24,7 @@ import { FaSignOutAlt, FaMoon, FaSun, FaUser, FaShoppingCart, FaUserTie, FaInfoC
 import { LiaSignInAltSolid } from "react-icons/lia";
 import { HiUserAdd } from "react-icons/hi";
 import { IoSunnyOutline } from "react-icons/io5";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { API_BASE_URL } from "../../api";
@@ -133,6 +133,30 @@ const HypemodeSubscriptionModal: React.FC<{
   );
 };
 
+// Marketplace Setup Prompt Component for Mobile Sidebar
+const MarketplaceSetupPrompt: React.FC<{
+  darkMode: boolean;
+  onClick: () => void;
+}> = ({ darkMode, onClick }) => {
+  return (
+    <div 
+      className={`mb-4 p-3 rounded-lg cursor-pointer ${darkMode ? 'bg-yellow-900/20 border border-yellow-800' : 'bg-yellow-50 border border-yellow-200'}`}
+      onClick={onClick}
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <RiStoreLine className="text-yellow-500" size="18" />
+        <span className={`font-semibold ${darkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>Setup Marketplace</span>
+        <span className="ml-auto text-xs px-2 py-1 bg-yellow-100 dark:bg-yellow-800 text-yellow-600 dark:text-yellow-300 rounded-full">
+          New
+        </span>
+      </div>
+      <p className={`text-xs ${darkMode ? 'text-yellow-300/70' : 'text-yellow-700/70'}`}>
+        Complete your profile to start buying or selling
+      </p>
+    </div>
+  );
+};
+
 const Layout: React.FC<LayoutProps> = ({
   children,
   hasHeader = true,
@@ -144,7 +168,7 @@ const Layout: React.FC<LayoutProps> = ({
   );
   const [decodedToken, setDecodedToken] = useState<Itoken | null>(null);
   const [userData, setUserData] = useState<any>(null);
-  const [userType, setUserType] = useState<'buyer' | 'seller'>('buyer');
+  const [userType, setUserType] = useState<string>(''); // Can be 'buyer', 'seller', or empty for normal user
   const [hasPaid, setHasPaid] = useState(false);
   const isDarkMode = localStorage.getItem("isDarkMode") ?? false;
   const [darkMode, setDarkMode] = useState<boolean>(!!isDarkMode);
@@ -157,6 +181,7 @@ const Layout: React.FC<LayoutProps> = ({
     useState<boolean>(!hideSidebar);
 
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleResize = () => setScreenWidth(window.innerWidth);
@@ -186,9 +211,13 @@ const Layout: React.FC<LayoutProps> = ({
       if (response.data.userType) {
         setUserType(response.data.userType);
         localStorage.setItem('marketplaceMode', response.data.userType);
+      } else {
+        setUserType('');
+        localStorage.removeItem('marketplaceMode');
       }
     } catch (error) {
       console.error("User data fetch error:", error);
+      setUserType('');
     }
   };
 
@@ -233,6 +262,17 @@ const Layout: React.FC<LayoutProps> = ({
     }
   };
 
+  const handleMarketplaceSetup = () => {
+    if (!decodedToken) {
+      toast.error("Please login first");
+      setType("login");
+      setModalShow(true);
+      return;
+    }
+    navigate(`/user/${decodedToken.userId}`);
+    setExpanded(false);
+  };
+
   const setLightMode = () => {
     localStorage.removeItem("isDarkMode");
     setDarkMode(false);
@@ -251,7 +291,6 @@ const Layout: React.FC<LayoutProps> = ({
   const handleHypemodeClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (hasPaid) {
       event.preventDefault();
-      // Show professional popup instead of toast
       setShowHypemodeModal(true);
     } else if (!hasPaid) {
       // Navigate will be handled by Link
@@ -269,6 +308,101 @@ const Layout: React.FC<LayoutProps> = ({
   // Get active class for sidebar items
   const getActiveClass = (path: string) => {
     return location.pathname === path ? "bg-yellow-50 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-400" : "";
+  };
+
+  // Render marketplace section for mobile sidebar
+  const renderMarketplaceSection = () => {
+    if (!decodedToken) return null;
+
+    // Normal users (no userType set) - Show setup prompt
+    if (!userType || userType === '') {
+      return (
+        <>
+          <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            <span>Marketplace</span>
+          </div>
+          <MarketplaceSetupPrompt 
+            darkMode={darkMode} 
+            onClick={handleMarketplaceSetup}
+          />
+        </>
+      );
+    }
+
+    // Buyer/Seller users - Show full marketplace options
+    return (
+      <>
+        <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider flex justify-between items-center">
+          <span>Marketplace</span>
+          <span className={`text-xs px-2 py-1 rounded-full ${userType === 'seller' ? 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300' : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-300'}`}>
+            {userType === 'seller' ? 'Seller' : 'Buyer'}
+          </span>
+        </div>
+
+        <Link
+          to="/marketplace"
+          className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace")}`}
+        >
+          <RiStoreLine size="20" />
+          <span>Browse Listings</span>
+        </Link>
+
+        <Link
+          to="/marketplace/messages"
+          className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace/messages")}`}
+        >
+          <RiMessageLine size="20" />
+          <span>Messages</span>
+        </Link>
+
+        {userType === 'seller' && (
+          <Link
+            to="/marketplace/create"
+            className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace/create")}`}
+          >
+            <RiAddCircleLine size="20" />
+            <span>Create Listing</span>
+          </Link>
+        )}
+
+        <Link
+          to={userType === 'seller' ? "/marketplace/dashboard" : "/marketplace/buyer-dashboard"}
+          className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass(userType === 'seller' ? "/marketplace/dashboard" : "/marketplace/buyer-dashboard")}`}
+        >
+          <RiListCheck size="20" />
+          <span>{userType === 'seller' ? 'Seller' : 'Buyer'} Dashboard</span>
+        </Link>
+
+        {userType === 'buyer' && (
+          <Link
+            to="/marketplace/my-orders"
+            className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace/my-orders")}`}
+          >
+            <RiShoppingBagLine size="20" />
+            <span>My Orders</span>
+          </Link>
+        )}
+
+        {/* User Type Badge */}
+        <div className="px-4 py-2">
+          <span className={`text-xs px-2 py-1 rounded-full ${userType === 'seller' ? 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300' : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-300'}`}>
+            {userType === 'seller' ? (
+              <>
+                <FaUserTie className="inline mr-1" size="10" />
+                Seller Mode
+              </>
+            ) : (
+              <>
+                <FaShoppingCart className="inline mr-1" size="10" />
+                Buyer Mode
+              </>
+            )}
+          </span>
+        </div>
+
+        <div className="border-t border-gray-200 my-2"></div>
+      </>
+    );
   };
 
   // Add CSS styles inline or you can add them in your main CSS file
@@ -618,78 +752,8 @@ const Layout: React.FC<LayoutProps> = ({
                     <span>Chat Bot</span>
                   </Link>
 
-                  {/* ✅ Marketplace for logged-in users */}
-                  {decodedToken && (
-                    <>
-                      <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider flex justify-between items-center">
-                        <span>Marketplace</span>
-                       
-                      </div>
-
-                      <Link
-                        to="/marketplace"
-                        className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace")}`}
-                      >
-                        <RiStoreLine size="20" />
-                        <span>Browse Listings</span>
-                      </Link>
-
-                      <Link
-                        to="/marketplace/messages"
-                        className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace/messages")}`}
-                      >
-                        <RiMessageLine size="20" />
-                        <span>Messages</span>
-                      </Link>
-
-                      {userType === 'seller' && (
-                        <Link
-                          to="/marketplace/create"
-                          className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace/create")}`}
-                        >
-                          <RiAddCircleLine size="20" />
-                          <span>Create Listing</span>
-                        </Link>
-                      )}
-
-                      <Link
-                        to={userType === 'seller' ? "/marketplace/dashboard" : "/marketplace/buyer-dashboard"}
-                        className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass(userType === 'seller' ? "/marketplace/dashboard" : "/marketplace/buyer-dashboard")}`}
-                      >
-                        <RiListCheck size="20" />
-                        <span>{userType === 'seller' ? 'Seller' : 'Buyer'} Dashboard</span>
-                      </Link>
-
-                      {userType === 'buyer' && (
-                        <Link
-                          to="/marketplace/my-orders"
-                          className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/marketplace/my-orders")}`}
-                        >
-                          <RiShoppingBagLine size="20" />
-                          <span>My Orders</span>
-                        </Link>
-                      )}
-
-                      {/* User Type Badge */}
-                      <div className="px-4 py-2">
-                        <span className={`text-xs px-2 py-1 rounded-full ${userType === 'seller' ? 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300' : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-300'}`}>
-                          {userType === 'seller' ? (
-                            <>
-                              <FaUserTie className="inline mr-1" size="10" />
-                              Seller Mode
-                            </>
-                          ) : (
-                            <>
-                              <FaShoppingCart className="inline mr-1" size="10" />
-                              Buyer Mode
-                            </>
-                          )}
-                        </span>
-                      </div>
-
-                      <div className="border-t border-gray-200 my-2"></div>
-                    </>
-                  )}
+                  {/* ✅ Marketplace Section - Conditionally Rendered */}
+                  {decodedToken && renderMarketplaceSection()}
 
                   {/* Support */}
                   <Link
