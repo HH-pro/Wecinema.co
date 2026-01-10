@@ -823,7 +823,18 @@
     width: 36px;
     height: 36px;
   }
-  
+    .dropdown-menu--upload {
+  min-width: 100px;
+}
+
+.dropdown-menu--genre {
+  min-width: 50px;
+  max-height: 400px;
+}
+
+.dropdown-menu--rating {
+  min-width: 50px;
+}
   .mobile-search-form__submit {
     height: 36px;
     padding: 0 16px;
