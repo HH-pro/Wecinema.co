@@ -1091,7 +1091,7 @@
   }
   
   .dropdown-menu--genre .dropdown-menu__item {
-    padding: 2px 1px;
+    padding: 10px 10px;
     min-height: 40px;
     font-size: 12px;
   }
@@ -1100,7 +1100,7 @@
 /* Touch device optimizations */
 @media (hover: none) and (pointer: coarse) {
   .dropdown-menu__item {
-    padding: 1px 1px; /* Larger touch target */
+    padding: 10px 10px; /* Larger touch target */
     margin-bottom: 2px;
   }
   
