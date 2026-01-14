@@ -218,7 +218,8 @@ const RightIcon = styled.span`
 `;
 
 const ContactSection = styled.div`
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+     background: linear-gradient(135deg, #d69e35 0%, #ffd000 100%);
+
   color: white;
   padding: 2.5rem;
   border-radius: 16px;
