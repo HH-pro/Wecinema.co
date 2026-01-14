@@ -256,7 +256,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
       legend: {
         position: "top" as const,
         labels: {
-          color: "#2c3e50",
+          color: "#ffffff",
           font: { 
             size: isMobile ? 10 : 11,
             family: "'Inter', -apple-system, sans-serif",
