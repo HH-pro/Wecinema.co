@@ -351,7 +351,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
           lineWidth: 1.5,
         },
         ticks: { 
-          color: "#2c3e50", 
+          color: "#ffffff", 
           font: { 
             size: isMobile ? 9 : 10,
             family: "'Inter', -apple-system, sans-serif",
