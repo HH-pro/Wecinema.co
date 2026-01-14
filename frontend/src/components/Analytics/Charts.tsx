@@ -141,7 +141,6 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
                 data: labels.map((date: string) => ratingData[date]?.averageRating || 0),
                 borderColor: '#FF4757', // Bright Red
                 backgroundColor: 'transparent',
-                lable: "#fff",
                 borderWidth: 2,
                 tension: 0.4,
                 pointRadius: 2,
