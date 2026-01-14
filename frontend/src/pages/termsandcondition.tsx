@@ -3,6 +3,12 @@ import '../styles/terms-and-conditions.css';
 import { Layout } from '../components';
 
 const TermsAndConditions = () => {
+  const currentDate = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
   return (
     <Layout expand={false} hasHeader={true}>
       <div className="terms-conditions-wrapper">
@@ -10,7 +16,7 @@ const TermsAndConditions = () => {
           <header className="terms-header">
             <h1 className="terms-title">WeCinema Terms & Conditions</h1>
             <div className="terms-meta">
-              <p className="effective-date">Effective: [Date]</p>
+              <p className="effective-date">Effective: {currentDate}</p>
               <p className="agreement-type">Platform Agreement for Video Distribution & Marketplace</p>
             </div>
           </header>
@@ -88,18 +94,54 @@ const TermsAndConditions = () => {
                       <h5>Basic Upload</h5>
                       <p className="percentage">Platform takes 30% of revenue</p>
                       <p>Standard distribution and hosting</p>
+                      <div className="features">
+                        <span>✓ Basic analytics</span>
+                        <span>✓ Standard encoding</span>
+                        <span>✓ 720p streaming</span>
+                      </div>
                     </div>
+                    
                     <div className="revenue-tier featured">
                       <h5>Premium Partnership</h5>
                       <p className="percentage">Platform takes 20% of revenue</p>
                       <p>Enhanced promotion and distribution</p>
+                      <div className="features">
+                        <span>✓ Advanced analytics</span>
+                        <span>✓ 4K encoding</span>
+                        <span>✓ Priority support</span>
+                        <span>✓ Custom thumbnails</span>
+                      </div>
                     </div>
+                    
                     <div className="revenue-tier">
                       <h5>Exclusive Content</h5>
                       <p className="percentage">Platform takes 40% of revenue</p>
                       <p>Maximum exposure and marketing support</p>
+                      <div className="features">
+                        <span>✓ Featured placement</span>
+                        <span>✓ Social media promotion</span>
+                        <span>✓ Email marketing</span>
+                        <span>✓ Dedicated account manager</span>
+                      </div>
+                    </div>
+                    
+                    <div className="revenue-tier hypemode-tier">
+                      <div className="hypemode-badge">🔥 Hypemode</div>
+                      <h5>Hypemode Feature</h5>
+                      <p className="percentage hypemode-percentage">Platform takes 15% of revenue</p>
+                      <p>Enhanced marketplace visibility and promotion</p>
+                      <div className="features">
+                        <span>✓ Top search ranking</span>
+                        <span>✓ "Trending" badge</span>
+                        <span>✓ Push notifications</span>
+                        <span>✓ Homepage featuring</span>
+                        <span>✓ Priority in recommendations</span>
+                      </div>
                     </div>
                   </div>
+                  <p className="revenue-note">
+                    <strong>Note:</strong> Revenue share percentages apply to net revenue after payment processing fees (Stripe: 2.9% + $0.30 per transaction).
+                  </p>
                 </div>
               </div>
             </section>
@@ -138,6 +180,18 @@ const TermsAndConditions = () => {
                     </div>
                   </div>
                 </div>
+                <div className="term-clause">
+                  <h4 className="clause-title">3.3 Hypemode Listings</h4>
+                  <p>Listings enabled with Hypemode feature receive:</p>
+                  <ul className="terms-list">
+                    <li>Premium placement in marketplace search results</li>
+                    <li>Special "Trending" badge for increased visibility</li>
+                    <li>Push notification alerts to interested buyers</li>
+                    <li>Featured placement on homepage</li>
+                    <li>Reduced platform fee of 15% (instead of standard 30%)</li>
+                    <li>Automatic inclusion in weekly "Featured Collections"</li>
+                  </ul>
+                </div>
               </div>
             </section>
 
@@ -149,13 +203,43 @@ const TermsAndConditions = () => {
                   <p>WeCinema uses Stripe for secure payment processing:</p>
                   <ul className="terms-list">
                     <li>All transactions processed through Stripe</li>
-                    <li>Platform fee: 5% per transaction (in addition to revenue share)</li>
+                    <li>Standard platform fee: 5% per transaction (in addition to revenue share)</li>
+                    <li>Hypemode transactions: 5% platform fee + 15% revenue share</li>
                     <li>Payment held in escrow until order completion</li>
                     <li>Refunds processed within 7-10 business days</li>
                   </ul>
                 </div>
                 <div className="term-clause">
-                  <h4 className="clause-title">4.2 Payment Release Conditions</h4>
+                  <h4 className="clause-title">4.2 Fee Structure</h4>
+                  <div className="fee-breakdown">
+                    <div className="fee-card">
+                      <h5>Standard Upload</h5>
+                      <div className="fee-details">
+                        <p>Platform Fee: <strong>5%</strong></p>
+                        <p>Revenue Share: <strong>30%</strong></p>
+                        <p className="total-fee">Total: <span>35%</span></p>
+                      </div>
+                    </div>
+                    <div className="fee-card">
+                      <h5>Premium Partnership</h5>
+                      <div className="fee-details">
+                        <p>Platform Fee: <strong>5%</strong></p>
+                        <p>Revenue Share: <strong>20%</strong></p>
+                        <p className="total-fee">Total: <span>25%</span></p>
+                      </div>
+                    </div>
+                    <div className="fee-card">
+                      <h5>Hypemode Feature</h5>
+                      <div className="fee-details">
+                        <p>Platform Fee: <strong>5%</strong></p>
+                        <p>Revenue Share: <strong>15%</strong></p>
+                        <p className="total-fee hypemode-total">Total: <span>20%</span></p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="term-clause">
+                  <h4 className="clause-title">4.3 Payment Release Conditions</h4>
                   <p>Payments are released to sellers when:</p>
                   <ul className="terms-list">
                     <li>Buyer confirms work completion</li>
@@ -165,7 +249,7 @@ const TermsAndConditions = () => {
                   </ul>
                 </div>
                 <div className="term-clause">
-                  <h4 className="clause-title">4.3 Dispute Resolution</h4>
+                  <h4 className="clause-title">4.4 Dispute Resolution</h4>
                   <p>In case of transaction disputes:</p>
                   <ul className="terms-list">
                     <li>Platform mediates through chat history and evidence</li>
@@ -306,8 +390,9 @@ const TermsAndConditions = () => {
                 <h3>Acceptance of Terms</h3>
                 <p>By using WeCinema.co, you acknowledge that you have read, understood, and agree to be bound by these Terms & Conditions, including our Privacy Policy and Acceptable Use Policy.</p>
                 <div className="last-updated">
-                  <p><strong>Last Updated:</strong> [Date]</p>
-                  <p><strong>Version:</strong> 2.0</p>
+                  <p><strong>Last Updated:</strong> {currentDate}</p>
+                  <p><strong>Version:</strong> 2.1</p>
+                  <p><strong>Includes:</strong> Hypemode Feature Terms</p>
                 </div>
               </div>
             </div>
