@@ -73,6 +73,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
             const datasets = genreTotals.map(({ genre }, index) => {
               const colors = getRandomColorSet(index);
               return {
+                label: genre,
                 data: labels.map((date: string) => genreData[genre][date]?.count || 0),
                 borderColor: colors.lineColor,
                 backgroundColor: 'transparent',
@@ -255,7 +256,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
       legend: {
         position: "top" as const,
         labels: {
-          color: "#2c3e50",
+          color: "#fffff",
           font: { 
             size: isMobile ? 10 : 11,
             family: "'Inter', -apple-system, sans-serif",
