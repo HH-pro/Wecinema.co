@@ -208,7 +208,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
       { lineColor: '#FFB8B8', pointColor: '#FF9F9F' }, // Light Pink
       { lineColor: '#C56CF0', pointColor: '#AE2CFF' }, // Bright Purple
       { lineColor: '#FFAF40', pointColor: '#FF9F00' }, // Amber
-      { lineColor: '#3D3D3D', pointColor: '#000000' }, // Black (for contrast)
+      { lineColor: '#3D3D3D', pointColor: '#FFFFFF' }, // Black (for contrast)
       { lineColor: '#7BED9F', pointColor: '#55E6C1' }, // Mint
       { lineColor: '#70A1FF', pointColor: '#1B9CFC' }, // Sky Blue
       { lineColor: '#FF9FF3', pointColor: '#F368E0' }, // Magenta
