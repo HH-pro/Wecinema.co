@@ -256,7 +256,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
       legend: {
         position: "top" as const,
         labels: {
-          color: "#000000",
+          color: "#fffff",
           font: { 
             size: isMobile ? 10 : 11,
             family: "'Inter', -apple-system, sans-serif",
@@ -285,7 +285,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
         intersect: false,
         backgroundColor: "rgba(255, 255, 255, 0.98)",
         titleColor: "#ffffff",
-        bodyColor: "#ffffff",
+        bodyColor: "#34495e",
         titleFont: {
           size: isMobile ? 11 : 12,
           family: "'Inter', -apple-system, sans-serif",
