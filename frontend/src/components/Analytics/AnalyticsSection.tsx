@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Charts from "./Charts";
 import "./Analytics.css";
 
@@ -12,6 +12,7 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
   const [showGraphs, setShowGraphs] = useState(true);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const sectionRef = useRef<HTMLDivElement>(null);
 
   // Check screen size
   useEffect(() => {
@@ -25,13 +26,13 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // // Check localStorage for user preference
-  // useEffect(() => {
-  //   const userPreference = localStorage.getItem('analyticsGraphsVisible');
-  //   if (userPreference !== null) {
-  //     setShowGraphs(userPreference === 'true');
-  //   }
-  // }, []);
+  // Check localStorage for user preference
+  useEffect(() => {
+    const userPreference = localStorage.getItem('analyticsGraphsVisible');
+    if (userPreference !== null) {
+      setShowGraphs(userPreference === 'true');
+    }
+  }, []);
 
   const handleToggle = () => {
     setIsAnimating(true);
@@ -45,11 +46,14 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
   };
 
   return (
-    <div className={`analytics-wrapper ${showGraphs ? 'expanded' : 'collapsed'}`}>
+    <div 
+      className={`analytics-wrapper ${showGraphs ? 'expanded' : 'collapsed'}`}
+      ref={sectionRef}
+    >
       
       {/* Yellow Theme Compact Bar (When Graphs Hidden) */}
       {!showGraphs && (
-        <div className="yellow-compact-bar">
+        <div className="yellow-compact-bar" onClick={handleToggle}>
           <div className="yellow-bar-content">
             <div className="yellow-bar-left">
               <div className="yellow-bar-icon">
