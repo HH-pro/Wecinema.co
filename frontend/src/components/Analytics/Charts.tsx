@@ -272,8 +272,6 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
       ? dataset.label.substring(0, isMobile ? 8 : 12) + '...'
       : dataset.label,
   color: '#ffffff', // 👈 label text white
-              fillStyle: dataset.pointBorderColor as string,
-              strokeStyle: dataset.pointBorderColor as string,
               lineWidth: 2,
               hidden: !chart.isDatasetVisible(i),
               index: i
