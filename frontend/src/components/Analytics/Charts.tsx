@@ -139,7 +139,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
               {
                 label: "Avg Rating",
                 data: labels.map((date: string) => ratingData[date]?.averageRating || 0),
-                borderColor: '#fff', // Bright Red
+                borderColor: '#FF4757', // Bright Red
                 backgroundColor: 'transparent',
                 borderWidth: 2,
                 tension: 0.4,
@@ -147,7 +147,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
                 pointHoverRadius: 5,
                 pointBackgroundColor: '#ffffff',
                 pointBorderColor: '#FF4757',
-                pointBorderWidth: 3,
+                pointBorderWidth: 1,
                 fill: false,
                 cubicInterpolationMode: 'monotone' as const,
               },
