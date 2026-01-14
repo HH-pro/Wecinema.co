@@ -77,10 +77,10 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
                 data: labels.map((date: string) => genreData[genre][date]?.count || 0),
                 borderColor: colors.lineColor,
                 backgroundColor: 'transparent',
-                borderWidth: 2,
+                borderWidth: 3,
                 tension: 0.4,
-                pointRadius: 2,
-                pointHoverRadius: 5,
+                pointRadius: 3,
+                pointHoverRadius: 6,
                 pointBackgroundColor: '#ffffff',
                 pointBorderColor: colors.pointColor,
                 pointBorderWidth: 3,
@@ -95,7 +95,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
             });
           }
 
-          // Process Theme Chart Data
+          // Process Theme Chart Data - WITH WHITE LABELS
           if (themeData && Object.keys(themeData).length > 0) {
             const firstKey = Object.keys(themeData)[0];
             const labels = Object.keys(themeData[firstKey]).reverse();
@@ -113,10 +113,10 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
                 data: labels.map((date: string) => themeData[theme][date]?.count || 0),
                 borderColor: colors.lineColor,
                 backgroundColor: 'transparent',
-                borderWidth: 2,
+                borderWidth: 3,
                 tension: 0.4,
-                pointRadius: 4,
-                pointHoverRadius: 5,
+                pointRadius: 3,
+                pointHoverRadius: 6,
                 pointBackgroundColor: '#ffffff',
                 pointBorderColor: colors.pointColor,
                 pointBorderWidth: 3,
@@ -141,10 +141,10 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
                 data: labels.map((date: string) => ratingData[date]?.averageRating || 0),
                 borderColor: '#FF4757', // Bright Red
                 backgroundColor: 'transparent',
-                borderWidth: 2,
+                borderWidth: 3,
                 tension: 0.4,
-                pointRadius: 2,
-                pointHoverRadius: 5,
+                pointRadius: 3,
+                pointHoverRadius: 6,
                 pointBackgroundColor: '#ffffff',
                 pointBorderColor: '#FF4757',
                 pointBorderWidth: 3,
@@ -156,10 +156,10 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
                 data: labels.map((date: string) => ratingData[date]?.totalRatings || 0),
                 borderColor: '#2ED573', // Bright Green
                 backgroundColor: 'transparent',
-                borderWidth: 2,
+                borderWidth: 3,
                 tension: 0.4,
-                pointRadius: 2,
-                pointHoverRadius: 5,
+                pointRadius: 3,
+                pointHoverRadius: 6,
                 pointBackgroundColor: '#ffffff',
                 pointBorderColor: '#2ED573',
                 pointBorderWidth: 3,
@@ -208,7 +208,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
       { lineColor: '#FFB8B8', pointColor: '#FF9F9F' }, // Light Pink
       { lineColor: '#C56CF0', pointColor: '#AE2CFF' }, // Bright Purple
       { lineColor: '#FFAF40', pointColor: '#FF9F00' }, // Amber
-      { lineColor: '#3D3D3D', pointColor: '#FFFFFF' }, // Black (for contrast)
+      { lineColor: '#3D3D3D', pointColor: '#FFFFFF' }, // White point for dark line
       { lineColor: '#7BED9F', pointColor: '#55E6C1' }, // Mint
       { lineColor: '#70A1FF', pointColor: '#1B9CFC' }, // Sky Blue
       { lineColor: '#FF9FF3', pointColor: '#F368E0' }, // Magenta
@@ -221,7 +221,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
       { lineColor: '#FF9A76', pointColor: '#FF7F50' }, // Salmon
       { lineColor: '#58B19F', pointColor: '#3B8D73' }, // Sea Green
       { lineColor: '#FD7272', pointColor: '#FC5C65' }, // Watermelon
-      { lineColor: '#9AECDB', pointColor: '#81ECEC' },
+      { lineColor: '#9AECDB', pointColor: '#81ECEC' }, // Aqua
     ];
     return colorSets[index % colorSets.length];
   };
@@ -248,15 +248,16 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
     });
   };
 
-  // Chart options with colorful theme
-  const chartOptions = (): ChartOptions<"line"> => ({
+  // Chart options with colorful theme and WHITE LABELS
+  const chartOptions = (chartType?: string): ChartOptions<"line"> => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
         position: "top" as const,
         labels: {
-          color: "#2c3e50",
+          // Theme chart के labels को white करें, बाकी को dark
+          color: chartType === 'theme' ? '#FFFFFF' : '#2c3e50',
           font: { 
             size: isMobile ? 10 : 11,
             family: "'Inter', -apple-system, sans-serif",
@@ -284,9 +285,9 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
         enabled: true,
         mode: 'index',
         intersect: false,
-        backgroundColor: "rgba(255, 255, 255, 0.98)",
-        titleColor: "#2c3e50",
-        bodyColor: "#34495e",
+        backgroundColor: chartType === 'theme' ? "rgba(0, 0, 0, 0.85)" : "rgba(255, 255, 255, 0.98)",
+        titleColor: chartType === 'theme' ? "#FFFFFF" : "#2c3e50",
+        bodyColor: chartType === 'theme' ? "#F0F0F0" : "#34495e",
         titleFont: {
           size: isMobile ? 11 : 12,
           family: "'Inter', -apple-system, sans-serif",
@@ -298,8 +299,8 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
           weight: '600' as const
         },
         padding: 14,
-        cornerRadius: 6,
-        borderColor: "rgba(0, 0, 0, 0.08)",
+        cornerRadius: 8,
+        borderColor: chartType === 'theme' ? "rgba(255, 255, 255, 0.2)" : "rgba(0, 0, 0, 0.08)",
         borderWidth: 1,
         displayColors: true,
         boxPadding: 6,
@@ -321,12 +322,12 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
     scales: {
       y: {
         grid: {
-          color: "rgba(255, 255, 255, 0.06)",
+          color: chartType === 'theme' ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.06)",
           drawBorder: false,
           lineWidth: 1.5,
         },
         ticks: { 
-          color: "#2c3e50", 
+          color: chartType === 'theme' ? "#FFFFFF" : "#2c3e50", 
           font: { 
             size: isMobile ? 9 : 10,
             family: "'Inter', -apple-system, sans-serif",
@@ -349,12 +350,12 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
       x: {
         reverse: true,
         grid: {
-          color: "rgba(0, 0, 0, 0.06)",
+          color: chartType === 'theme' ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.06)",
           drawBorder: false,
           lineWidth: 1.5,
         },
         ticks: { 
-          color: "#2c3e50", 
+          color: chartType === 'theme' ? "#FFFFFF" : "#2c3e50", 
           font: { 
             size: isMobile ? 9 : 10,
             family: "'Inter', -apple-system, sans-serif",
@@ -373,12 +374,12 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
     elements: {
       line: { 
         tension: 0.4, 
-        borderWidth: 2,
+        borderWidth: 3,
         fill: false,
       },
       point: { 
-        radius: 2,
-        hoverRadius: 9,
+        radius: 3,
+        hoverRadius: 7,
         backgroundColor: "#ffffff",
         borderWidth: 3,
         hoverBorderWidth: 4,
@@ -409,21 +410,24 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
       title: "Genre Trends", 
       description: "Popularity over time",
       icon: "🎬",
-      colors: getIconColors(0)
+      colors: getIconColors(0),
+      type: 'genre'
     },
     { 
       data: themeChartData, 
       title: "Theme Analysis", 
       description: "Engagement metrics",
       icon: "🎯",
-      colors: getIconColors(1)
+      colors: getIconColors(1),
+      type: 'theme'  // यहाँ type specify किया है
     },
     { 
       data: ratingChartData, 
       title: "Ratings Overview", 
       description: "Average & total ratings",
       icon: "⭐",
-      colors: getIconColors(2)
+      colors: getIconColors(2),
+      type: 'rating'
     },
   ];
 
@@ -439,24 +443,43 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
           style={{
             '--icon-color-1': chart.colors.color1,
             '--icon-color-2': chart.colors.color2,
+            // Theme chart के लिए background color change
+            backgroundColor: chart.type === 'theme' ? 'rgba(40, 44, 52, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+            borderColor: chart.type === 'theme' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+            color: chart.type === 'theme' ? '#FFFFFF' : 'inherit'
           } as React.CSSProperties}
         >
           <div className="yellow-chart-header">
             <div className="yellow-chart-title-section">
               <div className="yellow-chart-icon" style={{ 
                 borderColor: `${chart.colors.color1}80`,
-                background: `linear-gradient(135deg, ${chart.colors.color1}30, ${chart.colors.color2}20)`
+                background: `linear-gradient(135deg, ${chart.colors.color1}30, ${chart.colors.color2}20)`,
+                color: chart.type === 'theme' ? '#FFFFFF' : 'inherit'
               }}>
                 <span>{chart.icon}</span>
               </div>
               <div className="yellow-chart-text">
-                <h3 className="yellow-chart-title">{chart.title}</h3>
-                <p className="yellow-chart-description">{chart.description}</p>
+                <h3 className="yellow-chart-title" style={{ 
+                  color: chart.type === 'theme' ? '#FFFFFF' : '#78350f' 
+                }}>
+                  {chart.title}
+                </h3>
+                <p className="yellow-chart-description" style={{ 
+                  color: chart.type === 'theme' ? 'rgba(255, 255, 255, 0.8)' : '#92400e' 
+                }}>
+                  {chart.description}
+                </p>
               </div>
             </div>
             <div className="yellow-chart-status">
               <span className="yellow-status-dot"></span>
-              <span className="yellow-status-text">Live</span>
+              <span className="yellow-status-text" style={{ 
+                color: chart.type === 'theme' ? '#32FF7E' : '#10b981',
+                background: chart.type === 'theme' ? 'rgba(50, 255, 126, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                borderColor: chart.type === 'theme' ? 'rgba(50, 255, 126, 0.2)' : 'rgba(16, 185, 129, 0.2)'
+              }}>
+                Live
+              </span>
             </div>
           </div>
           
@@ -464,11 +487,14 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
             {chart.data ? (
               <Line 
                 data={chart.data} 
-                options={chartOptions()} 
+                options={chartOptions(chart.type)} 
                 height={isMobile ? 140 : 150}
               />
             ) : (
-              <div className="yellow-no-data">
+              <div className="yellow-no-data" style={{ 
+                background: chart.type === 'theme' ? 'rgba(0, 0, 0, 0.3)' : 'rgba(254, 243, 199, 0.5)',
+                color: chart.type === 'theme' ? '#FFFFFF' : '#92400e'
+              }}>
                 <div className="yellow-no-data-icon">📊</div>
                 <span>No data available</span>
               </div>
@@ -478,17 +504,29 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
           <div className="yellow-chart-footer">
             <div className="yellow-footer-info">
               <span className="yellow-info-item">
-                <span className="yellow-info-label">Data Points:</span>
-                <span className="yellow-info-value">{chart.data?.labels.length || 0}</span>
+                <span className="yellow-info-label" style={{ 
+                  color: chart.type === 'theme' ? 'rgba(255, 255, 255, 0.7)' : '#92400e' 
+                }}>
+                  Data Points:
+                </span>
+                <span className="yellow-info-value" style={{ 
+                  color: chart.type === 'theme' ? '#FFFFFF' : '#78350f' 
+                }}>
+                  {chart.data?.labels.length || 0}
+                </span>
               </span>
               <span className="yellow-info-item">
-                <span className="yellow-info-label">Status:</span>
+                <span className="yellow-info-label" style={{ 
+                  color: chart.type === 'theme' ? 'rgba(255, 255, 255, 0.7)' : '#92400e' 
+                }}>
+                  Status:
+                </span>
                 <span className="yellow-info-trend" style={{
                   backgroundColor: idx === 0 ? 'rgba(255, 107, 139, 0.15)' : 
-                                   idx === 1 ? 'rgba(46, 213, 115, 0.15)' : 
+                                   idx === 1 ? 'rgba(50, 255, 126, 0.15)' : 
                                    'rgba(30, 144, 255, 0.15)',
                   color: idx === 0 ? '#FF4757' : 
-                         idx === 1 ? '#1DD1A1' : 
+                         idx === 1 ? '#32FF7E' : 
                          '#3742FA'
                 }}>
                   {idx === 2 ? '↗ Rising' : '→ Stable'}
