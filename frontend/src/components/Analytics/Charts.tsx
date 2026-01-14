@@ -451,6 +451,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
               </div>
               <div className="yellow-chart-text">
                 <h3 className="yellow-chart-title">{chart.title}</h3>
+                <p className="yellow-chart-description">{chart.description}</p>
               </div>
             </div>
             <div className="yellow-chart-status">
