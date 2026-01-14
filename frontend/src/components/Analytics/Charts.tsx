@@ -109,7 +109,6 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
             const datasets = themeTotals.map(({ theme }, index) => {
               const colors = getRandomColorSet(index + 3);
               return {
-                label: theme,
                 data: labels.map((date: string) => themeData[theme][date]?.count || 0),
                 borderColor: colors.lineColor,
                 backgroundColor: 'transparent',
