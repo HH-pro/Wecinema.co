@@ -221,7 +221,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
       { lineColor: '#FF9A76', pointColor: '#FF7F50' }, // Salmon
       { lineColor: '#58B19F', pointColor: '#3B8D73' }, // Sea Green
       { lineColor: '#FD7272', pointColor: '#FC5C65' }, // Watermelon
-      { lineColor: '#9AECDB', pointColor: #81ECEC' }, // Aqua
+      { lineColor: '#9AECDB', pointColor: '#81ECEC' },
     ];
     return colorSets[index % colorSets.length];
   };
