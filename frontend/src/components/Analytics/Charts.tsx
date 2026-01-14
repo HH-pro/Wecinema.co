@@ -248,15 +248,16 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
     });
   };
 
-  // Chart options with colorful theme
-  const chartOptions = (): ChartOptions<"line"> => ({
+  // Chart options with colorful theme - THEME CHART के लिए WHITE LABELS
+  const chartOptions = (chartIndex?: number): ChartOptions<"line"> => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
         position: "top" as const,
         labels: {
-          color: "#2c3e50",
+          // ONLY Theme chart (index 1) के labels white करें
+          color: chartIndex === 1 ? '#FFFFFF' : "#2c3e50",
           font: { 
             size: isMobile ? 10 : 11,
             family: "'Inter', -apple-system, sans-serif",
@@ -321,7 +322,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
     scales: {
       y: {
         grid: {
-          color: "rgba(255, 255, 255, 0.06)",
+          color: "rgba(0, 0, 0, 0.06)",
           drawBorder: false,
           lineWidth: 1.5,
         },
@@ -439,19 +440,31 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
           style={{
             '--icon-color-1': chart.colors.color1,
             '--icon-color-2': chart.colors.color2,
+            // Theme chart (index 1) के लिए background dark करें
+            backgroundColor: idx === 1 ? 'rgba(30, 30, 40, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+            borderColor: idx === 1 ? 'rgba(255, 255, 255, 0.2)' : 'rgba(245, 158, 11, 0.2)',
           } as React.CSSProperties}
         >
           <div className="yellow-chart-header">
             <div className="yellow-chart-title-section">
               <div className="yellow-chart-icon" style={{ 
                 borderColor: `${chart.colors.color1}80`,
-                background: `linear-gradient(135deg, ${chart.colors.color1}30, ${chart.colors.color2}20)`
+                background: `linear-gradient(135deg, ${chart.colors.color1}30, ${chart.colors.color2}20)`,
+                color: idx === 1 ? '#FFFFFF' : 'inherit'
               }}>
                 <span>{chart.icon}</span>
               </div>
               <div className="yellow-chart-text">
-                <h3 className="yellow-chart-title">{chart.title}</h3>
-                <p className="yellow-chart-description">{chart.description}</p>
+                <h3 className="yellow-chart-title" style={{ 
+                  color: idx === 1 ? '#FFFFFF' : '#78350f' 
+                }}>
+                  {chart.title}
+                </h3>
+                <p className="yellow-chart-description" style={{ 
+                  color: idx === 1 ? 'rgba(255, 255, 255, 0.8)' : '#92400e' 
+                }}>
+                  {chart.description}
+                </p>
               </div>
             </div>
             <div className="yellow-chart-status">
@@ -464,11 +477,14 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
             {chart.data ? (
               <Line 
                 data={chart.data} 
-                options={chartOptions()} 
+                options={chartOptions(idx)} // idx pass करें ताकि theme chart पहचान सकें
                 height={isMobile ? 140 : 150}
               />
             ) : (
-              <div className="yellow-no-data">
+              <div className="yellow-no-data" style={{ 
+                background: idx === 1 ? 'rgba(0, 0, 0, 0.3)' : 'rgba(254, 243, 199, 0.5)',
+                color: idx === 1 ? '#FFFFFF' : '#92400e'
+              }}>
                 <div className="yellow-no-data-icon">📊</div>
                 <span>No data available</span>
               </div>
@@ -478,17 +494,29 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
           <div className="yellow-chart-footer">
             <div className="yellow-footer-info">
               <span className="yellow-info-item">
-                <span className="yellow-info-label">Data Points:</span>
-                <span className="yellow-info-value">{chart.data?.labels.length || 0}</span>
+                <span className="yellow-info-label" style={{ 
+                  color: idx === 1 ? 'rgba(255, 255, 255, 0.7)' : '#92400e' 
+                }}>
+                  Data Points:
+                </span>
+                <span className="yellow-info-value" style={{ 
+                  color: idx === 1 ? '#FFFFFF' : '#78350f' 
+                }}>
+                  {chart.data?.labels.length || 0}
+                </span>
               </span>
               <span className="yellow-info-item">
-                <span className="yellow-info-label">Status:</span>
+                <span className="yellow-info-label" style={{ 
+                  color: idx === 1 ? 'rgba(255, 255, 255, 0.7)' : '#92400e' 
+                }}>
+                  Status:
+                </span>
                 <span className="yellow-info-trend" style={{
                   backgroundColor: idx === 0 ? 'rgba(255, 107, 139, 0.15)' : 
-                                   idx === 1 ? 'rgba(46, 213, 115, 0.15)' : 
+                                   idx === 1 ? 'rgba(50, 255, 126, 0.15)' : 
                                    'rgba(30, 144, 255, 0.15)',
                   color: idx === 0 ? '#FF4757' : 
-                         idx === 1 ? '#1DD1A1' : 
+                         idx === 1 ? '#32FF7E' : 
                          '#3742FA'
                 }}>
                   {idx === 2 ? '↗ Rising' : '→ Stable'}
