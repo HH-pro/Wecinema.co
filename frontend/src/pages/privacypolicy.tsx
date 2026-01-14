@@ -513,7 +513,6 @@ const PrivacyPolicy = () => {
               <Paragraph>
                 <strong>Email:</strong> privacy@wecinema.co<br />
                 <strong>Support:</strong> support@wecinema.co<br />
-                <strong>Business Hours:</strong> Mon-Fri, 9 AM - 6 PM [Your Timezone]
               </Paragraph>
             </ContactSection>
             
