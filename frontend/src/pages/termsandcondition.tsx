@@ -178,23 +178,7 @@ const TermsAndConditions = () => {
                   </ul>
                 </div>
                 <div className="term-clause">
-                  <h4 className="clause-title">4.2 Fee Structure</h4>
-                  <div className="fee-breakdown">
-                    <div className="fee-card">
-                      <h5>Standard Upload</h5>
-                      <div className="fee-details">
-                        <p>Platform Fee: <strong>5%</strong></p>
-                        <p>Revenue Share: <strong>30%</strong></p>
-                        <p className="total-fee">Total: <span>35%</span></p>
-                      </div>
-                    </div>
-                    <div className="fee-card">
-                      <h5>Premium Partnership</h5>
-                      <div className="fee-details">
-                        <p>Platform Fee: <strong>5%</strong></p>
-                        <p>Revenue Share: <strong>20%</strong></p>
-                        <p className="total-fee">Total: <span>25%</span></p>
-                      </div>
+                  
                     </div>
                     <div className="fee-card">
                       <h5>Hypemode Feature</h5>
