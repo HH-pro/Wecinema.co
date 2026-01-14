@@ -295,7 +295,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
         bodyFont: {
           size: isMobile ? 10 : 11,
           family: "'Inter', -apple-system, sans-serif",
-          weight: '300' as const
+          weight: '600' as const
         },
         padding: 14,
         cornerRadius: 12,
