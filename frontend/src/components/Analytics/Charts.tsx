@@ -284,7 +284,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
         mode: 'index',
         intersect: false,
         backgroundColor: "rgba(255, 255, 255, 0.98)",
-        titleColor: "#ffffff",
+        titleColor: "#2c3e50",
         bodyColor: "#34495e",
         titleFont: {
           size: isMobile ? 11 : 12,
