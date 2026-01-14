@@ -321,7 +321,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
     scales: {
       y: {
         grid: {
-          color: "#ffffff",
+          color: "rgba(255, 255, 255, 0.06)",
           drawBorder: false,
           lineWidth: 1.5,
         },
