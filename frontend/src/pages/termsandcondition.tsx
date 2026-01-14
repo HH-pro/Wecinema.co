@@ -181,7 +181,6 @@ const TermsAndConditions = () => {
                   
                     <div className="fee-card">
                      
-                      </div>
                     </div>
                   </div>
                 </div>
