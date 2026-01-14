@@ -12,7 +12,8 @@ const Container = styled.div`
   max-width: 1200px;
   margin: 0 auto;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+     background: linear-gradient(135deg, #d69e35 0%, #ffd000 100%);
+
   padding: 2rem 1rem;
 `;
 
@@ -30,7 +31,8 @@ const PrivacyWrapper = styled.div`
     left: 0;
     right: 0;
     height: 4px;
-    background: linear-gradient(90deg, #667eea, #764ba2);
+       background: linear-gradient(135deg, #d69e35 0%, #ffd000 100%);
+
   }
 `;
 
@@ -46,7 +48,8 @@ const Title = styled.h1`
   font-weight: 700;
   color: #2d3748;
   margin-bottom: 1rem;
-  background: linear-gradient(90deg, #667eea, #764ba2);
+    background: linear-gradient(135deg, #d69e35 0%, #ffd000 100%);
+
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
