@@ -260,7 +260,6 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
           font: { 
             size: isMobile ? 10 : 11,
             family: "'Inter', -apple-system, sans-serif",
-            weight: '600' as const
           },
           usePointStyle: true,
           boxWidth: 8,
