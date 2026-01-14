@@ -9,7 +9,7 @@ interface AnalyticsSectionProps {
 const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({ 
   title = "Analytics Dashboard" 
 }) => {
-  const [showGraphs, setShowGraphs] = useState(true);
+  const [showGraphs, setShowGraphs] = useState(true); // Default to true
   const [isAnimating, setIsAnimating] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -26,12 +26,14 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Check localStorage for user preference
+  // Check localStorage for user preference - ONLY AFTER initial render
   useEffect(() => {
     const userPreference = localStorage.getItem('analyticsGraphsVisible');
     if (userPreference !== null) {
+      // Only update if user has explicitly set a preference
       setShowGraphs(userPreference === 'true');
     }
+    // If no preference exists in localStorage, keep it as true (visible)
   }, []);
 
   const handleToggle = () => {
