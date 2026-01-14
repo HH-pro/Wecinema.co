@@ -463,7 +463,6 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
           <div className="yellow-chart-wrapper">
             {chart.data ? (
               <Line 
-                data={chart.data} 
                 options={chartOptions()} 
                 height={isMobile ? 140 : 150}
               />
