@@ -208,7 +208,6 @@ const TermsAndConditions = () => {
                     <li>Either party can appeal decision</li>
                     <li>Escrow funds distributed as per resolution</li>
                   </ul>
-                </div>
               </div>
             </section>
 
