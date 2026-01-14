@@ -267,8 +267,6 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
           generateLabels: (chart) => {
             const datasets = chart.data.datasets;
             return datasets.map((dataset, i) => ({
-              fillStyle: dataset.pointBorderColor as string,
-              strokeStyle: dataset.pointBorderColor as string,
               lineWidth: 2,
               hidden: !chart.isDatasetVisible(i),
               index: i
