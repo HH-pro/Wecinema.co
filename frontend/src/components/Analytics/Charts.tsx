@@ -284,8 +284,8 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
         mode: 'index',
         intersect: false,
         backgroundColor: "rgba(255, 255, 255, 0.98)",
-        titleColor: "#2c3e50",
-        bodyColor: "#34495e",
+        titleColor: "#ffffff",
+        bodyColor: "#ffffff",
         titleFont: {
           size: isMobile ? 11 : 12,
           family: "'Inter', -apple-system, sans-serif",
@@ -318,7 +318,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
     scales: {
       y: {
         grid: {
-          color: "#ffffff",
+          color: "rgba(255, 255, 255, 0.06)",
           drawBorder: false,
           lineWidth: 1.5,
         },
