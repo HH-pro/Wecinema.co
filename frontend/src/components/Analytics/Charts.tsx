@@ -462,7 +462,10 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
           
           <div className="yellow-chart-wrapper">
             {chart.data ? (
-              
+              <Line 
+                data={chart.data} 
+                height={isMobile ? 140 : 150}
+              />
             ) : (
               <div className="yellow-no-data">
                 <div className="yellow-no-data-icon">📊</div>
