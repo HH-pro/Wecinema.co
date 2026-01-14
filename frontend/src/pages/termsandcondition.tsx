@@ -180,11 +180,7 @@ const TermsAndConditions = () => {
                 <div className="term-clause">
                   
                     <div className="fee-card">
-                      <h5>Hypemode Feature</h5>
-                      <div className="fee-details">
-                        <p>Platform Fee: <strong>5%</strong></p>
-                        <p>Revenue Share: <strong>15%</strong></p>
-                        <p className="total-fee hypemode-total">Total: <span>20%</span></p>
+                     
                       </div>
                     </div>
                   </div>
