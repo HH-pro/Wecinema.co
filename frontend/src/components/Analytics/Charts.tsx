@@ -109,6 +109,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
             const datasets = themeTotals.map(({ theme }, index) => {
               const colors = getRandomColorSet(index + 3);
               return {
+                label: theme,
                 data: labels.map((date: string) => themeData[theme][date]?.count || 0),
                 borderColor: colors.lineColor,
                 backgroundColor: 'transparent',
@@ -266,10 +267,6 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
           generateLabels: (chart) => {
             const datasets = chart.data.datasets;
             return datasets.map((dataset, i) => ({
-              text: dataset.label?.length > (isMobile ? 8 : 12) ? 
-                dataset.label.substring(0, isMobile ? 8 : 12) + '...' : 
-                dataset.label,
-                color: '#ffffff',
               fillStyle: dataset.pointBorderColor as string,
               strokeStyle: dataset.pointBorderColor as string,
               lineWidth: 2,
