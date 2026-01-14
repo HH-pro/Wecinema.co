@@ -464,6 +464,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
             {chart.data ? (
               <Line 
                 data={chart.data} 
+                options={chartOptions()} 
                 height={isMobile ? 140 : 150}
               />
             ) : (
