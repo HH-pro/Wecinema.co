@@ -450,7 +450,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
                 <span>{chart.icon}</span>
               </div>
               <div className="yellow-chart-text">
-                <p className="yellow-chart-description">{chart.description}</p>
+                <h3 className="yellow-chart-title">{chart.title}</h3>
               </div>
             </div>
             <div className="yellow-chart-status">
