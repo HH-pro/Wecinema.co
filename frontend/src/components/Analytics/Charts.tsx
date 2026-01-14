@@ -272,7 +272,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
                 dataset.label,
               fillStyle: dataset.pointBorderColor as string,
               strokeStyle: dataset.pointBorderColor as string,
-              lineWidth: 4,
+              lineWidth: 2,
               hidden: !chart.isDatasetVisible(i),
               index: i
             }));
