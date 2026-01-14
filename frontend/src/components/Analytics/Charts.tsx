@@ -256,7 +256,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
       legend: {
         position: "top" as const,
         labels: {
-          color: "#ffffff",
+          color: "#2c3e50",
           font: { 
             size: isMobile ? 10 : 11,
             family: "'Inter', -apple-system, sans-serif",
@@ -462,11 +462,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
           
           <div className="yellow-chart-wrapper">
             {chart.data ? (
-              <Line 
-                data={chart.data} 
-                options={chartOptions()} 
-                height={isMobile ? 140 : 150}
-              />
+              
             ) : (
               <div className="yellow-no-data">
                 <div className="yellow-no-data-icon">📊</div>
