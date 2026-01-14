@@ -112,7 +112,6 @@ const TermsAndConditions = () => {
                     <strong>Note:</strong> Revenue share percentages apply to net revenue after payment processing fees (Stripe: 2.9% + $0.30 per transaction).
                   </p>
                 </div>
-              </div>
             </section>
 
             <section id="marketplace" className="terms-section">
