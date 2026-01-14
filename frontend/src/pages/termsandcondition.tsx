@@ -1,78 +1,326 @@
 // src/pages/TermsAndConditions.js
-
-import '../components/header/drowpdown.css'; // Create this CSS file for styling
+import '../styles/terms-and-conditions.css';
 import { Layout } from '../components';
 
 const TermsAndConditions = () => {
   return (
     <Layout expand={false} hasHeader={true}>
-    <div className="terms-conditions">
-      <h1>Partnership with WeCinema.co Agreement</h1>
-      <p>This Partnership with WeCinema.co Agreement ("Agreement") is made and entered into as of [Date], by and between:</p>
+      <div className="terms-conditions-wrapper">
+        <div className="terms-conditions-container">
+          <header className="terms-header">
+            <h1 className="terms-title">WeCinema Terms & Conditions</h1>
+            <div className="terms-meta">
+              <p className="effective-date">Effective: [Date]</p>
+              <p className="agreement-type">Platform Agreement for Video Distribution & Marketplace</p>
+            </div>
+          </header>
 
-      <h2>1. Parties</h2>
-      <p><strong>WeCinema.co</strong>, a [State/Country] corporation, with its principal place of business at [Address] ("WeCinema"), and</p>
-      <p><strong>Studio/Production Company Name</strong>, a [State/Country] corporation, with its principal place of business at [Address] ("Studio").</p>
+          <div className="legal-notice">
+            <p><strong>IMPORTANT:</strong> These Terms govern your use of WeCinema.co platform including video uploads, marketplace transactions, chat communications, and payment processing.</p>
+          </div>
 
-      <h2>2. Recitals</h2>
-      <p>WHEREAS, WeCinema is an online platform dedicated to hosting and distributing films and other media content;</p>
-      <p>WHEREAS, Studio is engaged in the production of films and desires to distribute its content through WeCinema;</p>
-      <p>WHEREAS, the parties wish to enter into a joint venture and agree on terms of partial ownership and distribution of the films uploaded to WeCinema.</p>
+          <div className="terms-content">
+            <nav className="terms-toc">
+              <h3>Table of Contents</h3>
+              <ul>
+                <li><a href="#account">1. Account Registration</a></li>
+                <li><a href="#content">2. Content Upload & Licensing</a></li>
+                <li><a href="#marketplace">3. Marketplace Transactions</a></li>
+                <li><a href="#payments">4. Payments & Fees</a></li>
+                <li><a href="#communication">5. Communication System</a></li>
+                <li><a href="#intellectual">6. Intellectual Property</a></li>
+                <li><a href="#termination">7. Termination</a></li>
+                <li><a href="#liability">8. Liability & Disputes</a></li>
+              </ul>
+            </nav>
 
-      <h2>3. Agreement</h2>
-      <h3>3.1 Joint Venture and Partnership</h3>
-      <p>3.1.1 <strong>Formation</strong>: The parties hereby form a joint venture ("Joint Venture") for the purpose of producing, distributing, and monetizing films and other media content ("Content").</p>
-      <p>3.1.2 <strong>Partnership</strong>: The parties agree to become full partners in this Joint Venture, sharing resources, expertise, and revenues as outlined in this Agreement.</p>
+            <section id="account" className="terms-section">
+              <h2 className="section-title">1. Account Registration & User Responsibilities</h2>
+              <div className="term-article">
+                <div className="term-clause">
+                  <h4 className="clause-title">1.1 Account Creation</h4>
+                  <p>To access WeCinema features including video upload, marketplace transactions, and chat system, users must:</p>
+                  <ul className="terms-list">
+                    <li>Provide accurate registration information</li>
+                    <li>Maintain account security and password confidentiality</li>
+                    <li>Be at least 18 years old or have parental consent</li>
+                    <li>Not create multiple accounts without authorization</li>
+                  </ul>
+                </div>
+                <div className="term-clause">
+                  <h4 className="clause-title">1.2 User Types</h4>
+                  <p>WeCinema supports three user roles:</p>
+                  <div className="user-roles">
+                    <div className="role-card">
+                      <h5>Content Creator</h5>
+                      <p>Uploads videos, retains ownership rights, can sell through marketplace</p>
+                    </div>
+                    <div className="role-card">
+                      <h5>Buyer</h5>
+                      <p>Purchases video content, creates orders, uses chat for communication</p>
+                    </div>
+                    <div className="role-card">
+                      <h5>Seller</h5>
+                      <p>Sells video listings, completes work, receives payments upon completion</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
 
-      <h3>3.2 Partial Ownership</h3>
-      <p>3.2.1 <strong>Content Ownership</strong>: Upon uploading any Content to WeCinema, Studio grants WeCinema a partial ownership interest in said Content, including all associated images and sound ("Partial Ownership"). This Partial Ownership shall be defined as [Percentage]% of the ownership rights to the Content.</p>
-      <p>3.2.2 <strong>Rights Granted</strong>: This Partial Ownership includes the rights to distribute, sublicense, reproduce, display, and perform the Content on WeCinema and through any other distribution channels operated or affiliated with WeCinema.</p>
-      <p>3.2.3 <strong>Trademark and Branding</strong>: Any Content produced under this Joint Venture shall include branding consistent with WeCinema's standards and may be promoted as a co-produced work under the "WeCinema Originals" label or similar designation.</p>
+            <section id="content" className="terms-section">
+              <h2 className="section-title">2. Content Upload & Licensing Terms</h2>
+              <div className="term-article">
+                <div className="term-clause">
+                  <h4 className="clause-title">2.1 Video Upload Requirements</h4>
+                  <p>By uploading content to WeCinema, you warrant that:</p>
+                  <ul className="terms-list">
+                    <li>You own all rights to the content or have necessary permissions</li>
+                    <li>Content does not infringe any third-party rights</li>
+                    <li>Content complies with our Acceptable Use Policy</li>
+                    <li>You grant WeCinema license to host and distribute your content</li>
+                  </ul>
+                </div>
+                <div className="term-clause">
+                  <h4 className="clause-title">2.2 Revenue Sharing Model</h4>
+                  <div className="revenue-model">
+                    <div className="revenue-tier">
+                      <h5>Basic Upload</h5>
+                      <p className="percentage">Platform takes 30% of revenue</p>
+                      <p>Standard distribution and hosting</p>
+                    </div>
+                    <div className="revenue-tier featured">
+                      <h5>Premium Partnership</h5>
+                      <p className="percentage">Platform takes 20% of revenue</p>
+                      <p>Enhanced promotion and distribution</p>
+                    </div>
+                    <div className="revenue-tier">
+                      <h5>Exclusive Content</h5>
+                      <p className="percentage">Platform takes 40% of revenue</p>
+                      <p>Maximum exposure and marketing support</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
 
-      <h3>3.3 Revenue Sharing</h3>
-      <p>3.3.1 <strong>Revenue Distribution</strong>: All revenue generated from the distribution and monetization of the Content, including but not limited to subscription fees, advertising revenue, and licensing fees, shall be shared between the parties in proportion to their respective ownership interests.</p>
-      <p>3.3.2 <strong>Accounting and Reporting</strong>: WeCinema shall provide Studio with quarterly financial reports detailing the revenues generated from the Content and the corresponding payments due to Studio. Payments shall be made within [Number] days following the end of each quarter.</p>
+            <section id="marketplace" className="terms-section">
+              <h2 className="section-title">3. Marketplace Transactions</h2>
+              <div className="term-article">
+                <div className="term-clause">
+                  <h4 className="clause-title">3.1 Listing Creation</h4>
+                  <p>When creating listings in the marketplace, sellers must:</p>
+                  <ul className="terms-list">
+                    <li>Provide accurate descriptions and pricing</li>
+                    <li>Specify delivery timelines clearly</li>
+                    <li>Disclose any usage restrictions or licensing terms</li>
+                    <li>Maintain availability of listed content</li>
+                  </ul>
+                </div>
+                <div className="term-clause">
+                  <h4 className="clause-title">3.2 Order Process</h4>
+                  <div className="process-flow">
+                    <div className="process-step">
+                      <span className="step-number">1</span>
+                      <p>Buyer selects listing and creates order</p>
+                    </div>
+                    <div className="process-step">
+                      <span className="step-number">2</span>
+                      <p>Payment processed via Stripe (held in escrow)</p>
+                    </div>
+                    <div className="process-step">
+                      <span className="step-number">3</span>
+                      <p>Seller completes work and delivers through platform</p>
+                    </div>
+                    <div className="process-step">
+                      <span className="step-number">4</span>
+                      <p>Buyer approves delivery, payment released to seller</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
 
-      <h3>3.4 Production and Distribution</h3>
-      <p>3.4.1 <strong>Production</strong>: The parties agree to collaborate on the production of Content, with each party contributing resources as mutually agreed upon. Specific terms of each production, including budgets, timelines, and creative control, shall be detailed in separate production agreements.</p>
-      <p>3.4.2 <strong>Distribution</strong>: WeCinema shall have the exclusive right to distribute the Content on its platform and through any other channels as deemed appropriate by WeCinema. Studio shall not distribute the Content through any other means without the express written consent of WeCinema.</p>
+            <section id="payments" className="terms-section">
+              <h2 className="section-title">4. Payment Processing & Fees</h2>
+              <div className="term-article">
+                <div className="term-clause">
+                  <h4 className="clause-title">4.1 Stripe Integration</h4>
+                  <p>WeCinema uses Stripe for secure payment processing:</p>
+                  <ul className="terms-list">
+                    <li>All transactions processed through Stripe</li>
+                    <li>Platform fee: 5% per transaction (in addition to revenue share)</li>
+                    <li>Payment held in escrow until order completion</li>
+                    <li>Refunds processed within 7-10 business days</li>
+                  </ul>
+                </div>
+                <div className="term-clause">
+                  <h4 className="clause-title">4.2 Payment Release Conditions</h4>
+                  <p>Payments are released to sellers when:</p>
+                  <ul className="terms-list">
+                    <li>Buyer confirms work completion</li>
+                    <li>48-hour dispute period has passed without issue</li>
+                    <li>All platform fees have been deducted</li>
+                    <li>Account meets minimum payout threshold ($50)</li>
+                  </ul>
+                </div>
+                <div className="term-clause">
+                  <h4 className="clause-title">4.3 Dispute Resolution</h4>
+                  <p>In case of transaction disputes:</p>
+                  <ul className="terms-list">
+                    <li>Platform mediates through chat history and evidence</li>
+                    <li>Decision made within 5 business days</li>
+                    <li>Either party can appeal decision</li>
+                    <li>Escrow funds distributed as per resolution</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
 
-      <h3>3.5 Intellectual Property</h3>
-      <p>3.5.1 <strong>Intellectual Property Rights</strong>: All intellectual property rights in the Content, except for the Partial Ownership granted to WeCinema, shall remain with Studio.</p>
-      <p>3.5.2 <strong>Use of Trademarks</strong>: Each party grants the other a non-exclusive, royalty-free license to use its trademarks and logos for the purpose of promoting the Content and the Joint Venture.</p>
+            <section id="communication" className="terms-section">
+              <h2 className="section-title">5. Communication & Chat System</h2>
+              <div className="term-article">
+                <div className="term-clause">
+                  <h4 className="clause-title">5.1 Chat Guidelines</h4>
+                  <p>The integrated chat system allows buyers and sellers to communicate. Users agree to:</p>
+                  <ul className="terms-list">
+                    <li>Keep communications professional and relevant to transactions</li>
+                    <li>Not share personal contact information before transaction completion</li>
+                    <li>Use chat for order discussions, revisions, and delivery confirmations</li>
+                    <li>All chat logs are stored and may be used for dispute resolution</li>
+                  </ul>
+                </div>
+                <div className="term-clause">
+                  <h4 className="clause-title">5.2 Prohibited Communications</h4>
+                  <p>Chat may not be used for:</p>
+                  <ul className="terms-list warning">
+                    <li>Harassment or abusive language</li>
+                    <li>Attempting to bypass platform payments</li>
+                    <li>Spamming or promotional messages</li>
+                    <li>Sharing illegal or copyrighted material</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
 
-      <h3>3.6 Confidentiality</h3>
-      <p>3.6.1 <strong>Confidential Information</strong>: Each party agrees to keep confidential any proprietary or confidential information disclosed by the other party in connection with this Agreement and the Joint Venture.</p>
+            <section id="intellectual" className="terms-section">
+              <h2 className="section-title">6. Intellectual Property Rights</h2>
+              <div className="term-article">
+                <div className="term-clause">
+                  <h4 className="clause-title">6.1 Content Ownership</h4>
+                  <p>Uploaded content remains property of the creator. However, by using WeCinema:</p>
+                  <ul className="terms-list">
+                    <li>Creators grant non-exclusive license to WeCinema for hosting and distribution</li>
+                    <li>Marketplace sales transfer usage rights as specified in listing</li>
+                    <li>Platform may use thumbnails and excerpts for promotional purposes</li>
+                    <li>Original ownership rights are retained unless explicitly transferred</li>
+                  </ul>
+                </div>
+                <div className="term-clause">
+                  <h4 className="clause-title">6.2 License Types in Marketplace</h4>
+                  <div className="license-types">
+                    <div className="license-card">
+                      <h5>Standard License</h5>
+                      <p>Personal use only, non-commercial</p>
+                      <p className="price">Lower price point</p>
+                    </div>
+                    <div className="license-card">
+                      <h5>Commercial License</h5>
+                      <p>Business use, monetization allowed</p>
+                      <p className="price">Higher price point</p>
+                    </div>
+                    <div className="license-card">
+                      <h5>Exclusive License</h5>
+                      <p>All rights transferred to buyer</p>
+                      <p className="price">Premium pricing</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
 
-      <h3>3.7 Termination</h3>
-      <p>3.7.1 <strong>Termination for Cause</strong>: Either party may terminate this Agreement upon written notice if the other party breaches any material term of this Agreement and fails to cure such breach within [Number] days after receiving written notice thereof.</p>
-      <p>3.7.2 <strong>Effect of Termination</strong>: Upon termination, each party shall retain ownership of its respective intellectual property and any revenues due up to the date of termination shall be paid in accordance with Section 3.</p>
+            <section id="termination" className="terms-section">
+              <h2 className="section-title">7. Account Termination & Suspension</h2>
+              <div className="term-article">
+                <div className="term-clause">
+                  <h4 className="clause-title">7.1 User Termination Rights</h4>
+                  <p>Users may terminate accounts at any time:</p>
+                  <ul className="terms-list">
+                    <li>Active orders must be completed before termination</li>
+                    <li>Pending payments will be processed within 30 days</li>
+                    <li>Uploaded content may remain on platform for 90 days after termination</li>
+                    <li>Marketplace listings will be deactivated immediately</li>
+                  </ul>
+                </div>
+                <div className="term-clause">
+                  <h4 className="clause-title">7.2 Platform Suspension Rights</h4>
+                  <p>WeCinema may suspend or terminate accounts for:</p>
+                  <ul className="terms-list warning">
+                    <li>Violation of terms of service</li>
+                    <li>Fraudulent activity or chargebacks</li>
+                    <li>Copyright infringement claims</li>
+                    <li>Abusive behavior in chat system</li>
+                    <li>Multiple unresolved disputes</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
 
-      <h3>3.8 Miscellaneous</h3>
-      <p>3.8.1 <strong>Governing Law</strong>: This Agreement shall be governed by and construed in accordance with the laws of the State/Country of [Jurisdiction], without regard to its conflict of laws principles.</p>
-      <p>3.8.2 <strong>Entire Agreement</strong>: This Agreement constitutes the entire agreement between the parties and supersedes all prior agreements or understandings, whether written or oral, relating to the subject matter hereof.</p>
-      <p>3.8.3 <strong>Amendments</strong>: Any amendment or modification of this Agreement must be in writing and signed by authorized representatives of both parties.</p>
-      <p>3.8.4 <strong>Notices</strong>: Any notice required or permitted to be given under this Agreement shall be in writing and shall be deemed to have been given when delivered personally, sent by confirmed email, or mailed by registered or certified mail, return receipt requested, to the addresses set forth above.</p>
+            <section id="liability" className="terms-section">
+              <h2 className="section-title">8. Liability, Disputes & Legal</h2>
+              <div className="term-article">
+                <div className="term-clause">
+                  <h4 className="clause-title">8.1 Limitation of Liability</h4>
+                  <p>WeCinema's liability is limited to:</p>
+                  <ul className="terms-list">
+                    <li>Platform fees paid in the last 6 months</li>
+                    <li>Direct damages up to $1000</li>
+                    <li>Not responsible for user-generated content disputes</li>
+                    <li>Not liable for third-party payment processor issues</li>
+                  </ul>
+                </div>
+                <div className="term-clause">
+                  <h4 className="clause-title">8.2 Governing Law & Disputes</h4>
+                  <ul className="terms-list">
+                    <li>Governing law: [Your Jurisdiction]</li>
+                    <li>Disputes resolved through binding arbitration</li>
+                    <li>Class action lawsuits waived</li>
+                    <li>30-day negotiation period required before legal action</li>
+                  </ul>
+                </div>
+                <div className="term-clause">
+                  <h4 className="clause-title">8.3 Updates to Terms</h4>
+                  <p>We reserve the right to modify these terms:</p>
+                  <ul className="terms-list">
+                    <li>Users notified 30 days before changes take effect</li>
+                    <li>Continued use constitutes acceptance of new terms</li>
+                    <li>Major changes may require re-acceptance</li>
+                    <li>Previous terms archived and accessible</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
 
-      <p>IN WITNESS WHEREOF, the parties hereto have executed this Agreement as of the day and year first above written.</p>
+            <div className="acceptance-section">
+              <div className="acceptance-box">
+                <h3>Acceptance of Terms</h3>
+                <p>By using WeCinema.co, you acknowledge that you have read, understood, and agree to be bound by these Terms & Conditions, including our Privacy Policy and Acceptable Use Policy.</p>
+                <div className="last-updated">
+                  <p><strong>Last Updated:</strong> [Date]</p>
+                  <p><strong>Version:</strong> 2.0</p>
+                </div>
+              </div>
+            </div>
 
-      <div className="signatories">
-        <div>
-          <p><strong>WeCinema.co</strong></p>
-          <p>By: ________________________</p>
-          <p>Name: ______________________</p>
-          <p>Title: _______________________</p>
-        </div>
-        <div>
-          <p><strong>Studio/Production Company Name</strong></p>
-          <p>By: ________________________</p>
-          <p>Name: ______________________</p>
-          <p>Title: _______________________</p>
+            <div className="contact-info">
+              <h4>Questions about these terms?</h4>
+              <p>Contact: legal@wecinema.co | Support: support@wecinema.co</p>
+              <p>Business Hours: Mon-Fri, 9 AM - 6 PM [Your Timezone]</p>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
     </Layout>
-
   );
 };
 
