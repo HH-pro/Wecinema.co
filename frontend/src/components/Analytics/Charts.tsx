@@ -298,7 +298,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
           weight: '600' as const
         },
         padding: 14,
-        cornerRadius: 12,
+        cornerRadius: 6,
         borderColor: "rgba(0, 0, 0, 0.08)",
         borderWidth: 1,
         displayColors: true,
