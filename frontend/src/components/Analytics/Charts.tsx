@@ -136,21 +136,22 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
             const labels = Object.keys(ratingData).reverse();
             
             const datasets = [
-              {
-                label: "Avg Rating",
-                data: labels.map((date: string) => ratingData[date]?.averageRating || 0),
-                borderColor: '#FF4757', // Bright Red
-                backgroundColor: 'transparent',
-                borderWidth: 2,
-                tension: 0.4,
-                pointRadius: 2,
-                pointHoverRadius: 5,
-                pointBackgroundColor: '#ffffff',
-                pointBorderColor: '#FF4757',
-                pointBorderWidth: 3,
-                fill: false,
-                cubicInterpolationMode: 'monotone' as const,
-              },
+             {
+  label: "Avg Rating",
+  data: labels.map((date: string) => ratingData[date]?.averageRating || 0),
+  borderColor: '#FF4757',
+  backgroundColor: 'transparent',
+  borderWidth: 2,
+  tension: 0.4,
+  pointRadius: 2,
+  pointHoverRadius: 5,
+  pointBackgroundColor: '#ffffff',
+  pointBorderColor: '#FF4757',
+  pointBorderWidth: 3,
+  fill: false,
+  cubicInterpolationMode: 'monotone' as const,
+},
+
               {
                 label: "Total Ratings",
                 data: labels.map((date: string) => ratingData[date]?.totalRatings || 0),
