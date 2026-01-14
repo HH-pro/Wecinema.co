@@ -89,41 +89,10 @@ const TermsAndConditions = () => {
                 </div>
                 <div className="term-clause">
                   <h4 className="clause-title">2.2 Revenue Sharing Model</h4>
-                  <div className="revenue-model">
-                    <div className="revenue-tier">
-                      <h5>Basic Upload</h5>
-                      <p className="percentage">Platform takes 30% of revenue</p>
-                      <p>Standard distribution and hosting</p>
-                      <div className="features">
-                        <span>✓ Basic analytics</span>
-                        <span>✓ Standard encoding</span>
-                        <span>✓ 720p streaming</span>
-                      </div>
-                    </div>
+                
                     
-                    <div className="revenue-tier featured">
-                      <h5>Premium Partnership</h5>
-                      <p className="percentage">Platform takes 20% of revenue</p>
-                      <p>Enhanced promotion and distribution</p>
-                      <div className="features">
-                        <span>✓ Advanced analytics</span>
-                        <span>✓ 4K encoding</span>
-                        <span>✓ Priority support</span>
-                        <span>✓ Custom thumbnails</span>
-                      </div>
-                    </div>
                     
-                    <div className="revenue-tier">
-                      <h5>Exclusive Content</h5>
-                      <p className="percentage">Platform takes 40% of revenue</p>
-                      <p>Maximum exposure and marketing support</p>
-                      <div className="features">
-                        <span>✓ Featured placement</span>
-                        <span>✓ Social media promotion</span>
-                        <span>✓ Email marketing</span>
-                        <span>✓ Dedicated account manager</span>
-                      </div>
-                    </div>
+                   
                     
                     <div className="revenue-tier hypemode-tier">
                       <div className="hypemode-badge">🔥 Hypemode</div>
