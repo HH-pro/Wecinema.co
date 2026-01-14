@@ -264,14 +264,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
           usePointStyle: true,
           boxWidth: 8,
           padding: 12,
-          generateLabels: (chart) => {
-            const datasets = chart.data.datasets;
-            return datasets.map((dataset, i) => ({
-              lineWidth: 2,
-              hidden: !chart.isDatasetVisible(i),
-              index: i
-            }));
-          }
+        
         }
       },
       tooltip: {
