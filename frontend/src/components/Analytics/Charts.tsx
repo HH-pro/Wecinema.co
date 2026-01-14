@@ -299,7 +299,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
         },
         padding: 14,
         cornerRadius: 12,
-        borderColor: "rgba(0, 0, 0, 0.08)",
+        borderColor: "#fff1e6",
         borderWidth: 1,
         displayColors: true,
         boxPadding: 6,
