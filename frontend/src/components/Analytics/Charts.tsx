@@ -267,10 +267,11 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
           generateLabels: (chart) => {
             const datasets = chart.data.datasets;
             return datasets.map((dataset, i) => ({
-              text: dataset.label?.length > (isMobile ? 8 : 12) ? 
-                dataset.label.substring(0, isMobile ? 8 : 12) + '...' : 
-                dataset.label,
-                color: '#ffffff',
+              text:
+    dataset.label?.length > (isMobile ? 8 : 12)
+      ? dataset.label.substring(0, isMobile ? 8 : 12) + '...'
+      : dataset.label,
+  color: '#ffffff', // 👈 label text white
               fillStyle: dataset.pointBorderColor as string,
               strokeStyle: dataset.pointBorderColor as string,
               lineWidth: 2,
