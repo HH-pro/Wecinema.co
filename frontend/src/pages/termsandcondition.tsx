@@ -179,7 +179,6 @@ const TermsAndConditions = () => {
                 </div>
                 <div className="term-clause">
                   
-                    </div>
                     <div className="fee-card">
                       <h5>Hypemode Feature</h5>
                       <div className="fee-details">
