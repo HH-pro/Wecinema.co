@@ -143,7 +143,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
                 backgroundColor: 'transparent',
                 borderWidth: 4,
                 tension: 0.4,
-                pointRadius: 4,
+                pointRadius: 2,
                 pointHoverRadius: 9,
                 pointBackgroundColor: '#ffffff',
                 pointBorderColor: '#FF4757',
@@ -158,7 +158,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
                 backgroundColor: 'transparent',
                 borderWidth: 4,
                 tension: 0.4,
-                pointRadius: 4,
+                pointRadius: 2,
                 pointHoverRadius: 9,
                 pointBackgroundColor: '#ffffff',
                 pointBorderColor: '#2ED573',
@@ -373,11 +373,11 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
     elements: {
       line: { 
         tension: 0.4, 
-        borderWidth: 4,
+        borderWidth: 2,
         fill: false,
       },
       point: { 
-        radius: 4,
+        radius: 2,
         hoverRadius: 9,
         backgroundColor: "#ffffff",
         borderWidth: 3,
