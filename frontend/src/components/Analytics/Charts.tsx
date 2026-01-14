@@ -79,7 +79,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
                 backgroundColor: 'transparent',
                 borderWidth: 4,
                 tension: 0.4,
-                pointRadius: 4,
+                pointRadius: 2,
                 pointHoverRadius: 9,
                 pointBackgroundColor: '#ffffff',
                 pointBorderColor: colors.pointColor,
