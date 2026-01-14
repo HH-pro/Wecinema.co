@@ -147,7 +147,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
                 pointHoverRadius: 5,
                 pointBackgroundColor: '#ffffff',
                 pointBorderColor: '#FF4757',
-                pointBorderWidth: 1,
+                pointBorderWidth: 3,
                 fill: false,
                 cubicInterpolationMode: 'monotone' as const,
               },
