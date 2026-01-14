@@ -71,18 +71,18 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
             })).sort((a, b) => b.total - a.total).slice(0, 3);
 
             const datasets = genreTotals.map(({ genre }, index) => {
-              const gradientColors = getVibrantGradient(index);
+              const colors = getRandomColorSet(index);
               return {
                 label: genre,
                 data: labels.map((date: string) => genreData[genre][date]?.count || 0),
-                borderColor: gradientColors.border,
+                borderColor: colors.lineColor,
                 backgroundColor: 'transparent',
                 borderWidth: 4,
                 tension: 0.4,
-                pointRadius: 3,
-                pointHoverRadius: 8,
+                pointRadius: 4,
+                pointHoverRadius: 9,
                 pointBackgroundColor: '#ffffff',
-                pointBorderColor: gradientColors.point,
+                pointBorderColor: colors.pointColor,
                 pointBorderWidth: 3,
                 fill: false,
                 cubicInterpolationMode: 'monotone' as const,
@@ -107,18 +107,18 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
             })).sort((a, b) => b.total - a.total).slice(0, 3);
 
             const datasets = themeTotals.map(({ theme }, index) => {
-              const gradientColors = getVibrantGradient(index + 3);
+              const colors = getRandomColorSet(index + 3);
               return {
                 label: theme,
                 data: labels.map((date: string) => themeData[theme][date]?.count || 0),
-                borderColor: gradientColors.border,
+                borderColor: colors.lineColor,
                 backgroundColor: 'transparent',
                 borderWidth: 4,
                 tension: 0.4,
-                pointRadius: 3,
-                pointHoverRadius: 8,
+                pointRadius: 4,
+                pointHoverRadius: 9,
                 pointBackgroundColor: '#ffffff',
-                pointBorderColor: gradientColors.point,
+                pointBorderColor: colors.pointColor,
                 pointBorderWidth: 3,
                 fill: false,
                 cubicInterpolationMode: 'monotone' as const,
@@ -139,29 +139,29 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
               {
                 label: "Avg Rating",
                 data: labels.map((date: string) => ratingData[date]?.averageRating || 0),
-                borderColor: 'linear-gradient(90deg, #FF6B6B, #FF8E53)',
+                borderColor: '#FF4757', // Bright Red
                 backgroundColor: 'transparent',
                 borderWidth: 4,
                 tension: 0.4,
-                pointRadius: 3,
-                pointHoverRadius: 8,
+                pointRadius: 4,
+                pointHoverRadius: 9,
                 pointBackgroundColor: '#ffffff',
-                pointBorderColor: '#FF6B6B',
+                pointBorderColor: '#FF4757',
                 pointBorderWidth: 3,
                 fill: false,
                 cubicInterpolationMode: 'monotone' as const,
               },
               {
-                label: "Total",
+                label: "Total Ratings",
                 data: labels.map((date: string) => ratingData[date]?.totalRatings || 0),
-                borderColor: 'linear-gradient(90deg, #4ECDC4, #44A08D)',
+                borderColor: '#2ED573', // Bright Green
                 backgroundColor: 'transparent',
-                borderWidth: 3.5,
+                borderWidth: 4,
                 tension: 0.4,
-                pointRadius: 3,
-                pointHoverRadius: 7,
+                pointRadius: 4,
+                pointHoverRadius: 9,
                 pointBackgroundColor: '#ffffff',
-                pointBorderColor: '#4ECDC4',
+                pointBorderColor: '#2ED573',
                 pointBorderWidth: 3,
                 fill: false,
                 cubicInterpolationMode: 'monotone' as const,
@@ -189,31 +189,52 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
     };
   }, []);
 
-  // Colorful vibrant gradients for charts
-  const getVibrantGradient = (index: number) => {
-    const gradients = [
-      { border: 'linear-gradient(90deg, #FF6B6B, #FF8E53)', point: '#FF6B6B' },
-      { border: 'linear-gradient(90deg, #4ECDC4, #44A08D)', point: '#4ECDC4' },
-      { border: 'linear-gradient(90deg, #FFD166, #FFC145)', point: '#FFD166' },
-      { border: 'linear-gradient(90deg, #06D6A0, #0CB48A)', point: '#06D6A0' },
-      { border: 'linear-gradient(90deg, #118AB2, #0B5F8A)', point: '#118AB2' },
-      { border: 'linear-gradient(90deg, #EF476F, #D43A5F)', point: '#EF476F' },
-      { border: 'linear-gradient(90deg, #9D4EDD, #7B2CBF)', point: '#9D4EDD' },
-      { border: 'linear-gradient(90deg, #FF9E6D, #FF7F50)', point: '#FF9E6D' },
-      { border: 'linear-gradient(90deg, #2A9D8F, #1D7873)', point: '#2A9D8F' },
+  // Random vibrant colors for chart lines
+  const getRandomColorSet = (index: number) => {
+    const colorSets = [
+      { lineColor: '#FF6B8B', pointColor: '#FF4757' }, // Pink-Red
+      { lineColor: '#2ED573', pointColor: '#1DD1A1' }, // Green
+      { lineColor: '#1E90FF', pointColor: '#3742FA' }, // Blue
+      { lineColor: '#FFA502', pointColor: '#FF7F00' }, // Orange
+      { lineColor: '#9B59B6', pointColor: '#8E44AD' }, // Purple
+      { lineColor: '#FF3838', pointColor: '#FF0000' }, // Bright Red
+      { lineColor: '#32FF7E', pointColor: '#0BE370' }, // Lime Green
+      { lineColor: '#18DCFF', pointColor: '#17C0EB' }, // Cyan
+      { lineColor: '#FF9F1A', pointColor: '#FF8C00' }, // Dark Orange
+      { lineColor: '#7158E2', pointColor: '#5F27CD' }, // Violet
+      { lineColor: '#3AE374', pointColor: '#26DE81' }, // Emerald
+      { lineColor: '#FF3838', pointColor: '#FF0000' }, // Scarlet
+      { lineColor: '#67E6DC', pointColor: '#3DC7BE' }, // Teal
+      { lineColor: '#FFB8B8', pointColor: '#FF9F9F' }, // Light Pink
+      { lineColor: '#C56CF0', pointColor: '#AE2CFF' }, // Bright Purple
+      { lineColor: '#FFAF40', pointColor: '#FF9F00' }, // Amber
+      { lineColor: '#3D3D3D', pointColor: '#000000' }, // Black (for contrast)
+      { lineColor: '#7BED9F', pointColor: '#55E6C1' }, // Mint
+      { lineColor: '#70A1FF', pointColor: '#1B9CFC' }, // Sky Blue
+      { lineColor: '#FF9FF3', pointColor: '#F368E0' }, // Magenta
+      { lineColor: '#FECA57', pointColor: '#FF9F43' }, // Yellow-Orange
+      { lineColor: '#48DBFB', pointColor: '#0ABDE3' }, // Light Blue
+      { lineColor: '#D6A2E8', pointColor: '#BD8AE8' }, // Lavender
+      { lineColor: '#FF6B81', pointColor: '#EE5A52' }, // Coral
+      { lineColor: '#00D2D3', pointColor: '#01A3A4' }, // Turquoise
+      { lineColor: '#54A0FF', pointColor: '#2E86DE' }, // Deep Blue
+      { lineColor: '#FF9A76', pointColor: '#FF7F50' }, // Salmon
+      { lineColor: '#58B19F', pointColor: '#3B8D73' }, // Sea Green
+      { lineColor: '#FD7272', pointColor: '#FC5C65' }, // Watermelon
+      { lineColor: '#9AECDB', pointColor: #81ECEC' }, // Aqua
     ];
-    return gradients[index % gradients.length];
+    return colorSets[index % colorSets.length];
   };
 
   // Icon colors for chart cards
   const getIconColors = (index: number) => {
     const colors = [
-      { color1: '#FF6B6B', color2: '#FF8E53' },
-      { color1: '#4ECDC4', color2: '#44A08D' },
-      { color1: '#FFD166', color2: '#FFC145' },
-      { color1: '#06D6A0', color2: '#0CB48A' },
-      { color1: '#118AB2', color2: '#0B5F8A' },
-      { color1: '#EF476F', color2: '#D43A5F' },
+      { color1: '#FF6B8B', color2: '#FF4757' },
+      { color1: '#2ED573', color2: '#1DD1A1' },
+      { color1: '#1E90FF', color2: '#3742FA' },
+      { color1: '#FFA502', color2: '#FF7F00' },
+      { color1: '#9B59B6', color2: '#8E44AD' },
+      { color1: '#FF3838', color2: '#FF0000' },
     ];
     return colors[index % colors.length];
   };
@@ -235,15 +256,15 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
       legend: {
         position: "top" as const,
         labels: {
-          color: "#78350f",
+          color: "#2c3e50",
           font: { 
             size: isMobile ? 10 : 11,
             family: "'Inter', -apple-system, sans-serif",
             weight: '600' as const
           },
           usePointStyle: true,
-          boxWidth: 6,
-          padding: 10,
+          boxWidth: 8,
+          padding: 12,
           generateLabels: (chart) => {
             const datasets = chart.data.datasets;
             return datasets.map((dataset, i) => ({
@@ -252,7 +273,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
                 dataset.label,
               fillStyle: dataset.pointBorderColor as string,
               strokeStyle: dataset.pointBorderColor as string,
-              lineWidth: 3,
+              lineWidth: 4,
               hidden: !chart.isDatasetVisible(i),
               index: i
             }));
@@ -263,25 +284,25 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
         enabled: true,
         mode: 'index',
         intersect: false,
-        backgroundColor: "rgba(255, 255, 255, 0.95)",
-        titleColor: "#1a202c",
-        bodyColor: "#2d3748",
+        backgroundColor: "rgba(255, 255, 255, 0.98)",
+        titleColor: "#2c3e50",
+        bodyColor: "#34495e",
         titleFont: {
           size: isMobile ? 11 : 12,
           family: "'Inter', -apple-system, sans-serif",
-          weight: '600' as const
+          weight: '700' as const
         },
         bodyFont: {
           size: isMobile ? 10 : 11,
           family: "'Inter', -apple-system, sans-serif",
-          weight: '500' as const
+          weight: '600' as const
         },
-        padding: 12,
-        cornerRadius: 10,
-        borderColor: "rgba(0, 0, 0, 0.1)",
+        padding: 14,
+        cornerRadius: 12,
+        borderColor: "rgba(0, 0, 0, 0.08)",
         borderWidth: 1,
         displayColors: true,
-        boxPadding: 5,
+        boxPadding: 6,
         usePointStyle: true,
         callbacks: {
           label: function(context) {
@@ -300,17 +321,18 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
     scales: {
       y: {
         grid: {
-          color: "rgba(0, 0, 0, 0.05)",
+          color: "rgba(0, 0, 0, 0.06)",
           drawBorder: false,
-          lineWidth: 1,
+          lineWidth: 1.5,
         },
         ticks: { 
-          color: "#4a5568", 
+          color: "#2c3e50", 
           font: { 
             size: isMobile ? 9 : 10,
-            family: "'Inter', -apple-system, sans-serif"
+            family: "'Inter', -apple-system, sans-serif",
+            weight: '500' as const
           },
-          padding: 8,
+          padding: 10,
           callback: function(value) {
             const numValue = Number(value);
             if (numValue >= 1000) {
@@ -327,20 +349,21 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
       x: {
         reverse: true,
         grid: {
-          color: "rgba(0, 0, 0, 0.05)",
+          color: "rgba(0, 0, 0, 0.06)",
           drawBorder: false,
-          lineWidth: 1,
+          lineWidth: 1.5,
         },
         ticks: { 
-          color: "#4a5568", 
+          color: "#2c3e50", 
           font: { 
             size: isMobile ? 9 : 10,
-            family: "'Inter', -apple-system, sans-serif"
+            family: "'Inter', -apple-system, sans-serif",
+            weight: '500' as const
           },
           maxRotation: 0,
           autoSkip: true,
           maxTicksLimit: isMobile ? 5 : 6,
-          padding: 8,
+          padding: 10,
         },
         border: {
           display: false,
@@ -354,8 +377,8 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
         fill: false,
       },
       point: { 
-        radius: 3,
-        hoverRadius: 8,
+        radius: 4,
+        hoverRadius: 9,
         backgroundColor: "#ffffff",
         borderWidth: 3,
         hoverBorderWidth: 4,
@@ -455,12 +478,19 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
           <div className="yellow-chart-footer">
             <div className="yellow-footer-info">
               <span className="yellow-info-item">
-                <span className="yellow-info-label">Points:</span>
+                <span className="yellow-info-label">Data Points:</span>
                 <span className="yellow-info-value">{chart.data?.labels.length || 0}</span>
               </span>
               <span className="yellow-info-item">
-                <span className="yellow-info-label">Trend:</span>
-                <span className="yellow-info-trend">
+                <span className="yellow-info-label">Status:</span>
+                <span className="yellow-info-trend" style={{
+                  backgroundColor: idx === 0 ? 'rgba(255, 107, 139, 0.15)' : 
+                                   idx === 1 ? 'rgba(46, 213, 115, 0.15)' : 
+                                   'rgba(30, 144, 255, 0.15)',
+                  color: idx === 0 ? '#FF4757' : 
+                         idx === 1 ? '#1DD1A1' : 
+                         '#3742FA'
+                }}>
                   {idx === 2 ? '↗ Rising' : '→ Stable'}
                 </span>
               </span>
