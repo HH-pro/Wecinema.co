@@ -37,7 +37,6 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
   const [themeChartData, setThemeChartData] = useState<any>(null);
   const [ratingChartData, setRatingChartData] = useState<any>(null);
   const [hoveredChart, setHoveredChart] = useState<number | null>(null);
-  const [showCharts, setShowCharts] = useState<boolean[]>([]);
   const chartRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
@@ -175,9 +174,6 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
               datasets 
             });
           }
-
-          // Initialize all charts as visible
-          setShowCharts([true, true, true]);
         }
       } catch (error) {
         console.error("Error fetching chart data:", error);
@@ -192,21 +188,6 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
       isMounted = false;
     };
   }, []);
-
-  // Toggle visibility of individual chart
-  const toggleChartVisibility = (index: number) => {
-    setShowCharts(prev => {
-      const newState = [...prev];
-      newState[index] = !newState[index];
-      return newState;
-    });
-  };
-
-  // Toggle visibility of all charts
-  const toggleAllCharts = () => {
-    const allVisible = showCharts.every(visible => visible);
-    setShowCharts([!allVisible, !allVisible, !allVisible]);
-  };
 
   // Random vibrant colors for chart lines
   const getRandomColorSet = (index: number) => {
@@ -445,130 +426,76 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
   ];
 
   return (
-    <div className="yellow-charts-container">
-      {/* Chart Controls */}
-      <div className="yellow-chart-controls">
-        <button 
-          className="yellow-toggle-all-btn"
-          onClick={toggleAllCharts}
+    <div className="yellow-charts-grid">
+      {charts.map((chart, idx) => (
+        <div 
+          key={idx} 
+          className={`yellow-chart-card ${hoveredChart === idx ? 'hovered' : ''}`}
+          ref={el => chartRefs.current[idx] = el}
+          onMouseEnter={() => setHoveredChart(idx)}
+          onMouseLeave={() => setHoveredChart(null)}
+          style={{
+            '--icon-color-1': chart.colors.color1,
+            '--icon-color-2': chart.colors.color2,
+          } as React.CSSProperties}
         >
-          {showCharts.every(visible => visible) ? 'Hide All Charts' : 'Show All Charts'}
-        </button>
-        
-        <div className="yellow-individual-controls">
-          {charts.map((chart, idx) => (
-            <button
-              key={idx}
-              className={`yellow-toggle-btn ${showCharts[idx] ? 'active' : ''}`}
-              onClick={() => toggleChartVisibility(idx)}
-              style={{
-                backgroundColor: showCharts[idx] ? chart.colors.color1 : '#444',
-                borderColor: chart.colors.color1
-              }}
-            >
-              {showCharts[idx] ? `Hide ${chart.title}` : `Show ${chart.title}`}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Charts Grid */}
-      <div className="yellow-charts-grid">
-        {charts.map((chart, idx) => (
-          showCharts[idx] && (
-            <div 
-              key={idx} 
-              className={`yellow-chart-card ${hoveredChart === idx ? 'hovered' : ''}`}
-              ref={el => chartRefs.current[idx] = el}
-              onMouseEnter={() => setHoveredChart(idx)}
-              onMouseLeave={() => setHoveredChart(null)}
-              style={{
-                '--icon-color-1': chart.colors.color1,
-                '--icon-color-2': chart.colors.color2,
-              } as React.CSSProperties}
-            >
-              <div className="yellow-chart-header">
-                <div className="yellow-chart-title-section">
-                  <div className="yellow-chart-icon" style={{ 
-                    borderColor: `${chart.colors.color1}80`,
-                    background: `linear-gradient(135deg, ${chart.colors.color1}30, ${chart.colors.color2}20)`
-                  }}>
-                    <span>{chart.icon}</span>
-                  </div>
-                  <div className="yellow-chart-text">
-                    <h3 className="yellow-chart-title">{chart.title}</h3>
-                    <p className="yellow-chart-description">{chart.description}</p>
-                  </div>
-                </div>
-                <div className="yellow-chart-status">
-                  <button 
-                    className="yellow-hide-btn"
-                    onClick={() => toggleChartVisibility(idx)}
-                    style={{
-                      color: chart.colors.color1,
-                      borderColor: chart.colors.color1
-                    }}
-                  >
-                    Hide
-                  </button>
-                </div>
+          <div className="yellow-chart-header">
+            <div className="yellow-chart-title-section">
+              <div className="yellow-chart-icon" style={{ 
+                borderColor: `${chart.colors.color1}80`,
+                background: `linear-gradient(135deg, ${chart.colors.color1}30, ${chart.colors.color2}20)`
+              }}>
+                <span>{chart.icon}</span>
               </div>
-              
-              <div className="yellow-chart-wrapper">
-                {chart.data ? (
-                  <Line 
-                    data={chart.data} 
-                    options={chartOptions()} 
-                    height={isMobile ? 140 : 150}
-                  />
-                ) : (
-                  <div className="yellow-no-data">
-                    <div className="yellow-no-data-icon">📊</div>
-                    <span>No data available</span>
-                  </div>
-                )}
-              </div>
-              
-              <div className="yellow-chart-footer">
-                <div className="yellow-footer-info">
-                  <span className="yellow-info-item">
-                    <span className="yellow-info-label">Data Points:</span>
-                    <span className="yellow-info-value">{chart.data?.labels.length || 0}</span>
-                  </span>
-                  <span className="yellow-info-item">
-                    <span className="yellow-info-label">Status:</span>
-                    <span className="yellow-info-trend" style={{
-                      backgroundColor: idx === 0 ? 'rgba(255, 107, 139, 0.15)' : 
-                                       idx === 1 ? 'rgba(46, 213, 115, 0.15)' : 
-                                       'rgba(30, 144, 255, 0.15)',
-                      color: idx === 0 ? '#FF4757' : 
-                             idx === 1 ? '#1DD1A1' : 
-                             '#3742FA'
-                    }}>
-                      {idx === 2 ? '↗ Rising' : '→ Stable'}
-                    </span>
-                  </span>
-                </div>
+              <div className="yellow-chart-text">
+                <h3 className="yellow-chart-title">{chart.title}</h3>
+                <p className="yellow-chart-description">{chart.description}</p>
               </div>
             </div>
-          )
-        ))}
-      </div>
-
-      {/* Show message when all charts are hidden */}
-      {showCharts.every(visible => !visible) && (
-        <div className="yellow-all-charts-hidden">
-          <div className="yellow-hidden-icon">📊</div>
-          <h3>All charts are hidden</h3>
-          <p>Click "Show All Charts" or individual chart buttons to display them</p>
-          <button 
-            className="yellow-show-all-btn"
-            onClick={toggleAllCharts}
-          >
-            Show All Charts
-          </button>
+            <div className="yellow-chart-status">
+              <span className="yellow-status-dot"></span>
+              <span className="yellow-status-text">Live</span>
+            </div>
+          </div>
+          
+          <div className="yellow-chart-wrapper">
+            {chart.data ? (
+              <Line 
+                data={chart.data} 
+                options={chartOptions()} 
+                height={isMobile ? 140 : 150}
+              />
+            ) : (
+              <div className="yellow-no-data">
+                <div className="yellow-no-data-icon">📊</div>
+                <span>No data available</span>
+              </div>
+            )}
+          </div>
+          
+          <div className="yellow-chart-footer">
+            <div className="yellow-footer-info">
+              <span className="yellow-info-item">
+                <span className="yellow-info-label">Data Points:</span>
+                <span className="yellow-info-value">{chart.data?.labels.length || 0}</span>
+              </span>
+              <span className="yellow-info-item">
+                <span className="yellow-info-label">Status:</span>
+                <span className="yellow-info-trend" style={{
+                  backgroundColor: idx === 0 ? 'rgba(255, 107, 139, 0.15)' : 
+                                   idx === 1 ? 'rgba(46, 213, 115, 0.15)' : 
+                                   'rgba(30, 144, 255, 0.15)',
+                  color: idx === 0 ? '#FF4757' : 
+                         idx === 1 ? '#1DD1A1' : 
+                         '#3742FA'
+                }}>
+                  {idx === 2 ? '↗ Rising' : '→ Stable'}
+                </span>
+              </span>
+            </div>
+          </div>
         </div>
-      )}
+      ))}
     </div>
   );
 };
