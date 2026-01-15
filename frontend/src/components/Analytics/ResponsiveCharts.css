@@ -1,0 +1,29 @@
+/* ============================================
+   RESPONSIVE CHARTS WRAPPER
+   ============================================ */
+.responsive-charts-wrapper {
+  width: 100%;
+  height: 100%;
+}
+
+/* Fade in/out animations on orientation change */
+@media (max-width: 767px) {
+  .responsive-charts-wrapper {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+}
+
+@media (min-width: 768px) {
+  .responsive-charts-wrapper {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
