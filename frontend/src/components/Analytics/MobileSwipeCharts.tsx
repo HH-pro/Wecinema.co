@@ -253,8 +253,8 @@ const MobileSwipeCharts: React.FC = () => {
             <span className="chart-badge">{currentIndex + 1} / {charts.length}</span>
           </div>
 
-          {/* Bar Chart */}
-          <div className="mobile-bar-chart">
+          {/* Bar Chart - Single Row Mobile */}
+          <div className="mobile-bar-chart" style={{ overflowX: 'auto' }}>
             {currentChart.values.map((value, idx) => {
               const normalizedValue = (value - minValue) / range;
               return (
