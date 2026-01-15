@@ -97,56 +97,118 @@ const Homepage: React.FC = () => {
   const [scripts, setScripts] = useState<any>([]);
   const [data, setData] = useState<any>([]);
   const [showMoreIndex, setShowMoreIndex] = useState<number | null>(null);
-  const nav = useNavigate();
   const [expand, setExpand] = useState(false);
   const [progress, setProgress] = useState(0);
   const [showTermsPopup, setShowTermsPopup] = useState(false);
   
+  const nav = useNavigate();
+
+  // Check terms acceptance on mount
   useEffect(() => {
     const hasAcceptedTerms = localStorage.getItem("acceptedTerms");
     if (!hasAcceptedTerms) {
       setShowTermsPopup(true);
     }
   }, []);
-  
-  useEffect(() => {
-    const load = setInterval(() => {
-      setProgress(prevProgress => {
-        if (prevProgress < 100) {
-          return prevProgress + 10;
-        }
-        clearInterval(load);
-        return 100;
-      });
-    }, 200);
 
-    return () => clearInterval(load);
+  // Progress bar animation
+  useEffect(() => {
+    const loadInterval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= PROGRESS_MAX) {
+          clearInterval(loadInterval);
+          return PROGRESS_MAX;
+        }
+        return prev + PROGRESS_INCREMENT;
+      });
+    }, LOADING_INTERVAL);
+
+    return () => clearInterval(loadInterval);
   }, []);
-  
-  const handleAcceptTerms = () => {
-    localStorage.setItem("acceptedTerms", "true");
-    setShowTermsPopup(false);
-  };
-  
-  const fetchScripts = async () => {
+
+  // Fetch scripts
+  const fetchScripts = useCallback(async () => {
     const result: any = await getRequest("video/author/scripts", setLoading);
     if (result) {
       setScripts(result.map((res: any) => res.script));
       setData(result);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchScripts();
+  }, [fetchScripts]);
+
+  // Event handlers
+  const handleAcceptTerms = useCallback(() => {
+    localStorage.setItem("acceptedTerms", "true");
+    setShowTermsPopup(false);
   }, []);
 
-  const handleScriptMouseEnter = (index: number) => {
-    setShowMoreIndex(index);
-  };
+  const handleThemeClick = useCallback(
+    (theme: string) => {
+      nav(`/themes/${theme}`);
+    },
+    [nav]
+  );
 
-  const handleScriptMouseLeave = () => {
+  const handleScriptMouseEnter = useCallback((index: number) => {
+    setShowMoreIndex(index);
+  }, []);
+
+  const handleScriptMouseLeave = useCallback(() => {
     setShowMoreIndex(null);
-  };
+  }, []);
+
+  const handleScriptClick = useCallback(
+    (scriptData: any) => {
+      nav(`/script/${scriptData._id}`, {
+        state: JSON.stringify(scriptData),
+      });
+    },
+    [nav]
+  );
+
+  const handleReadMore = useCallback(
+    (e: React.MouseEvent, scriptData: any) => {
+      e.stopPropagation();
+      handleScriptClick(scriptData);
+    },
+    [handleScriptClick]
+  );
+
+  // Memoize gallery sections
+  const galleryElements = useMemo(
+    () =>
+      GALLERY_SECTIONS.map((section) => (
+        <Gallery
+          key={section.title}
+          title={section.title}
+          category={section.category}
+          length={CONTENT_LENGTH}
+          isFirst={section.isFirst}
+        />
+      )),
+    []
+  );
+
+  // Memoize script cards
+  const scriptCards = useMemo(
+    () =>
+      scripts.map((script: string, index: number) => (
+        <ScriptCard
+          key={`${data[index]?._id || index}`}
+          script={script}
+          data={data[index]}
+          isHighlighted={showMoreIndex === index}
+          onMouseEnter={() => handleScriptMouseEnter(index)}
+          onMouseLeave={handleScriptMouseLeave}
+          onClick={() => handleScriptClick(data[index])}
+          onReadMore={(e) => handleReadMore(e, data[index])}
+        />
+      )),
+    [scripts, data, showMoreIndex, handleScriptMouseEnter, handleScriptMouseLeave, handleScriptClick, handleReadMore]
+  );
 
   return (
     <Layout expand={expand} setExpand={setExpand}>
