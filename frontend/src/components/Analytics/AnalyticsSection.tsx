@@ -169,7 +169,7 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
                 {isMobile ? "Charts" : "Visual Analytics"}
               </h3>
               <p className="yellow-intro-subtitle">
-                {isMobile ? "Interactive trends" : "Interactive charts showing trends over time"}
+                {isMobile ? "Swipe to explore" : "Interactive charts showing trends over time"}
               </p>
             </div>
             
