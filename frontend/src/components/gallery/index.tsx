@@ -109,9 +109,6 @@ const Gallery: React.FC<GalleryProps> = ({
         </a>
       </div>
       
-      {/* ✅ FIX 2: Line 25 - Using ref object instead of string ref */}
-      {/* OLD: <div ref="canvas" className="flex flex-wrap w-full"> */}
-      {/* NEW: */}
       <div 
         ref={galleryCanvasRef} 
         className="flex flex-wrap w-full"
