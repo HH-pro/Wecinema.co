@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, memo, CSSProperties } from "react";
+import { useEffect, useState,  memo, CSSProperties } from "react";
 import Router from "./routes";
 import { MarketplaceProvider } from "./context/MarketplaceContext";
 import { ToastContainer } from "react-toastify";
