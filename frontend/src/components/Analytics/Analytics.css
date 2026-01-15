@@ -863,9 +863,21 @@
 
 @media (max-width: 767px) {
   .yellow-charts-grid {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: row;
     gap: 16px;
     margin-bottom: 16px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    padding-bottom: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .yellow-charts-grid {
+    gap: 12px;
+    margin-bottom: 12px;
   }
 }
 
