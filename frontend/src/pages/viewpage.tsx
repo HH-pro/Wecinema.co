@@ -10,7 +10,7 @@ const Viewpage: React.FC<any> = () => {
   const location = useLocation();
   const { slug } = useParams();
   const navigate = useNavigate();
-  const token = localStorage.getItem("token") || null;
+  const token = localStorage.getItem("token");
   
   const [loading, setLoading] = useState(false);
   const [catVideos, setCatVideos] = useState<any[]>([]);
