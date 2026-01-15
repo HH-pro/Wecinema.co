@@ -38,6 +38,8 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
   const [ratingChartData, setRatingChartData] = useState<any>(null);
   const [hoveredChart, setHoveredChart] = useState<number | null>(null);
   const chartRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const touchStartX = useRef(0);
+  const touchEndX = useRef(0);
 
   useEffect(() => {
     let isMounted = true;
