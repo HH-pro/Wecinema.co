@@ -213,71 +213,34 @@ const Homepage: React.FC = () => {
   return (
     <Layout expand={expand} setExpand={setExpand}>
       <LoadingBar color="#ffb300" progress={progress} height={3} />
-      
-   
 
-      {/* Analytics Section as Component */}
+      {/* Analytics Section */}
       <AnalyticsSection title="Analytics" />
-      
-      {/* Theme Bar */}
+
+      {/* Theme Navigation */}
       <div className="theme-bar">
-        {theme.map((val, index) => (
-          <button
-            key={index}
-            onClick={() => nav(`/themes/${val.toLowerCase()}`)}
-            className="theme-button"
-          >
-            {val}
-          </button>
+        {THEMES.map((themeItem) => (
+          <ThemeButton
+            key={themeItem}
+            theme={themeItem}
+            onThemeClick={handleThemeClick}
+          />
         ))}
       </div>
 
       {/* Gallery Sections */}
-      <Gallery title="Action" category="Action" length={5} isFirst />
-      <Gallery title="Comedy" length={5} category="Comedy" />
-      <Gallery title="Adventure" length={5} category="Adventure" />
-      <Gallery title="Horror" length={5} category="Horror" />
-      <Gallery title="Drama" length={5} category="Drama" />
-      
+      {galleryElements}
+
       {/* Scripts Section */}
       <div className="scripts-section">
         <div className="z-1 relative p-2 flex flex-wrap border-b border-blue-200 sm:mx-4 pb-4">
           {!loading && (
-            <h2 className="text-l font-extrabold text-lg sm:text-xl">Latest Scripts</h2>
+            <h2 className="text-l font-extrabold text-lg sm:text-xl">
+              Latest Scripts
+            </h2>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {scripts?.map((script: string, index: number) => (
-              <div
-                key={index}
-                className={`${showMoreIndex === index
-                    ? "script-card-highlighted"
-                    : "script-card"
-                  } hide-scrollbar`}
-                onMouseEnter={() => handleScriptMouseEnter(index)}
-                onMouseLeave={handleScriptMouseLeave}
-                onClick={() =>
-                  nav(`/script/${data[index]._id}`, {
-                    state: JSON.stringify(data[index]),
-                  })
-                }
-              >
-                <h2>{data[index].title}</h2>
-                {showMoreIndex === index && (
-                  <button
-                    className="read-more-button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      nav(`/script/${data[index]._id}`, {
-                        state: JSON.stringify(data[index]),
-                      });
-                    }}
-                  >
-                    Read More
-                  </button>
-                )}
-                <Render htmlString={script} />
-              </div>
-            ))}
+            {scriptCards}
           </div>
         </div>
       </div>
@@ -285,4 +248,4 @@ const Homepage: React.FC = () => {
   );
 };
 
-export default Homepage;
+export default memo(Homepage);
