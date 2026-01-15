@@ -777,11 +777,10 @@
 /* Yellow Header Gradient */
 .yellow-header-gradient {
   height: 2px;
-  background: linear-gradient(90deg, 
-    #6495FF, 
-    #87CEEB, 
-    #6495FF, 
-    #87CEEB
+   background: linear-gradient(90deg, 
+    #f59e0b, 
+    #fbbf24, 
+    #d97706
   );
   opacity: 0.6;
   flex-shrink: 0;
@@ -1028,7 +1027,7 @@
 }
 
 .yellow-chart-title {
-  color: #87CEEB;
+  color: #fbbf24;
   font-size: 1rem;
   font-weight: 700;
   margin: 0 0 4px 0;
