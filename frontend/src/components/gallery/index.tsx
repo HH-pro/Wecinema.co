@@ -194,5 +194,4 @@ const Gallery: React.FC<GalleryProps> = ({
   );
 };
 
-// ✅ FIX 3: No defaultProps - using default parameters instead
 export default Gallery;
