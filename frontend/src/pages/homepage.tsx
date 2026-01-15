@@ -97,7 +97,6 @@ const Homepage: React.FC = () => {
   const [scripts, setScripts] = useState<any>([]);
   const [data, setData] = useState<any>([]);
   const [showMoreIndex, setShowMoreIndex] = useState<number | null>(null);
-  const [expand, setExpand] = useState(false);
   const [progress, setProgress] = useState(0);
   
   const nav = useNavigate();
