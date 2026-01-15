@@ -46,7 +46,6 @@ const ThemeButton = memo(({ theme, onThemeClick }: { theme: string; onThemeClick
 ThemeButton.displayName = "ThemeButton";
 
 const Homepage: React.FC = () => {
-  const [showMoreIndex, setShowMoreIndex] = useState<number | null>(null);
   const nav = useNavigate();
 
   // Check terms acceptance on mount
@@ -64,13 +63,6 @@ const Homepage: React.FC = () => {
     [nav]
   );
 
-  const handleScriptMouseEnter = useCallback((index: number) => {
-    setShowMoreIndex(index);
-  }, []);
-
-  const handleScriptMouseLeave = useCallback(() => {
-    setShowMoreIndex(null);
-  }, []);
   const galleryElements = useMemo(
     () =>
       GALLERY_SECTIONS.map((section) => (
