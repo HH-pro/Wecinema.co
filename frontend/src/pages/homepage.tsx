@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo, memo } from "react";
+import React, { useEffect, useCallback, useMemo, memo } from "react";
 import { Gallery, Layout, AnalyticsSection } from "../components/";
 import { useNavigate } from "react-router-dom";
 import "../App.css";
