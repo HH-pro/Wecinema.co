@@ -795,6 +795,8 @@
   .yellow-charts-container {
     padding: 16px;
     min-height: 450px;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 }
 
