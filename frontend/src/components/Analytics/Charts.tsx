@@ -421,11 +421,21 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
           key={idx} 
           className={`yellow-chart-card ${hoveredChart === idx ? 'hovered' : ''}`}
           ref={el => chartRefs.current[idx] = el}
-          onMouseEnter={() => setHoveredChart(idx)}
-          onMouseLeave={() => setHoveredChart(null)}
+          onMouseEnter={() => isMobile ? undefined : setHoveredChart(idx)}
+          onMouseLeave={() => isMobile ? undefined : setHoveredChart(null)}
+          onTouchStart={(e) => {
+            if (isMobile) touchStartX.current = e.touches[0].clientX;
+          }}
+          onTouchEnd={(e) => {
+            if (isMobile) {
+              touchEndX.current = e.changedTouches[0].clientX;
+              // Optional: handle swipe between charts if needed
+            }
+          }}
           style={{
             '--icon-color-1': chart.colors.color1,
             '--icon-color-2': chart.colors.color2,
+            touchAction: isMobile ? 'pan-x' : 'auto'
           } as React.CSSProperties}
         >
           <div className="yellow-chart-header">
