@@ -88,7 +88,7 @@ const Viewpage: React.FC<any> = () => {
             <div className="bg-gradient-to-br rounded-2xl overflow-hidden shadow-2xl">
               {loggedVideo ? (
                 <div className="aspect-w-16 aspect-h-9 w-full">
-                  <Player video={loggedVideo} tokenData={token ? (decodeToken(token) as any) : undefined} />
+                  <Player video={loggedVideo} tokenData={token ? (decodeToken(token) as unknown as any) : undefined} />
                 </div>
               ) : (
                 <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl w-full h-[500px] flex items-center justify-center">
