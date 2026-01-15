@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useMemo, memo } from "react";
 import { Gallery, Layout, Render, AnalyticsSection } from "../components/";
 import { getRequest } from "../api";
 import { useNavigate } from "react-router-dom";
-import LoadingBar from 'react-top-loading-bar';
+import LoadingBar from "react-top-loading-bar";
 import "../App.css";
 
-export const theme = [
+// Constants
+export const THEMES = [
   "Love",
   "Redemption",
   "Family",
@@ -24,7 +25,72 @@ export const theme = [
   "Society",
   "Isolation",
   "Peace",
-];
+] as const;
+
+const GALLERY_SECTIONS = [
+  { title: "Action", category: "Action", isFirst: true },
+  { title: "Comedy", category: "Comedy" },
+  { title: "Adventure", category: "Adventure" },
+  { title: "Horror", category: "Horror" },
+  { title: "Drama", category: "Drama" },
+] as const;
+
+const LOADING_INTERVAL = 200;
+const PROGRESS_INCREMENT = 10;
+const PROGRESS_MAX = 100;
+const CONTENT_LENGTH = 5;
+
+// Memoized Theme Button
+const ThemeButton = memo(({ theme, onThemeClick }: { theme: string; onThemeClick: (theme: string) => void }) => (
+  <button
+    onClick={() => onThemeClick(theme.toLowerCase())}
+    className="theme-button"
+  >
+    {theme}
+  </button>
+));
+
+ThemeButton.displayName = "ThemeButton";
+
+// Memoized Script Card
+const ScriptCard = memo(
+  ({
+    script,
+    data,
+    isHighlighted,
+    onMouseEnter,
+    onMouseLeave,
+    onClick,
+    onReadMore,
+  }: {
+    script: string;
+    data: any;
+    isHighlighted: boolean;
+    onMouseEnter: () => void;
+    onMouseLeave: () => void;
+    onClick: () => void;
+    onReadMore: (e: React.MouseEvent) => void;
+  }) => (
+    <div
+      className={`${
+        isHighlighted ? "script-card-highlighted" : "script-card"
+      } hide-scrollbar`}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onClick={onClick}
+    >
+      <h2>{data.title}</h2>
+      {isHighlighted && (
+        <button className="read-more-button" onClick={onReadMore}>
+          Read More
+        </button>
+      )}
+      <Render htmlString={script} />
+    </div>
+  )
+);
+
+ScriptCard.displayName = "ScriptCard";
 
 const Homepage: React.FC = () => {
   const [loading, setLoading] = useState(false);
