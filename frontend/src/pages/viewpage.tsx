@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo, memo } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Layout, Player } from "../components";
 import { FaEye } from "react-icons/fa";
 import VideoThumbnail from "react-video-thumbnail";
@@ -79,7 +79,7 @@ const Viewpage: React.FC<any> = () => {
   }, [navigate]);
 
   return (
-    <Layout hideSidebar={true} expand={true}>
+    <Layout hideSidebar={true}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
           {/* Left Section: Video Content */}
@@ -88,7 +88,7 @@ const Viewpage: React.FC<any> = () => {
             <div className="bg-gradient-to-br rounded-2xl overflow-hidden shadow-2xl">
               {loggedVideo ? (
                 <div className="aspect-w-16 aspect-h-9 w-full">
-                  <Player video={loggedVideo} tokenData={decodeToken(token)} />
+                  <Player video={loggedVideo} tokenData={token ? decodeToken(token) : undefined} />
                 </div>
               ) : (
                 <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl w-full h-[500px] flex items-center justify-center">
