@@ -1302,9 +1302,9 @@
   align-items: center;
   padding: 12px 20px;
   background: linear-gradient(180deg, 
-    rgba(20, 20, 28, 0.9) 0%, 
-    rgba(15, 15, 22, 0.95) 100%);
-  border-top: 1px solid rgba(245, 158, 11, 0.15);
+    rgba(66, 50, 0, 0.95) 0%, 
+    rgba(55, 42, 0, 0.98) 100%);
+  border-top: 1px solid rgba(245, 158, 11, 0.25);
   gap: 16px;
   flex-shrink: 0;
 }
