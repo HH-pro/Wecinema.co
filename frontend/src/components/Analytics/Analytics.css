@@ -907,6 +907,19 @@
     height: 320px;
     padding: 16px;
     border-radius: 14px;
+    flex: 0 0 auto;
+    min-width: 280px;
+    width: 280px;
+  }
+}
+
+@media (max-width: 480px) {
+  .yellow-chart-card {
+    height: 300px;
+    padding: 14px;
+    border-radius: 12px;
+    min-width: 260px;
+    width: 260px;
   }
 }
 
