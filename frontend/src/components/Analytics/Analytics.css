@@ -957,9 +957,9 @@
   right: 0;
   height: 3px;
   background: linear-gradient(90deg, 
-    #f59e0b, 
-    #fbbf24, 
-    #d97706
+    #6495FF, 
+    #87CEEB, 
+    #6495FF
   );
   opacity: 0;
   transition: opacity 0.3s ease;
@@ -1101,7 +1101,10 @@
   flex: 1;
   min-height: 150px;
   position: relative;
-  margin: 8px 0;
+  margin: 6px 0;
+  background: rgba(10, 10, 15, 0.4);
+  border-radius: 8px;
+  padding: 4px;
 }
 
 @media (max-width: 767px) {
@@ -1131,7 +1134,7 @@
   align-items: center;
   justify-content: center;
   height: 200px;
-  color: #92400e;
+  color: rgba(150, 150, 180, 0.8);
   font-size: 0.9rem;
   flex: 1;
 }
@@ -1164,8 +1167,8 @@
   left: 0;
   width: 100%;
   height: 100%;
-  border: 3px solid rgba(245, 158, 11, 0.2);
-  border-top-color: #f59e0b;
+  border: 3px solid rgba(100, 149, 255, 0.2);
+  border-top-color: #6495FF;
   border-radius: 50%;
   animation: spin 1.5s linear infinite;
 }
@@ -1177,7 +1180,7 @@
   transform: translate(-50%, -50%);
   width: 20px;
   height: 20px;
-  background: #f59e0b;
+  background: #6495FF;
   border-radius: 50%;
   animation: yellowPulse 2s infinite;
 }
@@ -1190,7 +1193,7 @@
 }
 
 .yellow-loading-text {
-  color: #92400e;
+  color: rgba(150, 150, 180, 0.8);
   font-weight: 600;
   font-size: 0.85rem;
   text-align: center;
@@ -1206,11 +1209,11 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #92400e;
+  color: rgba(150, 150, 180, 0.7);
   font-size: 0.85rem;
-  background: rgba(254, 243, 199, 0.5);
+  background: rgba(100, 149, 255, 0.05);
   border-radius: 12px;
-  border: 2px dashed rgba(245, 158, 11, 0.3);
+  border: 2px dashed rgba(100, 149, 255, 0.2);
   padding: 20px;
   text-align: center;
 }
