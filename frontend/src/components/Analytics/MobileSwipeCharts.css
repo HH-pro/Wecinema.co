@@ -76,15 +76,44 @@
   padding: 16px 8px;
   background: rgba(0, 0, 0, 0.2);
   border-radius: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Single Row Mobile Layout */
+@media (max-width: 480px) {
+  .mobile-bar-chart {
+    height: 180px;
+    min-width: 100%;
+    width: 100%;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 12px;
+    margin: 16px -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+    border-radius: 0;
+  }
 }
 
 .bar-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  flex: 1;
+  flex: 0 0 auto;
+  min-width: 50px;
   height: 100%;
   gap: 8px;
+}
+
+/* Mobile single row - adjust container width */
+@media (max-width: 480px) {
+  .bar-container {
+    flex: 0 0 60px;
+    min-width: 60px;
+  }
 }
 
 .bar {
