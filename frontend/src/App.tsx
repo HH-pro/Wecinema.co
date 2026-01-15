@@ -137,54 +137,53 @@ const WeCinemaLoading = memo(() => (
 
 WeCinemaLoading.displayName = "WeCinemaLoading";
 
-export default function App() {
-  // 🆕 ADD LOADING STATE
+// Initialize Tawk.to widget
+const initializeTawkWidget = () => {
+  const script = document.createElement("script");
+  script.src = "https://embed.tawk.to/6849bde9e7d8d619164a49fe/1itg0ro66";
+  script.async = true;
+  script.charset = "UTF-8";
+  script.setAttribute("crossorigin", "*");
+  document.body.appendChild(script);
+};
+
+// Toast Configuration
+const TOAST_CONFIG = {
+  position: "top-right" as const,
+  autoClose: 5000,
+  hideProgressBar: false,
+  newestOnTop: false,
+  closeOnClick: true,
+  rtl: false,
+  pauseOnFocusLoss: true,
+  draggable: true,
+  pauseOnHover: true,
+  theme: "light" as const,
+} as const;
+
+export default memo(function App() {
   const [isLoading, setIsLoading] = useState(true);
-  
+
+  // Initialize Tawk widget on mount
   useEffect(() => {
-    // Simulate loading for 1.5 seconds
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1500);
-    
-    return () => clearTimeout(timer);
+    initializeTawkWidget();
   }, []);
 
-  // ✅ Tawk.to Live Chat Widget Setup
+  // Handle loading state
   useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://embed.tawk.to/6849bde9e7d8d619164a49fe/1itg0ro66";
-    script.async = true;
-    script.charset = "UTF-8";
-    script.setAttribute("crossorigin", "*");
-    document.body.appendChild(script);
+    const timer = setTimeout(() => setIsLoading(false), 1500);
+    return () => clearTimeout(timer);
   }, []);
 
   return (
     <div>
-      {/* 🆕 SHOW LOADING SCREEN FIRST */}
       {isLoading && <WeCinemaLoading />}
-      
-      {/* MAIN APP CONTENT */}
       <div className={isLoading ? "hidden" : "block"}>
         <MarketplaceProvider>
-          {/* <AICustomerSupport /> */}
           <Router />
-          
-          <ToastContainer
-            position="top-right"
-            autoClose={5000}
-            hideProgressBar={false}
-            newestOnTop={false}
-            closeOnClick
-            rtl={false}
-            pauseOnFocusLoss
-            draggable
-            pauseOnHover
-            theme="light"
-          />
+          <ToastContainer {...TOAST_CONFIG} />
         </MarketplaceProvider>
       </div>
     </div>
   );
-}
+});
