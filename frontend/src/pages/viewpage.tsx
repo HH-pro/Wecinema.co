@@ -1,27 +1,24 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useMemo, memo } from "react";
 import { Layout, Player } from "../components";
-import { FaEye, FaThumbsUp, FaThumbsDown, FaShare, FaBookmark } from "react-icons/fa";
-import { MdComment } from "react-icons/md";
+import { FaEye } from "react-icons/fa";
 import VideoThumbnail from "react-video-thumbnail";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { decodeToken, formatDateAgo, truncateText } from "../utilities/helperfFunction";
+import { decodeToken, formatDateAgo } from "../utilities/helperfFunction";
 import { getRequest } from "../api";
 
 const Viewpage: React.FC<any> = () => {
   const location = useLocation();
   const { slug } = useParams();
+  const navigate = useNavigate();
+  const token = localStorage.getItem("token") || null;
+  
   const [loading, setLoading] = useState(false);
   const [catVideos, setCatVideos] = useState<any[]>([]);
   const [loggedVideo, setLoggedVideo] = useState<any>(null);
-  const navigate = useNavigate();
-  const token = localStorage.getItem("token") || null;
-  const [expand, setExpand] = useState(false);
-  const [isLiked, setIsLiked] = useState(false);
-  const [isDisliked, setIsDisliked] = useState(false);
 
   // Fetch video data from location or localStorage
   useEffect(() => {
-    const getVideoData = async () => {
+    const getVideoData = () => {
       if (location.state) {
         setLoggedVideo(location.state);
       } else {
@@ -76,7 +73,10 @@ const Viewpage: React.FC<any> = () => {
     fetchRelatedVideos();
   }, [loggedVideo]);
 
-  
+  const handleVideoClick = useCallback((video: any) => {
+    localStorage.setItem("video", JSON.stringify(video));
+    navigate(`/video/${video.slug}`);
+  }, [navigate]);
 
   return (
     <Layout hideSidebar={true} expand={true}>
