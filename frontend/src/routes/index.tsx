@@ -20,7 +20,7 @@ import {
   HistoryPage,
   LikedVideoPage,
   ReportPage,
-  ChatbotPage,
+  // ChatbotPage,
   Signin,
   ProtectedRoute,
   Domain,
