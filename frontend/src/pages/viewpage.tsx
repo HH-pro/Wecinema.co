@@ -103,8 +103,6 @@ const Viewpage: React.FC<any> = () => {
                 </div>
               )}
             </div>
-
-           
           </div>
 
           {/* Right Section: Related Videos */}
@@ -120,10 +118,7 @@ const Viewpage: React.FC<any> = () => {
                     <div
                       key={video._id}
                       className="flex gap-3 p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-all duration-300 border-b border-gray-100 dark:border-gray-700 last:border-0"
-                      onClick={() => {
-                        localStorage.setItem("video", JSON.stringify(video));
-                        navigate(`/video/${video.slug}`);
-                      }}
+                      onClick={() => handleVideoClick(video)}
                     >
                       <div className="relative w-16 sm:w-28 md:w-32 flex-shrink-0 rounded-xl overflow-hidden">
                         <div className="aspect-w-16 aspect-h-9 bg-gray-200 dark:bg-gray-700">
