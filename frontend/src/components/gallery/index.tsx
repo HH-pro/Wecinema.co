@@ -32,7 +32,6 @@ const Gallery: React.FC<GalleryProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [videos, setVideos] = useState<any>([]);
   
-  // ✅ FIX 1: Create proper refs instead of string refs
   const galleryCanvasRef = useRef<HTMLDivElement>(null);
   const videoThumbnailRefs = useRef<(HTMLDivElement | null)[]>([]);
 
