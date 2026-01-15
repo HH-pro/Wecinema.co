@@ -775,7 +775,7 @@
 }
 
 /* Yellow Header Gradient */
-.yellow-header-gradient {
+/* .yellow-header-gradient {
   height: 2px;
   background: linear-gradient(90deg, 
     #6495FF, 
@@ -785,7 +785,7 @@
   );
   opacity: 0.6;
   flex-shrink: 0;
-}
+} */
 
 /* Yellow Charts Container */
 .yellow-charts-container {
