@@ -522,10 +522,10 @@
     rgba(20, 20, 25, 0.98) 0%, 
     rgba(25, 25, 30, 0.95) 100%);
   border-radius: 18px;
-  border: 2px solid rgba(100, 149, 255, 0.25);
+  border: 2px solid rgba(245, 158, 11, 0.25);
   box-shadow: 
     0 20px 60px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(100, 149, 255, 0.15),
+    0 0 0 1px rgba(245, 158, 11, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
   overflow: hidden;
   animation: yellowExpand 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -566,7 +566,7 @@
   background: linear-gradient(180deg, 
     rgba(30, 30, 40, 0.95) 0%, 
     rgba(20, 20, 28, 0.9) 100%);
-  border-bottom: 2px solid rgba(100, 149, 255, 0.2);
+  border-bottom: 2px solid rgba(245, 158, 11, 0.2);
   flex-shrink: 0;
 }
 
@@ -622,9 +622,9 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, rgba(100, 149, 255, 0.25), rgba(135, 206, 235, 0.2));
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(251, 191, 36, 0.2));
   border-radius: 12px;
-  border: 2px solid rgba(100, 149, 255, 0.4);
+  border: 2px solid rgba(245, 158, 11, 0.4);
 }
 
 .yellow-header-icon .yellow-header-svg {
@@ -632,7 +632,7 @@
   z-index: 2;
   width: 22px;
   height: 22px;
-  color: #6495FF;
+  color: #f59e0b;
   stroke-width: 2;
   margin: 13px;
 }
@@ -654,7 +654,7 @@
 }
 
 .yellow-header-title {
-  background: linear-gradient(135deg, #6495FF 0%, #87CEEB 100%);
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -691,9 +691,9 @@
 
 /* Yellow Close Button - FIXED FOR MOBILE */
 .yellow-close-btn {
-  background: rgba(100, 149, 255, 0.1);
-  color: #87CEEB;
-  border: 2px solid rgba(100, 149, 255, 0.25);
+  background: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+  border: 2px solid rgba(245, 158, 11, 0.25);
   border-radius: 12px;
   cursor: pointer;
   font-weight: 600;
@@ -816,7 +816,7 @@
 }
 
 .yellow-intro-title {
-  background: linear-gradient(135deg, #87CEEB 0%, #6495FF 100%);
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -893,7 +893,7 @@
 /* Yellow Chart Card */
 .yellow-chart-card {
   background: linear-gradient(135deg, rgba(30, 30, 40, 0.95) 0%, rgba(20, 20, 28, 0.9) 100%);
-  border: 2px solid rgba(100, 149, 255, 0.2);
+  border: 2px solid rgba(245, 158, 11, 0.2);
   border-radius: 16px;
   padding: 18px;
   transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -902,7 +902,7 @@
   height: 300px;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(100, 149, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(245, 158, 11, 0.1);
 }
 
 @media (min-width: 1024px) {
@@ -935,12 +935,12 @@
 @media (min-width: 768px) {
   .yellow-chart-card:hover {
     background: linear-gradient(135deg, rgba(40, 40, 55, 0.98) 0%, rgba(30, 30, 42, 0.95) 100%);
-    border-color: rgba(100, 149, 255, 0.4);
+    border-color: rgba(245, 158, 11, 0.4);
     transform: translateY(-4px);
     box-shadow: 
-      0 16px 40px rgba(100, 149, 255, 0.15),
-      0 0 0 1px rgba(100, 149, 255, 0.3),
-      inset 0 1px 0 rgba(100, 149, 255, 0.15);
+      0 16px 40px rgba(245, 158, 11, 0.15),
+      0 0 0 1px rgba(245, 158, 11, 0.3),
+      inset 0 1px 0 rgba(245, 158, 11, 0.15);
   }
 }
 
@@ -1239,7 +1239,7 @@
 .yellow-chart-footer {
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px solid rgba(100, 149, 255, 0.15);
+  border-top: 1px solid rgba(245, 158, 11, 0.15);
   flex-shrink: 0;
 }
 
@@ -1304,7 +1304,7 @@
   background: linear-gradient(180deg, 
     rgba(20, 20, 28, 0.9) 0%, 
     rgba(15, 15, 22, 0.95) 100%);
-  border-top: 1px solid rgba(100, 149, 255, 0.15);
+  border-top: 1px solid rgba(245, 158, 11, 0.15);
   gap: 16px;
   flex-shrink: 0;
 }
