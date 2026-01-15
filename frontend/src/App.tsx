@@ -1,31 +1,30 @@
-import { default as Router } from "./routes";
-import "./App.css";
-import { useEffect, useState } from "react";
-import * as Sentry from "@sentry/react";
-// import AICustomerSupport from "./components/AICustomerSupport";
+import { useEffect, useState, useMemo, memo, CSSProperties } from "react";
+import Router from "./routes";
 import { MarketplaceProvider } from "./context/MarketplaceContext";
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import "./App.css";
 
-export const categories = [
-  "Action ",
-  "Adventure ",
-  "Comedy ",
-  "Documentary ",
-  "Drama ",
-  "Horror ",
-  "Mystery ",
-  "Romance ",
-  "Thriller ",
-];
+// Constants
+export const CATEGORIES = [
+  "Action",
+  "Adventure",
+  "Comedy",
+  "Documentary",
+  "Drama",
+  "Horror",
+  "Mystery",
+  "Romance",
+  "Thriller",
+] as const;
 
-export const themes = [
+export const THEMES = [
   "Coming-of-age story",
   "Good versus evil",
   "Love",
   "Redemption",
   "Family",
-  "Opperession",
+  "Oppression",
   "Survival",
   "Revenge",
   "Justice",
@@ -37,9 +36,14 @@ export const themes = [
   "Isolation",
   "Peace",
   "Perseverance",
-];
+] as const;
 
-export const ratings = ["g ", "pg ", "pg-13 ", "r ", "x "];
+export const RATINGS = ["G", "PG", "PG-13", "R", "X"] as const;
+
+// Export for backward compatibility
+export const categories = CATEGORIES;
+export const themes = THEMES;
+export const ratings = RATINGS;
 
 // 🆕 MODERN LOADING COMPONENT WITH LIGHT THEME
 const WeCinemaLoading = () => {
