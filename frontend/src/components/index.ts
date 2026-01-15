@@ -12,3 +12,5 @@ export { default as Render } from "./render";
 export { default as Theme } from "./theme";
 export { default as Search } from "./search";
 
+
+export { AnalyticsSection, Charts } from "./Analytics";
