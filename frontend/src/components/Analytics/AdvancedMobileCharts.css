@@ -109,16 +109,36 @@
   justify-content: space-around;
   gap: 8px;
   height: 200px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+@media (max-width: 480px) {
+  .bar-chart-advanced {
+    height: 180px;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 0 8px;
+  }
 }
 
 .bar-item-advanced {
-  flex: 1;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
   position: relative;
+  min-width: 50px;
+}
+
+@media (max-width: 480px) {
+  .bar-item-advanced {
+    min-width: 60px;
+    flex: 0 0 60px;
+  }
 }
 
 .bar-fill {
