@@ -2,7 +2,7 @@ import { default as Router } from "./routes";
 import "./App.css";
 import { useEffect, useState } from "react";
 import * as Sentry from "@sentry/react";
-import AICustomerSupport from "./components/AICustomerSupport";
+// import AICustomerSupport from "./components/AICustomerSupport";
 import { MarketplaceProvider } from "./context/MarketplaceContext";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -172,7 +172,7 @@ export default function App() {
       {/* MAIN APP CONTENT */}
       <div className={isLoading ? "hidden" : "block"}>
         <MarketplaceProvider>
-          <AICustomerSupport />
+          {/* <AICustomerSupport /> */}
           <Router />
           
           <ToastContainer
