@@ -29,10 +29,10 @@ export const THEMES = [
 
 const GALLERY_SECTIONS = [
   { title: "Action", category: "Action", isFirst: true },
-  { title: "Comedy", category: "Comedy" },
-  { title: "Adventure", category: "Adventure" },
-  { title: "Horror", category: "Horror" },
-  { title: "Drama", category: "Drama" },
+  { title: "Comedy", category: "Comedy", isFirst: false },
+  { title: "Adventure", category: "Adventure", isFirst: false },
+  { title: "Horror", category: "Horror", isFirst: false },
+  { title: "Drama", category: "Drama", isFirst: false },
 ] as const;
 
 const LOADING_INTERVAL = 200;
@@ -99,7 +99,6 @@ const Homepage: React.FC = () => {
   const [showMoreIndex, setShowMoreIndex] = useState<number | null>(null);
   const [expand, setExpand] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [showTermsPopup, setShowTermsPopup] = useState(false);
   
   const nav = useNavigate();
 
@@ -107,42 +106,8 @@ const Homepage: React.FC = () => {
   useEffect(() => {
     const hasAcceptedTerms = localStorage.getItem("acceptedTerms");
     if (!hasAcceptedTerms) {
-      setShowTermsPopup(true);
+      localStorage.setItem("acceptedTerms", "true");
     }
-  }, []);
-
-  // Progress bar animation
-  useEffect(() => {
-    const loadInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= PROGRESS_MAX) {
-          clearInterval(loadInterval);
-          return PROGRESS_MAX;
-        }
-        return prev + PROGRESS_INCREMENT;
-      });
-    }, LOADING_INTERVAL);
-
-    return () => clearInterval(loadInterval);
-  }, []);
-
-  // Fetch scripts
-  const fetchScripts = useCallback(async () => {
-    const result: any = await getRequest("video/author/scripts", setLoading);
-    if (result) {
-      setScripts(result.map((res: any) => res.script));
-      setData(result);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchScripts();
-  }, [fetchScripts]);
-
-  // Event handlers
-  const handleAcceptTerms = useCallback(() => {
-    localStorage.setItem("acceptedTerms", "true");
-    setShowTermsPopup(false);
   }, []);
 
   const handleThemeClick = useCallback(
@@ -211,7 +176,7 @@ const Homepage: React.FC = () => {
   );
 
   return (
-    <Layout expand={expand} setExpand={setExpand}>
+    <Layout>
       <LoadingBar color="#ffb300" progress={progress} height={3} />
 
       {/* Analytics Section */}
