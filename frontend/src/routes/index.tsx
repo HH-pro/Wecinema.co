@@ -71,7 +71,7 @@ const Router: React.FC = () => {
           <Route path="/chat/:chatId" element={<ChatPage />} />
           <Route path="/videoeditor" element={<VideoEditorPage />} />
           <Route path="/history" element={<HistoryPage />} />
-          <Route path="/chatbot" element={<ChatbotPage />} />
+          {/* <Route path="/chatbot" element={<ChatbotPage />} /> */}
           <Route path="/customersupport" element={<CustomerSupportPage />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
