@@ -814,21 +814,12 @@ const CommentItem = React.memo((
         {/* Replies Display */}
         {comment.replies?.length > 0 && (
           <div className="ml-4 mt-3 border-l-2 border-gray-300 pl-3">
-            {comment.replies.map((replyItem) => (
-              <div key={replyItem._id} className="flex gap-2 mb-3">
-                <img
-                  src={replyItem.avatar}
-                  className="bg-white rounded-full w-6 h-6 flex-shrink-0 border border-gray-100"
-                  alt={`${replyItem.username} avatar`}
-                />
-                <div className="flex-1">
-                  <h5 className="text-sm font-semibold">{replyItem.username}</h5>
-                  <p className="text-sm break-words">{replyItem.text}</p>
-                  <span className="text-xs text-gray-500">
-                    {formatDateAgo(replyItem.chatedAt ?? videoDate)}
-                  </span>
-                </div>
-              </div>
+            {comment.replies.map((replyItem: Comment) => (
+              <ReplyItem
+                key={replyItem._id}
+                reply={replyItem}
+                videoDate={videoDate}
+              />
             ))}
           </div>
         )}
