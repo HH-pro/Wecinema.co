@@ -741,18 +741,30 @@ const ReplyItem = React.memo(({ reply, videoDate }: ReplyItemProps) => (
 
 ReplyItem.displayName = "ReplyItem";
 
-const CommentItem = React.memo(({
-  comment,
-  videoId,
-  videoDate,
-  replyingTo,
-  onReplyToggle,
-  onReplySubmit,
-  reply,
-  onReplyChange,
-  loading,
-  tokenData
-}: CommentItemProps) => {
+// ========== Comment Item Component ==========
+interface CommentItemProps {
+  comment: Comment;
+  videoDate: string;
+  replyingTo: string | null;
+  onReplyToggle: (id: string) => void;
+  onReplySubmit: (e: React.FormEvent<HTMLFormElement>, commentId: string) => Promise<void>;
+  reply: string;
+  onReplyChange: (reply: string) => void;
+  loading: boolean;
+}
+
+const CommentItem = React.memo((
+  {
+    comment,
+    videoDate,
+    replyingTo,
+    onReplyToggle,
+    onReplySubmit,
+    reply,
+    onReplyChange,
+    loading
+  }: CommentItemProps
+) => {
   return (
     <section className="relative mb-5 gap-2 flex">
       <img
