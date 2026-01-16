@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, ReactNode } from "react";
 import { BsDot } from "react-icons/bs";
 import { MdPlayArrow, MdUpload, MdVerifiedUser } from "react-icons/md";
 import { AiFillDislike, AiFillLike, AiOutlineDislike, AiOutlineLike } from "react-icons/ai";
@@ -9,6 +9,11 @@ import { useNavigate } from "react-router-dom";
 import Modal from 'react-modal';
 import axios from 'axios';
 import '../videoplayer/index.css';
+
+// Constants
+const VIDEO_COMMENT_MIN_LENGTH = 2;
+const REPLY_MIN_LENGTH = 2;
+const API_TIMEOUT = 10000;
 
 interface Video {
   _id: string;
