@@ -29,6 +29,7 @@ interface Video {
 interface LikedVideoItem {
   video: Video;
   likedAt: string;
+  interactionId?: string;
 }
 
 interface PaginationData {
@@ -73,38 +74,64 @@ const LikedVideos = () => {
         return;
       }
 
+      // Log the request URL for debugging
+      const requestUrl = `${API_BASE_URL}/video/user/liked`;
+      console.log("Fetching from:", requestUrl);
+
       const response = await axios.get<PaginationData>(
-        `${API_BASE_URL}/video/user/liked`,
+        requestUrl,
         {
           params: { page, limit: 20 },
           headers: {
             Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
           },
         }
       );
 
+      console.log("API Response:", response.data);
+
       if (response.data.success) {
-        setLikedVideos(response.data.likedVideos || []);
-        setCurrentPage(response.data.currentPage);
-        setTotalPages(response.data.totalPages);
-        setTotalVideos(response.data.totalLikedVideos);
-        setError("");
+        // Validate and filter out any invalid videos
+        const validVideos = (response.data.likedVideos || []).filter(
+          (item: any) => item?.video?._id
+        );
+        
+        setLikedVideos(validVideos);
+        setCurrentPage(response.data.currentPage || 1);
+        setTotalPages(response.data.totalPages || 1);
+        setTotalVideos(response.data.totalLikedVideos || 0);
+        setError(validVideos.length === 0 ? "No liked videos found." : "");
       } else {
         setError("Failed to load liked videos.");
+        setLikedVideos([]);
       }
     } catch (err: any) {
       console.error("Error fetching liked videos:", err);
       
+      // Log detailed error information
+      if (err.response) {
+        console.error("Response status:", err.response.status);
+        console.error("Response data:", err.response.data);
+        console.error("Response headers:", err.response.headers);
+      } else if (err.request) {
+        console.error("No response received:", err.request);
+      } else {
+        console.error("Error message:", err.message);
+      }
+      
       if (err.response?.status === 401) {
         setError("Your session has expired. Please log in again.");
         localStorage.removeItem("token");
-        navigate("/login");
+        setTimeout(() => navigate("/login"), 2000);
       } else if (err.response?.status === 404) {
-        setError("No liked videos found.");
-        setLikedVideos([]);
+        setError("API endpoint not found. Please check the server configuration.");
+      } else if (err.code === 'ERR_NETWORK') {
+        setError("Network error. Please check your connection.");
       } else {
-        setError("Failed to load liked videos. Please try again later.");
+        setError(`Failed to load liked videos: ${err.message || "Unknown error"}`);
       }
+      setLikedVideos([]);
     } finally {
       setLoading(false);
     }
@@ -116,8 +143,12 @@ const LikedVideos = () => {
 
   const handleVideoClick = useCallback(
     (videoItem: LikedVideoItem) => {
+      if (!videoItem?.video) {
+        console.error("Invalid video item:", videoItem);
+        return;
+      }
+      
       const video = videoItem.video;
-      // Use slug if available, otherwise use ID
       const slug = video.slug || video._id;
       navigate(`/video/${slug}`, { 
         state: { 
@@ -136,7 +167,11 @@ const LikedVideos = () => {
     }
   };
 
-  const memoizedVideos = useMemo(() => likedVideos, [likedVideos]);
+  // Filter out any invalid videos before rendering
+  const validLikedVideos = useMemo(() => 
+    likedVideos.filter(item => item?.video?._id),
+    [likedVideos]
+  );
 
   if (loading) {
     return (
@@ -172,7 +207,7 @@ const LikedVideos = () => {
         </div>
 
         {/* Error Message */}
-        {error && !loading && (
+        {error && (
           <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
             <div className="flex items-center">
               <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -180,11 +215,28 @@ const LikedVideos = () => {
               </svg>
               <span>{error}</span>
             </div>
+            {error.includes("API endpoint not found") && (
+              <div className="mt-2 text-sm">
+                <p>Please check if:</p>
+                <ul className="list-disc list-inside ml-4">
+                  <li>The server is running</li>
+                  <li>The API endpoint exists: <code className="bg-gray-100 px-1">/api/video/user/liked</code></li>
+                  <li>You have proper authentication</li>
+                </ul>
+              </div>
+            )}
           </div>
         )}
 
+        {/* Debug Info - Remove in production */}
+        <div className="mb-4 p-3 bg-gray-100 rounded text-xs text-gray-600">
+          <p>API Base URL: {API_BASE_URL}</p>
+          <p>Valid Videos: {validLikedVideos.length}</p>
+          <p>Total Videos: {totalVideos}</p>
+        </div>
+
         {/* Videos Grid */}
-        {memoizedVideos.length === 0 && !loading && !error ? (
+        {validLikedVideos.length === 0 && !loading ? (
           <div className="text-center py-16 bg-gray-50 rounded-lg">
             <div className="mx-auto w-24 h-24 mb-4 text-gray-300">
               <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -205,9 +257,9 @@ const LikedVideos = () => {
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-              {memoizedVideos.map((videoItem) => (
+              {validLikedVideos.map((videoItem) => (
                 <VideoCard
-                  key={videoItem.video._id}
+                  key={videoItem.video._id || Math.random().toString()}
                   videoItem={videoItem}
                   onVideoClick={() => handleVideoClick(videoItem)}
                 />
@@ -284,20 +336,46 @@ interface VideoCardProps {
 }
 
 const VideoCard = React.memo(({ videoItem, onVideoClick }: VideoCardProps) => {
+  // Validate videoItem before using it
+  if (!videoItem || !videoItem.video) {
+    console.error("Invalid video item in VideoCard:", videoItem);
+    return null;
+  }
+
   const { video, likedAt } = videoItem;
-  const formattedDate = useMemo(
-    () => new Date(likedAt).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }),
-    [likedAt]
-  );
+  
+  // Use safe defaults
+  const safeVideo = {
+    _id: video._id || 'unknown-id',
+    title: video.title || 'Untitled Video',
+    file: video.file || '',
+    views: video.views || 0,
+    likes: video.likes || [],
+    author: video.author || { 
+      _id: 'unknown', 
+      username: 'Unknown', 
+      avatar: '', 
+      followers: [] 
+    },
+    ...video
+  };
+
+  const formattedDate = useMemo(() => {
+    try {
+      return new Date(likedAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    } catch (e) {
+      return "Unknown date";
+    }
+  }, [likedAt]);
 
   return (
     <div
       className="cursor-pointer group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
-      onClick={onVideoClick}
+      onClick={onClick}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -309,10 +387,10 @@ const VideoCard = React.memo(({ videoItem, onVideoClick }: VideoCardProps) => {
     >
       {/* Thumbnail Container */}
       <div className="relative w-full aspect-video overflow-hidden bg-gray-900">
-        {video.file ? (
+        {safeVideo.file ? (
           <div className="w-full h-full">
             <VideoThumbnail
-              videoUrl={video.file}
+              videoUrl={safeVideo.file}
               width="100%"
               height="100%"
               snapshotAtTime={2}
@@ -355,20 +433,23 @@ const VideoCard = React.memo(({ videoItem, onVideoClick }: VideoCardProps) => {
       {/* Video Info */}
       <div className="p-4">
         <h3 className="font-semibold text-gray-900 line-clamp-2 mb-2 group-hover:text-blue-600 transition-colors">
-          {video.title || "Untitled Video"}
+          {safeVideo.title}
         </h3>
         
         {/* Author info */}
         <div className="flex items-center mb-3">
-          {video.author?.avatar && (
+          {safeVideo.author?.avatar && (
             <img
-              src={video.author.avatar}
-              alt={video.author.username}
+              src={safeVideo.author.avatar}
+              alt={safeVideo.author.username}
               className="w-6 h-6 rounded-full mr-2 object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
             />
           )}
           <span className="text-sm text-gray-600 truncate">
-            {video.author?.username || "Unknown"}
+            {safeVideo.author?.username || "Unknown"}
           </span>
         </div>
         
@@ -380,16 +461,16 @@ const VideoCard = React.memo(({ videoItem, onVideoClick }: VideoCardProps) => {
                 <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
                 <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
               </svg>
-              {video.views?.toLocaleString() || 0} views
+              {safeVideo.views?.toLocaleString() || 0} views
             </span>
             <span className="flex items-center">
               <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
               </svg>
-              {video.likes?.length || 0} likes
+              {safeVideo.likes?.length || 0} likes
             </span>
           </div>
-          <span className="text-gray-400" title={new Date(likedAt).toLocaleString()}>
+          <span className="text-gray-400" title={formattedDate}>
             {formattedDate}
           </span>
         </div>
