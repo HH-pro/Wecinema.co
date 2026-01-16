@@ -26,6 +26,8 @@ const LikedVideos = () => {
 
   // Initialize user and fetch liked videos in one effect
   useEffect(() => {
+    const controller = new AbortController();
+
     const initializeAndFetch = async () => {
       try {
         const token = localStorage.getItem("token");
@@ -45,12 +47,13 @@ const LikedVideos = () => {
         // Fetch liked videos directly
         const response = await axios.get(
           `${API_BASE_URL}/video/liked/${decoded.userId}`,
-          { timeout: 10000 }
+          { timeout: 10000, signal: controller.signal }
         );
 
         setLikedVideos(Array.isArray(response.data) ? response.data : []);
         setError("");
       } catch (err) {
+        if (axios.isCancel(err)) return;
         const message = axios.isAxiosError(err)
           ? err.response?.status === 404
             ? "No liked videos found."
@@ -63,8 +66,8 @@ const LikedVideos = () => {
     };
 
     initializeAndFetch();
+    return () => controller.abort();
   }, []);
-
   const handleVideoClick = useCallback(
     (video: LikedVideo) => {
       const slug = video.slug ?? generateSlug(video._id);
