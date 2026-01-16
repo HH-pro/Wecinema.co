@@ -68,9 +68,6 @@ const LikedVideos = () => {
     initializeAndFetch();
     return () => controller.abort();
   }, []);
-    initializeAndFetch();
-    return () => controller.abort();
-  }, []);
   const handleVideoClick = useCallback(
     (video: LikedVideo) => {
       const slug = video.slug ?? generateSlug(video._id);
