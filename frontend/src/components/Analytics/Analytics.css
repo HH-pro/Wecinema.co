@@ -935,7 +935,7 @@
 
 @media (min-width: 768px) {
   .yellow-chart-card:hover {
-    background: linear-gradient(135deg, rgba(40, 40, 55, 0.98) 0%, rgba(30, 30, 42, 0.95) 100%);
+    background: #0a0a0a;
     border-color: rgba(245, 158, 11, 0.4);
     transform: translateY(-4px);
     box-shadow: 
