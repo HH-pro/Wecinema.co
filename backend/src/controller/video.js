@@ -7,7 +7,7 @@ const Videos = require("../models/videos");
 const Script = require("../models/script");
 const History = require('../models/history');
 const User = require("../models/user");
-const UserLikedVideo = require("../models/userLikedVideos");
+const UserLikedVideo = require("../models/UserLikedVideos");
 const { authenticateMiddleware, isValidObjectId } = require("../utils");
 
 // ==================== VIDEO CRUD ROUTES ====================
