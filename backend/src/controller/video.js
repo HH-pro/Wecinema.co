@@ -286,19 +286,22 @@ router.get('/user/liked', authenticateMiddleware, async (req, res) => {
         // Filter out null videos (hidden or deleted)
         const filteredLikedVideos = likedVideos.filter(item => item.videoId);
         
-        // Get total count
-        const totalCount = await UserLikedVideo.countDocuments({ 
-            userId, 
-            action: 'like' 
-        });
+        // Get accurate total count of non-hidden videos
+        const totalCountResult = await UserLikedVideo.aggregate([
+            { $match: { userId, action: 'like' } },
+            { $lookup: { from: 'videos', localField: 'videoId', foreignField: '_id', as: 'video' } },
+            { $unwind: '$video' },
+            { $match: { 'video.hidden': false } },
+            { $count: 'total' }
+        ]);
+        const totalCount = totalCountResult[0]?.total || 0;
 
         res.status(200).json({
             success: true,
             userId,
             totalLikedVideos: totalCount,
             currentPage: page,
-            totalPages: Math.ceil(totalCount / limit),
-            likedVideos: filteredLikedVideos.map(item => ({
+            totalPages: Math.ceil(totalCount / limit),            likedVideos: filteredLikedVideos.map(item => ({
                 ...item.videoId._doc,
                 likedAt: item.createdAt
             }))
