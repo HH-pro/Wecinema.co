@@ -2,8 +2,8 @@ import React, { useEffect, useState } from "react";
 import { BsDot } from "react-icons/bs";
 import { MdPlayArrow, MdUpload, MdVerifiedUser } from "react-icons/md";
 import { AiFillDislike, AiFillLike, AiOutlineDislike, AiOutlineLike } from "react-icons/ai";
-import { formatDateAgo, isUserIdInArray } from "../../utilities/helperfFunction";
-import { getRequest, postRequest, putRequest } from "../../api";
+import { formatDateAgo } from "../../utilities/helperfFunction";
+import { getRequest, postRequest, putRequest, API_BASE_URL } from "../../api";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import Modal from 'react-modal';
@@ -70,7 +70,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
         
         // Fetch all video data in parallel
         const [videoData, likeStatus, viewsData] = await Promise.all([
-          getRequest("/video/" + video._id, setLoading),
+          getRequest(`/video/${video._id}`, setLoading),
           tokenData?.userId ? getRequest(`/video/${video._id}/like-status/${tokenData.userId}`, setLoading) 
                           : Promise.resolve({ isLiked: false, isDisliked: false }),
           getRequest(`/video/views/${video._id}`, setLoading)
@@ -91,25 +91,26 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
 
         setIsFollowing(videoData.author?.followers?.includes(tokenData?.userId));
         
-      // Fetch payment status
-const paymentPromises: Promise<any>[] = [];
+        // Fetch payment status using API_BASE_URL
+        const paymentPromises: Promise<any>[] = [];
 
-if (video.author?._id) {
-  paymentPromises.push(
-    axios
-      .get(`https://wecinema.co/api/user/payment-status/${video.author._id}`)
-      .then((response) => setUserHasPaid(response.data.hasPaid))
-  );
-}
+        if (video.author?._id) {
+          paymentPromises.push(
+            axios
+              .get(`${API_BASE_URL}/user/payment-status/${video.author._id}`)
+              .then((response) => setUserHasPaid(response.data.hasPaid))
+              .catch((error) => console.error("Error fetching author payment status:", error))
+          );
+        }
 
-if (tokenData?.userId) {
-  paymentPromises.push(
-    axios
-      .get(`https://wecinema.co/api/user/payment-status/${tokenData.userId}`)
-      .then((response) => setCurrentUserHasPaid(response.data.hasPaid))
-  );
-}
-
+        if (tokenData?.userId) {
+          paymentPromises.push(
+            axios
+              .get(`${API_BASE_URL}/user/payment-status/${tokenData.userId}`)
+              .then((response) => setCurrentUserHasPaid(response.data.hasPaid))
+              .catch((error) => console.error("Error fetching user payment status:", error))
+          );
+        }
 
         await Promise.all(paymentPromises);
         
@@ -241,7 +242,7 @@ if (tokenData?.userId) {
       };
 
       await putRequest(
-        `user/${video.author?._id}/follow`,
+        `/user/${video.author?._id}/follow`,
         payload,
         setLoading
       );
@@ -272,7 +273,7 @@ if (tokenData?.userId) {
           text: comment,
         };
         const result: any = await postRequest(
-          "video/" + video._id + "/comment",
+          `/video/${video._id}/comment`,
           payload,
           setLoading,
           "Commented successfully"
@@ -302,7 +303,7 @@ if (tokenData?.userId) {
           text: reply,
         };
         const result: any = await postRequest(
-          `video/${video._id}/comment/${commentId}`,
+          `/video/${video._id}/comment/${commentId}`,
           payload,
           setLoading,
           "Replied successfully"
@@ -327,7 +328,7 @@ if (tokenData?.userId) {
         userId: tokenData?.userId,
       };
       const result: any = await putRequest(
-        "video/" + video._id,
+        `/video/${video._id}`,
         payload,
         setLoading,
         `Video ${isBookmarked ? "Unbookmarked" : "Bookmarked"}!`
