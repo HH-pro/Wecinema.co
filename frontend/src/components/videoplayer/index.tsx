@@ -326,12 +326,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
     try {
       setLoading(true);
       const action = isBookmarked ? "removeBookmark" : "addBookmark";
+      const message = `Video ${isBookmarked ? "Unbookmarked" : "Bookmarked"}!`;
       await putRequest(
         `/video/${video._id}`,
         { action, userId: tokenData?.userId },
-        setLoading,
-        `Video ${isBookmarked ? "Unbookmarked" : "Bookmarked"}!`
+        setLoading
       );
+      toast.success(message);
       setIsBookmarked(!isBookmarked);
     } catch (error) {
       toast.error("Error toggling bookmark");
