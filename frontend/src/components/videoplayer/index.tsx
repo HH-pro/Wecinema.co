@@ -164,7 +164,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
         action: newIsLiked ? 'like' : 'unlike'
       };
 
-      await postRequest(`/video/${video._id}/like`, payload, setLoading);
+      await postRequest(`/video/like/${video._id}`, payload, setLoading);
       
     } catch (error) {
       // Revert on error
