@@ -174,7 +174,6 @@ const TermsAndConditions = () => {
                     <li>Standard platform fee: 5% per transaction (in addition to revenue share)</li>
                     <li>Hypemode transactions: 5% platform fee + 15% revenue share</li>
                     <li>Payment held in escrow until order completion</li>
-                    <li>Refunds processed within 7-10 business days</li>
                   </ul>
                 </div>
                 <div className="term-clause">
