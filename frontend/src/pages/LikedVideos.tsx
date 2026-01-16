@@ -306,14 +306,7 @@ const LikedVideos = () => {
           </div>
         )}
 
-        {/* Debug Info - Keep for now to see API response */}
-        <div className="mb-4 p-3 bg-gray-100 rounded text-xs text-gray-600">
-          <p><strong>Debug Info:</strong></p>
-          <p>API Base URL: {API_BASE_URL}</p>
-          <p>Valid Videos in State: {validVideos.length}</p>
-          <p>Total Videos from API: {totalVideos}</p>
-          <p>First video data: {validVideos[0] ? JSON.stringify(validVideos[0], null, 2) : 'None'}</p>
-        </div>
+      
 
         {/* Videos Grid */}
         {validVideos.length === 0 && !loading ? (
