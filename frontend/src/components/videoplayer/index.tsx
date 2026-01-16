@@ -11,9 +11,7 @@ import axios from 'axios';
 import '../videoplayer/index.css';
 
 // Constants
-const VIDEO_COMMENT_MIN_LENGTH = 2;
-const REPLY_MIN_LENGTH = 2;
-const API_TIMEOUT = 10000;
+const COMMENT_MIN_LENGTH = 2;
 
 interface Video {
   _id: string;
