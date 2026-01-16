@@ -46,7 +46,7 @@ const LikedVideos = () => {
 
         // Fetch liked videos directly
         const response = await axios.get(
-          `${API_BASE_URL}/video/liked/${decoded.userId}`,
+          `${API_BASE_URL}/like/${decoded.userId}`,
           { timeout: 10000, signal: controller.signal }
         );
 
