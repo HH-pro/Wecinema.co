@@ -538,15 +538,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
             <CommentItem
               key={comment._id}
               comment={comment}
-              videoId={video._id}
               videoDate={video.updatedAt}
               replyingTo={replyingTo}
-              onReplyToggle={(id) => setReplyingTo(replyingTo === id ? null : id)}
+              onReplyToggle={(commentId: string) => setReplyingTo(replyingTo === commentId ? null : commentId)}
               onReplySubmit={handleReplySubmit}
               reply={reply}
               onReplyChange={setReply}
               loading={loading}
-              tokenData={tokenData}
             />
           ))}
         </div>
