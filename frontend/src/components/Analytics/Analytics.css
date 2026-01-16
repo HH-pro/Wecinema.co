@@ -893,7 +893,7 @@
 
 /* Yellow Chart Card */
 .yellow-chart-card {
-  background: linear-gradient(135deg, rgba(30, 30, 40, 0.95) 0%, rgba(20, 20, 28, 0.9) 100%);
+  background: #000000;
   border: 2px solid rgba(245, 158, 11, 0.2);
   border-radius: 16px;
   padding: 18px;
