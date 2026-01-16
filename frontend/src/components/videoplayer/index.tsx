@@ -293,7 +293,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
   const handleReplySubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>, commentId: string) => {
     e.preventDefault();
 
-    if (reply.trim().length < 2) {
+    if (reply.trim().length < COMMENT_MIN_LENGTH) {
       toast.error("Reply must be at least 2 characters");
       return;
     }
@@ -308,9 +308,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
       const result: any = await postRequest(
         `/video/${video._id}/comment/${commentId}`,
         { userId: tokenData.userId, text: reply },
-        setLoading,
-        "Replied successfully"
+        setLoading
       );
+      toast.success("Replied successfully");
       setReply("");
       setReplyingTo(null);
       setCommentData(result?.comments || []);
