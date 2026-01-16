@@ -10,7 +10,7 @@ const TermsAndConditions = () => {
   });
 
   return (
-    <Layout expand={false} hasHeader={true}>
+    <Layout hasHeader={true}>
       <div className="terms-conditions-wrapper">
         <div className="terms-conditions-container">
           <header className="terms-header">
