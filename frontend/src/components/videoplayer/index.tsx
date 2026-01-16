@@ -560,18 +560,187 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
   );
 };
 
-interface CommentItemProps {
-  comment: Comment;
-  videoId: string;
-  videoDate: string;
-  replyingTo: string | null;
-  onReplyToggle: (id: string) => void;
-  onReplySubmit: (e: React.FormEvent<HTMLFormElement>, commentId: string) => Promise<void>;
-  reply: string;
-  onReplyChange: (reply: string) => void;
-  loading: boolean;
-  tokenData?: TokenData;
+// ========== Subscription Modal Component ==========
+interface SubscriptionModalProps {
+  isOpen: boolean;
+  onClose: () => void;
 }
+
+const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ isOpen, onClose }) => (
+  <Modal
+    isOpen={isOpen}
+    onRequestClose={onClose}
+    contentLabel="Subscribe Now"
+    style={{
+      overlay: { backgroundColor: 'rgba(0, 0, 0, 0.75)' },
+      content: {
+        top: '50%',
+        left: '50%',
+        right: 'auto',
+        bottom: 'auto',
+        marginRight: '-50%',
+        transform: 'translate(-50%, -50%)',
+        background: 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)',
+        color: '#fff',
+        padding: '20px',
+        borderRadius: '10px',
+        border: 'none',
+      },
+    }}
+  >
+    <h2 style={{ marginBottom: '20px' }}>Subscribe to Access This Profile</h2>
+    <p>You need to subscribe to access this profile.</p>
+    <button
+      onClick={onClose}
+      style={{
+        marginTop: '20px',
+        padding: '10px 20px',
+        background: '#fff',
+        color: '#000',
+        border: 'none',
+        borderRadius: '5px',
+        cursor: 'pointer',
+        fontWeight: 'bold',
+        transition: 'transform 0.2s'
+      }}
+    >
+      Close
+    </button>
+  </Modal>
+);
+
+// ========== Action Buttons Component ==========
+interface ActionButtonsProps {
+  likes: LikeState;
+  dislikes: DislikeState;
+  isBookmarked: boolean;
+  loading: boolean;
+  onLike: () => void;
+  onDislike: () => void;
+  onBookmark: () => void;
+}
+
+const ActionButtons = React.memo((props: ActionButtonsProps) => (
+  <div className="button-container">
+    <button
+      disabled={props.loading}
+      onClick={props.onLike}
+      className={`button ${props.likes.isLiked ? "like" : "bookmark"}`}
+      aria-label={`Like video (${props.likes.count} likes)`}
+    >
+      {props.likes.isLiked ? <AiFillLike size="20" /> : <AiOutlineLike size="20" />}
+      {props.likes.count}
+    </button>
+    <button
+      disabled={props.loading}
+      onClick={props.onDislike}
+      className={`button ${props.dislikes.isDisliked ? "dislike" : "bookmark"}`}
+      aria-label={`Dislike video (${props.dislikes.count} dislikes)`}
+    >
+      {props.dislikes.isDisliked ? <AiFillDislike size="20" /> : <AiOutlineDislike size="20" />}
+      {props.dislikes.count}
+    </button>
+
+    <button
+      onClick={props.onBookmark}
+      className={`button ${props.isBookmarked ? "like" : "bookmark"}`}
+      aria-label={props.isBookmarked ? "Remove bookmark" : "Add bookmark"}
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        {props.isBookmarked ? (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+        ) : (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+        )}
+      </svg>
+    </button>
+
+    <button className="button share" aria-label="Share video">
+      <MdUpload size="20" />
+      Share
+    </button>
+  </div>
+));
+
+ActionButtons.displayName = "ActionButtons";
+
+// ========== Author Info Component ==========
+interface AuthorInfoProps {
+  author: Video["author"];
+  createdAt: string;
+  updatedAt: string;
+  views: number;
+  isFollowing: boolean;
+  loading: boolean;
+  onFollow: () => void;
+}
+
+const AuthorInfo = React.memo((props: AuthorInfoProps) => (
+  <div className="sm:w-3/5 ml-4">
+    <h1 className="md:text-2xl font-bold mb-2 text-xl">{props.children}</h1>
+
+    <div className="flex sm:gap-10 gap-6 items-center">
+      <address className="flex items-center justify-between mt-2">
+        <a href="#" className="flex w-full overflow-hidden relative items-center">
+          <div className="relative rounded-full w-8 h-8 flex-shrink-0">
+            <div
+              className="items-center rounded-full flex-shrink-0 justify-center bg-center bg-no-repeat bg-cover flex w-8 h-8"
+              style={{ backgroundImage: `url(${props.author?.avatar})` }}
+              title={props.author?.username}
+            />
+          </div>
+          <div className="text-xs sm:text-sm w-full">
+            <div className="flex items-center sm:ml-2 flex-grow">
+              <span className="overflow-hidden truncate">{props.author?.username}</span>
+              <MdVerifiedUser size="18" color="green" className="flex-shrink-0 sm:ml-2" />
+            </div>
+            <div className="sm:ml-2 w-full text-xs">
+              <span>
+                {formatDateAgo(props.createdAt ?? props.updatedAt)} <BsDot className="inline-flex items-center" /> {props.views} Views
+              </span>
+            </div>
+          </div>
+        </a>
+      </address>
+      <button
+        onClick={props.onFollow}
+        disabled={props.loading}
+        className={`btn text-white cursor-pointer px-6 md:py-2 py-1 rounded-full transition-colors ${
+          props.isFollowing ? "bg-gray-500 hover:bg-gray-600" : "bg-yellow-500 hover:bg-yellow-600"
+        }`}
+      >
+        {props.loading ? "Processing..." : props.isFollowing ? "Unsubscribe" : "Subscribe"}
+      </button>
+    </div>
+  </div>
+));
+
+AuthorInfo.displayName = "AuthorInfo";
+
+// ========== Reply Item Component ==========
+interface ReplyItemProps {
+  reply: Comment;
+  videoDate: string;
+}
+
+const ReplyItem = React.memo(({ reply, videoDate }: ReplyItemProps) => (
+  <div className="flex gap-2 mb-3">
+    <img
+      src={reply.avatar}
+      className="bg-white rounded-full w-6 h-6 flex-shrink-0 border border-gray-100"
+      alt={`${reply.username} avatar`}
+    />
+    <div className="flex-1">
+      <h5 className="text-sm font-semibold">{reply.username}</h5>
+      <p className="text-sm break-words">{reply.text}</p>
+      <span className="text-xs text-gray-500">
+        {formatDateAgo(reply.chatedAt ?? videoDate)}
+      </span>
+    </div>
+  </div>
+));
+
+ReplyItem.displayName = "ReplyItem";
 
 const CommentItem = React.memo(({
   comment,
