@@ -138,11 +138,18 @@ const HistoryCard = React.memo(({ entry, onVideoClick }: HistoryCardProps) => {
         }
       }}
     >
-      <div className="relative w-full h-40">
-        <VideoThumbnail
-          videoUrl={entry.videoId?.file}
-          className="w-full h-full object-cover"
-        />
+      <div className="relative w-full h-40 overflow-hidden">
+        {entry.videoId?.file ? (
+          <VideoThumbnail
+            videoUrl={entry.videoId.file}
+            width="100%"
+            height="100%"
+          />
+        ) : (
+          <div className="w-full h-full bg-gray-300 flex items-center justify-center">
+            <span className="text-gray-500">No preview</span>
+          </div>
+        )}
       </div>
       <div className="p-2">
         <h3 className="text-sm font-semibold truncate">
