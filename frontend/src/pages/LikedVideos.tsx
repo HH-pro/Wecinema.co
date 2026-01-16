@@ -131,10 +131,10 @@ const VideoCard = React.memo(({ video, onVideoClick }: VideoCardProps) => {
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
           onVideoClick();
         }
-      }}
-    >
+      }}    >
       <div className="relative w-full h-40 overflow-hidden">
         {video.file ? (
           <VideoThumbnail
