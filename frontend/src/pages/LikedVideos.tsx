@@ -67,13 +67,13 @@ const LikedVideos = () => {
 
   const handleVideoClick = useCallback(
     (video: LikedVideo) => {
-      const navigationPath = video.slug ?? `/video/${generateSlug(video._id)}`;
+      const slug = video.slug ?? generateSlug(video._id);
+      const navigationPath = `/video/${slug}`;
       navigate(navigationPath, { state: video });
       localStorage.setItem("video", JSON.stringify(video));
     },
     [navigate]
   );
-
   const memoizedVideos = useMemo(() => likedVideos, [likedVideos]);
 
   if (loading) {
