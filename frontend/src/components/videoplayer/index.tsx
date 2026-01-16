@@ -208,7 +208,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
         action: newIsDisliked ? 'dislike' : 'undislike'
       };
 
-      await postRequest(`/video/${video._id}/dislike`, payload, setLoading);
+      await postRequest(`/video/dislike/${video._id}`, payload, setLoading);
       
     } catch (error) {
       // Revert on error
