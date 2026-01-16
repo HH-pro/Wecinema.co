@@ -563,7 +563,7 @@ interface SubscriptionModalProps {
   onClose: () => void;
 }
 
-const SubscriptionModal: React.FC<SubscriptionModalProps> = ({ isOpen, onClose }) => (
+const SubscriptionModal: React.FC<SubscriptionModalProps> = React.memo(({ isOpen, onClose }) => (
   <Modal
     isOpen={isOpen}
     onRequestClose={onClose}
