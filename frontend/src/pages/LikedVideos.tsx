@@ -28,9 +28,17 @@ interface Video {
 
 // Different possible response structures
 interface LikedVideosResponse {
-  likedVideos?: Video[] | Array<{ video: Video; likedAt: string }>;
+  // Structure 1: Direct array
+  likedVideos?: Video[];
+  // Structure 2: Nested with timestamps
+  likedVideos?: Array<{
+    video: Video;
+    likedAt: string;
+  }>;
+  // Structure 3: Different field names
   videos?: Video[];
   data?: Video[];
+  // Pagination info
   totalLikedVideos?: number;
   totalVideos?: number;
   currentPage?: number;
@@ -68,12 +76,11 @@ const LikedVideos = () => {
 
       console.log("Fetching liked videos for user:", decoded.userId);
 
-      // Try different endpoints in sequence
+      // Try different endpoints
       const endpoints = [
-        `${API_BASE_URL}/video/user/liked`,
-        `${API_BASE_URL}/video/user/liked/${decoded.userId}`,
-        `${API_BASE_URL}/video/likes/user/${decoded.userId}`,
-        `${API_BASE_URL}/video/user/likes`,
+        `${API_BASE_URL}/video/user/liked`,  // New endpoint
+        `${API_BASE_URL}/video/user/liked/${decoded.userId}`,  // Old endpoint style
+        `${API_BASE_URL}/video/likes/user/${decoded.userId}`,  // Alternative
       ];
 
       let response;
@@ -93,10 +100,12 @@ const LikedVideos = () => {
             }
           );
           console.log("Success with endpoint:", endpoint);
-          break;
+          console.log("Response data:", response.data);
+          break; // Exit loop if successful
         } catch (err) {
           lastError = err;
-          continue;
+          console.log("Failed with endpoint:", endpoint, err.message);
+          continue; // Try next endpoint
         }
       }
 
@@ -105,35 +114,34 @@ const LikedVideos = () => {
       }
 
       const data = response.data;
-      console.log("API Response:", data);
+      console.log("Full response data:", data);
 
-      // Parse response data
+      // Parse the response data
       let extractedVideos: Video[] = [];
       let extractedTotal = 0;
       let extractedCurrentPage = 1;
       let extractedTotalPages = 1;
 
+      // Check different possible response structures
       if (Array.isArray(data)) {
-        // Direct array response
+        // Case 1: Direct array of videos
         extractedVideos = data.filter(video => video?._id);
         extractedTotal = extractedVideos.length;
       } else if (data && typeof data === 'object') {
-        // Object response
+        // Case 2: Object with likedVideos array
         if (Array.isArray(data.likedVideos)) {
-          // Check if likedVideos contains nested objects
-          if (data.likedVideos.length > 0 && data.likedVideos[0]?.video) {
-            // Nested structure: { likedVideos: [{ video: {...}, likedAt: '...' }] }
+          // Check if likedVideos contains nested video objects
+          if (data.likedVideos[0]?.video?._id) {
+            // Structure: { likedVideos: [{ video: {...}, likedAt: '...' }] }
             extractedVideos = data.likedVideos
               .filter((item: any) => item?.video?._id)
-              .map((item: any) => ({
-                ...item.video,
-                likedAt: item.likedAt // Keep likedAt if needed
-              }));
+              .map((item: any) => item.video);
           } else {
-            // Flat structure: { likedVideos: [video1, video2, ...] }
+            // Structure: { likedVideos: [video1, video2, ...] }
             extractedVideos = data.likedVideos.filter((video: any) => video?._id);
           }
         } 
+        // Case 3: Other possible array fields
         else if (Array.isArray(data.videos)) {
           extractedVideos = data.videos.filter((video: any) => video?._id);
         }
@@ -141,31 +149,23 @@ const LikedVideos = () => {
           extractedVideos = data.data.filter((video: any) => video?._id);
         }
 
-        // Get totals
+        // Get pagination info
         extractedTotal = data.totalLikedVideos || data.totalVideos || extractedVideos.length;
         extractedCurrentPage = data.currentPage || 1;
         extractedTotalPages = data.totalPages || 1;
       }
 
       console.log("Extracted videos:", extractedVideos);
+      console.log("Extracted total:", extractedTotal);
 
-      // Validate video URLs and add fallback thumbnails
-      const validatedVideos = extractedVideos.map(video => ({
-        ...video,
-        // Ensure file URL is valid
-        file: video.file?.startsWith('http') ? video.file : `${API_BASE_URL}${video.file}`,
-        // Use thumbnail if available, otherwise generate from video
-        thumbnail: video.thumbnail || video.file
-      }));
-
-      setVideos(validatedVideos);
+      setVideos(extractedVideos);
       setCurrentPage(extractedCurrentPage);
       setTotalPages(extractedTotalPages);
       setTotalVideos(extractedTotal);
       
-      if (validatedVideos.length === 0) {
+      if (extractedVideos.length === 0) {
         setError(extractedTotal > 0 
-          ? "Could not parse video data. Check console for details." 
+          ? "Could not parse video data from API response." 
           : "No liked videos found.");
       } else {
         setError("");
@@ -173,20 +173,61 @@ const LikedVideos = () => {
     } catch (err: any) {
       console.error("Error fetching liked videos:", err);
       
+      // Detailed error logging
+      if (err.response) {
+        console.error("Response status:", err.response.status);
+        console.error("Response data:", err.response.data);
+        console.error("Response headers:", err.response.headers);
+      } else if (err.request) {
+        console.error("No response received:", err.request);
+      } else {
+        console.error("Error message:", err.message);
+      }
+      
       if (err.response?.status === 401) {
         setError("Your session has expired. Please log in again.");
         localStorage.removeItem("token");
         setTimeout(() => navigate("/login"), 2000);
       } else if (err.response?.status === 404) {
-        setError("Liked videos feature not available yet.");
+        // Try a fallback: get user's liked videos by checking all videos
+        tryFallbackMethod();
+      } else if (err.code === 'ERR_NETWORK') {
+        setError("Network error. Please check your connection.");
       } else {
-        setError("Failed to load liked videos. Please try again.");
+        setError(`Failed to load liked videos: ${err.message || "Unknown error"}`);
       }
       setVideos([]);
     } finally {
       setLoading(false);
     }
   }, [navigate]);
+
+  // Fallback method: Get all videos and filter by likes
+  const tryFallbackMethod = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const decoded = decodeToken(token) as any;
+      
+      if (!decoded?.userId) return;
+      
+      // Get all videos
+      const allVideosResponse = await axios.get(`${API_BASE_URL}/video/all`);
+      const allVideos = allVideosResponse.data || [];
+      
+      // Filter videos where user ID is in likes array
+      const likedVideos = allVideos.filter((video: Video) => 
+        Array.isArray(video.likes) && video.likes.includes(decoded.userId)
+      );
+      
+      setVideos(likedVideos);
+      setTotalVideos(likedVideos.length);
+      setError(likedVideos.length === 0 ? "No liked videos found." : "");
+      
+    } catch (fallbackErr) {
+      console.error("Fallback method failed:", fallbackErr);
+      setError("API endpoint not found and fallback failed.");
+    }
+  }, []);
 
   useEffect(() => {
     fetchLikedVideos(1);
@@ -199,17 +240,10 @@ const LikedVideos = () => {
         return;
       }
       
-      console.log("Opening video:", video);
-      
-      // Check if video exists in localStorage first
-      const existingVideo = localStorage.getItem(`video_${video._id}`);
-      if (!existingVideo) {
-        localStorage.setItem(`video_${video._id}`, JSON.stringify(video));
-      }
-      
-      // Navigate to video page
-      const videoSlug = video.slug || video._id;
-      navigate(`/video/${videoSlug}`);
+      const slug = video.slug || video._id;
+      navigate(`/video/${slug}`, { 
+        state: { video }
+      });
     },
     [navigate]
   );
@@ -221,8 +255,9 @@ const LikedVideos = () => {
     }
   };
 
+  // Filter out any invalid videos before rendering
   const validVideos = useMemo(() => 
-    videos.filter(video => video?._id && video?.file),
+    videos.filter(video => video?._id),
     [videos]
   );
 
@@ -242,7 +277,7 @@ const LikedVideos = () => {
   return (
     <Layout hasHeader={true}>
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
+        {/* Header Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Liked Videos</h1>
           <div className="flex items-center justify-between">
@@ -261,15 +296,24 @@ const LikedVideos = () => {
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-lg">
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
             <div className="flex items-center">
               <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
               <span>{error}</span>
             </div>
           </div>
         )}
+
+        {/* Debug Info - Keep for now to see API response */}
+        <div className="mb-4 p-3 bg-gray-100 rounded text-xs text-gray-600">
+          <p><strong>Debug Info:</strong></p>
+          <p>API Base URL: {API_BASE_URL}</p>
+          <p>Valid Videos in State: {validVideos.length}</p>
+          <p>Total Videos from API: {totalVideos}</p>
+          <p>First video data: {validVideos[0] ? JSON.stringify(validVideos[0], null, 2) : 'None'}</p>
+        </div>
 
         {/* Videos Grid */}
         {validVideos.length === 0 && !loading ? (
@@ -372,20 +416,17 @@ interface VideoCardProps {
 }
 
 const VideoCard = React.memo(({ video, onVideoClick }: VideoCardProps) => {
-  const [thumbnailError, setThumbnailError] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
-
+  // Validate video before using it
   if (!video || !video._id) {
     console.error("Invalid video in VideoCard:", video);
     return null;
   }
-
-  // Safe defaults
+  
+  // Use safe defaults
   const safeVideo = {
     _id: video._id || 'unknown-id',
     title: video.title || 'Untitled Video',
     file: video.file || '',
-    thumbnail: video.thumbnail || video.file,
     views: video.views || 0,
     likes: video.likes || [],
     author: video.author || { 
@@ -399,10 +440,8 @@ const VideoCard = React.memo(({ video, onVideoClick }: VideoCardProps) => {
 
   return (
     <div
-      className="cursor-pointer group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+      className="cursor-pointer group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
       onClick={onVideoClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -414,48 +453,38 @@ const VideoCard = React.memo(({ video, onVideoClick }: VideoCardProps) => {
     >
       {/* Thumbnail Container */}
       <div className="relative w-full aspect-video overflow-hidden bg-gray-900">
-        {safeVideo.file && !thumbnailError ? (
+        {safeVideo.file ? (
           <div className="w-full h-full">
-            <div className="relative w-full h-full">
-              <VideoThumbnail
-                videoUrl={safeVideo.file}
-                width="100%"
-                height="100%"
-                snapshotAtTime={1}
-                className="w-full h-full object-cover"
-              />
-              {/* Video duration - optional */}
-              <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
-                5:30 {/* You can calculate actual duration if available */}
-              </div>
-            </div>
-            
-            {/* Play button overlay on hover */}
-            {isHovered && (
-              <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center transition-opacity duration-300">
-                <div className="bg-white bg-opacity-90 rounded-full p-4 transform scale-110 transition-transform duration-300">
-                  <svg className="w-8 h-8 text-gray-900" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z" />
+            <VideoThumbnail
+              videoUrl={safeVideo.file}
+              width="100%"
+              height="100%"
+              snapshotAtTime={2}
+              className="w-full h-full object-cover"
+            />
+            {/* Overlay on hover */}
+            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300 flex items-center justify-center">
+              <div className="transform translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
+                <div className="bg-white bg-opacity-90 rounded-full p-3">
+                  <svg className="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
               </div>
-            )}
+            </div>
           </div>
         ) : (
-          // Fallback thumbnail
           <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
-            <div className="text-center">
-              <svg className="w-16 h-16 text-gray-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-              <p className="text-gray-500 text-sm">Video Preview</p>
-            </div>
+            <svg className="w-12 h-12 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
           </div>
         )}
         
         {/* Like badge */}
-        <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full flex items-center">
-          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+        <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+          <svg className="w-3 h-3 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
           </svg>
           Liked
@@ -464,65 +493,42 @@ const VideoCard = React.memo(({ video, onVideoClick }: VideoCardProps) => {
 
       {/* Video Info */}
       <div className="p-4">
-        <h3 className="font-semibold text-gray-900 line-clamp-2 mb-3 group-hover:text-blue-600 transition-colors text-sm md:text-base">
+        <h3 className="font-semibold text-gray-900 line-clamp-2 mb-2 group-hover:text-blue-600 transition-colors">
           {safeVideo.title}
         </h3>
         
         {/* Author info */}
         <div className="flex items-center mb-3">
-          {safeVideo.author?.avatar ? (
+          {safeVideo.author?.avatar && (
             <img
               src={safeVideo.author.avatar}
               alt={safeVideo.author.username}
-              className="w-8 h-8 rounded-full mr-2 object-cover border border-gray-200"
+              className="w-6 h-6 rounded-full mr-2 object-cover"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(safeVideo.author.username)}&background=random`;
+                (e.target as HTMLImageElement).style.display = 'none';
               }}
             />
-          ) : (
-            <div className="w-8 h-8 rounded-full mr-2 bg-gray-200 flex items-center justify-center">
-              <span className="text-xs font-semibold text-gray-600">
-                {safeVideo.author.username?.charAt(0) || 'U'}
-              </span>
-            </div>
           )}
-          <div>
-            <p className="text-sm font-medium text-gray-900 truncate">
-              {safeVideo.author?.username || "Unknown"}
-            </p>
-            <p className="text-xs text-gray-500">
-              {safeVideo.views?.toLocaleString() || 0} views
-            </p>
-          </div>
+          <span className="text-sm text-gray-600 truncate">
+            {safeVideo.author?.username || "Unknown"}
+          </span>
         </div>
         
-        {/* Action buttons */}
-        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-          <button 
-            className="flex items-center text-xs text-gray-500 hover:text-blue-600 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              // Handle like action
-            }}
-          >
-            <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+        {/* Stats */}
+        <div className="flex items-center text-xs text-gray-500">
+          <span className="flex items-center mr-4">
+            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+              <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+            </svg>
+            {safeVideo.views?.toLocaleString() || 0} views
+          </span>
+          <span className="flex items-center">
+            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
             </svg>
-            {safeVideo.likes?.length || 0}
-          </button>
-          
-          <button 
-            className="flex items-center text-xs text-gray-500 hover:text-blue-600 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              // Handle share action
-            }}
-          >
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-            </svg>
-            Share
-          </button>
+            {safeVideo.likes?.length || 0} likes
+          </span>
         </div>
       </div>
     </div>
