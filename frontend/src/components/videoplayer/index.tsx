@@ -604,9 +604,10 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = React.memo(({ isOpen
       Close
     </button>
   </Modal>
+  )
 );
 
-// ========== Action Buttons Component ==========
+SubscriptionModal.displayName = "SubscriptionModal";
 interface ActionButtonsProps {
   likes: LikeState;
   dislikes: DislikeState;
