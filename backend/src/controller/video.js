@@ -256,24 +256,38 @@ router.post('/dislike/:videoId', authenticateMiddleware, async (req, res) => {
 });
 
 // ==================== USER LIKED/INTERACTION HISTORY ROUTES ====================
-
-// Get user's liked videos (Authenticated)
+// Update the GET user liked videos route to work with proper authentication
 router.get('/user/liked', authenticateMiddleware, async (req, res) => {
     try {
-        const userId = req.user._id;
+        const userId = req.user._id || req.user.userId;
+        console.log("Fetching liked videos for user ID:", userId);
+        
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
         const skip = (page - 1) * limit;
 
+        if (!userId) {
+            return res.status(400).json({ 
+                success: false, 
+                error: "User ID not found in request" 
+            });
+        }
+
+        // First, let's debug what's in UserLikedVideo
+        const totalLikedCount = await UserLikedVideo.countDocuments({ 
+            userId, 
+            action: 'like' 
+        });
+        console.log("Total liked videos in UserLikedVideo:", totalLikedCount);
+
         // Get liked videos from UserLikedVideo collection
         const likedVideos = await UserLikedVideo.find({ 
-            userId, 
+            userId: mongoose.Types.ObjectId(userId), 
             action: 'like' 
         })
         .populate({
             path: 'videoId',
-            match: { hidden: false },
-            select: 'title thumbnail file views likes dislikes comments description createdAt',
+            select: 'title thumbnail file views likes dislikes comments description createdAt author hidden',
             populate: {
                 path: 'author',
                 select: 'username avatar followers'
@@ -283,29 +297,50 @@ router.get('/user/liked', authenticateMiddleware, async (req, res) => {
         .skip(skip)
         .limit(limit);
 
-        // Filter out null videos (hidden or deleted)
-        const filteredLikedVideos = likedVideos.filter(item => item.videoId);
+        console.log("Raw liked videos query result:", likedVideos.length);
         
-        // Get total count
-        const totalCount = await UserLikedVideo.countDocuments({ 
-            userId, 
-            action: 'like' 
-        });
+        // Filter out null videos (hidden or deleted)
+        const filteredLikedVideos = likedVideos.filter(item => item.videoId && !item.videoId.hidden);
+        console.log("Filtered liked videos:", filteredLikedVideos.length);
+        
+        // Format response
+        const formattedVideos = filteredLikedVideos.map(item => ({
+            video: {
+                _id: item.videoId._id,
+                title: item.videoId.title,
+                description: item.videoId.description,
+                file: item.videoId.file,
+                thumbnail: item.videoId.thumbnail,
+                views: item.videoId.views || 0,
+                likes: item.videoId.likes || [],
+                dislikes: item.videoId.dislikes || [],
+                comments: item.videoId.comments || [],
+                createdAt: item.videoId.createdAt,
+                author: item.videoId.author || {
+                    _id: 'unknown',
+                    username: 'Unknown',
+                    avatar: ''
+                }
+            },
+            likedAt: item.createdAt,
+            interactionId: item._id
+        }));
 
         res.status(200).json({
             success: true,
             userId,
-            totalLikedVideos: totalCount,
+            totalLikedVideos: totalLikedCount,
             currentPage: page,
-            totalPages: Math.ceil(totalCount / limit),
-            likedVideos: filteredLikedVideos.map(item => ({
-                ...item.videoId._doc,
-                likedAt: item.createdAt
-            }))
+            totalPages: Math.ceil(totalLikedCount / limit),
+            likedVideos: formattedVideos
         });
     } catch (error) {
         console.error("Error fetching user's liked videos:", error);
-        res.status(500).json({ error: "Internal Server Error" });
+        res.status(500).json({ 
+            success: false,
+            error: "Internal Server Error",
+            message: error.message 
+        });
     }
 });
 
