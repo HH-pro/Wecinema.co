@@ -2,28 +2,26 @@ const express = require("express");
 const mongoose = require("mongoose");
 const router = express.Router();
 
-// Import your Video model (assuming you have a MongoDB Video model)
+// Import models
 const Videos = require("../models/videos");
 const Script = require("../models/script");
-const History = require('../models/history'); // Adjust the path if necessary
-
-
-// Import your User model (assuming you have a MongoDB User model)
+const History = require('../models/history');
 const User = require("../models/user");
+const UserLikedVideo = require("../models/userLikedVideos");
 const { authenticateMiddleware, isValidObjectId } = require("../utils");
 
-// Route for creating a video
-router.post("/create", async (req, res) => {
+// ==================== VIDEO CRUD ROUTES ====================
+
+// Route for creating a video (Authenticated)
+router.post("/create", authenticateMiddleware, async (req, res) => {
     try {
-        const { title, description, genre, theme,rating,isForSale, file, author, role, slug, status,users,hasPaid} = req.body;
-        // Check if the user exists
-        const user = role !== "admin" ? await User.findById(author) : true;
-        if (!user) {
-            return res.status(404).json({ error: "User not found" });
-        }
-        console.log(req.user);
+        const { title, description, genre, theme, rating, isForSale, file, slug, status, users, hasPaid } = req.body;
+        
+        // Use authenticated user's ID as author
+        const author = req.user._id;
+        
         // Create a new video
-        await Videos.create({
+        const video = await Videos.create({
             title,
             description,
             genre,
@@ -31,23 +29,24 @@ router.post("/create", async (req, res) => {
             rating,
             file,
             slug,
-			users,
+            users,
             status: status ?? true,
-            author, //req.user._id,
-			hasPaid,
+            author,
+            hasPaid,
             isForSale,
         });
-        res.status(201).json({ message: "Video created successfully" });
+        
+        res.status(201).json({ message: "Video created successfully", videoId: video._id });
     } catch (error) {
         console.error("Error creating video:", error);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
 
-// Route for getting all videos
+// Route for getting all videos (Public)
 router.get("/all", async (req, res) => {
     try {
-        const videos = await Videos.find().populate("author", "username avatar followers followings");
+        const videos = await Videos.find({ hidden: false }).populate("author", "username avatar followers followings");
         res.json(videos);
     } catch (error) {
         console.error("Error getting all videos:", error);
@@ -55,10 +54,10 @@ router.get("/all", async (req, res) => {
     }
 });
 
+// Route for getting all videos by a specific user (Public)
 router.get("/all/:user", async (req, res) => {
     const userId = req.params.user;
 
-    // Check if userId is a valid ObjectId
     if (!mongoose.Types.ObjectId.isValid(userId)) {
         return res.status(400).json({ error: "Invalid user ID" });
     }
@@ -72,12 +71,13 @@ router.get("/all/:user", async (req, res) => {
     }
 });
 
-// Route for getting a specific video by ID
+// Route for getting a specific video by ID or slug (Public)
 router.get("/:id", async (req, res) => {
     try {
         const video = isValidObjectId(req.params.id)
-            ? await Videos.findById({ _id: req.params.id}).populate("author", "username avatar followers followings")
+            ? await Videos.findById({ _id: req.params.id, hidden: false }).populate("author", "username avatar followers followings")
             : await Videos.findOne({ slug: req.params.id, hidden: false }).populate("author", "username avatar followers followings");
+        
         if (!video) {
             return res.status(404).json({ error: "Video not found" });
         }
@@ -87,95 +87,14 @@ router.get("/:id", async (req, res) => {
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
-// Route for publishing a video
-router.patch("/publish/:id", async (req, res) => {
-    try {
-        const { id } = req.params;
-        const video = await Videos.findById(id);
-        if (!video) {
-            return res.status(404).json({ error: "Video not found" });
-        }
-        if (!video.hidden) {
-            return res.status(400).json({ error: "Video is already visible" });
-        }
 
-        // Set hidden to false (unhide)
-        video.hidden = false;
-        await video.save();
-        res.status(200).json({ message: "Video published successfully", video });
-    } catch (error) {
-        console.error("Error publishing video:", error);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-});
+// ==================== LIKE/DISLIKE ROUTES (with UserLikedVideo tracking) ====================
 
-
-// Route for unpublishing a video
-router.patch("/unpublish/:id", async (req, res) => {
-    try {
-        const { id } = req.params;
-        const video = await Videos.findById(id);
-        if (!video) {
-            return res.status(404).json({ error: "Video not found" });
-        }
-         // Toggle the hidden status
-         video.hidden = !video.hidden;
-         await video.save();
-         res.json({ message: `Video ${video.hidden ? "hidden" : "unhidden"} successfully`, video });
-    } catch (error) {
-        console.error("Error unpublishing video:", error);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-});
-
-// Route to hide a video by ID
-router.patch("/hide/:id", async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        // Check if video exists
-        const video = await Videos.findById(id);
-        if (!video) {
-            return res.status(404).json({ error: "Video not found" });
-        }
-
-        // Update hidden status to true
-        video.hidden = true;
-        await video.save();
-
-        res.status(200).json({ message: "Video hidden successfully", video });
-    } catch (error) {
-        console.error("Error hiding video:", error);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-});
-
-// Route to unhide a video by ID
-router.patch("/unhide/:id", async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        // Check if video exists
-        const video = await Videos.findById(id);
-        if (!video) {
-            return res.status(404).json({ error: "Video not found" });
-        }
-
-        // Update hidden status to false
-        video.hidden = false;
-        await video.save();
-
-        res.status(200).json({ message: "Video unhidden successfully", video });
-    } catch (error) {
-        console.error("Error unhiding video:", error);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-});
-
-// Like or Unlike a Video
+// Like or Unlike a Video (with UserLikedVideo tracking)
 router.post('/like/:videoId', authenticateMiddleware, async (req, res) => {
-    const { action, userId } = req.body;
+    const { action } = req.body;
     const videoId = req.params.videoId;
+    const userId = req.user._id; // Get user from authenticated middleware
 
     try {
         const video = await Videos.findById(videoId);
@@ -183,61 +102,73 @@ router.post('/like/:videoId', authenticateMiddleware, async (req, res) => {
             return res.status(404).json({ message: 'Video not found' });
         }
 
-        // Assuming genre and theme are arrays, adjust based on your actual schema
+        // Extract genres, themes, and ratings
         const genres = Array.isArray(video.genre) ? video.genre : [video.genre];
         const themes = Array.isArray(video.theme) ? video.theme : [video.theme];
         const ratings = Array.isArray(video.rating) ? video.rating : [video.rating];
 
-
-        // Handle the like or dislike action
         if (action === "like") {
+            // Update video likes array
             await Videos.findByIdAndUpdate(videoId, {
                 $pull: { dislikes: userId },
                 $addToSet: { likes: userId },
             });
 
-            // Update genreCounts and themeCounts for all videos with the same genres and themes
+            // Remove any existing dislike record
+            await UserLikedVideo.findOneAndDelete({ userId, videoId, action: 'dislike' });
+            
+            // Create like record
+            await UserLikedVideo.create({
+                userId,
+                videoId,
+                action: 'like'
+            });
+
+            // Update genreCounts and themeCounts
             await Videos.updateMany(
                 { $or: [{ genre: { $in: genres } }, { theme: { $in: themes } }] },
                 {
                     $inc: {
                         ...genres.reduce((acc, genre) => {
-                            acc[`genreCounts.${genre}`] = 1; // Increment count for each genre
+                            acc[`genreCounts.${genre}`] = 1;
                             return acc;
                         }, {}),
                         ...themes.reduce((acc, theme) => {
-                            acc[`themeCounts.${theme}`] = 1; // Increment count for each theme
+                            acc[`themeCounts.${theme}`] = 1;
                             return acc;
                         }, {}),
                         ...ratings.reduce((acc, rating) => {
-                            acc[`ratingCounts.${rating}`] = 1; // Increment count for each theme
+                            acc[`ratingCounts.${rating}`] = 1;
                             return acc;
                         }, {}),
                     },
                 }
             );
 
-        } else if (action === "dislike") {
+        } else if (action === "unlike") {
+            // Remove from likes array
             await Videos.findByIdAndUpdate(videoId, {
-                $pull: { likes: userId },
-                $addToSet: { dislikes: userId },
+                $pull: { likes: userId }
             });
 
-            // Update genreCounts and themeCounts for all videos with the same genres and themes
+            // Remove like record
+            await UserLikedVideo.findOneAndDelete({ userId, videoId, action: 'like' });
+
+            // Update genreCounts and themeCounts (decrement)
             await Videos.updateMany(
                 { $or: [{ genre: { $in: genres } }, { theme: { $in: themes } }] },
                 {
                     $inc: {
                         ...genres.reduce((acc, genre) => {
-                            acc[`genreCounts.${genre}`] = -1; // Decrement count for each genre
+                            acc[`genreCounts.${genre}`] = -1;
                             return acc;
                         }, {}),
                         ...themes.reduce((acc, theme) => {
-                            acc[`themeCounts.${theme}`] = -1; // Decrement count for each theme
+                            acc[`themeCounts.${theme}`] = -1;
                             return acc;
                         }, {}),
                         ...ratings.reduce((acc, rating) => {
-                            acc[`ratingCounts.${rating}`] = -1; // Decrement count for each theme
+                            acc[`ratingCounts.${rating}`] = -1;
                             return acc;
                         }, {}),
                     },
@@ -252,32 +183,11 @@ router.post('/like/:videoId', authenticateMiddleware, async (req, res) => {
     }
 });
 
-router.get('/likes/:videoId', async (req, res) => {
-    const videoId = req.params.videoId;
-
-
-
-    try {
-        const video = await Videos.findById(videoId);
-        if (!video) {
-            return res.status(404).json({ message: 'Video not found' });
-        }
-
-        res.status(200).json({ 
-            videoId, 
-            likesCount: video.likes.length, 
-            likes: video.likes 
-        });
-    } catch (error) {
-        console.error("Error fetching likes:", error);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-});
-
-
+// Dislike or Undislike a Video (with UserLikedVideo tracking)
 router.post('/dislike/:videoId', authenticateMiddleware, async (req, res) => {
-    const { userId } = req.body;
+    const { action } = req.body;
     const videoId = req.params.videoId;
+    const userId = req.user._id;
 
     try {
         const video = await Videos.findById(videoId);
@@ -290,722 +200,432 @@ router.post('/dislike/:videoId', authenticateMiddleware, async (req, res) => {
         const themes = Array.isArray(video.theme) ? video.theme : [video.theme];
         const ratings = Array.isArray(video.rating) ? video.rating : [video.rating];
 
-        // Add user to dislikes and remove from likes
-        await Videos.findByIdAndUpdate(videoId, {
-            $pull: { likes: userId },
-            $addToSet: { dislikes: userId },
-        });
+        if (action === "dislike") {
+            // Update video dislikes array
+            await Videos.findByIdAndUpdate(videoId, {
+                $pull: { likes: userId },
+                $addToSet: { dislikes: userId },
+            });
 
-        // Decrement counts for genres, themes, and ratings
-        await Videos.updateMany(
-            { $or: [{ genre: { $in: genres } }, { theme: { $in: themes } }] },
-            {
-                $inc: {
-                    ...genres.reduce((acc, genre) => {
-                        acc[`genreCounts.${genre}`] = -1;
-                        return acc;
-                    }, {}),
-                    ...themes.reduce((acc, theme) => {
-                        acc[`themeCounts.${theme}`] = -1;
-                        return acc;
-                    }, {}),
-                    ...ratings.reduce((acc, rating) => {
-                        acc[`ratingCounts.${rating}`] = -1;
-                        return acc;
-                    }, {}),
-                },
-            }
-        );
+            // Remove any existing like record
+            await UserLikedVideo.findOneAndDelete({ userId, videoId, action: 'like' });
+            
+            // Create dislike record
+            await UserLikedVideo.create({
+                userId,
+                videoId,
+                action: 'dislike'
+            });
 
-        res.status(200).json({ message: 'Video disliked successfully' });
-    } catch (error) {
-        console.error("Error disliking video:", error);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-});
+            // Update genreCounts and themeCounts (decrement for likes removed)
+            await Videos.updateMany(
+                { $or: [{ genre: { $in: genres } }, { theme: { $in: themes } }] },
+                {
+                    $inc: {
+                        ...genres.reduce((acc, genre) => {
+                            acc[`genreCounts.${genre}`] = -1;
+                            return acc;
+                        }, {}),
+                        ...themes.reduce((acc, theme) => {
+                            acc[`themeCounts.${theme}`] = -1;
+                            return acc;
+                        }, {}),
+                        ...ratings.reduce((acc, rating) => {
+                            acc[`ratingCounts.${rating}`] = -1;
+                            return acc;
+                        }, {}),
+                    },
+                }
+            );
 
-router.get('/dislike/:videoId', async (req, res) => {
-    const videoId = req.params.videoId;
+        } else if (action === "undislike") {
+            // Remove from dislikes array
+            await Videos.findByIdAndUpdate(videoId, {
+                $pull: { dislikes: userId }
+            });
 
-
-
-    try {
-        const video = await Videos.findById(videoId);
-        if (!video) {
-            return res.status(404).json({ message: 'Video not found' });
+            // Remove dislike record
+            await UserLikedVideo.findOneAndDelete({ userId, videoId, action: 'dislike' });
         }
 
-        res.status(200).json({ 
-            videoId, 
-            likesCount: video.dislikes.length, 
-            likes: video.dislikes 
-        });
+        res.status(200).json({ message: 'Action processed successfully' });
     } catch (error) {
-        console.error("Error fetching likes:", error);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-});
-router.get('/genres/graph', async (req, res) => {
-    try {
-        // Get the `from` and `to` query parameters from the request
-        const { from, to } = req.query;
-
-        // Convert them to Date objects
-        const fromDate = from ? new Date(from) : new Date();
-        fromDate.setDate(fromDate.getDate() - 7); // Default to last 7 days if `from` is not provided
-        fromDate.setHours(0, 0, 0, 0);
-
-        const toDate = to ? new Date(to) : new Date();
-        toDate.setHours(23, 59, 59, 999);
-
-        const genreTrends = await Videos.aggregate([
-            // Filter data to only include videos created in the last 7 days
-            {
-                $match: {
-                    createdAt: { $gte: fromDate, $lte: toDate }
-                }
-            },
-            {
-                $project: {
-                    genre: {
-                        $cond: {
-                            if: { $isArray: "$genre" },
-                            then: "$genre",
-                            else: { $cond: { if: { $eq: ["$genre", null] }, then: [], else: ["$genre"] } }
-                        }
-                    },
-                    genreCounts: 1,
-                    createdAt: 1
-                }
-            },
-            { 
-                $unwind: '$genre'
-            },
-            {
-                $group: {
-                    _id: {
-                        genre: '$genre',
-                        date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } } // Group by date instead of week
-                    },
-                    count: { $sum: 1 },
-                    genreCounts: { $first: "$genreCounts" }
-                }
-            },
-            {
-                $sort: { '_id.date': 1 }
-            }
-        ]);
-
-        // Restructure data for easier charting
-        const chartData = {}; 
-        genreTrends.forEach(item => {
-            const { genre, date } = item._id;
-            if (!chartData[genre]) {
-                chartData[genre] = {};
-            }
-            chartData[genre][date] = {
-                count: item.count,
-                genreCounts: item.genreCounts
-            };
-        });
-
-        res.status(200).json(chartData);
-    } catch (error) {
-        console.error("Error fetching genre data:", error);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-router.get('/themes/graph', async (req, res) => {
-    try {
-        // Get the `from` and `to` query parameters from the request
-        const { from, to } = req.query;
-
-        // Convert them to Date objects
-        const fromDate = from ? new Date(from) : new Date();
-        fromDate.setDate(fromDate.getDate() - 7); // Default to last 7 days
-        fromDate.setHours(0, 0, 0, 0);
-
-        const toDate = to ? new Date(to) : new Date();
-        toDate.setHours(23, 59, 59, 999);
-
-        const themeTrends = await Videos.aggregate([
-            {
-                $match: {
-                    createdAt: { $gte: fromDate, $lte: toDate }
-                }
-            },
-            {
-                $project: {
-                    theme: {
-                        $cond: {
-                            if: { $isArray: "$theme" },
-                            then: "$theme",
-                            else: { $cond: { if: { $eq: ["$theme", null] }, then: [], else: ["$theme"] } }
-                        }
-                    },
-                    themeCounts: 1,
-                    createdAt: 1
-                }
-            },
-            { 
-                $unwind: '$theme' 
-            },
-            {
-                $group: {
-                    _id: {
-                        theme: '$theme',
-                        date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }
-                    },
-                    count: { $sum: 1 },
-                    themeCounts: { $first: "$themeCounts" }
-                }
-            },
-            {
-                $sort: { '_id.date': 1 }
-            }
-        ]);
-
-        // Restructure data for easier charting
-        const chartData = {}; 
-        themeTrends.forEach(item => {
-            const { theme, date } = item._id;
-            if (!chartData[theme]) {
-                chartData[theme] = {};
-            }
-            chartData[theme][date] = {
-                count: item.count,
-                themeCounts: item.themeCounts
-            };
-        });
-
-        res.status(200).json(chartData);
-    } catch (error) {
-        console.error("Error fetching theme data:", error);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-router.get('/ratings/graph', async (req, res) => {
-    try {
-        // Get the `from` and `to` query parameters from the request
-        const { from, to } = req.query;
-
-        // Convert them to Date objects
-        const fromDate = from ? new Date(from) : new Date();
-        fromDate.setDate(fromDate.getDate() - 7); // Default to last 7 days
-        fromDate.setHours(0, 0, 0, 0);
-
-        const toDate = to ? new Date(to) : new Date();
-        toDate.setHours(23, 59, 59, 999);
-
-        const ratingTrends = await Videos.aggregate([
-            {
-                $match: {
-                    createdAt: { $gte: fromDate, $lte: toDate },
-                    rating: { $ne: null } // Ensure only videos with ratings are included
-                }
-            },
-            {
-                $project: {
-                    rating: 1,
-                    createdAt: 1
-                }
-            },
-            {
-                $group: {
-                    _id: {
-                        date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }
-                    },
-                    averageRating: { $avg: '$rating' },
-                    totalRatings: { $sum: 1 }
-                }
-            },
-            {
-                $sort: { '_id.date': 1 }
-            }
-        ]);
-
-        // Restructure data for easier charting
-        const chartData = {};
-        ratingTrends.forEach(item => {
-            const { date } = item._id;
-            chartData[date] = {
-                averageRating: item.averageRating,
-                totalRatings: item.totalRatings
-            };
-        });
-
-        res.status(200).json(chartData);
-    } catch (error) {
-        console.error("Error fetching rating data:", error);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-// Route to check if the user has liked/disliked a specific video
-router.get('/:videoId/like-status/:userId', async (req, res) => {
-  try {
-    const { videoId, userId } = req.params;
-
-    // Find the video by its ID
-    const video = await Videos.findById(videoId);
-
-    if (!video) {
-      return res.status(404).json({ message: "Video not found" });
-    }
-
-    // Check if the user has liked the video
-    const isLiked = video.likes.includes(userId);
-    const isDisliked = video.dislikes.includes(userId);
-
-    // Return the like and dislike status
-    res.status(200).json({
-      isLiked,
-      isDisliked
-    });
-  } catch (error) {
-    console.error('Error checking like status:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-
-  
-// Route for getting video likes
-router.get("/like/:videoId", async (req, res) => {
-    try {
-        const { videoId } = req.params;
-
-
-        // Check if video ID is valid
-        if (!mongoose.Types.ObjectId.isValid(videoId)) {
-            return res.status(400).json({ error: "Invalid video ID" });
-        }
-
-        const video = await Videos.findById(videoId).populate("likes", "username"); // Populate to get usernames of users who liked the video
-
-        if (!video) {
-            return res.status(404).json({ error: "Video not found" });
-        }
-
-        const numberOfLikes = video.likes.length;
-        res.json({ videoId, numberOfLikes, likes: video.likes });
-    } catch (error) {
-        console.error("Error getting video likes:", error);
+        console.error("Error processing dislike:", error);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
 
-// Route for getting videos by rating
-router.get("/ratings/:rating", async (req, res) => {
+// ==================== USER LIKED/INTERACTION HISTORY ROUTES ====================
+
+// Get user's liked videos (Authenticated)
+router.get('/user/liked', authenticateMiddleware, async (req, res) => {
     try {
-        const rating = req.params.rating;
-        const videos = await Videos.find({ rating }).populate("author", "username avatar followers followings");
-        res.json(videos);
+        const userId = req.user._id;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const skip = (page - 1) * limit;
+
+        // Get liked videos from UserLikedVideo collection
+        const likedVideos = await UserLikedVideo.find({ 
+            userId, 
+            action: 'like' 
+        })
+        .populate({
+            path: 'videoId',
+            match: { hidden: false },
+            select: 'title thumbnail file views likes dislikes comments description createdAt',
+            populate: {
+                path: 'author',
+                select: 'username avatar followers'
+            }
+        })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+        // Filter out null videos (hidden or deleted)
+        const filteredLikedVideos = likedVideos.filter(item => item.videoId);
+        
+        // Get total count
+        const totalCount = await UserLikedVideo.countDocuments({ 
+            userId, 
+            action: 'like' 
+        });
+
+        res.status(200).json({
+            success: true,
+            userId,
+            totalLikedVideos: totalCount,
+            currentPage: page,
+            totalPages: Math.ceil(totalCount / limit),
+            likedVideos: filteredLikedVideos.map(item => ({
+                ...item.videoId._doc,
+                likedAt: item.createdAt
+            }))
+        });
     } catch (error) {
-        console.error("Error getting videos by rating:", error);
+        console.error("Error fetching user's liked videos:", error);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
-// Route for getting videos by theme
-router.get("/themes/:theme", async (req, res) => {
+
+// Get user's disliked videos (Authenticated)
+router.get('/user/disliked', authenticateMiddleware, async (req, res) => {
     try {
-        const theme = req.params.theme;
-        const videos = await Videos.find({ theme }).populate("author", "username avatar followers followings");
-        res.json(videos);
+        const userId = req.user._id;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const skip = (page - 1) * limit;
+
+        // Get disliked videos from UserLikedVideo collection
+        const dislikedVideos = await UserLikedVideo.find({ 
+            userId, 
+            action: 'dislike' 
+        })
+        .populate({
+            path: 'videoId',
+            match: { hidden: false },
+            select: 'title thumbnail file views likes dislikes comments description createdAt',
+            populate: {
+                path: 'author',
+                select: 'username avatar followers'
+            }
+        })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+        // Filter out null videos
+        const filteredDislikedVideos = dislikedVideos.filter(item => item.videoId);
+        
+        // Get total count
+        const totalCount = await UserLikedVideo.countDocuments({ 
+            userId, 
+            action: 'dislike' 
+        });
+
+        res.status(200).json({
+            success: true,
+            userId,
+            totalDislikedVideos: totalCount,
+            currentPage: page,
+            totalPages: Math.ceil(totalCount / limit),
+            dislikedVideos: filteredDislikedVideos.map(item => ({
+                ...item.videoId._doc,
+                dislikedAt: item.createdAt
+            }))
+        });
     } catch (error) {
-        console.error("Error getting videos by theme:", error);
+        console.error("Error fetching user's disliked videos:", error);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
 
-// Route for getting videos by theme
-router.get("/search/:genre", async (req, res) => {
-	try {
-		const genre = req.params.genre;
+// Get user's bookmarked videos (Authenticated)
+router.get('/user/bookmarks', authenticateMiddleware, async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const skip = (page - 1) * limit;
 
-		// Use the find method to get all videos
-		let videos = await Videos.find().populate(
-			"author",
-			"username avatar followers followings "
-		);
+        // Get bookmarked videos from UserLikedVideo collection
+        const bookmarkedVideos = await UserLikedVideo.find({ 
+            userId, 
+            action: 'bookmark' 
+        })
+        .populate({
+            path: 'videoId',
+            match: { hidden: false },
+            select: 'title thumbnail file views likes dislikes comments description createdAt',
+            populate: {
+                path: 'author',
+                select: 'username avatar followers'
+            }
+        })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
 
-		// Filter videos based on the specified genre
-		const filteredVideos = videos.filter((video) =>
-			video.genre.includes(genre)
-		);
+        // Filter out null videos
+        const filteredBookmarkedVideos = bookmarkedVideos.filter(item => item.videoId);
+        
+        // Get total count
+        const totalCount = await UserLikedVideo.countDocuments({ 
+            userId, 
+            action: 'bookmark' 
+        });
 
-		res.json(filteredVideos);
-	} catch (error) {
-		console.error("Error getting videos by genre:", error);
-		res.status(500).json({ error: "Internal Server Error" });
-	}
+        res.status(200).json({
+            success: true,
+            userId,
+            totalBookmarkedVideos: totalCount,
+            currentPage: page,
+            totalPages: Math.ceil(totalCount / limit),
+            bookmarkedVideos: filteredBookmarkedVideos.map(item => ({
+                ...item.videoId._doc,
+                bookmarkedAt: item.createdAt
+            }))
+        });
+    } catch (error) {
+        console.error("Error fetching user's bookmarked videos:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
 });
-// Route for liking/disliking a specific video by ID
-router.put("/:id", authenticateMiddleware, async (req, res) => {
-	try {
-		const { action, userId } = req.body;
-		const video = await Videos.findById(req.params.id);
 
-		if (!video) {
-			return res.status(404).json({ error: "Video not found" });
-		}
+// Get user's complete interaction history (Authenticated)
+router.get('/user/interactions', authenticateMiddleware, async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 30;
+        const skip = (page - 1) * limit;
 
-		// Remove userId from dislikes if present and add to likes
-		if (action === "like") {
-			await Videos.findByIdAndUpdate(req.params.id, {
-				$pull: { dislikes: userId },
-				$addToSet: { likes: userId },
-			});
-		} else if (action === "dislike") {
-			// Remove userId from likes if present and add to dislikes
-			await Videos.findByIdAndUpdate(req.params.id, {
-				$pull: { likes: userId },
-				$addToSet: { dislikes: userId },
-			});
-		}
+        // Get all user interactions (likes, dislikes, bookmarks)
+        const interactions = await UserLikedVideo.find({ userId })
+            .populate({
+                path: 'videoId',
+                match: { hidden: false },
+                select: 'title thumbnail file views likes dislikes comments description createdAt',
+                populate: {
+                    path: 'author',
+                    select: 'username avatar followers'
+                }
+            })
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
 
-		res.json(video);
-	} catch (error) {
-		console.error("Error updating video by ID:", error);
-		res.status(500).json({ error: "Internal Server Error" });
-	}
+        // Filter out null videos and format response
+        const filteredInteractions = interactions
+            .filter(item => item.videoId)
+            .map(item => ({
+                video: item.videoId,
+                action: item.action,
+                interactedAt: item.createdAt,
+                interactionId: item._id
+            }));
+
+        // Get total count
+        const totalCount = await UserLikedVideo.countDocuments({ userId });
+
+        res.status(200).json({
+            success: true,
+            userId,
+            totalInteractions: totalCount,
+            currentPage: page,
+            totalPages: Math.ceil(totalCount / limit),
+            interactions: filteredInteractions
+        });
+    } catch (error) {
+        console.error("Error fetching user's interactions:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
 });
-router.post('/:id/bookmark', async (req, res) => {
+
+// ==================== BOOKMARK ROUTES ====================
+
+// Add or remove bookmark (with UserLikedVideo tracking)
+router.post('/:id/bookmark', authenticateMiddleware, async (req, res) => {
     try {
         const { id } = req.params;
-        const { userId } = req.body;
+        const userId = req.user._id;
+        const { action = 'add' } = req.body; // 'add' or 'remove'
 
         const video = await Videos.findById(id);
         if (!video) {
             return res.status(404).json({ error: 'Video not found' });
         }
 
-        // Check if the user already bookmarked the video
-        if (video.bookmarks.includes(userId)) {
-            return res.status(400).json({ error: 'Video already bookmarked' });
+        if (action === 'add') {
+            // Add to video bookmarks array
+            await Videos.findByIdAndUpdate(id, {
+                $addToSet: { bookmarks: userId }
+            });
+
+            // Create bookmark record
+            await UserLikedVideo.create({
+                userId,
+                videoId: id,
+                action: 'bookmark'
+            });
+
+            res.status(200).json({ 
+                message: 'Video bookmarked successfully',
+                bookmarked: true 
+            });
+
+        } else if (action === 'remove') {
+            // Remove from video bookmarks array
+            await Videos.findByIdAndUpdate(id, {
+                $pull: { bookmarks: userId }
+            });
+
+            // Remove bookmark record
+            await UserLikedVideo.findOneAndDelete({ 
+                userId, 
+                videoId: id, 
+                action: 'bookmark' 
+            });
+
+            res.status(200).json({ 
+                message: 'Bookmark removed successfully',
+                bookmarked: false 
+            });
         }
-
-        // Add userId to bookmarks array
-        video.bookmarks.push(userId);
-        await video.save();
-
-        res.status(200).json({ message: 'Video bookmarked successfully', video });
     } catch (error) {
         console.error('Error bookmarking video:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
-// Remove bookmark from video
-router.delete('/:id/bookmark', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { userId } = req.body;
+// ==================== COMMENT ROUTES ====================
 
-        const video = await Videos.findById(id);
-        if (!video) {
-            return res.status(404).json({ error: 'Video not found' });
-        }
-
-        // Check if the user has bookmarked the video
-        if (!video.bookmarks.includes(userId)) {
-            return res.status(400).json({ error: 'Video not bookmarked yet' });
-        }
-
-        // Remove userId from bookmarks array
-        video.bookmarks = video.bookmarks.filter(b => b !== userId);
-        await video.save();
-
-        res.status(200).json({ message: 'Bookmark removed successfully', video });
-    } catch (error) {
-        console.error('Error removing bookmark:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-// Route for commenting on a video by ID
+// Route for commenting on a video (Authenticated)
 router.post("/:id/comment", authenticateMiddleware, async (req, res) => {
 	try {
-		const { userId, text } = req.body;
+		const { text } = req.body;
+		const userId = req.user._id;
 		const video = await Videos.findById(req.params.id);
 
 		if (!video) {
 			return res.status(404).json({ error: "Video not found" });
 		}
+		
 		const user = await User.findById(userId);
 		const newComment = {
 			avatar: user.avatar,
 			username: user.username,
-			id: video.comments.length + 1,
+			userId: userId,
 			text,
 			chatedAt: new Date(),
-			replies: [], // Array to store replies to this comment
+			replies: [],
 		};
 
-		// Add the new comment to the video's comments array
 		video.comments.push(newComment);
-
-		// Save the updated video with the new comment
 		await video.save();
 
-		res.json(video);
+		res.status(201).json({ 
+			message: "Comment added successfully",
+			comment: newComment 
+		});
 	} catch (error) {
 		console.error("Error commenting on video:", error);
 		res.status(500).json({ error: "Internal Server Error" });
 	}
 });
 
+// Route for replying to a comment (Authenticated)
 router.post("/:id/comment/:commentId", authenticateMiddleware, async (req, res) => {
     try {
-      const { userId, text } = req.body;
+      const { text } = req.body;
+      const userId = req.user._id;
   
-      // Validate request body
-      if (!userId || !text) {
-        return res.status(400).json({ error: "userId and text are required." });
-      }
-  
-      // Find the video by ID
+      // Find the video
       const video = await Videos.findById(req.params.id);
       if (!video) {
         return res.status(404).json({ error: "Video not found" });
       }
   
-      // Find the comment by its ID
-      const comment = video.comments.find((comment) => 
-        comment._id.toString() === req.params.commentId
-      );
-  
+      // Find the comment
+      const comment = video.comments.id(req.params.commentId);
       if (!comment) {
         return res.status(404).json({ error: "Comment not found" });
       }
   
-      // Fetch user information for the reply
+      // Fetch user information
       const user = await User.findById(userId);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
   
-      // Create a new reply object
+      // Create reply
       const newReply = {
         avatar: user.avatar,
         username: user.username,
+        userId: userId,
         text,
         createdAt: new Date(),
       };
   
-      // Add the reply to the comment's replies array
+      // Add reply
       if (!comment.replies) {
         comment.replies = [];
       }
       comment.replies.push(newReply);
   
-      // Save the updated video
+      // Save video
       await video.save();
   
-      res.json({ comments: video.comments });
+      res.status(201).json({ 
+        message: "Reply added successfully",
+        reply: newReply 
+      });
     } catch (error) {
       console.error("Error replying to comment:", error);
       res.status(500).json({ error: "Internal Server Error" });
     }
-  });
-  
-// Route for getting videos by genre
-router.get("/category/:genre", async (req, res) => {
-	try {
-		const genre = req.params.genre;
-
-		// Use the find method to get all videos
-		let videos = await Videos.find().populate(
-			"author",
-			"username avatar followers followings "
-		);
-
-		// Filter videos based on the specified genre
-		const filteredVideos = videos.filter((video) =>
-			video.genre.includes(genre)
-		);
-
-		res.json(filteredVideos);
-	} catch (error) {
-		console.error("Error getting videos by genre:", error);
-		res.status(500).json({ error: "Internal Server Error" });
-	}
 });
 
-//Edit video
-// Route for editing a video
-router.put("/edit/:id", async (req, res) => {
-	try {
-		const { id } = req.params;
-		const { title, description, genre, file, thumbnail, author, slug } =
-			req.body;
+// ==================== VIEWS AND HISTORY ROUTES ====================
 
-		// Find the video by ID
-		let video = await Videos.findById(id);
-
-		// Check if the video exists
-		if (!video) {
-			return res.status(404).json({ error: "Video not found" });
-		}
-
-		// Update the video fields if provided in the request body
-		if (title) video.title = title;
-		if (description) video.description = description;
-		if (genre) video.genre = genre;
-		if (file) video.file = file;
-		if (thumbnail) video.thumbnail = thumbnail;
-		if (author) video.author = author;
-		if (slug) video.slug = slug;
-
-		// Save the updated video
-		await video.save();
-
-		res.status(200).json({ message: "Video updated successfully" });
-	} catch (error) {
-		console.error("Error editing video:", error);
-		res.status(500).json({ error: "Internal Server Error" });
-	}
-});
-
-//Delete Video
-// Route for deleting a video
-router.delete("/delete/:id", async (req, res) => {
-	try {
-		const { id } = req.params;
-
-		// Find the video by ID and delete
-		const deletedVideo = await Videos.findByIdAndDelete(id);
-		if (!deletedVideo) {
-			return res.status(404).json({ error: "Video not found" });
-		}
-
-		res.status(200).json({ message: "Video deleted successfully" });
-	} catch (error) {
-		console.error("Error deleting video:", error);
-		res.status(500).json({ error: "Internal Server Error" });
-	}
-});
-
-//create Script
-router.post("/scripts", async (req, res) => {
-    
-	try {
-		const { title, genre, script, author,isForSale } = req.body;
-		const newScript = await Script.create({ title, genre, script, author,isForSale });
-		res.status(201).json(newScript);
-	} catch (error) {
-		console.error("Error creating script:", error);
-		res.status(500).json({ error: "Internal Server Error" });
-	}
-});
-
-
-// Route to get all scripts
-router.get("/author/scripts", async (req, res) => {
+// Increment video views and record history (Authenticated)
+router.put('/view/:videoId', authenticateMiddleware, async (req, res) => {
     try {
-        const scripts = await Script.find().populate("author", "username avatar followers followings");
-        res.status(200).json(scripts);
-    } catch (error) {
-        console.error("Error getting scripts:", error);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-});
-
-// Route to get all scripts of a specific author
-router.get("/authors/:authorId/scripts", async (req, res) => {
-	try {
-		const authorId = req.params.authorId;
-		const scripts = await Script.find({ author: authorId });
-		res.status(200).json(scripts);
-	} catch (error) {
-		console.error("Error getting scripts by author:", error);
-		res.status(500).json({ error: "Internal Server Error" });
-	}
-});
-
-router.delete("/scripts/:scriptId", async (req, res) => {
-	try {
-		const { scriptId } = req.params;
-
-		// Check if scriptId is valid
-		if (!mongoose.Types.ObjectId.isValid(scriptId)) {
-			return res.status(400).json({ error: "Invalid script ID" });
-		}
-
-		const deletedScript = await Script.findByIdAndDelete(scriptId);
-
-		if (!deletedScript) {
-			return res.status(404).json({ error: "Script not found" });
-		}
-
-		res.status(200).json({ message: "Script deleted successfully", deletedScript });
-	} catch (error) {
-		console.error("Error deleting script:", error);
-		res.status(500).json({ error: "Internal Server Error" });
-	}
-});
-
-// edit script
-router.put("/scripts/:id", authenticateMiddleware, async (req, res) => {
-	try {
-		const { id } = req.params;
-		const { title, genre, script, author } = req.body;
-
-		// Construct an object with only the provided fields
-		const updateFields = {};
-		if (title) updateFields.title = title;
-		if (genre) updateFields.genre = genre;
-		if (script) updateFields.script = script;
-		if (author) updateFields.author = author;
-
-		// Find the script by ID and update only the provided fields
-		let updatedScript = await Script.findByIdAndUpdate(id, updateFields, {
-			new: true,
-		});
-
-		// Check if the script exists
-		if (!updatedScript) {
-			return res.status(404).json({ error: "Script not found" });
-		}
-
-		res.status(200).json(updatedScript);
-	} catch (error) {
-		console.error("Error updating script:", error);
-		res.status(500).json({ error: "Internal Server Error" });
-	}
-});
-// Get video views
-router.get('/views/:id', async (req, res) => {
-    try {
-        const videoId = req.params.id;
-        const video = await Videos.findById(videoId);
-        if (!video) {
-            return res.status(404).json({ error: "Video not found" });
-        }
-        res.status(200).json({ views: video.views || 0 });
-    } catch (error) {
-        console.error("Error fetching video views:", error);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-});
-
-// Increment video views and record the history
-router.put('/view/:videoId', async (req, res) => {
-    try {
-        const { userId } = req.body; // Assuming the userId is passed in the request body
+        const userId = req.user._id;
         const videoId = req.params.videoId;
 
-        // Find the video in the database
+        // Find the video
         const video = await Videos.findById(videoId);
         if (!video) {
             return res.status(404).json({ error: 'Video not found' });
         }
 
-        // Increment the views count
+        // Increment views
         video.views += 1;
         await video.save();
 
-        // Add history entry for the user watching this video
+        // Add history entry
         const newHistory = new History({
             userId,
             videoId,
@@ -1024,38 +644,372 @@ router.put('/view/:videoId', async (req, res) => {
     }
 });
 
-// Get video watch history for a user
-router.get('/history/:userId', async (req, res) => {
+// Get user's watch history (Authenticated)
+router.get('/history', authenticateMiddleware, async (req, res) => {
     try {
-        const userId = req.params.userId;
+        const userId = req.user._id;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const skip = (page - 1) * limit;
 
-        // Find all the history records for the user
-        const history = await History.find({ userId }) 
-            .populate('videoId', 'title thumbnail author username followers avator file description') // Populate video data (title, thumbnail, etc.)
-            .sort({ watchedAt: -1 }); // Sort by the most recent watched videos
+        // Get watch history
+        const history = await History.find({ userId })
+            .populate({
+                path: 'videoId',
+                select: 'title thumbnail author views file description createdAt',
+                match: { hidden: false },
+                populate: {
+                    path: 'author',
+                    select: 'username avatar followers'
+                }
+            })
+            .sort({ watchedAt: -1 })
+            .skip(skip)
+            .limit(limit);
 
-        if (history.length === 0) {
-            return res.status(404).json({ message: 'No watch history found for this user' });
-        }
+        // Filter out null videos
+        const filteredHistory = history.filter(item => item.videoId);
+        
+        // Get total count
+        const totalCount = await History.countDocuments({ userId });
 
-        res.status(200).json(history);
+        res.status(200).json({
+            success: true,
+            userId,
+            totalWatchedVideos: totalCount,
+            currentPage: page,
+            totalPages: Math.ceil(totalCount / limit),
+            watchHistory: filteredHistory.map(item => ({
+                video: item.videoId,
+                watchedAt: item.watchedAt,
+                historyId: item._id
+            }))
+        });
     } catch (error) {
         console.error("Error fetching user watch history:", error);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
 
+// ==================== STATUS CHECK ROUTES ====================
 
-// delete scripts
-router.delete("/scripts/:id", authenticateMiddleware, async (req, res) => {
+// Check like/dislike status for current user (Authenticated)
+router.get('/:videoId/like-status', authenticateMiddleware, async (req, res) => {
+  try {
+    const videoId = req.params.videoId;
+    const userId = req.user._id;
+
+    // Find the video
+    const video = await Videos.findById(videoId);
+    if (!video) {
+      return res.status(404).json({ message: "Video not found" });
+    }
+
+    // Check if user has liked or disliked
+    const isLiked = video.likes.includes(userId);
+    const isDisliked = video.dislikes.includes(userId);
+    
+    // Check if bookmarked
+    const isBookmarked = video.bookmarks ? video.bookmarks.includes(userId) : false;
+
+    // Also check from UserLikedVideo collection
+    const interaction = await UserLikedVideo.findOne({ 
+      userId, 
+      videoId 
+    });
+
+    res.status(200).json({
+      isLiked,
+      isDisliked,
+      isBookmarked,
+      lastAction: interaction ? interaction.action : null,
+      lastInteractionAt: interaction ? interaction.createdAt : null
+    });
+  } catch (error) {
+    console.error('Error checking like status:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ==================== ADMIN/VISIBILITY ROUTES ====================
+
+// Route for publishing a video (Authenticated - Author only)
+router.patch("/publish/:id", authenticateMiddleware, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const video = await Videos.findById(id);
+        
+        if (!video) {
+            return res.status(404).json({ error: "Video not found" });
+        }
+        
+        // Check if user is the author or admin
+        if (video.author.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+            return res.status(403).json({ error: "Unauthorized to publish this video" });
+        }
+        
+        if (!video.hidden) {
+            return res.status(400).json({ error: "Video is already visible" });
+        }
+
+        video.hidden = false;
+        await video.save();
+        
+        res.status(200).json({ message: "Video published successfully", video });
+    } catch (error) {
+        console.error("Error publishing video:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+// Route for unpublishing a video (Authenticated - Author only)
+router.patch("/unpublish/:id", authenticateMiddleware, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const video = await Videos.findById(id);
+        
+        if (!video) {
+            return res.status(404).json({ error: "Video not found" });
+        }
+        
+        // Check if user is the author or admin
+        if (video.author.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+            return res.status(403).json({ error: "Unauthorized to unpublish this video" });
+        }
+        
+        video.hidden = true;
+        await video.save();
+        
+        res.json({ message: "Video unpublished successfully", video });
+    } catch (error) {
+        console.error("Error unpublishing video:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+// Route to hide a video (Authenticated - Author or Admin)
+router.patch("/hide/:id", authenticateMiddleware, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const video = await Videos.findById(id);
+        
+        if (!video) {
+            return res.status(404).json({ error: "Video not found" });
+        }
+        
+        // Check authorization
+        if (video.author.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+            return res.status(403).json({ error: "Unauthorized to hide this video" });
+        }
+
+        video.hidden = true;
+        await video.save();
+
+        res.status(200).json({ message: "Video hidden successfully", video });
+    } catch (error) {
+        console.error("Error hiding video:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+// Route to unhide a video (Authenticated - Author or Admin)
+router.patch("/unhide/:id", authenticateMiddleware, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const video = await Videos.findById(id);
+        
+        if (!video) {
+            return res.status(404).json({ error: "Video not found" });
+        }
+        
+        // Check authorization
+        if (video.author.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+            return res.status(403).json({ error: "Unauthorized to unhide this video" });
+        }
+
+        video.hidden = false;
+        await video.save();
+
+        res.status(200).json({ message: "Video unhidden successfully", video });
+    } catch (error) {
+        console.error("Error unhiding video:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+// ==================== OTHER ROUTES ====================
+
+// Route for getting videos by genre (Public)
+router.get("/search/:genre", async (req, res) => {
+	try {
+		const genre = req.params.genre;
+		const videos = await Videos.find({ 
+            genre: genre, 
+            hidden: false 
+        }).populate("author", "username avatar followers followings");
+		res.json(videos);
+	} catch (error) {
+		console.error("Error getting videos by genre:", error);
+		res.status(500).json({ error: "Internal Server Error" });
+	}
+});
+
+// Route for getting videos by theme (Public)
+router.get("/themes/:theme", async (req, res) => {
+    try {
+        const theme = req.params.theme;
+        const videos = await Videos.find({ 
+            theme: theme, 
+            hidden: false 
+        }).populate("author", "username avatar followers followings");
+        res.json(videos);
+    } catch (error) {
+        console.error("Error getting videos by theme:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+// Route for getting videos by rating (Public)
+router.get("/ratings/:rating", async (req, res) => {
+    try {
+        const rating = req.params.rating;
+        const videos = await Videos.find({ 
+            rating: rating, 
+            hidden: false 
+        }).populate("author", "username avatar followers followings");
+        res.json(videos);
+    } catch (error) {
+        console.error("Error getting videos by rating:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+// Edit video (Authenticated - Author only)
+router.put("/edit/:id", authenticateMiddleware, async (req, res) => {
 	try {
 		const { id } = req.params;
+		const { title, description, genre, file, thumbnail, slug } = req.body;
 
-		// Find the script by ID and delete
-		const deletedScript = await Script.findByIdAndDelete(id);
-		if (!deletedScript) {
+		const video = await Videos.findById(id);
+		if (!video) {
+			return res.status(404).json({ error: "Video not found" });
+		}
+
+		// Check authorization
+		if (video.author.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+			return res.status(403).json({ error: "Unauthorized to edit this video" });
+		}
+
+		// Update fields
+		if (title) video.title = title;
+		if (description) video.description = description;
+		if (genre) video.genre = genre;
+		if (file) video.file = file;
+		if (thumbnail) video.thumbnail = thumbnail;
+		if (slug) video.slug = slug;
+
+		await video.save();
+
+		res.status(200).json({ message: "Video updated successfully", video });
+	} catch (error) {
+		console.error("Error editing video:", error);
+		res.status(500).json({ error: "Internal Server Error" });
+	}
+});
+
+// Delete video (Authenticated - Author or Admin)
+router.delete("/delete/:id", authenticateMiddleware, async (req, res) => {
+	try {
+		const { id } = req.params;
+		const video = await Videos.findById(id);
+		
+		if (!video) {
+			return res.status(404).json({ error: "Video not found" });
+		}
+
+		// Check authorization
+		if (video.author.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+			return res.status(403).json({ error: "Unauthorized to delete this video" });
+		}
+
+		// Delete related user interactions
+		await UserLikedVideo.deleteMany({ videoId: id });
+		
+		// Delete video
+		await Videos.findByIdAndDelete(id);
+
+		res.status(200).json({ message: "Video deleted successfully" });
+	} catch (error) {
+		console.error("Error deleting video:", error);
+		res.status(500).json({ error: "Internal Server Error" });
+	}
+});
+
+// ==================== SCRIPT ROUTES ====================
+
+// Create script (Authenticated)
+router.post("/scripts", authenticateMiddleware, async (req, res) => {
+	try {
+		const { title, genre, script, isForSale } = req.body;
+		const author = req.user._id;
+		
+		const newScript = await Script.create({ 
+			title, 
+			genre, 
+			script, 
+			author,
+			isForSale 
+		});
+		
+		res.status(201).json({ 
+			message: "Script created successfully",
+			script: newScript 
+		});
+	} catch (error) {
+		console.error("Error creating script:", error);
+		res.status(500).json({ error: "Internal Server Error" });
+	}
+});
+
+// Get all scripts (Public)
+router.get("/author/scripts", async (req, res) => {
+    try {
+        const scripts = await Script.find().populate("author", "username avatar followers followings");
+        res.status(200).json(scripts);
+    } catch (error) {
+        console.error("Error getting scripts:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+// Get scripts by author (Public)
+router.get("/authors/:authorId/scripts", async (req, res) => {
+	try {
+		const authorId = req.params.authorId;
+		const scripts = await Script.find({ author: authorId }).populate("author", "username avatar");
+		res.status(200).json(scripts);
+	} catch (error) {
+		console.error("Error getting scripts by author:", error);
+		res.status(500).json({ error: "Internal Server Error" });
+	}
+});
+
+// Delete script (Authenticated - Author only)
+router.delete("/scripts/:scriptId", authenticateMiddleware, async (req, res) => {
+	try {
+		const { scriptId } = req.params;
+		const script = await Script.findById(scriptId);
+
+		if (!script) {
 			return res.status(404).json({ error: "Script not found" });
 		}
+
+		// Check authorization
+		if (script.author.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+			return res.status(403).json({ error: "Unauthorized to delete this script" });
+		}
+
+		await Script.findByIdAndDelete(scriptId);
 
 		res.status(200).json({ message: "Script deleted successfully" });
 	} catch (error) {
@@ -1063,57 +1017,39 @@ router.delete("/scripts/:id", authenticateMiddleware, async (req, res) => {
 		res.status(500).json({ error: "Internal Server Error" });
 	}
 });
-// Route to get all videos by a specific author
-router.get("/authors/:authorId/videos", async (req, res) => {
-    try {
-        const authorId = req.params.authorId;
-        
-        // Check if authorId is a valid ObjectId
-        if (!mongoose.Types.ObjectId.isValid(authorId)) {
-            return res.status(400).json({ error: "Invalid author ID" });
-        }
-        
-        const videos = await Videos.find({ 
-            author: authorId, 
-            hidden: false 
-        }).populate("author", "username avatar followers followings");
-        
-        res.status(200).json(videos);
-    } catch (error) {
-        console.error("Error getting videos by author:", error);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-});
-router.patch("/change-video-status", async (req, res) => {
+
+// Edit script (Authenticated - Author only)
+router.put("/scripts/:id", authenticateMiddleware, async (req, res) => {
 	try {
-		// Set all users' isActive status to true
-		await Videos.updateMany({}, { status: true });
+		const { id } = req.params;
+		const { title, genre, script } = req.body;
 
-		return res
-			.status(200)
-			.json({ message: "Video status changed successfully" });
-	} catch (error) {
-		console.error("Error changing video status:", error);
-		return res.status(500).json({ error: "Internal Server Error" });
-	}
-});
+		const existingScript = await Script.findById(id);
+		if (!existingScript) {
+			return res.status(404).json({ error: "Script not found" });
+		}
 
-router.post("/change-video-status", async (req, res) => {
-	try {
-		// Update user's status
-		const updatedVideo = await Videos.findByIdAndUpdate(
-			req.body.videoId,
-			{ status: req.body.status },
-			{ new: true }
-		);
+		// Check authorization
+		if (existingScript.author.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+			return res.status(403).json({ error: "Unauthorized to edit this script" });
+		}
 
-		return res.status(200).json({
-			message: "Video status changed successfully",
-			video: updatedVideo,
+		const updateFields = {};
+		if (title) updateFields.title = title;
+		if (genre) updateFields.genre = genre;
+		if (script) updateFields.script = script;
+
+		const updatedScript = await Script.findByIdAndUpdate(id, updateFields, {
+			new: true,
+		});
+
+		res.status(200).json({ 
+			message: "Script updated successfully",
+			script: updatedScript 
 		});
 	} catch (error) {
-		console.error("Error changing video status:", error);
-		return res.status(500).json({ error: "Internal Server Error" });
+		console.error("Error updating script:", error);
+		res.status(500).json({ error: "Internal Server Error" });
 	}
 });
 
