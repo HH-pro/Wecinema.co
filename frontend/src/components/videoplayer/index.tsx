@@ -105,6 +105,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
         setViews(viewsData.views || 0);
         setIsFollowing(videoData.author?.followers?.includes(tokenData?.userId));
 
+        // Set initial like/dislike state
         if (likeStatus) {
           setLikes({
             count: videoData.likes?.length || 0,
@@ -114,6 +115,21 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
             count: videoData.dislikes?.length || 0,
             isDisliked: likeStatus.isDisliked || false
           });
+        } else {
+          // Fallback: Check if user ID is in likes/dislikes arrays
+          if (tokenData?.userId) {
+            const isLiked = videoData.likes?.includes(tokenData.userId) || false;
+            const isDisliked = videoData.dislikes?.includes(tokenData.userId) || false;
+            
+            setLikes({
+              count: videoData.likes?.length || 0,
+              isLiked
+            });
+            setDislikes({
+              count: videoData.dislikes?.length || 0,
+              isDisliked
+            });
+          }
         }
 
         // Fetch payment statuses in parallel
@@ -121,21 +137,22 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
         if (video.author?._id) {
           paymentPromises.push(
             axios.get(`${API_BASE_URL}/user/payment-status/${video.author._id}`)
+              .then(res => setUserHasPaid(res.data.hasPaid))
               .catch(err => console.error("Author payment status error:", err))
           );
         }
         if (tokenData?.userId) {
           paymentPromises.push(
             axios.get(`${API_BASE_URL}/user/payment-status/${tokenData.userId}`)
+              .then(res => setCurrentUserHasPaid(res.data.hasPaid))
               .catch(err => console.error("User payment status error:", err))
           );
         }
 
-        const paymentResults = await Promise.all(paymentPromises);
-        if (paymentResults[0]) setUserHasPaid(paymentResults[0].data.hasPaid);
-        if (paymentResults[1]) setCurrentUserHasPaid(paymentResults[1].data.hasPaid);
+        await Promise.all(paymentPromises);
       } catch (error) {
         console.error("Error fetching video data:", error);
+        toast.error("Failed to load video data");
       } finally {
         setLoading(false);
       }
@@ -163,36 +180,69 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
 
     try {
       setLoading(true);
+      
+      // Determine the action based on current state
       const newIsLiked = !likes.isLiked;
+      const action = newIsLiked ? 'like' : 'unlike';
 
       // Optimistic update
-      setLikes(prev => ({
+      const newLikes = {
         isLiked: newIsLiked,
-        count: newIsLiked ? prev.count + 1 : prev.count - 1
-      }));
-
-      if (dislikes.isDisliked) {
-        setDislikes(prev => ({
+        count: newIsLiked ? likes.count + 1 : likes.count - 1
+      };
+      
+      // If switching from dislike to like, remove dislike
+      let newDislikes = { ...dislikes };
+      if (dislikes.isDisliked && newIsLiked) {
+        newDislikes = {
           isDisliked: false,
-          count: prev.count - 1
-        }));
+          count: dislikes.count - 1
+        };
       }
 
-      await postRequest(`/video/like/${video._id}`, {
+      setLikes(newLikes);
+      if (dislikes.isDisliked && newIsLiked) {
+        setDislikes(newDislikes);
+      }
+
+      // Make API call
+      const payload = {
         userId: tokenData.userId,
-        action: newIsLiked ? 'like' : 'unlike'
-      }, setLoading);
-    } catch (error) {
-      setLikes(prev => ({
-        isLiked: !prev.isLiked,
-        count: prev.isLiked ? prev.count - 1 : prev.count + 1
-      }));
-      toast.error("Error updating like");
+        action: action
+      };
+
+      console.log("Sending like request:", { videoId: video._id, payload });
+      
+      const response = await postRequest(`/video/like/${video._id}`, payload, setLoading);
+      
+      console.log("Like response:", response);
+      
+      if (response?.message) {
+        toast.success(response.message);
+      }
+      
+      // If unliking, also remove from likes count
+      if (action === 'unlike' && response?.video?.likes) {
+        setLikes({
+          isLiked: false,
+          count: response.video.likes.length
+        });
+      }
+      
+    } catch (error: any) {
+      // Revert on error
+      setLikes({
+        isLiked: !likes.isLiked,
+        count: likes.isLiked ? likes.count - 1 : likes.count + 1
+      });
+      
+      const errorMessage = error.response?.data?.message || "Error updating like";
+      toast.error(errorMessage);
       console.error("Like error:", error);
     } finally {
       setLoading(false);
     }
-  }, [likes.isLiked, dislikes.isDisliked, tokenData?.userId, video._id]);
+  }, [likes, dislikes, tokenData?.userId, video._id]);
 
   const handleDislikeClick = useCallback(async () => {
     if (!tokenData?.userId) {
@@ -202,35 +252,69 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
 
     try {
       setLoading(true);
+      
+      // Determine the action based on current state
       const newIsDisliked = !dislikes.isDisliked;
+      const action = newIsDisliked ? 'dislike' : 'undislike';
 
-      setDislikes(prev => ({
+      // Optimistic update
+      const newDislikes = {
         isDisliked: newIsDisliked,
-        count: newIsDisliked ? prev.count + 1 : prev.count - 1
-      }));
-
-      if (likes.isLiked) {
-        setLikes(prev => ({
+        count: newIsDisliked ? dislikes.count + 1 : dislikes.count - 1
+      };
+      
+      // If switching from like to dislike, remove like
+      let newLikes = { ...likes };
+      if (likes.isLiked && newIsDisliked) {
+        newLikes = {
           isLiked: false,
-          count: prev.count - 1
-        }));
+          count: likes.count - 1
+        };
       }
 
-      await postRequest(`/video/dislike/${video._id}`, {
+      setDislikes(newDislikes);
+      if (likes.isLiked && newIsDisliked) {
+        setLikes(newLikes);
+      }
+
+      // Make API call
+      const payload = {
         userId: tokenData.userId,
-        action: newIsDisliked ? 'dislike' : 'undislike'
-      }, setLoading);
-    } catch (error) {
-      setDislikes(prev => ({
-        isDisliked: !prev.isDisliked,
-        count: prev.isDisliked ? prev.count - 1 : prev.count + 1
-      }));
-      toast.error("Error updating dislike");
+        action: action
+      };
+
+      console.log("Sending dislike request:", { videoId: video._id, payload });
+      
+      const response = await postRequest(`/video/dislike/${video._id}`, payload, setLoading);
+      
+      console.log("Dislike response:", response);
+      
+      if (response?.message) {
+        toast.success(response.message);
+      }
+      
+      // If undisliking, also remove from dislikes count
+      if (action === 'undislike' && response?.video?.dislikes) {
+        setDislikes({
+          isDisliked: false,
+          count: response.video.dislikes.length
+        });
+      }
+      
+    } catch (error: any) {
+      // Revert on error
+      setDislikes({
+        isDisliked: !dislikes.isDisliked,
+        count: dislikes.isDisliked ? dislikes.count - 1 : dislikes.count + 1
+      });
+      
+      const errorMessage = error.response?.data?.message || "Error updating dislike";
+      toast.error(errorMessage);
       console.error("Dislike error:", error);
     } finally {
       setLoading(false);
     }
-  }, [dislikes.isDisliked, likes.isLiked, tokenData?.userId, video._id]);
+  }, [dislikes, likes, tokenData?.userId, video._id]);
 
   const handleFollowSubmit = useCallback(async () => {
     if (!tokenData?.userId) {
@@ -241,18 +325,26 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
     try {
       setLoading(true);
       const action = isFollowing ? "unfollow" : "follow";
+      
+      // Optimistic update
       setIsFollowing(!isFollowing);
 
-      await putRequest(
+      const response = await putRequest(
         `/user/${video.author?._id}/follow`,
         { action, userId: tokenData.userId },
         setLoading
       );
 
-      toast.success(`Successfully ${action === "follow" ? "subscribed" : "unsubscribed"}`);
-    } catch (error) {
+      if (response?.message) {
+        toast.success(response.message);
+      } else {
+        toast.success(`Successfully ${action === "follow" ? "subscribed" : "unsubscribed"}`);
+      }
+    } catch (error: any) {
+      // Revert on error
       setIsFollowing(prev => !prev);
-      toast.error("Error updating subscription");
+      const errorMessage = error.response?.data?.message || "Error updating subscription";
+      toast.error(errorMessage);
       console.error("Subscription error:", error);
     } finally {
       setLoading(false);
@@ -279,11 +371,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
         { userId: tokenData.userId, text: comment },
         setLoading
       );
+      
       toast.success("Commented successfully");
       setComment("");
       setCommentData(result?.comments || []);
     } catch (error: any) {
-      toast.error(error.message || "Error posting comment");
+      const errorMessage = error.response?.data?.message || error.message || "Error posting comment";
+      toast.error(errorMessage);
       console.error("Post error:", error);
     } finally {
       setLoading(false);
@@ -315,7 +409,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
       setReplyingTo(null);
       setCommentData(result?.comments || []);
     } catch (error: any) {
-      toast.error(error.message || "Error posting reply");
+      const errorMessage = error.response?.data?.message || error.message || "Error posting reply";
+      toast.error(errorMessage);
       console.error("Reply error:", error);
     } finally {
       setLoading(false);
@@ -323,19 +418,32 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
   }, [reply, tokenData?.userId, video._id]);
 
   const toggleBookmark = useCallback(async () => {
+    if (!tokenData?.userId) {
+      toast.error("Please log in to bookmark videos");
+      return;
+    }
+
     try {
       setLoading(true);
       const action = isBookmarked ? "removeBookmark" : "addBookmark";
-      const message = `Video ${isBookmarked ? "Unbookmarked" : "Bookmarked"}!`;
-      await putRequest(
-        `/video/${video._id}`,
-        { action, userId: tokenData?.userId },
+      const message = `Video ${isBookmarked ? "unbookmarked" : "bookmarked"}!`;
+      
+      const result = await putRequest(
+        `/video/${video._id}/bookmark`,
+        { action, userId: tokenData.userId },
         setLoading
       );
-      toast.success(message);
+      
+      if (result?.message) {
+        toast.success(result.message);
+      } else {
+        toast.success(message);
+      }
+      
       setIsBookmarked(!isBookmarked);
-    } catch (error) {
-      toast.error("Error toggling bookmark");
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || "Error toggling bookmark";
+      toast.error(errorMessage);
       console.error("Bookmark toggle error:", error);
     } finally {
       setLoading(false);
@@ -349,7 +457,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
         { userId: tokenData?.userId },
         setLoading
       );
-      setViews(result.views);
+      if (result?.views !== undefined) {
+        setViews(result.views);
+      }
     } catch (error) {
       console.error("Error incrementing views:", error);
     }
@@ -428,7 +538,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
 
           <div className="flex sm:gap-10 gap-6 items-center">
             <address className="flex items-center justify-between mt-2">
-              <a href="#" className="flex w-full overflow-hidden relative items-center">
+              <div className="flex w-full overflow-hidden relative items-center">
                 <div className="relative rounded-full w-8 h-8 flex-shrink-0">
                   <div
                     className="items-center rounded-full flex-shrink-0 justify-center bg-center bg-no-repeat bg-cover flex w-8 h-8"
@@ -447,7 +557,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
                     </span>
                   </div>
                 </div>
-              </a>
+              </div>
             </address>
             <button
               onClick={handleFollowSubmit}
@@ -462,48 +572,80 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
         </div>
 
         {/* Action Buttons */}
-        <div className="button-container">
+        <div className="button-container mt-4 sm:mt-0">
           <button
             disabled={loading}
             onClick={handleLikeClick}
-            className={`button ${likes.isLiked ? "like" : "bookmark"}`}
+            className={`button flex items-center justify-center gap-2 ${likes.isLiked ? "like" : "bookmark"}`}
             aria-label={`Like video (${likes.count} likes)`}
           >
-            {likes.isLiked ? <AiFillLike size="20" /> : <AiOutlineLike size="20" />}
-            {likes.count}
+            {likes.isLiked ? (
+              <>
+                <AiFillLike size="20" />
+                <span>Liked</span>
+              </>
+            ) : (
+              <>
+                <AiOutlineLike size="20" />
+                <span>Like</span>
+              </>
+            )}
+            <span className="font-semibold">({likes.count})</span>
           </button>
+          
           <button
             disabled={loading}
             onClick={handleDislikeClick}
-            className={`button ${dislikes.isDisliked ? "dislike" : "bookmark"}`}
+            className={`button flex items-center justify-center gap-2 ${dislikes.isDisliked ? "dislike" : "bookmark"}`}
             aria-label={`Dislike video (${dislikes.count} dislikes)`}
           >
-            {dislikes.isDisliked ? <AiFillDislike size="20" /> : <AiOutlineDislike size="20" />}
-            {dislikes.count}
+            {dislikes.isDisliked ? (
+              <>
+                <AiFillDislike size="20" />
+                <span>Disliked</span>
+              </>
+            ) : (
+              <>
+                <AiOutlineDislike size="20" />
+                <span>Dislike</span>
+              </>
+            )}
+            <span className="font-semibold">({dislikes.count})</span>
           </button>
 
           <button
             onClick={toggleBookmark}
-            className={`button ${isBookmarked ? "like" : "bookmark"}`}
+            className={`button flex items-center justify-center gap-2 ${isBookmarked ? "like" : "bookmark"}`}
             aria-label={isBookmarked ? "Remove bookmark" : "Add bookmark"}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              {isBookmarked ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-              )}
-            </svg>
+            {isBookmarked ? (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                </svg>
+                <span>Bookmarked</span>
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                </svg>
+                <span>Bookmark</span>
+              </>
+            )}
           </button>
 
-          <button className="button share" aria-label="Share video">
+          <button 
+            className="button share flex items-center justify-center gap-2"
+            aria-label="Share video"
+          >
             <MdUpload size="20" />
-            Share
+            <span>Share</span>
           </button>
         </div>
       </div>
 
-      <hr />
+      <hr className="my-4" />
 
       {/* Comment Section */}
       <form
@@ -515,23 +657,23 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           rows={3}
-          className="w-full p-3 border-0 rounded-lg outline-none resize-none"
+          className="w-full p-3 border-0 rounded-lg outline-none resize-none bg-gray-50 focus:bg-white focus:ring-2 focus:ring-yellow-500"
           aria-label="Add comment"
         />
 
         <button
           disabled={loading || comment.trim().length < 2}
-          className="bg-yellow-500 p-2 text-white absolute bottom-5 right-5 border-0 rounded-lg outline-none hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+          className="bg-yellow-500 p-2 text-white absolute bottom-5 right-5 border-0 rounded-lg outline-none hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
         >
-          Comment
+          {loading ? "Posting..." : "Comment"}
         </button>
       </form>
 
       {/* Comments Display */}
       {memoizedComments.length > 0 ? (
         <div className="mt-4 sm:w-4/6 w-11/12 mx-auto mb-8">
-          <h3 className="break-words sm:text-base text-sm mb-4 font-semibold">
-            {memoizedComments.length} Comments
+          <h3 className="break-words sm:text-base text-sm mb-4 font-semibold text-gray-800">
+            {memoizedComments.length} Comment{memoizedComments.length !== 1 ? 's' : ''}
           </h3>
 
           {memoizedComments.map((comment) => (
@@ -549,197 +691,19 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
           ))}
         </div>
       ) : (
-        <p className="mt-4 sm:w-4/6 w-11/12 mx-auto text-center text-gray-500">
-          No comments yet. Be the first to comment!
-        </p>
+        <div className="mt-4 sm:w-4/6 w-11/12 mx-auto text-center py-8">
+          <div className="text-gray-400 mb-2">
+            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+          </div>
+          <p className="text-gray-500 text-lg font-medium">No comments yet</p>
+          <p className="text-gray-400 text-sm mt-1">Be the first to comment!</p>
+        </div>
       )}
     </div>
   );
 };
-
-// ========== Subscription Modal Component ==========
-interface SubscriptionModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-const SubscriptionModal: React.FC<SubscriptionModalProps> = React.memo(({ isOpen, onClose }) => (
-  <Modal
-    isOpen={isOpen}
-    onRequestClose={onClose}
-    contentLabel="Subscribe Now"
-    style={{
-      overlay: { backgroundColor: 'rgba(0, 0, 0, 0.75)' },
-      content: {
-        top: '50%',
-        left: '50%',
-        right: 'auto',
-        bottom: 'auto',
-        marginRight: '-50%',
-        transform: 'translate(-50%, -50%)',
-        background: 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)',
-        color: '#fff',
-        padding: '20px',
-        borderRadius: '10px',
-        border: 'none',
-      },
-    }}
-  >
-    <h2 style={{ marginBottom: '20px' }}>Subscribe to Access This Profile</h2>
-    <p>You need to subscribe to access this profile.</p>
-    <button
-      onClick={onClose}
-      style={{
-        marginTop: '20px',
-        padding: '10px 20px',
-        background: '#fff',
-        color: '#000',
-        border: 'none',
-        borderRadius: '5px',
-        cursor: 'pointer',
-        fontWeight: 'bold',
-        transition: 'transform 0.2s'
-      }}
-    >
-      Close
-    </button>
-  </Modal>
-  )
-);
-
-SubscriptionModal.displayName = "SubscriptionModal";
-interface ActionButtonsProps {
-  likes: LikeState;
-  dislikes: DislikeState;
-  isBookmarked: boolean;
-  loading: boolean;
-  onLike: () => void;
-  onDislike: () => void;
-  onBookmark: () => void;
-}
-
-const ActionButtons = React.memo((props: ActionButtonsProps) => (
-  <div className="button-container">
-    <button
-      disabled={props.loading}
-      onClick={props.onLike}
-      className={`button ${props.likes.isLiked ? "like" : "bookmark"}`}
-      aria-label={`Like video (${props.likes.count} likes)`}
-    >
-      {props.likes.isLiked ? <AiFillLike size="20" /> : <AiOutlineLike size="20" />}
-      {props.likes.count}
-    </button>
-    <button
-      disabled={props.loading}
-      onClick={props.onDislike}
-      className={`button ${props.dislikes.isDisliked ? "dislike" : "bookmark"}`}
-      aria-label={`Dislike video (${props.dislikes.count} dislikes)`}
-    >
-      {props.dislikes.isDisliked ? <AiFillDislike size="20" /> : <AiOutlineDislike size="20" />}
-      {props.dislikes.count}
-    </button>
-
-    <button
-      onClick={props.onBookmark}
-      className={`button ${props.isBookmarked ? "like" : "bookmark"}`}
-      aria-label={props.isBookmarked ? "Remove bookmark" : "Add bookmark"}
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        {props.isBookmarked ? (
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-        ) : (
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-        )}
-      </svg>
-    </button>
-
-    <button className="button share" aria-label="Share video">
-      <MdUpload size="20" />
-      Share
-    </button>
-  </div>
-));
-
-ActionButtons.displayName = "ActionButtons";
-
-// ========== Author Info Component ==========
-interface AuthorInfoProps {
-  author: Video["author"];
-  title: string;
-  createdAt: string;
-  updatedAt: string;
-  views: number;
-  isFollowing: boolean;
-  loading: boolean;
-  onFollow: () => void;
-}
-
-const AuthorInfo = React.memo((props: AuthorInfoProps) => (
-  <div className="sm:w-3/5 ml-4">
-    <h1 className="md:text-2xl font-bold mb-2 text-xl">{props.title}</h1>
-
-    <div className="flex sm:gap-10 gap-6 items-center">
-      <address className="flex items-center justify-between mt-2">
-        <a href="#" className="flex w-full overflow-hidden relative items-center">
-          <div className="relative rounded-full w-8 h-8 flex-shrink-0">
-            <div
-              className="items-center rounded-full flex-shrink-0 justify-center bg-center bg-no-repeat bg-cover flex w-8 h-8"
-              style={{ backgroundImage: `url(${props.author?.avatar})` }}
-              title={props.author?.username}
-            />
-          </div>
-          <div className="text-xs sm:text-sm w-full">
-            <div className="flex items-center sm:ml-2 flex-grow">
-              <span className="overflow-hidden truncate">{props.author?.username}</span>
-              <MdVerifiedUser size="18" color="green" className="flex-shrink-0 sm:ml-2" />
-            </div>
-            <div className="sm:ml-2 w-full text-xs">
-              <span>
-                {formatDateAgo(props.createdAt ?? props.updatedAt)} <BsDot className="inline-flex items-center" /> {props.views} Views
-              </span>
-            </div>
-          </div>
-        </a>
-      </address>
-      <button
-        onClick={props.onFollow}
-        disabled={props.loading}
-        className={`btn text-white cursor-pointer px-6 md:py-2 py-1 rounded-full transition-colors ${
-          props.isFollowing ? "bg-gray-500 hover:bg-gray-600" : "bg-yellow-500 hover:bg-yellow-600"
-        }`}
-      >
-        {props.loading ? "Processing..." : props.isFollowing ? "Unsubscribe" : "Subscribe"}
-      </button>
-    </div>
-  </div>
-));
-
-AuthorInfo.displayName = "AuthorInfo";
-
-// ========== Reply Item Component ==========
-interface ReplyItemProps {
-  reply: Comment;
-  videoDate: string;
-}
-
-const ReplyItem = React.memo(({ reply, videoDate }: ReplyItemProps) => (
-  <div className="flex gap-2 mb-3">
-    <img
-      src={reply.avatar}
-      className="bg-white rounded-full w-6 h-6 flex-shrink-0 border border-gray-100"
-      alt={`${reply.username} avatar`}
-    />
-    <div className="flex-1">
-      <h5 className="text-sm font-semibold">{reply.username}</h5>
-      <p className="text-sm break-words">{reply.text}</p>
-      <span className="text-xs text-gray-500">
-        {formatDateAgo(reply.chatedAt ?? videoDate)}
-      </span>
-    </div>
-  </div>
-));
-
-ReplyItem.displayName = "ReplyItem";
 
 // ========== Comment Item Component ==========
 interface CommentItemProps {
@@ -774,18 +738,18 @@ const CommentItem = React.memo((
       />
       <div className="flex-1">
         <div className="flex gap-1 mb-3">
-          <h4 className="m-0 sm:text-base text-sm text-cyan-950 leading-4 font-semibold">
+          <h4 className="m-0 sm:text-base text-sm text-gray-900 leading-4 font-semibold">
             {comment.username}
           </h4>
           <span className="m-0 italic sm:text-base text-sm text-gray-600 leading-4">
             {formatDateAgo(comment.chatedAt ?? videoDate)}
           </span>
         </div>
-        <p className="break-words sm:text-base text-sm mb-2">{comment.text}</p>
+        <p className="break-words sm:text-base text-sm mb-2 text-gray-800">{comment.text}</p>
 
         {/* Reply Button */}
         <button
-          className="text-sm text-blue-500 hover:underline transition-colors"
+          className="text-sm text-blue-500 hover:text-blue-700 hover:underline transition-colors"
           onClick={() => onReplyToggle(comment._id)}
         >
           {replyingTo === comment._id ? "Cancel" : "Reply"}
@@ -799,15 +763,24 @@ const CommentItem = React.memo((
               value={reply}
               onChange={(e) => onReplyChange(e.target.value)}
               rows={2}
-              className="w-full p-2 border rounded-md outline-none resize-none"
+              className="w-full p-2 border rounded-md outline-none resize-none focus:ring-2 focus:ring-yellow-500"
               aria-label="Reply to comment"
             />
-            <button
-              disabled={loading || reply.trim().length < 2}
-              className="bg-yellow-500 p-2 mt-2 text-white border-0 rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-            >
-              Reply
-            </button>
+            <div className="flex gap-2 mt-2">
+              <button
+                type="button"
+                onClick={() => onReplyToggle(comment._id)}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={loading || reply.trim().length < 2}
+                className="bg-yellow-500 px-4 py-2 text-white border-0 rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+              >
+                {loading ? "Posting..." : "Reply"}
+              </button>
+            </div>
           </form>
         )}
 
@@ -815,11 +788,20 @@ const CommentItem = React.memo((
         {(comment.replies && comment.replies.length > 0) && (
           <div className="ml-4 mt-3 border-l-2 border-gray-300 pl-3">
             {(comment.replies || []).map((replyItem: Comment) => (
-              <ReplyItem
-                key={replyItem._id}
-                reply={replyItem}
-                videoDate={videoDate}
-              />
+              <div key={replyItem._id} className="flex gap-2 mb-3">
+                <img
+                  src={replyItem.avatar}
+                  className="bg-white rounded-full w-6 h-6 flex-shrink-0 border border-gray-100"
+                  alt={`${replyItem.username} avatar`}
+                />
+                <div className="flex-1">
+                  <h5 className="text-sm font-semibold text-gray-900">{replyItem.username}</h5>
+                  <p className="text-sm break-words text-gray-800">{replyItem.text}</p>
+                  <span className="text-xs text-gray-500">
+                    {formatDateAgo(replyItem.chatedAt ?? videoDate)}
+                  </span>
+                </div>
+              </div>
             ))}
           </div>
         )}
