@@ -81,7 +81,7 @@ const HistoryView = () => {
 
   if (loading) {
     return (
-      <Layout expand={false} hasHeader={true}>
+      <Layout hasHeader={true}>
         <div className="p-4 flex items-center justify-center min-h-screen">
           <p className="text-gray-400">Loading history...</p>
         </div>
@@ -90,7 +90,7 @@ const HistoryView = () => {
   }
 
   return (
-    <Layout expand={false} hasHeader={true}>
+    <Layout  hasHeader={true}>
       <div className="p-4">
         <h2 className="text-xl font-bold mb-4">Watch History</h2>
         {error ? (
