@@ -812,7 +812,7 @@ const CommentItem = React.memo((
         )}
 
         {/* Replies Display */}
-        {comment.replies?.length > 0 && (
+        {comment.replies && comment.replies.length > 0 && (
           <div className="ml-4 mt-3 border-l-2 border-gray-300 pl-3">
             {comment.replies.map((replyItem: Comment) => (
               <ReplyItem
