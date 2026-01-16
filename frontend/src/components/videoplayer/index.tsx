@@ -665,6 +665,7 @@ ActionButtons.displayName = "ActionButtons";
 // ========== Author Info Component ==========
 interface AuthorInfoProps {
   author: Video["author"];
+  title: string;
   createdAt: string;
   updatedAt: string;
   views: number;
@@ -675,7 +676,7 @@ interface AuthorInfoProps {
 
 const AuthorInfo = React.memo((props: AuthorInfoProps) => (
   <div className="sm:w-3/5 ml-4">
-    <h1 className="md:text-2xl font-bold mb-2 text-xl">{props.children}</h1>
+    <h1 className="md:text-2xl font-bold mb-2 text-xl">{props.title}</h1>
 
     <div className="flex sm:gap-10 gap-6 items-center">
       <address className="flex items-center justify-between mt-2">
