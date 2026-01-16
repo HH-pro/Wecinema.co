@@ -26,29 +26,29 @@ interface Video {
   slug?: string;
 }
 
-interface LikedVideoItem {
-  video: Video;
-  likedAt: string;
-  interactionId?: string;
-}
-
-interface PaginationData {
-  success: boolean;
-  userId: string;
-  totalLikedVideos: number;
-  currentPage: number;
-  totalPages: number;
-  likedVideos: LikedVideoItem[];
-}
-
-interface TokenPayload {
-  userId: string;
-  role?: string;
-  username?: string;
+// Different possible response structures
+interface LikedVideosResponse {
+  // Structure 1: Direct array
+  likedVideos?: Video[];
+  // Structure 2: Nested with timestamps
+  likedVideos?: Array<{
+    video: Video;
+    likedAt: string;
+  }>;
+  // Structure 3: Different field names
+  videos?: Video[];
+  data?: Video[];
+  // Pagination info
+  totalLikedVideos?: number;
+  totalVideos?: number;
+  currentPage?: number;
+  totalPages?: number;
+  success?: boolean;
+  userId?: string;
 }
 
 const LikedVideos = () => {
-  const [likedVideos, setLikedVideos] = useState<LikedVideoItem[]>([]);
+  const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -67,49 +67,113 @@ const LikedVideos = () => {
         return;
       }
 
-      const decoded = decodeToken(token) as TokenPayload | null;
+      const decoded = decodeToken(token) as any;
       if (!decoded?.userId) {
         setError("Invalid or expired token. Please log in again.");
         setLoading(false);
         return;
       }
 
-      // Log the request URL for debugging
-      const requestUrl = `${API_BASE_URL}/video/user/liked`;
-      console.log("Fetching from:", requestUrl);
+      console.log("Fetching liked videos for user:", decoded.userId);
 
-      const response = await axios.get<PaginationData>(
-        requestUrl,
-        {
-          params: { page, limit: 20 },
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+      // Try different endpoints
+      const endpoints = [
+        `${API_BASE_URL}/video/user/liked`,  // New endpoint
+        `${API_BASE_URL}/video/user/liked/${decoded.userId}`,  // Old endpoint style
+        `${API_BASE_URL}/video/likes/user/${decoded.userId}`,  // Alternative
+      ];
+
+      let response;
+      let lastError;
+
+      for (const endpoint of endpoints) {
+        try {
+          console.log("Trying endpoint:", endpoint);
+          response = await axios.get<LikedVideosResponse>(
+            endpoint,
+            {
+              params: { page, limit: 20 },
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+          console.log("Success with endpoint:", endpoint);
+          console.log("Response data:", response.data);
+          break; // Exit loop if successful
+        } catch (err) {
+          lastError = err;
+          console.log("Failed with endpoint:", endpoint, err.message);
+          continue; // Try next endpoint
         }
-      );
+      }
 
-      console.log("API Response:", response.data);
+      if (!response) {
+        throw lastError || new Error("All endpoints failed");
+      }
 
-      if (response.data.success) {
-        // Validate and filter out any invalid videos
-        const validVideos = (response.data.likedVideos || []).filter(
-          (item: any) => item?.video?._id
-        );
-        
-        setLikedVideos(validVideos);
-        setCurrentPage(response.data.currentPage || 1);
-        setTotalPages(response.data.totalPages || 1);
-        setTotalVideos(response.data.totalLikedVideos || 0);
-        setError(validVideos.length === 0 ? "No liked videos found." : "");
+      const data = response.data;
+      console.log("Full response data:", data);
+
+      // Parse the response data
+      let extractedVideos: Video[] = [];
+      let extractedTotal = 0;
+      let extractedCurrentPage = 1;
+      let extractedTotalPages = 1;
+
+      // Check different possible response structures
+      if (Array.isArray(data)) {
+        // Case 1: Direct array of videos
+        extractedVideos = data.filter(video => video?._id);
+        extractedTotal = extractedVideos.length;
+      } else if (data && typeof data === 'object') {
+        // Case 2: Object with likedVideos array
+        if (Array.isArray(data.likedVideos)) {
+          // Check if likedVideos contains nested video objects
+          if (data.likedVideos[0]?.video?._id) {
+            // Structure: { likedVideos: [{ video: {...}, likedAt: '...' }] }
+            extractedVideos = data.likedVideos
+              .filter((item: any) => item?.video?._id)
+              .map((item: any) => item.video);
+          } else {
+            // Structure: { likedVideos: [video1, video2, ...] }
+            extractedVideos = data.likedVideos.filter((video: any) => video?._id);
+          }
+        } 
+        // Case 3: Other possible array fields
+        else if (Array.isArray(data.videos)) {
+          extractedVideos = data.videos.filter((video: any) => video?._id);
+        }
+        else if (Array.isArray(data.data)) {
+          extractedVideos = data.data.filter((video: any) => video?._id);
+        }
+
+        // Get pagination info
+        extractedTotal = data.totalLikedVideos || data.totalVideos || extractedVideos.length;
+        extractedCurrentPage = data.currentPage || 1;
+        extractedTotalPages = data.totalPages || 1;
+      }
+
+      console.log("Extracted videos:", extractedVideos);
+      console.log("Extracted total:", extractedTotal);
+
+      setVideos(extractedVideos);
+      setCurrentPage(extractedCurrentPage);
+      setTotalPages(extractedTotalPages);
+      setTotalVideos(extractedTotal);
+      
+      if (extractedVideos.length === 0) {
+        setError(extractedTotal > 0 
+          ? "Could not parse video data from API response." 
+          : "No liked videos found.");
       } else {
-        setError("Failed to load liked videos.");
-        setLikedVideos([]);
+        setError("");
       }
     } catch (err: any) {
       console.error("Error fetching liked videos:", err);
       
-      // Log detailed error information
+      // Detailed error logging
       if (err.response) {
         console.error("Response status:", err.response.status);
         console.error("Response data:", err.response.data);
@@ -125,36 +189,60 @@ const LikedVideos = () => {
         localStorage.removeItem("token");
         setTimeout(() => navigate("/login"), 2000);
       } else if (err.response?.status === 404) {
-        setError("API endpoint not found. Please check the server configuration.");
+        // Try a fallback: get user's liked videos by checking all videos
+        tryFallbackMethod();
       } else if (err.code === 'ERR_NETWORK') {
         setError("Network error. Please check your connection.");
       } else {
         setError(`Failed to load liked videos: ${err.message || "Unknown error"}`);
       }
-      setLikedVideos([]);
+      setVideos([]);
     } finally {
       setLoading(false);
     }
   }, [navigate]);
+
+  // Fallback method: Get all videos and filter by likes
+  const tryFallbackMethod = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const decoded = decodeToken(token) as any;
+      
+      if (!decoded?.userId) return;
+      
+      // Get all videos
+      const allVideosResponse = await axios.get(`${API_BASE_URL}/video/all`);
+      const allVideos = allVideosResponse.data || [];
+      
+      // Filter videos where user ID is in likes array
+      const likedVideos = allVideos.filter((video: Video) => 
+        Array.isArray(video.likes) && video.likes.includes(decoded.userId)
+      );
+      
+      setVideos(likedVideos);
+      setTotalVideos(likedVideos.length);
+      setError(likedVideos.length === 0 ? "No liked videos found." : "");
+      
+    } catch (fallbackErr) {
+      console.error("Fallback method failed:", fallbackErr);
+      setError("API endpoint not found and fallback failed.");
+    }
+  }, []);
 
   useEffect(() => {
     fetchLikedVideos(1);
   }, [fetchLikedVideos]);
 
   const handleVideoClick = useCallback(
-    (videoItem: LikedVideoItem) => {
-      if (!videoItem?.video) {
-        console.error("Invalid video item:", videoItem);
+    (video: Video) => {
+      if (!video?._id) {
+        console.error("Invalid video:", video);
         return;
       }
       
-      const video = videoItem.video;
       const slug = video.slug || video._id;
       navigate(`/video/${slug}`, { 
-        state: { 
-          video,
-          likedAt: videoItem.likedAt 
-        }
+        state: { video }
       });
     },
     [navigate]
@@ -168,9 +256,9 @@ const LikedVideos = () => {
   };
 
   // Filter out any invalid videos before rendering
-  const validLikedVideos = useMemo(() => 
-    likedVideos.filter(item => item?.video?._id),
-    [likedVideos]
+  const validVideos = useMemo(() => 
+    videos.filter(video => video?._id),
+    [videos]
   );
 
   if (loading) {
@@ -198,7 +286,7 @@ const LikedVideos = () => {
                 ? `You have liked ${totalVideos} video${totalVideos !== 1 ? 's' : ''}`
                 : "You haven't liked any videos yet"}
             </p>
-            {totalVideos > 0 && (
+            {totalVideos > 0 && totalPages > 1 && (
               <div className="flex items-center space-x-2 text-sm text-gray-500">
                 <span>Page {currentPage} of {totalPages}</span>
               </div>
@@ -215,28 +303,20 @@ const LikedVideos = () => {
               </svg>
               <span>{error}</span>
             </div>
-            {error.includes("API endpoint not found") && (
-              <div className="mt-2 text-sm">
-                <p>Please check if:</p>
-                <ul className="list-disc list-inside ml-4">
-                  <li>The server is running</li>
-                  <li>The API endpoint exists: <code className="bg-gray-100 px-1">/api/video/user/liked</code></li>
-                  <li>You have proper authentication</li>
-                </ul>
-              </div>
-            )}
           </div>
         )}
 
-        {/* Debug Info - Remove in production */}
+        {/* Debug Info - Keep for now to see API response */}
         <div className="mb-4 p-3 bg-gray-100 rounded text-xs text-gray-600">
+          <p><strong>Debug Info:</strong></p>
           <p>API Base URL: {API_BASE_URL}</p>
-          <p>Valid Videos: {validLikedVideos.length}</p>
-          <p>Total Videos: {totalVideos}</p>
+          <p>Valid Videos in State: {validVideos.length}</p>
+          <p>Total Videos from API: {totalVideos}</p>
+          <p>First video data: {validVideos[0] ? JSON.stringify(validVideos[0], null, 2) : 'None'}</p>
         </div>
 
         {/* Videos Grid */}
-        {validLikedVideos.length === 0 && !loading ? (
+        {validVideos.length === 0 && !loading ? (
           <div className="text-center py-16 bg-gray-50 rounded-lg">
             <div className="mx-auto w-24 h-24 mb-4 text-gray-300">
               <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -257,11 +337,11 @@ const LikedVideos = () => {
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-              {validLikedVideos.map((videoItem) => (
+              {validVideos.map((video) => (
                 <VideoCard
-                  key={videoItem.video._id || Math.random().toString()}
-                  videoItem={videoItem}
-                  onVideoClick={() => handleVideoClick(videoItem)}
+                  key={video._id}
+                  video={video}
+                  onVideoClick={() => handleVideoClick(video)}
                 />
               ))}
             </div>
@@ -331,18 +411,16 @@ const LikedVideos = () => {
 };
 
 interface VideoCardProps {
-  videoItem: LikedVideoItem;
+  video: Video;
   onVideoClick: () => void;
 }
 
-const VideoCard = React.memo(({ videoItem, onVideoClick }: VideoCardProps) => {
-  // Validate videoItem before using it
-  if (!videoItem || !videoItem.video) {
-    console.error("Invalid video item in VideoCard:", videoItem);
+const VideoCard = React.memo(({ video, onVideoClick }: VideoCardProps) => {
+  // Validate video before using it
+  if (!video || !video._id) {
+    console.error("Invalid video in VideoCard:", video);
     return null;
   }
-
-  const { video, likedAt } = videoItem;
   
   // Use safe defaults
   const safeVideo = {
@@ -360,22 +438,10 @@ const VideoCard = React.memo(({ videoItem, onVideoClick }: VideoCardProps) => {
     ...video
   };
 
-  const formattedDate = useMemo(() => {
-    try {
-      return new Date(likedAt).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-    } catch (e) {
-      return "Unknown date";
-    }
-  }, [likedAt]);
-
   return (
     <div
       className="cursor-pointer group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
-      onClick={onClick}
+      onClick={onVideoClick}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -423,11 +489,6 @@ const VideoCard = React.memo(({ videoItem, onVideoClick }: VideoCardProps) => {
           </svg>
           Liked
         </div>
-        
-        {/* Duration overlay - optional if you have duration data */}
-        <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded">
-          {/* You can add video duration here if available */}
-        </div>
       </div>
 
       {/* Video Info */}
@@ -453,25 +514,20 @@ const VideoCard = React.memo(({ videoItem, onVideoClick }: VideoCardProps) => {
           </span>
         </div>
         
-        {/* Stats and date */}
-        <div className="flex items-center justify-between text-xs text-gray-500">
-          <div className="flex items-center space-x-3">
-            <span className="flex items-center">
-              <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-              </svg>
-              {safeVideo.views?.toLocaleString() || 0} views
-            </span>
-            <span className="flex items-center">
-              <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
-              </svg>
-              {safeVideo.likes?.length || 0} likes
-            </span>
-          </div>
-          <span className="text-gray-400" title={formattedDate}>
-            {formattedDate}
+        {/* Stats */}
+        <div className="flex items-center text-xs text-gray-500">
+          <span className="flex items-center mr-4">
+            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+              <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+            </svg>
+            {safeVideo.views?.toLocaleString() || 0} views
+          </span>
+          <span className="flex items-center">
+            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+            </svg>
+            {safeVideo.likes?.length || 0} likes
           </span>
         </div>
       </div>
