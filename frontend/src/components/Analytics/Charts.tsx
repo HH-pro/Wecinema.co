@@ -143,10 +143,10 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
                 data: labels.map((date: string) => ratingData[date]?.averageRating || 0),
                 borderColor: '#FF4757', // Bright Red
                 backgroundColor: 'transparent',
-                borderWidth: 2,
+                borderWidth: isMobile ? 3 : 2,
                 tension: 0.4,
-                pointRadius: 2,
-                pointHoverRadius: 5,
+                pointRadius: isMobile ? 3 : 2,
+                pointHoverRadius: isMobile ? 6 : 5,
                 pointBackgroundColor: '#ffffff',
                 pointBorderColor: '#FF4757',
                 pointBorderWidth: 3,
