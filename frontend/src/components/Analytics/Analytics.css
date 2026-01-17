@@ -546,11 +546,9 @@
 /* Mobile Top Toggle Bar */
 .yellow-mobile-toggle-bar {
   display: none;
-  padding: 8px 12px;
-  background: linear-gradient(180deg, 
-    rgba(30, 30, 40, 0.95) 0%, 
-    rgba(20, 20, 28, 0.9) 100%);
-  border-bottom: 1px solid rgba(245, 158, 11, 0.15);
+  padding: 6px 10px;
+  background: linear-gradient(135deg, rgba(30, 30, 40, 0.95) 0%, rgba(20, 20, 28, 0.9) 100%);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.1);
   align-items: center;
   justify-content: flex-end;
   flex-shrink: 0;
