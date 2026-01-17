@@ -349,7 +349,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
           },
           maxRotation: 0,
           autoSkip: true,
-          maxTicksLimit: isMobile ? 5 : 6,
+          maxTicksLimit: isMobile ? 3 : 6,
           padding: 10,
         },
         border: {
