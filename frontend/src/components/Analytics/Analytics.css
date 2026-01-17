@@ -569,6 +569,23 @@
   font-weight: 600;
 }
 
+.yellow-mobile-toggle-bar .yellow-close-btn {
+  background: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+  border: 2px solid rgba(245, 158, 11, 0.25);
+  padding: 8px;
+  width: auto;
+  height: auto;
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 8px;
+}
+
+.yellow-mobile-toggle-bar .yellow-close-btn:active {
+  background: rgba(119, 53, 15, 0.2);
+  transform: scale(0.98);
+}
+
 .yellow-mobile-toggle-icon {
   width: 18px;
   height: 18px;
