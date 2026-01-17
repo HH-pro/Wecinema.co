@@ -1318,18 +1318,13 @@
 
 @media (max-width: 767px) {
   .yellow-footer {
-    padding: 10px 12px;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
+    display: none;
   }
 }
 
 @media (max-width: 480px) {
   .yellow-footer {
-    padding: 8px 10px;
-    gap: 6px;
+    display: none;
   }
 }
 
