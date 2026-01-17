@@ -400,7 +400,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
     },
     { 
       data: themeChartData, 
-      title: "Theme Analysis", 
+      // title: "Theme Analysis", 
       description: "Engagement metrics",
       icon: "🎯",
       colors: getIconColors(1)
