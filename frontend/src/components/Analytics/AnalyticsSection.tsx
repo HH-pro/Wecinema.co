@@ -123,7 +123,6 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
           
           {/* Mobile Top Toggle Bar */}
           <div className="yellow-mobile-toggle-bar">
-            <span className="yellow-mobile-toggle-text">Analytics</span>
             <button 
               className="yellow-close-btn"
               onClick={handleToggle}
