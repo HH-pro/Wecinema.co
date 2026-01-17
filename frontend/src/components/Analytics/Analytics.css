@@ -1029,8 +1029,8 @@
 
 @media (max-width: 767px) {
   .yellow-chart-header {
-    margin-bottom: 12px;
-    gap: 10px;
+    margin-bottom: 6px;
+    gap: 8px;
   }
 }
 
