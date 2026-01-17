@@ -799,9 +799,16 @@
 @media (max-width: 767px) {
   .yellow-charts-container {
     padding: 12px;
-    min-height: 320px;
+    min-height: 220px;
     overflow-y: auto;
     overflow-x: hidden;
+  }
+}
+
+@media (max-width: 480px) {
+  .yellow-charts-container {
+    padding: 10px;
+    min-height: 200px;
   }
 }
 
