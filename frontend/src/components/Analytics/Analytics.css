@@ -1359,6 +1359,12 @@
   white-space: nowrap;
 }
 
+@media (max-width: 480px) {
+  .yellow-legend-title {
+    font-size: 0.75rem;
+  }
+}
+
 .yellow-legend-dots {
   display: flex;
   gap: 8px;
