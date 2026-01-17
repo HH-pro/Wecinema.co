@@ -161,8 +161,8 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
                 data: labels.map((date: string) => ratingData[date]?.averageRating || 0),
                 borderColor: '#FF4757', // Bright Red
                 backgroundColor: 'transparent',
-                borderWidth: isMobile ? 3 : 2,
-                tension: isMobile ? 0.6 : 0.4,
+                borderWidth: isMobile ? 4 : 2,
+                tension: isMobile ? 0.7 : 0.4,
                 pointRadius: isMobile ? 0 : 2,
                 pointHoverRadius: isMobile ? 0 : 5,
                 pointBackgroundColor: '#ffffff',
@@ -171,22 +171,22 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
                 fill: false,
                 cubicInterpolationMode: 'monotone' as const,
               },
-              {
+              ...(isMobile ? [] : [{
                 label: "Total Ratings",
                 data: labels.map((date: string) => ratingData[date]?.totalRatings || 0),
                 borderColor: '#2ED573', // Bright Green
                 backgroundColor: 'transparent',
-                borderWidth: isMobile ? 3 : 2,
-                tension: isMobile ? 0.6 : 0.4,
-                pointRadius: isMobile ? 0 : 2,
-                pointHoverRadius: isMobile ? 0 : 5,
+                borderWidth: 2,
+                tension: 0.4,
+                pointRadius: 2,
+                pointHoverRadius: 5,
                 pointBackgroundColor: '#ffffff',
                 pointBorderColor: '#2ED573',
-                pointBorderWidth: isMobile ? 0 : 3,
+                pointBorderWidth: 3,
                 fill: false,
                 cubicInterpolationMode: 'monotone' as const,
-                borderDash: isMobile ? undefined : [6, 4],
-              },
+                borderDash: [6, 4],
+              }]),
             ];
 
             setRatingChartData({ 
