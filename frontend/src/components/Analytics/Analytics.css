@@ -963,7 +963,7 @@
 @media (max-width: 767px) {
   .yellow-chart-card {
     height: 300px;
-    padding: 8px;
+    padding: 8px 8px 4px 8px;
     border-radius: 10px;
     flex: 0 0 auto;
     min-width: 240px;
@@ -974,7 +974,7 @@
 @media (max-width: 480px) {
   .yellow-chart-card {
     height: 280px;
-    padding: 6px;
+    padding: 6px 6px 3px 6px;
     border-radius: 8px;
     min-width: 220px;
     width: 220px;
