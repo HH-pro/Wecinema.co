@@ -1089,8 +1089,14 @@
 
 @media (max-width: 767px) {
   .yellow-chart-title {
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     margin-bottom: 2px;
+  }
+}
+
+@media (max-width: 480px) {
+  .yellow-chart-title {
+    font-size: 0.75rem;
   }
 }
 
@@ -1105,7 +1111,13 @@
 
 @media (max-width: 767px) {
   .yellow-chart-description {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .yellow-chart-description {
+    font-size: 0.65rem;
   }
 }
 
