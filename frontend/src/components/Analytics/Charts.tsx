@@ -76,7 +76,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
             const genreTotals = Object.keys(genreData).map(genre => ({
               genre,
               total: Object.values(genreData[genre]).reduce((sum: number, val: any) => sum + (val?.count || 0), 0)
-            })).sort((a, b) => b.total - a.total).slice(0, 3);
+            })).sort((a, b) => b.total - a.total).slice(0, isMobile ? 1 : 3);
 
             const datasets = genreTotals.map(({ genre }, index) => {
               const colors = getRandomColorSet(index);
@@ -85,8 +85,8 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
                 data: labels.map((date: string) => genreData[genre][date]?.count || 0),
                 borderColor: colors.lineColor,
                 backgroundColor: 'transparent',
-                borderWidth: isMobile ? 3 : 2,
-                tension: isMobile ? 0.6 : 0.4,
+                borderWidth: isMobile ? 4 : 2,
+                tension: isMobile ? 0.7 : 0.4,
                 pointRadius: isMobile ? 0 : 2,
                 pointHoverRadius: isMobile ? 0 : 5,
                 pointBackgroundColor: '#ffffff',
