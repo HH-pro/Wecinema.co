@@ -1385,8 +1385,14 @@
 
 @media (max-width: 767px) {
   .yellow-footer-right {
-    width: 100%;
-    justify-content: space-between;
+    flex-shrink: 0;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .yellow-footer-right {
+    gap: 6px;
   }
 }
 
