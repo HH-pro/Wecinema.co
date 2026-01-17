@@ -1452,6 +1452,22 @@
   border-color: rgba(100, 149, 255, 0.4);
 }
 
+@media (max-width: 767px) {
+  .yellow-refresh-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .yellow-refresh-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+  }
+}
+
 .yellow-refresh-icon {
   width: 18px;
   height: 18px;
