@@ -147,7 +147,13 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
 
           // Process Rating Chart Data
           if (ratingData && Object.keys(ratingData).length > 0) {
-            const labels = Object.keys(ratingData).reverse();
+            let labels = Object.keys(ratingData).reverse();
+            
+            // Sample data points on mobile for cleaner display
+            if (isMobile) {
+              const step = Math.ceil(labels.length / 10);
+              labels = labels.filter((_, i) => i % step === 0);
+            }
             
             const datasets = [
               {
@@ -156,12 +162,12 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
                 borderColor: '#FF4757', // Bright Red
                 backgroundColor: 'transparent',
                 borderWidth: isMobile ? 3 : 2,
-                tension: 0.4,
+                tension: isMobile ? 0.6 : 0.4,
                 pointRadius: isMobile ? 0 : 2,
                 pointHoverRadius: isMobile ? 0 : 5,
                 pointBackgroundColor: '#ffffff',
                 pointBorderColor: '#FF4757',
-                pointBorderWidth: 3,
+                pointBorderWidth: isMobile ? 0 : 3,
                 fill: false,
                 cubicInterpolationMode: 'monotone' as const,
               },
@@ -170,16 +176,16 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
                 data: labels.map((date: string) => ratingData[date]?.totalRatings || 0),
                 borderColor: '#2ED573', // Bright Green
                 backgroundColor: 'transparent',
-                borderWidth: 2,
-                tension: 0.4,
-                pointRadius: 2,
-                pointHoverRadius: 5,
+                borderWidth: isMobile ? 3 : 2,
+                tension: isMobile ? 0.6 : 0.4,
+                pointRadius: isMobile ? 0 : 2,
+                pointHoverRadius: isMobile ? 0 : 5,
                 pointBackgroundColor: '#ffffff',
                 pointBorderColor: '#2ED573',
-                pointBorderWidth: 3,
+                pointBorderWidth: isMobile ? 0 : 3,
                 fill: false,
                 cubicInterpolationMode: 'monotone' as const,
-                borderDash: [6, 4],
+                borderDash: isMobile ? undefined : [6, 4],
               },
             ];
 
