@@ -818,7 +818,7 @@
 
 @media (max-width: 767px) {
   .yellow-charts-intro {
-    margin-bottom: 16px;
+    display: none;
   }
 }
 
