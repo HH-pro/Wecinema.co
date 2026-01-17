@@ -924,19 +924,19 @@
   .yellow-charts-grid {
     display: flex;
     flex-direction: row;
-    gap: 16px;
-    margin-bottom: 16px;
+    gap: 10px;
+    margin-bottom: 10px;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
-    padding-bottom: 8px;
+    padding-bottom: 6px;
   }
 }
 
 @media (max-width: 480px) {
   .yellow-charts-grid {
-    gap: 12px;
-    margin-bottom: 12px;
+    gap: 8px;
+    margin-bottom: 8px;
   }
 }
 
