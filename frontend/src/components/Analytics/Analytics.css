@@ -1319,8 +1319,7 @@
 
 @media (max-width: 767px) {
   .yellow-chart-footer {
-    margin-top: 12px;
-    padding-top: 10px;
+    display: none;
   }
 }
 
