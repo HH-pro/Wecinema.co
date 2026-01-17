@@ -838,8 +838,8 @@
 
 @media (max-width: 767px) {
   .yellow-charts-container {
-    padding: 10px 8px;
-    min-height: 200px;
+    padding: 8px 6px;
+    min-height: 160px;
     overflow-y: auto;
     overflow-x: hidden;
   }
@@ -847,8 +847,8 @@
 
 @media (max-width: 480px) {
   .yellow-charts-container {
-    padding: 8px 6px;
-    min-height: 180px;
+    padding: 6px 5px;
+    min-height: 150px;
   }
 }
 
