@@ -118,7 +118,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
             const themeTotals = Object.keys(themeData).map(theme => ({
               theme,
               total: Object.values(themeData[theme]).reduce((sum: number, val: any) => sum + (val?.count || 0), 0)
-            })).sort((a, b) => b.total - a.total).slice(0, 3);
+            })).sort((a, b) => b.total - a.total).slice(0, isMobile ? 1 : 3);
 
             const datasets = themeTotals.map(({ theme }, index) => {
               const colors = getRandomColorSet(index + 3);
@@ -127,8 +127,8 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
                 data: labels.map((date: string) => themeData[theme][date]?.count || 0),
                 borderColor: colors.lineColor,
                 backgroundColor: 'transparent',
-                borderWidth: isMobile ? 3 : 2,
-                tension: isMobile ? 0.6 : 0.4,
+                borderWidth: isMobile ? 4 : 2,
+                tension: isMobile ? 0.7 : 0.4,
                 pointRadius: isMobile ? 0 : 4,
                 pointHoverRadius: isMobile ? 0 : 5,
                 pointBackgroundColor: '#ffffff',
