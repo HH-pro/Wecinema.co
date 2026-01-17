@@ -106,7 +106,13 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
           // Process Theme Chart Data
           if (themeData && Object.keys(themeData).length > 0) {
             const firstKey = Object.keys(themeData)[0];
-            const labels = Object.keys(themeData[firstKey]).reverse();
+            let labels = Object.keys(themeData[firstKey]).reverse();
+            
+            // Sample data points on mobile for cleaner display
+            if (isMobile) {
+              const step = Math.ceil(labels.length / 10);
+              labels = labels.filter((_, i) => i % step === 0);
+            }
             
             // Get top 3 themes by total count
             const themeTotals = Object.keys(themeData).map(theme => ({
@@ -122,7 +128,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
                 borderColor: colors.lineColor,
                 backgroundColor: 'transparent',
                 borderWidth: isMobile ? 3 : 2,
-                tension: 0.4,
+                tension: isMobile ? 0.6 : 0.4,
                 pointRadius: isMobile ? 0 : 4,
                 pointHoverRadius: isMobile ? 0 : 5,
                 pointBackgroundColor: '#ffffff',
