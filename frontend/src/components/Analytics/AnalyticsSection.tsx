@@ -121,6 +121,21 @@ const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
       {showGraphs && (
         <div className={`yellow-analytics-section ${isAnimating ? 'animating' : ''}`}>
           
+          {/* Mobile Top Toggle Bar */}
+          <div className="yellow-mobile-toggle-bar">
+            <span className="yellow-mobile-toggle-text">Analytics</span>
+            <button 
+              className="yellow-close-btn"
+              onClick={handleToggle}
+              aria-label="Hide analytics graphs"
+              title="Hide Analytics"
+            >
+              <svg className="yellow-mobile-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+              </svg>
+            </button>
+          </div>
+          
           {/* Yellow Header */}
           <div className="yellow-header">
             <div className="yellow-header-content">
