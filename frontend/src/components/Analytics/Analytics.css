@@ -562,13 +562,13 @@
 }
 
 .yellow-mobile-toggle-bar .yellow-close-btn {
-  background: rgba(245, 158, 11, 0.12);
+  background: rgba(245, 158, 11, 0.15);
   color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.2);
-  padding: 4px;
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 3px;
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
