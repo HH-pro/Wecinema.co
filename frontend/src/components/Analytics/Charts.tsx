@@ -408,7 +408,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
     { 
       data: ratingChartData, 
       title: "Ratings Overview", 
-      description: "Average & total ratings",
+      // description: "Average & total ratings",
       icon: "⭐",
       colors: getIconColors(2)
     },
