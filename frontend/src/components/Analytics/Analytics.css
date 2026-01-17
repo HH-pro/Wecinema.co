@@ -1335,8 +1335,14 @@
 
 @media (max-width: 767px) {
   .yellow-footer-left {
-    width: 100%;
-    justify-content: space-between;
+    flex: 0;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .yellow-footer-left {
+    gap: 6px;
   }
 }
 
