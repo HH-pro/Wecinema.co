@@ -963,22 +963,22 @@
 
 @media (max-width: 767px) {
   .yellow-chart-card {
-    height: 280px;
-    padding: 14px;
-    border-radius: 12px;
+    height: 260px;
+    padding: 10px;
+    border-radius: 10px;
     flex: 0 0 auto;
-    min-width: 260px;
-    width: 260px;
+    min-width: 240px;
+    width: 240px;
   }
 }
 
 @media (max-width: 480px) {
   .yellow-chart-card {
-    height: 260px;
-    padding: 12px;
-    border-radius: 10px;
-    min-width: 240px;
-    width: 240px;
+    height: 240px;
+    padding: 8px;
+    border-radius: 8px;
+    min-width: 220px;
+    width: 220px;
   }
 }
 
