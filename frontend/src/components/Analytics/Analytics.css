@@ -537,7 +537,9 @@
 
 @media (max-width: 767px) {
   .yellow-analytics-section {
-    min-height: 420px;
+    min-height: auto;
+    max-height: 100vh;
+    border-radius: 12px;
   }
 }
 
