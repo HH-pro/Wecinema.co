@@ -490,27 +490,29 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
             )}
           </div>
           
-          <div className="yellow-chart-footer">
-            <div className="yellow-footer-info">
-              <span className="yellow-info-item">
-                <span className="yellow-info-label">Data Points:</span>
-                <span className="yellow-info-value">{chart.data?.labels.length || 0}</span>
-              </span>
-              <span className="yellow-info-item">
-                <span className="yellow-info-label">Status:</span>
-                <span className="yellow-info-trend" style={{
-                  backgroundColor: idx === 0 ? 'rgba(255, 107, 139, 0.15)' : 
-                                   idx === 1 ? 'rgba(46, 213, 115, 0.15)' : 
-                                   'rgba(30, 144, 255, 0.15)',
-                  color: idx === 0 ? '#FF4757' : 
-                         idx === 1 ? '#1DD1A1' : 
-                         '#3742FA'
-                }}>
-                  {idx === 2 ? '↗ Rising' : '→ Stable'}
+          {!isMobile && (
+            <div className="yellow-chart-footer">
+              <div className="yellow-footer-info">
+                <span className="yellow-info-item">
+                  <span className="yellow-info-label">Data Points:</span>
+                  <span className="yellow-info-value">{chart.data?.labels.length || 0}</span>
                 </span>
-              </span>
+                <span className="yellow-info-item">
+                  <span className="yellow-info-label">Status:</span>
+                  <span className="yellow-info-trend" style={{
+                    backgroundColor: idx === 0 ? 'rgba(255, 107, 139, 0.15)' : 
+                                     idx === 1 ? 'rgba(46, 213, 115, 0.15)' : 
+                                     'rgba(30, 144, 255, 0.15)',
+                    color: idx === 0 ? '#FF4757' : 
+                           idx === 1 ? '#1DD1A1' : 
+                           '#3742FA'
+                  }}>
+                    {idx === 2 ? '↗ Rising' : '→ Stable'}
+                  </span>
+                </span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       ))}
     </div>
