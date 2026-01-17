@@ -564,9 +564,9 @@
   background: rgba(245, 158, 11, 0.12);
   color: #fbbf24;
   border: 1px solid rgba(245, 158, 11, 0.2);
-  padding: 6px;
-  width: 36px;
-  height: 36px;
+  padding: 4px;
+  width: 32px;
+  height: 32px;
   border-radius: 6px;
   display: flex;
   align-items: center;
