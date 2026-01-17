@@ -721,19 +721,10 @@
   }
 }
 
-/* Mobile Close Button */
+/* Mobile Close Button - HIDDEN on mobile */
 @media (max-width: 767px) {
   .yellow-close-btn {
-    width: 100%;
-    padding: 10px 16px;
-    font-size: 0.85rem;
-    min-height: 44px;
-    align-self: stretch;
-  }
-  
-  .yellow-close-btn:active {
-    background: rgba(119, 53, 15, 0.2);
-    transform: scale(0.98);
+    display: none;
   }
 }
 
