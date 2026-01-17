@@ -137,15 +137,6 @@ const WeCinemaLoading = memo(() => (
 
 WeCinemaLoading.displayName = "WeCinemaLoading";
 
-// Initialize Tawk.to widget
-const initializeTawkWidget = () => {
-  const script = document.createElement("script");
-  script.src = "https://embed.tawk.to/6849bde9e7d8d619164a49fe/1itg0ro66";
-  script.async = true;
-  script.charset = "UTF-8";
-  script.setAttribute("crossorigin", "*");
-  document.body.appendChild(script);
-};
 
 // Toast Configuration
 const TOAST_CONFIG = {
@@ -164,10 +155,6 @@ const TOAST_CONFIG = {
 export default memo(function App() {
   const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize Tawk widget on mount
-  useEffect(() => {
-    initializeTawkWidget();
-  }, []);
 
   // Handle loading state
   useEffect(() => {
