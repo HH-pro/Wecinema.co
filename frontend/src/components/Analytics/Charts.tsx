@@ -326,12 +326,12 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
     scales: {
       y: {
         grid: {
-          color: "rgba(255, 255, 255, 0.06)",
+          color: "rgba(148, 163, 184, 0.15)",
           drawBorder: false,
           lineWidth: 1.5,
         },
         ticks: { 
-          color: "#ffffff", 
+          color: "#cbd5e1", 
           font: { 
             size: isMobile ? 9 : 10,
             family: "'Inter', -apple-system, sans-serif",
@@ -354,12 +354,12 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
       x: {
         reverse: true,
         grid: {
-          color: "rgba(0, 0, 0, 0.06)",
+          color: "rgba(148, 163, 184, 0.12)",
           drawBorder: false,
           lineWidth: 1.5,
         },
         ticks: { 
-          color: "#ffffff", 
+          color: "#cbd5e1", 
           font: { 
             size: isMobile ? 9 : 10,
             family: "'Inter', -apple-system, sans-serif",
