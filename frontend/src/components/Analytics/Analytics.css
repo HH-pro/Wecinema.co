@@ -1029,18 +1029,18 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 16px;
-  gap: 12px;
+  margin-bottom: 12px;
+  gap: 10px;
   flex-shrink: 0;
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
 }
 
 @media (max-width: 767px) {
   .yellow-chart-header {
-    margin-bottom: 10px;
-    gap: 8px;
-    padding-bottom: 10px;
+    margin-bottom: 8px;
+    gap: 6px;
+    padding-bottom: 8px;
   }
 }
 
