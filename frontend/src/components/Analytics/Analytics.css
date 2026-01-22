@@ -1360,26 +1360,28 @@
 }
 
 .yellow-info-label {
-  color: rgba(150, 150, 180, 0.7);
-  font-size: 0.75rem;
+  color: rgba(148, 163, 184, 0.7);
+  font-size: 0.7rem;
+  font-weight: 500;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.yellow-info-value {
+  color: #e2e8f0;
+  font-size: 0.8rem;
   font-weight: 600;
   white-space: nowrap;
 }
 
-.yellow-info-value {
-  color: #fbbf24;
-  font-size: 0.8rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
 .yellow-info-trend {
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 8px;
-  background: rgba(245, 158, 11, 0.15);
-  color: #b45309;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
   white-space: nowrap;
 }
 
