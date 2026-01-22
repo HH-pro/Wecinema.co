@@ -378,15 +378,15 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
     elements: {
       line: { 
         tension: 0.4, 
-        borderWidth: isMobile ? 3 : 2,
+        borderWidth: isMobile ? 3 : 3,
         fill: false,
       },
       point: { 
-        radius: isMobile ? 0 : 2,
-        hoverRadius: isMobile ? 0 : 9,
+        radius: isMobile ? 0 : 3,
+        hoverRadius: isMobile ? 0 : 6,
         backgroundColor: "#ffffff",
-        borderWidth: isMobile ? 0 : 3,
-        hoverBorderWidth: isMobile ? 0 : 4,
+        borderWidth: isMobile ? 0 : 2,
+        hoverBorderWidth: isMobile ? 0 : 3,
         hoverBackgroundColor: "#ffffff",
       },
     },
