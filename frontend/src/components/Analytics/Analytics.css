@@ -1111,12 +1111,13 @@
 }
 
 .yellow-chart-description {
-  color: rgba(150, 150, 180, 0.7);
-  font-size: 0.8rem;
+  color: rgba(148, 163, 184, 0.8);
+  font-size: 0.75rem;
   margin: 0;
   line-height: 1.4;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  font-weight: 500;
 }
 
 @media (max-width: 767px) {
