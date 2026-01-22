@@ -1172,7 +1172,7 @@
 /* Yellow Chart Wrapper */
 .yellow-chart-wrapper {
   flex: 1;
-  min-height: 200px;
+  min-height: 160px;
   position: relative;
   margin: 0;
   display: flex;
@@ -1181,14 +1181,14 @@
 
 @media (max-width: 767px) {
   .yellow-chart-wrapper {
-    min-height: 180px;
+    min-height: 140px;
     margin: 0;
   }
 }
 
 @media (max-width: 480px) {
   .yellow-chart-wrapper {
-    min-height: 160px;
+    min-height: 130px;
     margin: 0;
   }
 }
