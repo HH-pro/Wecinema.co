@@ -1172,22 +1172,24 @@
 /* Yellow Chart Wrapper */
 .yellow-chart-wrapper {
   flex: 1;
-  min-height: 150px;
+  min-height: 200px;
   position: relative;
-  margin: 8px 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
 }
 
 @media (max-width: 767px) {
   .yellow-chart-wrapper {
     min-height: 180px;
-    margin: 2px 0;
+    margin: 0;
   }
 }
 
 @media (max-width: 480px) {
   .yellow-chart-wrapper {
-    min-height: 170px;
-    margin: 2px 0;
+    min-height: 160px;
+    margin: 0;
   }
 }
 
