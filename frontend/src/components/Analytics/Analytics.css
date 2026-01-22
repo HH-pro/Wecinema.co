@@ -908,22 +908,22 @@
 .yellow-charts-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-  margin-bottom: 24px;
+  gap: 20px;
+  margin-bottom: 20px;
   align-items: stretch;
 }
 
 @media (max-width: 1200px) {
   .yellow-charts-grid {
     grid-template-columns: repeat(3, 1fr);
-    gap: 18px;
+    gap: 16px;
   }
 }
 
 @media (max-width: 992px) {
   .yellow-charts-grid {
     grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
+    gap: 14px;
   }
 }
 
