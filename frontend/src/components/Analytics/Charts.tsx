@@ -412,14 +412,13 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
     { 
       data: genreChartData, 
       title: "Genre Trends", 
-      description: "Popularity over time",
       icon: "🎬",
       colors: getIconColors(0)
     },
     { 
       data: themeChartData, 
-      // title: "Theme Analysis", 
-      description: "Engagement metrics",
+      title: "Theme Analysis", 
+      // description: "Engagement metrics",
       icon: "🎯",
       colors: getIconColors(1)
     },
