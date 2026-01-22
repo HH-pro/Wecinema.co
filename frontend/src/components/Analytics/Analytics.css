@@ -1136,17 +1136,18 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(16, 185, 129, 0.1);
-  padding: 4px 10px;
-  border-radius: 12px;
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  background: rgba(34, 197, 94, 0.1);
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(34, 197, 94, 0.2);
   flex-shrink: 0;
+  font-size: 0.7rem;
 }
 
 @media (max-width: 767px) {
   .yellow-chart-status {
-    padding: 3px 8px;
-    border-radius: 10px;
+    padding: 4px 10px;
+    border-radius: 6px;
   }
 }
 
