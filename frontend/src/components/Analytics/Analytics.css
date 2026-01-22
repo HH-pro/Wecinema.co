@@ -1197,7 +1197,7 @@
 .yellow-chart-wrapper canvas {
   width: 100% !important;
   height: 100% !important;
-  max-height: 150px;
+  max-height: 200px;
 }
 
 @media (max-width: 767px) {
@@ -1208,7 +1208,7 @@
 
 @media (max-width: 480px) {
   .yellow-chart-wrapper canvas {
-    max-height: 170px;
+    max-height: 160px;
   }
 }
 
