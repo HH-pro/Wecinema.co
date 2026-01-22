@@ -1197,18 +1197,18 @@
 .yellow-chart-wrapper canvas {
   width: 100% !important;
   height: 100% !important;
-  max-height: 200px;
+  max-height: 160px;
 }
 
 @media (max-width: 767px) {
   .yellow-chart-wrapper canvas {
-    max-height: 180px;
+    max-height: 140px;
   }
 }
 
 @media (max-width: 480px) {
   .yellow-chart-wrapper canvas {
-    max-height: 160px;
+    max-height: 130px;
   }
 }
 
