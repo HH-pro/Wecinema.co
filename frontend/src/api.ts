@@ -783,7 +783,8 @@ export const unbookmarkVideo = async (
   return await deleteRequest(
     `/video/${videoId}/bookmark`,
     setLoading,
-    { message: 'Bookmark removed successfully!' }
+    { message: 'Bookmark removed successfully!' },
+    { userId }
   );
 };
 
