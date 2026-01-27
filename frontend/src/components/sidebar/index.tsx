@@ -389,25 +389,6 @@ const Sidebar: React.FC<SidebarProps> = ({
               <span className="sidebar-text">Profile</span>
             </Link>
 
-            <Link
-              to="/history"
-              className={`sidebar-item ${getActiveClass("/history")} ${
-                expand ? "" : "collapsed"
-              }`}
-            >
-              <RiHistoryLine className="sidebar-icon" />
-              <span className="sidebar-text">History</span>
-            </Link>
-
-            <Link
-              to="/likedvideos"
-              className={`sidebar-item ${getActiveClass("/likedvideos")} ${
-                expand ? "" : "collapsed"
-              }`}
-            >
-              <RiHeartLine className="sidebar-icon" />
-              <span className="sidebar-text">Liked Videos</span>
-            </Link>
 
             <Link
               to="/chatbot"
