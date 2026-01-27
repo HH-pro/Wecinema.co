@@ -725,49 +725,48 @@ router.post('/:id/bookmark', async (req, res) => {
     }
 });
 
-// Get user's bookmarks (including deleted videos)
+// Get user's bookmarks
 router.get('/bookmarks/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
 
         console.log('🔵 BOOKMARK GET REQUEST');
-        console.log('User ID param:', userId);
+        console.log('User ID:', userId);
 
         // Validate userId
         if (!mongoose.Types.ObjectId.isValid(userId)) {
-            console.log('❌ Invalid user ID format');
+            console.log('❌ Invalid user ID');
             return res.status(400).json({ error: 'Invalid user ID' });
         }
 
-        // Convert to ObjectId for proper query
-        const userIdObj = mongoose.Types.ObjectId(userId);
-        console.log('Converted to ObjectId:', userIdObj);
+        // Get user with populated bookmarks
+        const user = await User.findById(userId).populate({
+            path: 'bookmarks',
+            model: 'Videos',
+            select: 'title description thumbnail author genre theme rating createdAt'
+        }).populate('bookmarks.author', 'username avatar');
 
-        // Find all videos that have this user's bookmarks
-        const videos = await Videos.find({
-            'bookmarks.userId': userIdObj
-        }).populate('author', 'username avatar');
+        if (!user) {
+            console.log('❌ User not found');
+            return res.status(404).json({ error: 'User not found' });
+        }
 
-        console.log('📊 Found videos with bookmarks:', videos.length);
-        console.log('Videos:', videos.map(v => ({ id: v._id, bookmarks: v.bookmarks })));
+        console.log('✅ User found with bookmarks:', user.bookmarks.length);
 
-        // Filter bookmarks for this user and include deletion status
-        const userBookmarks = videos.map(video => {
-            const bookmark = video.bookmarks.find(b => b.userId?.toString() === userIdObj.toString());
-            return {
-                videoId: video._id,
-                title: video.title,
-                thumbnail: video.thumbnail,
-                author: video.author,
-                bookmarkedAt: bookmark?.bookmarkedAt,
-                deleted: bookmark?.deleted || false,
-                deletedAt: bookmark?.deletedAt || null,
-                description: video.description,
-                status: bookmark?.deleted ? 'deleted' : 'active'
-            };
-        });
+        // Format response
+        const userBookmarks = user.bookmarks.map(video => ({
+            videoId: video._id,
+            title: video.title,
+            description: video.description,
+            thumbnail: video.thumbnail,
+            author: video.author,
+            genre: video.genre,
+            theme: video.theme,
+            rating: video.rating,
+            createdAt: video.createdAt
+        }));
 
-        console.log('✅ Returning bookmarks:', userBookmarks);
+        console.log('✅ Returning bookmarks:', userBookmarks.length);
 
         res.status(200).json({ bookmarks: userBookmarks });
     } catch (error) {
