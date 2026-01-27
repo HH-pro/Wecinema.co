@@ -39,6 +39,10 @@ const UserProfilePage: React.FC = () => {
     const [isCurrentUser, setIsCurrentUser] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [contentLoading, setContentLoading] = useState(false);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const [videoBookmarks, setVideoBookmarks] = useState<Set<string>>(new Set());
+    const [scriptBookmarks, setScriptBookmarks] = useState<Set<string>>(new Set());
+    const [bookmarkingIds, setBookmarkingIds] = useState<Set<string>>(new Set());
 
     // Direct API call for changing user type
     const changeUserTypeDirect = async (userId: string, userType: string) => {
