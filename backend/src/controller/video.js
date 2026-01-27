@@ -1281,49 +1281,56 @@ router.post("/change-video-status", async (req, res) => {
 
 // ========== SCRIPT BOOKMARK ROUTES ==========
 
-// Add bookmark to script
+// Add bookmark to script (save to User model)
 router.post('/scripts/:id/bookmark', async (req, res) => {
     try {
-        const { id } = req.params;
+        const scriptId = req.params.id;
         const { userId } = req.body;
 
-        // Validate userId
+        console.log('🔵 SCRIPT BOOKMARK POST REQUEST');
+        console.log('Script ID:', scriptId);
+        console.log('User ID:', userId);
+
+        // Validate IDs
+        if (!mongoose.Types.ObjectId.isValid(scriptId)) {
+            return res.status(400).json({ error: 'Invalid script ID' });
+        }
+
         if (!mongoose.Types.ObjectId.isValid(userId)) {
             return res.status(400).json({ error: 'Invalid user ID' });
         }
 
-        const script = await Script.findById(id);
+        // Check script exists
+        const script = await Script.findById(scriptId);
         if (!script) {
+            console.log('❌ Script not found');
             return res.status(404).json({ error: 'Script not found' });
         }
 
-        // Convert userId to ObjectId for consistent storage
-        const userIdObj = mongoose.Types.ObjectId(userId);
+        // Check user exists
+        const user = await User.findById(userId);
+        if (!user) {
+            console.log('❌ User not found');
+            return res.status(404).json({ error: 'User not found' });
+        }
 
-        // Check if the user already bookmarked the script
-        const existingBookmark = script.bookmarks.find(b => b.userId?.toString() === userIdObj.toString());
-        if (existingBookmark) {
-            // If it was previously deleted, restore it
-            if (existingBookmark.deleted) {
-                existingBookmark.deleted = false;
-                existingBookmark.deletedAt = null;
-                await script.save();
-                return res.status(200).json({ message: 'Bookmark restored successfully', script });
-            }
+        console.log('✅ Script and User found');
+
+        // Add script to user's script bookmarks (no duplicates)
+        if (user.scriptBookmarks.includes(scriptId)) {
+            console.log('⚠️ Already bookmarked');
             return res.status(400).json({ error: 'Script already bookmarked' });
         }
 
-        // Add bookmark with metadata (store as ObjectId)
-        script.bookmarks.push({
-            userId: userIdObj,
-            bookmarkedAt: new Date(),
-            deleted: false
-        });
-        await script.save();
+        user.scriptBookmarks.push(scriptId);
+        await user.save();
 
-        res.status(200).json({ message: 'Script bookmarked successfully', script });
+        console.log('✅ Script bookmark saved to User model');
+        console.log('User scriptBookmarks:', user.scriptBookmarks);
+
+        res.status(200).json({ message: 'Script bookmarked successfully', scriptBookmarks: user.scriptBookmarks });
     } catch (error) {
-        console.error('Error bookmarking script:', error);
+        console.error('❌ Error bookmarking script:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
