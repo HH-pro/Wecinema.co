@@ -1346,15 +1346,23 @@ router.delete('/scripts/:id/bookmark', async (req, res) => {
         const { id } = req.params;
         const { userId } = req.body;
 
+        // Validate userId
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ error: 'Invalid user ID' });
+        }
+
         const script = await Script.findById(id);
         if (!script) {
             return res.status(404).json({ error: 'Script not found' });
         }
 
+        // Convert userId to ObjectId for consistent comparison
+        const userIdObj = mongoose.Types.ObjectId(userId);
+
         // Find and remove the user's bookmark completely
         const initialLength = script.bookmarks.length;
         script.bookmarks = script.bookmarks.filter(b => 
-            b.userId?.toString() !== userId && b !== userId
+            b.userId?.toString() !== userIdObj.toString()
         );
 
         if (script.bookmarks.length === initialLength) {
