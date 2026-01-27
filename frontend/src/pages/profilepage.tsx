@@ -849,7 +849,7 @@ const UserProfilePage: React.FC = () => {
                                 {[
                                     { key: 'scripts', label: 'Scripts', icon: '📝', count: scripts.length },
                                     { key: 'videos', label: 'Videos', icon: '🎬', count: videos.length },
-                                    { key: 'likevideos', label: 'Like Videos', icon: '❤️', link: '/likevideos' },
+                                    { key: 'likevideos', label: 'Like Videos', icon: '❤️', link: '/likedvideos' },
                                     { key: 'bookmark', label: 'Bookmark', icon: '🔖', link: '/bookmark' },
                                     { key: 'history', label: 'History', icon: '📜', link: '/history' },
                                     { key: 'about', label: 'About', icon: '👤', count: null }
