@@ -778,37 +778,45 @@ router.get('/bookmarks/:userId', async (req, res) => {
 // Remove bookmark from video (unsave)
 router.delete('/:id/bookmark', async (req, res) => {
     try {
-        const { id } = req.params;
+        const videoId = req.params.id;
         const { userId } = req.body;
 
-        // Validate userId
+        console.log('🔵 BOOKMARK DELETE REQUEST');
+        console.log('Video ID:', videoId);
+        console.log('User ID:', userId);
+
+        // Validate IDs
+        if (!mongoose.Types.ObjectId.isValid(videoId)) {
+            return res.status(400).json({ error: 'Invalid video ID' });
+        }
+
         if (!mongoose.Types.ObjectId.isValid(userId)) {
             return res.status(400).json({ error: 'Invalid user ID' });
         }
 
-        const video = await Videos.findById(id);
-        if (!video) {
-            return res.status(404).json({ error: 'Video not found' });
+        // Get user and remove video from bookmarks
+        const user = await User.findById(userId);
+        if (!user) {
+            console.log('❌ User not found');
+            return res.status(404).json({ error: 'User not found' });
         }
 
-        // Convert userId to ObjectId for consistent comparison
-        const userIdObj = mongoose.Types.ObjectId(userId);
+        const initialLength = user.bookmarks.length;
+        user.bookmarks = user.bookmarks.filter(id => id.toString() !== videoId);
 
-        // Find and remove the user's bookmark completely
-        const initialLength = video.bookmarks.length;
-        video.bookmarks = video.bookmarks.filter(b => 
-            b.userId?.toString() !== userIdObj.toString()
-        );
-
-        if (video.bookmarks.length === initialLength) {
+        if (user.bookmarks.length === initialLength) {
+            console.log('⚠️ Video not in bookmarks');
             return res.status(400).json({ error: 'Video not bookmarked by this user' });
         }
 
-        await video.save();
+        await user.save();
 
-        res.status(200).json({ message: 'Bookmark removed successfully', video });
+        console.log('✅ Bookmark removed from User model');
+        console.log('Remaining bookmarks:', user.bookmarks.length);
+
+        res.status(200).json({ message: 'Bookmark removed successfully', bookmarks: user.bookmarks });
     } catch (error) {
-        console.error('Error removing bookmark:', error);
+        console.error('❌ Error removing bookmark:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
