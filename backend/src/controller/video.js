@@ -1336,41 +1336,53 @@ router.post('/scripts/:id/bookmark', async (req, res) => {
 });
 
 // Get user's script bookmarks (including deleted scripts)
+// Get user's script bookmarks
 router.get('/scripts/bookmarks/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
 
+        console.log('🔵 SCRIPT BOOKMARK GET REQUEST');
+        console.log('User ID:', userId);
+
         // Validate userId
         if (!mongoose.Types.ObjectId.isValid(userId)) {
+            console.log('❌ Invalid user ID');
             return res.status(400).json({ error: 'Invalid user ID' });
         }
 
-        // Convert to ObjectId for proper query
-        const userIdObj = mongoose.Types.ObjectId(userId);
-
-        // Find all scripts that have this user's bookmarks
-        const scripts = await Script.find({
-            'bookmarks.userId': userIdObj
-        }).populate('author', 'username avatar');
-
-        // Filter bookmarks for this user and include deletion status
-        const userBookmarks = scripts.map(script => {
-            const bookmark = script.bookmarks.find(b => b.userId?.toString() === userIdObj.toString());
-            return {
-                scriptId: script._id,
-                title: script.title,
-                genre: script.genre,
-                author: script.author,
-                bookmarkedAt: bookmark?.bookmarkedAt,
-                deleted: bookmark?.deleted || false,
-                deletedAt: bookmark?.deletedAt || null,
-                status: bookmark?.deleted ? 'deleted' : 'active'
-            };
+        // Get user with populated script bookmarks (nested populate for author)
+        const user = await User.findById(userId).populate({
+            path: 'scriptBookmarks',
+            model: 'Script',
+            select: 'title genre author description createdAt',
+            populate: {
+                path: 'author',
+                select: 'username avatar'
+            }
         });
+
+        if (!user) {
+            console.log('❌ User not found');
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        console.log('✅ User found with script bookmarks:', user.scriptBookmarks.length);
+
+        // Format response
+        const userBookmarks = user.scriptBookmarks.map(script => ({
+            scriptId: script._id,
+            title: script.title,
+            genre: script.genre,
+            author: script.author,
+            description: script.description,
+            createdAt: script.createdAt
+        }));
+
+        console.log('✅ Returning script bookmarks:', userBookmarks.length);
 
         res.status(200).json({ bookmarks: userBookmarks });
     } catch (error) {
-        console.error('Error fetching script bookmarks:', error);
+        console.error('❌ Error fetching script bookmarks:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
