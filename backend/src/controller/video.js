@@ -671,64 +671,54 @@ router.put("/:id", authenticateMiddleware, async (req, res) => {
 		res.status(500).json({ error: "Internal Server Error" });
 	}
 });
-// Add bookmark to video
+// Add bookmark to video (save to User model)
 router.post('/:id/bookmark', async (req, res) => {
     try {
-        const { id } = req.params;
+        const videoId = req.params.id;
         const { userId } = req.body;
 
         console.log('🔵 BOOKMARK POST REQUEST');
-        console.log('Video ID:', id);
-        console.log('User ID from body:', userId);
+        console.log('Video ID:', videoId);
+        console.log('User ID:', userId);
 
-        // Validate userId
+        // Validate IDs
+        if (!mongoose.Types.ObjectId.isValid(videoId)) {
+            return res.status(400).json({ error: 'Invalid video ID' });
+        }
+
         if (!mongoose.Types.ObjectId.isValid(userId)) {
-            console.log('❌ Invalid user ID format');
             return res.status(400).json({ error: 'Invalid user ID' });
         }
 
-        const video = await Videos.findById(id);
+        // Check video exists
+        const video = await Videos.findById(videoId);
         if (!video) {
             console.log('❌ Video not found');
             return res.status(404).json({ error: 'Video not found' });
         }
 
-        console.log('✅ Video found:', video._id);
-        console.log('Current bookmarks:', video.bookmarks);
+        // Check user exists
+        const user = await User.findById(userId);
+        if (!user) {
+            console.log('❌ User not found');
+            return res.status(404).json({ error: 'User not found' });
+        }
 
-        // Convert userId to ObjectId for consistent storage
-        const userIdObj = mongoose.Types.ObjectId(userId);
-        console.log('Converted userId to ObjectId:', userIdObj);
+        console.log('✅ Video and User found');
 
-        // Check if the user already bookmarked the video
-        const existingBookmark = video.bookmarks.find(b => b.userId?.toString() === userIdObj.toString());
-        if (existingBookmark) {
+        // Add video to user's bookmarks (no duplicates)
+        if (user.bookmarks.includes(videoId)) {
             console.log('⚠️ Already bookmarked');
-            // If it was previously deleted, restore it
-            if (existingBookmark.deleted) {
-                existingBookmark.deleted = false;
-                existingBookmark.deletedAt = null;
-                await video.save();
-                return res.status(200).json({ message: 'Bookmark restored successfully', video });
-            }
             return res.status(400).json({ error: 'Video already bookmarked' });
         }
 
-        // Add bookmark with metadata (store as ObjectId)
-        video.bookmarks.push({
-            userId: userIdObj,
-            bookmarkedAt: new Date(),
-            deleted: false
-        });
-        
-        console.log('📝 Bookmark added to array:', video.bookmarks);
+        user.bookmarks.push(videoId);
+        await user.save();
 
-        await video.save();
+        console.log('✅ Bookmark saved to User model');
+        console.log('User bookmarks:', user.bookmarks);
 
-        console.log('✅ Video saved to database');
-        console.log('Final bookmarks:', video.bookmarks);
-
-        res.status(200).json({ message: 'Video bookmarked successfully', video });
+        res.status(200).json({ message: 'Video bookmarked successfully', bookmarks: user.bookmarks });
     } catch (error) {
         console.error('❌ Error bookmarking video:', error);
         res.status(500).json({ error: 'Internal Server Error' });
