@@ -1026,6 +1026,22 @@ router.delete("/scripts/:scriptId", async (req, res) => {
 			return res.status(400).json({ error: "Invalid script ID" });
 		}
 
+		// Find the script
+		const script = await Script.findById(scriptId);
+		if (!script) {
+			return res.status(404).json({ error: "Script not found" });
+		}
+
+		// Mark all bookmarks as deleted before removing the script
+		if (script.bookmarks && script.bookmarks.length > 0) {
+			script.bookmarks.forEach(bookmark => {
+				bookmark.deleted = true;
+				bookmark.deletedAt = new Date();
+			});
+			await script.save();
+		}
+
+		// Now delete the script
 		const deletedScript = await Script.findByIdAndDelete(scriptId);
 
 		if (!deletedScript) {
