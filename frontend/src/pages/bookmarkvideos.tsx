@@ -96,7 +96,7 @@ const BookmarkVideos: React.FC = () => {
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-orange-50 p-4 md:p-8">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-7xl mx-auto mt-10">
           {/* Header */}
           <div className="mb-8">
             <button
