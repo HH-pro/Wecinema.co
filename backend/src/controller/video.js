@@ -671,6 +671,7 @@ router.put("/:id", authenticateMiddleware, async (req, res) => {
 		res.status(500).json({ error: "Internal Server Error" });
 	}
 });
+// Add bookmark to video
 router.post('/:id/bookmark', async (req, res) => {
     try {
         const { id } = req.params;
@@ -682,12 +683,24 @@ router.post('/:id/bookmark', async (req, res) => {
         }
 
         // Check if the user already bookmarked the video
-        if (video.bookmarks.includes(userId)) {
+        const existingBookmark = video.bookmarks.find(b => b.userId?.toString() === userId || b === userId);
+        if (existingBookmark) {
+            // If it was previously deleted, restore it
+            if (existingBookmark.deleted) {
+                existingBookmark.deleted = false;
+                existingBookmark.deletedAt = null;
+                await video.save();
+                return res.status(200).json({ message: 'Bookmark restored successfully', video });
+            }
             return res.status(400).json({ error: 'Video already bookmarked' });
         }
 
-        // Add userId to bookmarks array
-        video.bookmarks.push(userId);
+        // Add bookmark with metadata
+        video.bookmarks.push({
+            userId,
+            bookmarkedAt: new Date(),
+            deleted: false
+        });
         await video.save();
 
         res.status(200).json({ message: 'Video bookmarked successfully', video });
@@ -697,7 +710,40 @@ router.post('/:id/bookmark', async (req, res) => {
     }
 });
 
-// Remove bookmark from video
+// Get user's bookmarks (including deleted videos)
+router.get('/bookmarks/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        // Find all videos that have this user's bookmarks
+        const videos = await Videos.find({
+            'bookmarks.userId': userId
+        }).populate('author', 'username avatar');
+
+        // Filter bookmarks for this user and include deletion status
+        const userBookmarks = videos.map(video => {
+            const bookmark = video.bookmarks.find(b => b.userId?.toString() === userId);
+            return {
+                videoId: video._id,
+                title: video.title,
+                thumbnail: video.thumbnail,
+                author: video.author,
+                bookmarkedAt: bookmark?.bookmarkedAt,
+                deleted: bookmark?.deleted || false,
+                deletedAt: bookmark?.deletedAt || null,
+                description: video.description,
+                status: bookmark?.deleted ? 'deleted' : 'active'
+            };
+        });
+
+        res.status(200).json({ bookmarks: userBookmarks });
+    } catch (error) {
+        console.error('Error fetching bookmarks:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Remove bookmark from video (unsave)
 router.delete('/:id/bookmark', async (req, res) => {
     try {
         const { id } = req.params;
@@ -708,18 +754,51 @@ router.delete('/:id/bookmark', async (req, res) => {
             return res.status(404).json({ error: 'Video not found' });
         }
 
-        // Check if the user has bookmarked the video
-        if (!video.bookmarks.includes(userId)) {
-            return res.status(400).json({ error: 'Video not bookmarked yet' });
+        // Find and remove the user's bookmark completely
+        const initialLength = video.bookmarks.length;
+        video.bookmarks = video.bookmarks.filter(b => 
+            b.userId?.toString() !== userId && b !== userId
+        );
+
+        if (video.bookmarks.length === initialLength) {
+            return res.status(400).json({ error: 'Video not bookmarked by this user' });
         }
 
-        // Remove userId from bookmarks array
-        video.bookmarks = video.bookmarks.filter(b => b !== userId);
         await video.save();
 
         res.status(200).json({ message: 'Bookmark removed successfully', video });
     } catch (error) {
         console.error('Error removing bookmark:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Mark video as deleted in all bookmarks
+router.patch('/:id/mark-deleted-in-bookmarks', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const video = await Videos.findById(id);
+        if (!video) {
+            return res.status(404).json({ error: 'Video not found' });
+        }
+
+        // Mark all bookmarks for this video as deleted
+        video.bookmarks.forEach(bookmark => {
+            if (!bookmark.deleted) {
+                bookmark.deleted = true;
+                bookmark.deletedAt = new Date();
+            }
+        });
+
+        await video.save();
+
+        res.status(200).json({ 
+            message: 'Video marked as deleted in all bookmarks',
+            notifiedCount: video.bookmarks.length 
+        });
+    } catch (error) {
+        console.error('Error marking video as deleted:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
