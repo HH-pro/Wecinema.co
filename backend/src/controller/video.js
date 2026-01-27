@@ -739,12 +739,16 @@ router.get('/bookmarks/:userId', async (req, res) => {
             return res.status(400).json({ error: 'Invalid user ID' });
         }
 
-        // Get user with populated bookmarks
+        // Get user with populated bookmarks (nested populate for author)
         const user = await User.findById(userId).populate({
             path: 'bookmarks',
             model: 'Videos',
-            select: 'title description thumbnail author genre theme rating createdAt'
-        }).populate('bookmarks.author', 'username avatar');
+            select: 'title description thumbnail author genre theme rating createdAt',
+            populate: {
+                path: 'author',
+                select: 'username avatar'
+            }
+        });
 
         if (!user) {
             console.log('❌ User not found');
