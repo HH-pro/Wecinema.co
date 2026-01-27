@@ -80,6 +80,12 @@ const UserProfilePage: React.FC = () => {
             return;
         }
 
+        // Get current user ID from token
+        const currentUser = getCurrentUserFromToken();
+        if (currentUser?.userId || currentUser?.id) {
+            setCurrentUserId(currentUser.userId || currentUser.id);
+        }
+
         fetchUserData();
     }, [id]);
 
