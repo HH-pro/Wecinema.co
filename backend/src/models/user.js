@@ -39,6 +39,9 @@ const userSchema = new Schema({
     bookmarks: [
         { type: Schema.Types.ObjectId, ref: "Video" }
     ],
+    scriptBookmarks: [
+        { type: Schema.Types.ObjectId, ref: "Script" }
+    ],
     followers: [
         { type: Schema.Types.ObjectId, ref: "User" }
     ],
