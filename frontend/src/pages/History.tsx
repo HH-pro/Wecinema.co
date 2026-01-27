@@ -91,7 +91,7 @@ const HistoryView = () => {
 
   return (
     <Layout  hasHeader={true}>
-      <div className="p-4">
+      <div className="p-4 mt-8">
         <h2 className="text-xl font-bold mb-4">Watch History</h2>
         {error ? (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
