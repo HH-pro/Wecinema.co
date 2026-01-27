@@ -742,7 +742,7 @@ router.get('/bookmarks/:userId', async (req, res) => {
         // Get user with populated bookmarks (nested populate for author)
         const user = await User.findById(userId).populate({
             path: 'bookmarks',
-            model: 'Videos',
+            model: 'Video',
             select: 'title description thumbnail author genre theme rating createdAt',
             populate: {
                 path: 'author',
