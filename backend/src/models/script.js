@@ -21,6 +21,14 @@ const scriptSchema = new Schema(
 			required: true,
 		},
 		isForSale:{ type: Boolean, default: false },
+		bookmarks: [
+			{
+				userId: { type: Schema.Types.ObjectId, ref: "User" },
+				bookmarkedAt: { type: Date, default: Date.now },
+				deleted: { type: Boolean, default: false },
+				deletedAt: { type: Date }
+			}
+		],
 	},
 	{
 		timestamps: true, // Add createdAt and updatedAt fields
