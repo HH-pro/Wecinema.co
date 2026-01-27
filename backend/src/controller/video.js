@@ -740,18 +740,26 @@ router.get('/bookmarks/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
 
+        console.log('🔵 BOOKMARK GET REQUEST');
+        console.log('User ID param:', userId);
+
         // Validate userId
         if (!mongoose.Types.ObjectId.isValid(userId)) {
+            console.log('❌ Invalid user ID format');
             return res.status(400).json({ error: 'Invalid user ID' });
         }
 
         // Convert to ObjectId for proper query
         const userIdObj = mongoose.Types.ObjectId(userId);
+        console.log('Converted to ObjectId:', userIdObj);
 
         // Find all videos that have this user's bookmarks
         const videos = await Videos.find({
             'bookmarks.userId': userIdObj
         }).populate('author', 'username avatar');
+
+        console.log('📊 Found videos with bookmarks:', videos.length);
+        console.log('Videos:', videos.map(v => ({ id: v._id, bookmarks: v.bookmarks })));
 
         // Filter bookmarks for this user and include deletion status
         const userBookmarks = videos.map(video => {
@@ -769,9 +777,11 @@ router.get('/bookmarks/:userId', async (req, res) => {
             };
         });
 
+        console.log('✅ Returning bookmarks:', userBookmarks);
+
         res.status(200).json({ bookmarks: userBookmarks });
     } catch (error) {
-        console.error('Error fetching bookmarks:', error);
+        console.error('❌ Error fetching bookmarks:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
