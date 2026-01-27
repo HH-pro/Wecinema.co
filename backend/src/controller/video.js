@@ -1259,13 +1259,21 @@ router.post('/scripts/:id/bookmark', async (req, res) => {
         const { id } = req.params;
         const { userId } = req.body;
 
+        // Validate userId
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ error: 'Invalid user ID' });
+        }
+
         const script = await Script.findById(id);
         if (!script) {
             return res.status(404).json({ error: 'Script not found' });
         }
 
+        // Convert userId to ObjectId for consistent storage
+        const userIdObj = mongoose.Types.ObjectId(userId);
+
         // Check if the user already bookmarked the script
-        const existingBookmark = script.bookmarks.find(b => b.userId?.toString() === userId || b === userId);
+        const existingBookmark = script.bookmarks.find(b => b.userId?.toString() === userIdObj.toString());
         if (existingBookmark) {
             // If it was previously deleted, restore it
             if (existingBookmark.deleted) {
@@ -1277,9 +1285,9 @@ router.post('/scripts/:id/bookmark', async (req, res) => {
             return res.status(400).json({ error: 'Script already bookmarked' });
         }
 
-        // Add bookmark with metadata
+        // Add bookmark with metadata (store as ObjectId)
         script.bookmarks.push({
-            userId,
+            userId: userIdObj,
             bookmarkedAt: new Date(),
             deleted: false
         });
