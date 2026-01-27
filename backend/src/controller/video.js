@@ -952,7 +952,22 @@ router.delete("/delete/:id", async (req, res) => {
 	try {
 		const { id } = req.params;
 
-		// Find the video by ID and delete
+		// Find the video by ID
+		const video = await Videos.findById(id);
+		if (!video) {
+			return res.status(404).json({ error: "Video not found" });
+		}
+
+		// Mark all bookmarks as deleted before removing the video
+		if (video.bookmarks && video.bookmarks.length > 0) {
+			video.bookmarks.forEach(bookmark => {
+				bookmark.deleted = true;
+				bookmark.deletedAt = new Date();
+			});
+			await video.save();
+		}
+
+		// Now delete the video
 		const deletedVideo = await Videos.findByIdAndDelete(id);
 		if (!deletedVideo) {
 			return res.status(404).json({ error: "Video not found" });
