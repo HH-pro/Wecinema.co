@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Delete, Layout, Render } from "../components";
-import { deleteRequest, getRequest, putRequest } from "../api";
+import { deleteRequest, getRequest, putRequest, bookmarkVideo, unbookmarkVideo, bookmarkScript, unbookmarkScript, getCurrentUserFromToken } from "../api";
 import { decodeToken } from "../utilities/helperfFunction";
 import '../components/header/drowpdown.css';
 import { 
   FaEdit, FaStore, FaShoppingCart, FaUserTie, FaUser, 
   FaSync, FaHeart, FaUsers, FaVideo, FaFileAlt, 
-  FaCalendar, FaEnvelope, FaStar, FaCheckCircle, FaEye, FaTrash
+  FaCalendar, FaEnvelope, FaStar, FaCheckCircle, FaEye, FaTrash, FaBookmark
 } from 'react-icons/fa';
 import { BsThreeDotsVertical } from 'react-icons/bs';
 import axios from 'axios';
