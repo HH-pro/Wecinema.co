@@ -19,6 +19,8 @@ import {
   TermsAndConditions,
   HistoryPage,
   LikedVideoPage,
+  BookmarkVideosPage,
+  BookmarkScriptsPage,
   ReportPage,
   // ChatbotPage,
   Signin,
