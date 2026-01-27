@@ -677,13 +677,21 @@ router.post('/:id/bookmark', async (req, res) => {
         const { id } = req.params;
         const { userId } = req.body;
 
+        // Validate userId
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ error: 'Invalid user ID' });
+        }
+
         const video = await Videos.findById(id);
         if (!video) {
             return res.status(404).json({ error: 'Video not found' });
         }
 
+        // Convert userId to ObjectId for consistent storage
+        const userIdObj = mongoose.Types.ObjectId(userId);
+
         // Check if the user already bookmarked the video
-        const existingBookmark = video.bookmarks.find(b => b.userId?.toString() === userId || b === userId);
+        const existingBookmark = video.bookmarks.find(b => b.userId?.toString() === userIdObj.toString());
         if (existingBookmark) {
             // If it was previously deleted, restore it
             if (existingBookmark.deleted) {
@@ -695,9 +703,9 @@ router.post('/:id/bookmark', async (req, res) => {
             return res.status(400).json({ error: 'Video already bookmarked' });
         }
 
-        // Add bookmark with metadata
+        // Add bookmark with metadata (store as ObjectId)
         video.bookmarks.push({
-            userId,
+            userId: userIdObj,
             bookmarkedAt: new Date(),
             deleted: false
         });
