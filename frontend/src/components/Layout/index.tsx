@@ -751,29 +751,6 @@ const Layout: React.FC<LayoutProps> = ({
                     </Link>
                   )}
 
-                  {/* History */}
-                  {decodedToken && (
-                    <Link
-                      to="/history"
-                      className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/history")}`}
-                    >
-                      <RiHistoryLine size="20" />
-                      <span>History</span>
-                    </Link>
-                  )}
-
-                  {/* Liked Videos */}
-                  {decodedToken && (
-                    <Link
-                      to="/likedvideos"
-                      className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/likedvideos")}`}
-                    >
-                      <RiHeartLine size="20" />
-                      <span>Liked Videos</span>
-                    </Link>
-                  )}
-
-                  {/* Chat Bot */}
                   <Link
                     to="/chatbot"
                     className={`flex items-center gap-3 px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded ${getActiveClass("/chatbot")}`}
