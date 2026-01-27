@@ -86,7 +86,14 @@ const videoSchema = new Schema(
       },
     ],
 
-    bookmarks: [{ type: Schema.Types.ObjectId, ref: "User" }],
+    bookmarks: [
+      {
+        userId: { type: Schema.Types.ObjectId, ref: "User" },
+        bookmarkedAt: { type: Date, default: Date.now },
+        deleted: { type: Boolean, default: false },
+        deletedAt: { type: Date }
+      }
+    ],
 
     // 🔹 Hype Mode relations
     listing: { type: Schema.Types.ObjectId, ref: "Listing" },
