@@ -1227,4 +1227,107 @@ router.post("/change-video-status", async (req, res) => {
 	}
 });
 
+// ========== SCRIPT BOOKMARK ROUTES ==========
+
+// Add bookmark to script
+router.post('/scripts/:id/bookmark', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { userId } = req.body;
+
+        const script = await Script.findById(id);
+        if (!script) {
+            return res.status(404).json({ error: 'Script not found' });
+        }
+
+        // Check if the user already bookmarked the script
+        const existingBookmark = script.bookmarks.find(b => b.userId?.toString() === userId || b === userId);
+        if (existingBookmark) {
+            // If it was previously deleted, restore it
+            if (existingBookmark.deleted) {
+                existingBookmark.deleted = false;
+                existingBookmark.deletedAt = null;
+                await script.save();
+                return res.status(200).json({ message: 'Bookmark restored successfully', script });
+            }
+            return res.status(400).json({ error: 'Script already bookmarked' });
+        }
+
+        // Add bookmark with metadata
+        script.bookmarks.push({
+            userId,
+            bookmarkedAt: new Date(),
+            deleted: false
+        });
+        await script.save();
+
+        res.status(200).json({ message: 'Script bookmarked successfully', script });
+    } catch (error) {
+        console.error('Error bookmarking script:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Get user's script bookmarks (including deleted scripts)
+router.get('/scripts/bookmarks/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        // Find all scripts that have this user's bookmarks
+        const scripts = await Script.find({
+            'bookmarks.userId': userId
+        }).populate('author', 'username avatar');
+
+        // Filter bookmarks for this user and include deletion status
+        const userBookmarks = scripts.map(script => {
+            const bookmark = script.bookmarks.find(b => b.userId?.toString() === userId);
+            return {
+                scriptId: script._id,
+                title: script.title,
+                genre: script.genre,
+                author: script.author,
+                bookmarkedAt: bookmark?.bookmarkedAt,
+                deleted: bookmark?.deleted || false,
+                deletedAt: bookmark?.deletedAt || null,
+                status: bookmark?.deleted ? 'deleted' : 'active'
+            };
+        });
+
+        res.status(200).json({ bookmarks: userBookmarks });
+    } catch (error) {
+        console.error('Error fetching script bookmarks:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Remove bookmark from script (unsave)
+router.delete('/scripts/:id/bookmark', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { userId } = req.body;
+
+        const script = await Script.findById(id);
+        if (!script) {
+            return res.status(404).json({ error: 'Script not found' });
+        }
+
+        // Find and remove the user's bookmark completely
+        const initialLength = script.bookmarks.length;
+        script.bookmarks = script.bookmarks.filter(b => 
+            b.userId?.toString() !== userId && b !== userId
+        );
+
+        if (script.bookmarks.length === initialLength) {
+            return res.status(400).json({ error: 'Script not bookmarked by this user' });
+        }
+
+        await script.save();
+
+        res.status(200).json({ message: 'Bookmark removed successfully', script });
+    } catch (error) {
+        console.error('Error removing script bookmark:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 module.exports = router;
