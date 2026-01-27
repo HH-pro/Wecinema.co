@@ -758,6 +758,108 @@ export const setStorageItem = (key: string, value: any): void => {
   }
 };
 // ========================
+// BOOKMARK FUNCTIONS - VIDEOS & SCRIPTS
+// ========================
+
+// Video Bookmarks
+export const bookmarkVideo = async (
+  videoId: string,
+  userId: string,
+  setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+): Promise<any> => {
+  return await postRequest(
+    `/video/${videoId}/bookmark`,
+    { userId },
+    setLoading,
+    { message: 'Video bookmarked successfully!' }
+  );
+};
+
+export const unbookmarkVideo = async (
+  videoId: string,
+  userId: string,
+  setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+): Promise<any> => {
+  return await deleteRequest(
+    `/video/${videoId}/bookmark`,
+    setLoading,
+    { message: 'Bookmark removed successfully!' }
+  );
+};
+
+export const getUserVideoBookmarks = async (
+  userId: string,
+  setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+): Promise<any> => {
+  return await getRequest(
+    `/video/bookmarks/${userId}`,
+    setLoading,
+    { showToast: false }
+  );
+};
+
+// Script Bookmarks
+export const bookmarkScript = async (
+  scriptId: string,
+  userId: string,
+  setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+): Promise<any> => {
+  return await postRequest(
+    `/video/scripts/${scriptId}/bookmark`,
+    { userId },
+    setLoading,
+    { message: 'Script bookmarked successfully!' }
+  );
+};
+
+export const unbookmarkScript = async (
+  scriptId: string,
+  userId: string,
+  setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+): Promise<any> => {
+  return await deleteRequest(
+    `/video/scripts/${scriptId}/bookmark`,
+    setLoading,
+    { message: 'Bookmark removed successfully!' }
+  );
+};
+
+export const getUserScriptBookmarks = async (
+  userId: string,
+  setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+): Promise<any> => {
+  return await getRequest(
+    `/video/scripts/bookmarks/${userId}`,
+    setLoading,
+    { showToast: false }
+  );
+};
+
+// Combined bookmarks for user (videos + scripts)
+export const getUserAllBookmarks = async (
+  userId: string,
+  setLoading?: React.Dispatch<React.SetStateAction<boolean>>
+): Promise<{ videoBookmarks: any[]; scriptBookmarks: any[] }> => {
+  try {
+    setLoading?.(true);
+    const [videoBookmarks, scriptBookmarks] = await Promise.all([
+      getUserVideoBookmarks(userId),
+      getUserScriptBookmarks(userId)
+    ]);
+    
+    return {
+      videoBookmarks: videoBookmarks?.bookmarks || [],
+      scriptBookmarks: scriptBookmarks?.bookmarks || []
+    };
+  } catch (error) {
+    console.error('Error fetching all bookmarks:', error);
+    return { videoBookmarks: [], scriptBookmarks: [] };
+  } finally {
+    setLoading?.(false);
+  }
+};
+
+// ========================
 // AUTH FUNCTIONS
 // ========================
 
