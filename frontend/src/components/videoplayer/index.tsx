@@ -97,9 +97,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
 
         if (tokenData?.userId) {
           promises.push(getRequest(`/video/${video._id}/like-status/${tokenData.userId}`, setLoading));
+          // Fetch user's bookmarks to check if this video is bookmarked
+          promises.push(getUserVideoBookmarks(tokenData.userId, setLoading));
         }
 
-        const [videoData, viewsData, likeStatus] = await Promise.all(promises);
+        const responses = await Promise.all(promises);
+        const videoData = responses[0];
+        const viewsData = responses[1];
+        const likeStatus = responses[2];
+        const bookmarksData = responses[3];
 
         setCommentData(videoData.comments || []);
         setViews(viewsData.views || 0);
@@ -114,6 +120,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
             count: videoData.dislikes?.length || 0,
             isDisliked: likeStatus.isDisliked || false
           });
+        }
+
+        // Check if current video is in user's bookmarks
+        if (bookmarksData && bookmarksData.bookmarks) {
+          const isCurrentVideoBookmarked = bookmarksData.bookmarks.some(
+            (bookmark: any) => bookmark.videoId === video._id || bookmark._id === video._id
+          );
+          setIsBookmarked(isCurrentVideoBookmarked);
         }
 
         // Fetch payment statuses in parallel
