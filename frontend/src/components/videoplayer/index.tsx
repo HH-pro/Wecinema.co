@@ -337,17 +337,25 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ video, tokenData }) => {
   }, [reply, tokenData?.userId, video._id]);
 
   const toggleBookmark = useCallback(async () => {
+    if (!tokenData?.userId) {
+      toast.error("Please log in to bookmark videos");
+      return;
+    }
+
     try {
       setLoading(true);
-      const action = isBookmarked ? "removeBookmark" : "addBookmark";
-      const message = `Video ${isBookmarked ? "Unbookmarked" : "Bookmarked"}!`;
-      await putRequest(
-        `/video/${video._id}`,
-        { action, userId: tokenData?.userId },
-        setLoading
-      );
-      toast.success(message);
-      setIsBookmarked(!isBookmarked);
+      
+      if (isBookmarked) {
+        // Remove bookmark
+        await unbookmarkVideo(video._id, tokenData.userId, setLoading);
+        setIsBookmarked(false);
+        toast.success("Bookmark removed successfully!");
+      } else {
+        // Add bookmark
+        await bookmarkVideo(video._id, tokenData.userId, setLoading);
+        setIsBookmarked(true);
+        toast.success("Video bookmarked successfully!");
+      }
     } catch (error) {
       toast.error("Error toggling bookmark");
       console.error("Bookmark toggle error:", error);
