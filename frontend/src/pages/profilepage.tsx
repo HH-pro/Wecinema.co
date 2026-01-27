@@ -89,6 +89,13 @@ const UserProfilePage: React.FC = () => {
         fetchUserData();
     }, [id]);
 
+    // Fetch bookmarks whenever currentUserId changes
+    useEffect(() => {
+        if (currentUserId) {
+            fetchUserBookmarks(currentUserId);
+        }
+    }, [currentUserId]);
+
     const fetchUserData = async () => {
         try {
             setLoading(true);
