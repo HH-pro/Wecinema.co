@@ -677,22 +677,33 @@ router.post('/:id/bookmark', async (req, res) => {
         const { id } = req.params;
         const { userId } = req.body;
 
+        console.log('🔵 BOOKMARK POST REQUEST');
+        console.log('Video ID:', id);
+        console.log('User ID from body:', userId);
+
         // Validate userId
         if (!mongoose.Types.ObjectId.isValid(userId)) {
+            console.log('❌ Invalid user ID format');
             return res.status(400).json({ error: 'Invalid user ID' });
         }
 
         const video = await Videos.findById(id);
         if (!video) {
+            console.log('❌ Video not found');
             return res.status(404).json({ error: 'Video not found' });
         }
 
+        console.log('✅ Video found:', video._id);
+        console.log('Current bookmarks:', video.bookmarks);
+
         // Convert userId to ObjectId for consistent storage
         const userIdObj = mongoose.Types.ObjectId(userId);
+        console.log('Converted userId to ObjectId:', userIdObj);
 
         // Check if the user already bookmarked the video
         const existingBookmark = video.bookmarks.find(b => b.userId?.toString() === userIdObj.toString());
         if (existingBookmark) {
+            console.log('⚠️ Already bookmarked');
             // If it was previously deleted, restore it
             if (existingBookmark.deleted) {
                 existingBookmark.deleted = false;
@@ -709,11 +720,17 @@ router.post('/:id/bookmark', async (req, res) => {
             bookmarkedAt: new Date(),
             deleted: false
         });
+        
+        console.log('📝 Bookmark added to array:', video.bookmarks);
+
         await video.save();
+
+        console.log('✅ Video saved to database');
+        console.log('Final bookmarks:', video.bookmarks);
 
         res.status(200).json({ message: 'Video bookmarked successfully', video });
     } catch (error) {
-        console.error('Error bookmarking video:', error);
+        console.error('❌ Error bookmarking video:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
