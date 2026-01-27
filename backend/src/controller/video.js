@@ -723,14 +723,22 @@ router.get('/bookmarks/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
 
+        // Validate userId
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ error: 'Invalid user ID' });
+        }
+
+        // Convert to ObjectId for proper query
+        const userIdObj = mongoose.Types.ObjectId(userId);
+
         // Find all videos that have this user's bookmarks
         const videos = await Videos.find({
-            'bookmarks.userId': userId
+            'bookmarks.userId': userIdObj
         }).populate('author', 'username avatar');
 
         // Filter bookmarks for this user and include deletion status
         const userBookmarks = videos.map(video => {
-            const bookmark = video.bookmarks.find(b => b.userId?.toString() === userId);
+            const bookmark = video.bookmarks.find(b => b.userId?.toString() === userIdObj.toString());
             return {
                 videoId: video._id,
                 title: video.title,
