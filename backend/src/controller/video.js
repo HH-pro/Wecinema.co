@@ -1390,37 +1390,45 @@ router.get('/scripts/bookmarks/:userId', async (req, res) => {
 // Remove bookmark from script (unsave)
 router.delete('/scripts/:id/bookmark', async (req, res) => {
     try {
-        const { id } = req.params;
+        const scriptId = req.params.id;
         const { userId } = req.body;
 
-        // Validate userId
+        console.log('🔵 SCRIPT BOOKMARK DELETE REQUEST');
+        console.log('Script ID:', scriptId);
+        console.log('User ID:', userId);
+
+        // Validate IDs
+        if (!mongoose.Types.ObjectId.isValid(scriptId)) {
+            return res.status(400).json({ error: 'Invalid script ID' });
+        }
+
         if (!mongoose.Types.ObjectId.isValid(userId)) {
             return res.status(400).json({ error: 'Invalid user ID' });
         }
 
-        const script = await Script.findById(id);
-        if (!script) {
-            return res.status(404).json({ error: 'Script not found' });
+        // Get user and remove script from bookmarks
+        const user = await User.findById(userId);
+        if (!user) {
+            console.log('❌ User not found');
+            return res.status(404).json({ error: 'User not found' });
         }
 
-        // Convert userId to ObjectId for consistent comparison
-        const userIdObj = mongoose.Types.ObjectId(userId);
+        const initialLength = user.scriptBookmarks.length;
+        user.scriptBookmarks = user.scriptBookmarks.filter(id => id.toString() !== scriptId);
 
-        // Find and remove the user's bookmark completely
-        const initialLength = script.bookmarks.length;
-        script.bookmarks = script.bookmarks.filter(b => 
-            b.userId?.toString() !== userIdObj.toString()
-        );
-
-        if (script.bookmarks.length === initialLength) {
+        if (user.scriptBookmarks.length === initialLength) {
+            console.log('⚠️ Script not in bookmarks');
             return res.status(400).json({ error: 'Script not bookmarked by this user' });
         }
 
-        await script.save();
+        await user.save();
 
-        res.status(200).json({ message: 'Bookmark removed successfully', script });
+        console.log('✅ Script bookmark removed from User model');
+        console.log('Remaining script bookmarks:', user.scriptBookmarks.length);
+
+        res.status(200).json({ message: 'Bookmark removed successfully', scriptBookmarks: user.scriptBookmarks });
     } catch (error) {
-        console.error('Error removing script bookmark:', error);
+        console.error('❌ Error removing script bookmark:', error);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
