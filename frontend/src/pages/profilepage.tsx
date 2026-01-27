@@ -533,17 +533,18 @@ const UserProfilePage: React.FC = () => {
                                     <div
                                         key={video._id}
                                         className="group bg-white rounded-xl border border-gray-200 hover:border-yellow-300 transition-all duration-300 overflow-hidden"
-                                        onClick={() => nav(`/video/${video._id}`)}
                                     >
                                         <div className="relative overflow-hidden bg-gray-100">
                                             {video.thumbnail ? (
                                                 <img
                                                     src={video.thumbnail}
                                                     alt={video.title}
-                                                    className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-500"
+                                                    className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-500 cursor-pointer"
+                                                    onClick={() => nav(`/video/${video._id}`)}
                                                 />
                                             ) : (
-                                                <div className="w-full h-40 bg-gradient-to-br from-yellow-100 to-yellow-200 flex items-center justify-center">
+                                                <div className="w-full h-40 bg-gradient-to-br from-yellow-100 to-yellow-200 flex items-center justify-center cursor-pointer"
+                                                    onClick={() => nav(`/video/${video._id}`)}>
                                                     <span className="text-4xl">🎥</span>
                                                 </div>
                                             )}
@@ -552,10 +553,27 @@ const UserProfilePage: React.FC = () => {
                                                     Video
                                                 </span>
                                             </div>
+                                            {/* Bookmark Button */}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleBookmarkVideo(video._id);
+                                                }}
+                                                disabled={bookmarkingIds.has(video._id)}
+                                                className={`absolute top-2 right-2 p-2 rounded-full transition-all ${
+                                                    videoBookmarks.has(video._id)
+                                                        ? 'bg-yellow-500 text-white'
+                                                        : 'bg-white/80 text-gray-700 hover:bg-white'
+                                                } ${bookmarkingIds.has(video._id) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                title={videoBookmarks.has(video._id) ? 'Remove bookmark' : 'Add bookmark'}
+                                            >
+                                                <FaBookmark className="text-sm" />
+                                            </button>
                                         </div>
                                         
                                         <div className="p-4">
-                                            <h3 className="font-semibold text-gray-900 text-md mb-2 line-clamp-2">
+                                            <h3 className="font-semibold text-gray-900 text-md mb-2 line-clamp-2 cursor-pointer"
+                                                onClick={() => nav(`/video/${video._id}`)}>
                                                 {video.title || "Untitled Video"}
                                             </h3>
                                             <p className="text-gray-600 text-sm mb-3 line-clamp-2">
@@ -565,9 +583,12 @@ const UserProfilePage: React.FC = () => {
                                                 <span className="text-xs text-gray-500">
                                                     {video.duration || 'N/A'}
                                                 </span>
-                                                <span className="text-xs font-medium text-yellow-700">
+                                                <button
+                                                    onClick={() => nav(`/video/${video._id}`)}
+                                                    className="text-xs font-medium text-yellow-700 hover:text-yellow-800 transition-colors"
+                                                >
                                                     Watch →
-                                                </span>
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
