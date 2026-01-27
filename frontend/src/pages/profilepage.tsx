@@ -438,27 +438,50 @@ const UserProfilePage: React.FC = () => {
                                             className="group relative bg-white rounded-xl border border-gray-200 hover:border-yellow-300 transition-all duration-300 overflow-hidden"
                                             onMouseEnter={() => handleScriptMouseEnter(index)}
                                             onMouseLeave={handleScriptMouseLeave}
-                                            onClick={() => nav(`/script/${scriptData?._id}`, { state: JSON.stringify(scriptData) })}
                                         >
                                             <div className="p-4">
                                                 <div className="flex justify-between items-start mb-3">
-                                                    <h3 className="font-semibold text-gray-900 text-md line-clamp-2 pr-2">
+                                                    <h3 
+                                                        className="font-semibold text-gray-900 text-md line-clamp-2 pr-2 cursor-pointer hover:text-yellow-600"
+                                                        onClick={() => nav(`/script/${scriptData?._id}`, { state: JSON.stringify(scriptData) })}
+                                                    >
                                                         {scriptData?.title || "Untitled Script"}
                                                     </h3>
-                                                    {isCurrentUser && (
+                                                    <div className="flex items-center space-x-1">
+                                                        {/* Bookmark Button */}
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                setMenuOpen(menuOpen === index ? null : index);
+                                                                handleBookmarkScript(scriptData?._id);
                                                             }}
-                                                            className="p-1 hover:bg-gray-50 rounded transition-colors"
+                                                            disabled={bookmarkingIds.has(scriptData?._id)}
+                                                            className={`p-1.5 rounded transition-all ${
+                                                                scriptBookmarks.has(scriptData?._id)
+                                                                    ? 'bg-yellow-500 text-white'
+                                                                    : 'bg-gray-50 text-gray-600 hover:bg-yellow-50 hover:text-yellow-600'
+                                                            } ${bookmarkingIds.has(scriptData?._id) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                            title={scriptBookmarks.has(scriptData?._id) ? 'Remove bookmark' : 'Add bookmark'}
                                                         >
-                                                            <BsThreeDotsVertical className="text-gray-400 text-sm" />
+                                                            <FaBookmark className="text-xs" />
                                                         </button>
-                                                    )}
+                                                        {isCurrentUser && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setMenuOpen(menuOpen === index ? null : index);
+                                                                }}
+                                                                className="p-1 hover:bg-gray-50 rounded transition-colors"
+                                                            >
+                                                                <BsThreeDotsVertical className="text-gray-400 text-sm" />
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 
-                                                <div className="text-gray-600 text-sm line-clamp-3 mb-3 min-h-[60px]">
+                                                <div 
+                                                    className="text-gray-600 text-sm line-clamp-3 mb-3 min-h-[60px] cursor-pointer hover:text-gray-700"
+                                                    onClick={() => nav(`/script/${scriptData?._id}`, { state: JSON.stringify(scriptData) })}
+                                                >
                                                     <Render htmlString={script} />
                                                 </div>
                                                 
@@ -466,9 +489,12 @@ const UserProfilePage: React.FC = () => {
                                                     <span className="text-xs text-gray-500">
                                                         {scriptData?.createdAt ? new Date(scriptData.createdAt).toLocaleDateString() : 'Recent'}
                                                     </span>
-                                                    <span className="text-xs font-medium text-yellow-700">
+                                                    <button
+                                                        onClick={() => nav(`/script/${scriptData?._id}`, { state: JSON.stringify(scriptData) })}
+                                                        className="text-xs font-medium text-yellow-700 hover:text-yellow-800 transition-colors"
+                                                    >
                                                         Script
-                                                    </span>
+                                                    </button>
                                                 </div>
                                             </div>
 
