@@ -224,6 +224,78 @@ const UserProfilePage: React.FC = () => {
         }
     };
 
+    const handleBookmarkVideo = async (videoId: string) => {
+        if (!currentUserId) {
+            toast.error("Please login to bookmark videos");
+            return;
+        }
+
+        try {
+            setBookmarkingIds(prev => new Set([...prev, videoId]));
+            
+            if (videoBookmarks.has(videoId)) {
+                // Remove bookmark
+                await unbookmarkVideo(videoId, currentUserId);
+                setVideoBookmarks(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(videoId);
+                    return newSet;
+                });
+                toast.success("Bookmark removed");
+            } else {
+                // Add bookmark
+                await bookmarkVideo(videoId, currentUserId);
+                setVideoBookmarks(prev => new Set([...prev, videoId]));
+                toast.success("Video bookmarked");
+            }
+        } catch (error) {
+            console.error("Error bookmarking video:", error);
+            toast.error("Failed to bookmark video");
+        } finally {
+            setBookmarkingIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(videoId);
+                return newSet;
+            });
+        }
+    };
+
+    const handleBookmarkScript = async (scriptId: string) => {
+        if (!currentUserId) {
+            toast.error("Please login to bookmark scripts");
+            return;
+        }
+
+        try {
+            setBookmarkingIds(prev => new Set([...prev, scriptId]));
+            
+            if (scriptBookmarks.has(scriptId)) {
+                // Remove bookmark
+                await unbookmarkScript(scriptId, currentUserId);
+                setScriptBookmarks(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(scriptId);
+                    return newSet;
+                });
+                toast.success("Bookmark removed");
+            } else {
+                // Add bookmark
+                await bookmarkScript(scriptId, currentUserId);
+                setScriptBookmarks(prev => new Set([...prev, scriptId]));
+                toast.success("Script bookmarked");
+            }
+        } catch (error) {
+            console.error("Error bookmarking script:", error);
+            toast.error("Failed to bookmark script");
+        } finally {
+            setBookmarkingIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(scriptId);
+                return newSet;
+            });
+        }
+    };
+
     const handleEdit = () => {
         setEditMode(true);
     };
