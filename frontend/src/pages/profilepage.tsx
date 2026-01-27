@@ -167,10 +167,36 @@ const UserProfilePage: React.FC = () => {
             } else {
                 setVideos([]);
             }
+
+            // Fetch current user's bookmarks if logged in
+            if (currentUserId) {
+                await fetchUserBookmarks(currentUserId);
+            }
         } catch (error) {
             console.error("Error fetching user content:", error);
             setScripts([]);
             setVideos([]);
+        }
+    };
+
+    const fetchUserBookmarks = async (userId: string) => {
+        try {
+            // Fetch video bookmarks
+            const videoBookmarksResult: any = await getRequest(`video/bookmarks/${userId}`);
+            if (videoBookmarksResult?.bookmarks) {
+                const bookmarkedVideoIds = new Set(videoBookmarksResult.bookmarks.map((b: any) => b.videoId));
+                setVideoBookmarks(bookmarkedVideoIds);
+            }
+
+            // Fetch script bookmarks
+            const scriptBookmarksResult: any = await getRequest(`video/scripts/bookmarks/${userId}`);
+            if (scriptBookmarksResult?.bookmarks) {
+                const bookmarkedScriptIds = new Set(scriptBookmarksResult.bookmarks.map((b: any) => b.scriptId));
+                setScriptBookmarks(bookmarkedScriptIds);
+            }
+        } catch (error) {
+            console.error("Error fetching bookmarks:", error);
+            // Don't show error toast for bookmarks, it's not critical
         }
     };
 
