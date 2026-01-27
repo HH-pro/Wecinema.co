@@ -17,6 +17,8 @@ export { default as TermsAndConditions } from "./termsandcondition";
 export { default as HistoryPage } from "./History";
 export { default as LikedVideoPage } from "./LikedVideos";
 export { default as ReportPage } from "./report";
+export { default as BookmarkVideosPage } from "./bookmarkvideos";
+export { default as BookmarkScriptsPage } from "./bookmarkscripts";
 // export { default as ChatbotPage } from "./Chatbot";
 export { default as OrderDetailsPage } from "./Orders/OrderDetailsPage";
 export { default as Layout  } from "../components/admin/Layout";
