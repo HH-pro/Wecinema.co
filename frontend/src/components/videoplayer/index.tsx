@@ -3,7 +3,7 @@ import { BsDot } from "react-icons/bs";
 import { MdPlayArrow, MdUpload, MdVerifiedUser } from "react-icons/md";
 import { AiFillDislike, AiFillLike, AiOutlineDislike, AiOutlineLike } from "react-icons/ai";
 import { formatDateAgo } from "../../utilities/helperfFunction";
-import { getRequest, postRequest, putRequest, API_BASE_URL } from "../../api";
+import { getRequest, postRequest, putRequest, API_BASE_URL, bookmarkVideo, unbookmarkVideo, getUserVideoBookmarks } from "../../api";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import Modal from 'react-modal';
