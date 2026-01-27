@@ -845,16 +845,25 @@ const UserProfilePage: React.FC = () => {
                     <div className="lg:col-span-2">
                         {/* Tabs Navigation */}
                         <div className="mb-6">
-                            <div className="flex space-x-1 bg-white rounded-lg border border-gray-200 p-1">
+                            <div className="flex space-x-1 bg-white rounded-lg border border-gray-200 p-1 overflow-x-auto">
                                 {[
                                     { key: 'scripts', label: 'Scripts', icon: '📝', count: scripts.length },
                                     { key: 'videos', label: 'Videos', icon: '🎬', count: videos.length },
+                                    { key: 'likevideos', label: 'Like Videos', icon: '❤️', link: '/likevideos' },
+                                    { key: 'bookmark', label: 'Bookmark', icon: '🔖', link: '/bookmark' },
+                                    { key: 'history', label: 'History', icon: '📜', link: '/history' },
                                     { key: 'about', label: 'About', icon: '👤', count: null }
                                 ].map((tab) => (
                                     <button
                                         key={tab.key}
-                                        onClick={() => setActiveTab(tab.key)}
-                                        className={`flex-1 flex items-center justify-center py-2.5 px-2 rounded-md transition-colors text-sm ${
+                                        onClick={() => {
+                                            if (tab.link) {
+                                                nav(tab.link);
+                                            } else {
+                                                setActiveTab(tab.key);
+                                            }
+                                        }}
+                                        className={`flex-1 flex items-center justify-center py-2.5 px-2 rounded-md transition-colors text-sm whitespace-nowrap ${
                                             activeTab === tab.key
                                                 ? 'bg-yellow-500 text-white'
                                                 : 'text-gray-600 hover:text-yellow-600 hover:bg-yellow-50'
@@ -862,7 +871,7 @@ const UserProfilePage: React.FC = () => {
                                     >
                                         <span className="mr-2">{tab.icon}</span>
                                         <span className="font-medium">{tab.label}</span>
-                                        {tab.count !== null && (
+                                        {tab.count !== null && !tab.link && (
                                             <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-xs ${
                                                 activeTab === tab.key
                                                     ? 'bg-white text-yellow-600'
