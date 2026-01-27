@@ -68,6 +68,8 @@ const Router: React.FC = () => {
           <Route path="/hypemode" element={<HypeMode />} />
           <Route path="/report" element={<ReportPage />} />
           <Route path="/likedvideos" element={<LikedVideoPage />} />
+          <Route path="/bookmark" element={<BookmarkVideosPage />} />
+          <Route path="/bookmarkscripts" element={<BookmarkScriptsPage />} />
           <Route path="/payment" element={<PaymentComponent />} />
           <Route path="/hypemodeprofile" element={<HypeModeProfile />} />
           <Route path="/chat/:chatId" element={<ChatPage />} />
