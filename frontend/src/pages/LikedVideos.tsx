@@ -266,7 +266,7 @@ const LikedVideos = () => {
       <Layout hasHeader={true}>
         <div className="p-4 flex items-center justify-center min-h-screen">
           <div className="flex flex-col items-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mb-4"></div>
             <p className="text-gray-400">Loading liked videos...</p>
           </div>
         </div>
