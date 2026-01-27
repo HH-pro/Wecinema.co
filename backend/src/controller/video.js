@@ -1305,14 +1305,22 @@ router.get('/scripts/bookmarks/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
 
+        // Validate userId
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ error: 'Invalid user ID' });
+        }
+
+        // Convert to ObjectId for proper query
+        const userIdObj = mongoose.Types.ObjectId(userId);
+
         // Find all scripts that have this user's bookmarks
         const scripts = await Script.find({
-            'bookmarks.userId': userId
+            'bookmarks.userId': userIdObj
         }).populate('author', 'username avatar');
 
         // Filter bookmarks for this user and include deletion status
         const userBookmarks = scripts.map(script => {
-            const bookmark = script.bookmarks.find(b => b.userId?.toString() === userId);
+            const bookmark = script.bookmarks.find(b => b.userId?.toString() === userIdObj.toString());
             return {
                 scriptId: script._id,
                 title: script.title,
