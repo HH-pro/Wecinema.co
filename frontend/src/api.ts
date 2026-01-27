@@ -409,14 +409,16 @@ export const patchRequest = async <T = any>(
 export const deleteRequest = async <T = any>(
   url: string,
   setLoading?: React.Dispatch<React.SetStateAction<boolean>>,
-  options?: RequestOptions & { message?: string }
+  options?: RequestOptions & { message?: string },
+  data?: any
 ): Promise<T> => {
   setLoading?.(true);
   
   const requestFn = () => api.delete<ApiResponse<T>>(url, {
     timeout: options?.timeout,
     headers: options?.headers,
-    params: options?.params
+    params: options?.params,
+    data: data
   });
 
   try {
