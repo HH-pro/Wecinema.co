@@ -1684,7 +1684,7 @@
     z-index: 20;
   }
 }
-}
+
 
 /* Navigation Buttons */
 .yellow-slider-btn {
@@ -1728,12 +1728,10 @@
 
 .yellow-slider-btn-prev {
   order: 1;
-  margin-right: 12px;
 }
 
 .yellow-slider-btn-next {
   order: 3;
-  margin-left: 12px;
 }
 
 @media (max-width: 480px) {
@@ -1741,14 +1739,6 @@
     width: 40px;
     height: 40px;
     font-size: 20px;
-  }
-  
-  .yellow-slider-btn-prev {
-    margin-right: 8px;
-  }
-
-  .yellow-slider-btn-next {
-    margin-left: 8px;
   }
 }
 
