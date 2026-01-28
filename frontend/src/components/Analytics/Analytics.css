@@ -1686,27 +1686,6 @@
   }
 }
 
-/* Slider Title */
-.yellow-slider-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: rgba(203, 213, 225, 0.8);
-  margin: 0;
-  padding: 0 16px;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-  flex: 1;
-  text-align: center;
-  order: 2;
-}
-
-@media (max-width: 480px) {
-  .yellow-slider-title {
-    font-size: 12px;
-    padding: 0 12px;
-  }
-}
-
 /* Slider Controls - Navigation Buttons & Indicators */
 .yellow-slider-controls {
   display: flex;
