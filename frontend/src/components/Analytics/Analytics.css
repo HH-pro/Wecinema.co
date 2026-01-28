@@ -704,7 +704,7 @@
 }
 
 .yellow-header-title {
-  color: #ffffff;
+  color: #ffffff !important;
   font-size: 1.3rem;
   font-weight: 700;
   margin: 0;
@@ -712,11 +712,14 @@
   line-height: 1.3;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  display: block;
 }
 
 @media (max-width: 767px) {
   .yellow-header-title {
     font-size: 1.1rem;
+    color: #ffffff !important;
+    display: block;
   }
 }
 
