@@ -475,88 +475,132 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
   ];
 
   return (
-    <div className="yellow-charts-grid">
-      {charts.map((chart, idx) => (
-        <div 
-          key={idx} 
-          className={`yellow-chart-card ${hoveredChart === idx ? 'hovered' : ''}`}
-          ref={el => chartRefs.current[idx] = el}
-          onMouseEnter={() => isMobile ? undefined : setHoveredChart(idx)}
-          onMouseLeave={() => isMobile ? undefined : setHoveredChart(null)}
-          onTouchStart={(e) => {
-            if (isMobile) touchStartX.current = e.touches[0].clientX;
-          }}
-          onTouchEnd={(e) => {
-            if (isMobile) {
-              touchEndX.current = e.changedTouches[0].clientX;
-              // Optional: handle swipe between charts if needed
-            }
-          }}
-          style={{
-            '--icon-color-1': chart.colors.color1,
-            '--icon-color-2': chart.colors.color2,
-            touchAction: isMobile ? 'pan-x' : 'auto'
-          } as React.CSSProperties}
-        >
-          <div className="yellow-chart-header">
-            <div className="yellow-chart-title-section">
-              <div className="yellow-chart-icon" style={{ 
-                borderColor: `${chart.colors.color1}80`,
-                background: `linear-gradient(135deg, ${chart.colors.color1}30, ${chart.colors.color2}20)`
-              }}>
-                <span>{chart.icon}</span>
+    <div className={`yellow-charts-wrapper ${isMobile ? 'mobile' : 'desktop'}`}>
+      <div 
+        className="yellow-charts-grid"
+        ref={containerRef}
+        onTouchStart={(e) => {
+          touchStartX.current = e.touches[0].clientX;
+          touchStartTime.current = Date.now();
+        }}
+        onTouchEnd={(e) => {
+          touchEndX.current = e.changedTouches[0].clientX;
+          handleSwipe();
+        }}
+      >
+        {charts.map((chart, idx) => (
+          <div 
+            key={idx} 
+            className={`yellow-chart-card ${hoveredChart === idx ? 'hovered' : ''} ${isMobile && idx === currentSlide ? 'active-slide' : ''}`}
+            ref={el => chartRefs.current[idx] = el}
+            onMouseEnter={() => isMobile ? undefined : setHoveredChart(idx)}
+            onMouseLeave={() => isMobile ? undefined : setHoveredChart(null)}
+            style={{
+              '--icon-color-1': chart.colors.color1,
+              '--icon-color-2': chart.colors.color2,
+              touchAction: isMobile ? 'pan-x' : 'auto'
+            } as React.CSSProperties}
+          >
+            <div className="yellow-chart-header">
+              <div className="yellow-chart-title-section">
+                <div className="yellow-chart-icon" style={{ 
+                  borderColor: `${chart.colors.color1}80`,
+                  background: `linear-gradient(135deg, ${chart.colors.color1}30, ${chart.colors.color2}20)`
+                }}>
+                  <span>{chart.icon}</span>
+                </div>
+                <div className="yellow-chart-text">
+                  <h3 className="yellow-chart-title">{chart.title}</h3>
+                  <p className="yellow-chart-description">{chart.description}</p>
+                </div>
               </div>
-              <div className="yellow-chart-text">
-                <h3 className="yellow-chart-title">{chart.title}</h3>
-                <p className="yellow-chart-description">{chart.description}</p>
+              <div className="yellow-chart-status">
+                <span className="yellow-status-dot"></span>
+                <span className="yellow-status-text">Live</span>
               </div>
             </div>
-            <div className="yellow-chart-status">
-              <span className="yellow-status-dot"></span>
-              <span className="yellow-status-text">Live</span>
+            
+            <div className="yellow-chart-wrapper">
+              {chart.data ? (
+                <Line 
+                  data={chart.data} 
+                  options={chartOptions()} 
+                  height={isMobile ? 140 : 150}
+                />
+              ) : (
+                <div className="yellow-no-data">
+                  <div className="yellow-no-data-icon">📊</div>
+                  <span>No data available</span>
+                </div>
+              )}
             </div>
-          </div>
-          
-          <div className="yellow-chart-wrapper">
-            {chart.data ? (
-              <Line 
-                data={chart.data} 
-                options={chartOptions()} 
-                height={isMobile ? 140 : 150}
-              />
-            ) : (
-              <div className="yellow-no-data">
-                <div className="yellow-no-data-icon">📊</div>
-                <span>No data available</span>
+            
+            {!isMobile && (
+              <div className="yellow-chart-footer">
+                <div className="yellow-footer-info">
+                  <span className="yellow-info-item">
+                    <span className="yellow-info-label">Data Points:</span>
+                    <span className="yellow-info-value">{chart.data?.labels.length || 0}</span>
+                  </span>
+                  <span className="yellow-info-item">
+                    <span className="yellow-info-label">Status:</span>
+                    <span className="yellow-info-trend" style={{
+                      backgroundColor: idx === 0 ? 'rgba(255, 107, 139, 0.15)' : 
+                                       idx === 1 ? 'rgba(46, 213, 115, 0.15)' : 
+                                       'rgba(30, 144, 255, 0.15)',
+                      color: idx === 0 ? '#FF4757' : 
+                             idx === 1 ? '#1DD1A1' : 
+                             '#3742FA'
+                    }}>
+                      {idx === 2 ? '↗ Rising' : '→ Stable'}
+                    </span>
+                  </span>
+                </div>
               </div>
             )}
           </div>
-          
-          {!isMobile && (
-            <div className="yellow-chart-footer">
-              <div className="yellow-footer-info">
-                <span className="yellow-info-item">
-                  <span className="yellow-info-label">Data Points:</span>
-                  <span className="yellow-info-value">{chart.data?.labels.length || 0}</span>
-                </span>
-                <span className="yellow-info-item">
-                  <span className="yellow-info-label">Status:</span>
-                  <span className="yellow-info-trend" style={{
-                    backgroundColor: idx === 0 ? 'rgba(255, 107, 139, 0.15)' : 
-                                     idx === 1 ? 'rgba(46, 213, 115, 0.15)' : 
-                                     'rgba(30, 144, 255, 0.15)',
-                    color: idx === 0 ? '#FF4757' : 
-                           idx === 1 ? '#1DD1A1' : 
-                           '#3742FA'
-                  }}>
-                    {idx === 2 ? '↗ Rising' : '→ Stable'}
-                  </span>
-                </span>
-              </div>
+        ))}
+      </div>
+
+      {isMobile && (
+        <>
+          {/* Navigation Buttons */}
+          <div className="yellow-slider-controls">
+            <button 
+              className="yellow-slider-btn yellow-slider-btn-prev"
+              onClick={goToPreviousSlide}
+              aria-label="Previous chart"
+            >
+              ‹
+            </button>
+            
+            {/* Slide Indicators */}
+            <div className="yellow-slide-indicators">
+              {charts.map((_, idx) => (
+                <button
+                  key={idx}
+                  className={`yellow-indicator-dot ${idx === currentSlide ? 'active' : ''}`}
+                  onClick={() => setCurrentSlide(idx)}
+                  aria-label={`Go to chart ${idx + 1}`}
+                />
+              ))}
             </div>
-          )}
-        </div>
-      ))}
+            
+            <button 
+              className="yellow-slider-btn yellow-slider-btn-next"
+              onClick={goToNextSlide}
+              aria-label="Next chart"
+            >
+              ›
+            </button>
+          </div>
+          
+          {/* Slide Counter */}
+          <div className="yellow-slide-counter">
+            <span>{currentSlide + 1} / {charts.length}</span>
+          </div>
+        </>
+      )}
     </div>
   );
 };
