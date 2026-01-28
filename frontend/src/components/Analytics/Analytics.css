@@ -1739,7 +1739,7 @@
 
 /* Slide Indicators */
 .yellow-slide-indicators {
-  display: flex;
+  display: none;
   gap: 8px;
   align-items: center;
   justify-content: center;
@@ -1747,6 +1747,12 @@
   order: 2;
   pointer-events: auto;
   z-index: 15;
+}
+
+@media (max-width: 600px) {
+  .yellow-slide-indicators {
+    display: none;
+  }
 }
 
 .yellow-indicator-dot {
