@@ -579,17 +579,7 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
               ‹
             </button>
             
-            {/* Slide Indicators */}
-            <div className="yellow-slide-indicators">
-              {charts.map((_, idx) => (
-                <button
-                  key={idx}
-                  className={`yellow-indicator-dot ${idx === currentSlide ? 'active' : ''}`}
-                  onClick={() => setCurrentSlide(idx)}
-                  aria-label={`Go to chart ${idx + 1}`}
-                />
-              ))}
-            </div>
+            <h3 className="yellow-slider-title">Analytics Dashboard</h3>
             
             <button 
               className="yellow-slider-btn yellow-slider-btn-next"
