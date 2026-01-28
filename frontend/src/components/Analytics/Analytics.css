@@ -1621,28 +1621,149 @@
   }
 }
 
-/* Reduced Motion */
-@media (prefers-reduced-motion: reduce) {
-  .yellow-compact-bar,
-  .yellow-chart-card,
-  .yellow-close-btn,
-  .yellow-toggle-btn,
-  .yellow-refresh-btn {
-    transition: none;
-    animation: none;
+}
+
+/* ============================================
+   MOBILE SLIDER CONTROLS
+   ============================================ */
+.yellow-charts-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.yellow-charts-wrapper.mobile {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.yellow-charts-wrapper.desktop {
+  display: block;
+}
+
+/* Slider Controls - Navigation Buttons & Indicators */
+.yellow-slider-controls {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+@media (max-width: 600px) {
+  .yellow-charts-wrapper.mobile .yellow-slider-controls {
+    display: flex;
+  }
+}
+
+/* Navigation Buttons */
+.yellow-slider-btn {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(251, 191, 36, 0.1));
+  border: 1.5px solid rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.yellow-slider-btn:active {
+  transform: scale(0.95);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(251, 191, 36, 0.15));
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.yellow-slider-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .yellow-slider-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+  }
+}
+
+/* Slide Indicators */
+.yellow-slide-indicators {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+
+.yellow-indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(203, 213, 225, 0.3);
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0;
+  margin: 0;
+}
+
+.yellow-indicator-dot:hover {
+  background: rgba(203, 213, 225, 0.5);
+  transform: scale(1.2);
+}
+
+.yellow-indicator-dot.active {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  width: 10px;
+  height: 10px;
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.5);
+}
+
+@media (max-width: 480px) {
+  .yellow-indicator-dot {
+    width: 6px;
+    height: 6px;
   }
   
-  .sun-ray,
-  .yellow-icon-glow,
-  .yellow-btn-glow,
-  .yellow-status-dot,
-  .yellow-legend-dot,
-  .yellow-spinner-ring,
-  .yellow-spinner-core,
-  .yellow-compact-bar::before,
-  .yellow-compact-bar::after {
-    animation: none;
-    display: none;
+  .yellow-indicator-dot.active {
+    width: 8px;
+    height: 8px;
+  }
+}
+
+/* Slide Counter */
+.yellow-slide-counter {
+  text-align: center;
+  font-size: 12px;
+  color: rgba(203, 213, 225, 0.6);
+  padding: 8px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .yellow-charts-wrapper.mobile .yellow-slide-counter {
+    display: block;
+  }
+}
+
+/* Active Slide Styling */
+.yellow-chart-card.active-slide {
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+/* Smooth Scrolling for Desktop Compatibility */
+@supports (scroll-behavior: smooth) {
+  .yellow-charts-grid {
+    scroll-behavior: smooth;
   }
 }
 
