@@ -1655,6 +1655,37 @@
   display: block;
 }
 
+/* Charts Header - Mobile Only */
+.yellow-charts-header {
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.yellow-charts-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  padding: 0;
+  letter-spacing: 0.5px;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+@media (max-width: 480px) {
+  .yellow-charts-header {
+    padding: 10px 12px;
+    margin-bottom: 6px;
+  }
+  
+  .yellow-charts-title {
+    font-size: 16px;
+  }
+}
+
 /* Slider Controls - Navigation Buttons & Indicators */
 .yellow-slider-controls {
   display: flex;
