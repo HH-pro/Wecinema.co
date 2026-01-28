@@ -1819,7 +1819,7 @@
 
 @media (max-width: 600px) {
   .yellow-charts-wrapper.mobile .yellow-slide-counter {
-    display: block;
+    display: none;
   }
 }
 
