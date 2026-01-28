@@ -476,11 +476,6 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
 
   return (
     <div className={`yellow-charts-wrapper ${isMobile ? 'mobile' : 'desktop'}`}>
-      {isMobile && (
-        <div className="yellow-charts-header">
-          <h2 className="yellow-charts-title">Analytics Dashboard</h2>
-        </div>
-      )}
       <div 
         className="yellow-charts-grid"
         ref={containerRef}
