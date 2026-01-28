@@ -1792,21 +1792,29 @@
 /* Slide Counter */
 .yellow-slide-counter {
   text-align: center;
-  font-size: 12px;
+  font-size: 11px;
   color: rgba(203, 213, 225, 0.7);
-  padding: 10px 16px;
+  padding: 6px 12px;
   font-weight: 600;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.4px;
   display: none;
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(251, 191, 36, 0.05));
-  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.08);
+  border-radius: 6px;
   border: 1px solid rgba(245, 158, 11, 0.15);
-  margin-top: 8px;
+  margin-top: 12px;
+  text-transform: uppercase;
 }
 
 @media (max-width: 600px) {
   .yellow-charts-wrapper.mobile .yellow-slide-counter {
     display: block;
+  }
+}
+
+@media (max-width: 480px) {
+  .yellow-slide-counter {
+    font-size: 10px;
+    padding: 5px 10px;
   }
 }
 
