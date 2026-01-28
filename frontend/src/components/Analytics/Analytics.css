@@ -1665,9 +1665,7 @@
 
 @media (max-width: 600px) {
   .yellow-charts-wrapper.mobile .yellow-slider-controls {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
+    display: none;
   }
 }
 
