@@ -973,22 +973,27 @@
 
 @media (max-width: 767px) {
   .yellow-chart-card {
-    height: 320px;
+    height: 340px;
     padding: 16px;
     border-radius: 10px;
-    flex: 0 0 auto;
-    min-width: 280px;
-    width: 280px;
+    flex: 0 0 100%;
+    min-width: 100%;
+    width: 100%;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
   }
 }
 
 @media (max-width: 480px) {
   .yellow-chart-card {
-    height: 300px;
+    height: 320px;
     padding: 14px;
     border-radius: 10px;
-    min-width: 240px;
-    width: 240px;
+    flex: 0 0 100%;
+    min-width: 100%;
+    width: 100%;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
   }
 }
 
