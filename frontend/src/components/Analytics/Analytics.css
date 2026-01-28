@@ -1671,8 +1671,19 @@
 
 @media (max-width: 600px) {
   .yellow-charts-wrapper.mobile .yellow-slider-controls {
-    display: none;
+    display: flex;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: calc(100% + 24px);
+    left: -12px;
+    pointer-events: none;
+    justify-content: space-between;
+    padding: 0;
+    margin-top: 0;
+    z-index: 20;
   }
+}
 }
 
 /* Navigation Buttons */
