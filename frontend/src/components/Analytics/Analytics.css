@@ -940,6 +940,12 @@
     padding: 0;
     width: 100%;
     snap-type: x mandatory;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  
+  .yellow-charts-grid::-webkit-scrollbar {
+    display: none;
   }
 }
 
