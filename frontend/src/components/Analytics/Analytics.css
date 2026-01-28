@@ -1705,13 +1705,37 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0;
+  gap: 20px;
   padding: 12px 0;
   position: relative;
   width: 100%;
   pointer-events: auto;
   margin-top: 0;
   z-index: 10;
+}
+
+/* Slider Title */
+.yellow-slider-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+  padding: 0;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  flex: 1;
+  text-align: center;
+  order: 2;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+@media (max-width: 480px) {
+  .yellow-slider-title {
+    font-size: 12px;
+    padding: 0;
+  }
 }
 
 @media (max-width: 600px) {
