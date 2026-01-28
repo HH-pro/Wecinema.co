@@ -271,6 +271,46 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
     });
   };
 
+  // Handle swipe detection
+  const handleSwipe = () => {
+    const swipeDistance = touchStartX.current - touchEndX.current;
+    const swipeTime = Date.now() - touchStartTime.current;
+    const minDistance = 50; // Minimum swipe distance
+    const maxTime = 1000; // Maximum time for a swipe
+
+    if (Math.abs(swipeDistance) > minDistance && swipeTime < maxTime) {
+      if (swipeDistance > 0) {
+        // Swiped left - go to next slide
+        goToNextSlide();
+      } else {
+        // Swiped right - go to previous slide
+        goToPreviousSlide();
+      }
+    }
+  };
+
+  const goToNextSlide = () => {
+    setCurrentSlide((prev) => (prev + 1) % 3);
+  };
+
+  const goToPreviousSlide = () => {
+    setCurrentSlide((prev) => (prev - 1 + 3) % 3);
+  };
+
+  // Scroll to current slide when it changes
+  useEffect(() => {
+    if (isMobile && containerRef.current) {
+      const cards = containerRef.current.querySelectorAll('.yellow-chart-card');
+      if (cards[currentSlide]) {
+        cards[currentSlide].scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'center'
+        });
+      }
+    }
+  }, [currentSlide, isMobile]);
+
   // Chart options with colorful theme
   const chartOptions = (): ChartOptions<"line"> => ({
     responsive: true,
