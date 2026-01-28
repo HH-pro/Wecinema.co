@@ -1654,8 +1654,13 @@
   display: none;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 0;
+  gap: 0;
+  padding: 0;
+  position: relative;
+  width: 100%;
+  pointer-events: none;
+  margin-top: -280px;
+  z-index: 10;
 }
 
 @media (max-width: 600px) {
@@ -1666,38 +1671,72 @@
 
 /* Navigation Buttons */
 .yellow-slider-btn {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(251, 191, 36, 0.1));
-  border: 1.5px solid rgba(245, 158, 11, 0.3);
-  color: #fbbf24;
-  font-size: 24px;
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.8), rgba(251, 191, 36, 0.7));
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+  font-size: 28px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   font-weight: bold;
   flex-shrink: 0;
+  pointer-events: auto;
+  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.yellow-slider-btn:hover {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 1), rgba(251, 191, 36, 0.9));
+  box-shadow: 0 12px 32px rgba(245, 158, 11, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transform: translateY(-50%) scale(1.08);
 }
 
 .yellow-slider-btn:active {
-  transform: scale(0.95);
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(251, 191, 36, 0.15));
-  border-color: rgba(245, 158, 11, 0.5);
+  transform: translateY(-50%) scale(0.95);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.9), rgba(251, 191, 36, 0.8));
+  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
 }
 
 .yellow-slider-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
+}
+
+.yellow-slider-btn-prev {
+  left: 12px;
+}
+
+.yellow-slider-btn-next {
+  right: 12px;
+}
+
+@media (max-width: 600px) {
+  .yellow-slider-controls {
+    margin-top: -320px;
+  }
 }
 
 @media (max-width: 480px) {
   .yellow-slider-btn {
-    width: 36px;
-    height: 36px;
-    font-size: 20px;
+    width: 42px;
+    height: 42px;
+    font-size: 24px;
+  }
+  
+  .yellow-slider-btn-prev {
+    left: 8px;
+  }
+
+  .yellow-slider-btn-next {
+    right: 8px;
   }
 }
 
