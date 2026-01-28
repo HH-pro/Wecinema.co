@@ -1651,21 +1651,23 @@
 
 /* Slider Controls - Navigation Buttons & Indicators */
 .yellow-slider-controls {
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0;
-  padding: 0;
+  padding: 12px 0;
   position: relative;
   width: 100%;
-  pointer-events: none;
-  margin-top: -280px;
+  pointer-events: auto;
+  margin-top: 0;
   z-index: 10;
 }
 
 @media (max-width: 600px) {
   .yellow-charts-wrapper.mobile .yellow-slider-controls {
     display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
   }
 }
 
