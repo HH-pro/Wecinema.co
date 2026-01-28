@@ -703,6 +703,14 @@
   flex: 1;
 }
 
+@media (max-width: 767px) {
+  .yellow-header-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+
 .yellow-header-title {
   color: #ffffff !important;
   font-size: 1.3rem;
