@@ -574,8 +574,6 @@ const Charts: React.FC<ChartsProps> = ({ isMobile = false }) => {
               ‹
             </button>
             
-            <h3 className="yellow-slider-title">Analytics Dashboard</h3>
-            
             <button 
               className="yellow-slider-btn yellow-slider-btn-next"
               onClick={goToNextSlide}
