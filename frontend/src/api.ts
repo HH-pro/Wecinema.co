@@ -249,8 +249,8 @@ const retryRequest = async <T>(
   throw new Error("Max retries exceeded");
 };
 
-const handleSuccess = <T>(
-  response: AxiosResponse<ApiResponse<T>>,
+const handleSuccess = <T extends ApiResponse>(
+  response: AxiosResponse<T>,
   method: Method,
   setLoading?: React.Dispatch<React.SetStateAction<boolean>>,
   successMessage?: string
@@ -266,7 +266,7 @@ const handleSuccess = <T>(
     });
   }
 
-  return response.data.data as T;
+  return response.data;
 };
 
 const handleError = (
