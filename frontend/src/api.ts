@@ -519,7 +519,7 @@ export const isAuthenticated = (): boolean => {
     return false;
   }
 };
-
+ 
 export const getUserRole = (): string => {
   const user = getCurrentUserFromToken();
   return user?.isAdmin ? 'admin' : 
