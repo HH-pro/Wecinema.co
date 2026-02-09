@@ -1,5 +1,15 @@
-const Joi = require('joi');
 const path = require('path');
+const fs = require('fs');
+
+// Load .env file BEFORE anything else
+const dotenvPath = path.join(process.cwd(), '.env');
+if (fs.existsSync(dotenvPath)) {
+  require('dotenv').config({ path: dotenvPath });
+} else {
+  console.warn('⚠️  .env file not found at:', dotenvPath);
+}
+
+const Joi = require('joi');
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -44,7 +54,8 @@ const loadConfig = () => {
   if (error) {
     const missing = error.details.map(d => d.path.join('.')).join(', ');
     console.error('\n❌ Missing required environment variables:', missing);
-    console.error('Create .env file with these variables\n');
+    console.error('Current NODE_ENV:', process.env.NODE_ENV);
+    console.error('Create .env file in backend/ directory with these variables\n');
     process.exit(1);
   }
 
