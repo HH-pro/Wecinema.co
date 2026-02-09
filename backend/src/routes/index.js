@@ -1,4 +1,4 @@
-const videoRoutes = require('./video.routes');
+const videoRoutes = require('../video.routes');
 const userRoutes = require('./user.routes');
 const domainRoutes = require('./domain.routes');
 const sentryRoutes = require('./sentry.routes');
