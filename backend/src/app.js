@@ -18,7 +18,7 @@ const { config } = require('./config');
 const { connect } = require('./config/database');
 const { createLogger } = require('./utils/logger');
 const { globalErrorHandler, notFoundHandler } = require('./middleware');
-const { initializeServices } = require('./services');
+const { initializeServices } = require('../services');
 
 // Route imports
 const {
