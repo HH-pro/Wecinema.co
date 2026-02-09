@@ -1,4 +1,4 @@
-const { createLogger } = require('../utils/logger');
+const { createLogger } = require('../../backend/src/utils/logger');
 const logger = createLogger('Services');
 
 /**
