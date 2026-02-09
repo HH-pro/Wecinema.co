@@ -1,3 +1,5 @@
+
+require('dotenv').config();
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -10,6 +12,7 @@ const morgan = require('morgan');
 const cron = require('node-cron');
 const Sentry = require('@sentry/node');
 const { nodeProfilingIntegration } = require('@sentry/profiling-node');
+
 
 const { config } = require('./config');
 const { connect } = require('./config/database');
