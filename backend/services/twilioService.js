@@ -1,134 +1,273 @@
-// services/twilioService.js
 const twilio = require('twilio');
+const { createLogger } = require('../utils/logger');
 
-// Twilio Configuration (Hardcoded - for testing only)
-const accountSid = 'AC38eb9207822aa3a28c803f96d49f68ae'; // Your Twilio Account SID
-const authToken = '45fc31f42e4719ad907311ca6a61aa58'; // Your Twilio Auth Token
-const twilioPhoneNumber = 'whatsapp:+14155238886'; // Twilio WhatsApp sandbox number
-const recipientNumber = 'whatsapp:+923117836704'; // Your recipient's WhatsApp number
-// ======================
-// CLIENT INITIALIZATION
-// ======================
-let client;
-try {
-  client = twilio(accountSid, authToken);
-} catch (error) {
-  console.error('TWILIO CLIENT INIT FAILED:', error);
-  throw new Error('Twilio client initialization failed');
-}
+const logger = createLogger('TwilioService');
 
-// ======================
-// VALIDATION CHECKS
-// ======================
+/**
+ * Twilio configuration schema
+ */
+const CONFIG = {
+  accountSid: process.env.TWILIO_ACCOUNT_SID,
+  authToken: process.env.TWILIO_AUTH_TOKEN,
+  whatsappFrom: process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+14155238886',
+  smsFrom: process.env.TWILIO_SMS_FROM,
+  defaultRecipient: process.env.TWILIO_DEFAULT_RECIPIENT,
+};
+
+/**
+ * Validate Twilio configuration
+ * @returns {string[]}
+ */
 const validateConfig = () => {
   const errors = [];
-  
-  if (!accountSid || !accountSid.startsWith('AC')) {
-    errors.push('Invalid Account SID format');
+
+  if (!CONFIG.accountSid) {
+    errors.push('TWILIO_ACCOUNT_SID not configured');
+  } else if (!CONFIG.accountSid.startsWith('AC')) {
+    errors.push('Invalid Account SID format (must start with AC)');
   }
-  if (!authToken || authToken.length !== 32) {
-    errors.push('Invalid Auth Token format');
-  }
-  if (!twilioPhoneNumber.startsWith('whatsapp:+')) {
-    errors.push('Invalid Twilio number format');
-  }
-  if (!recipientNumber.startsWith('whatsapp:+')) {
-    errors.push('Invalid recipient number format');
+
+  if (!CONFIG.authToken) {
+    errors.push('TWILIO_AUTH_TOKEN not configured');
   }
 
   return errors;
 };
 
-// ======================
-// CORE FUNCTION
-// ======================
-const sendWhatsAppMessage = async (message) => {
-  try {
-    // Configuration validation
-    const configErrors = validateConfig();
-    if (configErrors.length > 0) {
-      throw new Error(`Configuration errors:\n${configErrors.join('\n')}`);
-    }
+/**
+ * Initialize Twilio client
+ * @returns {twilio.Twilio|null}
+ */
+const initializeClient = () => {
+  const errors = validateConfig();
 
-    // API Request
-    console.log('Attempting to send message to:', recipientNumber);
-    const messageInstance = await client.messages.create({
-      body: message,
-      from: twilioPhoneNumber,
-      to: recipientNumber
+  if (errors.length > 0) {
+    logger.error('Twilio configuration invalid', { errors });
+    return null;
+  }
+
+  try {
+    const client = twilio(CONFIG.accountSid, CONFIG.authToken);
+    logger.info('Twilio client initialized');
+    return client;
+  } catch (error) {
+    logger.error('Twilio client initialization failed', { error: error.message });
+    return null;
+  }
+};
+
+const client = initializeClient();
+
+/**
+ * Check if Twilio is configured
+ * @returns {boolean}
+ */
+const isConfigured = () => !!client;
+
+/**
+ * Format WhatsApp number
+ * @param {string} number 
+ * @returns {string}
+ */
+const formatWhatsAppNumber = (number) => {
+  if (!number) return null;
+  return number.startsWith('whatsapp:') ? number : `whatsapp:${number}`;
+};
+
+/**
+ * Send WhatsApp message
+ * @param {Object} params
+ * @param {string} params.to - Recipient number (with or without whatsapp: prefix)
+ * @param {string} params.body - Message body
+ * @param {string} [params.from] - Sender number (defaults to env config)
+ * @returns {Promise<Object>}
+ */
+const sendWhatsAppMessage = async ({ to, body, from }) => {
+  if (!client) {
+    logger.error('Twilio not configured, cannot send WhatsApp message');
+    throw new Error('WhatsApp service unavailable');
+  }
+
+  if (!to || !body) {
+    throw new Error('Recipient (to) and message body are required');
+  }
+
+  const fromNumber = from || CONFIG.whatsappFrom;
+  const toNumber = formatWhatsAppNumber(to);
+
+  try {
+    logger.info('Sending WhatsApp message', { to: toNumber });
+
+    const message = await client.messages.create({
+      body,
+      from: fromNumber,
+      to: toNumber,
     });
 
-    console.log('Twilio API Response:', {
-      status: messageInstance.status,
-      sid: messageInstance.sid,
-      errorCode: messageInstance.errorCode,
-      errorMessage: messageInstance.errorMessage
+    logger.info('WhatsApp message sent', {
+      sid: message.sid,
+      status: message.status,
+      to: toNumber,
     });
 
     return {
       success: true,
-      sid: messageInstance.sid,
-      status: messageInstance.status
+      sid: message.sid,
+      status: message.status,
+      dateCreated: message.dateCreated,
     };
   } catch (error) {
-    console.error('FULL ERROR DETAILS:', {
+    logger.error('Failed to send WhatsApp message', {
+      error: error.message,
       code: error.code,
-      status: error.status,
-      twilioError: error.moreInfo,
-      message: error.message,
-      stack: error.stack
+      to: toNumber,
     });
 
-    throw new Error(`Twilio API failure: ${error.message}`);
+    throw new Error(`WhatsApp delivery failed: ${error.message}`);
   }
 };
 
-// ======================
-// DEBUGGING UTILITIES
-// ======================
-const debugConnection = async () => {
+/**
+ * Send SMS message
+ * @param {Object} params
+ * @param {string} params.to - Recipient phone number
+ * @param {string} params.body - Message body
+ * @param {string} [params.from] - Sender number
+ * @returns {Promise<Object>}
+ */
+const sendSMS = async ({ to, body, from }) => {
+  if (!client) {
+    logger.error('Twilio not configured, cannot send SMS');
+    throw new Error('SMS service unavailable');
+  }
+
+  if (!to || !body) {
+    throw new Error('Recipient (to) and message body are required');
+  }
+
+  if (!from && !CONFIG.smsFrom) {
+    throw new Error('SMS from number not configured');
+  }
+
+  const fromNumber = from || CONFIG.smsFrom;
+
   try {
-    console.log('Testing Twilio API connectivity...');
-    const balance = await client.balance.fetch();
-    console.log('Account balance:', balance.currency, balance.balance);
-    return true;
+    logger.info('Sending SMS', { to });
+
+    const message = await client.messages.create({
+      body,
+      from: fromNumber,
+      to,
+    });
+
+    logger.info('SMS sent', {
+      sid: message.sid,
+      status: message.status,
+      to,
+    });
+
+    return {
+      success: true,
+      sid: message.sid,
+      status: message.status,
+    };
   } catch (error) {
-    console.error('API Connectivity Test Failed:', error);
-    return false;
+    logger.error('Failed to send SMS', {
+      error: error.message,
+      code: error.code,
+      to,
+    });
+
+    throw new Error(`SMS delivery failed: ${error.message}`);
   }
 };
 
-// ======================
-// TEST EXECUTION
-// ======================
-const runDiagnostics = async () => {
-  console.log('\n=== STARTING DIAGNOSTICS ===');
-  
-  // 1. Validate configuration
-  console.log('\n[1/3] Validating configuration...');
+/**
+ * Send alert to default recipient (legacy support)
+ * @param {string} message 
+ * @returns {Promise<Object>}
+ */
+const sendAlert = async (message) => {
+  if (!CONFIG.defaultRecipient) {
+    throw new Error('TWILIO_DEFAULT_RECIPIENT not configured');
+  }
+
+  return sendWhatsAppMessage({
+    to: CONFIG.defaultRecipient,
+    body: message,
+  });
+};
+
+/**
+ * Check account balance and status
+ * @returns {Promise<Object|null>}
+ */
+const getAccountInfo = async () => {
+  if (!client) {
+    logger.warn('Twilio not configured, cannot fetch account info');
+    return null;
+  }
+
+  try {
+    const account = await client.api.accounts(CONFIG.accountSid).fetch();
+    const balance = await client.api.accounts(CONFIG.accountSid).balance.fetch();
+
+    return {
+      status: account.status,
+      type: account.type,
+      balance: balance.balance,
+      currency: balance.currency,
+    };
+  } catch (error) {
+    logger.error('Failed to fetch account info', { error: error.message });
+    return null;
+  }
+};
+
+/**
+ * Health check for Twilio service
+ * @returns {Promise<Object>}
+ */
+const healthCheck = async () => {
   const configErrors = validateConfig();
+  
   if (configErrors.length > 0) {
-    console.error('Configuration invalid:', configErrors);
-    return;
+    return {
+      status: 'unconfigured',
+      errors: configErrors,
+    };
   }
-  console.log('✓ Configuration valid');
 
-  // 2. Test API connectivity
-  console.log('\n[2/3] Testing API connectivity...');
-  const connectionOK = await debugConnection();
-  if (!connectionOK) return;
-
-  // 3. Send test message
-  console.log('\n[3/3] Sending test message...');
-  try {
-    await sendWhatsAppMessage('🔧 Diagnostic test message');
-    console.log('✓ All tests passed successfully');
-  } catch (error) {
-    console.error('✖ Final test failed');
+  if (!client) {
+    return {
+      status: 'error',
+      message: 'Client initialization failed',
+    };
   }
+
+  const accountInfo = await getAccountInfo();
+
+  if (!accountInfo) {
+    return {
+      status: 'error',
+      message: 'Cannot connect to Twilio API',
+    };
+  }
+
+  return {
+    status: 'healthy',
+    account: {
+      status: accountInfo.status,
+      balance: `${accountInfo.balance} ${accountInfo.currency}`,
+    },
+  };
 };
 
-// Uncomment to run diagnostics
-runDiagnostics();
-
-module.exports = { sendWhatsAppMessage, runDiagnostics };
+module.exports = {
+  sendWhatsAppMessage,
+  sendSMS,
+  sendAlert,
+  getAccountInfo,
+  healthCheck,
+  isConfigured,
+};
