@@ -1,13 +1,7 @@
 const path = require('path');
-const fs = require('fs');
 
-// Load .env file BEFORE anything else
-const dotenvPath = path.join(process.cwd(), '.env');
-if (fs.existsSync(dotenvPath)) {
-  require('dotenv').config({ path: dotenvPath });
-} else {
-  console.warn('⚠️  .env file not found at:', dotenvPath);
-}
+// Load .env FIRST
+require('dotenv').config({ path: path.join(process.cwd(), '.env') });
 
 const Joi = require('joi');
 
@@ -30,6 +24,9 @@ const envSchema = Joi.object({
   FIREBASE_SERVICE_ACCOUNT_PATH: Joi.string().default(
     path.join(__dirname, '../../config/firebase-service-account.json')
   ),
+  
+  // Sentry
+  SENTRY_DSN: Joi.string().uri().allow('').default(''),
   
   // Email
   EMAIL_SERVICE: Joi.string().default('gmail'),
@@ -54,8 +51,6 @@ const loadConfig = () => {
   if (error) {
     const missing = error.details.map(d => d.path.join('.')).join(', ');
     console.error('\n❌ Missing required environment variables:', missing);
-    console.error('Current NODE_ENV:', process.env.NODE_ENV);
-    console.error('Create .env file in backend/ directory with these variables\n');
     process.exit(1);
   }
 
@@ -84,6 +79,10 @@ const loadConfig = () => {
       serviceAccountPath: env.FIREBASE_SERVICE_ACCOUNT_PATH,
     },
     
+    sentry: {
+      dsn: env.SENTRY_DSN,
+    },
+    
     email: {
       service: env.EMAIL_SERVICE,
       user: env.EMAIL_USER,
@@ -106,4 +105,6 @@ const loadConfig = () => {
   };
 };
 
-module.exports = { config: loadConfig() };
+// Export config object directly
+const config = loadConfig();
+module.exports = { config };
