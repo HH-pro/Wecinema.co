@@ -1,13 +1,16 @@
-const videoRoutes = require('../video.routes');
-const userRoutes = require('./user.routes');
-const domainRoutes = require('./domain.routes');
-const sentryRoutes = require('./sentry.routes');
-const listingRoutes = require('./marketplace/listing.routes');
-const orderRoutes = require('./marketplace/order.routes');
-const offerRoutes = require('./marketplace/offer.routes');
-const chatRoutes = require('./marketplace/chat.routes');
-const paymentRoutes = require('./marketplace/payment.routes');
-const stripeRoutes = require('./marketplace/stripe.routes');
+// Temporary: Point to existing controllers until we refactor them
+const videoRoutes = require('../controller/video');
+const userRoutes = require('../controller/user');
+const domainRoutes = require('../controller/domainController');
+const sentryRoutes = require('../controller/sentry');
+
+// Marketplace routes
+const listingRoutes = require('../controller/marketplace/listingController');
+const orderRoutes = require('../controller/marketplace/orders');
+const offerRoutes = require('../controller/marketplace/offers');
+const chatRoutes = require('../controller/marketplace/chat');
+const paymentRoutes = require('../controller/marketplace/payments');
+const stripeRoutes = require('../controller/marketplace/stripe');
 
 module.exports = {
   videoRoutes,
