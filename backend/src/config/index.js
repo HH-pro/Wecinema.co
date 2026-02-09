@@ -1,8 +1,6 @@
 const Joi = require('joi');
+const path = require('path');
 
-/**
- * Environment variable schema validation
- */
 const envSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
   PORT: Joi.number().default(3000),
@@ -20,19 +18,28 @@ const envSchema = Joi.object({
   // External Services
   STRIPE_SECRET_KEY: Joi.string().required(),
   STRIPE_WEBHOOK_SECRET: Joi.string().required(),
-  FIREBASE_SERVICE_ACCOUNT_PATH: Joi.string().default('./config/firebase-service-account.json'),
+  STRIPE_PUBLISHABLE_KEY: Joi.string().required(),
   
-  // Optional
+  // Firebase
+  FIREBASE_SERVICE_ACCOUNT_PATH: Joi.string().default(
+    path.join(__dirname, '../../config/firebase-service-account.json')
+  ),
+  
+  // Sentry
+  SENTRY_DSN: Joi.string().uri().allow('').default(''),
+  
+  // CORS
+  CORS_ORIGINS: Joi.string().default('http://localhost:3000'),
+  
+  // Cron
+  CRON_ENABLED: Joi.boolean().default(true),
+  
+  // Logging
   LOG_LEVEL: Joi.string().valid('error', 'warn', 'info', 'debug').default('info'),
 }).unknown(true);
 
-/**
- * Validate and load configuration
- * @returns {Object}
- * @throws {Error}
- */
 const loadConfig = () => {
-  const { error, value: validatedEnv } = envSchema.validate(process.env, {
+  const { error, value: env } = envSchema.validate(process.env, {
     abortEarly: false,
     allowUnknown: true,
   });
@@ -42,35 +49,51 @@ const loadConfig = () => {
     throw new Error(`Environment validation failed: ${missingVars}`);
   }
 
+  const allowedOrigins = env.CORS_ORIGINS.split(',').map(o => o.trim());
+
   return {
-    env: validatedEnv.NODE_ENV,
-    port: validatedEnv.PORT,
-    isDevelopment: validatedEnv.NODE_ENV === 'development',
-    isProduction: validatedEnv.NODE_ENV === 'production',
+    env: env.NODE_ENV,
+    port: env.PORT,
+    isDevelopment: env.NODE_ENV === 'development',
+    isProduction: env.NODE_ENV === 'production',
+    isTest: env.NODE_ENV === 'test',
     
     database: {
-      uri: validatedEnv.MONGODB_URI,
-      name: validatedEnv.MONGODB_DB_NAME,
-      maxPoolSize: validatedEnv.MONGODB_MAX_POOL_SIZE,
-      minPoolSize: validatedEnv.MONGODB_MIN_POOL_SIZE,
+      uri: env.MONGODB_URI,
+      name: env.MONGODB_DB_NAME,
+      maxPoolSize: env.MONGODB_MAX_POOL_SIZE,
+      minPoolSize: env.MONGODB_MIN_POOL_SIZE,
     },
     
     jwt: {
-      secret: validatedEnv.JWT_SECRET,
-      expiresIn: validatedEnv.JWT_EXPIRES_IN,
+      secret: env.JWT_SECRET,
+      expiresIn: env.JWT_EXPIRES_IN,
     },
     
     stripe: {
-      secretKey: validatedEnv.STRIPE_SECRET_KEY,
-      webhookSecret: validatedEnv.STRIPE_WEBHOOK_SECRET,
+      secretKey: env.STRIPE_SECRET_KEY,
+      webhookSecret: env.STRIPE_WEBHOOK_SECRET,
+      publishableKey: env.STRIPE_PUBLISHABLE_KEY,
     },
     
     firebase: {
-      serviceAccountPath: validatedEnv.FIREBASE_SERVICE_ACCOUNT_PATH,
+      serviceAccountPath: env.FIREBASE_SERVICE_ACCOUNT_PATH,
+    },
+    
+    sentry: {
+      dsn: env.SENTRY_DSN,
+    },
+    
+    cors: {
+      allowedOrigins,
+    },
+    
+    cron: {
+      enabled: env.CRON_ENABLED,
     },
     
     logging: {
-      level: validatedEnv.LOG_LEVEL,
+      level: env.LOG_LEVEL,
     },
   };
 };
